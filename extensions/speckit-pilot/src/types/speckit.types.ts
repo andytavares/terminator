@@ -124,16 +124,6 @@ export interface PhaseGateConfig {
   perFileConfirm: boolean
 }
 
-export interface LinearSettings {
-  teamFilter?: string
-}
-
-export interface JiraSettings {
-  domain: string
-  email: string
-  jql: string
-}
-
 export interface JiraCreds {
   domain: string
   email: string
@@ -205,8 +195,6 @@ export interface PilotSettings {
   defaultAutonomy: AutonomyLevel
   batchCheckinsEnabled: boolean
   writeStatusBackOnPrOpen: boolean
-  linear: LinearSettings | null
-  jira: JiraSettings | null
   phaseGates: Record<PhaseId, PhaseGateConfig>
   disallowedPaths: string[]
   maxFilesPerImplementRun: number
@@ -356,8 +344,6 @@ export const DEFAULT_SETTINGS: PilotSettings = {
   defaultAutonomy: 'standard',
   batchCheckinsEnabled: true,
   writeStatusBackOnPrOpen: false,
-  linear: null,
-  jira: null,
   phaseGates: Object.fromEntries(
     PHASE_ORDER.map((id) => [
       id,

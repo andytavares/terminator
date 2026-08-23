@@ -31,16 +31,6 @@ const PhaseGateConfigSchema = z.object({
   perFileConfirm: z.boolean(),
 })
 
-const LinearSettingsSchema = z.object({
-  teamFilter: z.string().optional(),
-})
-
-const JiraSettingsSchema = z.object({
-  domain: z.string(),
-  email: z.string(),
-  jql: z.string(),
-})
-
 export const BoardStageSchema = z.enum(['backlog', 'in-progress', 'in-review', 'done'])
 
 export const CardTypeSchema = z.enum(['feature', 'bug', 'chore', 'spike'])
@@ -82,9 +72,9 @@ const PilotSettingsSchema = z.object({
   defaultModel: z.string(),
   defaultAutonomy: z.enum(['guided', 'standard', 'fast']).default('standard'),
   batchCheckinsEnabled: z.boolean().default(true),
+  // Off by default, deliberately (FR-034a): this writes to the operator's
+  // tracker, and a write nobody asked for is not a default.
   writeStatusBackOnPrOpen: z.boolean().default(false),
-  linear: LinearSettingsSchema.nullable().default(null),
-  jira: JiraSettingsSchema.nullable().default(null),
   phaseGates: z.record(PhaseIdSchema, PhaseGateConfigSchema),
   disallowedPaths: z.array(z.string()),
   maxFilesPerImplementRun: z.number().int().positive(),

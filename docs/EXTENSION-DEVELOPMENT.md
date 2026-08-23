@@ -471,6 +471,51 @@ listening; delivered live, everything in that window goes to nobody — includin
 the command you just typed into it. The hold is released automatically when the
 tab mounts.
 
+### `api.issues` — the application's tracker connection _(v2.2.0)_
+
+Linear and Jira are connected **once**, by the operator, in the application's own
+Settings → Integrations. An extension never holds a tracker credential and never contacts a
+tracker itself — it asks here, the same way it asks for a shell or a PTY.
+
+```typescript
+// "My issues" across every connected tracker.
+const { issues, failures } = await api.issues.listMine({ limit: 25 })
+
+// A tracker that failed does not fail the call. Say what is missing rather
+// than presenting a partial list as complete.
+for (const failure of failures) {
+  if (failure.error !== 'not-connected') {
+    api.notifications.showToast('warning', `${failure.tracker}: ${failure.error}`, 'fetchFailed')
+  }
+}
+
+// One issue. `description` and every comment body are markdown, whichever
+// tracker it came from — Jira's ADF is converted before it reaches you.
+const issue = await api.issues.get('linear', 'TAV-42')
+
+// The only write. It rejects on failure; do not swallow it.
+await api.issues.comment('linear', 'TAV-42', `PR opened: ${prUrl}`)
+
+// The issue attached to a project. Synchronous — it is local state.
+const link = api.issues.linkFor(projectId)
+const off = api.issues.onLinkChange((id, next) => {
+  /* … */
+})
+```
+
+**Identity is the pair `(tracker, key)`, never the key alone.** Two trackers can both have a
+`TAV-42` and they are different issues.
+
+**There is deliberately no way to create or edit an issue**, or to change any field of one.
+`comment` is the entire write surface, and a test asserts the shape of that surface so it stays
+that way.
+
+**Types** — `Issue`, `IssueSummary`, `IssueLink`, `IssueListResult`, `TrackerConnection`,
+`TrackerId` — are exported from the API module. Do not re-declare them locally.
+
+`api.issues.connections()` reports whether each tracker is connected and which account its
+credential proved to belong to. It never returns the credential.
+
 ### `api.workspace.createProject` — somewhere to put a worktree _(v2.1.0)_
 
 An extension that provisions a git worktree previously had nowhere to put it: the
@@ -486,6 +531,25 @@ const project = api.workspace.createProject({
 })
 ```
 
+#### Attaching an issue at creation _(v2.2.0)_
+
+```typescript
+api.workspace.createProject({
+  workspaceId,
+  name: branch,
+  worktreePath,
+  gitBranch: branch,
+  issue: { tracker: 'linear', key: 'TAV-42' },
+})
+```
+
+An extension that already knows what a checkout is for should not make the operator attach it
+again. When the **existing** project is returned for the same path, the issue is attached to
+_that_ project — you have just said what that checkout is for.
+
+Best-effort: if the link cannot be written, the project is still returned. Provisioning the
+checkout is the expensive part, and losing it over a link file would be the worse failure.
+
 Returns the **existing** project when the workspace already has one for that
 **path**, so provisioning the same worktree twice lands in the project you were
 already looking at rather than beside it. Matching on the name as well would
@@ -494,6 +558,11 @@ collision is disambiguated instead, as `name (directory)`. The sidebar is notifi
 without a reload.
 
 ---
+
+> **A note on version numbers.** The markers in this document (v1.1.0 … v2.2.0) are the API's own
+> release series. The annotations in `src/main/extensions/api.ts` still use an older v1.x series
+> for some of the same members. The two disagree; this document is the one to follow. Reconciling
+> them is a separate cleanup and was deliberately not folded into the v2.2.0 work.
 
 ## Disposables
 

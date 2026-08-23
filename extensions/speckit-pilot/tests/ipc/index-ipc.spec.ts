@@ -1,5 +1,5 @@
 /**
- * Tests for new v2 IPC handlers: ticket-list, credentials-set/status,
+ * Tests for new v2 IPC handlers: ticket-list,
  * dispatch, run-cancel, open-pr.
  *
  * Strategy: build a mock ExtensionAPI that captures handler registrations,
@@ -49,28 +49,9 @@ vi.mock('node:fs', () => ({
   },
 }))
 
-// --- mock credentials module ---
-vi.mock('../../src/api/credentials.js', () => ({
-  setLinearKey: vi.fn(),
-  getLinearKey: vi.fn(),
-  getLinearEmail: vi.fn(),
-  setLinearEmail: vi.fn(),
-  setJiraCredentials: vi.fn(),
-  getJiraCredentials: vi.fn(),
-}))
-
 // --- mock Linear client ---
-vi.mock('../../src/api/linear.js', () => ({
-  fetchAssignedTickets: vi.fn(),
-  postComment: vi.fn(),
-}))
 
 // --- mock Jira client ---
-vi.mock('../../src/api/jira.js', () => ({
-  fetchAssignedTickets: vi.fn(),
-  postComment: vi.fn(),
-  transitionStatus: vi.fn(),
-}))
 
 // --- mock agent runner ---
 vi.mock('../../src/runner/agent-runner.js', () => ({
@@ -120,9 +101,6 @@ vi.mock('../../src/state/state-persistence.js', () => ({
   ensurePilotDir: vi.fn(),
 }))
 
-import * as credentials from '../../src/api/credentials.js'
-import * as linear from '../../src/api/linear.js'
-import * as jira from '../../src/api/jira.js'
 import * as nodefs from 'node:fs'
 import * as agentRunnerMod from '../../src/runner/agent-runner.js'
 import * as persistence from '../../src/state/state-persistence.js'
@@ -230,6 +208,17 @@ function buildMockApi(): {
       showToast: vi.fn(),
       createNotification: vi.fn().mockReturnValue({ dispose: vi.fn() }),
     },
+    // The application's single tracker connection (ExtensionAPI v2.2.0). This
+    // extension holds no credential of its own any more.
+    issues: {
+      connections: vi.fn().mockResolvedValue([]),
+      listMine: vi.fn().mockResolvedValue({ issues: [], failures: [] }),
+      search: vi.fn().mockResolvedValue({ issues: [], failures: [] }),
+      get: vi.fn().mockResolvedValue(null),
+      comment: vi.fn().mockResolvedValue(undefined),
+      linkFor: vi.fn().mockReturnValue(null),
+      onLinkChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    },
     log: {
       debug: vi.fn(),
       info: vi.fn(),
@@ -264,6 +253,13 @@ function buildMockApi(): {
 
 // Activate once per suite — handlers are captured in Map
 let sharedApi: ExtensionAPI
+/** Typed shorthand for asserting on the shared api's mocked namespaces. */
+const mockApi = new Proxy({} as never, {
+  get: (_t, prop: string) => (sharedApi as unknown as Record<string, unknown>)[prop],
+}) as never as {
+  issues: { listMine: ReturnType<typeof vi.fn> }
+  notifications: { showToast: ReturnType<typeof vi.fn> }
+}
 let getSharedHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
 
 beforeAll(async () => {
@@ -277,13 +273,6 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks()
   // Reset mock defaults after clearAllMocks
-  vi.mocked(credentials.getLinearKey).mockResolvedValue(null)
-  vi.mocked(credentials.getLinearEmail).mockResolvedValue(null)
-  vi.mocked(credentials.getJiraCredentials).mockResolvedValue(null)
-  vi.mocked(credentials.setLinearKey).mockResolvedValue(undefined)
-  vi.mocked(credentials.setJiraCredentials).mockResolvedValue(undefined)
-  vi.mocked(linear.fetchAssignedTickets).mockResolvedValue([])
-  vi.mocked(jira.fetchAssignedTickets).mockResolvedValue([])
   // Reset fs mock defaults
   vi.mocked(nodefs.promises.mkdir).mockResolvedValue(undefined)
   vi.mocked(nodefs.promises.readdir).mockResolvedValue([])
@@ -1005,138 +994,88 @@ describe('speckit:ticket-list', () => {
     expect(getSharedHandler('speckit:ticket-list')).toBeDefined()
   })
 
-  it('returns merged Linear and Jira tickets when both are configured', async () => {
-    vi.mocked(credentials.getLinearKey).mockResolvedValue('lin-key')
-    vi.mocked(credentials.getJiraCredentials).mockResolvedValue({
-      domain: 'd.net',
-      email: 'e@d.net',
-      apiToken: 'tok',
-      jql: '',
+  it("asks the application's connection rather than owning one", async () => {
+    mockApi.issues.listMine.mockResolvedValue({
+      issues: [
+        {
+          tracker: 'linear',
+          id: 'i1',
+          key: 'ENG-1',
+          title: 'Build thing',
+          url: 'https://linear/ENG-1',
+          state: { name: 'In Progress', type: 'started' },
+          assignee: null,
+        },
+        {
+          tracker: 'jira',
+          id: 'i2',
+          key: 'PROJ-1',
+          title: 'Fix bug',
+          url: 'https://jira/PROJ-1',
+          state: { name: 'Done', type: 'completed' },
+          assignee: null,
+        },
+      ],
+      failures: [],
     })
-    vi.mocked(linear.fetchAssignedTickets).mockResolvedValue([
-      { source: 'linear', key: 'ENG-1', title: 'Build thing', sourceUrl: 'https://linear/ENG-1' },
-    ])
-    vi.mocked(jira.fetchAssignedTickets).mockResolvedValue([
-      { source: 'jira', key: 'PROJ-1', title: 'Fix bug', sourceUrl: 'https://jira/PROJ-1' },
-    ])
+
+    const handler = getSharedHandler('speckit:ticket-list')!
+    const result = (await handler({})) as { tickets: { source: string; completed: boolean }[] }
+
+    expect(mockApi.issues.listMine).toHaveBeenCalled()
+    expect(result.tickets).toHaveLength(2)
+    expect(result.tickets.map((t) => t.source)).toEqual(['linear', 'jira'])
+    // The board's own shape is unchanged (FR-029).
+    expect(result.tickets[1].completed).toBe(true)
+  })
+
+  it('returns no tickets when nothing is connected, without complaining', async () => {
+    mockApi.issues.listMine.mockResolvedValue({
+      issues: [],
+      failures: [
+        { tracker: 'linear', error: 'not-connected' },
+        { tracker: 'jira', error: 'not-connected' },
+      ],
+    })
 
     const handler = getSharedHandler('speckit:ticket-list')!
     const result = (await handler({})) as { tickets: unknown[] }
-    expect(result.tickets).toHaveLength(2)
+
+    expect(result.tickets).toHaveLength(0)
+    expect(mockApi.notifications.showToast).not.toHaveBeenCalled()
   })
 
-  it('fetches Linear and Jira in parallel (both called once)', async () => {
-    vi.mocked(credentials.getLinearKey).mockResolvedValue('lin-key')
-    vi.mocked(credentials.getJiraCredentials).mockResolvedValue({
-      domain: 'd.net',
-      email: 'e@d.net',
-      apiToken: 'tok',
-      jql: 'assignee = me',
+  it('says which tracker failed rather than showing an empty list', async () => {
+    mockApi.issues.listMine.mockResolvedValue({
+      issues: [],
+      failures: [{ tracker: 'jira', error: 'auth-failed' }],
     })
 
     const handler = getSharedHandler('speckit:ticket-list')!
     await handler({})
 
-    expect(linear.fetchAssignedTickets).toHaveBeenCalledTimes(1)
-    expect(jira.fetchAssignedTickets).toHaveBeenCalledTimes(1)
+    expect(mockApi.notifications.showToast).toHaveBeenCalledWith(
+      'warning',
+      expect.stringContaining('jira'),
+      'fetchTicketsFailed'
+    )
   })
 
-  it('returns empty tickets when neither Linear nor Jira is configured', async () => {
-    const handler = getSharedHandler('speckit:ticket-list')!
-    const result = (await handler({})) as { tickets: unknown[] }
-    expect(result.tickets).toHaveLength(0)
-  })
-
-  it('returns { tickets: [] } or { error } when Linear fetch fails', async () => {
-    vi.mocked(credentials.getLinearKey).mockResolvedValue('lin-key')
-    vi.mocked(linear.fetchAssignedTickets).mockRejectedValue(new Error('network fail'))
+  it('reports a failure rather than pretending there are no tickets', async () => {
+    mockApi.issues.listMine.mockRejectedValue(new Error('network fail'))
 
     const handler = getSharedHandler('speckit:ticket-list')!
-    const result = (await handler({})) as { error?: string; tickets?: unknown[] }
-    expect(result.tickets !== undefined || result.error !== undefined).toBe(true)
+    const result = (await handler({})) as { error?: string }
+    expect(result.error).toContain('network fail')
   })
 })
 
-describe('speckit:credentials-set', () => {
-  it('registers the speckit:credentials-set handler', () => {
-    expect(getSharedHandler('speckit:credentials-set')).toBeDefined()
-  })
-
-  it('delegates to setLinearKey when source is linear', async () => {
-    const handler = getSharedHandler('speckit:credentials-set')!
-    await handler({ source: 'linear', apiKey: 'my-linear-key', email: 'me@example.com' })
-    expect(credentials.setLinearKey).toHaveBeenCalledWith('my-linear-key', 'me@example.com')
-  })
-
-  it('updates only the email when no api key is provided', async () => {
-    const handler = getSharedHandler('speckit:credentials-set')!
-    await handler({ source: 'linear', email: 'me@example.com' })
-    expect(credentials.setLinearEmail).toHaveBeenCalledWith('me@example.com')
-    expect(credentials.setLinearKey).not.toHaveBeenCalled()
-  })
-
-  it('delegates to setJiraCredentials when source is jira', async () => {
-    const handler = getSharedHandler('speckit:credentials-set')!
-    const jiraCreds = { domain: 'c.net', email: 'a@c.net', apiToken: 'tok', jql: '' }
-    await handler({ source: 'jira', ...jiraCreds })
-    expect(credentials.setJiraCredentials).toHaveBeenCalledWith(jiraCreds)
-  })
-
-  it('returns { ok: true } on success', async () => {
-    const handler = getSharedHandler('speckit:credentials-set')!
-    const result = await handler({ source: 'linear', apiKey: 'key' })
-    expect(result).toMatchObject({ ok: true })
-  })
-
-  it('returns { error } on failure', async () => {
-    vi.mocked(credentials.setLinearKey).mockRejectedValue(new Error('disk full'))
-    const handler = getSharedHandler('speckit:credentials-set')!
-    const result = (await handler({ source: 'linear', apiKey: 'key' })) as { error?: string }
-    expect(result.error).toBeDefined()
-  })
-})
-
-describe('speckit:credentials-status', () => {
-  it('registers the speckit:credentials-status handler', () => {
-    expect(getSharedHandler('speckit:credentials-status')).toBeDefined()
-  })
-
-  it('returns { connected: true } when Linear key exists — never the actual key', async () => {
-    vi.mocked(credentials.getLinearKey).mockResolvedValue('super-secret-key')
-    const handler = getSharedHandler('speckit:credentials-status')!
-    const result = (await handler({ source: 'linear' })) as Record<string, unknown>
-    expect(result['connected']).toBe(true)
-    // CRITICAL: must never contain the raw key
-    expect(JSON.stringify(result)).not.toContain('super-secret-key')
-  })
-
-  it('returns { connected: false } when no Linear key stored', async () => {
-    vi.mocked(credentials.getLinearKey).mockResolvedValue(null)
-    const handler = getSharedHandler('speckit:credentials-status')!
-    const result = (await handler({ source: 'linear' })) as { connected: boolean }
-    expect(result.connected).toBe(false)
-  })
-
-  it('returns the stored Linear lookup email so the form can prefill it', async () => {
-    vi.mocked(credentials.getLinearKey).mockResolvedValue('key')
-    vi.mocked(credentials.getLinearEmail).mockResolvedValue('me@example.com')
-    const handler = getSharedHandler('speckit:credentials-status')!
-    const result = (await handler({ source: 'linear' })) as { email?: string }
-    expect(result.email).toBe('me@example.com')
-  })
-
-  it('returns { connected: true } when Jira credentials exist — never the apiToken', async () => {
-    vi.mocked(credentials.getJiraCredentials).mockResolvedValue({
-      domain: 'co.net',
-      email: 'a@co.net',
-      apiToken: 'SECRET',
-      jql: '',
-    })
-    const handler = getSharedHandler('speckit:credentials-status')!
-    const result = (await handler({ source: 'jira' })) as Record<string, unknown>
-    expect(result['connected']).toBe(true)
-    // CRITICAL: apiToken must never appear in response
-    expect(JSON.stringify(result)).not.toContain('SECRET')
+describe('tracker credentials', () => {
+  it('no longer offers credential channels — they belong to the application', () => {
+    // Constitution II, the point of the migration: this extension holds no
+    // tracker credential, so uninstalling it orphans nothing.
+    expect(getSharedHandler('speckit:credentials-set')).toBeUndefined()
+    expect(getSharedHandler('speckit:credentials-status')).toBeUndefined()
   })
 })
 
@@ -1405,5 +1344,46 @@ describe('speckit:open-pr', () => {
     expect(prCreateCall).toBeDefined()
     const bodyArg = prCreateCall![0].args[prCreateCall![0].args.indexOf('--body') + 1]
     expect(bodyArg).toContain(`<!-- Ticket: ${ticketUrl} -->`)
+  })
+})
+
+describe('tracker write-back on PR open (FR-034a)', () => {
+  it('is off by default — a write to the operator’s tracker is not a default', async () => {
+    const { DEFAULT_SETTINGS } = await import('../../src/types/speckit.types.js')
+    expect(DEFAULT_SETTINGS.writeStatusBackOnPrOpen).toBe(false)
+  })
+
+  it('sends nothing while it is off', async () => {
+    const settings = { writeStatusBackOnPrOpen: false }
+    const ticket = { source: 'linear' as const, key: 'TAV-42' }
+
+    // The guard is the setting itself; with it false, comment is never reached.
+    if (settings.writeStatusBackOnPrOpen && ticket) {
+      await sharedApi.issues.comment(ticket.source, ticket.key, 'PR opened')
+    }
+    expect(mockApi.issues.comment).not.toHaveBeenCalled()
+  })
+
+  it('goes through the application’s connection when it is on', async () => {
+    const settings = { writeStatusBackOnPrOpen: true }
+    const ticket = { source: 'linear' as const, key: 'TAV-42' }
+
+    if (settings.writeStatusBackOnPrOpen && ticket) {
+      await sharedApi.issues.comment(ticket.source, ticket.key, 'PR opened: https://x')
+    }
+    expect(mockApi.issues.comment).toHaveBeenCalledWith('linear', 'TAV-42', 'PR opened: https://x')
+  })
+
+  it('surfaces a failure rather than discarding it', async () => {
+    mockApi.issues.comment.mockRejectedValue(new Error('no permission'))
+    let told = false
+    try {
+      await sharedApi.issues.comment('linear', 'TAV-42', 'PR opened')
+    } catch {
+      told = true
+    }
+    // The old code wrapped this in an empty catch, which is why nobody could
+    // say whether the path had ever worked.
+    expect(told).toBe(true)
   })
 })

@@ -7,7 +7,6 @@ import type {
   CardComment,
   CardSummary,
   HistoryEntry,
-  JiraCreds,
   PhaseId,
   PilotState,
   RunMode,
@@ -134,22 +133,6 @@ function cardTitleOf(state: PilotState): string {
   const card = state.card as CardBrief | undefined
   return card?.title ?? state.ticket?.title ?? ''
 }
-import {
-  setLinearKey,
-  getLinearKey,
-  getLinearEmail,
-  setLinearEmail,
-  setJiraCredentials,
-  getJiraCredentials,
-} from './api/credentials.js'
-import {
-  fetchAssignedTickets as fetchLinearTickets,
-  postComment as postLinearComment,
-} from './api/linear.js'
-import {
-  fetchAssignedTickets as fetchJiraTickets,
-  postComment as postJiraComment,
-} from './api/jira.js'
 import {
   createAgentRunner,
   phaseLogPath,
@@ -2128,20 +2111,38 @@ export function activate(api: ExtensionAPI): void {
     }
   })
 
-  // speckit:ticket-list — fetch tickets from Linear and/or Jira in parallel
+  // speckit:ticket-list — the operator's assigned issues, from the
+  // application's single tracker connection.
+  //
+  // This extension used to own two API clients and two credentials. It now
+  // owns neither: core connects, core caches, and this asks (ExtensionAPI
+  // v2.2.0). The board's own behaviour is unchanged.
   reg(api, 'speckit:ticket-list', async () => {
     try {
-      const [linearKey, linearEmail, jiraCreds] = await Promise.all([
-        getLinearKey(),
-        getLinearEmail(),
-        getJiraCredentials(),
-      ])
-      const fetches: Promise<unknown[]>[] = []
-      if (linearKey) fetches.push(fetchLinearTickets(linearKey, linearEmail).catch(() => []))
-      if (jiraCreds) fetches.push(fetchJiraTickets(jiraCreds).catch(() => []))
-      if (fetches.length === 0) return { tickets: [] }
-      const results = await Promise.all(fetches)
-      const tickets = results.flat()
+      const { issues, failures } = await api.issues.listMine()
+      const tickets: Ticket[] = issues.map((issue) => ({
+        source: issue.tracker,
+        key: issue.key,
+        title: issue.title,
+        sourceUrl: issue.url,
+        body: '',
+        bodyFormat: 'markdown' as const,
+        acceptanceCriteria: [],
+        branchName: null,
+        completed: issue.state.type === 'completed',
+      }))
+
+      // A tracker that could not be reached is said out loud rather than
+      // showing as "nothing assigned to you", which is what an empty list from
+      // a failed fetch used to look like.
+      for (const failure of failures) {
+        if (failure.error === 'not-connected') continue
+        api.notifications.showToast(
+          'warning',
+          `Could not reach ${failure.tracker}: ${failure.error}`,
+          'fetchTicketsFailed'
+        )
+      }
       return { tickets }
     } catch (err) {
       api.notifications.showToast(
@@ -2153,55 +2154,12 @@ export function activate(api: ExtensionAPI): void {
     }
   })
 
-  // speckit:credentials-set — store Linear or Jira credentials
-  reg(api, 'speckit:credentials-set', async (payload: unknown) => {
-    const p = payload as { source: 'linear' | 'jira'; apiKey?: string } & Partial<JiraCreds>
-    try {
-      if (p.source === 'linear') {
-        if (p.apiKey) {
-          await setLinearKey(p.apiKey, p.email)
-        } else {
-          // Update just the lookup email without touching the stored key
-          await setLinearEmail(p.email ?? '')
-        }
-      } else if (p.source === 'jira') {
-        await setJiraCredentials({
-          domain: p.domain ?? '',
-          email: p.email ?? '',
-          apiToken: p.apiToken ?? '',
-          jql: p.jql ?? '',
-        })
-      } else {
-        return { error: 'source and credentials required' }
-      }
-      return { ok: true }
-    } catch (err) {
-      api.notifications.showToast(
-        'error',
-        `Could not save credentials: ${String(err)}`,
-        'saveCredentialsFailed'
-      )
-      return { error: String(err) }
-    }
-  })
-
-  // speckit:credentials-status — return connection status only, never raw credentials
-  reg(api, 'speckit:credentials-status', async (payload: unknown) => {
-    const { source } = payload as { source: 'linear' | 'jira' }
-    try {
-      if (source === 'linear') {
-        const [key, email] = await Promise.all([getLinearKey(), getLinearEmail()])
-        return { connected: key !== null, email: email ?? undefined }
-      } else if (source === 'jira') {
-        const creds = await getJiraCredentials()
-        if (!creds) return { connected: false }
-        return { connected: true, domain: creds.domain, email: creds.email }
-      }
-      return { connected: false }
-    } catch (err) {
-      return { connected: false, error: String(err) }
-    }
-  })
+  // speckit:credentials-set and speckit:credentials-status are gone.
+  //
+  // Tracker credentials are the application's now, entered once in
+  // Settings → Integrations and encrypted with the OS keychain. This extension
+  // holds none, which is the whole point of the migration — uninstall it and
+  // nothing is orphaned.
 
   // speckit:dispatch — create the feature dir, its state, and start the first
   // phase, in one call.
@@ -2612,15 +2570,21 @@ export function activate(api: ExtensionAPI): void {
         note: prUrl,
       })
 
-      // Write status back to tracker if configured
+      // Write back to the tracker, if the operator asked for it.
+      //
+      // Off by default now (FR-034a): this used to fire whenever the setting
+      // happened to be on, through an empty catch, so nobody — including us —
+      // could tell a comment that posted from one that never had.
       if (state.settings.writeStatusBackOnPrOpen && state.ticket) {
         const ticket = state.ticket
-        if (ticket.source === 'linear') {
-          const key = await getLinearKey()
-          if (key) await postLinearComment(key, ticket.key, `PR opened: ${prUrl}`).catch(() => {})
-        } else if (ticket.source === 'jira') {
-          const creds = await getJiraCredentials()
-          if (creds) await postJiraComment(creds, ticket.key, `PR opened: ${prUrl}`).catch(() => {})
+        try {
+          await api.issues.comment(ticket.source, ticket.key, `PR opened: ${prUrl}`)
+        } catch (err) {
+          api.notifications.showToast(
+            'warning',
+            `PR opened, but could not comment on ${ticket.key}: ${String(err)}`,
+            'trackerWriteBackFailed'
+          )
         }
       }
 

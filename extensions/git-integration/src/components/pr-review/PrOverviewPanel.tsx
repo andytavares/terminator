@@ -379,7 +379,7 @@ export function PrOverviewPanel({
               <ul className="pr-overview-issue-refs">
                 {pr.issueRefs.map((ref, i) => (
                   <li key={i} className="pr-overview-issue-ref">
-                    {ref.type === 'linear' && ref.url ? (
+                    {ref.url ? (
                       <a
                         href={ref.url}
                         onClick={(e) => {
@@ -393,6 +393,12 @@ export function PrOverviewPanel({
                       </a>
                     ) : (
                       <span className="pr-overview-issue-ref-label">{ref.ref}</span>
+                    )}
+                    {ref.title !== undefined && (
+                      <span className="pr-overview-issue-ref-title">{ref.title}</span>
+                    )}
+                    {ref.state !== undefined && (
+                      <span className="pr-overview-issue-ref-state">{ref.state}</span>
                     )}
                     <span className="pr-overview-issue-ref-type">{ref.type}</span>
                   </li>

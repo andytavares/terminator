@@ -929,3 +929,96 @@ describe('buildChapters tier classification for multiple languages', () => {
     expect(file?.tier).toBe(expectedTier)
   })
 })
+
+describe('extractIssueRefs — Jira', () => {
+  it('finds a Jira browse URL', async () => {
+    const { extractIssueRefs } = await import('../../src/github/pr-review-service')
+    const refs = extractIssueRefs('Fixes https://tav.atlassian.net/browse/TAV-7 today')
+    expect(refs).toContainEqual({
+      type: 'jira',
+      ref: 'TAV-7',
+      url: 'https://tav.atlassian.net/browse/TAV-7',
+    })
+  })
+
+  it('still finds GitHub and Linear references alongside it', async () => {
+    const { extractIssueRefs } = await import('../../src/github/pr-review-service')
+    const refs = extractIssueRefs(
+      'Closes #12, https://linear.app/tav/issue/TAV-42 and https://tav.atlassian.net/browse/TAV-7'
+    )
+    expect(refs.map((r) => r.type).sort()).toEqual(['github', 'jira', 'linear'])
+  })
+})
+
+describe('enrichIssueRefs (FR-030)', () => {
+  const LINEAR_REF = {
+    type: 'linear' as const,
+    ref: 'TAV-42',
+    url: 'https://linear.app/tav/issue/TAV-42',
+  }
+
+  it('fills in the title and state a bare key does not carry', async () => {
+    const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
+    const issues = {
+      get: vi
+        .fn()
+        .mockResolvedValue({ title: 'Unify connections', state: { name: 'In Progress' } }),
+    }
+
+    const [enriched] = await enrichIssueRefs([LINEAR_REF], issues)
+
+    expect(issues.get).toHaveBeenCalledWith('linear', 'TAV-42')
+    expect(enriched).toMatchObject({ title: 'Unify connections', state: 'In Progress' })
+  })
+
+  it('leaves GitHub references alone — they are not a tracker issue', async () => {
+    const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
+    const issues = { get: vi.fn() }
+
+    const [enriched] = await enrichIssueRefs([{ type: 'github' as const, ref: '#12' }], issues)
+
+    expect(issues.get).not.toHaveBeenCalled()
+    expect(enriched).toEqual({ type: 'github', ref: '#12' })
+  })
+
+  it('renders exactly as today when the tracker cannot be reached', async () => {
+    const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
+    const issues = { get: vi.fn().mockRejectedValue(new Error('not connected')) }
+
+    const [enriched] = await enrichIssueRefs([LINEAR_REF], issues)
+
+    // Best-effort by design: a review must not fail because a tracker did.
+    expect(enriched).toEqual(LINEAR_REF)
+  })
+
+  it('leaves a reference alone when the issue no longer exists', async () => {
+    const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
+    const issues = { get: vi.fn().mockResolvedValue(null) }
+
+    const [enriched] = await enrichIssueRefs([LINEAR_REF], issues)
+    expect(enriched).toEqual(LINEAR_REF)
+  })
+
+  it('enriches Jira references through the same path', async () => {
+    const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
+    const issues = {
+      get: vi.fn().mockResolvedValue({ title: 'Move Jira over', state: { name: 'Done' } }),
+    }
+
+    await enrichIssueRefs([{ type: 'jira' as const, ref: 'TAV-7' }], issues)
+    expect(issues.get).toHaveBeenCalledWith('jira', 'TAV-7')
+  })
+})
+
+describe('enrichIssueRefs — no tracker available', () => {
+  it('returns references untouched when the host offers no issues namespace', async () => {
+    const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
+    const refs = [
+      { type: 'linear' as const, ref: 'TAV-42', url: 'https://linear.app/tav/issue/TAV-42' },
+      { type: 'github' as const, ref: '#12' },
+    ]
+    // An older host has no api.issues; the review view must render exactly as
+    // it always did rather than failing.
+    await expect(enrichIssueRefs(refs, undefined)).resolves.toEqual(refs)
+  })
+})

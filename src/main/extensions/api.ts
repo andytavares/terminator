@@ -117,6 +117,19 @@ export interface ProjectSnapshot {
 import type { SessionOrigin, SpawnSessionOptions, SessionInfo } from '../terminal/pty-manager.js'
 export type { SessionOrigin, SpawnSessionOptions, SessionInfo }
 
+// Issue-tracker types are re-exported here rather than re-declared by every
+// extension that needs them (Constitution II: shared types come through the
+// API surface).
+import type {
+  Issue,
+  IssueLink,
+  IssueListResult,
+  IssueSummary,
+  TrackerConnection,
+  TrackerId,
+} from '../../shared/types/index.js'
+export type { Issue, IssueLink, IssueListResult, IssueSummary, TrackerConnection, TrackerId }
+
 export interface PtyManagerAPI {
   /** @deprecated since v1.4.0 — use spawnSession() plus onData()/onExit(). */
   spawn(
@@ -176,6 +189,15 @@ export interface CreateProjectInput {
   gitBranch?: string
   /** True when the directory is a git worktree rather than a plain folder. */
   isWorktree?: boolean
+  /**
+   * Attach this issue to the project as it is created (v2.2.0).
+   *
+   * An extension that already knows what a checkout is for should not have to
+   * make the operator attach it again. When an existing project is returned
+   * for the same path, the issue is attached to *that* project — the caller
+   * has just said what that checkout is for.
+   */
+  issue?: { tracker: TrackerId; key: string }
 }
 
 export interface OpenTerminalTabInput {
@@ -253,6 +275,30 @@ export interface ExtensionAPI {
       cwd: string
       timeoutMs?: number
     }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
+  }
+  /**
+   * Issue trackers, through the application's single connection (v2.2.0).
+   *
+   * An extension never holds a tracker credential and never contacts a tracker
+   * itself — it asks here, the same way it asks for a shell or a PTY. There is
+   * deliberately no way to create or edit an issue, or to change any field of
+   * one: `comment` is the only write, and FR-034 says so.
+   */
+  issues: {
+    /** Connected trackers and whose account each credential proved to be. Never a secret. */
+    connections(): Promise<TrackerConnection[]>
+    /** "My issues" across connected trackers. Per-tracker failures are reported, not thrown. */
+    listMine(opts?: { tracker?: TrackerId; limit?: number }): Promise<IssueListResult>
+    /** Full-text search. An exact issue key resolves directly and sorts first. */
+    search(term: string, opts?: { tracker?: TrackerId; limit?: number }): Promise<IssueListResult>
+    /** One issue; description and comments are markdown whichever tracker it came from. */
+    get(tracker: TrackerId, key: string, opts?: { refresh?: boolean }): Promise<Issue | null>
+    /** Comment on an issue. Rejects on failure — it must not be swallowed. */
+    comment(tracker: TrackerId, key: string, body: string): Promise<void>
+    /** The issue attached to a project, or null. Synchronous: it is local state. */
+    linkFor(projectId: string): IssueLink | null
+    /** Fires when any project's link is set, replaced, cleared or garbage-collected. */
+    onLinkChange(handler: (projectId: string, link: IssueLink | null) => void): Disposable
   }
   notifications: {
     /**
@@ -341,6 +387,8 @@ import { getGlobalSettings, getWorkspaceSettings } from '../storage/settings-sto
 import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
+
+const apiLog = makeLogger('extension-api')
 import {
   listWorkspaces,
   listProjects as listProjectsFromStore,
@@ -348,8 +396,32 @@ import {
   deleteProject as deleteProjectFromStore,
 } from '../storage/workspace-store.js'
 import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
+import { getIssueService } from '../integrations/index.js'
+import { listConnections as listTrackerConnections } from '../integrations/tracker-store.js'
+import {
+  getLink as getIssueLink,
+  onLinkChange as onIssueLinkChange,
+  setLink as setIssueLink,
+} from '../integrations/issue-link-store.js'
 import { RESERVED_SHORTCUTS } from '../shared/reserved-shortcuts.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
+
+/**
+ * Attach the issue a caller said the project is for (v2.2.0).
+ *
+ * Best-effort and never fatal: an extension that provisioned a worktree has
+ * done the expensive part, and failing the whole call because a link could not
+ * be written would cost the operator the checkout.
+ */
+function attachIssueToProject(
+  projectId: string,
+  issue: { tracker: TrackerId; key: string } | undefined
+): void {
+  if (issue === undefined) return
+  void setIssueLink({ projectId, tracker: issue.tracker, key: issue.key }).catch((error) => {
+    apiLog.warn(`Could not attach ${issue.key} to project ${projectId}: ${String(error)}`)
+  })
+}
 
 interface Registry {
   settingsSections: Map<string, ExtensionSettingsSchema>
@@ -692,6 +764,7 @@ export function createExtensionAPI(
           (project) => project.worktreePath === input.worktreePath
         )
         if (existing !== undefined) {
+          attachIssueToProject(existing.id, input.issue)
           return { id: existing.id, workspaceId: existing.workspaceId, name: existing.name }
         }
         const create = (name: string) =>
@@ -713,6 +786,7 @@ export function createExtensionAPI(
         }
         if (!('project' in created)) return null
         const { id, workspaceId, name } = created.project
+        attachIssueToProject(id, input.issue)
         deps?.broadcastToWindows?.('workspace:project-added', created.project)
         return { id, workspaceId, name }
       },
@@ -749,6 +823,35 @@ export function createExtensionAPI(
           cwd: options.cwd,
           timeoutMs: options.timeoutMs ?? 10000,
         })
+      },
+    },
+    issues: {
+      async connections(): Promise<TrackerConnection[]> {
+        return listTrackerConnections()
+      },
+      async listMine(opts = {}): Promise<IssueListResult> {
+        return getIssueService().listMine(opts)
+      },
+      async search(term: string, opts = {}): Promise<IssueListResult> {
+        return getIssueService().search(term, opts)
+      },
+      async get(
+        tracker: TrackerId,
+        key: string,
+        opts: { refresh?: boolean } = {}
+      ): Promise<Issue | null> {
+        return getIssueService().get(tracker, key, opts)
+      },
+      async comment(tracker: TrackerId, key: string, body: string): Promise<void> {
+        // Deliberately not caught here: an extension that swallows a failed
+        // write is exactly the defect this feature exists to remove.
+        await getIssueService().comment(tracker, key, body)
+      },
+      linkFor(projectId: string): IssueLink | null {
+        return getIssueLink(projectId)
+      },
+      onLinkChange(handler: (projectId: string, link: IssueLink | null) => void): Disposable {
+        return disposable(onIssueLinkChange(handler))
       },
     },
     notifications: {

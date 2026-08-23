@@ -13,6 +13,7 @@ import {
   buildChapters,
   parseReviewQueuePR,
   extractIssueRefs,
+  enrichIssueRefs,
   detectDryViolations,
   normalizeGraphQLNode,
   mapMergeStateStatus,
@@ -46,7 +47,14 @@ const activeReviewStore = new Store<Record<string, unknown>>({ name: 'pr-active-
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
-export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): void {
+/** The application's tracker connection, when this build's host offers one. */
+type IssuesApi = Parameters<typeof enrichIssueRefs>[1]
+
+export function registerGithubHandlers(
+  register: RegisterFn,
+  opts: GhOptions,
+  issues?: IssuesApi
+): void {
   const gh = (cwd: string, args: string[], timeoutMs?: number) => runGh(cwd, args, opts, timeoutMs)
   const ownerAndName = (repoRoot: string) => getRepoOwnerAndName(repoRoot, opts)
   const catchError = (e: unknown) => {
@@ -192,8 +200,10 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
       const coChangeAffinity = await computeCoChangeAffinityFromGit(repoRoot, filePaths)
       const chapters = buildChapters(filesData, undefined, coChangeAffinity)
 
-      // Extract issue refs from PR body for context panel
-      const issueRefs = extractIssueRefs(String(meta.body ?? ''))
+      // Issue refs from the PR body, with title and state filled in from the
+      // application's tracker connection where there is one. A bare key tells
+      // a reviewer nothing.
+      const issueRefs = await enrichIssueRefs(extractIssueRefs(String(meta.body ?? '')), issues)
 
       // Detect DRY violations across all changed files
       const patchFiles = filesData.map((f) => {
