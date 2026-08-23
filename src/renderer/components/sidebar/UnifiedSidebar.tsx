@@ -447,6 +447,17 @@ export function UnifiedSidebar({
     )
   }
 
+  /** One definition, handed to both the group header's menu and ScopeMenu. */
+  function issueActionsFor(projectId: string) {
+    return {
+      issueKey: issueLinkFor(projectId)?.key ?? null,
+      onLinkIssue: () => openLinkDialog(projectId),
+      onOpenIssue: () => openLinkedIssue(projectId),
+      onCopyIssueKey: () => copyIssueKey(projectId),
+      onUnlinkIssue: () => void unlinkIssue(projectId),
+    }
+  }
+
   function openLinkedIssue(projectId: string): void {
     const issue = issueFor(projectId)
     if (issue === null) return
@@ -522,6 +533,7 @@ export function UnifiedSidebar({
                   }
                   isActiveScope={project !== undefined && project.id === activeProjectId}
                   issueBadge={renderIssueBadge(project?.id)}
+                  issueActions={project ? issueActionsFor(project.id) : undefined}
                   onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
                   onAddSession={project ? () => addSessionToProject(project.id) : undefined}
                   onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
@@ -657,11 +669,7 @@ export function UnifiedSidebar({
               x={scopeMenu.x}
               y={scopeMenu.y}
               projectName={project.name}
-              issueKey={issueLinkFor(project.id)?.key ?? null}
-              onLinkIssue={() => openLinkDialog(project.id)}
-              onOpenIssue={() => openLinkedIssue(project.id)}
-              onCopyIssueKey={() => copyIssueKey(project.id)}
-              onUnlinkIssue={() => void unlinkIssue(project.id)}
+              issueActions={issueActionsFor(project.id)}
               workspaceTabs={workspaceTabList}
               onSelectWorkspaceTab={(tabId) => onSelectWorkspaceTab(project.workspaceId, tabId)}
               onAddSession={() => addSessionToProject(project.id)}

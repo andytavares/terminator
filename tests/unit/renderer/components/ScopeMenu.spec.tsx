@@ -78,6 +78,7 @@ describe('ScopeMenu — the attached issue', () => {
   }
 
   function open(over: Record<string, unknown> = {}) {
+    const { issueKey = null, onDismiss = vi.fn(), ...rest } = over
     return render(
       <ScopeMenu
         x={0}
@@ -87,9 +88,8 @@ describe('ScopeMenu — the attached issue', () => {
         onSelectWorkspaceTab={vi.fn()}
         onAddSession={vi.fn()}
         onRemoveProject={vi.fn()}
-        onDismiss={vi.fn()}
-        {...handlers}
-        {...over}
+        onDismiss={onDismiss as () => void}
+        issueActions={{ issueKey: issueKey as string | null, ...handlers, ...rest }}
       />
     )
   }
