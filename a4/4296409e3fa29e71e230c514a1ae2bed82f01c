@@ -1,0 +1,23 @@
+extensions/speckit-pilot/src/index.ts
+  s_1b2bbe25506890::t_5a2da45bb5e033 2124-2146
+  s_1b2bbe25506890::t_ba76e9fd218714 13
+extensions/speckit-pilot/tests/ipc/index-ipc.spec.ts
+  s_1b2bbe25506890::t_d8ae7c86548747 260,1008,1018,1034-1109
+  s_1b2bbe25506890::t_a109aebdbd4445 1110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "a44296409e3fa29e71e230c514a1ae2bed82f01c",
+  "prompts": {},
+  "sessions": {
+    "s_1b2bbe25506890": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "039a9a9a-6645-4d53-990e-4529c70b1991",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
