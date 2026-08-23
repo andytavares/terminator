@@ -6,6 +6,12 @@ export interface ScopeMenuProps {
   x: number
   y: number
   projectName: string
+  /** The issue attached to this project, if any. */
+  issueKey?: string | null
+  onLinkIssue?: () => void
+  onOpenIssue?: () => void
+  onCopyIssueKey?: () => void
+  onUnlinkIssue?: () => void
   /** Workspace-scoped extension buttons, offered here as menu items instead. */
   workspaceTabs: WorkspaceTabRegistration[]
   onSelectWorkspaceTab: (tabId: string) => void
@@ -26,6 +32,11 @@ export function ScopeMenu({
   x,
   y,
   projectName,
+  issueKey,
+  onLinkIssue,
+  onOpenIssue,
+  onCopyIssueKey,
+  onUnlinkIssue,
   workspaceTabs,
   onSelectWorkspaceTab,
   onAddSession,
@@ -45,6 +56,52 @@ export function ScopeMenu({
             onAddSession()
           },
         },
+        // Only "link" when there is nothing attached: offering "unlink" and
+        // "open" against no issue is four dead rows.
+        ...(onLinkIssue === undefined
+          ? []
+          : issueKey == null
+            ? [
+                {
+                  label: 'Link issue…',
+                  separatorBefore: true,
+                  onSelect: () => {
+                    onDismiss()
+                    onLinkIssue()
+                  },
+                },
+              ]
+            : [
+                {
+                  label: `Open ${issueKey} in tracker`,
+                  separatorBefore: true,
+                  onSelect: () => {
+                    onDismiss()
+                    onOpenIssue?.()
+                  },
+                },
+                {
+                  label: 'Copy issue key',
+                  onSelect: () => {
+                    onDismiss()
+                    onCopyIssueKey?.()
+                  },
+                },
+                {
+                  label: 'Change linked issue…',
+                  onSelect: () => {
+                    onDismiss()
+                    onLinkIssue()
+                  },
+                },
+                {
+                  label: `Unlink ${issueKey}`,
+                  onSelect: () => {
+                    onDismiss()
+                    onUnlinkIssue?.()
+                  },
+                },
+              ]),
         ...workspaceTabs.map((tab, index) => ({
           label: tab.label,
           separatorBefore: index === 0,

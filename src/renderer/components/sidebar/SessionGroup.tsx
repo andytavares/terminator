@@ -21,6 +21,12 @@ export interface SessionGroupProps {
   /** True when this group's scope is the active project. */
   isActiveScope?: boolean
   /**
+   * The attached issue's badge, for a group whose scope is a project. Passed
+   * as a node rather than as data so the sidebar's view-model stays ignorant
+   * of issue trackers entirely.
+   */
+  issueBadge?: React.ReactNode
+  /**
    * Selects the group's scope. FR-026 requires the header to host everything
    * the tree's project row hosted, and that row's primary action was selecting
    * the project — so a header click selects, and the chevron owns collapse.
@@ -57,6 +63,7 @@ export function SessionGroup({
   busy,
   branchSwitcher,
   isActiveScope,
+  issueBadge,
   onSelectScope,
   onAddSession,
   onSelectAll,
@@ -149,6 +156,8 @@ export function SessionGroup({
         )}
 
         {busy && <span className="session-group__busy" />}
+
+        {issueBadge}
 
         {workspaceTabs && workspaceTabs.length > 0 && (
           <div className="session-group__ws-tabs" onClick={(e) => e.stopPropagation()}>

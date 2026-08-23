@@ -107,3 +107,18 @@
   margin-left: auto;
   color: var(--danger) !important;
 }
+
+/*
+ * The issue drawer sits over the right edge of the app, not inside the
+ * sidebar: it is about the project, not about the session list, and at 396px
+ * it would squeeze the list to nothing.
+ */
+.issue-drawer-host {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 500;
+  display: flex;
+  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.45);
+}

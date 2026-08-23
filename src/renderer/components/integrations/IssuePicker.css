@@ -1,0 +1,157 @@
+/* ── Inline issue picker ─────────────────────────────────────── */
+
+.issue-picker {
+  position: relative;
+}
+
+.issue-picker__search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 9px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.issue-picker__search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.issue-picker__search svg {
+  width: 11px;
+  height: 11px;
+  /* Inherits currentColor and dims by opacity — never a colour of its own
+     (Constitution XII). */
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.issue-picker__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.issue-picker__input::placeholder {
+  color: var(--text-muted);
+}
+
+/*
+ * Overlaid rather than inline: this sits inside a form, and pushing every
+ * field below it down by 200px as soon as the input takes focus makes the
+ * dialog jump under the operator's cursor.
+ */
+.issue-picker__list {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+
+.issue-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.issue-picker__row:last-child {
+  border-bottom: none;
+}
+
+.issue-picker__row:hover {
+  background: var(--bg-card-hover);
+}
+
+.issue-picker__row--muted {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.issue-picker__failures {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--warning);
+  border-bottom: 1px solid var(--border);
+}
+
+.issue-picker__chosen {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 30px;
+  padding: 0 6px 0 9px;
+  background: var(--bg-input);
+  border: 1px solid var(--accent-glow);
+  border-radius: var(--radius-sm);
+}
+
+.issue-picker__key {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.issue-picker__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.issue-picker__tracker {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.issue-picker__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.issue-picker__clear:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.issue-picker__clear svg {
+  width: 12px;
+  height: 12px;
+}

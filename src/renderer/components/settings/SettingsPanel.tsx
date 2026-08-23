@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { GlobalSettings } from './GlobalSettings'
+import { IntegrationsSettings } from './IntegrationsSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useModalEffect } from '../../stores/modal.store'
 import { dispatchNotification } from '../../lib/notifications'
 import './SettingsPanel.css'
 
-type Section = 'global' | 'workspace' | 'extensions'
+type Section = 'global' | 'workspace' | 'integrations' | 'extensions'
 
 interface Props {
   onClose: () => void
@@ -46,6 +47,12 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
               </button>
             )}
             <button
+              className={`settings-panel__nav-item${section === 'integrations' ? ' settings-panel__nav-item--active' : ''}`}
+              onClick={() => setSection('integrations')}
+            >
+              Integrations
+            </button>
+            <button
               className={`settings-panel__nav-item${section === 'extensions' ? ' settings-panel__nav-item--active' : ''}`}
               onClick={() => setSection('extensions')}
             >
@@ -61,6 +68,7 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
           {section === 'workspace' && activeWorkspaceId && (
             <WorkspaceSettings workspaceId={activeWorkspaceId} />
           )}
+          {section === 'integrations' && <IntegrationsSettings />}
           {section === 'extensions' && <ExtensionsSection />}
         </div>
       </div>

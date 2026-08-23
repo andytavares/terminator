@@ -11,6 +11,7 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
 vi.mock('../../../../src/renderer/stores/settings.store', () => ({
   useSettingsStore: vi.fn(),
 }))
+vi.mock('../../../../src/renderer/stores/modal.store', () => ({ useModalEffect: () => {} }))
 
 const mockCreateProject = vi.fn()
 
@@ -456,5 +457,135 @@ describe('CreateProjectDialog', () => {
     fireEvent.change(newBranchInput, { target: { value: '' } })
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() => expect(screen.getByText('Select or enter a branch name')).toBeTruthy())
+  })
+})
+
+// ── Starting from an issue (US5) ────────────────────────────────────────────
+
+describe('CreateProjectDialog — from an issue', () => {
+  const ISSUE = {
+    tracker: 'linear' as const,
+    id: 'id-1',
+    key: 'TAV-42',
+    title: 'Unify Linear connections behind one core service',
+    url: 'https://linear.app/tav/issue/TAV-42',
+    state: { name: 'In Progress', type: 'started' as const },
+    assignee: null,
+    branchName: 'andrew/tav-42-unify-linear',
+  }
+  const JIRA_ISSUE = { ...ISSUE, tracker: 'jira' as const, key: 'TAV-7', branchName: null }
+
+  const listMine = vi.fn()
+  const linkIssue = vi.fn()
+
+  async function openWithIssues(connected = true, issues = [ISSUE]) {
+    const { useIntegrationsStore } = await import(
+      '../../../../src/renderer/stores/integrations.store'
+    )
+    listMine.mockResolvedValue({ issues, failures: [] })
+    linkIssue.mockResolvedValue(true)
+    useIntegrationsStore.setState({
+      connections: connected
+        ? [
+            {
+              tracker: 'linear',
+              connected: true,
+              account: null,
+              site: null,
+              mine: { kind: 'assignee', email: null },
+              lastError: null,
+            },
+          ]
+        : [],
+      listMine,
+      searchIssues: vi.fn().mockResolvedValue({ issues: [], failures: [] }),
+      linkIssue,
+    } as never)
+
+    setupGitAPI({
+      isRepo: vi.fn().mockResolvedValue({ isRepo: true, root: '/repo' }),
+      listBranches: vi.fn().mockResolvedValue({ branches: [{ name: 'main', isRemote: false }] }),
+    })
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      createProject: mockCreateProject,
+      projectsByWorkspaceId: new Map(),
+      workspaces: [{ id: 'w1', name: 'ws', folderPath: '/repo', color: '#fff', tags: [] }],
+    } as never)
+    vi.mocked(useSettingsStore).mockReturnValue({
+      resolveSettings: () => ({ git: { worktreeBaseDir: '' } }),
+    } as never)
+
+    render(<CreateProjectDialog workspaceId="w1" onClose={vi.fn()} />)
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCreateProject.mockResolvedValue({ project: { id: 'p-new' } })
+  })
+
+  it('does not offer the picker when no tracker is connected', async () => {
+    await openWithIssues(false)
+    expect(screen.queryByText('Start from an issue')).toBeNull()
+  })
+
+  it('offers the picker once a tracker is connected', async () => {
+    await openWithIssues(true)
+    expect(screen.getByText('Start from an issue')).toBeTruthy()
+  })
+
+  it('prefills name and branch from the picked issue', async () => {
+    await openWithIssues()
+    fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
+    fireEvent.click(await screen.findByText('TAV-42'))
+
+    const name = screen.getByPlaceholderText('My Project') as HTMLInputElement
+    expect(name.value).toContain('TAV-42')
+    expect(screen.getByDisplayValue('andrew/tav-42-unify-linear')).toBeTruthy()
+  })
+
+  it('derives a branch when the tracker has no suggestion (Jira)', async () => {
+    await openWithIssues(true, [JIRA_ISSUE])
+    fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
+    fireEvent.click(await screen.findByText('TAV-7'))
+
+    expect(screen.getByDisplayValue(/tav-7-unify-linear/)).toBeTruthy()
+  })
+
+  it('honours an edit made after prefilling', async () => {
+    await openWithIssues()
+    fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
+    fireEvent.click(await screen.findByText('TAV-42'))
+
+    const name = screen.getByPlaceholderText('My Project') as HTMLInputElement
+    fireEvent.change(name, { target: { value: 'my own name' } })
+    expect(name.value).toBe('my own name')
+  })
+
+  it('lets the operator back out of the issue', async () => {
+    await openWithIssues()
+    fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
+    fireEvent.click(await screen.findByText('TAV-42'))
+
+    fireEvent.click(screen.getByTitle('Choose a different issue'))
+    expect(screen.getByPlaceholderText(/Search, or type an issue key/)).toBeTruthy()
+  })
+
+  it('attaches the issue to the project it just created (FR-011)', async () => {
+    await openWithIssues()
+    fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
+    fireEvent.click(await screen.findByText('TAV-42'))
+
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
+    await vi.waitFor(() => expect(linkIssue).toHaveBeenCalledWith('p-new', 'linear', 'TAV-42'))
+  })
+
+  it('attaches nothing when no issue was picked', async () => {
+    await openWithIssues()
+    fireEvent.change(screen.getByPlaceholderText('My Project'), { target: { value: 'plain' } })
+    fireEvent.click(screen.getByText('Create'))
+
+    await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
+    expect(linkIssue).not.toHaveBeenCalled()
   })
 })

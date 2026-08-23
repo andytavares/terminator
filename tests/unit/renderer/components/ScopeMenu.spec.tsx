@@ -66,3 +66,87 @@ describe('ScopeMenu — the second host for scope actions (FR-027)', () => {
     expect([menu.style.left, menu.style.top]).toEqual(['10px', '20px'])
   })
 })
+
+// ── Issue actions ───────────────────────────────────────────────────────────
+
+describe('ScopeMenu — the attached issue', () => {
+  const handlers = {
+    onLinkIssue: vi.fn(),
+    onOpenIssue: vi.fn(),
+    onCopyIssueKey: vi.fn(),
+    onUnlinkIssue: vi.fn(),
+  }
+
+  function open(over: Record<string, unknown> = {}) {
+    return render(
+      <ScopeMenu
+        x={0}
+        y={0}
+        projectName="terminator"
+        workspaceTabs={[]}
+        onSelectWorkspaceTab={vi.fn()}
+        onAddSession={vi.fn()}
+        onRemoveProject={vi.fn()}
+        onDismiss={vi.fn()}
+        {...handlers}
+        {...over}
+      />
+    )
+  }
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('offers only Link when nothing is attached', () => {
+    open({ issueKey: null })
+    expect(screen.getByText('Link issue…')).toBeTruthy()
+    // Four dead rows against no issue would be worse than none.
+    expect(screen.queryByText('Copy issue key')).toBeNull()
+    expect(screen.queryByText(/^Unlink/)).toBeNull()
+    expect(screen.queryByText(/Open .* in tracker/)).toBeNull()
+  })
+
+  it('offers the full set once an issue is attached, naming it', () => {
+    open({ issueKey: 'TAV-42' })
+    expect(screen.getByText('Open TAV-42 in tracker')).toBeTruthy()
+    expect(screen.getByText('Copy issue key')).toBeTruthy()
+    expect(screen.getByText('Change linked issue…')).toBeTruthy()
+    expect(screen.getByText('Unlink TAV-42')).toBeTruthy()
+    expect(screen.queryByText('Link issue…')).toBeNull()
+  })
+
+  it('offers nothing at all when the host does not support issues', () => {
+    open({ issueKey: null, onLinkIssue: undefined })
+    expect(screen.queryByText('Link issue…')).toBeNull()
+  })
+
+  it.each([
+    ['Link issue…', 'onLinkIssue', null],
+    ['Open TAV-42 in tracker', 'onOpenIssue', 'TAV-42'],
+    ['Copy issue key', 'onCopyIssueKey', 'TAV-42'],
+    ['Change linked issue…', 'onLinkIssue', 'TAV-42'],
+    ['Unlink TAV-42', 'onUnlinkIssue', 'TAV-42'],
+  ])('%s calls its handler and dismisses', (label, handler, issueKey) => {
+    const onDismiss = vi.fn()
+    open({ issueKey, onDismiss })
+    fireEvent.click(screen.getByText(label as string))
+
+    expect(handlers[handler as keyof typeof handlers]).toHaveBeenCalled()
+    expect(onDismiss).toHaveBeenCalled()
+  })
+
+  it('does not throw when an optional handler is absent', () => {
+    open({
+      issueKey: 'TAV-42',
+      onOpenIssue: undefined,
+      onCopyIssueKey: undefined,
+      onUnlinkIssue: undefined,
+    })
+    expect(() => fireEvent.click(screen.getByText('Open TAV-42 in tracker'))).not.toThrow()
+  })
+
+  it('keeps Remove last and destructive', () => {
+    open({ issueKey: 'TAV-42' })
+    const labels = screen.getAllByRole('button').map((b) => b.textContent)
+    expect(labels[labels.length - 1]).toContain('Remove terminator')
+  })
+})

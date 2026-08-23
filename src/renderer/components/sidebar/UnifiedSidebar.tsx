@@ -25,6 +25,10 @@ import { ScratchSection } from './ScratchSection'
 import { ExtensionFooter } from './ExtensionFooter'
 import { FilterNotice } from './FilterNotice'
 import { ScopeMenu } from './ScopeMenu'
+import { IssueBadge } from '../integrations/IssueBadge'
+import { LinkIssueDialog } from '../integrations/LinkIssueDialog'
+import { IssueDrawer } from '../integrations/IssueDrawer'
+import { useIntegrationsStore } from '../../stores/integrations.store'
 import { SessionGroup } from './SessionGroup'
 import { SessionRow } from './SessionRow'
 import { WorkspaceRow } from './WorkspaceRow'
@@ -141,6 +145,21 @@ export function UnifiedSidebar({
   const [noteEditingId, setNoteEditingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkCloseOpen, setBulkCloseOpen] = useState(false)
+  const {
+    linkFor: issueLinkFor,
+    issueFor,
+    loadLink,
+    unlinkIssue,
+    subscribe: subscribeIntegrations,
+    loadConnections: loadTrackerConnections,
+    linkDialogProjectId,
+    openLinkDialog,
+    closeLinkDialog,
+    drawerProjectId,
+    openDrawer,
+    closeDrawer,
+  } = useIntegrationsStore()
+
   const [scopeMenu, setScopeMenu] = useState<{
     x: number
     y: number
@@ -397,6 +416,49 @@ export function UnifiedSidebar({
       ? workspaces.filter((ws) => !lastGroupKeyByWorkspace.has(ws.id))
       : []
 
+  // ── Attached issues ───────────────────────────────────────────────────────
+  //
+  // The sidebar's view model knows nothing about issue trackers; it deals in
+  // projects. The badge is looked up here, by project id, and passed down as a
+  // node.
+
+  useEffect(() => {
+    void loadTrackerConnections()
+    return subscribeIntegrations()
+  }, [loadTrackerConnections, subscribeIntegrations])
+
+  useEffect(() => {
+    for (const project of allProjects) void loadLink(project.id)
+  }, [allProjects, loadLink])
+
+  function renderIssueBadge(projectId: string | undefined): React.ReactNode {
+    if (projectId === undefined) return undefined
+    const link = issueLinkFor(projectId)
+    if (link === null) return undefined
+    const issue = issueFor(projectId)
+    return (
+      <IssueBadge
+        tracker={link.tracker}
+        issueKey={link.key}
+        state={issue?.state ?? null}
+        title={issue?.title}
+        onClick={() => openDrawer(projectId)}
+      />
+    )
+  }
+
+  function openLinkedIssue(projectId: string): void {
+    const issue = issueFor(projectId)
+    if (issue === null) return
+    void window.electronAPI.shell.openExternal(issue.url)
+  }
+
+  function copyIssueKey(projectId: string): void {
+    const link = issueLinkFor(projectId)
+    if (link === null) return
+    void navigator.clipboard?.writeText(link.key)
+  }
+
   return (
     <>
       <div
@@ -459,6 +521,7 @@ export function UnifiedSidebar({
                     ) : undefined
                   }
                   isActiveScope={project !== undefined && project.id === activeProjectId}
+                  issueBadge={renderIssueBadge(project?.id)}
                   onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
                   onAddSession={project ? () => addSessionToProject(project.id) : undefined}
                   onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
@@ -594,6 +657,11 @@ export function UnifiedSidebar({
               x={scopeMenu.x}
               y={scopeMenu.y}
               projectName={project.name}
+              issueKey={issueLinkFor(project.id)?.key ?? null}
+              onLinkIssue={() => openLinkDialog(project.id)}
+              onOpenIssue={() => openLinkedIssue(project.id)}
+              onCopyIssueKey={() => copyIssueKey(project.id)}
+              onUnlinkIssue={() => void unlinkIssue(project.id)}
               workspaceTabs={workspaceTabList}
               onSelectWorkspaceTab={(tabId) => onSelectWorkspaceTab(project.workspaceId, tabId)}
               onAddSession={() => addSessionToProject(project.id)}
@@ -602,6 +670,35 @@ export function UnifiedSidebar({
               }
               onDismiss={() => setScopeMenu(null)}
             />
+          )
+        })()}
+
+      {linkDialogProjectId !== null &&
+        (() => {
+          const project = projectById.get(linkDialogProjectId)
+          if (!project) return null
+          return (
+            <LinkIssueDialog
+              projectId={project.id}
+              projectName={project.name}
+              currentKey={issueLinkFor(project.id)?.key ?? null}
+              onClose={closeLinkDialog}
+            />
+          )
+        })()}
+
+      {drawerProjectId !== null &&
+        (() => {
+          const project = projectById.get(drawerProjectId)
+          if (!project) return null
+          return (
+            <div className="issue-drawer-host">
+              <IssueDrawer
+                projectId={project.id}
+                projectName={project.name}
+                onClose={closeDrawer}
+              />
+            </div>
           )
         })()}
 
