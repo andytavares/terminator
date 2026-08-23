@@ -1,0 +1,39 @@
+docs/adr/030-session-start-issue-context.md
+  s_1b2bbe25506890::t_1ed4356075083e 15,78-83
+  s_1b2bbe25506890::t_cdfc3431f6a203 111-113,115-116
+  s_1b2bbe25506890::t_784478ce8006dd 114
+  s_1b2bbe25506890::t_a0084ed0f31a25 1-14,16-77,84-110
+src/main/integrations/context-sync.ts
+  s_1b2bbe25506890::t_a63a41a884699b 1-97
+tests/unit/integrations/session-hook.spec.ts
+  s_1b2bbe25506890::t_1ed4356075083e 51-53
+  s_1b2bbe25506890::t_cee0ddbee51f81 1-50,54-278
+src/main/integrations/session-hook.ts
+  s_1b2bbe25506890::t_1ed4356075083e 179
+  s_1b2bbe25506890::t_758b8503de893d 1-178,180-203
+tests/unit/integrations/agent-context.spec.ts
+  s_1b2bbe25506890::t_c03acee669b47b 5-6,18-143,147-148,151-177,226-227
+  s_1b2bbe25506890::t_c41b9bfd51cf5e 144-146,149-150
+  s_1b2bbe25506890::t_9156b7d725011c 1-4,7-17,178-225
+tests/unit/integrations/context-sync.spec.ts
+  s_1b2bbe25506890::t_7174f498454b8a 1-266
+src/main/integrations/agent-context.ts
+  s_1b2bbe25506890::t_5badfbfec2fedb 138-147
+  s_1b2bbe25506890::t_4883a48008c4fa 1-137,148-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "027369eb1b34a09cabba83d2b1c4b60f8ecbd80d",
+  "prompts": {},
+  "sessions": {
+    "s_1b2bbe25506890": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "039a9a9a-6645-4d53-990e-4529c70b1991",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
