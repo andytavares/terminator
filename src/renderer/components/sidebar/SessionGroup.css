@@ -80,6 +80,30 @@
   white-space: nowrap;
 }
 
+.session-group__workspace {
+  margin-left: 6px;
+  opacity: 0.55;
+  font-weight: 600;
+}
+
+.session-group__workspace::before {
+  content: '· ';
+}
+
+/* The project layer inside a workspace group: indented, and quieter than the
+   workspace header above it. */
+.session-group--nested > .session-group__header {
+  margin-top: 2px;
+  padding-left: var(--sidebar-content-indent, 20px);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 11px;
+}
+
+.session-group--nested > .session-group__header .session-group__chevron {
+  margin-left: -10px;
+}
+
 .session-group__busy {
   width: 5px;
   height: 5px;

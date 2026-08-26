@@ -15,7 +15,10 @@ export const BUILT_IN_VIEWS: SessionView[] = [
   {
     id: 'everything',
     name: 'Everything',
-    groupBy: 'project',
+    // Workspace first: it is the outermost thing a user navigates by, and the
+    // grouping nests its projects, so nothing the project grouping offers is
+    // lost by defaulting here.
+    groupBy: 'workspace',
     sortBy: 'manual',
     filters: {},
     builtIn: true,

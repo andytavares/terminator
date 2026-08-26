@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react'
 import type { GroupKey, SessionView, SortKey } from '../../sidebar/view-model'
 import './ViewBar.css'
 
+// Order is the menu order; workspace leads because it is the default grouping.
 const GROUP_LABELS: Record<GroupKey, string> = {
-  project: 'Project',
   workspace: 'Workspace',
+  project: 'Project',
   status: 'Status',
   branch: 'Branch',
   none: 'None',

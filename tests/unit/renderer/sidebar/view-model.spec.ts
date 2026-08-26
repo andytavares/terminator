@@ -428,3 +428,58 @@ describe('buildGroups — purity', () => {
     })
   })
 })
+
+describe('buildGroups — workspace grouping nests its projects', () => {
+  it('nests a project subgroup per project, in project order', () => {
+    const r = build(
+      [session('a'), session('b', { projectId: 'p2' }), session('c', { projectId: 'p3' })],
+      view({ groupBy: 'workspace' })
+    )
+    expect(r.groups.map((g) => g.label)).toEqual(['Backend', 'Writing'])
+    expect(r.groups[0].subgroups!.map((g) => [g.key, g.label])).toEqual([
+      ['p1', 'API'],
+      ['p2', 'Web'],
+    ])
+    expect(r.groups[0].subgroups![0].scope).toEqual({
+      kind: 'project',
+      projectId: 'p1',
+      workspaceId: 'w1',
+    })
+  })
+
+  it('puts each session under its own project subgroup', () => {
+    const r = build(
+      [session('a'), session('b', { projectId: 'p2' })],
+      view({ groupBy: 'workspace' })
+    )
+    const [api, web] = r.groups[0].subgroups!
+    expect(api.sessions.map((s) => s.id)).toEqual(['a'])
+    expect(web.sessions.map((s) => s.id)).toEqual(['b'])
+    expect(r.groups[0].count).toBe(2)
+  })
+
+  it('sorts sessions inside a subgroup by the view sort', () => {
+    const r = build(
+      [session('old', { lastActivityAt: NOW - HOUR }), session('new', { lastActivityAt: NOW })],
+      view({ groupBy: 'workspace', sortBy: 'recent' })
+    )
+    expect(r.groups[0].subgroups![0].sessions.map((s) => s.id)).toEqual(['new', 'old'])
+  })
+
+  it('keeps a project with no sessions reachable while browsing', () => {
+    const r = build([session('a')], view({ groupBy: 'workspace' }))
+    expect(r.groups[0].subgroups!.map((g) => g.label)).toEqual(['API', 'Web'])
+    expect(r.groups[0].subgroups![1].count).toBe(0)
+  })
+
+  it('drops empty project subgroups once a filter is active', () => {
+    const r = build([session('a')], view({ groupBy: 'workspace', filters: { query: 'a' } }))
+    expect(r.groups[0].subgroups!.map((g) => g.label)).toEqual(['API'])
+  })
+
+  it('leaves other groupings without subgroups', () => {
+    for (const groupBy of ['project', 'status', 'branch', 'none'] as const) {
+      expect(build([session('a')], view({ groupBy })).groups[0].subgroups).toBeUndefined()
+    }
+  })
+})

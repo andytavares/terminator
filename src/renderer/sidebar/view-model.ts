@@ -37,6 +37,13 @@ export interface Group {
   scope?: GroupScope
   sessions: TerminalSession[]
   count: number
+  /**
+   * Present only under workspace grouping, where the workspace owns the header
+   * and each of its projects gets one of its own. Without them a project — and
+   * so a branch — has no row to click, no + to press, and starting a terminal
+   * on it means switching the grouping first.
+   */
+  subgroups?: Group[]
 }
 
 export interface BuildResult {
@@ -138,6 +145,39 @@ function bucketFor(
   }
 }
 
+/**
+ * The project layer inside a workspace group. Every project of the workspace is
+ * listed while browsing, so one that has never had a terminal is still
+ * reachable — the same rule the scope groupings follow at the top level.
+ */
+function projectSubgroups(
+  workspaceId: string,
+  sessions: TerminalSession[],
+  projects: Project[],
+  isNarrowed: boolean,
+  sortBy: SortKey
+): Group[] {
+  const byProject = new Map<string, TerminalSession[]>()
+  for (const session of sessions) {
+    const bucket = byProject.get(session.projectId)
+    if (bucket) bucket.push(session)
+    else byProject.set(session.projectId, [session])
+  }
+  return projects
+    .filter((project) => project.workspaceId === workspaceId)
+    .filter((project) => !isNarrowed || byProject.has(project.id))
+    .map((project) => {
+      const own = byProject.get(project.id) ?? []
+      return {
+        key: project.id,
+        label: project.name,
+        scope: { kind: 'project' as const, projectId: project.id, workspaceId },
+        sessions: [...own].sort((a, b) => compareSessions(a, b, sortBy)),
+        count: own.length,
+      }
+    })
+}
+
 function compareSessions(a: TerminalSession, b: TerminalSession, sortBy: SortKey): number {
   switch (sortBy) {
     case 'recent':
@@ -221,15 +261,26 @@ export function buildGroups(
 
   const groups = [...buckets.values()]
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
-    .map(
-      (bucket): Group => ({
+    .map((bucket): Group => {
+      const sessions = [...bucket.sessions].sort((a, b) => compareSessions(a, b, view.sortBy))
+      const group: Group = {
         key: bucket.key,
         label: bucket.label,
         ...(bucket.scope ? { scope: bucket.scope } : {}),
-        sessions: [...bucket.sessions].sort((a, b) => compareSessions(a, b, view.sortBy)),
+        sessions,
         count: bucket.sessions.length,
-      })
-    )
+      }
+      if (view.groupBy === 'workspace' && bucket.scope?.kind === 'workspace') {
+        group.subgroups = projectSubgroups(
+          bucket.scope.workspaceId,
+          sessions,
+          projects,
+          isNarrowed,
+          view.sortBy
+        )
+      }
+      return group
+    })
 
   return { groups, shown: kept.length, total: sessions.length }
 }

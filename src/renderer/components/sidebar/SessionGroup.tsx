@@ -12,6 +12,14 @@ export interface SessionGroupProps {
   onToggleCollapse: () => void
   /** Colour band inherited from the group's workspace. */
   workspaceColor?: string
+  /**
+   * The workspace this project belongs to, named in the header. The colour band
+   * alone cannot answer "which workspace is this?" — a filtered list of project
+   * headers is otherwise a list of names with no home.
+   */
+  workspaceName?: string
+  /** True for a project group rendered inside its workspace's group. */
+  nested?: boolean
   busy?: boolean
   /**
    * Rendered under the header, but only for the project you are working in.
@@ -69,6 +77,8 @@ export function SessionGroup({
   collapsed,
   onToggleCollapse,
   workspaceColor,
+  workspaceName,
+  nested,
   busy,
   branchSwitcher,
   isActiveScope,
@@ -123,7 +133,7 @@ export function SessionGroup({
     <div
       className={`session-group${isScope ? ' session-group--scope' : ''}${
         isActiveScope ? ' session-group--active' : ''
-      }`}
+      }${nested ? ' session-group--nested' : ''}`}
       style={
         workspaceColor
           ? ({ ['--ws-color' as string]: workspaceColor } as React.CSSProperties)
@@ -163,6 +173,11 @@ export function SessionGroup({
         ) : (
           <span className="session-group__label" title={group.label}>
             {group.label}
+            {workspaceName && (
+              <span className="session-group__workspace" title={workspaceName}>
+                {workspaceName}
+              </span>
+            )}
           </span>
         )}
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GlobalTabRegistration } from '../../extensions/registry'
-import type { SessionView } from '../../sidebar/view-model'
+import type { Group, SessionView } from '../../sidebar/view-model'
 import type { Workspace } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
@@ -412,7 +412,7 @@ export function UnifiedSidebar({
     view.filters.projectIds !== undefined ||
     view.filters.staleOnly === true
   const workspacesWithoutGroups =
-    view.groupBy === 'project' && !isNarrowed
+    (view.groupBy === 'project' || view.groupBy === 'workspace') && !isNarrowed
       ? workspaces.filter((ws) => !lastGroupKeyByWorkspace.has(ws.id))
       : []
 
@@ -470,6 +470,98 @@ export function UnifiedSidebar({
     void navigator.clipboard?.writeText(link.key)
   }
 
+  /**
+   * One group, and — under workspace grouping — the project groups nested
+   * inside it. A project group is the same component at either level, so a
+   * project keeps its header actions (select, +, branch switcher, issue, rename,
+   * remove) whichever grouping the user is in.
+   */
+  function renderGroup(group: Group, nested: boolean): JSX.Element {
+    const project =
+      group.scope?.kind === 'project' ? projectById.get(group.scope.projectId) : undefined
+    const workspaceId = group.scope?.workspaceId
+    const workspace = workspaceId ? workspaceById.get(workspaceId) : undefined
+    const ownsWorkspaceTabs =
+      workspaceId !== undefined && firstGroupKeyByWorkspace.get(workspaceId) === group.key
+    const collapsed = isGroupCollapsed(collapseState, view.groupBy, group.key)
+
+    return (
+      <SessionGroup
+        key={group.key}
+        group={group}
+        nested={nested}
+        collapsed={collapsed}
+        onToggleCollapse={() => toggleGroup(group.key)}
+        workspaceColor={workspace?.color}
+        // Nested under its workspace the question is already answered; anywhere
+        // else a project header is a bare name with no home.
+        workspaceName={project && !nested ? workspace?.name : undefined}
+        busy={group.sessions.some((s) => isSessionBusy(s.id))}
+        branchSwitcher={
+          project && workspace ? (
+            <BranchSwitcher
+              project={project}
+              workspaceFolderPath={workspace.folderPath}
+              workspaceId={workspace.id}
+            />
+          ) : undefined
+        }
+        isActiveScope={project !== undefined && project.id === activeProjectId}
+        issueBadge={renderIssueBadge(project?.id)}
+        issueActions={project ? issueActionsFor(project.id) : undefined}
+        onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
+        onAddSession={project ? () => addSessionToProject(project.id) : undefined}
+        onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
+        onRename={project ? (name) => void renameProject(project.id, name) : undefined}
+        onRemove={
+          project
+            ? () => setConfirmDeleteProject({ id: project.id, name: project.name })
+            : undefined
+        }
+        workspaceTabs={ownsWorkspaceTabs ? workspaceTabList : undefined}
+        activeWorkspaceTabId={activeWorkspaceId === workspaceId ? activeWorkspaceTabId : null}
+        onSelectWorkspaceTab={
+          workspaceId ? (tabId) => onSelectWorkspaceTab(workspaceId, tabId) : undefined
+        }
+      >
+        {group.subgroups
+          ? group.subgroups.map((subgroup) => renderGroup(subgroup, true))
+          : group.sessions.map((session) => (
+              <SessionRow
+                key={session.id}
+                session={session}
+                isActive={projectViews.get(session.projectId)?.activeSessionId === session.id}
+                isBusy={isSessionBusy(session.id)}
+                bellCount={getBellCountForSession(session.id)}
+                workspaceColor={workspace?.color ?? ''}
+                now={clock}
+                projectBadge={
+                  group.scope?.kind === 'project'
+                    ? undefined
+                    : projectById.get(session.projectId)?.name
+                }
+                onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
+                noteEditing={noteEditingId === session.id}
+                onNoteEditingChange={(editing) => setNoteEditingId(editing ? session.id : null)}
+                selectable={selectionEnabled}
+                selected={selectedIds.includes(session.id)}
+                onToggleSelected={(shiftKey) => toggleSelection(session.id, shiftKey)}
+                onScopeClick={(e) =>
+                  setScopeMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    projectId: session.projectId,
+                  })
+                }
+                isSubSession={session.parentSessionId !== undefined}
+                onSelect={() => selectSession(session.projectId, session.id)}
+                onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
+              />
+            ))}
+      </SessionGroup>
+    )
+  }
+
   return (
     <>
       <div
@@ -503,89 +595,14 @@ export function UnifiedSidebar({
 
         <div className="unified-sidebar__list">
           {groups.map((group) => {
-            const project =
-              group.scope?.kind === 'project' ? projectById.get(group.scope.projectId) : undefined
             const workspaceId = group.scope?.workspaceId
             const workspace = workspaceId ? workspaceById.get(workspaceId) : undefined
-            const ownsWorkspaceTabs =
-              workspaceId !== undefined && firstGroupKeyByWorkspace.get(workspaceId) === group.key
-            const collapsed = isGroupCollapsed(collapseState, view.groupBy, group.key)
-
             const closesWorkspace =
               workspaceId !== undefined && lastGroupKeyByWorkspace.get(workspaceId) === group.key
 
             return (
               <React.Fragment key={group.key}>
-                <SessionGroup
-                  group={group}
-                  collapsed={collapsed}
-                  onToggleCollapse={() => toggleGroup(group.key)}
-                  workspaceColor={workspace?.color}
-                  busy={group.sessions.some((s) => isSessionBusy(s.id))}
-                  branchSwitcher={
-                    project && workspace ? (
-                      <BranchSwitcher
-                        project={project}
-                        workspaceFolderPath={workspace.folderPath}
-                        workspaceId={workspace.id}
-                      />
-                    ) : undefined
-                  }
-                  isActiveScope={project !== undefined && project.id === activeProjectId}
-                  issueBadge={renderIssueBadge(project?.id)}
-                  issueActions={project ? issueActionsFor(project.id) : undefined}
-                  onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
-                  onAddSession={project ? () => addSessionToProject(project.id) : undefined}
-                  onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
-                  onRename={project ? (name) => void renameProject(project.id, name) : undefined}
-                  onRemove={
-                    project
-                      ? () => setConfirmDeleteProject({ id: project.id, name: project.name })
-                      : undefined
-                  }
-                  workspaceTabs={ownsWorkspaceTabs ? workspaceTabList : undefined}
-                  activeWorkspaceTabId={
-                    activeWorkspaceId === workspaceId ? activeWorkspaceTabId : null
-                  }
-                  onSelectWorkspaceTab={
-                    workspaceId ? (tabId) => onSelectWorkspaceTab(workspaceId, tabId) : undefined
-                  }
-                >
-                  {group.sessions.map((session) => (
-                    <SessionRow
-                      key={session.id}
-                      session={session}
-                      isActive={projectViews.get(session.projectId)?.activeSessionId === session.id}
-                      isBusy={isSessionBusy(session.id)}
-                      bellCount={getBellCountForSession(session.id)}
-                      workspaceColor={workspace?.color ?? ''}
-                      now={clock}
-                      projectBadge={
-                        group.scope?.kind === 'project'
-                          ? undefined
-                          : projectById.get(session.projectId)?.name
-                      }
-                      onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
-                      noteEditing={noteEditingId === session.id}
-                      onNoteEditingChange={(editing) =>
-                        setNoteEditingId(editing ? session.id : null)
-                      }
-                      selectable={selectionEnabled}
-                      selected={selectedIds.includes(session.id)}
-                      onToggleSelected={(shiftKey) => toggleSelection(session.id, shiftKey)}
-                      onScopeClick={(e) =>
-                        setScopeMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          projectId: session.projectId,
-                        })
-                      }
-                      isSubSession={session.parentSessionId !== undefined}
-                      onSelect={() => selectSession(session.projectId, session.id)}
-                      onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
-                    />
-                  ))}
-                </SessionGroup>
+                {renderGroup(group, false)}
 
                 {closesWorkspace && workspace && (
                   <div

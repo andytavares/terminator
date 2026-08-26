@@ -12,7 +12,7 @@
 
 ### User Story 1 - See every session at a glance (Priority: P1)
 
-A user returning to the app after a break opens the sidebar and immediately sees every one of their sessions in one list, each showing what state it is in and how recently it did anything — without expanding anything. The list is grouped by project by default, so the positional information the old tree carried is still there, but nothing is hidden behind a collapsed header.
+A user returning to the app after a break opens the sidebar and immediately sees every one of their sessions in one list, each showing what state it is in and how recently it did anything — without expanding anything. The list is grouped by workspace by default (amended 2026-08-25 — originally by project — with each project nested under its workspace), so the positional information the old tree carried is still there, but nothing is hidden behind a collapsed header.
 
 **Why this priority**: This is the core complaint. Today all sessions sit behind collapsed workspace headers with no recency information, so a user with 20+ sessions cannot tell which ones matter without clicking through the tree. Every other story in this feature builds on the flat list.
 
@@ -151,7 +151,7 @@ A user types a query and the list narrows to matching sessions — matched on se
 - **FR-009**: The system MUST provide selectable views that each specify a grouping key, a sort key, and a filter set.
 - **FR-010**: Grouping MUST support at least: by project, by workspace, by status, by branch, and no grouping.
 - **FR-011**: Sorting MUST support at least: most recent activity, oldest activity, name, status, and manual order.
-- **FR-012**: The system MUST ship built-in views: Everything (grouped by project, manual order), Needs me (waiting-on-user only), Active (working only), and Stale (stale only, oldest first).
+- **FR-012**: The system MUST ship built-in views: Everything (grouped by workspace, with each project nested under its workspace — amended 2026-08-25, was grouped by project; manual order), Needs me (waiting-on-user only), Active (working only), and Stale (stale only, oldest first).
 - **FR-013**: Users MUST be able to change grouping, sort, and filters for the current view and save the result as a named custom view.
 - **FR-014**: Custom views and per-view settings MUST persist across restarts.
 - **FR-015**: On launch the sidebar MUST restore to the unfiltered Everything view, never to a filtered view.

@@ -519,10 +519,14 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 │   └── SessionGroup — the scope-bearing header. When the grouping key is a project or
 │       │             workspace this header IS the row the old tree had, and hosts
 │       │             everything it hosted.
-│       ├── chevron / worktree icon / label / busy aggregate / count / + new terminal
+│       ├── chevron / worktree icon / label / workspace name (project headers outside
+│       │     workspace grouping) / busy aggregate / count / + new terminal
 │       ├── workspace tab icons — hover-reveal icons from registerWorkspaceTab(),
 │       │     rendered on each workspace's FIRST group so they appear once per
 │       │     workspace rather than once per project
+│       ├── SessionGroup[] — under workspace grouping only: one nested project group
+│       │     per project of that workspace, rendered by the same component so a
+│       │     project keeps its header actions without changing the grouping
 │       ├── BranchSwitcher (project groups only)
 │       └── SessionRow[] — status dot / spinner / bell, relative activity, optional
 │             note, project badge (which opens ScopeMenu when the header does not
@@ -535,7 +539,8 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 ### The view-model layer
 
 `src/renderer/sidebar/` holds the pure core: `view-model.ts` (`buildGroups`, `isStale`),
-`views.ts` (built-in views as data + persistence), `agent-state.ts`, `collapse-state.ts`,
+`views.ts` (built-in views as data + persistence — Everything, the default view, groups
+by workspace), `agent-state.ts`, `collapse-state.ts`,
 and `relative-time.ts`.
 
 **These modules import nothing but types.** No React, no store, no `Date.now()` — `now`
