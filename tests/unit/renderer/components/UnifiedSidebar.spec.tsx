@@ -220,17 +220,10 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
     }
   })
 
-  it('groups by project by default, so positional information survives the flattening', () => {
-    const { container } = renderSidebar()
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
-      (el) => el.textContent
-    )
-    expect(labels).toEqual(['API', 'Jobs', 'Web'])
-  })
-
   it('defaults every group to expanded (FR-008)', () => {
     const { container } = renderSidebar()
-    expect(container.querySelectorAll('.session-group__sessions')).toHaveLength(3)
+    // Two workspaces plus the three project groups nested inside them.
+    expect(container.querySelectorAll('.session-group__sessions')).toHaveLength(5)
   })
 
   it('shows a relative last-activity label on each row', () => {
@@ -249,7 +242,7 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.textContent
     )
-    expect(labels).toEqual(['API', 'Jobs', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
     expect(container.querySelectorAll('.session-group__add')).toHaveLength(3)
   })
 
@@ -304,20 +297,20 @@ describe('UnifiedSidebar — selection keeps project-scoped state resolved (I4, 
 describe('UnifiedSidebar — collapse state', () => {
   it('selects the project when its header is clicked', () => {
     const { container } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.session-group__header')[0])
+    fireEvent.click(container.querySelectorAll('.session-group__header')[1])
     expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p1')
   })
 
   it('collapses a group and hides only its sessions', () => {
     const { container } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.session-group__chevron')[0])
+    fireEvent.click(container.querySelectorAll('.session-group__chevron')[1])
     expect(screen.queryByText('api-shell')).toBeNull()
     expect(screen.getByText('jobs-run')).toBeTruthy()
   })
 
   it('persists the collapsed group across a remount', () => {
     const { container, unmount } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.session-group__chevron')[0])
+    fireEvent.click(container.querySelectorAll('.session-group__chevron')[1])
     unmount()
     renderSidebar()
     expect(screen.queryByText('api-shell')).toBeNull()
@@ -351,14 +344,14 @@ describe('UnifiedSidebar — scope actions on the group header (FR-026)', () => 
 
   it('offers project removal from the header context menu', () => {
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[0])
+    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
     fireEvent.click(screen.getByText('Remove'))
     expect(screen.getByText('Remove project "API"?')).toBeTruthy()
   })
 
   it('deletes the project once removal is confirmed', () => {
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[0])
+    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
     fireEvent.click(screen.getByText('Remove'))
     fireEvent.click(screen.getAllByText('Remove').at(-1)!)
     expect(mockWorkspaceStore.deleteProject).toHaveBeenCalledWith('p1')
@@ -435,12 +428,12 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     const order = Array.from(
       container.querySelectorAll('.session-group__label, .ws-row__name')
     ).map((el) => el.textContent)
-    expect(order).toEqual(['API', 'Jobs', 'Backend', 'Web', 'Frontend'])
+    expect(order).toEqual(['Backend', 'API', 'Jobs', 'Backend', 'Frontend', 'Web', 'Frontend'])
   })
 
   it('offers a create-project entry point per workspace', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByText('Frontend'))
+    const { container } = renderSidebar()
+    fireEvent.click(container.querySelectorAll('.ws-row__name')[1])
     expect(screen.getByTestId('create-project-dialog')).toBeTruthy()
   })
 
@@ -467,8 +460,8 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
   })
 
   it('closes the create-project dialog when it asks to close', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByText('Frontend'))
+    const { container } = renderSidebar()
+    fireEvent.click(container.querySelectorAll('.ws-row__name')[1])
     fireEvent.click(screen.getByText('close-project'))
     expect(screen.queryByTestId('create-project-dialog')).toBeNull()
   })
@@ -526,7 +519,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
 
   it('renames a project through the store', () => {
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[0])
+    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
     fireEvent.click(screen.getByText('Rename'))
     const input = container.querySelector('.session-group__rename-input') as HTMLInputElement
     fireEvent.change(input, { target: { value: 'API v2' } })
@@ -563,7 +556,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
 
   it('leaves the project alone when removal is cancelled', () => {
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[0])
+    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
     fireEvent.click(screen.getByText('Remove'))
     fireEvent.click(screen.getByText('Cancel'))
     expect(mockWorkspaceStore.deleteProject).not.toHaveBeenCalled()
@@ -573,7 +566,9 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
   it('marks a busy group with the aggregate indicator', () => {
     mockSessionStore.isSessionBusy.mockImplementation((id: string) => id === 's3')
     const { container } = renderSidebar()
-    expect(container.querySelectorAll('.session-group__busy')).toHaveLength(1)
+    // The workspace header aggregates its projects, so both it and the project
+    // group carry the indicator.
+    expect(container.querySelectorAll('.session-group__busy')).toHaveLength(2)
     mockSessionStore.isSessionBusy.mockReturnValue(false)
   })
 
@@ -604,10 +599,10 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
 
   it('groups by workspace and keeps the workspace scope on the header', () => {
     const { container } = renderSidebar({ initialViewId: 'by-workspace' })
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
-      (el) => el.textContent
+    const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
+      el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'Frontend'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
   })
 
   it('shows the project badge on every row once the header stops naming the project', () => {
@@ -655,10 +650,10 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
 
   it('falls back to the default view when the stored view id is unknown', () => {
     const { container } = renderSidebar({ initialViewId: 'nope' })
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
-      (el) => el.textContent
+    const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
+      el.textContent!.trim()
     )
-    expect(labels).toEqual(['API', 'Jobs', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
   })
 
   it('highlights the workspace drop target during a drag', () => {
@@ -713,7 +708,7 @@ describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', 
 describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
   it('switches grouping from the view bar', () => {
     const { container } = renderSidebar()
-    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
     fireEvent.click(screen.getByText('Status'))
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.textContent
@@ -723,14 +718,14 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
 
   it('persists a grouping change for that view across a remount', () => {
     const { unmount } = renderSidebar()
-    fireEvent.click(screen.getByText('Group: Project'))
-    fireEvent.click(screen.getByText('Workspace'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
+    fireEvent.click(screen.getByText('Project'))
     unmount()
     const { container } = renderSidebar()
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
-      (el) => el.textContent
+      (el) => el.firstChild!.textContent
     )
-    expect(labels).toEqual(['Backend', 'Frontend'])
+    expect(labels).toEqual(['API', 'Jobs', 'Web'])
   })
 
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
@@ -948,5 +943,50 @@ describe('UnifiedSidebar — session notes (FR-005)', () => {
   it('shows no note element when the session has none', () => {
     const { container } = renderSidebar()
     expect(container.querySelector('.session-row__note')).toBeNull()
+  })
+})
+
+describe('UnifiedSidebar — workspace grouping keeps the project layer (default view)', () => {
+  it('nests each project under its workspace', () => {
+    const { container } = renderSidebar()
+    const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
+      el.textContent!.trim()
+    )
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+  })
+
+  it('starts a terminal on a nested project without changing the grouping', () => {
+    const { container } = renderSidebar()
+    const jobs = Array.from(container.querySelectorAll('.session-group--nested')).find((el) =>
+      el.querySelector('.session-group__label')!.textContent!.startsWith('Jobs')
+    )!
+    fireEvent.click(jobs.querySelector('.session-group__add')!)
+    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p2')
+    expect(mockCreateSession).toHaveBeenCalled()
+  })
+
+  it('offers the branch switcher on the nested project that is active', () => {
+    mockWorkspaceStore.activeProjectId = 'p1'
+    renderSidebar()
+    expect(screen.getAllByTestId('branch-switcher')).toHaveLength(1)
+  })
+
+  it('names no workspace on a nested project — its header already says it', () => {
+    const { container } = renderSidebar()
+    expect(container.querySelector('.session-group__workspace')).toBeNull()
+  })
+
+  it('names the workspace on every project header under project grouping', () => {
+    localStorage.setItem(
+      'terminator.sidebar.views',
+      JSON.stringify([
+        { id: 'by-project', name: 'P', groupBy: 'project', sortBy: 'name', filters: {} },
+      ])
+    )
+    const { container } = renderSidebar({ initialViewId: 'by-project' })
+    const names = Array.from(container.querySelectorAll('.session-group__workspace')).map(
+      (el) => el.textContent
+    )
+    expect(names).toEqual(['Backend', 'Backend', 'Frontend'])
   })
 })

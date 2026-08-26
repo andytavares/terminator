@@ -69,13 +69,13 @@ describe('ViewBar — saved views', () => {
 describe('ViewBar — grouping and sort', () => {
   it('shows the active grouping and sort', () => {
     renderBar()
-    expect(screen.getByText('Group: Project')).toBeTruthy()
+    expect(screen.getByText('Group: Workspace')).toBeTruthy()
     expect(screen.getByText('Sort: Manual')).toBeTruthy()
   })
 
   it('offers every grouping key (FR-010)', () => {
     renderBar()
-    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
     for (const label of ['Project', 'Workspace', 'Status', 'Branch', 'None']) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0)
     }
@@ -91,7 +91,7 @@ describe('ViewBar — grouping and sort', () => {
 
   it('changes the grouping of the active view', () => {
     renderBar()
-    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
     fireEvent.click(screen.getByText('Branch'))
     expect(props.onChangeView).toHaveBeenCalledWith({ groupBy: 'branch' })
   })
@@ -105,7 +105,7 @@ describe('ViewBar — grouping and sort', () => {
 
   it('closes the menu on an outside click, like every other menu in the app', () => {
     const { container } = renderBar()
-    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
     expect(container.querySelector('.view-bar__menu')).toBeTruthy()
     fireEvent.click(window)
     expect(container.querySelector('.view-bar__menu')).toBeNull()
@@ -120,22 +120,22 @@ describe('ViewBar — grouping and sort', () => {
 
   it('closes an open menu when another context menu broadcasts a close', () => {
     const { container } = renderBar()
-    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
     fireEvent(window, new CustomEvent('close-context-menus'))
     expect(container.querySelector('.view-bar__menu')).toBeNull()
   })
 
   it('stops listening once unmounted', () => {
     const { unmount } = renderBar()
-    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
     unmount()
     expect(() => fireEvent.click(window)).not.toThrow()
   })
 
   it('closes the menu when the same control is clicked again', () => {
     const { container } = renderBar()
-    fireEvent.click(screen.getByText('Group: Project'))
-    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
+    fireEvent.click(screen.getByText('Group: Workspace'))
     expect(container.querySelector('.view-bar__menu')).toBeNull()
   })
 })
@@ -165,6 +165,17 @@ describe('ViewBar — hide stale (FR-021)', () => {
 
   it('falls back to the first view when the active id is unknown', () => {
     renderBar({ activeViewId: 'gone' })
-    expect(screen.getByText('Group: Project')).toBeTruthy()
+    expect(screen.getByText('Group: Workspace')).toBeTruthy()
+  })
+})
+
+describe('ViewBar — grouping menu order', () => {
+  it('lists Workspace first, matching the default grouping', () => {
+    const { container } = renderBar()
+    fireEvent.click(screen.getByText('Group: Workspace'))
+    const items = Array.from(container.querySelectorAll('.view-bar__menu-item')).map(
+      (el) => el.textContent
+    )
+    expect(items).toEqual(['Workspace', 'Project', 'Status', 'Branch', 'None'])
   })
 })

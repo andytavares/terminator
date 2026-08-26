@@ -300,3 +300,20 @@ describe('SessionGroup — the attached issue', () => {
     expect(screen.queryByText('Link issue…')).toBeNull()
   })
 })
+
+describe('SessionGroup — naming the workspace a project belongs to', () => {
+  it('renders the workspace name beside the project name', () => {
+    const { container } = renderGroup({ workspaceName: 'Backend' })
+    expect(container.querySelector('.session-group__workspace')!.textContent).toBe('Backend')
+  })
+
+  it('renders nothing extra when no workspace name is given', () => {
+    const { container } = renderGroup()
+    expect(container.querySelector('.session-group__workspace')).toBeNull()
+  })
+
+  it('marks a nested group so the project layer reads as one', () => {
+    const { container } = renderGroup({ nested: true })
+    expect(container.querySelector('.session-group--nested')).toBeTruthy()
+  })
+})

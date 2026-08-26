@@ -48,7 +48,7 @@ describe('built-in views', () => {
     expect(DEFAULT_VIEW_ID).toBe('everything')
     const everything = BUILT_IN_VIEWS.find((v) => v.id === 'everything')!
     expect(everything.filters).toEqual({})
-    expect(everything.groupBy).toBe('project')
+    expect(everything.groupBy).toBe('workspace')
     expect(everything.sortBy).toBe('manual')
   })
 

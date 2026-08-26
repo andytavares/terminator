@@ -93,11 +93,16 @@ export function workspaceRow(page: Page, name: string) {
 /**
  * A project's group header. Projects are groups now, and a project with no
  * sessions still gets a header so it can be selected and started in.
+ *
+ * Under the default workspace grouping a project group is nested inside its
+ * workspace's group, so the filter matches both; the last match is always the
+ * innermost one, which is the project.
  */
 export function projectGroup(page: Page, projectName: string) {
   return page
     .locator('.session-group')
     .filter({ has: page.locator('.session-group__label', { hasText: projectName }) })
+    .last()
 }
 
 /**

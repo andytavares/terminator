@@ -30,7 +30,9 @@ test.beforeAll(async () => {
   // A workspace whose folder is a git repo auto-creates a project on the current
   // branch; selecting it gives the git panels a repoRoot to read.
   await createWorkspace(handle.page, WS, gitRepoDir)
-  const firstProject = handle.page.locator('.session-group').first()
+  // The innermost group is a project: under the default workspace grouping the
+  // project group is nested inside its workspace's group.
+  const firstProject = handle.page.locator('.session-group:not(:has(.session-group))').first()
   await expect(firstProject).toBeVisible()
   // The header click is what selects the project, which is what gives the git
   // panels a repoRoot and puts the Git project tab in the primary bar.
