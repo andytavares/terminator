@@ -1,0 +1,58 @@
+src/renderer/components/sidebar/SessionRow.tsx
+  s_fcfef3c41f4cf0::t_3b4e306325cb00 2,5,38-44,95-96,98-99,108-111,114,128-130
+specs/032-branch-first-sidebar/tasks.md
+  s_fcfef3c41f4cf0::t_4f2b796460db63 61-65,69-71
+  s_fcfef3c41f4cf0::t_47fb4decb30949 31-33,45-47
+  s_fcfef3c41f4cf0::t_3c9d90a5af1224 178-193
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_fcfef3c41f4cf0::t_822b00e4b25431 4-8
+tests/unit/renderer/sidebar/session-status.spec.ts
+  s_fcfef3c41f4cf0::t_9bb7a21070db91 1-75
+specs/032-branch-first-sidebar/baseline.md
+  s_fcfef3c41f4cf0::t_47fb4decb30949 10-14,18-22,26-29,35-38
+  s_fcfef3c41f4cf0::t_835cecc567e019 1-9,15-17,23-25,30-34,39-44
+tests/unit/renderer/sidebar-status-colour-independence.spec.ts
+  s_fcfef3c41f4cf0::t_52f569e7c948d1 22-34,36-45,70-75
+src/renderer/sidebar/session-status.ts
+  s_fcfef3c41f4cf0::t_110f169548554a 1-44
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_fcfef3c41f4cf0::t_eaccc2cf1a4794 520-521
+  s_fcfef3c41f4cf0::t_978fcdeecfdcf7 805-807,811
+  s_fcfef3c41f4cf0::t_b703b790f1a43f 472,500-511
+  s_fcfef3c41f4cf0::t_cb1c5d7b0d6af2 1008-1035,1039-1040
+  s_fcfef3c41f4cf0::t_4f2b796460db63 1036-1038
+src/renderer/components/sidebar/SessionGroup.css
+  s_fcfef3c41f4cf0::t_822b00e4b25431 186-201
+src/renderer/components/sidebar/SessionRow.css
+  s_fcfef3c41f4cf0::t_fe2cd79469b59b 194
+  s_fcfef3c41f4cf0::t_822b00e4b25431 188-193,195-197
+  s_fcfef3c41f4cf0::t_1165019dc0caed 19-20,23-24,61-66,69-70,73-74
+src/renderer/styles.css
+  s_fcfef3c41f4cf0::t_822b00e4b25431 56
+tests/unit/renderer/components/SessionRow.spec.tsx
+  s_fcfef3c41f4cf0::t_cb8859d74ce358 352,357
+  s_fcfef3c41f4cf0::t_0a0301796bb957 359,361-401,403-452
+  s_fcfef3c41f4cf0::t_be5c2c3ff3ce7d 120,135,139-140,343
+  s_fcfef3c41f4cf0::t_47fb4decb30949 130-132,141-143,347-348
+  s_fcfef3c41f4cf0::t_2150b8d104b064 349,358,360
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_fcfef3c41f4cf0::t_e948657ef5321c 11,261-267,270-274,276
+  s_fcfef3c41f4cf0::t_03043c51f52f1c 66-69
+  s_fcfef3c41f4cf0::t_978fcdeecfdcf7 268-269,275
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "2965540e48af04152fee40a3e6637ea4a59abc90",
+  "prompts": {},
+  "sessions": {
+    "s_fcfef3c41f4cf0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3779fbc3-6b0c-468d-91ec-b7d824a3c1fc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
