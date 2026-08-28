@@ -183,3 +183,19 @@
 .session-group--active .session-group__header {
   background: var(--bg-card-hover);
 }
+
+/* ── Width degradation ────────────────────────────────────────
+   Same fixed order as the session row (research R3). The worktree glyph
+   survives every breakpoint because it carries the safety-relevant bit —
+   which tree a command is about to run in. */
+@container sidebar (max-width: 299px) {
+  .session-group__stats {
+    display: none;
+  }
+}
+
+@container sidebar (max-width: 259px) {
+  .session-group__worktree-tag {
+    display: none;
+  }
+}

@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react'
+import { Circle, CircleX, Pause, Play } from 'lucide-react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { formatRelativeTime } from '../../sidebar/relative-time'
+import { statusPresentationFor, type StatusIcon } from '../../sidebar/session-status'
 import { useSessionStore } from '../../stores/session.store'
 import { MoveSessionDialog } from './MoveSessionDialog'
 import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
@@ -31,6 +33,13 @@ interface SessionRowProps {
   /** Opens the note editor from outside, e.g. the Cmd+I shortcut. */
   noteEditing?: boolean
   onNoteEditingChange?: (editing: boolean) => void
+}
+
+const STATUS_ICON: Record<StatusIcon, typeof Circle> = {
+  play: Play,
+  circle: Circle,
+  pause: Pause,
+  'circle-x': CircleX,
 }
 
 export function SessionRow({
@@ -83,7 +92,11 @@ export function SessionRow({
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
+  const status = statusPresentationFor(session)
+
   function renderStatus(): React.ReactNode {
+    // A live spinner and an unread bell are both more urgent than the resting
+    // state, and both already say what the glyph would. Unchanged precedence.
     if (isBusy) return <span className="session-row__spinner" />
     if (bellCount > 0) {
       return (
@@ -92,15 +105,13 @@ export function SessionRow({
         </span>
       )
     }
-    // One dot shape at three opacities. Hue never carries meaning on its own —
-    // awaiting-input is marked by the edge bar and pill below, not by colour.
-    if (session.agentState === 'exited')
-      return <span className="session-row__dot session-row__dot--exited" />
-    if (isActive) return <span className="session-row__dot session-row__dot--active" />
-    return <span className="session-row__dot session-row__dot--dim" />
+    // Shape carries the state; the icon inherits currentColor and is hidden
+    // from assistive technology, which reads the row's aria-label instead.
+    const Icon = STATUS_ICON[status.icon]
+    return <Icon aria-hidden="true" data-state={session.agentState} />
   }
 
-  const needsYou = session.agentState === 'awaiting-input'
+  const needsYou = status.emphasises
 
   function commitNote(value: string): void {
     onSetNote?.(value)
@@ -114,6 +125,9 @@ export function SessionRow({
         onClick={onSelect}
         onDoubleClick={startRename}
         onContextMenu={handleContextMenu}
+        aria-label={`${session.tabTitle}, ${status.label}${
+          now === undefined ? '' : `, active ${formatRelativeTime(session.lastActivityAt, now)}`
+        }`}
       >
         {selectable && (
           <input

@@ -19,14 +19,30 @@ function ruleBody(css: string, selector: string): string {
 }
 
 describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
-  it('separates the three dot states by opacity, not only by hue', () => {
-    const dim = ruleBody(ROW_CSS, '.session-row__dot--dim')
-    const exited = ruleBody(ROW_CSS, '.session-row__dot--exited')
-    expect(dim).toMatch(/opacity:\s*0?\.\d+/)
-    expect(exited).toMatch(/opacity:\s*0?\.\d+/)
-    // Different enough to tell apart with colour removed.
+  it('separates the four states by glyph shape, which survives greyscale outright', () => {
+    // The dot-at-three-opacities scheme this replaced could not distinguish
+    // running from idle from waiting at all — one shape, one channel, and that
+    // channel was spent on selection (audit SESS-1).
+    const STATUS = read('../../../src/renderer/sidebar/session-status.ts')
+    const icons = [...STATUS.matchAll(/icon:\s*'([a-z-]+)'/g)].map((m) => m[1])
+    expect(icons).toHaveLength(4)
+    expect(new Set(icons).size).toBe(4)
+  })
+
+  it('reserves opacity for receding the states that are not asking for anything', () => {
+    const idle = ruleBody(ROW_CSS, ".session-row__status svg[data-state='idle']")
+    const exited = ruleBody(ROW_CSS, ".session-row__status svg[data-state='exited']")
     const value = (body: string) => Number(/opacity:\s*([\d.]+)/.exec(body)![1])
-    expect(Math.abs(value(dim) - value(exited))).toBeGreaterThanOrEqual(0.15)
+    expect(Math.abs(value(idle) - value(exited))).toBeGreaterThanOrEqual(0.15)
+  })
+
+  it('puts no colour on the status glyph — shape is the only state channel', () => {
+    const statusRules = [...ROW_CSS.matchAll(/\.session-row__status[^{]*\{([^}]*)\}/g)]
+    expect(statusRules.length).toBeGreaterThan(0)
+    for (const [, body] of statusRules) {
+      expect(body).not.toMatch(/(^|\s)color:/)
+      expect(body).not.toMatch(/(^|\s)fill:/)
+    }
   })
 
   it('marks awaiting-input with a shape cue — a left edge bar', () => {
@@ -50,12 +66,13 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
   })
 
   it('uses no emoji anywhere in the row (Principle XII)', () => {
-    // The row draws no icon at all now — the status dot leads it, matching the
-    // design. Any icon it grows later must come from lucide.
     expect(ROW_TSX).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u)
-    if (/<[A-Z]\w*Icon|size=\{/.test(ROW_TSX)) {
-      expect(ROW_TSX).toMatch(/from 'lucide-react'/)
-    }
+  })
+
+  it('draws its status glyphs from lucide, sized by CSS rather than the size prop', () => {
+    expect(ROW_TSX).toMatch(/from 'lucide-react'/)
+    expect(ROW_TSX).not.toMatch(/size=\{/)
+    expect(ROW_CSS).toMatch(/\.session-row__status svg\s*\{[^}]*width:/)
   })
 
   it('never sets an explicit colour on an icon', () => {

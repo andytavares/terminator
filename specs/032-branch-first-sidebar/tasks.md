@@ -28,9 +28,9 @@ Electron desktop app, per plan.md: `src/main/`, `src/preload/`, `src/renderer/`,
 
 **Purpose**: Land on the right base and record what "no regression" means before touching anything.
 
-- [ ] T001 Rebase this branch onto `032-sidebar-workspace-grouping` (PR #155), resolving conflicts in `src/renderer/components/sidebar/UnifiedSidebar.tsx` and `src/renderer/components/sidebar/SessionGroup.tsx` — the `nested` and `workspaceName` props this feature builds on come from that PR
-- [ ] T002 [P] Record the pre-change baseline (total passing tests, and per-file coverage for `src/renderer/components/sidebar/` and `src/renderer/sidebar/`) in `specs/032-branch-first-sidebar/baseline.md` by running `npx vitest run --coverage`
-- [ ] T003 [P] Confirm `npm run lint` reports 0 errors and `npx playwright test` passes on the rebased base, so any later failure is attributable to this feature
+- [x] T001 Rebase this branch onto `032-sidebar-workspace-grouping` (PR #155), resolving conflicts in `src/renderer/components/sidebar/UnifiedSidebar.tsx` and `src/renderer/components/sidebar/SessionGroup.tsx` — the `nested` and `workspaceName` props this feature builds on come from that PR
+- [x] T002 [P] Record the pre-change baseline (total passing tests, and per-file coverage for `src/renderer/components/sidebar/` and `src/renderer/sidebar/`) in `specs/032-branch-first-sidebar/baseline.md` by running `npx vitest run --coverage`
+- [x] T003 [P] Confirm `npm run lint` reports 0 errors and `npx playwright test` passes on the rebased base, so any later failure is attributable to this feature
 
 **Checkpoint**: Rebased, green, and the baseline is written down.
 
@@ -42,9 +42,9 @@ Electron desktop app, per plan.md: `src/main/`, `src/preload/`, `src/renderer/`,
 
 **⚠️ CRITICAL**: T004–T006 block US1 and US2.
 
-- [ ] T004 Raise `DEFAULT_WIDTH` from 260 to 300 in `src/renderer/components/sidebar/UnifiedSidebar.tsx`, leaving `MIN_WIDTH`, `MAX_WIDTH` and `readStoredWidth()` untouched so an existing stored width still wins (research R3)
-- [ ] T005 [P] Add the width-degradation rules to `src/renderer/components/sidebar/SessionRow.css` and `src/renderer/components/sidebar/SessionGroup.css` in the fixed drop order — statistics below 300px, worktree tag text below 260px, activity time below 230px — with name and state glyph never dropping and the row never wrapping (research R3, contracts/sidebar-row.md)
-- [ ] T006 [P] Extend `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` with failing tests asserting the new 300px default and that a stored width still overrides it
+- [x] T004 Raise `DEFAULT_WIDTH` from 260 to 300 in `src/renderer/components/sidebar/UnifiedSidebar.tsx`, leaving `MIN_WIDTH`, `MAX_WIDTH` and `readStoredWidth()` untouched so an existing stored width still wins (research R3)
+- [x] T005 [P] Add the width-degradation rules to `src/renderer/components/sidebar/SessionRow.css` and `src/renderer/components/sidebar/SessionGroup.css` in the fixed drop order — statistics below 300px, worktree tag text below 260px, activity time below 230px — with name and state glyph never dropping and the row never wrapping (research R3, contracts/sidebar-row.md)
+- [x] T006 [P] Extend `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` with failing tests asserting the new 300px default and that a stored width still overrides it
 
 **Checkpoint**: Foundation ready — US1 and US2 can proceed in parallel.
 
@@ -58,17 +58,17 @@ Electron desktop app, per plan.md: `src/main/`, `src/preload/`, `src/renderer/`,
 
 ### Tests for User Story 1 ⚠️ Write first, confirm they fail
 
-- [ ] T007 [P] [US1] Write failing tests for the pure status mapping in `tests/unit/renderer/sidebar/session-status.spec.ts` — all four `AgentState` values map to distinct icons and labels, the mapping is total, and the function takes no selection input (data-model.md § SessionStatus)
-- [ ] T008 [P] [US1] Add a failing test to `tests/unit/renderer/components/SessionRow.spec.tsx` asserting the state glyph is unchanged when `isActive` toggles from false to true (FR-001)
-- [ ] T009 [P] [US1] Add a failing test to `tests/unit/renderer/components/SessionRow.spec.tsx` for render precedence: busy spinner beats bell badge beats state glyph
-- [ ] T010 [P] [US1] Add a failing test to `tests/unit/renderer/components/SessionRow.spec.tsx` asserting `aria-label` contains the status label and the icon carries `aria-hidden` (SC-007, contracts/sidebar-row.md)
-- [ ] T011 [P] [US1] Add a failing test to `tests/unit/renderer/components/SessionRow.spec.tsx` asserting the icon element carries no colour class and no inline `color` style (constitution XII)
+- [x] T007 [P] [US1] Write failing tests for the pure status mapping in `tests/unit/renderer/sidebar/session-status.spec.ts` — all four `AgentState` values map to distinct icons and labels, the mapping is total, and the function takes no selection input (data-model.md § SessionStatus)
+- [x] T008 [P] [US1] Add a failing test to `tests/unit/renderer/components/SessionRow.spec.tsx` asserting the state glyph is unchanged when `isActive` toggles from false to true (FR-001)
+- [x] T009 [P] [US1] Add a failing test to `tests/unit/renderer/components/SessionRow.spec.tsx` for render precedence: busy spinner beats bell badge beats state glyph
+- [x] T010 [P] [US1] Add a failing test to `tests/unit/renderer/components/SessionRow.spec.tsx` asserting `aria-label` contains the status label and the icon carries `aria-hidden` (SC-007, contracts/sidebar-row.md)
+- [x] T011 [P] [US1] Add a failing test to `tests/unit/renderer/components/SessionRow.spec.tsx` asserting the icon element carries no colour class and no inline `color` style (constitution XII)
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Create `src/renderer/sidebar/session-status.ts` exporting a pure, total `statusPresentationFor(session)` returning `{ icon, label, emphasises }`, using `Play` / `Circle` / `Pause` / `CircleX` (research R1) — no clock, no store, no I/O
-- [ ] T013 [US1] Rewrite `renderStatus()` in `src/renderer/components/sidebar/SessionRow.tsx` to consume `statusPresentationFor`, removing the `isActive`-driven dot entirely and keeping the existing spinner and bell precedence
-- [ ] T014 [US1] Move selection to the row surface in `src/renderer/components/sidebar/SessionRow.css` (`.session-row--active` background) and keep the `--needs-you` edge bar as the awaiting-input emphasis (FR-004)
+- [x] T012 [US1] Create `src/renderer/sidebar/session-status.ts` exporting a pure, total `statusPresentationFor(session)` returning `{ icon, label, emphasises }`, using `Play` / `Circle` / `Pause` / `CircleX` (research R1) — no clock, no store, no I/O
+- [x] T013 [US1] Rewrite `renderStatus()` in `src/renderer/components/sidebar/SessionRow.tsx` to consume `statusPresentationFor`, removing the `isActive`-driven dot entirely and keeping the existing spinner and bell precedence
+- [x] T014 [US1] Move selection to the row surface in `src/renderer/components/sidebar/SessionRow.css` (`.session-row--active` background) and keep the `--needs-you` edge bar as the awaiting-input emphasis (FR-004)
 
 **Checkpoint**: US1 is independently shippable — the sidebar now answers "what is happening" without US2, US3 or US4.
 
@@ -172,6 +172,22 @@ Electron desktop app, per plan.md: `src/main/`, `src/preload/`, `src/renderer/`,
 - [ ] T060 Run `npx vitest run --coverage` and confirm all pass with every new file at ≥ 80% statements, branches, functions and lines: `session-status.ts`, `branch-display.ts`, `change-stats.store.ts`, `AppBand.tsx`
 - [ ] T061 Run `npx playwright test` and confirm the full e2e suite passes
 - [ ] T062 Walk every scenario in `specs/032-branch-first-sidebar/quickstart.md` by hand, including the greyscale check for SC-001 and the `git diff --numstat` spawn count for the TTL
+
+---
+
+## Discovered During Implementation
+
+Work the plan did not anticipate, recorded here rather than folded silently into another task.
+
+- [x] T063 [US1] Derive `agentState` in the `sessionList` memo of `src/renderer/components/sidebar/UnifiedSidebar.tsx` via the existing `BellAndBusySource`, and derive before the closed-session filter so a closed session can reach `exited`
+- [x] T064 [US1] Replace the fixture in `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` that set `agentState: 'awaiting-input'` directly with `bellCount: 1`, so the test expresses the signal rather than the derived field
+- [x] T065 [US1] Rewrite `tests/unit/renderer/sidebar-status-colour-independence.spec.ts` to guard the four-glyph design instead of the removed three-opacity dot, keeping the SC-011 greyscale guarantee it exists to protect
+
+**Why T063 was necessary.** `spec.md` assumes "session state continues to be inferred by the existing mechanism". That mechanism — `BellAndBusySource` in `src/renderer/sidebar/agent-state.ts` — had no production caller: its only importer was its own test. `agentState` was written as `'idle'` at session creation and never updated, so every session read as idle forever, and the Needs me, Active and Stale views were filtering on a constant. Without T063, US1 would ship four glyphs of which exactly one could ever appear.
+
+The derivation is done at read time rather than stored, because `busy` is time-dependent and a stored copy would need a timer to stay honest. `buildGroups` stays pure and its performance spec is untouched.
+
+**Still broken, deliberately left alone**: `⌘⇧A` (jump to next awaiting session) in `useKeyboardShortcuts.ts` and the guard in `BulkCloseDialog.tsx` both read `agentState` straight from the store, where it is still the never-updated `'idle'`. Fixing those means moving the derivation into the store, which is a bigger change than this feature's scope allows. Filed as a separate defect.
 
 ---
 

@@ -8,6 +8,7 @@ import { useSessionStore } from '../../stores/session.store'
 import { useSettingsStore } from '../../stores/settings.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { buildGroups } from '../../sidebar/view-model'
+import { BellAndBusySource } from '../../sidebar/agent-state'
 import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
 import {
   isCollapsed as isGroupCollapsed,
@@ -62,7 +63,10 @@ interface UnifiedSidebarProps {
 }
 
 const SIDEBAR_WIDTH_KEY = 'terminator.sidebar.width'
-const DEFAULT_WIDTH = 260
+// The branch row carries name, state, worktree marker and change statistics.
+// 260px truncated a 30-character branch name to uselessness, which is the
+// ambiguity this feature exists to remove (research R3).
+const DEFAULT_WIDTH = 300
 const MIN_WIDTH = 200
 const MAX_WIDTH = 480
 const DEFAULT_STALE_AFTER_MS = 2 * 60 * 60 * 1000
@@ -254,10 +258,22 @@ export function UnifiedSidebar({
     [workspaces, projectsByWorkspaceId]
   )
 
-  const sessionList = useMemo(
-    () => [...sessions.values()].filter((s) => s.status !== 'closed' || s.agentState === 'exited'),
-    [sessions]
-  )
+  // agentState is view state derived from bell, byte flow and exit — the type
+  // says so, but nothing was deriving it, so every session read as 'idle'
+  // forever and the Needs me / Active / Stale views filtered on a constant.
+  // Deriving here keeps it a pure function of the store rather than a fourth
+  // thing to hold in sync, and keeps buildGroups pure.
+  const sessionList = useMemo(() => {
+    const source = new BellAndBusySource()
+    // Derive before filtering: the keep-if-exited rule reads agentState, and
+    // reading it before deriving would drop every closed session.
+    return [...sessions.values()]
+      .map((s) => {
+        const agentState = source.derive(s)
+        return agentState === s.agentState ? s : { ...s, agentState }
+      })
+      .filter((s) => s.status !== 'closed' || s.agentState === 'exited')
+  }, [sessions])
 
   const clock = now ?? Date.now()
   const { groups, shown, total } = useMemo(

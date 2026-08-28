@@ -1,7 +1,11 @@
 .unified-sidebar {
   display: flex;
   flex-direction: column;
-  width: var(--sidebar-w, 260px);
+  /* Named container so the rows can drop metadata as the sidebar narrows,
+     rather than wrapping or truncating the branch name (research R3). */
+  container-type: inline-size;
+  container-name: sidebar;
+  width: var(--sidebar-w, 300px);
   min-width: var(--sidebar-min-w, 200px);
   max-width: var(--sidebar-max-w, 480px);
   background: var(--bg-surface);

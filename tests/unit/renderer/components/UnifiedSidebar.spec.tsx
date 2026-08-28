@@ -469,7 +469,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
   it('restores the default width on a resize-handle double click', () => {
     const { container } = renderSidebar()
     fireEvent.doubleClick(container.querySelector('.unified-sidebar__resize-handle')!)
-    expect(localStorage.getItem('terminator.sidebar.width')).toBe('260')
+    expect(localStorage.getItem('terminator.sidebar.width')).toBe('300')
   })
 
   it('loads projects for a workspace that has not been fetched', () => {
@@ -497,7 +497,18 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
   it('ignores a stored width that is not a number', () => {
     localStorage.setItem('terminator.sidebar.width', 'wide')
     const { container } = renderSidebar()
-    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('260px')
+    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('300px')
+  })
+
+  it('opens at the branch-row default width when nothing is stored', () => {
+    const { container } = renderSidebar()
+    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('300px')
+  })
+
+  it('lets a stored width beat the new default, so a resize survives the change', () => {
+    localStorage.setItem('terminator.sidebar.width', '264')
+    const { container } = renderSidebar()
+    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('264px')
   })
 
   it('persists a new width after a resize drag', () => {
@@ -506,7 +517,8 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     fireEvent.mouseDown(handle, { clientX: 100 })
     fireEvent.mouseMove(document, { clientX: 150 })
     fireEvent.mouseUp(document, { clientX: 150 })
-    expect(localStorage.getItem('terminator.sidebar.width')).toBe('310')
+    // 50px of drag from the 300px default.
+    expect(localStorage.getItem('terminator.sidebar.width')).toBe('350')
   })
 
   it('reorders workspaces on drop', () => {
@@ -790,10 +802,13 @@ describe('UnifiedSidebar — stale cleanup (US3)', () => {
       ['c', session('c', 'p2', { tabTitle: 'old-c', lastActivityAt: 0 })],
       [
         'w',
+        // Expressed through the signal that produces the state, not the derived
+        // field — agentState is computed from the bell, so setting it directly
+        // would be overwritten.
         session('w', 'p1', {
           tabTitle: 'waiting',
           lastActivityAt: 0,
-          agentState: 'awaiting-input',
+          bellCount: 1,
         }),
       ],
     ])
@@ -988,5 +1003,38 @@ describe('UnifiedSidebar — workspace grouping keeps the project layer (default
       (el) => el.textContent
     )
     expect(names).toEqual(['Backend', 'Backend', 'Frontend'])
+  })
+})
+
+describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes', () => {
+  it('treats a session with an unread bell as awaiting input', () => {
+    sessions.set('s6', session('s6', 'p1', { tabTitle: 'claude', bellCount: 2 }))
+    renderSidebar({ initialViewId: 'needs-me' })
+    expect(screen.getByText('claude')).toBeTruthy()
+  })
+
+  it('treats a session producing output as working', () => {
+    sessions.set('s7', session('s7', 'p1', { tabTitle: 'build', busy: true }))
+    renderSidebar({ initialViewId: 'active' })
+    expect(screen.getByText('build')).toBeTruthy()
+  })
+
+  it('leaves a quiet session idle, so it appears in neither', () => {
+    sessions.clear()
+    sessions.set('s8', session('s8', 'p1', { tabTitle: 'quiet' }))
+    const needs = renderSidebar({ initialViewId: 'needs-me' })
+    expect(needs.container.textContent).not.toContain('quiet')
+    needs.unmount()
+    const active = renderSidebar({ initialViewId: 'active' })
+    expect(active.container.textContent).not.toContain('quiet')
+  })
+
+  it('treats a closed session as exited', () => {
+    sessions.clear()
+    sessions.set('s9', session('s9', 'p1', { tabTitle: 'gone', status: 'closed' }))
+    const { container } = renderSidebar()
+    expect(container.querySelector('.session-row__status svg')!.getAttribute('data-state')).toBe(
+      'exited'
+    )
   })
 })
