@@ -9,7 +9,7 @@ An end-to-end reference for every feature and extension in Terminator — an ext
 1. [What is Terminator?](#1-what-is-terminator)
 2. [Installation](#2-installation)
 3. [The Interface at a Glance](#3-the-interface-at-a-glance)
-4. [Workspaces & Projects](#4-workspaces--projects)
+4. [Repos & Branches](#4-repos--branches)
 5. [Terminal Sessions](#5-terminal-sessions)
 6. [Split Panes](#6-split-panes)
 7. [Scratch Terminals](#7-scratch-terminals)
@@ -67,17 +67,17 @@ npm run dev
 
 The window is divided into three zones:
 
-| Zone             | Description                                                                                                                                                                        |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                                  |
-| **Main sidebar** | Expanded workspace showing its projects and terminal sessions. Search bar at the top. Icon row (grid / wifi / notepad / calendar / bell / +) for quick access to extension panels. |
-| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, SpecKit, Git).                                                                          |
+| Zone             | Description                                                                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                |
+| **Main sidebar** | A labelled app band at the top (Overview, Notes, Remote Control, Task Vault, Git Changes), then search, then every repo with its branches and terminal sessions. |
+| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, SpecKit, Git).                                                        |
 
 The **status bar** at the bottom of the window shows live CPU, Memory, and Network figures when the global metrics bar is enabled in Settings.
 
 ---
 
-## 4. Workspaces & Projects
+## 4. Repos & Branches
 
 ![Sidebar workspaces](screenshots/03-sidebar-workspaces.png)
 
@@ -86,7 +86,7 @@ The **status bar** at the bottom of the window shows live CPU, Memory, and Netwo
 A workspace maps to a directory on disk — typically a git repository. Each workspace appears as a named, colour-coded card in the left rail. Click a workspace name to expand it in the main sidebar.
 
 - **Create a workspace:** Click `+` in the sidebar header and choose a directory.
-- **Color coding:** Each workspace has a distinct accent colour visible in the rail and project headers.
+- **Color coding:** Each repo has a distinct accent colour visible on its branch rows and headers.
 - **Keyboard access:** `Cmd+1`–`Cmd+9` focuses and expands the corresponding workspace; `Cmd++` / `Cmd+-` cycles through them.
 - **Toggle sidebar:** `Cmd+B`.
 
@@ -94,8 +94,8 @@ A workspace maps to a directory on disk — typically a git repository. Each wor
 
 Projects live inside a workspace and hold one or more terminal sessions scoped to a task or branch.
 
-- **Create a project:** Click `+ New project` inside any expanded workspace.
-- **Sessions per project:** A project can hold multiple named terminal tabs. Sessions are grouped under the project name in the sidebar.
+- **Create a branch:** Click `+ New branch` under any repo. A branch can be a plain checkout or its own git worktree; the sidebar marks which with a distinct glyph.
+- **Sessions per branch:** A branch can hold multiple named terminal tabs. Sessions are grouped under the branch in the sidebar, and the session tab bar states which branch's terminals it is showing.
 - **Per-workspace settings:** Theme, scrollback limit, and default shell can be overridden per workspace via Settings.
 
 ---
@@ -108,7 +108,7 @@ Terminal sessions are powered by **xterm.js** backed by **node-pty** in the main
 
 ### Opening sessions
 
-- **New tab in project:** Click `+` in the tab bar or press `Cmd+T`.
+- **New tab on this branch:** Click `+` in the tab bar or press `Cmd+T`.
 - **New scratch terminal:** Press `Cmd+Shift+T` or click the `~` button in the workspace rail (see [Scratch Terminals](#7-scratch-terminals)).
 
 ### Navigating tabs
@@ -135,14 +135,14 @@ URLs and absolute file paths in terminal output are **underlined on hover**. `Cm
 
 ## 6. Split Panes
 
-Split panes let you view multiple terminals side by side without leaving the current project.
+Split panes let you view multiple terminals side by side without leaving the current branch.
 
 - **Split vertically (side by side):** `Cmd+D`
 - **Split horizontally (top / bottom):** `Cmd+Shift+D`
 
 Splits are **recursive** — each pane can be split again. Drag the divider bar to resize. Click a pane to focus it; a blue border marks the focused pane. `Cmd+W` closes the focused pane (collapsing the split) or the active tab when there is no split.
 
-> **Note:** Split panes require an active project session. Scratch sessions do not support splits.
+> **Note:** Split panes require an active branch session. Scratch sessions do not support splits.
 
 ---
 
@@ -150,11 +150,11 @@ Splits are **recursive** — each pane can be split again. Drag the divider bar 
 
 ![Scratch terminal](screenshots/15-scratch-terminal.png)
 
-Scratch terminals give you an instant shell without selecting any workspace or project first.
+Scratch terminals give you an instant shell without selecting any repo or branch first.
 
 - **Open a scratch terminal:** Click the `~` button in the workspace rail or press `Cmd+Shift+T`.
-- Scratch sessions appear in a dedicated **SCRATCH** section at the bottom of the sidebar, beneath all workspace projects.
-- **Promote a scratch session:** Right-click its tab and choose **Move to project…** to attach it to an existing project or create a new one.
+- Scratch sessions appear as a **Scratch** group at the bottom of the sidebar, with a count like any other group.
+- **Promote a scratch session:** Right-click its tab and choose **Move to branch…** to attach it to an existing branch or create a new one.
 
 ---
 
@@ -208,7 +208,7 @@ first time you launch a build with this feature. You will not be asked for them 
 extension's old credential file is renamed `.bak` rather than deleted.
 
 **Disconnecting** destroys that tracker's credential and leaves the other one alone. Anything you
-had linked to a project stays linked — it is your association, not the tracker's — and starts
+had linked to a branch stays linked — it is your association, not the tracker's — and starts
 working again as soon as you reconnect.
 
 ### Per-workspace overrides
@@ -221,25 +221,25 @@ Themes switch immediately across the entire app — no restart required. Termina
 
 ## 10. Issue Tracking
 
-Terminator attaches a **Linear or Jira issue to a project**, so the thing you are working on is on
+Terminator attaches a **Linear or Jira issue to a branch**, so the thing you are working on is on
 screen — and so every agent session you start there already knows it.
 
 Connect a tracker first: [Settings → Integrations](#9-settings).
 
-### Attaching an issue to a project
+### Attaching an issue to a branch
 
-A project can carry **one** issue at a time — a project is a branch of work, and so is a ticket.
+A branch can carry **one** issue at a time — a branch is a unit of work, and so is a ticket.
 
-**To attach one**: right-click the project in the sidebar → **Link issue…**. The picker opens on
+**To attach one**: right-click the branch in the sidebar → **Link issue…**. The picker opens on
 the issues assigned to you across every connected tracker, so the common case needs no typing.
 Type to search, or type an issue key exactly (`TAV-42`) to jump straight to it. Each row shows
 which tracker it came from, because two trackers can both have a `TAV-42` and they are different
 issues.
 
 You can also reach it from the command palette (`⌘K`) with **Link Issue to Project**, scoped to
-whichever project you are in.
+whichever branch you are in.
 
-**The badge.** Once attached, the project's row in the sidebar carries the issue key with a small
+**The badge.** Once attached, the branch's row in the sidebar carries the issue key with a small
 dot:
 
 | Dot            | Meaning                                       |
@@ -253,14 +253,14 @@ The dot is never the only signal — hover the badge for the tracker, the state 
 issue title, and screen readers get the same text. Clicking the badge opens the issue.
 
 **Changing it.** Picking a different issue **replaces** the one attached; you are warned before it
-happens. Right-click the project for **Change linked issue…**, **Copy issue key**, **Open … in
+happens. Right-click the branch for **Change linked issue…**, **Copy issue key**, **Open … in
 tracker**, or **Unlink**.
 
-**Removing a project** discards its association with it. Nothing is left behind.
+**Removing a branch** discards its association with it. Nothing is left behind.
 
 ### Reading an issue
 
-Click the issue key on a project to open it. Description and comments are **rendered** — headings,
+Click the issue key on a branch to open it. Description and comments are **rendered** — headings,
 lists, task lists, tables, code blocks, links and emphasis all appear as formatted text, the same
 whether the issue came from Linear or from Jira.
 

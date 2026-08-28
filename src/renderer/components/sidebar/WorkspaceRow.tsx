@@ -40,7 +40,7 @@ export function WorkspaceRow({
         <span className="ws-row__band" />
         <button className="ws-row__add" onClick={onAddProject}>
           <span className="ws-row__plus">+</span>
-          <span>New project in </span>
+          <span>New branch in </span>
           <span className="ws-row__name">{workspace.name}</span>
         </button>
         {workspace.tags.map((tag) => (

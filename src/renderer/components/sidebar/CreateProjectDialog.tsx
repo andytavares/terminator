@@ -100,7 +100,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     if (value.length > 100) return 'Name must be 100 characters or less'
     const existing = projectsByWorkspaceId.get(workspaceId) ?? []
     if (existing.some((p) => p.name.toLowerCase() === value.toLowerCase())) {
-      return 'A project with this name already exists in this workspace'
+      return 'A branch with this name already exists in this repo'
     }
     return ''
   }
@@ -134,7 +134,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     setError('')
 
     if (branchMode === 'existing' && hasNonWorktreeProject) {
-      setError('A branch-based project already exists in this workspace')
+      setError('A branch-based entry already exists in this repo')
       return
     }
 
@@ -163,8 +163,8 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       })
       if ('error' in result) {
         if (result.error === 'DUPLICATE_NAME')
-          setNameError('A project with this name already exists')
-        else setError('Failed to create project')
+          setNameError('A branch with this name already exists')
+        else setError('Could not create the branch')
         return
       }
       await attachIssue(result)
@@ -194,8 +194,8 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       })
       if ('error' in result) {
         if (result.error === 'DUPLICATE_NAME')
-          setNameError('A project with this name already exists')
-        else setError('Failed to create project')
+          setNameError('A branch with this name already exists')
+        else setError('Could not create the branch')
         return
       }
       await attachIssue(result)
@@ -221,7 +221,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <h2 className="dialog__title">Create Project</h2>
+        <h2 className="dialog__title">Create Branch</h2>
         <form onSubmit={handleSubmit}>
           {isAnyConnected() && (
             <div className="dialog__field">
@@ -245,7 +245,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
                 setNameError('')
               }}
               onBlur={() => setNameError(validateName(name))}
-              placeholder="My Project"
+              placeholder="My branch"
               autoFocus
             />
             {nameError && <span className="dialog__error">{nameError}</span>}
@@ -262,7 +262,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
                   disabled={hasNonWorktreeProject}
                   title={
                     hasNonWorktreeProject
-                      ? 'A branch-based project already exists in this workspace'
+                      ? 'A branch-based entry already exists in this repo'
                       : undefined
                   }
                 >

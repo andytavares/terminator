@@ -30,6 +30,7 @@ import { AboutDialog } from './components/AboutDialog'
 import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 import { adoptTerminalSession } from './terminal/session-controller'
+import { qualifiedBranchLabel } from './sidebar/branch-display'
 
 installLogInterceptor()
 
@@ -299,8 +300,11 @@ export function App(): JSX.Element {
 
   // Sessions are offered in the existing palette rather than a second overlay.
   const paletteSessions = useMemo(() => {
+    const repoNameById = new Map(workspaces.map((w) => [w.id, w.name]))
     const projectName = new Map(
-      [...projectsByWorkspaceId.values()].flat().map((p) => [p.id, p.name])
+      [...projectsByWorkspaceId.values()]
+        .flat()
+        .map((p) => [p.id, qualifiedBranchLabel(p, repoNameById.get(p.workspaceId))])
     )
     return [...sessions.values()]
       .filter((s) => s.status !== 'closed')
@@ -310,7 +314,7 @@ export function App(): JSX.Element {
         tabTitle: s.tabTitle,
         projectName: projectName.get(s.projectId) ?? '',
       }))
-  }, [sessions, projectsByWorkspaceId])
+  }, [sessions, projectsByWorkspaceId, workspaces])
 
   useEffect(() => {
     loadWorkspaces()

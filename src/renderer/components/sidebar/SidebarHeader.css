@@ -163,3 +163,22 @@
   background: var(--bg-card-hover);
   color: var(--text-primary);
 }
+
+/* Search plus the two controls that act on the list beneath it. */
+.sidebar-header__search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px var(--sidebar-gutter, 10px);
+}
+
+.sidebar-header__search-row .sidebar-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-header__search-row .sidebar-header__bell svg,
+.sidebar-header__search-row .sidebar-header__add svg {
+  width: 14px;
+  height: 14px;
+}

@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
@@ -17,6 +18,14 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({ useBranchSync: vi.fn() }))
+vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
+  useIntegrationsStore: vi.fn(),
+}))
+vi.mock('../../../../src/renderer/components/integrations/LinkIssueDialog', () => ({
+  LinkIssueDialog: ({ projectName }: { projectName: string }) => (
+    <div data-testid="link-issue-dialog">{projectName}</div>
+  ),
+}))
 vi.mock('../../../../src/renderer/components/sidebar/BranchSwitcher', () => ({
   BranchSwitcher: () => <div data-testid="branch-switcher" />,
 }))
@@ -147,7 +156,9 @@ const mockSessionStore = {
   projectViews: new Map(),
   isSessionBusy: vi.fn().mockReturnValue(false),
   getBellCountForSession: vi.fn().mockReturnValue(0),
-  getScratchSessions: vi.fn().mockReturnValue([]),
+  getScratchSessions: vi.fn(() =>
+    [...sessions.values()].filter((s) => s.projectId === '00000000-0000-0000-0000-000000000000')
+  ),
   setActiveSessionForProject: vi.fn(),
   renameSession: vi.fn(),
 }
@@ -159,6 +170,21 @@ const mockRegistryState = {
   sidebarButtons: [] as Array<{ id: string; label: string; action: () => void }>,
   setActiveGlobalTab: vi.fn(),
   registerCommand: vi.fn(() => vi.fn()),
+}
+
+const mockIntegrationsStore = {
+  linkFor: vi.fn().mockReturnValue(null),
+  issueFor: vi.fn().mockReturnValue(null),
+  loadLink: vi.fn().mockResolvedValue(undefined),
+  unlinkIssue: vi.fn().mockResolvedValue(undefined),
+  subscribe: vi.fn().mockReturnValue(() => {}),
+  loadConnections: vi.fn().mockResolvedValue(undefined),
+  linkDialogProjectId: null as string | null,
+  openLinkDialog: vi.fn(),
+  closeLinkDialog: vi.fn(),
+  drawerProjectId: null as string | null,
+  openDrawer: vi.fn(),
+  closeDrawer: vi.fn(),
 }
 
 const defaultProps = {
@@ -182,6 +208,14 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  mockIntegrationsStore.linkDialogProjectId = null
+  mockIntegrationsStore.drawerProjectId = null
+  mockIntegrationsStore.linkFor.mockReturnValue(null)
+  mockIntegrationsStore.issueFor.mockReturnValue(null)
+  mockIntegrationsStore.subscribe.mockReturnValue(() => {})
+  vi.mocked(useIntegrationsStore).mockReturnValue(
+    mockIntegrationsStore as unknown as ReturnType<typeof useIntegrationsStore>
+  )
   sessions = new Map([
     ['s1', session('s1', 'p1', { tabTitle: 'api-shell' })],
     ['s2', session('s2', 'p1', { tabTitle: 'api-agent', lastActivityAt: NOW - 300_000 })],
@@ -222,8 +256,8 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
 
   it('defaults every group to expanded (FR-008)', () => {
     const { container } = renderSidebar()
-    // Two workspaces plus the three project groups nested inside them.
-    expect(container.querySelectorAll('.session-group__sessions')).toHaveLength(5)
+    // Two workspaces, the three project groups nested inside them, and scratch.
+    expect(container.querySelectorAll('.session-group__sessions')).toHaveLength(6)
   })
 
   it('shows a relative last-activity label on each row', () => {
@@ -242,7 +276,7 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.textContent
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
     expect(container.querySelectorAll('.session-group__add')).toHaveLength(3)
   })
 
@@ -346,7 +380,7 @@ describe('UnifiedSidebar — scope actions on the group header (FR-026)', () => 
     const { container } = renderSidebar()
     fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
     fireEvent.click(screen.getByText('Remove'))
-    expect(screen.getByText('Remove project "API"?')).toBeTruthy()
+    expect(screen.getByText('Remove branch "API"?')).toBeTruthy()
   })
 
   it('deletes the project once removal is confirmed', () => {
@@ -428,7 +462,16 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     const order = Array.from(
       container.querySelectorAll('.session-group__label, .ws-row__name')
     ).map((el) => el.textContent)
-    expect(order).toEqual(['Backend', 'API', 'Jobs', 'Backend', 'Frontend', 'Web', 'Frontend'])
+    expect(order).toEqual([
+      'Backend',
+      'API',
+      'Jobs',
+      'Backend',
+      'Frontend',
+      'Web',
+      'Frontend',
+      'Scratch',
+    ])
   })
 
   it('offers a create-project entry point per workspace', () => {
@@ -469,7 +512,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
   it('restores the default width on a resize-handle double click', () => {
     const { container } = renderSidebar()
     fireEvent.doubleClick(container.querySelector('.unified-sidebar__resize-handle')!)
-    expect(localStorage.getItem('terminator.sidebar.width')).toBe('260')
+    expect(localStorage.getItem('terminator.sidebar.width')).toBe('300')
   })
 
   it('loads projects for a workspace that has not been fetched', () => {
@@ -497,7 +540,18 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
   it('ignores a stored width that is not a number', () => {
     localStorage.setItem('terminator.sidebar.width', 'wide')
     const { container } = renderSidebar()
-    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('260px')
+    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('300px')
+  })
+
+  it('opens at the branch-row default width when nothing is stored', () => {
+    const { container } = renderSidebar()
+    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('300px')
+  })
+
+  it('lets a stored width beat the new default, so a resize survives the change', () => {
+    localStorage.setItem('terminator.sidebar.width', '264')
+    const { container } = renderSidebar()
+    expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('264px')
   })
 
   it('persists a new width after a resize drag', () => {
@@ -506,7 +560,8 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     fireEvent.mouseDown(handle, { clientX: 100 })
     fireEvent.mouseMove(document, { clientX: 150 })
     fireEvent.mouseUp(document, { clientX: 150 })
-    expect(localStorage.getItem('terminator.sidebar.width')).toBe('310')
+    // 50px of drag from the 300px default.
+    expect(localStorage.getItem('terminator.sidebar.width')).toBe('350')
   })
 
   it('reorders workspaces on drop', () => {
@@ -560,7 +615,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     fireEvent.click(screen.getByText('Remove'))
     fireEvent.click(screen.getByText('Cancel'))
     expect(mockWorkspaceStore.deleteProject).not.toHaveBeenCalled()
-    expect(screen.queryByText('Remove project "API"?')).toBeNull()
+    expect(screen.queryByText('Remove branch "API"?')).toBeNull()
   })
 
   it('marks a busy group with the aggregate indicator', () => {
@@ -602,7 +657,7 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('shows the project badge on every row once the header stops naming the project', () => {
@@ -636,7 +691,8 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
 
   it('renders a single group when grouping is switched off', () => {
     const { container } = renderSidebar({ initialViewId: 'flat' })
-    expect(container.querySelectorAll('.session-group')).toHaveLength(1)
+    // The flat group, plus the scratch group which belongs to no grouping.
+    expect(container.querySelectorAll('.session-group')).toHaveLength(2)
     expect(container.querySelector('.session-group__label')!.textContent).toBe('All sessions')
   })
 
@@ -653,7 +709,7 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('highlights the workspace drop target during a drag', () => {
@@ -713,19 +769,19 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.textContent
     )
-    expect(labels).toEqual(['Idle'])
+    expect(labels).toEqual(['Idle', 'Scratch'])
   })
 
   it('persists a grouping change for that view across a remount', () => {
     const { unmount } = renderSidebar()
     fireEvent.click(screen.getByText('Group: Workspace'))
-    fireEvent.click(screen.getByText('Project'))
+    fireEvent.click(screen.getByText('Branch'))
     unmount()
     const { container } = renderSidebar()
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.firstChild!.textContent
     )
-    expect(labels).toEqual(['API', 'Jobs', 'Web'])
+    expect(labels).toEqual(['API', 'Jobs', 'Web', 'Scratch'])
   })
 
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
@@ -790,10 +846,13 @@ describe('UnifiedSidebar — stale cleanup (US3)', () => {
       ['c', session('c', 'p2', { tabTitle: 'old-c', lastActivityAt: 0 })],
       [
         'w',
+        // Expressed through the signal that produces the state, not the derived
+        // field — agentState is computed from the bell, so setting it directly
+        // would be overwritten.
         session('w', 'p1', {
           tabTitle: 'waiting',
           lastActivityAt: 0,
-          agentState: 'awaiting-input',
+          bellCount: 1,
         }),
       ],
     ])
@@ -952,7 +1011,7 @@ describe('UnifiedSidebar — workspace grouping keeps the project layer (default
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('starts a terminal on a nested project without changing the grouping', () => {
@@ -988,5 +1047,160 @@ describe('UnifiedSidebar — workspace grouping keeps the project layer (default
       (el) => el.textContent
     )
     expect(names).toEqual(['Backend', 'Backend', 'Frontend'])
+  })
+})
+
+describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes', () => {
+  it('treats a session with an unread bell as awaiting input', () => {
+    sessions.set('s6', session('s6', 'p1', { tabTitle: 'claude', bellCount: 2 }))
+    renderSidebar({ initialViewId: 'needs-me' })
+    expect(screen.getByText('claude')).toBeTruthy()
+  })
+
+  it('treats a session producing output as working', () => {
+    sessions.set('s7', session('s7', 'p1', { tabTitle: 'build', busy: true }))
+    renderSidebar({ initialViewId: 'active' })
+    expect(screen.getByText('build')).toBeTruthy()
+  })
+
+  it('leaves a quiet session idle, so it appears in neither', () => {
+    sessions.clear()
+    sessions.set('s8', session('s8', 'p1', { tabTitle: 'quiet' }))
+    const needs = renderSidebar({ initialViewId: 'needs-me' })
+    expect(needs.container.textContent).not.toContain('quiet')
+    needs.unmount()
+    const active = renderSidebar({ initialViewId: 'active' })
+    expect(active.container.textContent).not.toContain('quiet')
+  })
+
+  it('treats a closed session as exited', () => {
+    sessions.clear()
+    sessions.set('s9', session('s9', 'p1', { tabTitle: 'gone', status: 'closed' }))
+    const { container } = renderSidebar()
+    expect(container.querySelector('.session-row__status svg')!.getAttribute('data-state')).toBe(
+      'exited'
+    )
+  })
+})
+
+describe('UnifiedSidebar — one name identifies one thing (US3)', () => {
+  it('qualifies every new-terminal command with its repo, so six mains are six commands', () => {
+    // Every repo's default branch is called main; the palette used to list six
+    // identical "New terminal in main" rows.
+    const repos = ['ws-1', 'ws-2', 'ws-3', 'ws-4', 'ws-5', 'ws-6']
+    mockWorkspaceStore.workspaces = repos.map((id, i) => ({
+      ...ws1,
+      id,
+      name: `Repo ${i + 1}`,
+    }))
+    mockWorkspaceStore.projectsByWorkspaceId = new Map(
+      repos.map((id, i) => [
+        id,
+        [{ ...api, id: `p-${i}`, workspaceId: id, name: 'main', gitBranch: 'main' }],
+      ])
+    )
+    renderSidebar()
+
+    const labels = mockRegistryState.registerCommand.mock.calls
+      .map(([cmd]) => (cmd as { label: string }).label)
+      .filter((l) => l.toLowerCase().includes('terminal'))
+
+    // Registration may run more than once per render pass; what matters is
+    // that the six repos yield six *distinct* labels (SC-002).
+    expect(new Set(labels).size).toBe(6)
+
+    mockWorkspaceStore.workspaces = [ws1, ws2]
+  })
+
+  it('says branch, never project, in the commands it registers', () => {
+    renderSidebar()
+    for (const [cmd] of mockRegistryState.registerCommand.mock.calls) {
+      expect((cmd as { label: string }).label.toLowerCase()).not.toContain('project')
+    }
+  })
+
+  it('offers a new branch, not a new project, under each repo', () => {
+    const { container } = renderSidebar()
+    const text = container.textContent ?? ''
+    expect(text).toContain('New branch in')
+    expect(text.toLowerCase()).not.toContain('new project')
+  })
+
+  it('names the branch, not the project, when confirming removal', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
+    fireEvent.click(screen.getByText('Remove'))
+    expect(screen.getByText(/Remove branch "API"\?/)).toBeTruthy()
+  })
+})
+
+describe('UnifiedSidebar — the link dialog names what it attaches to (US3, FR-014)', () => {
+  it('qualifies the branch with its repo', () => {
+    mockIntegrationsStore.linkDialogProjectId = 'p1'
+    renderSidebar()
+    expect(screen.getByTestId('link-issue-dialog').textContent).toContain('Backend · API')
+    mockIntegrationsStore.linkDialogProjectId = null
+  })
+})
+
+describe('UnifiedSidebar — app surfaces have one home, scratch has a group (US4)', () => {
+  it('draws contributed sidebar items in the app band, not a separate footer', () => {
+    mockRegistryState.sidebarButtons = [{ id: 'git', label: 'Git Changes', action: vi.fn() }]
+    const { container } = renderSidebar()
+    expect(container.querySelector('.extension-footer')).toBeNull()
+    expect(container.querySelector('.app-band')).toBeTruthy()
+    expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+    mockRegistryState.sidebarButtons = []
+  })
+
+  it('renders scratch sessions as a group with a count, not a pinned footer', () => {
+    sessions.set(
+      'sc1',
+      session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })
+    )
+    const { container } = renderSidebar()
+    expect(container.querySelector('.scratch-section')).toBeNull()
+    const labels = [...container.querySelectorAll('.session-group__label')].map((el) =>
+      el.textContent!.trim()
+    )
+    expect(labels).toContain('Scratch')
+    expect(screen.getByText('notes')).toBeTruthy()
+  })
+
+  it('offers a way to start a scratch terminal from that group', () => {
+    const onNewScratch = vi.fn()
+    const { container } = renderSidebar({ onNewScratch })
+    const add = container.querySelector('.unified-sidebar__scratch-add')
+    expect(add).toBeTruthy()
+    fireEvent.click(add!)
+    expect(onNewScratch).toHaveBeenCalledOnce()
+  })
+})
+
+describe('UnifiedSidebar — scratch group behaviour retired from ScratchSection', () => {
+  beforeEach(() => {
+    sessions.set(
+      'sc1',
+      session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })
+    )
+  })
+
+  it('selects a scratch session when its row is clicked', () => {
+    const onSelectScratchSession = vi.fn()
+    renderSidebar({ onSelectScratchSession })
+    fireEvent.click(screen.getByText('notes'))
+    expect(onSelectScratchSession).toHaveBeenCalledWith('sc1')
+  })
+
+  it('marks the active scratch session', () => {
+    const { container } = renderSidebar({ activeScratchSessionId: 'sc1' })
+    const scratch = container.querySelector('.unified-sidebar__scratch')!
+    expect(scratch.querySelector('.session-row--active')).toBeTruthy()
+  })
+
+  it('counts the scratch sessions on the group header', () => {
+    const { container } = renderSidebar()
+    const scratch = container.querySelector('.unified-sidebar__scratch')!
+    expect(scratch.querySelector('.session-group__count')!.textContent).toBe('1')
   })
 })

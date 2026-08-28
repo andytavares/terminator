@@ -73,11 +73,101 @@
   margin-left: -4px;
 }
 
+/* The name holds its ground; the qualifiers beside it give way first. It still
+   caps at part of the row so a very long branch name cannot squeeze the count
+   and actions off the end. */
 .session-group__label {
-  flex: 1;
+  /* shrink 0: the qualifiers give way, the name does not. max-width still caps
+     it so a very long branch cannot push the count and actions off the end. */
+  flex: 0 0 auto;
+  max-width: 62%;
+  min-width: 4ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Push everything after the qualifiers to the right edge. */
+.session-group__label ~ .session-group__count,
+.session-group__label ~ .session-group__stats,
+.session-group__label ~ .session-group__worktree-tag {
+  margin-left: auto;
+}
+
+.session-group__label ~ .session-group__stats ~ .session-group__count,
+.session-group__label ~ .session-group__worktree-tag ~ .session-group__stats,
+.session-group__label ~ .session-group__worktree-tag ~ .session-group__count {
+  margin-left: 0;
+}
+
+/* The branch glyph. Flat, currentColor, sized by CSS — never the size prop
+   (Principle XII). Shape alone says worktree vs plain checkout. */
+.session-group__branch-glyph {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  opacity: 0.65;
+}
+
+.session-group__branch-secondary {
+  margin-left: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.55;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.session-group__repo-path {
+  margin-left: 6px;
+  /* Absorbs the shrinking so the repo name does not — an unbounded path pushed
+     the name out of its own header. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.5;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.session-group__worktree-tag {
+  flex-shrink: 0;
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  opacity: 0.75;
+}
+
+.session-group__stats {
+  flex-shrink: 0;
+  display: inline-flex;
+  gap: 4px;
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.8;
+}
+
+/* Added and removed are the one place hue is doing real work, and they are
+   text rather than icons, so Principle XII does not apply. The +/- signs carry
+   the same information without colour. */
+.session-group__stats-add {
+  color: var(--success);
+}
+
+.session-group__stats-del {
+  color: var(--danger);
 }
 
 .session-group__workspace {
@@ -182,4 +272,20 @@
 
 .session-group--active .session-group__header {
   background: var(--bg-card-hover);
+}
+
+/* ── Width degradation ────────────────────────────────────────
+   Same fixed order as the session row (research R3). The worktree glyph
+   survives every breakpoint because it carries the safety-relevant bit —
+   which tree a command is about to run in. */
+@container sidebar (max-width: 289px) {
+  .session-group__stats {
+    display: none;
+  }
+}
+
+@container sidebar (max-width: 249px) {
+  .session-group__worktree-tag {
+    display: none;
+  }
 }

@@ -70,6 +70,15 @@ export const PrCreatePayloadSchema = z.object({
   isDraft: z.boolean().default(false),
 })
 
+/** Uncommitted change volume for one working tree, staged and unstaged. */
+export const ChangeStatsSchema = z.object({
+  added: z.number().int().nonnegative(),
+  removed: z.number().int().nonnegative(),
+  files: z.number().int().nonnegative(),
+})
+
+export type ChangeStats = z.infer<typeof ChangeStatsSchema>
+
 export type FileStatus = z.infer<typeof FileStatusSchema>
 export type GitFileStatus = z.infer<typeof GitFileStatusSchema>
 export type GitStatus = z.infer<typeof GitStatusSchema>

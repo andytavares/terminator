@@ -77,7 +77,7 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
     setLoading(false)
     if ('error' in result) {
       setNewProjectError(
-        result.error === 'DUPLICATE_NAME' ? 'Name already in use' : 'Could not create project'
+        result.error === 'DUPLICATE_NAME' ? 'Name already in use' : 'Could not create the branch'
       )
       return
     }
@@ -91,12 +91,12 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog move-session-dialog" onClick={(e) => e.stopPropagation()}>
-        <h2 className="dialog__title">Move to project</h2>
+        <h2 className="dialog__title">Move to branch</h2>
 
         {subView?.type === 'new-project' ? (
           <div className="move-session-dialog__new-project">
             <div className="dialog__field">
-              <label className="dialog__label">Project name</label>
+              <label className="dialog__label">Branch name</label>
               <input
                 className={`dialog__input${newProjectError ? ' dialog__input--error' : ''}`}
                 value={newProjectName}
@@ -108,7 +108,7 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
                   if (e.key === 'Enter') void handleCreateProject(subView.workspaceId)
                   if (e.key === 'Escape') setSubView(null)
                 }}
-                placeholder="My project"
+                placeholder="My branch"
                 autoFocus
               />
               {newProjectError && <span className="dialog__error">{newProjectError}</span>}
@@ -164,7 +164,7 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
                         setSubView({ type: 'new-project', workspaceId: ws.id })
                       }}
                     >
-                      + New project in {ws.name}
+                      + New branch in {ws.name}
                     </button>
                   </div>
                 )

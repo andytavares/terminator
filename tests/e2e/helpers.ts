@@ -116,8 +116,8 @@ export async function addAndSelectProject(
   projectName: string
 ): Promise<void> {
   await workspaceRow(page, workspaceName).locator('.ws-row__add').click()
-  await expect(page.locator('.dialog__title')).toContainText('Create Project')
-  await page.getByPlaceholder('My Project').fill(projectName)
+  await expect(page.locator('.dialog__title')).toContainText('Create Branch')
+  await page.getByPlaceholder('My branch').fill(projectName)
   await page.click('.dialog__btn-primary')
   const group = projectGroup(page, projectName)
   await expect(group).toBeVisible()

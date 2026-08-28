@@ -14,6 +14,7 @@ const makeTab = (id: string, label: string, hidden = false): GlobalTabRegistrati
 
 const defaultProps = {
   globalTabs: [] as GlobalTabRegistration[],
+  sidebarItems: [],
   activeGlobalTabId: null as string | null,
   onSelectGlobalTab: vi.fn(),
   onSearchFocus: vi.fn(),
@@ -43,14 +44,14 @@ describe('SidebarHeader', () => {
   it('renders one button per non-hidden globalTabs entry', () => {
     const tabs = [makeTab('t1', 'Overview'), makeTab('t2', 'Git')]
     render(<SidebarHeader {...defaultProps} globalTabs={tabs} />)
-    expect(screen.getByTitle('Overview')).toBeTruthy()
-    expect(screen.getByTitle('Git')).toBeTruthy()
+    expect(screen.getByLabelText('Overview')).toBeTruthy()
+    expect(screen.getByLabelText('Git')).toBeTruthy()
   })
 
   it('does not render hidden tabs', () => {
     const tabs = [makeTab('t1', 'Overview'), makeTab('t2', 'Hidden', true)]
     render(<SidebarHeader {...defaultProps} globalTabs={tabs} />)
-    expect(screen.getByTitle('Overview')).toBeTruthy()
+    expect(screen.getByLabelText('Overview')).toBeTruthy()
     expect(screen.queryByTitle('Hidden')).toBeNull()
   })
 
@@ -58,7 +59,7 @@ describe('SidebarHeader', () => {
     const onSelect = vi.fn()
     const tabs = [makeTab('t1', 'Overview')]
     render(<SidebarHeader {...defaultProps} globalTabs={tabs} onSelectGlobalTab={onSelect} />)
-    fireEvent.click(screen.getByTitle('Overview'))
+    fireEvent.click(screen.getByLabelText('Overview'))
     expect(onSelect).toHaveBeenCalledWith('t1')
   })
 
@@ -67,18 +68,18 @@ describe('SidebarHeader', () => {
     const { container } = render(
       <SidebarHeader {...defaultProps} globalTabs={tabs} activeGlobalTabId="t1" />
     )
-    expect(container.querySelector('.sidebar-header__tab--active')).toBeTruthy()
+    expect(container.querySelector('.app-band__entry--active')).toBeTruthy()
   })
 
   it('renders + workspace button', () => {
     render(<SidebarHeader {...defaultProps} />)
-    expect(screen.getByTitle(/new workspace/i)).toBeTruthy()
+    expect(screen.getByLabelText(/new repo/i)).toBeTruthy()
   })
 
   it('calls onAddWorkspace when + button is clicked', () => {
     const onAdd = vi.fn()
     render(<SidebarHeader {...defaultProps} onAddWorkspace={onAdd} />)
-    fireEvent.click(screen.getByTitle(/new workspace/i))
+    fireEvent.click(screen.getByLabelText(/new repo/i))
     expect(onAdd).toHaveBeenCalledOnce()
   })
 
@@ -99,5 +100,61 @@ describe('SidebarHeader', () => {
   it('does not render bell badge when unreadNotifications is 0', () => {
     const { container } = render(<SidebarHeader {...defaultProps} unreadNotifications={0} />)
     expect(container.querySelector('.sidebar-header__bell-badge')).toBeNull()
+  })
+})
+
+function renderHeader(overrides: Partial<React.ComponentProps<typeof SidebarHeader>> = {}) {
+  return render(<SidebarHeader {...defaultProps} sidebarItems={[]} {...overrides} />)
+}
+
+describe('SidebarHeader — the app band sits above, list controls sit with the list (US4)', () => {
+  it('draws the app band above the search row', () => {
+    const { container } = renderHeader({
+      globalTabs: [makeTab('overview', 'Overview')],
+    })
+    const band = container.querySelector('.app-band')
+    const search = container.querySelector('.sidebar-search')
+    expect(band).toBeTruthy()
+    expect(search).toBeTruthy()
+    expect(band!.compareDocumentPosition(search!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps no unlabelled icon row of its own', () => {
+    const { container } = renderHeader({
+      globalTabs: [makeTab('overview', 'Overview')],
+    })
+    expect(container.querySelector('.sidebar-header__tabs')).toBeNull()
+  })
+
+  it('puts the bell and add-repo controls on the search row, where the list is', () => {
+    const { container } = renderHeader()
+    const row = container.querySelector('.sidebar-header__search-row')!
+    expect(row.querySelector('.sidebar-header__bell')).toBeTruthy()
+    expect(row.querySelector('.sidebar-header__add')).toBeTruthy()
+  })
+
+  it('labels every app-band entry', () => {
+    renderHeader({
+      globalTabs: [makeTab('overview', 'Overview')],
+    })
+    expect(screen.getByText('Overview')).toBeTruthy()
+  })
+})
+
+describe('SidebarHeader — optional search handlers', () => {
+  it('does not crash when typing with no onSearchChange supplied', () => {
+    const { container } = render(<SidebarHeader {...defaultProps} sidebarItems={[]} />)
+    expect(() =>
+      fireEvent.change(container.querySelector('input')!, { target: { value: 'x' } })
+    ).not.toThrow()
+  })
+
+  it('does not crash when clearing with no onSearchClear supplied', () => {
+    const { container } = render(
+      <SidebarHeader {...defaultProps} sidebarItems={[]} searchQuery="abc" />
+    )
+    const clear = container.querySelector('.sidebar-search__clear') as HTMLElement | null
+    if (clear) expect(() => fireEvent.click(clear)).not.toThrow()
+    else expect(container.querySelector('input')).toBeTruthy()
   })
 })

@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, GitBranch, GitFork } from 'lucide-react'
 import type { WorkspaceTabRegistration } from '../../extensions/registry'
 import type { Group } from '../../sidebar/view-model'
+import type { BranchName } from '../../sidebar/branch-display'
+import type { ChangeStats } from '../../../shared/schemas/git.schema'
 import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
 import { issueMenuItems, type IssueMenuActions } from './issue-menu-items'
 import './SessionGroup.css'
@@ -12,6 +14,23 @@ export interface SessionGroupProps {
   onToggleCollapse: () => void
   /** Colour band inherited from the group's workspace. */
   workspaceColor?: string
+  /**
+   * How this branch names itself: the branch, or a label with the branch kept
+   * beside it. Passed pre-computed so the component holds no display rule.
+   */
+  branchName?: BranchName
+  /** True when the branch has its own working copy on disk. */
+  isWorktree?: boolean
+  /** Where that working copy is; revealed on hover.  */
+  worktreePath?: string
+  /**
+   * Uncommitted change volume. `undefined` means not asked for yet, `null`
+   * means git could not answer — both render as nothing, because change volume
+   * is decorative and a git failure must not produce a broken-looking row.
+   */
+  changeStats?: ChangeStats | null
+  /** Folder path of the repo, shown on a repo group header. */
+  repoPath?: string
   /**
    * The workspace this project belongs to, named in the header. The colour band
    * alone cannot answer "which workspace is this?" — a filtered list of project
@@ -72,12 +91,40 @@ export interface SessionGroupProps {
  * groupings it degrades to a label and a count, and the scope actions move to
  * the rows instead (see ScopeMenu).
  */
+/**
+ * A branch with its own working copy reads differently from a plain checkout —
+ * which tree a command is about to run in is the safety-relevant bit, and the
+ * sidebar never used to say.
+ */
+function BranchGlyph({
+  isWorktree,
+  worktreePath,
+}: {
+  isWorktree: boolean
+  worktreePath?: string
+}): JSX.Element {
+  const Glyph = isWorktree ? GitFork : GitBranch
+  return (
+    <Glyph
+      className="session-group__branch-glyph"
+      data-kind={isWorktree ? 'worktree' : 'branch'}
+      aria-hidden="true"
+      {...(worktreePath ? { title: worktreePath } : {})}
+    />
+  )
+}
+
 export function SessionGroup({
   group,
   collapsed,
   onToggleCollapse,
   workspaceColor,
   workspaceName,
+  branchName,
+  isWorktree,
+  worktreePath,
+  changeStats,
+  repoPath,
   nested,
   busy,
   branchSwitcher,
@@ -156,6 +203,10 @@ export function SessionGroup({
           {collapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
         </button>
 
+        {isWorktree !== undefined && (
+          <BranchGlyph isWorktree={isWorktree} worktreePath={worktreePath} />
+        )}
+
         {renameValue !== null ? (
           <input
             className="session-group__rename-input"
@@ -171,14 +222,28 @@ export function SessionGroup({
             }}
           />
         ) : (
-          <span className="session-group__label" title={group.label}>
-            {group.label}
+          <>
+            {/* The label holds the name and nothing else, so it reads cleanly
+                on its own; everything qualifying it sits beside it. */}
+            <span className="session-group__label" title={branchName?.secondary ?? group.label}>
+              {branchName?.primary ?? group.label}
+            </span>
+            {branchName?.secondary && (
+              <span className="session-group__branch-secondary" title={branchName.secondary}>
+                {branchName.secondary}
+              </span>
+            )}
             {workspaceName && (
               <span className="session-group__workspace" title={workspaceName}>
                 {workspaceName}
               </span>
             )}
-          </span>
+            {repoPath && (
+              <span className="session-group__repo-path" title={repoPath}>
+                {repoPath}
+              </span>
+            )}
+          </>
         )}
 
         {busy && <span className="session-group__busy" />}
@@ -198,6 +263,19 @@ export function SessionGroup({
               </button>
             ))}
           </div>
+        )}
+
+        {isWorktree && (
+          <span className="session-group__worktree-tag" title={worktreePath}>
+            worktree
+          </span>
+        )}
+
+        {changeStats && (changeStats.added > 0 || changeStats.removed > 0) && (
+          <span className="session-group__stats">
+            <span className="session-group__stats-add">+{changeStats.added}</span>
+            <span className="session-group__stats-del">&minus;{changeStats.removed}</span>
+          </span>
         )}
 
         <span className="session-group__count">{group.count}</span>

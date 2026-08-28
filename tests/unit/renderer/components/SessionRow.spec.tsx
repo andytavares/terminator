@@ -117,7 +117,7 @@ describe('SessionRow', () => {
     expect(container.querySelector('.session-row__bell')).toBeNull()
   })
 
-  it('renders dim dot when not active, not busy, and no bell', () => {
+  it('renders the resting state glyph when not busy and no bell', () => {
     const { container } = render(
       <SessionRow
         session={makeSession()}
@@ -127,14 +127,20 @@ describe('SessionRow', () => {
         bellCount={0}
       />
     )
-    expect(container.querySelector('.session-row__dot--dim')).toBeTruthy()
+    expect(container.querySelector('.session-row__status svg')!.getAttribute('data-state')).toBe(
+      'idle'
+    )
   })
 
-  it('renders active dot when active and not busy', () => {
+  it('marks the selected row on the row, not on the glyph', () => {
     const { container } = render(
       <SessionRow session={makeSession()} {...defaultProps} isActive isBusy={false} />
     )
-    expect(container.querySelector('.session-row__dot--active')).toBeTruthy()
+    expect(container.querySelector('.session-row--active')).toBeTruthy()
+    // The glyph still reports state, not selection.
+    expect(container.querySelector('.session-row__status svg')!.getAttribute('data-state')).toBe(
+      'idle'
+    )
   })
 
   it('activates inline rename on double-click and calls onRename on blur', () => {
@@ -194,12 +200,12 @@ describe('SessionRow', () => {
       expect(document.querySelector('.ctx-menu')).toBeTruthy()
     })
 
-    it('context menu has Rename, Move to project, and Close options', () => {
+    it('context menu has Rename, Move to branch, and Close options', () => {
       const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
       fireEvent.contextMenu(container.querySelector('.session-row')!)
       const menu = document.querySelector('.ctx-menu')!
       expect(menu.textContent).toContain('Rename')
-      expect(menu.textContent).toContain('Move to project')
+      expect(menu.textContent).toContain('Move to branch')
       expect(menu.textContent).toContain('Close')
     })
 
@@ -231,7 +237,7 @@ describe('SessionRow', () => {
       expect(closeSession).toHaveBeenCalledWith('sess-99')
     })
 
-    it('Move to project menu item opens MoveSessionDialog', () => {
+    it('Move to branch menu item opens MoveSessionDialog', () => {
       const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
       fireEvent.contextMenu(container.querySelector('.session-row')!)
       const moveBtn = Array.from(document.querySelectorAll('.ctx-menu__item')).find((el) =>
@@ -334,19 +340,138 @@ describe('SessionRow', () => {
       expect(screen.queryByText('needs you')).toBeNull()
     })
 
-    it('dims the dot for an exited session', () => {
+    it('marks an exited session with its own glyph', () => {
       const { container } = render(
         <SessionRow session={makeSession({ agentState: 'exited' })} {...defaultProps} />
       )
-      expect(container.querySelector('.session-row__dot--exited')).toBeTruthy()
+      expect(container.querySelector('.session-row__status svg')!.getAttribute('data-state')).toBe(
+        'exited'
+      )
     })
 
-    it('shows the busy spinner ahead of any dot', () => {
+    it('shows the busy spinner ahead of the state glyph', () => {
       const { container } = render(
         <SessionRow session={makeSession({ agentState: 'working' })} {...defaultProps} isBusy />
       )
       expect(container.querySelector('.session-row__spinner')).toBeTruthy()
-      expect(container.querySelector('.session-row__dot')).toBeNull()
+      expect(container.querySelector('.session-row__status svg')).toBeNull()
     })
+  })
+})
+
+describe('SessionRow — state and selection are two channels (US1, FR-001)', () => {
+  const render_ = (overrides: Partial<TerminalSession>, props = {}) =>
+    render(<SessionRow {...defaultProps} {...props} session={makeSession(overrides)} />)
+
+  function glyphOf(container: HTMLElement): string {
+    const svg = container.querySelector('.session-row__status svg')
+    return svg?.getAttribute('data-state') ?? ''
+  }
+
+  it('keeps the state glyph identical when the row becomes selected', () => {
+    const idle = render_({ agentState: 'idle' }, { isActive: false })
+    const before = glyphOf(idle.container)
+    idle.unmount()
+
+    const selected = render_({ agentState: 'idle' }, { isActive: true })
+    expect(glyphOf(selected.container)).toBe(before)
+    expect(before).not.toBe('')
+  })
+
+  it('expresses selection on the row itself, not on the glyph', () => {
+    const { container } = render_({ agentState: 'idle' }, { isActive: true })
+    expect(container.querySelector('.session-row--active')).toBeTruthy()
+  })
+
+  it.each([
+    ['working', 'working'],
+    ['idle', 'idle'],
+    ['awaiting-input', 'awaiting-input'],
+    ['exited', 'exited'],
+  ] as const)('draws a distinct glyph for %s', (state, expected) => {
+    const { container } = render_({ agentState: state })
+    expect(glyphOf(container)).toBe(expected)
+  })
+
+  it('gives all four states four different glyphs', () => {
+    const seen = (['working', 'idle', 'awaiting-input', 'exited'] as const).map((s) => {
+      const r = render_({ agentState: s })
+      const g = glyphOf(r.container)
+      r.unmount()
+      return g
+    })
+    expect(new Set(seen).size).toBe(4)
+  })
+
+  it('lets a busy spinner outrank the state glyph', () => {
+    const { container } = render_({ agentState: 'idle' }, { isBusy: true })
+    expect(container.querySelector('.session-row__spinner')).toBeTruthy()
+    expect(container.querySelector('.session-row__status svg')).toBeNull()
+  })
+
+  it('shows the waiting glyph together with the unread count, not instead of it', () => {
+    // The waiting state is derived *from* the bell, so letting the count
+    // replace the glyph made the waiting shape unreachable in the real app.
+    const { container } = render_({ agentState: 'awaiting-input' }, { bellCount: 3 })
+    expect(container.querySelector('.session-row__bell')!.textContent).toBe('3')
+    expect(glyphOf(container)).toBe('awaiting-input')
+  })
+
+  it('names the state in the row accessible name, since shape means nothing to a reader', () => {
+    const { container } = render_({ agentState: 'awaiting-input', tabTitle: 'claude' })
+    const row = container.querySelector('.session-row')!
+    expect(row.getAttribute('aria-label')).toContain('claude')
+    expect(row.getAttribute('aria-label')).toContain('Waiting on you')
+  })
+
+  it('hides the glyph from assistive technology — the label carries it instead', () => {
+    const { container } = render_({ agentState: 'working' })
+    expect(container.querySelector('.session-row__status svg')!.getAttribute('aria-hidden')).toBe(
+      'true'
+    )
+  })
+
+  it('puts no colour on the icon element (constitution XII)', () => {
+    for (const state of ['working', 'idle', 'awaiting-input', 'exited'] as const) {
+      const r = render_({ agentState: state })
+      const svg = r.container.querySelector('.session-row__status svg') as SVGElement
+      expect(svg.style.color).toBe('')
+      expect(svg.getAttribute('fill')).not.toMatch(/#|rgb/)
+      expect(svg.className.baseVal ?? '').not.toMatch(/green|red|amber|warn|danger|success/)
+      r.unmount()
+    }
+  })
+
+  it('marks only the waiting row for emphasis', () => {
+    const waiting = render_({ agentState: 'awaiting-input' })
+    expect(waiting.container.querySelector('.session-row--needs-you')).toBeTruthy()
+    waiting.unmount()
+
+    for (const state of ['working', 'idle', 'exited'] as const) {
+      const r = render_({ agentState: state })
+      expect(r.container.querySelector('.session-row--needs-you')).toBeNull()
+      r.unmount()
+    }
+  })
+})
+
+describe('SessionRow — SC-001: the four states survive greyscale', () => {
+  it('draws four geometrically different shapes, not four tints of one', () => {
+    // The mechanical form of "name all four from a greyscale screenshot": if
+    // the rendered path data differs, the shapes differ, whatever the palette.
+    const shapes = (['working', 'idle', 'awaiting-input', 'exited'] as const).map((state) => {
+      const r = render(
+        <SessionRow {...defaultProps} session={makeSession({ agentState: state })} />
+      )
+      const svg = r.container.querySelector('.session-row__status svg')!
+      const geometry = [...svg.querySelectorAll('path, circle, rect, line, polyline, polygon')]
+        .map((n) => n.outerHTML)
+        .join('|')
+      r.unmount()
+      return geometry
+    })
+
+    expect(shapes.every((s) => s.length > 0)).toBe(true)
+    expect(new Set(shapes).size).toBe(4)
   })
 })

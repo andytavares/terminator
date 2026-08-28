@@ -61,6 +61,7 @@ describe('remoteAccessibleCoreChannels()', () => {
     'git:is-repo',
     'git:current-branch',
     'git:list-branches',
+    'git:change-stats',
     'git:checkout',
     'git:create-branch',
     'git:create-worktree',

@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react'
+import { Circle, CircleX, Pause, Play } from 'lucide-react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { formatRelativeTime } from '../../sidebar/relative-time'
+import { statusPresentationFor, type StatusIcon } from '../../sidebar/session-status'
 import { useSessionStore } from '../../stores/session.store'
 import { MoveSessionDialog } from './MoveSessionDialog'
 import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
@@ -31,6 +33,13 @@ interface SessionRowProps {
   /** Opens the note editor from outside, e.g. the Cmd+I shortcut. */
   noteEditing?: boolean
   onNoteEditingChange?: (editing: boolean) => void
+}
+
+const STATUS_ICON: Record<StatusIcon, typeof Circle> = {
+  play: Play,
+  circle: Circle,
+  pause: Pause,
+  'circle-x': CircleX,
 }
 
 export function SessionRow({
@@ -83,24 +92,34 @@ export function SessionRow({
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
+  const status = statusPresentationFor(session)
+
   function renderStatus(): React.ReactNode {
+    // A live spinner outranks everything: it is the only signal about right now.
     if (isBusy) return <span className="session-row__spinner" />
+
+    // Shape carries the state; the icon inherits currentColor and is hidden
+    // from assistive technology, which reads the row's aria-label instead.
+    const Icon = STATUS_ICON[status.icon]
+    const glyph = <Icon aria-hidden="true" data-state={session.agentState} />
+
+    // A waiting session shows its glyph *and* how many times it asked. Letting
+    // the count replace the glyph made the waiting shape unreachable, since the
+    // count is the very thing the waiting state is derived from.
     if (bellCount > 0) {
       return (
-        <span className="session-row__bell">
-          <span>{bellCount}</span>
+        <span className="session-row__waiting">
+          {glyph}
+          <span className="session-row__bell">
+            <span>{bellCount}</span>
+          </span>
         </span>
       )
     }
-    // One dot shape at three opacities. Hue never carries meaning on its own —
-    // awaiting-input is marked by the edge bar and pill below, not by colour.
-    if (session.agentState === 'exited')
-      return <span className="session-row__dot session-row__dot--exited" />
-    if (isActive) return <span className="session-row__dot session-row__dot--active" />
-    return <span className="session-row__dot session-row__dot--dim" />
+    return glyph
   }
 
-  const needsYou = session.agentState === 'awaiting-input'
+  const needsYou = status.emphasises
 
   function commitNote(value: string): void {
     onSetNote?.(value)
@@ -114,6 +133,9 @@ export function SessionRow({
         onClick={onSelect}
         onDoubleClick={startRename}
         onContextMenu={handleContextMenu}
+        aria-label={`${session.tabTitle}, ${status.label}${
+          now === undefined ? '' : `, active ${formatRelativeTime(session.lastActivityAt, now)}`
+        }`}
       >
         {selectable && (
           <input
@@ -203,7 +225,7 @@ export function SessionRow({
               },
             },
             {
-              label: 'Move to project',
+              label: 'Move to branch',
               onSelect: () => {
                 setCtxMenu(null)
                 setMoveOpen(true)

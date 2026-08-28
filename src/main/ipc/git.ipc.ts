@@ -11,6 +11,7 @@ import {
   createWorktree,
   removeWorktree,
   listWorktrees,
+  getChangeStats,
 } from '../git/git-service.js'
 
 const PathSchema = z.object({ path: z.string().min(1) })
@@ -28,6 +29,13 @@ export function registerGitHandlers(): void {
         return { isRepo: true, root: await getGitRoot(path) }
       },
       onError: () => ({ isRepo: false }),
+    }),
+    invokeSpec({
+      channel: 'git:change-stats',
+      schema: PathSchema,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: async ({ path }) => await getChangeStats(path),
+      onError: (e) => ({ error: String(e) }),
     }),
     invokeSpec({
       channel: 'git:current-branch',

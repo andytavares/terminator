@@ -20,10 +20,10 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-test('US2-1: clicking Add Project shows the Create Project dialog', async () => {
+test('US2-1: clicking Add Branch shows the Create Branch dialog', async () => {
   const { page } = handle
   await workspaceRow(page, WS).locator('.ws-row__add').click()
-  await expect(page.locator('.dialog__title')).toContainText('Create Project')
+  await expect(page.locator('.dialog__title')).toContainText('Create Branch')
   await page.getByRole('button', { name: 'Cancel' }).click()
   await expect(page.locator('.dialog__title')).toHaveCount(0)
 })
@@ -32,7 +32,7 @@ test('US2-2: a created project appears under its workspace', async () => {
   const { page } = handle
   await workspaceRow(page, WS).locator('.ws-row__add').click()
   await page.waitForSelector('.dialog__title')
-  await page.getByPlaceholder('My Project').fill('alpha-project')
+  await page.getByPlaceholder('My branch').fill('alpha-project')
   await page.click('.dialog__btn-primary')
   await expect(projectGroup(page, 'alpha-project')).toBeVisible()
 })

@@ -177,6 +177,7 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
     render(
       <SidebarHeader
         globalTabs={[globalTab]}
+        sidebarItems={[]}
         activeGlobalTabId={null}
         onSelectGlobalTab={onSelectGlobalTab}
         onSearchFocus={() => {}}
@@ -188,7 +189,7 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
         onSearchClear={() => {}}
       />
     )
-    fireEvent.click(screen.getByTitle('Fake Tab'))
+    fireEvent.click(screen.getByLabelText('Fake Tab'))
     expect(onSelectGlobalTab).toHaveBeenCalledWith('fake.global')
   })
 
@@ -243,13 +244,13 @@ describe('scope actions are reachable from the command palette (FR-027)', () => 
   it('registers a new-terminal command per project', () => {
     renderSidebar('project')
     const labels = mockRegistryState.registerCommand.mock.calls.map((c) => c[0].label)
-    expect(labels).toContain('New terminal in API')
+    expect(labels).toContain('New terminal — Backend · API')
   })
 
   it('creates the session when the palette command runs', () => {
     renderSidebar('project')
     const command = mockRegistryState.registerCommand.mock.calls.find(
-      (c) => c[0].label === 'New terminal in API'
+      (c) => c[0].label === 'New terminal — Backend · API'
     )![0]
     command.action()
     expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)

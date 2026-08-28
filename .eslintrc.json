@@ -19,19 +19,42 @@
       "rules": {
         "@typescript-eslint/no-var-requires": "off"
       }
+    },
+    {
+      "files": ["src/renderer/components/**/*.tsx"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "JSXText[value=/[Pp]roject/]",
+            "message": "The product calls this a branch, not a project. The stored entity keeps the name `Project` (ADR 032) but no user-facing string may say it."
+          },
+          {
+            "selector": "Property[key.name='label'] > Literal[value=/[Pp]roject/]",
+            "message": "Menu and command labels say branch, not project (ADR 032). Qualify by repo too \u2014 every repo has a `main`."
+          },
+          {
+            "selector": "JSXAttribute[name.name=/^(placeholder|title|aria-label)$/] > Literal[value=/[Pp]roject/]",
+            "message": "Placeholders, tooltips and accessible names say branch, not project (ADR 032)."
+          }
+        ]
+      }
     }
   ],
   "rules": {
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/no-unused-vars": [
       "error",
-      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
     ],
     "no-restricted-syntax": [
       "error",
       {
         "selector": "JSXAttribute[name.name='style'] Literal[value=/^#[0-9a-fA-F]{3,8}$/]",
-        "message": "Don't hardcode hex colors in inline `style` — use a theme token, e.g. color: 'var(--text-secondary)'. Hardcoded hex breaks the light theme (see ErrorBoundary regression). Terminal/xterm palettes and workspace color data belong in named constants, not style props."
+        "message": "Don't hardcode hex colors in inline `style` \u2014 use a theme token, e.g. color: 'var(--text-secondary)'. Hardcoded hex breaks the light theme (see ErrorBoundary regression). Terminal/xterm palettes and workspace color data belong in named constants, not style props."
       }
     ]
   }

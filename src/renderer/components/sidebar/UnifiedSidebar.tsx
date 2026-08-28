@@ -8,6 +8,9 @@ import { useSessionStore } from '../../stores/session.store'
 import { useSettingsStore } from '../../stores/settings.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { buildGroups } from '../../sidebar/view-model'
+import { BellAndBusySource } from '../../sidebar/agent-state'
+import { abbreviatePath, displayName, qualifiedBranchLabel } from '../../sidebar/branch-display'
+import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
 import {
   isCollapsed as isGroupCollapsed,
@@ -21,8 +24,6 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
-import { ScratchSection } from './ScratchSection'
-import { ExtensionFooter } from './ExtensionFooter'
 import { FilterNotice } from './FilterNotice'
 import { ScopeMenu } from './ScopeMenu'
 import { IssueBadge } from '../integrations/IssueBadge'
@@ -62,7 +63,10 @@ interface UnifiedSidebarProps {
 }
 
 const SIDEBAR_WIDTH_KEY = 'terminator.sidebar.width'
-const DEFAULT_WIDTH = 260
+// The branch row carries name, state, worktree marker and change statistics.
+// 260px truncated a 30-character branch name to uselessness, which is the
+// ambiguity this feature exists to remove (research R3).
+const DEFAULT_WIDTH = 300
 const MIN_WIDTH = 200
 const MAX_WIDTH = 480
 const DEFAULT_STALE_AFTER_MS = 2 * 60 * 60 * 1000
@@ -115,6 +119,16 @@ export function UnifiedSidebar({
   const { getScratchSessions, sessions, projectViews, isSessionBusy, getBellCountForSession } =
     sessionStore
   const { resolveSettings } = useSettingsStore()
+  const {
+    statsFor,
+    ensure: ensureChangeStats,
+    invalidate: invalidateStats,
+    invalidateAll: invalidateAllStats,
+  } = useChangeStatsStore()
+  /** Last activity seen per branch, so work in a terminal refreshes its statistics. */
+  const lastActivityByBranch = useRef(new Map<string, number>())
+  /** Home directory, so a repo path reads as `~/repos/app`. */
+  const [homeDir, setHomeDir] = useState<string | undefined>(undefined)
   const staleAfterMs = resolveSettings().sidebar?.staleAfterMs ?? DEFAULT_STALE_AFTER_MS
   const { createSession } = useTerminalSession()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
@@ -224,6 +238,20 @@ export function UnifiedSidebar({
     if (editNoteSessionId) setNoteEditingId(editNoteSessionId)
   }, [editNoteSessionId])
 
+  useEffect(() => {
+    void window.electronAPI?.app
+      ?.getInfo?.()
+      .then((info) => setHomeDir(info.homeDir))
+      .catch(() => setHomeDir(undefined))
+  }, [])
+
+  // Coming back to the window is the cheapest moment to notice that the working
+  // trees moved on while you were away.
+  useEffect(() => {
+    window.addEventListener('focus', invalidateAllStats)
+    return () => window.removeEventListener('focus', invalidateAllStats)
+  }, [invalidateAllStats])
+
   // The active view is deliberately component state, never restored from
   // storage: a filtered view must never be what greets you at launch (FR-015).
   const [views, setViews] = useState(loadViews)
@@ -254,10 +282,38 @@ export function UnifiedSidebar({
     [workspaces, projectsByWorkspaceId]
   )
 
-  const sessionList = useMemo(
-    () => [...sessions.values()].filter((s) => s.status !== 'closed' || s.agentState === 'exited'),
-    [sessions]
-  )
+  // agentState is view state derived from bell, byte flow and exit — the type
+  // says so, but nothing was deriving it, so every session read as 'idle'
+  // forever and the Needs me / Active / Stale views filtered on a constant.
+  // Deriving here keeps it a pure function of the store rather than a fourth
+  // thing to hold in sync, and keeps buildGroups pure.
+  const sessionList = useMemo(() => {
+    const source = new BellAndBusySource()
+    // Derive before filtering: the keep-if-exited rule reads agentState, and
+    // reading it before deriving would drop every closed session.
+    return [...sessions.values()]
+      .map((s) => {
+        const agentState = source.derive(s)
+        return agentState === s.agentState ? s : { ...s, agentState }
+      })
+      .filter((s) => s.status !== 'closed' || s.agentState === 'exited')
+  }, [sessions])
+
+  // Work in a terminal changes the tree under it, so a branch whose sessions
+  // just did something gets its statistics dropped rather than waiting out the
+  // TTL. Tracked here rather than in the session store: making the session
+  // store import the stats store would couple two things that have no other
+  // reason to know about each other.
+  useEffect(() => {
+    const seen = lastActivityByBranch.current
+    for (const session of sessionList) {
+      const previous = seen.get(session.projectId) ?? 0
+      if (session.lastActivityAt > previous) {
+        seen.set(session.projectId, session.lastActivityAt)
+        if (previous !== 0) invalidateStats(session.projectId)
+      }
+    }
+  }, [sessionList, invalidateStats])
 
   const clock = now ?? Date.now()
   const { groups, shown, total } = useMemo(
@@ -285,7 +341,12 @@ export function UnifiedSidebar({
     const disposers = allProjects.map((project) =>
       registerCommand({
         id: `core.scope.new-terminal.${project.id}`,
-        label: `New terminal in ${project.name}`,
+        // Qualified by repo: every repo's default branch is called main, so an
+        // unqualified label lists the same words once per repo.
+        label: `New terminal — ${qualifiedBranchLabel(
+          project,
+          workspaceById.get(project.workspaceId)?.name
+        )}`,
         category: 'Sessions',
         action: () => {
           const settings = resolveSettings(project.workspaceId)
@@ -485,6 +546,12 @@ export function UnifiedSidebar({
       workspaceId !== undefined && firstGroupKeyByWorkspace.get(workspaceId) === group.key
     const collapsed = isGroupCollapsed(collapseState, view.groupBy, group.key)
 
+    // Asking for a branch's change volume the first time its row renders, and
+    // never awaiting the answer. A collapsed group costs nothing.
+    const branchCwd = project ? (project.worktreePath ?? workspace?.folderPath) : undefined
+    if (project && branchCwd) ensureChangeStats(project.id, branchCwd, clock)
+    const statsEntry = project ? statsFor(project.id) : undefined
+
     return (
       <SessionGroup
         key={group.key}
@@ -493,6 +560,15 @@ export function UnifiedSidebar({
         collapsed={collapsed}
         onToggleCollapse={() => toggleGroup(group.key)}
         workspaceColor={workspace?.color}
+        branchName={project ? displayName(project) : undefined}
+        isWorktree={project ? project.isWorktree : undefined}
+        worktreePath={project?.worktreePath}
+        changeStats={statsEntry?.stats}
+        repoPath={
+          group.scope?.kind === 'workspace' && workspace
+            ? abbreviatePath(workspace.folderPath, homeDir)
+            : undefined
+        }
         // Nested under its workspace the question is already answered; anywhere
         // else a project header is a bare name with no home.
         workspaceName={project && !nested ? workspace?.name : undefined}
@@ -571,6 +647,7 @@ export function UnifiedSidebar({
       >
         <SidebarHeader
           globalTabs={globalTabs}
+          sidebarItems={sidebarButtons}
           activeGlobalTabId={activeGlobalTabId}
           onSelectGlobalTab={onSelectGlobalTab}
           onSearchFocus={() => {}}
@@ -641,6 +718,41 @@ export function UnifiedSidebar({
             </div>
           ))}
 
+          {/* Scratch terminals belong to no repo, so they get their own group
+              rather than a pinned footer with its own separate vocabulary. */}
+          {(scratchSessions.length > 0 || groups.length > 0) && (
+            <div className="session-group unified-sidebar__scratch">
+              <div className="session-group__header">
+                <span className="session-group__label">Scratch</span>
+                <span className="session-group__count">{scratchSessions.length}</span>
+                <button
+                  className="unified-sidebar__scratch-add"
+                  title="New scratch terminal"
+                  aria-label="New scratch terminal"
+                  onClick={onNewScratch}
+                >
+                  +
+                </button>
+              </div>
+              <div className="session-group__sessions">
+                {scratchSessions.map((session) => (
+                  <SessionRow
+                    key={session.id}
+                    session={session}
+                    isActive={activeScratchSessionId === session.id}
+                    isBusy={isSessionBusy(session.id)}
+                    bellCount={getBellCountForSession(session.id)}
+                    workspaceColor=""
+                    now={clock}
+                    onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
+                    onSelect={() => onSelectScratchSession(session.id)}
+                    onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {groups.length === 0 && workspacesWithoutGroups.length === 0 && (
             <div className="unified-sidebar__empty">
               {searchQuery ? `No sessions match "${searchQuery}"` : 'No sessions yet'}
@@ -657,18 +769,6 @@ export function UnifiedSidebar({
             </button>
           </div>
         )}
-
-        {/* Sidebar items are a flat global contribution, so the footer hosts
-            them once per window, outside the group list and independent of how
-            sessions are grouped (FR-028). */}
-        <ExtensionFooter buttons={sidebarButtons} />
-
-        <ScratchSection
-          sessions={scratchSessions}
-          activeSessionId={activeScratchSessionId}
-          onSelectSession={onSelectScratchSession}
-          onNewScratch={onNewScratch}
-        />
 
         <div
           className="unified-sidebar__resize-handle"
@@ -705,7 +805,11 @@ export function UnifiedSidebar({
           return (
             <LinkIssueDialog
               projectId={project.id}
-              projectName={project.name}
+              // Qualified: "Attaching to main" named one of six identical things.
+              projectName={qualifiedBranchLabel(
+                project,
+                workspaceById.get(project.workspaceId)?.name
+              )}
               currentKey={issueLinkFor(project.id)?.key ?? null}
               onClose={closeLinkDialog}
             />
@@ -767,7 +871,7 @@ export function UnifiedSidebar({
       )}
       {confirmDeleteProject && (
         <ConfirmDialog
-          title={`Remove project "${confirmDeleteProject.name}"?`}
+          title={`Remove branch "${confirmDeleteProject.name}"?`}
           confirmLabel="Remove"
           danger
           onConfirm={() => {

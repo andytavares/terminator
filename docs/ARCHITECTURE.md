@@ -509,39 +509,68 @@ The primary navigation is a single resizable sidebar (`UnifiedSidebar`) replacin
 
 ```
 UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
-├── SidebarHeader — search + global tab icons (scrolls horizontally when many global
-│                   tabs registered; bell + add button stay pinned right)
-│                   + "+ workspace" button. Workspace-independent, so the flattening
-│                   left it untouched.
+├── SidebarHeader
+│   ├── AppBand — every app-level surface in one labelled band: core's Overview, the
+│   │     `contributes.globalTab` entries from extension manifests, and the items from
+│   │     api.sidebar.registerItem(). Icon plus visible label, accessible name, keyboard
+│   │     focus order. Both contribution contracts are unchanged — only the render
+│   │     target merged (ADR 033). Replaces the old unlabelled icon strip and the
+│   │     deleted ExtensionFooter.
+│   └── search row — search, notification bell, "+ repo". These act on the list below,
+│         not on the apps above, which is why they sit here and not in the band.
 ├── ViewBar — saved-view chips, group-by / sort menus, hide-stale toggle
 ├── FilterNotice — "showing N of M · show all"; rendered only while something is hidden
 ├── [group list] — SessionGroup per group returned by buildGroups()
 │   └── SessionGroup — the scope-bearing header. When the grouping key is a project or
 │       │             workspace this header IS the row the old tree had, and hosts
 │       │             everything it hosted.
-│       ├── chevron / worktree icon / label / workspace name (project headers outside
-│       │     workspace grouping) / busy aggregate / count / + new terminal
+│       ├── chevron / branch glyph (GitFork for a worktree, GitBranch for a plain
+│       │     checkout) / branch name / worktree tag / workspace name (branch headers
+│       │     outside workspace grouping) / repo folder path (repo headers) /
+│       │     busy aggregate / change statistics / count / + new terminal
 │       ├── workspace tab icons — hover-reveal icons from registerWorkspaceTab(),
 │       │     rendered on each workspace's FIRST group so they appear once per
 │       │     workspace rather than once per project
 │       ├── SessionGroup[] — under workspace grouping only: one nested project group
 │       │     per project of that workspace, rendered by the same component so a
 │       │     project keeps its header actions without changing the grouping
-│       ├── BranchSwitcher (project groups only)
-│       └── SessionRow[] — status dot / spinner / bell, relative activity, optional
-│             note, project badge (which opens ScopeMenu when the header does not
-│             already name the project), and a needs-you edge bar + pill
-├── bulk bar — selection count + Close selected (Stale view only)
-├── ExtensionFooter — sidebar items from api.sidebar.registerItem(), once per window
-└── ScratchSection — pinned scratch terminal sessions at the bottom
+│       ├── BranchSwitcher (branch groups only)
+│       └── SessionRow[] — state glyph / spinner / bell, relative activity, optional
+│             note, branch badge (which opens ScopeMenu when the header does not
+│             already name the branch), and a needs-you edge bar + pill.
+│             The glyph is one of four lucide components chosen by session state
+│             (Play / Circle / Pause / CircleX); selection is the row's own surface.
+│             The two were the same dot until 032 — see below.
+├── scratch group — scratch sessions as an ordinary group with a count, not a pinned
+│     footer with its own vocabulary
+└── bulk bar — selection count + Close selected (Stale view only)
 ```
 
 ### The view-model layer
 
 `src/renderer/sidebar/` holds the pure core: `view-model.ts` (`buildGroups`, `isStale`),
 `views.ts` (built-in views as data + persistence — Everything, the default view, groups
-by workspace), `agent-state.ts`, `collapse-state.ts`,
-and `relative-time.ts`.
+by workspace), `agent-state.ts`, `session-status.ts` (state → glyph/label, total over
+`AgentState`), `branch-display.ts` (`displayName`, `abbreviatePath`,
+`qualifiedBranchLabel`), `collapse-state.ts`, and `relative-time.ts`.
+
+### Change statistics sit beside the pure layer, not in it
+
+`src/renderer/stores/change-stats.store.ts` holds each branch's `+n/−m`, keyed by branch
+id, with a 15-second TTL and an injected clock. It is deliberately **not** a field on the
+`Project` record: putting it there would make `buildGroups` a function of when git last
+answered, which breaks the determinism the whole pure layer depends on. `ensure()` returns
+`void`, so a component cannot await git during render, and a branch whose statistics are
+missing or errored simply draws none. See ADR 031.
+
+### Vocabulary: the product says "branch", the code says `Project`
+
+The object between a repo and a session is a branch. Every user-visible string says so;
+the stored entity, its IPC channels and the `api.project.*` Extension API keep the name
+`Project`, because renaming them would break installed extensions and require a data
+migration for no user-visible gain. A lint rule on `src/renderer/components/**` fails the
+build if "project" reaches JSX text, a `label:` value, or a `placeholder`/`title`/
+`aria-label`. See ADR 032.
 
 **These modules import nothing but types.** No React, no store, no `Date.now()` — `now`
 is always a parameter. That physical separation is the point: it makes the whole

@@ -16,8 +16,12 @@
   color: var(--text-primary);
 }
 
+/* Selection is the row's surface. It used to be the status dot's colour, which
+   left running, idle and waiting sharing one glyph (FR-001). */
 .session-row--active {
   color: var(--text-primary);
+  background: var(--bg-card-hover);
+  box-shadow: inset 2px 0 0 var(--ws-color, var(--accent));
 }
 
 .session-row__prefix {
@@ -54,27 +58,20 @@
   width: 16px;
 }
 
-/* Status indicators */
-.session-row__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: block;
+/* Shape carries the state; the glyph inherits currentColor and is never tinted
+   (Principle XII). Opacity is the only permitted differentiation, and it is
+   used to recede the two states that are not asking for anything. */
+.session-row__status svg {
+  width: 11px;
+  height: 11px;
 }
 
-.session-row__dot--active {
-  background: var(--ws-color, var(--accent));
+.session-row__status svg[data-state='idle'] {
+  opacity: 0.55;
 }
 
-.session-row__dot--dim {
-  background: var(--text-muted);
-  opacity: 0.4;
-}
-
-/* One dot shape at three opacities — never hue alone (WCAG 1.4.1). */
-.session-row__dot--exited {
-  background: var(--text-muted);
-  opacity: 0.18;
+.session-row__status svg[data-state='exited'] {
+  opacity: 0.35;
 }
 
 /*
@@ -187,4 +184,22 @@
   color: var(--text-primary);
   font-family: inherit;
   padding: 0 3px;
+}
+
+/* ── Width degradation ────────────────────────────────────────
+   A narrow sidebar drops metadata in a fixed order, cheapest first. The
+   session title and the state glyph are what FR-001 and FR-005 exist to
+   guarantee, so they never drop and the row never wraps. */
+@container sidebar (max-width: 219px) {
+  .session-row__activity {
+    display: none;
+  }
+}
+
+/* Waiting shows both: the shape that says what state this is, and the count
+   that says how many times it asked. */
+.session-row__waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }

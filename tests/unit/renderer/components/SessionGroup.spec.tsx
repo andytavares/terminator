@@ -317,3 +317,128 @@ describe('SessionGroup — naming the workspace a project belongs to', () => {
     expect(container.querySelector('.session-group--nested')).toBeTruthy()
   })
 })
+
+describe('SessionGroup — the branch is the identity (US2)', () => {
+  const worktreeGroup: Group = {
+    key: 'p2',
+    label: 'TAV-14 Make all text red',
+    scope: { kind: 'project', projectId: 'p2', workspaceId: 'w1' },
+    sessions: [],
+    count: 0,
+  }
+
+  function renderBranch(props: Partial<React.ComponentProps<typeof SessionGroup>> = {}) {
+    return render(
+      <SessionGroup
+        group={projectGroup}
+        collapsed={false}
+        onToggleCollapse={onToggleCollapse}
+        branchName={{ primary: 'main', secondary: undefined }}
+        isWorktree={false}
+        {...props}
+      >
+        <div data-testid="child" />
+      </SessionGroup>
+    )
+  }
+
+  it('marks a worktree branch differently from a plain checkout', () => {
+    const wt = renderBranch({ group: worktreeGroup, isWorktree: true, worktreePath: '/r/.wt/x' })
+    const wtGlyph = wt.container
+      .querySelector('.session-group__branch-glyph')!
+      .getAttribute('data-kind')
+    wt.unmount()
+
+    const plain = renderBranch({ isWorktree: false })
+    const plainGlyph = plain.container
+      .querySelector('.session-group__branch-glyph')!
+      .getAttribute('data-kind')
+
+    expect(wtGlyph).toBe('worktree')
+    expect(plainGlyph).toBe('branch')
+    expect(wtGlyph).not.toBe(plainGlyph)
+  })
+
+  it('tags a worktree and reveals its path on hover', () => {
+    const { container } = renderBranch({ isWorktree: true, worktreePath: '/r/.worktrees/tav-14' })
+    const tag = container.querySelector('.session-group__worktree-tag')!
+    expect(tag.textContent).toBe('worktree')
+    expect(tag.getAttribute('title')).toBe('/r/.worktrees/tav-14')
+  })
+
+  it('puts no worktree tag on a plain checkout', () => {
+    const { container } = renderBranch({ isWorktree: false })
+    expect(container.querySelector('.session-group__worktree-tag')).toBeNull()
+  })
+
+  it('shows the branch alone when the label is just the branch name', () => {
+    const { container } = renderBranch({ branchName: { primary: 'main' } })
+    expect(container.querySelector('.session-group__label')!.textContent).toContain('main')
+    expect(container.querySelector('.session-group__branch-secondary')).toBeNull()
+  })
+
+  it('keeps the branch visible beside a human label', () => {
+    const { container } = renderBranch({
+      group: worktreeGroup,
+      branchName: { primary: 'TAV-14 Make all text red', secondary: 'andrew/tav-14' },
+    })
+    expect(container.querySelector('.session-group__label')!.textContent).toContain(
+      'TAV-14 Make all text red'
+    )
+    expect(container.querySelector('.session-group__branch-secondary')!.textContent).toBe(
+      'andrew/tav-14'
+    )
+  })
+
+  it('renders change statistics when they are available', () => {
+    const { container } = renderBranch({ changeStats: { added: 48, removed: 12, files: 3 } })
+    const stats = container.querySelector('.session-group__stats')!
+    expect(stats.textContent).toContain('48')
+    expect(stats.textContent).toContain('12')
+  })
+
+  it('renders no statistics at all when they are absent', () => {
+    const { container } = renderBranch({ changeStats: undefined })
+    expect(container.querySelector('.session-group__stats')).toBeNull()
+  })
+
+  it('renders no statistics and no error affordance when git failed', () => {
+    const { container } = renderBranch({ changeStats: null })
+    expect(container.querySelector('.session-group__stats')).toBeNull()
+    expect(container.textContent).not.toMatch(/error|failed|unavailable/i)
+  })
+
+  it('omits statistics for a clean tree rather than showing +0 −0', () => {
+    const { container } = renderBranch({ changeStats: { added: 0, removed: 0, files: 0 } })
+    expect(container.querySelector('.session-group__stats')).toBeNull()
+  })
+
+  it('names the repo folder path on a repo group header', () => {
+    const repoGroup: Group = {
+      key: 'w1',
+      label: 'Backend',
+      scope: { kind: 'workspace', workspaceId: 'w1' },
+      sessions: [],
+      count: 0,
+    }
+    const { container } = render(
+      <SessionGroup
+        group={repoGroup}
+        collapsed={false}
+        onToggleCollapse={onToggleCollapse}
+        repoPath="~/repos/backend"
+      >
+        <div />
+      </SessionGroup>
+    )
+    expect(container.querySelector('.session-group__repo-path')!.textContent).toBe(
+      '~/repos/backend'
+    )
+  })
+
+  it('puts no colour on the branch glyph (constitution XII)', () => {
+    const { container } = renderBranch({ isWorktree: true })
+    const svg = container.querySelector('.session-group__branch-glyph') as SVGElement
+    expect(svg.style.color).toBe('')
+  })
+})

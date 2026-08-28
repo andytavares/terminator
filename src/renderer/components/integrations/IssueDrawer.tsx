@@ -198,7 +198,7 @@ export function IssueDrawer({ projectId, projectName, onClose }: IssueDrawerProp
           )}
         </h3>
         {context === null ? (
-          <p className="issue-drawer__empty">Nothing is fed to agent sessions in this project.</p>
+          <p className="issue-drawer__empty">Nothing is fed to agent sessions on this branch.</p>
         ) : (
           <>
             <pre className="issue-drawer__context">{context.markdown}</pre>

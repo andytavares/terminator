@@ -170,6 +170,12 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toPayload: (path: string) => ({ path }),
   },
   {
+    path: 'git.changeStats',
+    kind: 'invoke',
+    channel: 'git:change-stats',
+    toPayload: (path: string) => ({ path }),
+  },
+  {
     path: 'git.listBranches',
     kind: 'invoke',
     channel: 'git:list-branches',

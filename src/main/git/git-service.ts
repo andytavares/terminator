@@ -2,7 +2,7 @@ import { execFile as execFileCb } from 'child_process'
 import { promisify } from 'util'
 import { join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
-import type { GitStatus, FileDiff } from '../../shared/schemas/git.schema.js'
+import type { GitStatus, FileDiff, ChangeStats } from '../../shared/schemas/git.schema.js'
 import { parseStatus, parseDiff } from './git-parser.js'
 import { GIT_ENV } from './git-env.js'
 
@@ -31,6 +31,45 @@ export async function getStatus(repoRoot: string, maxFiles: number = 500): Promi
   ])
   const partial = parseStatus(statusOut, maxFiles)
   return { ...partial, branch: branch || 'HEAD' }
+}
+
+/**
+ * Uncommitted change volume for one working tree.
+ *
+ * `cwd` is the branch's own directory — its worktree path when it has one, the
+ * repo root otherwise. Diffing against HEAD counts staged and unstaged work in
+ * a single call, which is the number a sidebar row wants: "how much have I
+ * changed on this branch". Untracked files are not counted, consistent with
+ * `git diff` everywhere else in the app.
+ */
+export async function getChangeStats(cwd: string): Promise<ChangeStats> {
+  let out: string
+  try {
+    out = await git(['diff', '--numstat', 'HEAD'], cwd)
+  } catch (err) {
+    // A repository with no commits has no HEAD to diff against. That is an
+    // empty tree, not a failure — every other error still propagates.
+    if (err instanceof Error && /unknown revision|ambiguous argument/i.test(err.message)) {
+      return { added: 0, removed: 0, files: 0 }
+    }
+    throw err
+  }
+
+  let added = 0
+  let removed = 0
+  let files = 0
+  for (const line of out.split('\n')) {
+    // <added>\t<removed>\t<path>. Binary files report '-' in both columns;
+    // they are a changed file but contribute no line counts.
+    const parts = line.split('\t')
+    if (parts.length < 3) continue
+    files += 1
+    const a = Number(parts[0])
+    const r = Number(parts[1])
+    if (Number.isFinite(a)) added += a
+    if (Number.isFinite(r)) removed += r
+  }
+  return { added, removed, files }
 }
 
 export async function getDiff(

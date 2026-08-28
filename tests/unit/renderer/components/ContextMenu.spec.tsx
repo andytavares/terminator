@@ -7,7 +7,7 @@ let onDismiss: ReturnType<typeof vi.fn>
 
 const items = [
   { label: 'Rename', onSelect: vi.fn() },
-  { label: 'Move to project', onSelect: vi.fn() },
+  { label: 'Move to branch', onSelect: vi.fn() },
   { label: 'Close', onSelect: vi.fn(), danger: true, separatorBefore: true },
 ]
 

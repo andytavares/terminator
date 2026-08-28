@@ -44,6 +44,7 @@ import {
   listWorktrees,
   createWorktree,
   removeWorktree,
+  getChangeStats,
 } from '../../../src/main/git/git-service'
 
 const customMock = () =>
@@ -345,5 +346,53 @@ describe('removeWorktree', () => {
     expect(args).toContain('remove')
     expect(args).toContain('--force')
     expect(args).toContain('/worktrees/old-feature')
+  })
+})
+
+// ─── getChangeStats ──────────────────────────────────────────────────────────
+
+describe('getChangeStats', () => {
+  it('sums the numstat columns across files', async () => {
+    mockResolve(['12\t3\tsrc/a.ts', '4\t0\tsrc/b.ts', '0\t9\tsrc/c.ts'].join('\n'))
+    expect(await getChangeStats('/repo')).toEqual({ added: 16, removed: 12, files: 3 })
+  })
+
+  it('runs diff against HEAD so staged and unstaged work both count', async () => {
+    mockResolve('1\t1\ta.ts')
+    await getChangeStats('/repo')
+    const [cmd, args, opts] = customMock().mock.calls[0]
+    expect(cmd).toBe('git')
+    expect(args).toEqual(['diff', '--numstat', 'HEAD'])
+    expect(opts).toMatchObject({ cwd: '/repo' })
+  })
+
+  it('counts a binary file but adds nothing for it — git reports dashes, not numbers', async () => {
+    mockResolve(['5\t2\tsrc/a.ts', '-\t-\tassets/logo.png'].join('\n'))
+    expect(await getChangeStats('/repo')).toEqual({ added: 5, removed: 2, files: 2 })
+  })
+
+  it('reports zeroes for a clean tree', async () => {
+    mockResolve('')
+    expect(await getChangeStats('/repo')).toEqual({ added: 0, removed: 0, files: 0 })
+  })
+
+  it('reports zeroes for a repository with no commits rather than throwing', async () => {
+    mockReject("fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree")
+    expect(await getChangeStats('/repo')).toEqual({ added: 0, removed: 0, files: 0 })
+  })
+
+  it('rejects when the directory is not a git repository', async () => {
+    mockReject('fatal: not a git repository (or any of the parent directories): .git')
+    await expect(getChangeStats('/tmp')).rejects.toThrow(/not a git repository/)
+  })
+
+  it('rejects when git times out', async () => {
+    mockReject('spawn ETIMEDOUT')
+    await expect(getChangeStats('/repo')).rejects.toThrow(/ETIMEDOUT/)
+  })
+
+  it('ignores malformed rows rather than producing NaN', async () => {
+    mockResolve(['3\t1\tok.ts', 'garbage', ''].join('\n'))
+    expect(await getChangeStats('/repo')).toEqual({ added: 3, removed: 1, files: 1 })
   })
 })
