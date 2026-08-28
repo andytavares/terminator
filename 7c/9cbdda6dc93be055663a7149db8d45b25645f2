@@ -1,0 +1,82 @@
+src/shared/electron-api/manifest.ts
+  s_fcfef3c41f4cf0::t_a568b3b1387c28 173-177
+  s_fcfef3c41f4cf0::t_8558933621a17b 172
+src/renderer/components/sidebar/SessionGroup.css
+  s_fcfef3c41f4cf0::t_f90029d4ed4cb4 84-87,114-115,130-133,281,287
+  s_fcfef3c41f4cf0::t_2b9c70767c0987 88-100
+  s_fcfef3c41f4cf0::t_f26fccd37eaf0c 76-78,83,127-129
+  s_fcfef3c41f4cf0::t_f2d15594d93b98 80-82
+  s_fcfef3c41f4cf0::t_2f113d880668de 101,103-113,119-126,134-170
+  s_fcfef3c41f4cf0::t_a961dd4165544e 102
+tests/unit/ipc/git.ipc.spec.ts
+  s_fcfef3c41f4cf0::t_4438dc57e49e31 20,179-203
+  s_fcfef3c41f4cf0::t_2f8be3efc5547a 204
+tests/unit/renderer/stores/change-stats.store.spec.ts
+  s_fcfef3c41f4cf0::t_29b3c92e4de0b8 1,6-130,138-143
+  s_fcfef3c41f4cf0::t_2f113d880668de 2-5
+  s_fcfef3c41f4cf0::t_1bbfedb12ba1a1 131-137
+src/main/ipc/git.ipc.ts
+  s_fcfef3c41f4cf0::t_fe2e44b4467d95 14,33-38
+  s_fcfef3c41f4cf0::t_77a0d223683fa3 39
+src/renderer/stores/change-stats.store.ts
+  s_fcfef3c41f4cf0::t_12a7214b683cbd 1-59,70-95
+  s_fcfef3c41f4cf0::t_1bbfedb12ba1a1 60-69
+tests/unit/renderer/components/SessionGroup.spec.tsx
+  s_fcfef3c41f4cf0::t_2f113d880668de 347-349
+  s_fcfef3c41f4cf0::t_c569db305233cd 320-346,350-444
+src/renderer/components/sidebar/SessionGroup.tsx
+  s_fcfef3c41f4cf0::t_2b9c70767c0987 225-230,246
+  s_fcfef3c41f4cf0::t_20489c31e27a44 2,5-6,17-33,94-116,123-127,206-208,231-235,241-245,268-279
+  s_fcfef3c41f4cf0::t_5250f203e11e4d 209,280
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_fcfef3c41f4cf0::t_eaf2e3510f1620 64
+src/main/index.ts
+  s_fcfef3c41f4cf0::t_fd36eae264e031 253-255
+docs/adr/031-change-stats-out-of-band.md
+  s_fcfef3c41f4cf0::t_1b4dfdeff3cdab 1-57
+tests/unit/git/git-service.spec.ts
+  s_fcfef3c41f4cf0::t_cb055c469f8e0c 47,351-397
+  s_fcfef3c41f4cf0::t_d764f6dbed14f2 398
+tests/unit/renderer/sidebar/branch-display.spec.ts
+  s_fcfef3c41f4cf0::t_33f2309be7ee6a 1,3-52,75-76
+  s_fcfef3c41f4cf0::t_311c244880551c 2,53-69,71-74
+  s_fcfef3c41f4cf0::t_f90029d4ed4cb4 70
+src/shared/schemas/git.schema.ts
+  s_fcfef3c41f4cf0::t_dc5506de1383f5 73-81
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_fcfef3c41f4cf0::t_7ba9c7752391c2 124-131
+  s_fcfef3c41f4cf0::t_40d1644e5f2b73 13,250-256,546-551,560-563
+  s_fcfef3c41f4cf0::t_2ace2281073c08 304-319
+  s_fcfef3c41f4cf0::t_f90029d4ed4cb4 12,132-133,243-249,564-568
+src/renderer/sidebar/branch-display.ts
+  s_fcfef3c41f4cf0::t_311c244880551c 27-38
+  s_fcfef3c41f4cf0::t_9db8510c041cb8 1-26
+specs/032-branch-first-sidebar/tasks.md
+  s_fcfef3c41f4cf0::t_2f113d880668de 85-89,93-98
+  s_fcfef3c41f4cf0::t_03a54399f16414 99-104,186-189
+src/renderer/electron.d.ts
+  s_fcfef3c41f4cf0::t_fd36eae264e031 200
+  s_fcfef3c41f4cf0::t_8f15e5de90a131 20
+  s_fcfef3c41f4cf0::t_a568b3b1387c28 74
+src/renderer/components/sidebar/SessionRow.css
+  s_fcfef3c41f4cf0::t_f90029d4ed4cb4 193
+src/main/git/git-service.ts
+  s_fcfef3c41f4cf0::t_dc5506de1383f5 5,36-72
+  s_fcfef3c41f4cf0::t_a627a736408467 73-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "7c9cbdda6dc93be055663a7149db8d45b25645f2",
+  "prompts": {},
+  "sessions": {
+    "s_fcfef3c41f4cf0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3779fbc3-6b0c-468d-91ec-b7d824a3c1fc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
