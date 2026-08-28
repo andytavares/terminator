@@ -17,6 +17,7 @@ const gitService = vi.hoisted(() => ({
   createWorktree: vi.fn(),
   removeWorktree: vi.fn(),
   listWorktrees: vi.fn(),
+  getChangeStats: vi.fn(),
 }))
 vi.mock('../../../src/main/git/git-service.js', () => gitService)
 
@@ -173,5 +174,31 @@ describe('git:list-worktrees', () => {
     await expect(handler('git:list-worktrees')({}, { path: '/r' })).resolves.toEqual({
       worktrees: [],
     })
+  })
+})
+
+describe('git:change-stats', () => {
+  it('returns the service result for a valid path', async () => {
+    gitService.getChangeStats.mockResolvedValue({ added: 12, removed: 3, files: 2 })
+    await expect(handler('git:change-stats')({}, { path: '/repo' })).resolves.toEqual({
+      added: 12,
+      removed: 3,
+      files: 2,
+    })
+    expect(gitService.getChangeStats).toHaveBeenCalledWith('/repo')
+  })
+
+  it('maps an invalid payload to an error envelope', async () => {
+    await expect(handler('git:change-stats')({}, {})).resolves.toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+  })
+
+  it('resolves with an error envelope rather than rejecting across the boundary', async () => {
+    gitService.getChangeStats.mockRejectedValue(new Error('not a git repository'))
+    const result = (await handler('git:change-stats')({}, { path: '/tmp' })) as {
+      error: string
+    }
+    expect(result.error).toContain('not a git repository')
   })
 })

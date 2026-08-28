@@ -17,6 +17,7 @@ import type {
   TrackerConnection,
   TrackerId,
 } from '../shared/types/index'
+import type { ChangeStats } from '../shared/schemas/git.schema'
 
 export type { NotificationTarget }
 
@@ -70,6 +71,7 @@ interface ElectronAPI {
     isRepo(path: string): Promise<{ isRepo: boolean; root?: string }>
     currentBranch(path: string): Promise<{ branch: string } | { error: string }>
     listBranches(path: string): Promise<{ branches: Branch[] }>
+    changeStats(path: string): Promise<ChangeStats | { error: string }>
     checkout(path: string, branch: string): Promise<{ success: true } | { error: string }>
     createBranch(path: string, branch: string): Promise<{ success: true } | { error: string }>
     suggestWorktreePath(
@@ -195,6 +197,7 @@ interface ElectronAPI {
       nodeVersion: string
       chromeVersion: string
       platform: string
+      homeDir: string
     }>
   }
   notifications: {

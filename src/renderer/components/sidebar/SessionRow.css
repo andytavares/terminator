@@ -190,7 +190,7 @@
    A narrow sidebar drops metadata in a fixed order, cheapest first. The
    session title and the state glyph are what FR-001 and FR-005 exist to
    guarantee, so they never drop and the row never wraps. */
-@container sidebar (max-width: 229px) {
+@container sidebar (max-width: 219px) {
   .session-row__activity {
     display: none;
   }

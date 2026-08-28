@@ -250,6 +250,9 @@ function registerAppHandlers(): void {
     nodeVersion: process.versions.node,
     chromeVersion: process.versions.chrome,
     platform: process.platform,
+    // Lets the renderer show `~/repos/app` instead of an absolute path that
+    // wraps a sidebar row onto two lines.
+    homeDir: app.getPath('home'),
   }))
 }
 

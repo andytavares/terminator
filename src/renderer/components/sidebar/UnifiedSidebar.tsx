@@ -9,6 +9,8 @@ import { useSettingsStore } from '../../stores/settings.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { buildGroups } from '../../sidebar/view-model'
 import { BellAndBusySource } from '../../sidebar/agent-state'
+import { abbreviatePath, displayName } from '../../sidebar/branch-display'
+import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
 import {
   isCollapsed as isGroupCollapsed,
@@ -119,6 +121,16 @@ export function UnifiedSidebar({
   const { getScratchSessions, sessions, projectViews, isSessionBusy, getBellCountForSession } =
     sessionStore
   const { resolveSettings } = useSettingsStore()
+  const {
+    statsFor,
+    ensure: ensureChangeStats,
+    invalidate: invalidateStats,
+    invalidateAll: invalidateAllStats,
+  } = useChangeStatsStore()
+  /** Last activity seen per branch, so work in a terminal refreshes its statistics. */
+  const lastActivityByBranch = useRef(new Map<string, number>())
+  /** Home directory, so a repo path reads as `~/repos/app`. */
+  const [homeDir, setHomeDir] = useState<string | undefined>(undefined)
   const staleAfterMs = resolveSettings().sidebar?.staleAfterMs ?? DEFAULT_STALE_AFTER_MS
   const { createSession } = useTerminalSession()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
@@ -228,6 +240,20 @@ export function UnifiedSidebar({
     if (editNoteSessionId) setNoteEditingId(editNoteSessionId)
   }, [editNoteSessionId])
 
+  useEffect(() => {
+    void window.electronAPI?.app
+      ?.getInfo?.()
+      .then((info) => setHomeDir(info.homeDir))
+      .catch(() => setHomeDir(undefined))
+  }, [])
+
+  // Coming back to the window is the cheapest moment to notice that the working
+  // trees moved on while you were away.
+  useEffect(() => {
+    window.addEventListener('focus', invalidateAllStats)
+    return () => window.removeEventListener('focus', invalidateAllStats)
+  }, [invalidateAllStats])
+
   // The active view is deliberately component state, never restored from
   // storage: a filtered view must never be what greets you at launch (FR-015).
   const [views, setViews] = useState(loadViews)
@@ -274,6 +300,22 @@ export function UnifiedSidebar({
       })
       .filter((s) => s.status !== 'closed' || s.agentState === 'exited')
   }, [sessions])
+
+  // Work in a terminal changes the tree under it, so a branch whose sessions
+  // just did something gets its statistics dropped rather than waiting out the
+  // TTL. Tracked here rather than in the session store: making the session
+  // store import the stats store would couple two things that have no other
+  // reason to know about each other.
+  useEffect(() => {
+    const seen = lastActivityByBranch.current
+    for (const session of sessionList) {
+      const previous = seen.get(session.projectId) ?? 0
+      if (session.lastActivityAt > previous) {
+        seen.set(session.projectId, session.lastActivityAt)
+        if (previous !== 0) invalidateStats(session.projectId)
+      }
+    }
+  }, [sessionList, invalidateStats])
 
   const clock = now ?? Date.now()
   const { groups, shown, total } = useMemo(
@@ -501,6 +543,12 @@ export function UnifiedSidebar({
       workspaceId !== undefined && firstGroupKeyByWorkspace.get(workspaceId) === group.key
     const collapsed = isGroupCollapsed(collapseState, view.groupBy, group.key)
 
+    // Asking for a branch's change volume the first time its row renders, and
+    // never awaiting the answer. A collapsed group costs nothing.
+    const branchCwd = project ? (project.worktreePath ?? workspace?.folderPath) : undefined
+    if (project && branchCwd) ensureChangeStats(project.id, branchCwd, clock)
+    const statsEntry = project ? statsFor(project.id) : undefined
+
     return (
       <SessionGroup
         key={group.key}
@@ -509,6 +557,15 @@ export function UnifiedSidebar({
         collapsed={collapsed}
         onToggleCollapse={() => toggleGroup(group.key)}
         workspaceColor={workspace?.color}
+        branchName={project ? displayName(project) : undefined}
+        isWorktree={project ? project.isWorktree : undefined}
+        worktreePath={project?.worktreePath}
+        changeStats={statsEntry?.stats}
+        repoPath={
+          group.scope?.kind === 'workspace' && workspace
+            ? abbreviatePath(workspace.folderPath, homeDir)
+            : undefined
+        }
         // Nested under its workspace the question is already answered; anywhere
         // else a project header is a bare name with no home.
         workspaceName={project && !nested ? workspace?.name : undefined}

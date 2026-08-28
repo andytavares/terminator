@@ -82,26 +82,26 @@ Electron desktop app, per plan.md: `src/main/`, `src/preload/`, `src/renderer/`,
 
 ### Tests for User Story 2 ⚠️ Write first, confirm they fail
 
-- [ ] T015 [P] [US2] Write failing tests for `getChangeStats` in `tests/unit/git/git-service.spec.ts` — numstat summing, binary rows reporting `-` counting toward `files` but contributing 0, unborn `HEAD` resolving to zeroes, and rejection on non-repo and timeout (contracts/change-stats-ipc.md)
-- [ ] T016 [P] [US2] Write failing tests in `tests/unit/renderer/stores/change-stats.store.spec.ts` — cache hit inside the TTL, refetch at exactly `fetchedAt + TTL` and one ms past, concurrent `ensure` calls collapsing to one request, error state throttling retries, and `invalidate` forcing a refetch
-- [ ] T017 [P] [US2] Extend `tests/unit/ipc/git.ipc.spec.ts` with failing tests for `git:change-stats` success passthrough and `{ error }` shaping
-- [ ] T018 [P] [US2] Write failing tests for `displayName` in `tests/unit/renderer/sidebar/branch-display.spec.ts` covering all three cases — absent `gitBranch`, `name === gitBranch`, and a distinct label (data-model.md § Branch)
-- [ ] T019 [P] [US2] Extend `tests/unit/renderer/components/SessionGroup.spec.tsx` with failing tests for `GitFork` vs `GitBranch` by `isWorktree`, the worktree tag carrying `worktreePath` in its `title`, statistics rendering as absent when the store has none, and the repo folder path on the group header
+- [x] T015 [P] [US2] Write failing tests for `getChangeStats` in `tests/unit/git/git-service.spec.ts` — numstat summing, binary rows reporting `-` counting toward `files` but contributing 0, unborn `HEAD` resolving to zeroes, and rejection on non-repo and timeout (contracts/change-stats-ipc.md)
+- [x] T016 [P] [US2] Write failing tests in `tests/unit/renderer/stores/change-stats.store.spec.ts` — cache hit inside the TTL, refetch at exactly `fetchedAt + TTL` and one ms past, concurrent `ensure` calls collapsing to one request, error state throttling retries, and `invalidate` forcing a refetch
+- [x] T017 [P] [US2] Extend `tests/unit/ipc/git.ipc.spec.ts` with failing tests for `git:change-stats` success passthrough and `{ error }` shaping
+- [x] T018 [P] [US2] Write failing tests for `displayName` in `tests/unit/renderer/sidebar/branch-display.spec.ts` covering all three cases — absent `gitBranch`, `name === gitBranch`, and a distinct label (data-model.md § Branch)
+- [x] T019 [P] [US2] Extend `tests/unit/renderer/components/SessionGroup.spec.tsx` with failing tests for `GitFork` vs `GitBranch` by `isWorktree`, the worktree tag carrying `worktreePath` in its `title`, statistics rendering as absent when the store has none, and the repo folder path on the group header
 
 ### Implementation for User Story 2
 
-- [ ] T020 [P] [US2] Add `changeStatsSchema` and its inferred `ChangeStats` type to `src/shared/schemas/git.schema.ts`
-- [ ] T021 [US2] Implement `getChangeStats(cwd)` in `src/main/git/git-service.ts` running `git diff --numstat HEAD` through the module's existing `execFile` wrapper, `GIT_TIMEOUT` and `GIT_ENV`
-- [ ] T022 [US2] Register the `git:change-stats` invoke handler in `src/main/ipc/git.ipc.ts`, resolving `{ error }` rather than rejecting across the boundary
-- [ ] T023 [US2] Expose `electronAPI.git.changeStats(cwd)` in `src/preload/index.ts`
-- [ ] T024 [US2] Create `src/renderer/stores/change-stats.store.ts` with `statsFor` / `ensure` / `invalidate`, a 15s TTL, injected `now`, and in-flight collapsing — `ensure` returns void and is never awaited by render (contracts/change-stats-ipc.md)
-- [ ] T025 [P] [US2] Create `src/renderer/sidebar/branch-display.ts` exporting the pure `displayName(branch)` — **note: an addition to the file list in plan.md**, made so the display rule is unit-testable in isolation rather than buried in the component
-- [ ] T026 [US2] Render the branch glyph, `displayName` and worktree tag on the project-scope header in `src/renderer/components/sidebar/SessionGroup.tsx`, truncating the name head-first so the disambiguating tail survives
-- [ ] T027 [US2] Render change statistics on the branch row and the repo folder path on the repo group header in `src/renderer/components/sidebar/SessionGroup.tsx`, calling `ensure` at render and rendering nothing when the entry is absent, loading or errored
-- [ ] T028 [US2] Style the glyph, tag, statistics and repo path in `src/renderer/components/sidebar/SessionGroup.css`, keeping icons flat and `currentColor`
-- [ ] T029 [US2] Invalidate a branch's cached statistics when a session in it stamps activity, in `src/renderer/stores/session.store.ts`
-- [ ] T030 [US2] Invalidate on completed git operations and on window focus in `src/renderer/components/sidebar/UnifiedSidebar.tsx`
-- [ ] T031 [US2] Write `docs/adr/031-change-stats-out-of-band.md` recording why statistics live in their own store rather than on the branch record, and the purity constraint that forced it (constitution IX, research R2)
+- [x] T020 [P] [US2] Add `changeStatsSchema` and its inferred `ChangeStats` type to `src/shared/schemas/git.schema.ts`
+- [x] T021 [US2] Implement `getChangeStats(cwd)` in `src/main/git/git-service.ts` running `git diff --numstat HEAD` through the module's existing `execFile` wrapper, `GIT_TIMEOUT` and `GIT_ENV`
+- [x] T022 [US2] Register the `git:change-stats` invoke handler in `src/main/ipc/git.ipc.ts`, resolving `{ error }` rather than rejecting across the boundary
+- [x] T023 [US2] Expose `electronAPI.git.changeStats(cwd)` in `src/preload/index.ts`
+- [x] T024 [US2] Create `src/renderer/stores/change-stats.store.ts` with `statsFor` / `ensure` / `invalidate`, a 15s TTL, injected `now`, and in-flight collapsing — `ensure` returns void and is never awaited by render (contracts/change-stats-ipc.md)
+- [x] T025 [P] [US2] Create `src/renderer/sidebar/branch-display.ts` exporting the pure `displayName(branch)` — **note: an addition to the file list in plan.md**, made so the display rule is unit-testable in isolation rather than buried in the component
+- [x] T026 [US2] Render the branch glyph, `displayName` and worktree tag on the project-scope header in `src/renderer/components/sidebar/SessionGroup.tsx`, truncating the name head-first so the disambiguating tail survives
+- [x] T027 [US2] Render change statistics on the branch row and the repo folder path on the repo group header in `src/renderer/components/sidebar/SessionGroup.tsx`, calling `ensure` at render and rendering nothing when the entry is absent, loading or errored
+- [x] T028 [US2] Style the glyph, tag, statistics and repo path in `src/renderer/components/sidebar/SessionGroup.css`, keeping icons flat and `currentColor`
+- [x] T029 [US2] Invalidate a branch's cached statistics when a session in it stamps activity, in `src/renderer/stores/session.store.ts`
+- [x] T030 [US2] Invalidate on completed git operations and on window focus in `src/renderer/components/sidebar/UnifiedSidebar.tsx`
+- [x] T031 [US2] Write `docs/adr/031-change-stats-out-of-band.md` recording why statistics live in their own store rather than on the branch record, and the purity constraint that forced it (constitution IX, research R2)
 
 **Checkpoint**: Both P1 stories are done. The sidebar now answers "what is happening" and "where am I". This is the point at which the feature is worth shipping even if US3 and US4 never land.
 
@@ -182,6 +182,10 @@ Work the plan did not anticipate, recorded here rather than folded silently into
 - [x] T063 [US1] Derive `agentState` in the `sessionList` memo of `src/renderer/components/sidebar/UnifiedSidebar.tsx` via the existing `BellAndBusySource`, and derive before the closed-session filter so a closed session can reach `exited`
 - [x] T064 [US1] Replace the fixture in `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` that set `agentState: 'awaiting-input'` directly with `bellCount: 1`, so the test expresses the signal rather than the derived field
 - [x] T065 [US1] Rewrite `tests/unit/renderer/sidebar-status-colour-independence.spec.ts` to guard the four-glyph design instead of the removed three-opacity dot, keeping the SC-011 greyscale guarantee it exists to protect
+
+- [x] T066 [US2] Add a pure `abbreviatePath` to `src/renderer/sidebar/branch-display.ts` and expose `homeDir` on the existing `app:get-info` channel, so a repo path reads as `~/repos/app` instead of wrapping a header onto two lines
+- [x] T067 [US2] Guard `change-stats.store.ts` against a missing `window.electronAPI` — the remote renderer has none, and a decorative statistic must never crash the sidebar
+- [x] T068 [US2] Correct the container-query breakpoints: they measure the container's content box, so `max-width: 299px` matched at the 300px default and hid every statistic immediately
 
 **Why T063 was necessary.** `spec.md` assumes "session state continues to be inferred by the existing mechanism". That mechanism — `BellAndBusySource` in `src/renderer/sidebar/agent-state.ts` — had no production caller: its only importer was its own test. `agentState` was written as `'idle'` at session creation and never updated, so every session read as idle forever, and the Needs me, Active and Stale views were filtering on a constant. Without T063, US1 would ship four glyphs of which exactly one could ever appear.
 
