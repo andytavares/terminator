@@ -1,0 +1,92 @@
+src/renderer/sidebar/branch-display.ts
+  s_fcfef3c41f4cf0::t_c3f2a596a44d80 39-48
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_fcfef3c41f4cf0::t_c4d7ec7dbcc634 246,252
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_fcfef3c41f4cf0::t_a9383f9dfa780b 349-362
+  s_fcfef3c41f4cf0::t_1932579f4bd29c 61
+  s_fcfef3c41f4cf0::t_694559b941d7c8 273,283,326,339
+  s_fcfef3c41f4cf0::t_0ac3420d18ca53 136
+  s_fcfef3c41f4cf0::t_3e528ad4eacb0b 347-348,363-377
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_fcfef3c41f4cf0::t_ec69aa00371279 381,1096-1097
+  s_fcfef3c41f4cf0::t_a560034517e5de 607
+  s_fcfef3c41f4cf0::t_5fe509f2420bf9 766
+  s_fcfef3c41f4cf0::t_5756bad6f0849f 1073-1095,1098-1123
+  s_fcfef3c41f4cf0::t_b35fbac5c1052f 1124-1132
+  s_fcfef3c41f4cf0::t_1b459e47533f3b 7,21-28,173-187,209-216
+tests/unit/renderer/components/ContextMenu.spec.tsx
+  s_fcfef3c41f4cf0::t_a67f9259e3da3c 10
+tests/unit/renderer/components/CommandPalette.spec.tsx
+  s_fcfef3c41f4cf0::t_2b8f4afc34919a 231-248
+src/renderer/components/sidebar/ViewBar.tsx
+  s_fcfef3c41f4cf0::t_92f6e079c3c17c 8,10
+tests/unit/renderer/components/ScratchSection.spec.tsx
+  s_fcfef3c41f4cf0::t_a67f9259e3da3c 108,120,141,152,169
+tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_fcfef3c41f4cf0::t_2cf2e229c93d43 196
+  s_fcfef3c41f4cf0::t_a67f9259e3da3c 129,147,156,166,179,192,222,233,241
+  s_fcfef3c41f4cf0::t_212ce2311da909 130,167,180,193,223,234,244
+src/renderer/components/integrations/LinkIssueDialog.tsx
+  s_fcfef3c41f4cf0::t_431245b19076fe 168
+src/renderer/components/sidebar/MoveSessionDialog.tsx
+  s_fcfef3c41f4cf0::t_a8ea36ca1e5299 94
+  s_fcfef3c41f4cf0::t_d5d19376ca0480 167
+  s_fcfef3c41f4cf0::t_8d3d97e7e3c6e8 80,99,111
+tests/unit/renderer/components/SessionRow.spec.tsx
+  s_fcfef3c41f4cf0::t_a67f9259e3da3c 203,208,240
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_fcfef3c41f4cf0::t_8d3d97e7e3c6e8 103,137,166-167,197-198,224,248,265
+src/renderer/components/integrations/IssueDrawer.tsx
+  s_fcfef3c41f4cf0::t_431245b19076fe 201
+tests/unit/renderer/sidebar/branch-display.spec.ts
+  s_fcfef3c41f4cf0::t_cf31f9863a6a7d 2-6,97-100,105-107
+  s_fcfef3c41f4cf0::t_c3f2a596a44d80 81-96,101-104,108
+  s_fcfef3c41f4cf0::t_96932193e01030 109
+src/renderer/components/sidebar/WorkspaceRow.tsx
+  s_fcfef3c41f4cf0::t_d5d19376ca0480 43
+src/renderer/components/terminal/TabBar.tsx
+  s_fcfef3c41f4cf0::t_a8ea36ca1e5299 8,44,144-150,283
+  s_fcfef3c41f4cf0::t_1932579f4bd29c 45-48
+.eslintrc.json
+  s_fcfef3c41f4cf0::t_c1ae8ff7075400 28,49-51
+  s_fcfef3c41f4cf0::t_d3cf97311a7020 22-27,29-41,48,57
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_fcfef3c41f4cf0::t_ab01ffa1563ccb 71,127,133,174,201
+  s_fcfef3c41f4cf0::t_4401969676aa0d 237,328,375,389,404,407,414,416,428,450,537,555,581
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_fcfef3c41f4cf0::t_d5d19376ca0480 346-347,852
+  s_fcfef3c41f4cf0::t_b35fbac5c1052f 786-790
+  s_fcfef3c41f4cf0::t_8df5e43b2dbcb9 12,348-351
+src/renderer/components/sidebar/SessionRow.tsx
+  s_fcfef3c41f4cf0::t_a8ea36ca1e5299 220
+src/renderer/components/terminal/TabBar.css
+  s_fcfef3c41f4cf0::t_cf31f9863a6a7d 188-204
+docs/adr/032-branch-vocabulary-ui-only.md
+  s_fcfef3c41f4cf0::t_487e40dea8768d 1-56
+src/renderer/App.tsx
+  s_fcfef3c41f4cf0::t_8df5e43b2dbcb9 303,305-307,317
+  s_fcfef3c41f4cf0::t_8eb565970c84c6 33
+src/renderer/components/sidebar/ScratchSection.tsx
+  s_fcfef3c41f4cf0::t_8adef9d89c932c 98
+tests/unit/renderer/components/ViewBar.spec.tsx
+  s_fcfef3c41f4cf0::t_2cf2e229c93d43 79,95,179
+specs/032-branch-first-sidebar/tasks.md
+  s_fcfef3c41f4cf0::t_dceaf821191dad 118-121,125-131,190-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "931a1073797d1d8c61d09e0ed0a0e2ad14d588c4",
+  "prompts": {},
+  "sessions": {
+    "s_fcfef3c41f4cf0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3779fbc3-6b0c-468d-91ec-b7d824a3c1fc",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
