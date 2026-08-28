@@ -115,20 +115,20 @@ Electron desktop app, per plan.md: `src/main/`, `src/preload/`, `src/renderer/`,
 
 ### Tests for User Story 3 ⚠️ Write first, confirm they fail
 
-- [ ] T032 [P] [US3] Add a failing test to `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` asserting that six repos whose branch is `main` produce six textually distinct new-terminal commands (SC-002, FR-011)
-- [ ] T033 [P] [US3] Add a failing test to `tests/unit/renderer/components/CommandPalette.spec.tsx` asserting session entries name both repo and branch (FR-012)
-- [ ] T034 [P] [US3] Add failing tests to `tests/unit/renderer/components/LinkIssueDialog.spec.tsx` and `tests/unit/renderer/components/MoveSessionDialog.spec.tsx` asserting "branch" wording and repo qualification (FR-014)
-- [ ] T035 [P] [US3] Add a failing test to `tests/unit/renderer/components/TabBar.spec.tsx` asserting the session tab bar states which branch's terminals it is showing (FR-013)
+- [x] T032 [P] [US3] Add a failing test to `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` asserting that six repos whose branch is `main` produce six textually distinct new-terminal commands (SC-002, FR-011)
+- [x] T033 [P] [US3] Add a failing test to `tests/unit/renderer/components/CommandPalette.spec.tsx` asserting session entries name both repo and branch (FR-012)
+- [x] T034 [P] [US3] Add failing tests to `tests/unit/renderer/components/LinkIssueDialog.spec.tsx` and `tests/unit/renderer/components/MoveSessionDialog.spec.tsx` asserting "branch" wording and repo qualification (FR-014)
+- [x] T035 [P] [US3] Add a failing test to `tests/unit/renderer/components/TabBar.spec.tsx` asserting the session tab bar states which branch's terminals it is showing (FR-013)
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] Add the vocabulary lint rule to `.eslintrc.json` — fail on the case-insensitive word "project" in user-facing string literals and JSX text under `src/renderer/components/`, allowlisting identifiers, import paths and type names (research R4)
-- [ ] T037 [US3] Qualify the registered `core.scope.new-terminal.*` command labels with their repo in `src/renderer/components/sidebar/UnifiedSidebar.tsx`
-- [ ] T038 [US3] Name repo and branch on session entries in `src/renderer/components/CommandPalette.tsx`
-- [ ] T039 [US3] Add the branch scope label to `src/renderer/components/terminal/TabBar.tsx`
-- [ ] T040 [P] [US3] Update copy in `src/renderer/components/integrations/LinkIssueDialog.tsx`, `src/renderer/components/sidebar/MoveSessionDialog.tsx` and `src/renderer/components/sidebar/CreateProjectDialog.tsx` to say "branch" and name the repo
-- [ ] T041 [P] [US3] Update the remaining user-facing strings — the group-header add action and rename/remove menu items in `src/renderer/components/sidebar/SessionGroup.tsx`, `src/renderer/components/sidebar/ScopeMenu.tsx`, and the removal confirmation title in `src/renderer/components/sidebar/UnifiedSidebar.tsx` — **wording only; do not add the missing worktree disclosure, which belongs to audit finding PRJ-1 and its own feature**
-- [ ] T042 [US3] Write `docs/adr/032-branch-vocabulary-ui-only.md` recording why the stored `Project` entity keeps its name, what the translation seam costs, and how the lint rule contains it (constitution IX, research R4)
+- [x] T036 [US3] Add the vocabulary lint rule to `.eslintrc.json` — fail on the case-insensitive word "project" in user-facing string literals and JSX text under `src/renderer/components/`, allowlisting identifiers, import paths and type names (research R4)
+- [x] T037 [US3] Qualify the registered `core.scope.new-terminal.*` command labels with their repo in `src/renderer/components/sidebar/UnifiedSidebar.tsx`
+- [x] T038 [US3] Name repo and branch on session entries in `src/renderer/components/CommandPalette.tsx`
+- [x] T039 [US3] Add the branch scope label to `src/renderer/components/terminal/TabBar.tsx`
+- [x] T040 [P] [US3] Update copy in `src/renderer/components/integrations/LinkIssueDialog.tsx`, `src/renderer/components/sidebar/MoveSessionDialog.tsx` and `src/renderer/components/sidebar/CreateProjectDialog.tsx` to say "branch" and name the repo
+- [x] T041 [P] [US3] Update the remaining user-facing strings — the group-header add action and rename/remove menu items in `src/renderer/components/sidebar/SessionGroup.tsx`, `src/renderer/components/sidebar/ScopeMenu.tsx`, and the removal confirmation title in `src/renderer/components/sidebar/UnifiedSidebar.tsx` — **wording only; do not add the missing worktree disclosure, which belongs to audit finding PRJ-1 and its own feature**
+- [x] T042 [US3] Write `docs/adr/032-branch-vocabulary-ui-only.md` recording why the stored `Project` entity keeps its name, what the translation seam costs, and how the lint rule contains it (constitution IX, research R4)
 
 **Checkpoint**: The product says "branch" and every name identifies exactly one thing.
 
@@ -186,6 +186,9 @@ Work the plan did not anticipate, recorded here rather than folded silently into
 - [x] T066 [US2] Add a pure `abbreviatePath` to `src/renderer/sidebar/branch-display.ts` and expose `homeDir` on the existing `app:get-info` channel, so a repo path reads as `~/repos/app` instead of wrapping a header onto two lines
 - [x] T067 [US2] Guard `change-stats.store.ts` against a missing `window.electronAPI` — the remote renderer has none, and a decorative statistic must never crash the sidebar
 - [x] T068 [US2] Correct the container-query breakpoints: they measure the container's content box, so `max-width: 299px` matched at the 300px default and hid every statistic immediately
+
+- [x] T069 [US3] Extract `qualifiedBranchLabel` into `src/renderer/sidebar/branch-display.ts` so the sidebar's registered commands, the command palette and the link dialog cannot drift apart in how they name a branch
+- [x] T070 [US3] Rename the `project` grouping option to **Branch** in `ViewBar.tsx`, and the pre-existing `branch` grouping to **Branch name**, which the two now collide on
 
 **Why T063 was necessary.** `spec.md` assumes "session state continues to be inferred by the existing mechanism". That mechanism — `BellAndBusySource` in `src/renderer/sidebar/agent-state.ts` — had no production caller: its only importer was its own test. `agentState` was written as `'idle'` at session creation and never updated, so every session read as idle forever, and the Needs me, Active and Stale views were filtering on a constant. Without T063, US1 would ship four glyphs of which exactly one could ever appear.
 

@@ -200,12 +200,12 @@ describe('SessionRow', () => {
       expect(document.querySelector('.ctx-menu')).toBeTruthy()
     })
 
-    it('context menu has Rename, Move to project, and Close options', () => {
+    it('context menu has Rename, Move to branch, and Close options', () => {
       const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
       fireEvent.contextMenu(container.querySelector('.session-row')!)
       const menu = document.querySelector('.ctx-menu')!
       expect(menu.textContent).toContain('Rename')
-      expect(menu.textContent).toContain('Move to project')
+      expect(menu.textContent).toContain('Move to branch')
       expect(menu.textContent).toContain('Close')
     })
 
@@ -237,7 +237,7 @@ describe('SessionRow', () => {
       expect(closeSession).toHaveBeenCalledWith('sess-99')
     })
 
-    it('Move to project menu item opens MoveSessionDialog', () => {
+    it('Move to branch menu item opens MoveSessionDialog', () => {
       const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
       fireEvent.contextMenu(container.querySelector('.session-row')!)
       const moveBtn = Array.from(document.querySelectorAll('.ctx-menu__item')).find((el) =>

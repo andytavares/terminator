@@ -58,6 +58,7 @@ beforeEach(() => {
   vi.mocked(useWorkspaceStore).mockReturnValue({
     workspaces: [],
     activeWorkspaceId: null,
+    projectsByWorkspaceId: new Map(),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   mockGetSessions.mockReturnValue([])
   mockGetActive.mockReturnValue(null)
@@ -132,6 +133,7 @@ describe('TabBar', () => {
     vi.mocked(useWorkspaceStore).mockReturnValue({
       workspaces: [{ id: 'ws-1', color: '#ff0000', name: 'Test', folderPath: '/', tags: [] }],
       activeWorkspaceId: 'ws-1',
+      projectsByWorkspaceId: new Map(),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     const { container } = renderTabBar()
     const tabBarStack = container.querySelector('.tab-bar-stack') as HTMLElement
@@ -268,7 +270,7 @@ describe('TabBar', () => {
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
       fireEvent.contextMenu(tab)
       expect(screen.getByText('Rename')).toBeTruthy()
-      expect(screen.getByText('Move to project…')).toBeTruthy()
+      expect(screen.getByText('Move to branch…')).toBeTruthy()
       expect(screen.getByText('Close tab')).toBeTruthy()
     })
 
@@ -278,7 +280,7 @@ describe('TabBar', () => {
       renderTabBar()
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
       fireEvent.contextMenu(tab)
-      fireEvent.click(screen.getByText('Move to project…'))
+      fireEvent.click(screen.getByText('Move to branch…'))
       expect(screen.getByTestId('move-session-dialog')).toBeTruthy()
     })
 
@@ -321,7 +323,7 @@ describe('TabBar', () => {
       renderTabBar()
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
       fireEvent.contextMenu(tab)
-      fireEvent.click(screen.getByText('Move to project…'))
+      fireEvent.click(screen.getByText('Move to branch…'))
       expect(screen.getByTestId('move-session-dialog')).toBeTruthy()
       fireEvent.click(screen.getByText('Close Move Dialog'))
       expect(screen.queryByTestId('move-session-dialog')).toBeNull()
@@ -334,11 +336,42 @@ describe('TabBar', () => {
       renderTabBar({ onScratchDeactivate })
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
       fireEvent.contextMenu(tab)
-      fireEvent.click(screen.getByText('Move to project…'))
+      fireEvent.click(screen.getByText('Move to branch…'))
       expect(screen.getByTestId('move-session-dialog')).toBeTruthy()
       fireEvent.click(screen.getByText('Trigger onMoved'))
       expect(onScratchDeactivate).toHaveBeenCalled()
       expect(screen.queryByTestId('move-session-dialog')).toBeNull()
     })
+  })
+})
+
+describe('TabBar — the session bar states whose terminals it shows (US3, FR-013)', () => {
+  beforeEach(() => {
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [{ id: 'ws-1', name: 'Terminator' }],
+      activeWorkspaceId: 'ws-1',
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [{ id: 'proj-1', workspaceId: 'ws-1', name: 'main', gitBranch: 'main' }]],
+      ]),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    mockGetSessions.mockReturnValue([
+      { id: 's1', projectId: 'proj-1', tabTitle: 'tests', status: 'active' },
+    ])
+    mockGetActive.mockReturnValue('s1')
+  })
+
+  it('names the branch that owns the tabs', () => {
+    const { container } = renderTabBar()
+    const scope = container.querySelector('.tab-bar__scope')
+    expect(scope).toBeTruthy()
+    expect(scope!.textContent).toContain('main')
+  })
+
+  it('says branch, not project, in the session context menu', () => {
+    const { container } = renderTabBar()
+    const tab = container.querySelector('.tab-bar__tab--session')!
+    fireEvent.contextMenu(tab)
+    expect(screen.queryByText(/Move to project/i)).toBeNull()
+    expect(screen.getByText(/Move to branch/i)).toBeTruthy()
   })
 })

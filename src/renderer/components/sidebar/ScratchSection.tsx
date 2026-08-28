@@ -95,7 +95,7 @@ export function ScratchSection({
               },
             },
             {
-              label: 'Move to project…',
+              label: 'Move to branch…',
               onSelect: () => {
                 setMoveSessionId(ctxMenu.sessionId)
                 setCtxMenu(null)

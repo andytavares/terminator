@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
@@ -17,6 +18,14 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({ useBranchSync: vi.fn() }))
+vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
+  useIntegrationsStore: vi.fn(),
+}))
+vi.mock('../../../../src/renderer/components/integrations/LinkIssueDialog', () => ({
+  LinkIssueDialog: ({ projectName }: { projectName: string }) => (
+    <div data-testid="link-issue-dialog">{projectName}</div>
+  ),
+}))
 vi.mock('../../../../src/renderer/components/sidebar/BranchSwitcher', () => ({
   BranchSwitcher: () => <div data-testid="branch-switcher" />,
 }))
@@ -161,6 +170,21 @@ const mockRegistryState = {
   registerCommand: vi.fn(() => vi.fn()),
 }
 
+const mockIntegrationsStore = {
+  linkFor: vi.fn().mockReturnValue(null),
+  issueFor: vi.fn().mockReturnValue(null),
+  loadLink: vi.fn().mockResolvedValue(undefined),
+  unlinkIssue: vi.fn().mockResolvedValue(undefined),
+  subscribe: vi.fn().mockReturnValue(() => {}),
+  loadConnections: vi.fn().mockResolvedValue(undefined),
+  linkDialogProjectId: null as string | null,
+  openLinkDialog: vi.fn(),
+  closeLinkDialog: vi.fn(),
+  drawerProjectId: null as string | null,
+  openDrawer: vi.fn(),
+  closeDrawer: vi.fn(),
+}
+
 const defaultProps = {
   globalTabs: [],
   activeGlobalTabId: null as string | null,
@@ -182,6 +206,14 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  mockIntegrationsStore.linkDialogProjectId = null
+  mockIntegrationsStore.drawerProjectId = null
+  mockIntegrationsStore.linkFor.mockReturnValue(null)
+  mockIntegrationsStore.issueFor.mockReturnValue(null)
+  mockIntegrationsStore.subscribe.mockReturnValue(() => {})
+  vi.mocked(useIntegrationsStore).mockReturnValue(
+    mockIntegrationsStore as unknown as ReturnType<typeof useIntegrationsStore>
+  )
   sessions = new Map([
     ['s1', session('s1', 'p1', { tabTitle: 'api-shell' })],
     ['s2', session('s2', 'p1', { tabTitle: 'api-agent', lastActivityAt: NOW - 300_000 })],
@@ -346,7 +378,7 @@ describe('UnifiedSidebar — scope actions on the group header (FR-026)', () => 
     const { container } = renderSidebar()
     fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
     fireEvent.click(screen.getByText('Remove'))
-    expect(screen.getByText('Remove project "API"?')).toBeTruthy()
+    expect(screen.getByText('Remove branch "API"?')).toBeTruthy()
   })
 
   it('deletes the project once removal is confirmed', () => {
@@ -572,7 +604,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     fireEvent.click(screen.getByText('Remove'))
     fireEvent.click(screen.getByText('Cancel'))
     expect(mockWorkspaceStore.deleteProject).not.toHaveBeenCalled()
-    expect(screen.queryByText('Remove project "API"?')).toBeNull()
+    expect(screen.queryByText('Remove branch "API"?')).toBeNull()
   })
 
   it('marks a busy group with the aggregate indicator', () => {
@@ -731,7 +763,7 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
   it('persists a grouping change for that view across a remount', () => {
     const { unmount } = renderSidebar()
     fireEvent.click(screen.getByText('Group: Workspace'))
-    fireEvent.click(screen.getByText('Project'))
+    fireEvent.click(screen.getByText('Branch'))
     unmount()
     const { container } = renderSidebar()
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
@@ -1036,5 +1068,65 @@ describe('UnifiedSidebar — agent state is derived, not read from a field nobod
     expect(container.querySelector('.session-row__status svg')!.getAttribute('data-state')).toBe(
       'exited'
     )
+  })
+})
+
+describe('UnifiedSidebar — one name identifies one thing (US3)', () => {
+  it('qualifies every new-terminal command with its repo, so six mains are six commands', () => {
+    // Every repo's default branch is called main; the palette used to list six
+    // identical "New terminal in main" rows.
+    const repos = ['ws-1', 'ws-2', 'ws-3', 'ws-4', 'ws-5', 'ws-6']
+    mockWorkspaceStore.workspaces = repos.map((id, i) => ({
+      ...ws1,
+      id,
+      name: `Repo ${i + 1}`,
+    }))
+    mockWorkspaceStore.projectsByWorkspaceId = new Map(
+      repos.map((id, i) => [
+        id,
+        [{ ...api, id: `p-${i}`, workspaceId: id, name: 'main', gitBranch: 'main' }],
+      ])
+    )
+    renderSidebar()
+
+    const labels = mockRegistryState.registerCommand.mock.calls
+      .map(([cmd]) => (cmd as { label: string }).label)
+      .filter((l) => l.toLowerCase().includes('terminal'))
+
+    // Registration may run more than once per render pass; what matters is
+    // that the six repos yield six *distinct* labels (SC-002).
+    expect(new Set(labels).size).toBe(6)
+
+    mockWorkspaceStore.workspaces = [ws1, ws2]
+  })
+
+  it('says branch, never project, in the commands it registers', () => {
+    renderSidebar()
+    for (const [cmd] of mockRegistryState.registerCommand.mock.calls) {
+      expect((cmd as { label: string }).label.toLowerCase()).not.toContain('project')
+    }
+  })
+
+  it('offers a new branch, not a new project, under each repo', () => {
+    const { container } = renderSidebar()
+    const text = container.textContent ?? ''
+    expect(text).toContain('New branch in')
+    expect(text.toLowerCase()).not.toContain('new project')
+  })
+
+  it('names the branch, not the project, when confirming removal', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
+    fireEvent.click(screen.getByText('Remove'))
+    expect(screen.getByText(/Remove branch "API"\?/)).toBeTruthy()
+  })
+})
+
+describe('UnifiedSidebar — the link dialog names what it attaches to (US3, FR-014)', () => {
+  it('qualifies the branch with its repo', () => {
+    mockIntegrationsStore.linkDialogProjectId = 'p1'
+    renderSidebar()
+    expect(screen.getByTestId('link-issue-dialog').textContent).toContain('Backend · API')
+    mockIntegrationsStore.linkDialogProjectId = null
   })
 })

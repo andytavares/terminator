@@ -185,3 +185,20 @@
   outline: none;
   min-width: 0;
 }
+
+/* Whose terminals these are. The session tab bar is scoped to one branch, and
+   switching branches used to swap the whole row with nothing to mark it. */
+.tab-bar__scope {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 10px 0 12px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-right: 1px solid var(--border);
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

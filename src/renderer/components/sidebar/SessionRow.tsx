@@ -217,7 +217,7 @@ export function SessionRow({
               },
             },
             {
-              label: 'Move to project',
+              label: 'Move to branch',
               onSelect: () => {
                 setCtxMenu(null)
                 setMoveOpen(true)

@@ -76,7 +76,7 @@ describe('ViewBar — grouping and sort', () => {
   it('offers every grouping key (FR-010)', () => {
     renderBar()
     fireEvent.click(screen.getByText('Group: Workspace'))
-    for (const label of ['Project', 'Workspace', 'Status', 'Branch', 'None']) {
+    for (const label of ['Branch', 'Workspace', 'Status', 'Branch name', 'None']) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0)
     }
   })
@@ -92,7 +92,7 @@ describe('ViewBar — grouping and sort', () => {
   it('changes the grouping of the active view', () => {
     renderBar()
     fireEvent.click(screen.getByText('Group: Workspace'))
-    fireEvent.click(screen.getByText('Branch'))
+    fireEvent.click(screen.getByText('Branch name'))
     expect(props.onChangeView).toHaveBeenCalledWith({ groupBy: 'branch' })
   })
 
@@ -176,6 +176,6 @@ describe('ViewBar — grouping menu order', () => {
     const items = Array.from(container.querySelectorAll('.view-bar__menu-item')).map(
       (el) => el.textContent
     )
-    expect(items).toEqual(['Workspace', 'Project', 'Status', 'Branch', 'None'])
+    expect(items).toEqual(['Workspace', 'Branch', 'Status', 'Branch name', 'None'])
   })
 })

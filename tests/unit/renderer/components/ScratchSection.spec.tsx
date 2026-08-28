@@ -105,7 +105,7 @@ describe('ScratchSection', () => {
     expect(activeRow?.textContent).toContain('Active')
   })
 
-  it('right-click on a session row shows context menu with Rename and Move to project', () => {
+  it('right-click on a session row shows context menu with Rename and Move to branch', () => {
     render(
       <ScratchSection
         sessions={[makeSession('s1', 'Alpha')]}
@@ -117,7 +117,7 @@ describe('ScratchSection', () => {
     fireEvent.contextMenu(screen.getByText('Alpha'))
     expect(document.querySelector('.ctx-menu')).toBeTruthy()
     expect(document.querySelector('.ctx-menu')?.textContent).toContain('Rename')
-    expect(document.querySelector('.ctx-menu')?.textContent).toContain('Move to project')
+    expect(document.querySelector('.ctx-menu')?.textContent).toContain('Move to branch')
   })
 
   it('clicking Rename in context menu starts inline rename and hides menu', () => {
@@ -138,7 +138,7 @@ describe('ScratchSection', () => {
     expect(container.querySelector('.scratch-section__rename-input')).toBeTruthy()
   })
 
-  it('clicking Move to project in context menu opens MoveSessionDialog', () => {
+  it('clicking Move to branch in context menu opens MoveSessionDialog', () => {
     render(
       <ScratchSection
         sessions={[makeSession('s1', 'Alpha')]}
@@ -149,7 +149,7 @@ describe('ScratchSection', () => {
     )
     fireEvent.contextMenu(screen.getByText('Alpha'))
     const moveBtn = Array.from(document.querySelectorAll('.ctx-menu__item')).find(
-      (b) => b.textContent === 'Move to project…'
+      (b) => b.textContent === 'Move to branch…'
     ) as HTMLElement
     fireEvent.click(moveBtn)
     expect(screen.getByTestId('move-session-dialog')).toBeTruthy()
@@ -166,7 +166,7 @@ describe('ScratchSection', () => {
     )
     fireEvent.contextMenu(screen.getByText('Alpha'))
     const moveBtn = Array.from(document.querySelectorAll('.ctx-menu__item')).find(
-      (b) => b.textContent === 'Move to project…'
+      (b) => b.textContent === 'Move to branch…'
     ) as HTMLElement
     fireEvent.click(moveBtn)
     fireEvent.click(screen.getByText('close-move'))

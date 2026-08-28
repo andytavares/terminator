@@ -165,7 +165,7 @@ export function LinkIssueDialog({
             {currentKey != null && selected !== null && selected.key !== currentKey && (
               <p className="link-issue__warning" role="alert">
                 {projectName} is attached to {currentKey}. Linking {selected.key} replaces it — a
-                project holds one issue.
+                branch holds one issue.
               </p>
             )}
 

@@ -36,3 +36,13 @@ export function abbreviatePath(path: string, home: string | undefined): string {
   if (rest !== '' && !rest.startsWith('/')) return path
   return `~${rest}`
 }
+
+/**
+ * How a branch is named outside its own repo group — in the command palette, a
+ * dialog, a registered command. Every repo's default branch is called `main`,
+ * so a bare branch name identifies nothing on its own.
+ */
+export function qualifiedBranchLabel(branch: Project, repoName: string | undefined): string {
+  const name = displayName(branch).primary
+  return repoName ? `${repoName} · ${name}` : name
+}

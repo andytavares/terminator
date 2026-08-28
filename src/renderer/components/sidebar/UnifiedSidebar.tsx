@@ -9,7 +9,7 @@ import { useSettingsStore } from '../../stores/settings.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { buildGroups } from '../../sidebar/view-model'
 import { BellAndBusySource } from '../../sidebar/agent-state'
-import { abbreviatePath, displayName } from '../../sidebar/branch-display'
+import { abbreviatePath, displayName, qualifiedBranchLabel } from '../../sidebar/branch-display'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
 import {
@@ -343,7 +343,12 @@ export function UnifiedSidebar({
     const disposers = allProjects.map((project) =>
       registerCommand({
         id: `core.scope.new-terminal.${project.id}`,
-        label: `New terminal in ${project.name}`,
+        // Qualified by repo: every repo's default branch is called main, so an
+        // unqualified label lists the same words once per repo.
+        label: `New terminal — ${qualifiedBranchLabel(
+          project,
+          workspaceById.get(project.workspaceId)?.name
+        )}`,
         category: 'Sessions',
         action: () => {
           const settings = resolveSettings(project.workspaceId)
@@ -778,7 +783,11 @@ export function UnifiedSidebar({
           return (
             <LinkIssueDialog
               projectId={project.id}
-              projectName={project.name}
+              // Qualified: "Attaching to main" named one of six identical things.
+              projectName={qualifiedBranchLabel(
+                project,
+                workspaceById.get(project.workspaceId)?.name
+              )}
               currentKey={issueLinkFor(project.id)?.key ?? null}
               onClose={closeLinkDialog}
             />
@@ -840,7 +849,7 @@ export function UnifiedSidebar({
       )}
       {confirmDeleteProject && (
         <ConfirmDialog
-          title={`Remove project "${confirmDeleteProject.name}"?`}
+          title={`Remove branch "${confirmDeleteProject.name}"?`}
           confirmLabel="Remove"
           danger
           onConfirm={() => {

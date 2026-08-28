@@ -228,3 +228,21 @@ describe('CommandPalette — sessions alongside commands (FR-032)', () => {
     expect(screen.getByPlaceholderText(/type a command/i)).toBeTruthy()
   })
 })
+
+describe('CommandPalette — a session names its repo and branch (US3, FR-012)', () => {
+  it('shows the qualifier a session was given, not a bare branch name', () => {
+    render(
+      <CommandPalette
+        commands={[]}
+        sessions={[
+          { id: 's1', projectId: 'p1', tabTitle: 'tests', projectName: 'Terminator · main' },
+          { id: 's2', projectId: 'p2', tabTitle: 'tests', projectName: 'Fluent · main' },
+        ]}
+        onSelectSession={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Terminator · main')).toBeTruthy()
+    expect(screen.getByText('Fluent · main')).toBeTruthy()
+  })
+})

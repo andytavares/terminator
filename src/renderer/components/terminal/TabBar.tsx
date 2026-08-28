@@ -5,6 +5,7 @@ import { AlertBadge } from '../AlertBadge'
 import { ActivitySpinner } from '../ActivitySpinner'
 import { MoveSessionDialog } from '../sidebar/MoveSessionDialog'
 import type { ProjectTabRegistration } from '../../extensions/registry'
+import { qualifiedBranchLabel } from '../../sidebar/branch-display'
 import './TabBar.css'
 
 interface Props {
@@ -40,7 +41,11 @@ export function TabBar({
   const [moveDialogSessionId, setMoveDialogSessionId] = useState<string | null>(null)
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const { workspaces, activeWorkspaceId } = useWorkspaceStore()
+  const { workspaces, activeWorkspaceId, projectsByWorkspaceId } = useWorkspaceStore()
+  const branch = [...projectsByWorkspaceId.values()].flat().find((p) => p.id === projectId)
+  const scopeLabel = branch
+    ? qualifiedBranchLabel(branch, workspaces.find((w) => w.id === branch.workspaceId)?.name)
+    : null
   const allSessions = getSessionsForProject(projectId)
   const sessions = allSessions.filter((s) => !s.parentSessionId)
   const activeSessionId = getActiveSessionForProject(projectId)
@@ -136,6 +141,13 @@ export function TabBar({
       {/* Session sub-tab bar: only visible when Terminal is the active primary tab */}
       {isTerminalActive && (
         <div className="tab-bar tab-bar--sessions">
+          {/* Tabs are scoped to one branch, and switching branches silently
+              swapped the whole row. Say whose terminals these are. */}
+          {scopeLabel && (
+            <span className="tab-bar__scope" title={scopeLabel}>
+              {scopeLabel}
+            </span>
+          )}
           {sessions.map((session, index) => (
             <div
               key={session.id}
@@ -268,7 +280,7 @@ function SessionTabCtxMenu({
       </button>
       <div className="ctx-menu__separator" />
       <button className="ctx-menu__item" onClick={() => onMove(sessionId)}>
-        Move to project…
+        Move to branch…
       </button>
       <div className="ctx-menu__separator" />
       <button

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { displayName, abbreviatePath } from '../../../../src/renderer/sidebar/branch-display'
+import {
+  displayName,
+  abbreviatePath,
+  qualifiedBranchLabel,
+} from '../../../../src/renderer/sidebar/branch-display'
 import type { Project } from '../../../../src/shared/types/index'
 
 const branch = (patch: Partial<Project> = {}): Project => ({
@@ -72,5 +76,34 @@ describe('abbreviatePath — a repo path as a human reads it', () => {
 
   it('leaves the path alone when home is unknown', () => {
     expect(abbreviatePath('/Users/andrew/app', undefined)).toBe('/Users/andrew/app')
+  })
+})
+
+describe('qualifiedBranchLabel — one name identifies one thing', () => {
+  it('leads with the repo, because every repo has a main', () => {
+    expect(qualifiedBranchLabel(branch({ name: 'main', gitBranch: 'main' }), 'Terminator')).toBe(
+      'Terminator · main'
+    )
+  })
+
+  it('gives two identically named branches two different labels', () => {
+    const a = qualifiedBranchLabel(branch({ name: 'main', gitBranch: 'main' }), 'Terminator')
+    const b = qualifiedBranchLabel(branch({ name: 'main', gitBranch: 'main' }), 'Fluent')
+    expect(a).not.toBe(b)
+  })
+
+  it('uses the human label when a branch has one', () => {
+    expect(
+      qualifiedBranchLabel(
+        branch({ name: 'TAV-14 Red text', gitBranch: 'andrew/tav-14' }),
+        'Fluent'
+      )
+    ).toBe('Fluent · TAV-14 Red text')
+  })
+
+  it('falls back to the branch alone when the repo is unknown', () => {
+    expect(qualifiedBranchLabel(branch({ name: 'main', gitBranch: 'main' }), undefined)).toBe(
+      'main'
+    )
   })
 })

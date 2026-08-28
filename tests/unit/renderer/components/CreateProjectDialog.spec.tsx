@@ -68,7 +68,7 @@ function setupGitWorkspace(): void {
 describe('CreateProjectDialog', () => {
   it('renders dialog title', () => {
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    expect(screen.getByText('Create Project')).toBeTruthy()
+    expect(screen.getByText('Create Branch')).toBeTruthy()
   })
 
   it('calls onClose when Cancel is clicked', () => {
@@ -124,15 +124,13 @@ describe('CreateProjectDialog', () => {
     const nameInput = screen.getAllByRole('textbox')[0]
     fireEvent.change(nameInput, { target: { value: 'My App' } })
     fireEvent.blur(nameInput)
-    expect(
-      screen.getByText('A project with this name already exists in this workspace')
-    ).toBeTruthy()
+    expect(screen.getByText('A branch with this name already exists in this repo')).toBeTruthy()
   })
 
   it('calls onClose when overlay is clicked', () => {
     const onClose = vi.fn()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
-    fireEvent.click(screen.getByText('Create Project').closest('.dialog-overlay')!)
+    fireEvent.click(screen.getByText('Create Branch').closest('.dialog-overlay')!)
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -173,7 +171,7 @@ describe('CreateProjectDialog', () => {
     const onClose = vi.fn()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
     await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     // Open BranchSelect dropdown and select the inline new-branch option
     await vi.waitFor(() => screen.getByText('main'))
     fireEvent.click(screen.getByText('main'))
@@ -200,7 +198,7 @@ describe('CreateProjectDialog', () => {
     await vi.waitFor(() => screen.getByText('main'))
     fireEvent.click(screen.getByText('main'))
     fireEvent.click(screen.getByText('+ New branch…'))
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() => expect(screen.getByText('Enter a branch name')).toBeTruthy())
   })
@@ -236,9 +234,7 @@ describe('CreateProjectDialog', () => {
     rerender(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() =>
-      expect(
-        screen.getByText('A branch-based project already exists in this workspace')
-      ).toBeTruthy()
+      expect(screen.getByText('A branch-based entry already exists in this repo')).toBeTruthy()
     )
   })
 
@@ -329,7 +325,7 @@ describe('CreateProjectDialog', () => {
     await vi.waitFor(() => screen.getByText('main'))
     fireEvent.click(screen.getByText('main'))
     fireEvent.click(screen.getByText('develop'))
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() =>
       expect(mockCreateProject).toHaveBeenCalledWith(
@@ -376,7 +372,7 @@ describe('CreateProjectDialog', () => {
     const onClose = vi.fn()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
     await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() =>
       expect(mockCreateProject).toHaveBeenCalledWith(expect.objectContaining({ gitBranch: 'main' }))
@@ -390,7 +386,7 @@ describe('CreateProjectDialog', () => {
     ).git.createBranch.mockResolvedValue({ error: 'already exists' })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     fireEvent.click(screen.getByText('main'))
     fireEvent.click(screen.getByText('+ New branch…'))
     fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
@@ -405,19 +401,19 @@ describe('CreateProjectDialog', () => {
   it('shows name error when createProject returns DUPLICATE_NAME', async () => {
     mockCreateProject.mockResolvedValue({ error: 'DUPLICATE_NAME' })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     fireEvent.click(screen.getByText('Create'))
     await vi.waitFor(() =>
-      expect(screen.getByText('A project with this name already exists')).toBeTruthy()
+      expect(screen.getByText('A branch with this name already exists')).toBeTruthy()
     )
   })
 
   it('shows generic error when createProject returns other error', async () => {
     mockCreateProject.mockResolvedValue({ error: 'DB_ERROR' })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(screen.getByText('Failed to create project')).toBeTruthy())
+    await vi.waitFor(() => expect(screen.getByText('Could not create the branch')).toBeTruthy())
   })
 
   it('shows error when createWorktree fails', async () => {
@@ -429,7 +425,7 @@ describe('CreateProjectDialog', () => {
     await vi.waitFor(() => screen.getByText('Worktree'))
     fireEvent.click(screen.getByText('Worktree'))
     await vi.waitFor(() => screen.getByText('Worktree path'))
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     const inputs = screen.getAllByRole('textbox')
     fireEvent.change(inputs[inputs.length - 2], { target: { value: 'feature/wt' } })
     fireEvent.click(screen.getByText('Create'))
@@ -451,7 +447,7 @@ describe('CreateProjectDialog', () => {
     await vi.waitFor(() => screen.getByText('main'))
     fireEvent.click(screen.getByText('main'))
     fireEvent.click(screen.getAllByText('+ New branch…')[0])
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My branch' } })
     // Ensure new branch name input is empty then submit
     const newBranchInput = screen.getByPlaceholderText('feature/my-feature')
     fireEvent.change(newBranchInput, { target: { value: '' } })
@@ -538,7 +534,7 @@ describe('CreateProjectDialog — from an issue', () => {
     fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
     fireEvent.click(await screen.findByText('TAV-42'))
 
-    const name = screen.getByPlaceholderText('My Project') as HTMLInputElement
+    const name = screen.getByPlaceholderText('My branch') as HTMLInputElement
     expect(name.value).toContain('TAV-42')
     expect(screen.getByDisplayValue('andrew/tav-42-unify-linear')).toBeTruthy()
   })
@@ -556,7 +552,7 @@ describe('CreateProjectDialog — from an issue', () => {
     fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
     fireEvent.click(await screen.findByText('TAV-42'))
 
-    const name = screen.getByPlaceholderText('My Project') as HTMLInputElement
+    const name = screen.getByPlaceholderText('My branch') as HTMLInputElement
     fireEvent.change(name, { target: { value: 'my own name' } })
     expect(name.value).toBe('my own name')
   })
@@ -582,7 +578,7 @@ describe('CreateProjectDialog — from an issue', () => {
 
   it('attaches nothing when no issue was picked', async () => {
     await openWithIssues()
-    fireEvent.change(screen.getByPlaceholderText('My Project'), { target: { value: 'plain' } })
+    fireEvent.change(screen.getByPlaceholderText('My branch'), { target: { value: 'plain' } })
     fireEvent.click(screen.getByText('Create'))
 
     await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())

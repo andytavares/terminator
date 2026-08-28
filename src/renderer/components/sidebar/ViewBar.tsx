@@ -5,9 +5,9 @@ import './ViewBar.css'
 // Order is the menu order; workspace leads because it is the default grouping.
 const GROUP_LABELS: Record<GroupKey, string> = {
   workspace: 'Workspace',
-  project: 'Project',
+  project: 'Branch',
   status: 'Status',
-  branch: 'Branch',
+  branch: 'Branch name',
   none: 'None',
 }
 
