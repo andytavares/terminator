@@ -177,6 +177,7 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
     render(
       <SidebarHeader
         globalTabs={[globalTab]}
+        sidebarItems={[]}
         activeGlobalTabId={null}
         onSelectGlobalTab={onSelectGlobalTab}
         onSearchFocus={() => {}}
@@ -188,7 +189,7 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
         onSearchClear={() => {}}
       />
     )
-    fireEvent.click(screen.getByTitle('Fake Tab'))
+    fireEvent.click(screen.getByLabelText('Fake Tab'))
     expect(onSelectGlobalTab).toHaveBeenCalledWith('fake.global')
   })
 

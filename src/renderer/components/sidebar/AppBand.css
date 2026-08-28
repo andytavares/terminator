@@ -1,0 +1,74 @@
+/*
+ * App-level surfaces. Ruled off from the session list below so the two read as
+ * different systems — one is where you go, the other is what you are working on.
+ */
+.app-band {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-strong);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-band::-webkit-scrollbar {
+  display: none;
+}
+
+.app-band__entry {
+  /* Share the width evenly rather than overflow: a clipped fifth entry is
+     invisible, whereas a truncated label still has its accessible name and
+     tooltip. Beyond about eight entries this needs real overflow behaviour
+     (ADR 033). */
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 7px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.app-band__entry:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.app-band__entry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.app-band__entry--active {
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border-bottom-color: var(--accent);
+}
+
+/* Flat, currentColor, sized by CSS — never the size prop (Principle XII). */
+.app-band__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 15px;
+}
+
+.app-band__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.app-band__label {
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

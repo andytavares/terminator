@@ -142,20 +142,20 @@ Electron desktop app, per plan.md: `src/main/`, `src/preload/`, `src/renderer/`,
 
 ### Tests for User Story 4 ⚠️ Write first, confirm they fail
 
-- [ ] T043 [P] [US4] Write failing tests in `tests/unit/renderer/components/AppBand.spec.tsx` — every registration renders a visible label and an `aria-label`, an unresolved icon name falls back to `Square` without throwing, entries fire `onSelect` with the right id, focus order follows DOM order, and a contributed sidebar item and a global tab both appear in the same band (contracts/app-band.md)
-- [ ] T044 [P] [US4] Add failing tests to `tests/unit/renderer/components/SidebarHeader.spec.tsx` asserting the bell and add-repo controls sit on the search row and no unlabelled icon row remains (FR-017)
-- [ ] T045 [P] [US4] Add failing tests to `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` asserting scratch renders as a group with a count, no `ExtensionFooter` is in the tree, and each contributed item still appears exactly once (FR-018, existing FR-028 assertions must keep passing)
+- [x] T043 [P] [US4] Write failing tests in `tests/unit/renderer/components/AppBand.spec.tsx` — every registration renders a visible label and an `aria-label`, an unresolved icon name falls back to `Square` without throwing, entries fire `onSelect` with the right id, focus order follows DOM order, and a contributed sidebar item and a global tab both appear in the same band (contracts/app-band.md)
+- [x] T044 [P] [US4] Add failing tests to `tests/unit/renderer/components/SidebarHeader.spec.tsx` asserting the bell and add-repo controls sit on the search row and no unlabelled icon row remains (FR-017)
+- [x] T045 [P] [US4] Add failing tests to `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` asserting scratch renders as a group with a count, no `ExtensionFooter` is in the tree, and each contributed item still appears exactly once (FR-018, existing FR-028 assertions must keep passing)
 
 ### Implementation for User Story 4
 
-- [ ] T046 [US4] Create `src/renderer/components/sidebar/AppBand.tsx` rendering global tabs and contributed sidebar items in one band, iterating registry data only and naming no extension in code (constitution II, contracts/app-band.md)
-- [ ] T047 [US4] Add the icon-name to lucide-component resolution with a `Square` fallback inside `src/renderer/components/sidebar/AppBand.tsx`, so an extension typo cannot break the sidebar
-- [ ] T048 [P] [US4] Style the band in `src/renderer/components/sidebar/AppBand.css` — icon above visible label, ruled off from the session list, visible keyboard focus ring
-- [ ] T049 [US4] Restructure `src/renderer/components/sidebar/SidebarHeader.tsx` to render `AppBand` above the search row and move the bell and add-repo controls onto the search row
-- [ ] T050 [US4] Delete `src/renderer/components/sidebar/ExtensionFooter.tsx` and `ExtensionFooter.css`, remove its usage from `UnifiedSidebar.tsx`, and move the assertions from `tests/unit/renderer/components/ExtensionFooter.spec.tsx` into `AppBand.spec.tsx` before deleting that spec (constitution X — no orphaned files, no lost coverage)
-- [ ] T051 [US4] Render scratch sessions as a group with a count and a "New scratch terminal" action in `src/renderer/components/sidebar/UnifiedSidebar.tsx` — **do not change the count `buildGroups` reports; audit finding NAV-6 is out of scope** (contracts/app-band.md)
-- [ ] T052 [US4] Delete `src/renderer/components/sidebar/ScratchSection.tsx` and `ScratchSection.css` and fold `tests/unit/renderer/components/ScratchSection.spec.tsx` into the sidebar spec
-- [ ] T053 [US4] Write `docs/adr/033-one-app-band.md` recording why two contribution points render into one surface and why that does not violate extension isolation (constitution IX, research R5)
+- [x] T046 [US4] Create `src/renderer/components/sidebar/AppBand.tsx` rendering global tabs and contributed sidebar items in one band, iterating registry data only and naming no extension in code (constitution II, contracts/app-band.md)
+- [x] T047 [US4] Add the icon-name to lucide-component resolution with a `Square` fallback inside `src/renderer/components/sidebar/AppBand.tsx`, so an extension typo cannot break the sidebar
+- [x] T048 [P] [US4] Style the band in `src/renderer/components/sidebar/AppBand.css` — icon above visible label, ruled off from the session list, visible keyboard focus ring
+- [x] T049 [US4] Restructure `src/renderer/components/sidebar/SidebarHeader.tsx` to render `AppBand` above the search row and move the bell and add-repo controls onto the search row
+- [x] T050 [US4] Delete `src/renderer/components/sidebar/ExtensionFooter.tsx` and `ExtensionFooter.css`, remove its usage from `UnifiedSidebar.tsx`, and move the assertions from `tests/unit/renderer/components/ExtensionFooter.spec.tsx` into `AppBand.spec.tsx` before deleting that spec (constitution X — no orphaned files, no lost coverage)
+- [x] T051 [US4] Render scratch sessions as a group with a count and a "New scratch terminal" action in `src/renderer/components/sidebar/UnifiedSidebar.tsx` — **do not change the count `buildGroups` reports; audit finding NAV-6 is out of scope** (contracts/app-band.md)
+- [x] T052 [US4] Delete `src/renderer/components/sidebar/ScratchSection.tsx` and `ScratchSection.css` and fold `tests/unit/renderer/components/ScratchSection.spec.tsx` into the sidebar spec
+- [x] T053 [US4] Write `docs/adr/033-one-app-band.md` recording why two contribution points render into one surface and why that does not violate extension isolation (constitution IX, research R5)
 
 **Checkpoint**: All four stories functional and independently verifiable.
 
@@ -189,6 +189,10 @@ Work the plan did not anticipate, recorded here rather than folded silently into
 
 - [x] T069 [US3] Extract `qualifiedBranchLabel` into `src/renderer/sidebar/branch-display.ts` so the sidebar's registered commands, the command palette and the link dialog cannot drift apart in how they name a branch
 - [x] T070 [US3] Rename the `project` grouping option to **Branch** in `ViewBar.tsx`, and the pre-existing `branch` grouping to **Branch name**, which the two now collide on
+
+- [x] T071 [US4] Amend the app-band icon-fallback rule: both contribution shapes carry `icon` as an already-resolved React node, not a name string, so the fallback is "no icon supplied" rather than "unresolvable name" — contracts/app-band.md was written against an assumed shape
+- [x] T072 [US4] Let band entries share the sidebar width instead of overflowing: five labelled entries clipped the fifth at the 300px default, and a clipped entry is invisible where a truncated label still has its tooltip and accessible name
+- [x] T073 [US4] Update the e2e selectors that addressed global tabs as `.sidebar-header__tab[title=...]` and the create dialog as "Create Project"
 
 **Why T063 was necessary.** `spec.md` assumes "session state continues to be inferred by the existing mechanism". That mechanism — `BellAndBusySource` in `src/renderer/sidebar/agent-state.ts` — had no production caller: its only importer was its own test. `agentState` was written as `'idle'` at session creation and never updated, so every session read as idle forever, and the Needs me, Active and Stale views were filtering on a constant. Without T063, US1 would ship four glyphs of which exactly one could ever appear.
 

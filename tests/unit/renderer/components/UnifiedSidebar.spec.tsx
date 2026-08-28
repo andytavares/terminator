@@ -156,7 +156,9 @@ const mockSessionStore = {
   projectViews: new Map(),
   isSessionBusy: vi.fn().mockReturnValue(false),
   getBellCountForSession: vi.fn().mockReturnValue(0),
-  getScratchSessions: vi.fn().mockReturnValue([]),
+  getScratchSessions: vi.fn(() =>
+    [...sessions.values()].filter((s) => s.projectId === '00000000-0000-0000-0000-000000000000')
+  ),
   setActiveSessionForProject: vi.fn(),
   renameSession: vi.fn(),
 }
@@ -254,8 +256,8 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
 
   it('defaults every group to expanded (FR-008)', () => {
     const { container } = renderSidebar()
-    // Two workspaces plus the three project groups nested inside them.
-    expect(container.querySelectorAll('.session-group__sessions')).toHaveLength(5)
+    // Two workspaces, the three project groups nested inside them, and scratch.
+    expect(container.querySelectorAll('.session-group__sessions')).toHaveLength(6)
   })
 
   it('shows a relative last-activity label on each row', () => {
@@ -274,7 +276,7 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.textContent
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
     expect(container.querySelectorAll('.session-group__add')).toHaveLength(3)
   })
 
@@ -460,7 +462,16 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     const order = Array.from(
       container.querySelectorAll('.session-group__label, .ws-row__name')
     ).map((el) => el.textContent)
-    expect(order).toEqual(['Backend', 'API', 'Jobs', 'Backend', 'Frontend', 'Web', 'Frontend'])
+    expect(order).toEqual([
+      'Backend',
+      'API',
+      'Jobs',
+      'Backend',
+      'Frontend',
+      'Web',
+      'Frontend',
+      'Scratch',
+    ])
   })
 
   it('offers a create-project entry point per workspace', () => {
@@ -646,7 +657,7 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('shows the project badge on every row once the header stops naming the project', () => {
@@ -680,7 +691,8 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
 
   it('renders a single group when grouping is switched off', () => {
     const { container } = renderSidebar({ initialViewId: 'flat' })
-    expect(container.querySelectorAll('.session-group')).toHaveLength(1)
+    // The flat group, plus the scratch group which belongs to no grouping.
+    expect(container.querySelectorAll('.session-group')).toHaveLength(2)
     expect(container.querySelector('.session-group__label')!.textContent).toBe('All sessions')
   })
 
@@ -697,7 +709,7 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('highlights the workspace drop target during a drag', () => {
@@ -757,7 +769,7 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.textContent
     )
-    expect(labels).toEqual(['Idle'])
+    expect(labels).toEqual(['Idle', 'Scratch'])
   })
 
   it('persists a grouping change for that view across a remount', () => {
@@ -769,7 +781,7 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.firstChild!.textContent
     )
-    expect(labels).toEqual(['API', 'Jobs', 'Web'])
+    expect(labels).toEqual(['API', 'Jobs', 'Web', 'Scratch'])
   })
 
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
@@ -999,7 +1011,7 @@ describe('UnifiedSidebar — workspace grouping keeps the project layer (default
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web'])
+    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('starts a terminal on a nested project without changing the grouping', () => {
@@ -1128,5 +1140,67 @@ describe('UnifiedSidebar — the link dialog names what it attaches to (US3, FR-
     renderSidebar()
     expect(screen.getByTestId('link-issue-dialog').textContent).toContain('Backend · API')
     mockIntegrationsStore.linkDialogProjectId = null
+  })
+})
+
+describe('UnifiedSidebar — app surfaces have one home, scratch has a group (US4)', () => {
+  it('draws contributed sidebar items in the app band, not a separate footer', () => {
+    mockRegistryState.sidebarButtons = [{ id: 'git', label: 'Git Changes', action: vi.fn() }]
+    const { container } = renderSidebar()
+    expect(container.querySelector('.extension-footer')).toBeNull()
+    expect(container.querySelector('.app-band')).toBeTruthy()
+    expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+    mockRegistryState.sidebarButtons = []
+  })
+
+  it('renders scratch sessions as a group with a count, not a pinned footer', () => {
+    sessions.set(
+      'sc1',
+      session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })
+    )
+    const { container } = renderSidebar()
+    expect(container.querySelector('.scratch-section')).toBeNull()
+    const labels = [...container.querySelectorAll('.session-group__label')].map((el) =>
+      el.textContent!.trim()
+    )
+    expect(labels).toContain('Scratch')
+    expect(screen.getByText('notes')).toBeTruthy()
+  })
+
+  it('offers a way to start a scratch terminal from that group', () => {
+    const onNewScratch = vi.fn()
+    const { container } = renderSidebar({ onNewScratch })
+    const add = container.querySelector('.unified-sidebar__scratch-add')
+    expect(add).toBeTruthy()
+    fireEvent.click(add!)
+    expect(onNewScratch).toHaveBeenCalledOnce()
+  })
+})
+
+describe('UnifiedSidebar — scratch group behaviour retired from ScratchSection', () => {
+  beforeEach(() => {
+    sessions.set(
+      'sc1',
+      session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })
+    )
+  })
+
+  it('selects a scratch session when its row is clicked', () => {
+    const onSelectScratchSession = vi.fn()
+    renderSidebar({ onSelectScratchSession })
+    fireEvent.click(screen.getByText('notes'))
+    expect(onSelectScratchSession).toHaveBeenCalledWith('sc1')
+  })
+
+  it('marks the active scratch session', () => {
+    const { container } = renderSidebar({ activeScratchSessionId: 'sc1' })
+    const scratch = container.querySelector('.unified-sidebar__scratch')!
+    expect(scratch.querySelector('.session-row--active')).toBeTruthy()
+  })
+
+  it('counts the scratch sessions on the group header', () => {
+    const { container } = renderSidebar()
+    const scratch = container.querySelector('.unified-sidebar__scratch')!
+    expect(scratch.querySelector('.session-group__count')!.textContent).toBe('1')
   })
 })

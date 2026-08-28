@@ -52,7 +52,8 @@ async function pressEscapeInExtensionView(times: number): Promise<void> {
 const EXTENSION_TAB_TITLE = 'Notes'
 
 async function openExtensionGlobalTab(): Promise<void> {
-  const tab = handle.page.locator(`.sidebar-header__tab[title="${EXTENSION_TAB_TITLE}"]`)
+  // Global tabs now live in the labelled app band, addressed by accessible name.
+  const tab = handle.page.locator(`.app-band__entry[aria-label="${EXTENSION_TAB_TITLE}"]`)
   await expect(tab).toBeVisible({ timeout: 15000 })
   await tab.click()
   await expect(handle.page.locator('[data-extension-panel]')).toHaveCount(1, { timeout: 10000 })

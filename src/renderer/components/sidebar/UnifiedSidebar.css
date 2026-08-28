@@ -126,3 +126,30 @@
   display: flex;
   box-shadow: -18px 0 48px rgba(0, 0, 0, 0.45);
 }
+
+/* Scratch is a group like any other, but it belongs to no repo, so it carries
+   no scope actions — only a way to start another one. */
+.unified-sidebar__scratch-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.unified-sidebar__scratch .session-group__header:hover .unified-sidebar__scratch-add {
+  opacity: 0.75;
+}
+
+.unified-sidebar__scratch-add:hover {
+  opacity: 1;
+}

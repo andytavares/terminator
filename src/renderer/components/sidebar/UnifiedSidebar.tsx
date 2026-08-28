@@ -24,8 +24,6 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
-import { ScratchSection } from './ScratchSection'
-import { ExtensionFooter } from './ExtensionFooter'
 import { FilterNotice } from './FilterNotice'
 import { ScopeMenu } from './ScopeMenu'
 import { IssueBadge } from '../integrations/IssueBadge'
@@ -649,6 +647,7 @@ export function UnifiedSidebar({
       >
         <SidebarHeader
           globalTabs={globalTabs}
+          sidebarItems={sidebarButtons}
           activeGlobalTabId={activeGlobalTabId}
           onSelectGlobalTab={onSelectGlobalTab}
           onSearchFocus={() => {}}
@@ -719,6 +718,41 @@ export function UnifiedSidebar({
             </div>
           ))}
 
+          {/* Scratch terminals belong to no repo, so they get their own group
+              rather than a pinned footer with its own separate vocabulary. */}
+          {(scratchSessions.length > 0 || groups.length > 0) && (
+            <div className="session-group unified-sidebar__scratch">
+              <div className="session-group__header">
+                <span className="session-group__label">Scratch</span>
+                <span className="session-group__count">{scratchSessions.length}</span>
+                <button
+                  className="unified-sidebar__scratch-add"
+                  title="New scratch terminal"
+                  aria-label="New scratch terminal"
+                  onClick={onNewScratch}
+                >
+                  +
+                </button>
+              </div>
+              <div className="session-group__sessions">
+                {scratchSessions.map((session) => (
+                  <SessionRow
+                    key={session.id}
+                    session={session}
+                    isActive={activeScratchSessionId === session.id}
+                    isBusy={isSessionBusy(session.id)}
+                    bellCount={getBellCountForSession(session.id)}
+                    workspaceColor=""
+                    now={clock}
+                    onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
+                    onSelect={() => onSelectScratchSession(session.id)}
+                    onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {groups.length === 0 && workspacesWithoutGroups.length === 0 && (
             <div className="unified-sidebar__empty">
               {searchQuery ? `No sessions match "${searchQuery}"` : 'No sessions yet'}
@@ -735,18 +769,6 @@ export function UnifiedSidebar({
             </button>
           </div>
         )}
-
-        {/* Sidebar items are a flat global contribution, so the footer hosts
-            them once per window, outside the group list and independent of how
-            sessions are grouped (FR-028). */}
-        <ExtensionFooter buttons={sidebarButtons} />
-
-        <ScratchSection
-          sessions={scratchSessions}
-          activeSessionId={activeScratchSessionId}
-          onSelectSession={onSelectScratchSession}
-          onNewScratch={onNewScratch}
-        />
 
         <div
           className="unified-sidebar__resize-handle"
