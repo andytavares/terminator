@@ -195,3 +195,11 @@
     display: none;
   }
 }
+
+/* Waiting shows both: the shape that says what state this is, and the count
+   that says how many times it asked. */
+.session-row__waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}

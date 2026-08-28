@@ -163,15 +163,15 @@ Electron desktop app, per plan.md: `src/main/`, `src/preload/`, `src/renderer/`,
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T054 [P] Write `tests/e2e/sidebar-branch-first.spec.ts` covering: four states visible at rest, worktree distinguishable from checkout, the palette with two same-named branches, and the band surviving an extension registering after mount
-- [ ] T055 [P] Update the sidebar section of `docs/ARCHITECTURE.md` — the component hierarchy gains `AppBand` and loses `ExtensionFooter`/`ScratchSection`; document `change-stats.store` and why it sits outside the pure view-model layer (constitution VIII)
-- [ ] T056 [P] Update the session-views bullet in `README.md` to the branch vocabulary and the enriched row
-- [ ] T057 [P] Update `docs/user-guide/USER-GUIDE.md` for the branch vocabulary and the app band
-- [ ] T058 Verify `tests/unit/renderer/sidebar/view-model.spec.ts` and `view-model-performance.spec.ts` are byte-identical to the base commit via `git diff` — an edit to either means the pure core was changed and the design was not followed
-- [ ] T059 Run `npm run format`, then `npm run lint` and confirm 0 errors, including the new vocabulary rule
-- [ ] T060 Run `npx vitest run --coverage` and confirm all pass with every new file at ≥ 80% statements, branches, functions and lines: `session-status.ts`, `branch-display.ts`, `change-stats.store.ts`, `AppBand.tsx`
-- [ ] T061 Run `npx playwright test` and confirm the full e2e suite passes
-- [ ] T062 Walk every scenario in `specs/032-branch-first-sidebar/quickstart.md` by hand, including the greyscale check for SC-001 and the `git diff --numstat` spawn count for the TTL
+- [x] T054 [P] Write `tests/e2e/sidebar-branch-first.spec.ts` covering: four states visible at rest, worktree distinguishable from checkout, the palette with two same-named branches, and the band surviving an extension registering after mount
+- [x] T055 [P] Update the sidebar section of `docs/ARCHITECTURE.md` — the component hierarchy gains `AppBand` and loses `ExtensionFooter`/`ScratchSection`; document `change-stats.store` and why it sits outside the pure view-model layer (constitution VIII)
+- [x] T056 [P] Update the session-views bullet in `README.md` to the branch vocabulary and the enriched row
+- [x] T057 [P] Update `docs/user-guide/USER-GUIDE.md` for the branch vocabulary and the app band
+- [x] T058 Verify `tests/unit/renderer/sidebar/view-model.spec.ts` and `view-model-performance.spec.ts` are byte-identical to the base commit via `git diff` — an edit to either means the pure core was changed and the design was not followed
+- [x] T059 Run `npm run format`, then `npm run lint` and confirm 0 errors, including the new vocabulary rule
+- [x] T060 Run `npx vitest run --coverage` and confirm all pass with every new file at ≥ 80% statements, branches, functions and lines: `session-status.ts`, `branch-display.ts`, `change-stats.store.ts`, `AppBand.tsx`
+- [x] T061 Run `npx playwright test` and confirm the full e2e suite passes
+- [x] T062 Walk every scenario in `specs/032-branch-first-sidebar/quickstart.md` by hand, including the greyscale check for SC-001 and the `git diff --numstat` spawn count for the TTL
 
 ---
 
@@ -193,6 +193,10 @@ Work the plan did not anticipate, recorded here rather than folded silently into
 - [x] T071 [US4] Amend the app-band icon-fallback rule: both contribution shapes carry `icon` as an already-resolved React node, not a name string, so the fallback is "no icon supplied" rather than "unresolvable name" — contracts/app-band.md was written against an assumed shape
 - [x] T072 [US4] Let band entries share the sidebar width instead of overflowing: five labelled entries clipped the fifth at the 300px default, and a clipped entry is invisible where a truncated label still has its tooltip and accessible name
 - [x] T073 [US4] Update the e2e selectors that addressed global tabs as `.sidebar-header__tab[title=...]` and the create dialog as "Create Project"
+
+- [x] T074 [US1] Make the waiting glyph reachable. `awaiting-input` is derived only when `bellCount > 0`, and the bell badge short-circuited ahead of the glyph — so the `Pause` shape could never render in the running app. The row now shows the glyph **and** the count together
+- [x] T075 Replace the greyscale scenario's human step with a mechanical one in `SessionRow.spec.tsx`: assert the four states render four geometrically different SVG shapes, which is what "nameable in greyscale" actually requires
+- [x] T076 Correct `README.md`, which documented `⌘K` as the command palette (it is `⌘P`; `⌘K` clears the terminal) and claimed `⌘⇧A` jumps to the next waiting session, which it cannot do while it reads the stale stored state
 
 **Why T063 was necessary.** `spec.md` assumes "session state continues to be inferred by the existing mechanism". That mechanism — `BellAndBusySource` in `src/renderer/sidebar/agent-state.ts` — had no production caller: its only importer was its own test. `agentState` was written as `'idle'` at session creation and never updated, so every session read as idle forever, and the Needs me, Active and Stale views were filtering on a constant. Without T063, US1 would ship four glyphs of which exactly one could ever appear.
 

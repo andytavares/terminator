@@ -409,10 +409,12 @@ describe('SessionRow — state and selection are two channels (US1, FR-001)', ()
     expect(container.querySelector('.session-row__status svg')).toBeNull()
   })
 
-  it('lets an unread bell outrank the state glyph', () => {
-    const { container } = render_({ agentState: 'idle' }, { bellCount: 3 })
-    expect(container.querySelector('.session-row__bell')).toBeTruthy()
-    expect(container.querySelector('.session-row__status svg')).toBeNull()
+  it('shows the waiting glyph together with the unread count, not instead of it', () => {
+    // The waiting state is derived *from* the bell, so letting the count
+    // replace the glyph made the waiting shape unreachable in the real app.
+    const { container } = render_({ agentState: 'awaiting-input' }, { bellCount: 3 })
+    expect(container.querySelector('.session-row__bell')!.textContent).toBe('3')
+    expect(glyphOf(container)).toBe('awaiting-input')
   })
 
   it('names the state in the row accessible name, since shape means nothing to a reader', () => {
@@ -450,5 +452,26 @@ describe('SessionRow — state and selection are two channels (US1, FR-001)', ()
       expect(r.container.querySelector('.session-row--needs-you')).toBeNull()
       r.unmount()
     }
+  })
+})
+
+describe('SessionRow — SC-001: the four states survive greyscale', () => {
+  it('draws four geometrically different shapes, not four tints of one', () => {
+    // The mechanical form of "name all four from a greyscale screenshot": if
+    // the rendered path data differs, the shapes differ, whatever the palette.
+    const shapes = (['working', 'idle', 'awaiting-input', 'exited'] as const).map((state) => {
+      const r = render(
+        <SessionRow {...defaultProps} session={makeSession({ agentState: state })} />
+      )
+      const svg = r.container.querySelector('.session-row__status svg')!
+      const geometry = [...svg.querySelectorAll('path, circle, rect, line, polyline, polygon')]
+        .map((n) => n.outerHTML)
+        .join('|')
+      r.unmount()
+      return geometry
+    })
+
+    expect(shapes.every((s) => s.length > 0)).toBe(true)
+    expect(new Set(shapes).size).toBe(4)
   })
 })

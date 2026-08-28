@@ -95,20 +95,28 @@ export function SessionRow({
   const status = statusPresentationFor(session)
 
   function renderStatus(): React.ReactNode {
-    // A live spinner and an unread bell are both more urgent than the resting
-    // state, and both already say what the glyph would. Unchanged precedence.
+    // A live spinner outranks everything: it is the only signal about right now.
     if (isBusy) return <span className="session-row__spinner" />
-    if (bellCount > 0) {
-      return (
-        <span className="session-row__bell">
-          <span>{bellCount}</span>
-        </span>
-      )
-    }
+
     // Shape carries the state; the icon inherits currentColor and is hidden
     // from assistive technology, which reads the row's aria-label instead.
     const Icon = STATUS_ICON[status.icon]
-    return <Icon aria-hidden="true" data-state={session.agentState} />
+    const glyph = <Icon aria-hidden="true" data-state={session.agentState} />
+
+    // A waiting session shows its glyph *and* how many times it asked. Letting
+    // the count replace the glyph made the waiting shape unreachable, since the
+    // count is the very thing the waiting state is derived from.
+    if (bellCount > 0) {
+      return (
+        <span className="session-row__waiting">
+          {glyph}
+          <span className="session-row__bell">
+            <span>{bellCount}</span>
+          </span>
+        </span>
+      )
+    }
+    return glyph
   }
 
   const needsYou = status.emphasises
