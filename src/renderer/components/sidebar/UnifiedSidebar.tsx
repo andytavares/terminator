@@ -9,7 +9,7 @@ import { useSettingsStore } from '../../stores/settings.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { buildGroups } from '../../sidebar/view-model'
 import { BellAndBusySource } from '../../sidebar/agent-state'
-import { abbreviatePath, displayName, qualifiedBranchLabel } from '../../sidebar/branch-display'
+import { abbreviatePath, branchLabel, qualifiedBranchLabel } from '../../sidebar/branch-display'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
 import {
@@ -570,7 +570,7 @@ export function UnifiedSidebar({
         collapsed={collapsed}
         onToggleCollapse={() => toggleGroup(group.key)}
         workspaceColor={workspace?.color}
-        branchName={project ? displayName(project) : undefined}
+        branchName={project ? branchLabel(project) : undefined}
         isWorktree={project ? project.isWorktree : undefined}
         worktreePath={project?.worktreePath}
         changeStats={statsEntry?.stats}
@@ -589,10 +589,17 @@ export function UnifiedSidebar({
         onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
         onAddSession={project ? () => addSessionToProject(project.id) : undefined}
         onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
-        onRename={project ? (name) => void renameProject(project.id, name) : undefined}
+        // A branch is named by its branch (ADR-034), so there is nothing to
+        // rename. A project in a folder that is not a repo has no branch, and
+        // its stored name is the only name it has.
+        onRename={
+          project && project.gitBranch === undefined
+            ? (name) => void renameProject(project.id, name)
+            : undefined
+        }
         onRemove={
           project
-            ? () => setConfirmDeleteProject({ id: project.id, name: project.name })
+            ? () => setConfirmDeleteProject({ id: project.id, name: branchLabel(project) })
             : undefined
         }
         workspaceTabs={ownsWorkspaceTabs ? workspaceTabList : undefined}
@@ -612,11 +619,11 @@ export function UnifiedSidebar({
                 bellCount={getBellCountForSession(session.id)}
                 workspaceColor={workspaceColorForSession(session.projectId)}
                 now={clock}
-                projectBadge={
-                  group.scope?.kind === 'project'
-                    ? undefined
-                    : projectById.get(session.projectId)?.name
-                }
+                projectBadge={(() => {
+                  if (group.scope?.kind === 'project') return undefined
+                  const p = projectById.get(session.projectId)
+                  return p ? branchLabel(p) : undefined
+                })()}
                 onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
                 noteEditing={noteEditingId === session.id}
                 onNoteEditingChange={(editing) => setNoteEditingId(editing ? session.id : null)}
@@ -786,13 +793,13 @@ export function UnifiedSidebar({
             <ScopeMenu
               x={scopeMenu.x}
               y={scopeMenu.y}
-              projectName={project.name}
+              projectName={branchLabel(project)}
               issueActions={issueActionsFor(project.id)}
               workspaceTabs={workspaceTabList}
               onSelectWorkspaceTab={(tabId) => onSelectWorkspaceTab(project.workspaceId, tabId)}
               onAddSession={() => addSessionToProject(project.id)}
               onRemoveProject={() =>
-                setConfirmDeleteProject({ id: project.id, name: project.name })
+                setConfirmDeleteProject({ id: project.id, name: branchLabel(project) })
               }
               onDismiss={() => setScopeMenu(null)}
             />
@@ -825,7 +832,7 @@ export function UnifiedSidebar({
             <div className="issue-drawer-host">
               <IssueDrawer
                 projectId={project.id}
-                projectName={project.name}
+                projectName={branchLabel(project)}
                 onClose={closeDrawer}
               />
             </div>

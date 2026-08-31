@@ -95,6 +95,7 @@ A workspace maps to a directory on disk — typically a git repository. Each wor
 Projects live inside a workspace and hold one or more terminal sessions scoped to a task or branch.
 
 - **Create a branch:** Click `+ New branch` under any repo. A branch can be a plain checkout or its own git worktree; the sidebar marks which with a distinct glyph.
+- **Naming:** A branch is named by its branch — there is nothing else to name and nothing to rename. Check out a different branch in a plain checkout's own terminal and its card follows within a moment. A worktree's branch is fixed when you create it. (A workspace whose folder is not a git repository has no branch to take a name from, so there you are asked for one and can rename it.)
 - **Sessions per branch:** A branch can hold multiple named terminal tabs. Sessions are grouped under the branch in the sidebar, and the session tab bar states which branch's terminals it is showing.
 - **Per-workspace settings:** Theme, scrollback limit, and default shell can be overridden per workspace via Settings.
 

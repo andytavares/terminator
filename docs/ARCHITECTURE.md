@@ -550,8 +550,21 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 `src/renderer/sidebar/` holds the pure core: `view-model.ts` (`buildGroups`, `isStale`),
 `views.ts` (built-in views as data + persistence — Everything, the default view, groups
 by workspace), `agent-state.ts`, `session-status.ts` (state → glyph/label, total over
-`AgentState`), `branch-display.ts` (`displayName`, `abbreviatePath`,
+`AgentState`), `branch-display.ts` (`branchLabel`, `abbreviatePath`,
 `qualifiedBranchLabel`), `collapse-state.ts`, and `relative-time.ts`.
+
+### A branch is named by its branch
+
+`branchLabel(project)` returns `project.gitBranch`, and every surface that names a branch —
+group header, session row badge, scope menu, move and link dialogs, removal confirmation,
+overview tiles, command palette — goes through it. `Project.name` is read only when there
+is no branch to read instead, which is a workspace whose folder is not a git repository;
+that is also the only case where the create dialog asks for a name and the header context
+menu offers Rename. `useBranchSync`, called from `App` over every non-worktree project,
+keeps `gitBranch` equal to the branch the working tree is actually on, so a `git switch` in
+a branch's own terminal renames its card within five seconds. It polls, because
+`fs:changed` never fires — nothing calls `fs.watchStart` — and a hidden window is not
+polled at all. See ADR 034.
 
 ### Change statistics sit beside the pure layer, not in it
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  displayName,
+  branchLabel,
   abbreviatePath,
   qualifiedBranchLabel,
 } from '../../../../src/renderer/sidebar/branch-display'
@@ -17,43 +17,32 @@ const branch = (patch: Partial<Project> = {}): Project => ({
   ...patch,
 })
 
-describe('displayName — the branch is the identity', () => {
-  it('shows the branch alone when the stored name is just the branch', () => {
-    expect(displayName(branch({ name: 'main', gitBranch: 'main' }))).toEqual({
-      primary: 'main',
-      secondary: undefined,
-    })
+describe('branchLabel — a branch is named by its branch', () => {
+  it('names a branch after its branch', () => {
+    expect(branchLabel(branch({ name: 'main', gitBranch: 'main' }))).toBe('main')
   })
 
-  it('leads with a real label and keeps the branch as secondary', () => {
+  it('ignores a stored label that is not the branch', () => {
+    // The card used to lead with this label and demote the branch to secondary
+    // text, which gave one thing two names.
     expect(
-      displayName(
+      branchLabel(
         branch({ name: 'TAV-14 Make all text red', gitBranch: 'andrew/tav-14-make-text-red' })
       )
-    ).toEqual({
-      primary: 'TAV-14 Make all text red',
-      secondary: 'andrew/tav-14-make-text-red',
-    })
+    ).toBe('andrew/tav-14-make-text-red')
   })
 
   it('falls back to the stored name when there is no branch to show', () => {
-    expect(displayName(branch({ name: 'detached', gitBranch: undefined }))).toEqual({
-      primary: 'detached',
-      secondary: undefined,
-    })
-  })
-
-  it('never hides the branch when it differs from the label', () => {
-    const d = displayName(branch({ name: 'API', gitBranch: 'feature/api-v2' }))
-    expect(d.secondary).toBe('feature/api-v2')
+    // A workspace whose folder is not a git repository. The name is all it has.
+    expect(branchLabel(branch({ name: 'detached', gitBranch: undefined }))).toBe('detached')
   })
 
   it('is pure and does not mutate its input', () => {
     const b = branch()
     const snapshot = JSON.stringify(b)
-    displayName(b)
+    branchLabel(b)
     expect(JSON.stringify(b)).toBe(snapshot)
-    expect(displayName(b)).toEqual(displayName(b))
+    expect(branchLabel(b)).toBe(branchLabel(b))
   })
 })
 
@@ -92,13 +81,13 @@ describe('qualifiedBranchLabel — one name identifies one thing', () => {
     expect(a).not.toBe(b)
   })
 
-  it('uses the human label when a branch has one', () => {
+  it('qualifies the branch, not a stored label', () => {
     expect(
       qualifiedBranchLabel(
         branch({ name: 'TAV-14 Red text', gitBranch: 'andrew/tav-14' }),
         'Fluent'
       )
-    ).toBe('Fluent · TAV-14 Red text')
+    ).toBe('Fluent · andrew/tav-14')
   })
 
   it('falls back to the branch alone when the repo is unknown', () => {

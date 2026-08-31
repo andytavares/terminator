@@ -6,10 +6,7 @@ import { BranchSelect } from './BranchSelect'
 import { useModalEffect } from '../../stores/modal.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { IssuePicker } from '../integrations/IssuePicker'
-import {
-  branchFromIssue,
-  projectNameFromIssue,
-} from '../../../shared/integrations/branch-from-issue'
+import { branchFromIssue } from '../../../shared/integrations/branch-from-issue'
 import type { IssueSummary } from '../../../shared/types/index'
 import './Dialog.css'
 
@@ -88,13 +85,13 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
    */
   function applyIssue(picked: IssueSummary): void {
     setIssue(picked)
-    setName(projectNameFromIssue(picked))
     setNameError('')
     setWorktreeIsNewBranch(true)
     setNewBranchName(branchFromIssue(picked))
     setBranchMode('worktree')
   }
 
+  /** What the card will be called: its branch, or a supplied name if it has none. */
   function validateName(value: string): string {
     if (!value.trim()) return 'Name is required'
     if (value.length > 100) return 'Name must be 100 characters or less'
@@ -126,10 +123,14 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
-    const nameErr = validateName(name)
-    if (nameErr) {
-      setNameError(nameErr)
-      return
+    // Only a non-repo folder carries a name of its own; everywhere else the
+    // branch chosen below is the name, and it is validated where it is chosen.
+    if (!gitRoot) {
+      const nameErr = validateName(name)
+      if (nameErr) {
+        setNameError(nameErr)
+        return
+      }
     }
     setError('')
 
@@ -156,15 +157,24 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         }
         branch = branchTrimmed
       }
+      // In a repo the branch is the card's name, so a card with no branch would
+      // be a card with no name.
+      if (gitRoot && !branch) {
+        setError('Select or enter a branch name')
+        return
+      }
       const result = await createProject({
         workspaceId,
-        name: name.trim(),
+        name: branch || name.trim(),
         ...(branch ? { gitBranch: branch } : {}),
       })
       if ('error' in result) {
-        if (result.error === 'DUPLICATE_NAME')
-          setNameError('A branch with this name already exists')
-        else setError('Could not create the branch')
+        const duplicate = result.error === 'DUPLICATE_NAME'
+        // With a repo the name is the branch, and the Name field it would be
+        // reported under is not rendered — so that case has to speak up here.
+        if (duplicate && !gitRoot) setNameError('A branch with this name already exists')
+        else
+          setError(duplicate ? 'This repo already has that branch' : 'Could not create the branch')
         return
       }
       await attachIssue(result)
@@ -187,15 +197,18 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       }
       const result = await createProject({
         workspaceId,
-        name: name.trim(),
+        name: branch,
         gitBranch: branch,
         worktreePath,
         isWorktree: true,
       })
       if ('error' in result) {
-        if (result.error === 'DUPLICATE_NAME')
-          setNameError('A branch with this name already exists')
-        else setError('Could not create the branch')
+        const duplicate = result.error === 'DUPLICATE_NAME'
+        // With a repo the name is the branch, and the Name field it would be
+        // reported under is not rendered — so that case has to speak up here.
+        if (duplicate && !gitRoot) setNameError('A branch with this name already exists')
+        else
+          setError(duplicate ? 'This repo already has that branch' : 'Could not create the branch')
         return
       }
       await attachIssue(result)
@@ -229,27 +242,32 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
               <IssuePicker selected={issue} onSelect={applyIssue} onClear={() => setIssue(null)} />
               {issue !== null && (
                 <span className="dialog__hint">
-                  Name and branch filled in from {issue.key}. Both stay editable.
+                  Branch filled in from {issue.key}. It stays editable.
                 </span>
               )}
             </div>
           )}
 
-          <div className="dialog__field">
-            <label className="dialog__label">Name *</label>
-            <input
-              className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value)
-                setNameError('')
-              }}
-              onBlur={() => setNameError(validateName(name))}
-              placeholder="My branch"
-              autoFocus
-            />
-            {nameError && <span className="dialog__error">{nameError}</span>}
-          </div>
+          {/* A branch is named by its branch (ADR-034). Only a folder that is
+              not a repo has no branch to take a name from, and there the
+              operator still has to supply one. */}
+          {!gitRoot && (
+            <div className="dialog__field">
+              <label className="dialog__label">Name *</label>
+              <input
+                className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  setNameError('')
+                }}
+                onBlur={() => setNameError(validateName(name))}
+                placeholder="My branch"
+                autoFocus
+              />
+              {nameError && <span className="dialog__error">{nameError}</span>}
+            </div>
+          )}
 
           {gitRoot && (
             <div className="dialog__field">

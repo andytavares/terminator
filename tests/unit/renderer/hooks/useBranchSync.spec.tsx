@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
-import { useBranchSync } from '../../../../src/renderer/hooks/useBranchSync'
-import type { Project } from '../../../../src/shared/types/index'
+import { useBranchSync, type BranchSyncTarget } from '../../../../src/renderer/hooks/useBranchSync'
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   useWorkspaceStore: vi.fn(),
@@ -10,161 +9,132 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
 
 const mockUpdateProjectBranch = vi.fn()
 const mockCurrentBranch = vi.fn()
-const mockUnsubFs = vi.fn()
-const mockOnChanged = vi.fn().mockReturnValue(mockUnsubFs)
 
-function makeProject(overrides: Partial<Project> = {}): Project {
-  return {
-    id: 'proj-1',
-    workspaceId: 'ws-1',
-    name: 'My Project',
-    gitBranch: 'main',
-    isWorktree: false,
-    worktreePath: undefined,
-    ...overrides,
-  } as Project
+const target = (over: Partial<BranchSyncTarget> = {}): BranchSyncTarget => ({
+  id: 'proj-1',
+  cwd: '/workspace',
+  gitBranch: 'main',
+  ...over,
+})
+
+/** The effect chains awaits per target; let them all settle. */
+async function settle(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.useFakeTimers({ shouldAdvanceTime: true })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     git: { currentBranch: mockCurrentBranch },
-    fs: { onChanged: mockOnChanged },
   }
   vi.mocked(useWorkspaceStore).mockReturnValue({
     updateProjectBranch: mockUpdateProjectBranch,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   mockCurrentBranch.mockResolvedValue({ branch: 'main' })
-  mockUpdateProjectBranch.mockResolvedValue({ project: makeProject() })
+  mockUpdateProjectBranch.mockResolvedValue({})
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
-describe('useBranchSync', () => {
-  it('does nothing for worktree projects', async () => {
-    const project = makeProject({ isWorktree: true, gitBranch: 'feature/x' })
-    renderHook(() => useBranchSync(project, '/repo'))
-    await act(async () => {
-      await Promise.resolve()
-    })
-    expect(mockCurrentBranch).not.toHaveBeenCalled()
-    expect(mockUpdateProjectBranch).not.toHaveBeenCalled()
-  })
-
-  it('calls currentBranch with the provided cwd', async () => {
-    const project = makeProject()
-    renderHook(() => useBranchSync(project, '/workspace'))
-    await act(async () => {
-      await Promise.resolve()
-    })
+describe('useBranchSync — the name on the card is the branch in the tree', () => {
+  it('reads HEAD from each tracked working tree', async () => {
+    renderHook(() => useBranchSync([target(), target({ id: 'proj-2', cwd: '/other' })]))
+    await settle()
     expect(mockCurrentBranch).toHaveBeenCalledWith('/workspace')
+    expect(mockCurrentBranch).toHaveBeenCalledWith('/other')
   })
 
-  it('does not update when branch matches project.gitBranch', async () => {
+  it('does nothing at all when there is nothing to track', () => {
+    renderHook(() => useBranchSync([]))
+    expect(mockCurrentBranch).not.toHaveBeenCalled()
+  })
+
+  it('leaves a card alone when it already names the branch it is on', async () => {
     mockCurrentBranch.mockResolvedValue({ branch: 'main' })
-    renderHook(() => useBranchSync(makeProject({ gitBranch: 'main' }), '/workspace'))
-    await act(async () => {
-      await Promise.resolve()
-    })
+    renderHook(() => useBranchSync([target({ gitBranch: 'main' })]))
+    await settle()
     expect(mockUpdateProjectBranch).not.toHaveBeenCalled()
   })
 
-  it('calls updateProjectBranch when branch differs', async () => {
+  it('renames a card whose tree has moved to another branch', async () => {
     mockCurrentBranch.mockResolvedValue({ branch: 'feature/new' })
-    renderHook(() => useBranchSync(makeProject({ gitBranch: 'main' }), '/workspace'))
-    await act(async () => {
-      await Promise.resolve()
-    })
+    renderHook(() => useBranchSync([target({ gitBranch: 'main' })]))
+    await settle()
     expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'feature/new')
   })
 
-  it('subscribes to fs.onChanged', () => {
-    renderHook(() => useBranchSync(makeProject(), '/workspace'))
-    expect(mockOnChanged).toHaveBeenCalled()
+  it('moves every card that shares the folder, without one telling the other', async () => {
+    // Two plain cards on one repo: each is checked against its own tree, so
+    // both land on the branch that tree is on.
+    mockCurrentBranch.mockResolvedValue({ branch: 'feature/new' })
+    renderHook(() =>
+      useBranchSync([target(), target({ id: 'proj-2', cwd: '/workspace', gitBranch: 'main' })])
+    )
+    await settle()
+    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'feature/new')
+    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-2', 'feature/new')
   })
 
-  it('calls currentBranch again when fs changes', async () => {
-    let fsCallback: (() => void) | null = null
-    mockOnChanged.mockImplementation((cb: () => void) => {
-      fsCallback = cb
-      return mockUnsubFs
-    })
-    renderHook(() => useBranchSync(makeProject(), '/workspace'))
-    await act(async () => {
-      await Promise.resolve()
-    })
+  it('keeps asking, because a checkout in the terminal announces nothing', async () => {
+    renderHook(() => useBranchSync([target()]))
+    await settle()
     mockCurrentBranch.mockClear()
     mockCurrentBranch.mockResolvedValue({ branch: 'develop' })
     await act(async () => {
-      fsCallback?.()
-      await Promise.resolve()
+      vi.advanceTimersByTime(5000)
     })
+    await settle()
     expect(mockCurrentBranch).toHaveBeenCalledWith('/workspace')
+    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'develop')
   })
 
-  it('unsubscribes fs listener on unmount', () => {
-    const { unmount } = renderHook(() => useBranchSync(makeProject(), '/workspace'))
+  it('does not ask while the window is hidden', async () => {
+    const spy = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    renderHook(() => useBranchSync([target()]))
+    await settle()
+    expect(mockCurrentBranch).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('stops asking on unmount', async () => {
+    const { unmount } = renderHook(() => useBranchSync([target()]))
+    await settle()
     unmount()
-    expect(mockUnsubFs).toHaveBeenCalled()
+    mockCurrentBranch.mockClear()
+    await act(async () => {
+      vi.advanceTimersByTime(15000)
+    })
+    expect(mockCurrentBranch).not.toHaveBeenCalled()
   })
 
-  it('ignores errors from currentBranch silently', async () => {
+  it('does not resync when the targets are rebuilt with the same contents', async () => {
+    const { rerender } = renderHook(() => useBranchSync([target()]))
+    await settle()
+    const callsAfterMount = mockCurrentBranch.mock.calls.length
+    rerender()
+    await settle()
+    expect(mockCurrentBranch.mock.calls.length).toBe(callsAfterMount)
+  })
+
+  it('ignores a folder that is not a repository', async () => {
     mockCurrentBranch.mockRejectedValue(new Error('not a git repo'))
-    const project = makeProject()
-    expect(() => renderHook(() => useBranchSync(project, '/workspace'))).not.toThrow()
-    await act(async () => {
-      await Promise.resolve()
-    })
+    expect(() => renderHook(() => useBranchSync([target()]))).not.toThrow()
+    await settle()
     expect(mockUpdateProjectBranch).not.toHaveBeenCalled()
   })
 
-  it('ignores error responses from currentBranch', async () => {
+  it('ignores an error response from currentBranch', async () => {
     mockCurrentBranch.mockResolvedValue({ error: 'INVALID_PATH' })
-    renderHook(() => useBranchSync(makeProject(), '/workspace'))
-    await act(async () => {
-      await Promise.resolve()
-    })
+    renderHook(() => useBranchSync([target()]))
+    await settle()
     expect(mockUpdateProjectBranch).not.toHaveBeenCalled()
-  })
-
-  it('propagates branch change to non-worktree siblings in the same workspace', async () => {
-    mockCurrentBranch.mockResolvedValue({ branch: 'feature/new' })
-    const sibling = makeProject({ id: 'proj-2', gitBranch: 'main', isWorktree: false })
-    const worktreeSibling = makeProject({ id: 'proj-3', gitBranch: 'main', isWorktree: true })
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      updateProjectBranch: mockUpdateProjectBranch,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-    Object.assign(useWorkspaceStore, {
-      getState: vi.fn().mockReturnValue({
-        workspaces: [{ id: 'ws-1' }],
-        projectsByWorkspaceId: new Map([['ws-1', [makeProject(), sibling, worktreeSibling]]]),
-      }),
-    })
-    renderHook(() => useBranchSync(makeProject({ gitBranch: 'main' }), '/workspace'))
-    await act(async () => {
-      await Promise.resolve()
-      await Promise.resolve()
-    })
-    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'feature/new')
-    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-2', 'feature/new')
-    expect(mockUpdateProjectBranch).not.toHaveBeenCalledWith('proj-3', expect.anything())
-  })
-
-  it('does not propagate when no workspace contains the project', async () => {
-    mockCurrentBranch.mockResolvedValue({ branch: 'feature/new' })
-    Object.assign(useWorkspaceStore, {
-      getState: vi.fn().mockReturnValue({
-        workspaces: [],
-        projectsByWorkspaceId: new Map(),
-      }),
-    })
-    renderHook(() => useBranchSync(makeProject({ gitBranch: 'main' }), '/workspace'))
-    await act(async () => {
-      await Promise.resolve()
-    })
-    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'feature/new')
-    expect(mockUpdateProjectBranch).toHaveBeenCalledTimes(1)
   })
 })

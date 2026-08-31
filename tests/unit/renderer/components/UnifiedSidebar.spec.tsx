@@ -273,7 +273,7 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.textContent
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
+    expect(labels).toEqual(['Backend', 'main', 'Jobs', 'Frontend', 'Web', 'Scratch'])
     expect(container.querySelectorAll('.session-group__add')).toHaveLength(3)
   })
 
@@ -366,7 +366,7 @@ describe('UnifiedSidebar — scope actions on the group header (FR-026)', () => 
     const { container } = renderSidebar()
     fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
     fireEvent.click(screen.getByText('Remove'))
-    expect(screen.getByText('Remove branch "API"?')).toBeTruthy()
+    expect(screen.getByText('Remove branch "main"?')).toBeTruthy()
   })
 
   it('deletes the project once removal is confirmed', () => {
@@ -450,7 +450,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     ).map((el) => el.textContent)
     expect(order).toEqual([
       'Backend',
-      'API',
+      'main',
       'Jobs',
       'Backend',
       'Frontend',
@@ -558,14 +558,24 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     expect(mockWorkspaceStore.reorderWorkspaces).toHaveBeenCalledWith(['ws-2', 'ws-1'])
   })
 
-  it('renames a project through the store', () => {
+  it('renames a branchless project through the store', () => {
+    // `web` sits in a folder that is not a repo, so its stored name is the only
+    // name it has and renaming it is the only way to change it.
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
+    const headers = Array.from(container.querySelectorAll('.session-group__header'))
+    fireEvent.contextMenu(headers.find((h) => h.textContent?.includes('Web'))!)
     fireEvent.click(screen.getByText('Rename'))
     const input = container.querySelector('.session-group__rename-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'API v2' } })
+    fireEvent.change(input, { target: { value: 'Web v2' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(mockWorkspaceStore.renameProject).toHaveBeenCalledWith('p1', 'API v2')
+    expect(mockWorkspaceStore.renameProject).toHaveBeenCalledWith('p3', 'Web v2')
+  })
+
+  it('offers no rename on a branch — it is named by its branch (ADR-034)', () => {
+    const { container } = renderSidebar()
+    const headers = Array.from(container.querySelectorAll('.session-group__header'))
+    fireEvent.contextMenu(headers.find((h) => h.textContent?.includes('main'))!)
+    expect(screen.queryByText('Rename')).toBeNull()
   })
 
   it('renames a session through the store', () => {
@@ -601,7 +611,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     fireEvent.click(screen.getByText('Remove'))
     fireEvent.click(screen.getByText('Cancel'))
     expect(mockWorkspaceStore.deleteProject).not.toHaveBeenCalled()
-    expect(screen.queryByText('Remove branch "API"?')).toBeNull()
+    expect(screen.queryByText('Remove branch "main"?')).toBeNull()
   })
 
   it('marks a busy group with the aggregate indicator', () => {
@@ -643,7 +653,7 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
+    expect(labels).toEqual(['Backend', 'main', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('shows the project badge on every row once the header stops naming the project', () => {
@@ -651,7 +661,7 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
     const badges = Array.from(document.querySelectorAll('.session-row__project-badge')).map(
       (el) => el.textContent
     )
-    expect(badges.sort()).toEqual(['API', 'API', 'Jobs', 'Web'])
+    expect(badges.sort()).toEqual(['Jobs', 'Web', 'main', 'main'])
   })
 
   it('offers no project-scoped header actions when the grouping is not a scope', () => {
@@ -694,7 +704,7 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
+    expect(labels).toEqual(['Backend', 'main', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('highlights the workspace drop target during a drag', () => {
@@ -766,7 +776,7 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.firstChild!.textContent
     )
-    expect(labels).toEqual(['API', 'Jobs', 'Web', 'Scratch'])
+    expect(labels).toEqual(['main', 'Jobs', 'Web', 'Scratch'])
   })
 
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
@@ -996,7 +1006,7 @@ describe('UnifiedSidebar — workspace grouping keeps the project layer (default
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
       el.textContent!.trim()
     )
-    expect(labels).toEqual(['Backend', 'API', 'Jobs', 'Frontend', 'Web', 'Scratch'])
+    expect(labels).toEqual(['Backend', 'main', 'Jobs', 'Frontend', 'Web', 'Scratch'])
   })
 
   it('starts a terminal on a nested project without changing the grouping', () => {
@@ -1109,7 +1119,7 @@ describe('UnifiedSidebar — one name identifies one thing (US3)', () => {
     const { container } = renderSidebar()
     fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
     fireEvent.click(screen.getByText('Remove'))
-    expect(screen.getByText(/Remove branch "API"\?/)).toBeTruthy()
+    expect(screen.getByText(/Remove branch "main"\?/)).toBeTruthy()
   })
 })
 
@@ -1117,7 +1127,7 @@ describe('UnifiedSidebar — the link dialog names what it attaches to (US3, FR-
   it('qualifies the branch with its repo', () => {
     mockIntegrationsStore.linkDialogProjectId = 'p1'
     renderSidebar()
-    expect(screen.getByTestId('link-issue-dialog').textContent).toContain('Backend · API')
+    expect(screen.getByTestId('link-issue-dialog').textContent).toContain('Backend · main')
     mockIntegrationsStore.linkDialogProjectId = null
   })
 })

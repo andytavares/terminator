@@ -3,26 +3,22 @@ import type { Project } from '../../shared/types/index'
 // How a branch names itself in the sidebar. Pure, like the rest of this
 // directory — no store, no clock, no I/O.
 
-export interface BranchName {
-  /** What the row leads with. */
-  primary: string
-  /** The branch, shown only when the label is not already the branch name. */
-  secondary?: string
-}
-
 /**
- * The branch is the identity; a stored name is a label on top of it.
+ * A branch is named by its branch.
  *
- * Most branches created by the app are named after their branch, so they render
- * as just the branch and nothing changes for them. A branch created from a
- * ticket carries a human label — "TAV-14 Make all text red" — and gains its
- * branch name as secondary information rather than losing it.
+ * The stored `name` is not a second identity to be shown beside it: a card
+ * labelled `TAV-14 Make all text red` sitting on
+ * `andrew/tav-14-make-text-red` gave the operator two names for one thing and
+ * no way to tell which one the terminal in it was on. The branch is the thing
+ * that is true — `useBranchSync` keeps it following the working tree — so the
+ * branch is what the card says.
+ *
+ * `name` still answers for a branch that has none: a workspace whose folder is
+ * not a git repository has projects with no branch at all, and there the
+ * stored name is the only name there is.
  */
-export function displayName(branch: Project): BranchName {
-  const { name, gitBranch } = branch
-  if (!gitBranch) return { primary: name, secondary: undefined }
-  if (name === gitBranch) return { primary: gitBranch, secondary: undefined }
-  return { primary: name, secondary: gitBranch }
+export function branchLabel(branch: Project): string {
+  return branch.gitBranch ?? branch.name
 }
 
 /**
@@ -43,6 +39,6 @@ export function abbreviatePath(path: string, home: string | undefined): string {
  * so a bare branch name identifies nothing on its own.
  */
 export function qualifiedBranchLabel(branch: Project, repoName: string | undefined): string {
-  const name = displayName(branch).primary
+  const name = branchLabel(branch)
   return repoName ? `${repoName} · ${name}` : name
 }

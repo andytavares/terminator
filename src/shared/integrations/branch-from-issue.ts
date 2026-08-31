@@ -1,10 +1,12 @@
 import type { IssueSummary } from '../types/index.js'
 
-// Turning an issue into a project name and a branch name.
+// Turning an issue into a branch name.
 //
 // Pure, and deliberately conservative: whatever comes out of here is going to
 // be handed to git, and a ref git refuses fails at worktree creation, which is
-// several steps after the operator chose the issue and stopped watching.
+// several steps after the operator chose the issue and stopped watching. It is
+// also what the card will be called, because a branch is named by its branch
+// (ADR-034).
 //
 // In `shared/` rather than `main/` because the renderer is what needs it — the
 // new-project dialog prefills from it — and a pure string function does not
@@ -12,9 +14,6 @@ import type { IssueSummary } from '../types/index.js'
 
 /** Long enough to be recognisable, short enough not to wrap a terminal. */
 const MAX_BRANCH_LENGTH = 60
-/** Long enough to tell two projects apart in a 260px sidebar. */
-const MAX_NAME_LENGTH = 50
-
 /** What an issue carries, plus the branch name only some trackers suggest. */
 type IssueLike = IssueSummary & { branchName?: string | null }
 
@@ -68,23 +67,4 @@ export function branchFromIssue(issue: IssueLike): string {
 /** git refuses a ref ending in `.lock`, and the slug can produce one. */
 function stripLock(value: string): string {
   return value.replace(/\.lock$/, '-lock')
-}
-
-/**
- * What the project is called in the sidebar.
- *
- * Not the branch: a branch is for git and a name is for reading, and
- * `andrew/tav-42-unify-linear-connections` in a 260px column tells you
- * nothing that `TAV-42 Unify Linear connections` does not tell you better.
- */
-export function projectNameFromIssue(issue: IssueLike): string {
-  const title = issue.title.trim()
-  if (title.length === 0) return issue.key
-
-  const full = `${issue.key} ${title}`
-  if (full.length <= MAX_NAME_LENGTH) return full
-
-  const cut = full.slice(0, MAX_NAME_LENGTH)
-  const lastSpace = cut.lastIndexOf(' ')
-  return (lastSpace > issue.key.length ? cut.slice(0, lastSpace) : cut).trimEnd()
 }

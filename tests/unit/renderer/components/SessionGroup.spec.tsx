@@ -314,7 +314,7 @@ describe('SessionGroup — the branch is the identity (US2)', () => {
         group={projectGroup}
         collapsed={false}
         onToggleCollapse={onToggleCollapse}
-        branchName={{ primary: 'main', secondary: undefined }}
+        branchName="main"
         isWorktree={false}
         {...props}
       >
@@ -352,23 +352,11 @@ describe('SessionGroup — the branch is the identity (US2)', () => {
     expect(container.querySelector('.session-group__worktree-tag')).toBeNull()
   })
 
-  it('shows the branch alone when the label is just the branch name', () => {
-    const { container } = renderBranch({ branchName: { primary: 'main' } })
-    expect(container.querySelector('.session-group__label')!.textContent).toContain('main')
+  it('names a branch by its branch, and nothing else', () => {
+    const { container } = renderBranch({ branchName: 'andrew/tav-14' })
+    expect(container.querySelector('.session-group__label')!.textContent).toBe('andrew/tav-14')
+    // There is no second name to sit beside it any more.
     expect(container.querySelector('.session-group__branch-secondary')).toBeNull()
-  })
-
-  it('keeps the branch visible beside a human label', () => {
-    const { container } = renderBranch({
-      group: worktreeGroup,
-      branchName: { primary: 'TAV-14 Make all text red', secondary: 'andrew/tav-14' },
-    })
-    expect(container.querySelector('.session-group__label')!.textContent).toContain(
-      'TAV-14 Make all text red'
-    )
-    expect(container.querySelector('.session-group__branch-secondary')!.textContent).toBe(
-      'andrew/tav-14'
-    )
   })
 
   it('renders change statistics when they are available', () => {

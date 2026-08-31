@@ -7,6 +7,7 @@ import { SessionTile } from './SessionTile'
 import type { Project, Workspace, TerminalSession } from '../../../../shared/types/index'
 import { SCRATCH_PROJECT_ID } from '../../../shared/types/index'
 import './OverviewScreen.css'
+import { branchLabel } from '../../sidebar/branch-display'
 
 interface TileData {
   session: TerminalSession
@@ -80,7 +81,7 @@ export function OverviewScreen(): JSX.Element {
       if (aBusy !== bBusy) return aBusy - bBusy
       const wCmp = a.workspace.name.localeCompare(b.workspace.name)
       if (wCmp !== 0) return wCmp
-      const pCmp = a.project.name.localeCompare(b.project.name)
+      const pCmp = branchLabel(a.project).localeCompare(branchLabel(b.project))
       if (pCmp !== 0) return pCmp
       return a.session.tabTitle.localeCompare(b.session.tabTitle)
     })

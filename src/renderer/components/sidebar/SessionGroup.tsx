@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { ChevronDown, ChevronRight, GitBranch, GitFork } from 'lucide-react'
 import type { WorkspaceTabRegistration } from '../../extensions/registry'
 import type { Group } from '../../sidebar/view-model'
-import type { BranchName } from '../../sidebar/branch-display'
 import type { ChangeStats } from '../../../shared/schemas/git.schema'
 import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
 import { issueMenuItems, type IssueMenuActions } from './issue-menu-items'
@@ -15,10 +14,10 @@ export interface SessionGroupProps {
   /** Colour band inherited from the group's workspace. */
   workspaceColor?: string
   /**
-   * How this branch names itself: the branch, or a label with the branch kept
-   * beside it. Passed pre-computed so the component holds no display rule.
+   * What this branch is called — its branch name. Passed pre-computed so the
+   * component holds no display rule.
    */
-  branchName?: BranchName
+  branchName?: string
   /** True when the branch has its own working copy on disk. */
   isWorktree?: boolean
   /** Where that working copy is; revealed on hover.  */
@@ -218,14 +217,9 @@ export function SessionGroup({
           <>
             {/* The label holds the name and nothing else, so it reads cleanly
                 on its own; everything qualifying it sits beside it. */}
-            <span className="session-group__label" title={branchName?.secondary ?? group.label}>
-              {branchName?.primary ?? group.label}
+            <span className="session-group__label" title={branchName ?? group.label}>
+              {branchName ?? group.label}
             </span>
-            {branchName?.secondary && (
-              <span className="session-group__branch-secondary" title={branchName.secondary}>
-                {branchName.secondary}
-              </span>
-            )}
             {workspaceName && (
               <span className="session-group__workspace" title={workspaceName}>
                 {workspaceName}

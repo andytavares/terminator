@@ -123,19 +123,6 @@
   opacity: 0.65;
 }
 
-.session-group__branch-secondary {
-  margin-left: 6px;
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.55;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
 .session-group__repo-path {
   margin-left: 6px;
   /* Absorbs the shrinking so the repo name does not — an unbounded path pushed

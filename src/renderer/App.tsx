@@ -15,6 +15,7 @@ import { useSessionStore } from './stores/session.store'
 import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useExtensionEscapeExit } from './hooks/useExtensionEscapeExit'
+import { useBranchSync } from './hooks/useBranchSync'
 import { installLogInterceptor, useLogStore } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
 import { dispatchNotification } from './lib/notifications'
@@ -297,6 +298,25 @@ export function App(): JSX.Element {
   }
 
   const paletteCommands = [...builtinCommands(), ...extensionCommands]
+
+  /**
+   * A card is named by its branch, so the branch it names has to be the one its
+   * tree is on. Worktree cards are fixed at creation and are left out; the rest
+   * follow whatever the operator checks out in their own terminal.
+   */
+  const branchSyncTargets = useMemo(() => {
+    const folderById = new Map(workspaces.map((w) => [w.id, w.folderPath]))
+    return [...projectsByWorkspaceId.values()]
+      .flat()
+      .filter((p) => !p.isWorktree)
+      .map((p) => ({
+        id: p.id,
+        cwd: p.worktreePath ?? folderById.get(p.workspaceId) ?? '',
+        gitBranch: p.gitBranch,
+      }))
+      .filter((t) => t.cwd !== '')
+  }, [projectsByWorkspaceId, workspaces])
+  useBranchSync(branchSyncTargets)
 
   // Sessions are offered in the existing palette rather than a second overlay.
   const paletteSessions = useMemo(() => {
