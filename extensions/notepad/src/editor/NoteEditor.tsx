@@ -340,3 +340,22 @@ export function scrollToAnchor(view: EditorView | null, from: number, to: number
   })
   view.focus()
 }
+
+/**
+ * Puts the caret at `pos` and lifts it to the top of the viewport, which is how
+ * an outline navigates: `scrollToAnchor`'s default "nearest" strategy would
+ * leave a heading that is already on screen exactly where it was, so clicking
+ * it would look like nothing happened.
+ *
+ * The position is clamped because the outline is derived from the draft body,
+ * which can trail the document by a render when another surface replaces it.
+ */
+export function scrollToPosition(view: EditorView | null, pos: number): void {
+  if (!view) return
+  const clamped = Math.min(pos, view.state.doc.length)
+  view.dispatch({
+    selection: { anchor: clamped },
+    effects: EditorView.scrollIntoView(clamped, { y: 'start' }),
+  })
+  view.focus()
+}
