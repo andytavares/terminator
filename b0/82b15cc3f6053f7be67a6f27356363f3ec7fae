@@ -1,0 +1,74 @@
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_7b3421c914bc00::t_6818f49fe89758 244,250
+tests/unit/renderer/components/SessionGroup.spec.tsx
+  s_7b3421c914bc00::t_6e132a7d497691 317
+  s_7b3421c914bc00::t_3cc9a404d97ac9 355-358
+docs/ARCHITECTURE.md
+  s_7b3421c914bc00::t_659f8c6f432a46 565-567
+  s_7b3421c914bc00::t_08b06c28137a99 553,556-564
+  s_7b3421c914bc00::t_afd1bb801b7c7d 568
+docs/user-guide/USER-GUIDE.md
+  s_7b3421c914bc00::t_08b06c28137a99 98
+tests/unit/renderer/sidebar/branch-display.spec.ts
+  s_7b3421c914bc00::t_98976f836cdde3 3,20-22,25-27,29,32,36-37,43,45,84,90
+src/renderer/components/sidebar/SessionGroup.tsx
+  s_7b3421c914bc00::t_69fc3cac722360 17-18,20,220-221
+tests/unit/integrations/branch-from-issue.spec.ts
+  s_7b3421c914bc00::t_d9c41e7dcac2a9 2
+docs/adr/034-a-branch-is-named-by-its-branch.md
+  s_7b3421c914bc00::t_9a89926583c052 1-10,12-34,37-54
+  s_7b3421c914bc00::t_08b06c28137a99 11
+  s_7b3421c914bc00::t_659f8c6f432a46 35-36
+src/renderer/components/sidebar/MoveSessionDialog.tsx
+  s_7b3421c914bc00::t_1b165fd50b501c 9,154
+src/shared/integrations/branch-from-issue.ts
+  s_7b3421c914bc00::t_3d9c5c6e313194 3,7-9
+src/renderer/App.tsx
+  s_7b3421c914bc00::t_24c193590bad07 18,302-319
+  s_7b3421c914bc00::t_00c674f561448b 320
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_7b3421c914bc00::t_4efd76ff483a82 9,94,126-133,168,200,245,251-270
+  s_7b3421c914bc00::t_3d9c5c6e313194 172-175,206-209
+  s_7b3421c914bc00::t_0d2d8933b5ab7b 160-165
+  s_7b3421c914bc00::t_08b06c28137a99 176-177,210-211
+src/renderer/sidebar/branch-display.ts
+  s_7b3421c914bc00::t_96759872a6c724 7-14,16-18,20-21,42
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_7b3421c914bc00::t_e81adc00797b8c 276,369,453,561-563,565-566,569,571-578,614,656,664,707,779,1009,1122,1130
+src/renderer/components/overview/SessionTile.tsx
+  s_7b3421c914bc00::t_bcc70ca91b6464 11,61,83
+tests/e2e/branch-name.spec.ts
+  s_7b3421c914bc00::t_86819cef084937 51-52,54
+  s_7b3421c914bc00::t_a3f7c90adcd294 1-39,45-50,53,57-78
+  s_7b3421c914bc00::t_5d26a8099883f2 40-44,55-56
+tests/unit/renderer/hooks/useBranchSync.spec.tsx
+  s_7b3421c914bc00::t_fa2b12c442d0bf 13-26,39,47-52,55-57,60,62-63,67,69-70,74-83,87-88,108,118-124,127-131,134-137
+  s_7b3421c914bc00::t_649dcc9f4a822b 31,43,86,92,94,96,99-104,107,109-111,113,115
+  s_7b3421c914bc00::t_08b06c28137a99 4
+  s_7b3421c914bc00::t_a90c42dddebc57 12,138
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_7b3421c914bc00::t_0d2d8933b5ab7b 161-172,532-534,612
+  s_7b3421c914bc00::t_fc11d838e78cc1 137-160,563,569-570,586-588
+src/renderer/hooks/useBranchSync.ts
+  s_7b3421c914bc00::t_128181ca8a0485 4-14,16-32,34,36-39,42,47-53,55-57,63,67,69-71
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_7b3421c914bc00::t_4defdfa14e0abc 12,573,592-599,602,622-626,796,802,835
+src/renderer/components/overview/OverviewScreen.tsx
+  s_7b3421c914bc00::t_bcc70ca91b6464 10,84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "b082b15cc3f6053f7be67a6f27356363f3ec7fae",
+  "prompts": {},
+  "sessions": {
+    "s_7b3421c914bc00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd584800-553c-4e34-8212-80f2239ddc2b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
