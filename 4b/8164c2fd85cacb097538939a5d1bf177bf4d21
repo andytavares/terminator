@@ -1,0 +1,33 @@
+src/renderer/components/sidebar/WorkspaceRow.css
+  s_7b3421c914bc00::t_20d1f24a9ab0cc 15-18,21-23,27-28,31
+docs/ARCHITECTURE.md
+  s_7b3421c914bc00::t_319a96225fb34e 608
+tests/unit/renderer/sidebar-workspace-tint.spec.ts
+  s_7b3421c914bc00::t_d65a6abed0e245 183,190
+  s_7b3421c914bc00::t_c65a264b4e2520 166-168
+  s_7b3421c914bc00::t_a15bd02c7a5f96 15,122,137-155,157,164-165,169-181,184-189,194-195,200
+  s_7b3421c914bc00::t_2a0b4ca48c25cd 156,158-163
+src/renderer/components/sidebar/SessionGroup.css
+  s_7b3421c914bc00::t_2a0b4ca48c25cd 15-20,33-36,38-40,200-201,203-204
+  s_7b3421c914bc00::t_20d1f24a9ab0cc 267-269,272-273
+docs/user-guide/USER-GUIDE.md
+  s_7b3421c914bc00::t_319a96225fb34e 89
+src/renderer/components/sidebar/SessionRow.css
+  s_7b3421c914bc00::t_20d1f24a9ab0cc 12-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "4b8164c2fd85cacb097538939a5d1bf177bf4d21",
+  "prompts": {},
+  "sessions": {
+    "s_7b3421c914bc00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd584800-553c-4e34-8212-80f2239ddc2b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
