@@ -1,0 +1,23 @@
+docs/user-guide/USER-GUIDE.md
+  s_7b3421c914bc00::t_a312b9651fd257 89
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_7b3421c914bc00::t_0d24bfd2094337 532
+docs/ARCHITECTURE.md
+  s_7b3421c914bc00::t_a312b9651fd257 607
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "879c054b69b6e7bbeb8ad515c271c1fcf76a9b09",
+  "prompts": {},
+  "sessions": {
+    "s_7b3421c914bc00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd584800-553c-4e34-8212-80f2239ddc2b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
