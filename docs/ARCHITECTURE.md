@@ -603,6 +603,10 @@ Three tab layers compete for the main content area. Only one is active at a time
 
 Each workspace has a `color` field (hex string). `SessionGroup` sets `style={{ '--ws-color': workspace.color }}` on its root element. All descendant CSS rules (`SessionRow`, etc.) inherit `var(--ws-color)` for accent colors, tinted backgrounds, and border highlights without any prop drilling.
 
+`SessionRow` also sets `--ws-color` on its own root, from a `workspaceColor` prop `UnifiedSidebar` resolves through the session's project (`workspaceColorForSession`). Inheritance alone is not enough: under `status`, `branch` or `none` grouping a group spans workspaces, so its header has no colour to hand down.
+
+The colour is spent as muted `color-mix` washes — the group header, and a session row's hover and selected states — plus left-edge rails on the header and every row. Every mix spells its fallback as `var(--ws-color, transparent)`: a group with no workspace (a status bucket, Scratch) sets no `--ws-color` at all, and an unresolved custom property makes the _whole_ declaration invalid at computed-value time rather than just that term, which would leave the surface with no background. `tests/unit/renderer/sidebar-workspace-tint.spec.ts` reads the real CSS and asserts both the fallback and that each wash is shallow enough to keep the text on it at WCAG AA for all ten preset colours in both themes.
+
 ### Collapse persistence
 
 `useWorkspaceStore` maintains `expandedWorkspaceIds: Set<string>` initialized from `localStorage` key `terminator.workspace.expanded` (JSON array). `toggleWorkspaceCollapse(id)` updates the set and writes back to localStorage. `setExpandedWorkspaceIds(ids)` replaces the entire set (used by `⌘1–9` to expand one workspace and collapse all others).

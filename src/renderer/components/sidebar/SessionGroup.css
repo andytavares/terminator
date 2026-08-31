@@ -22,10 +22,18 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   user-select: none;
+  /* The wash and the rail are the second and third channels saying which
+     workspace this is; the text colour alone was one channel doing all of it.
+     Every mix spells the `transparent` fallback, because a group with no
+     workspace — a status bucket, scratch — sets no --ws-color at all, and an
+     unresolved var voids the whole declaration rather than the one term.
+     The wash is deliberately shallow: the text on it is the same hue. */
+  background: color-mix(in srgb, var(--ws-color, transparent) 10%, transparent);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 70%, transparent);
 }
 
 .session-group__header:hover {
-  background: var(--bg-card-hover);
+  background: color-mix(in srgb, var(--ws-color, transparent) 10%, var(--bg-card-hover));
 }
 
 .session-group__chevron,
@@ -271,7 +279,7 @@
 }
 
 .session-group--active .session-group__header {
-  background: var(--bg-card-hover);
+  background: color-mix(in srgb, var(--ws-color, transparent) 18%, var(--bg-card-hover));
 }
 
 /* ── Width degradation ────────────────────────────────────────

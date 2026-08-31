@@ -86,7 +86,7 @@ The **status bar** at the bottom of the window shows live CPU, Memory, and Netwo
 A workspace maps to a directory on disk — typically a git repository. Each workspace appears as a named, colour-coded card in the left rail. Click a workspace name to expand it in the main sidebar.
 
 - **Create a workspace:** Click `+` in the sidebar header and choose a directory.
-- **Color coding:** Each repo has a distinct accent colour visible on its branch rows and headers.
+- **Color coding:** Each repo has a distinct accent colour, and the sidebar wears it: a branch header is washed in a muted version of that colour and carries it as a left edge marker, each of its session rows repeats the marker, and hovering or selecting a row keeps the highlight in the same hue. A run of rows therefore reads as one workspace's territory at a glance. A session row takes the colour from its own branch, so it stays right even when the sidebar is grouped by status or by branch, where one group holds sessions from several workspaces. Scratch terminals belong to no workspace and stay on the neutral surface.
 - **Keyboard access:** `Cmd+1`–`Cmd+9` focuses and expands the corresponding workspace; `Cmd++` / `Cmd+-` cycles through them.
 - **Toggle sidebar:** `Cmd+B`.
 

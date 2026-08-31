@@ -9,10 +9,17 @@
   font-size: 11px;
   font-family: var(--font-mono);
   user-select: none;
+  /* A faint rail in the workspace's colour, so a run of rows reads as that
+     workspace's territory even when the grouping above them spans several.
+     Rows with no workspace — scratch — resolve it to transparent and keep the
+     flush left edge they had. */
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 30%, transparent);
 }
 
+/* Hover and selection stay in the workspace's hue rather than reverting the row
+   to the neutral card colour, which is where the workspace used to get lost. */
 .session-row:hover {
-  background: var(--bg-card-hover);
+  background: color-mix(in srgb, var(--ws-color, transparent) 14%, var(--bg-card-hover));
   color: var(--text-primary);
 }
 
@@ -20,7 +27,7 @@
    left running, idle and waiting sharing one glyph (FR-001). */
 .session-row--active {
   color: var(--text-primary);
-  background: var(--bg-card-hover);
+  background: color-mix(in srgb, var(--ws-color, transparent) 22%, var(--bg-card-hover));
   box-shadow: inset 2px 0 0 var(--ws-color, var(--accent));
 }
 
