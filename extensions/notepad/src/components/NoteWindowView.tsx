@@ -5,11 +5,13 @@ import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
 import { CommentMargin } from './CommentMargin'
 import { CommentComposer } from './CommentComposer'
+import { NoteOutline } from './NoteOutline'
 import {
   NoteEditor,
   applyAnchors,
   applyExternalDoc,
   scrollToAnchor,
+  scrollToPosition,
   setEditorHoverAnchor,
   type SelectionAnchor,
 } from '../editor/NoteEditor'
@@ -41,6 +43,7 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
   const [panelContentHeight, setPanelContentHeight] = useState(0)
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
+  const [showOutline, setShowOutline] = useState(true)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
@@ -350,6 +353,13 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
           >
             {previewMode ? 'Markdown' : 'Live'}
           </button>
+          <button
+            className="notepad-btn-ghost"
+            onClick={() => setShowOutline((v) => !v)}
+            title={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
+          >
+            {showOutline ? 'Hide outline' : 'Outline'}
+          </button>
           {note.tags.length > 0 && (
             <div className="notepad-window__tags">
               {note.tags.map((t) => (
@@ -425,32 +435,40 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
             </div>
           )}
         </div>
-        <div className="notepad-view__comments" ref={commentPanelRef}>
-          {composingAnchor && (
-            <CommentComposer
-              anchor={{
-                noteId: NOTE_ID,
-                from: composingAnchor.from,
-                to: composingAnchor.to,
-                quote: composingAnchor.quote,
-                prefix: composingAnchor.prefix,
-                suffix: composingAnchor.suffix,
-              }}
-              onClose={() => setComposingAnchor(null)}
-              onCreated={() => {
-                setComposingAnchor(null)
-                reloadComments()
-              }}
+        <div className="notepad-view__rail">
+          {showOutline && (
+            <NoteOutline
+              onSelect={(pos) => scrollToPosition(editorViewRef.current, pos)}
+              onClose={() => setShowOutline(false)}
             />
           )}
-          <CommentMargin
-            noteId={NOTE_ID}
-            anchorTops={anchorTops}
-            containerHeight={panelContentHeight}
-            activeCommentId={activeCommentId}
-            onCommentClick={(from, to) => scrollToAnchor(editorViewRef.current, from, to)}
-            onHoverComment={(id) => setEditorHoverAnchor(editorViewRef.current, id)}
-          />
+          <div className="notepad-view__comments" ref={commentPanelRef}>
+            {composingAnchor && (
+              <CommentComposer
+                anchor={{
+                  noteId: NOTE_ID,
+                  from: composingAnchor.from,
+                  to: composingAnchor.to,
+                  quote: composingAnchor.quote,
+                  prefix: composingAnchor.prefix,
+                  suffix: composingAnchor.suffix,
+                }}
+                onClose={() => setComposingAnchor(null)}
+                onCreated={() => {
+                  setComposingAnchor(null)
+                  reloadComments()
+                }}
+              />
+            )}
+            <CommentMargin
+              noteId={NOTE_ID}
+              anchorTops={anchorTops}
+              containerHeight={panelContentHeight}
+              activeCommentId={activeCommentId}
+              onCommentClick={(from, to) => scrollToAnchor(editorViewRef.current, from, to)}
+              onHoverComment={(id) => setEditorHoverAnchor(editorViewRef.current, id)}
+            />
+          </div>
         </div>
       </div>
     </div>

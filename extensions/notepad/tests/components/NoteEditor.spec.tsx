@@ -17,6 +17,10 @@ vi.mock('@codemirror/view', () => {
   ;(EditorView as unknown as Record<string, unknown>).updateListener = { of: vi.fn(() => ({})) }
   ;(EditorView as unknown as Record<string, unknown>).theme = vi.fn(() => ({}))
   ;(EditorView as unknown as Record<string, unknown>).lineWrapping = {}
+  ;(EditorView as unknown as Record<string, unknown>).scrollIntoView = vi.fn((pos, opts) => ({
+    scrollTo: pos,
+    opts,
+  }))
   return {
     EditorView,
     keymap: { of: vi.fn(() => ({})) },
@@ -89,6 +93,7 @@ import {
   applyAnchors,
   setEditorHoverAnchor,
   scrollToAnchor,
+  scrollToPosition,
 } from '../../src/editor/NoteEditor'
 import type { EditorView } from '@codemirror/view'
 
@@ -176,5 +181,38 @@ describe('scrollToAnchor', () => {
 
   it('does nothing when view is null', () => {
     expect(() => scrollToAnchor(null, 0, 5)).not.toThrow()
+  })
+})
+
+describe('scrollToPosition', () => {
+  function viewWithDoc(length: number) {
+    return {
+      state: { doc: { length } },
+      dispatch: vi.fn(),
+      focus: vi.fn(),
+    } as unknown as EditorView
+  }
+
+  it('puts the caret at the position and scrolls it to the top of the viewport', () => {
+    const mockView = viewWithDoc(100)
+    scrollToPosition(mockView, 42)
+    expect(mockView.dispatch).toHaveBeenCalledWith({
+      selection: { anchor: 42 },
+      effects: { scrollTo: 42, opts: { y: 'start' } },
+    })
+    expect(mockView.focus).toHaveBeenCalled()
+  })
+
+  it('clamps past the end of the document, so a stale outline offset cannot throw', () => {
+    const mockView = viewWithDoc(10)
+    scrollToPosition(mockView, 999)
+    expect(mockView.dispatch).toHaveBeenCalledWith({
+      selection: { anchor: 10 },
+      effects: { scrollTo: 10, opts: { y: 'start' } },
+    })
+  })
+
+  it('does nothing when view is null', () => {
+    expect(() => scrollToPosition(null, 0)).not.toThrow()
   })
 })

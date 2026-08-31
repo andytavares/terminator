@@ -475,3 +475,23 @@ describe('SessionRow — SC-001: the four states survive greyscale', () => {
     expect(new Set(shapes).size).toBe(4)
   })
 })
+
+describe('SessionRow — the workspace it belongs to', () => {
+  it('carries its own workspace colour, not the one its group happens to hand down', () => {
+    // Grouped by status or branch, a group spans workspaces and has no colour
+    // to give — so the row has to set --ws-color itself.
+    const { container } = render(<SessionRow {...defaultProps} session={makeSession()} />)
+    const row = container.querySelector<HTMLElement>('.session-row')!
+    expect(row.style.getPropertyValue('--ws-color')).toBe('#5c6bc0')
+  })
+
+  it('sets no colour for a session that belongs to no workspace', () => {
+    // A scratch terminal. The washes fall back to transparent, which is what
+    // keeps its row on the neutral surface.
+    const { container } = render(
+      <SessionRow {...defaultProps} workspaceColor="" session={makeSession()} />
+    )
+    const row = container.querySelector<HTMLElement>('.session-row')!
+    expect(row.style.getPropertyValue('--ws-color')).toBe('')
+  })
+})

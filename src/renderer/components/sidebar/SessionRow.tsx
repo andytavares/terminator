@@ -13,6 +13,11 @@ interface SessionRowProps {
   isActive: boolean
   isBusy: boolean
   bellCount: number
+  /**
+   * The session's own workspace colour, or '' when it belongs to none. Set on
+   * the row rather than inherited from the group, because a group keyed by
+   * status or branch spans workspaces and has no colour to hand down.
+   */
   workspaceColor: string
   onSelect: () => void
   onRename: (newTitle: string) => void
@@ -47,6 +52,7 @@ export function SessionRow({
   isActive,
   isBusy,
   bellCount,
+  workspaceColor,
   onSelect,
   onRename,
   isSubSession,
@@ -130,6 +136,11 @@ export function SessionRow({
     <>
       <div
         className={`session-row${isActive ? ' session-row--active' : ''}${isSubSession ? ' session-row--sub' : ''}${needsYou ? ' session-row--needs-you' : ''}`}
+        style={
+          workspaceColor
+            ? ({ ['--ws-color' as string]: workspaceColor } as React.CSSProperties)
+            : undefined
+        }
         onClick={onSelect}
         onDoubleClick={startRename}
         onContextMenu={handleContextMenu}

@@ -6,6 +6,7 @@ import { useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
 import { NoteList } from './NoteList'
+import { NoteOutline } from './NoteOutline'
 import { EmptyState } from './EmptyState'
 import { DiagramView } from './DiagramView'
 import { CommentMargin } from './CommentMargin'
@@ -17,6 +18,7 @@ import {
   applyAnchors,
   applyExternalDoc,
   scrollToAnchor,
+  scrollToPosition,
   setEditorHoverAnchor,
   type SelectionAnchor,
 } from '../editor/NoteEditor'
@@ -48,6 +50,7 @@ export function NotepadView(): React.JSX.Element {
   const [showExport, setShowExport] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showComments, setShowComments] = useState(true)
+  const [showOutline, setShowOutline] = useState(true)
   const [readingMode, setReadingMode] = useState(false)
   const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null)
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
@@ -606,6 +609,13 @@ export function NotepadView(): React.JSX.Element {
             {readingMode ? 'Edit' : 'Read'}
           </button>
           <button
+            className={`notepad-btn-ghost${showOutline ? ' notepad-view__comments-toggle--on' : ''}`}
+            onClick={() => setShowOutline((v) => !v)}
+            title={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
+          >
+            {showOutline ? 'Hide outline' : 'Outline'}
+          </button>
+          <button
             className={`notepad-btn-ghost${showComments ? ' notepad-view__comments-toggle--on' : ''}`}
             onClick={() => setShowComments((v) => !v)}
             title={showComments ? 'Hide comments' : 'Show comments'}
@@ -689,42 +699,53 @@ export function NotepadView(): React.JSX.Element {
           <div className="notepad-view__no-selection">Select a note to start editing</div>
         )}
       </div>
-      <div className="notepad-view__comments" ref={commentPanelRef} hidden={!showComments}>
-        {selectedNoteId && (
-          <>
-            {composingAnchor && (
-              <CommentComposer
-                anchor={{
-                  noteId: selectedNoteId,
-                  from: composingAnchor.from,
-                  to: composingAnchor.to,
-                  quote: composingAnchor.quote,
-                  prefix: composingAnchor.prefix,
-                  suffix: composingAnchor.suffix,
-                }}
-                onClose={() => setComposingAnchor(null)}
-                onCreated={() => {
-                  setComposingAnchor(null)
-                  window.electronAPI.extensionBridge
-                    .invoke('terminator.notepad:comments.list', { noteId: selectedNoteId })
-                    .then((r) => {
-                      const data = (r as { data?: Comment[] }).data
-                      if (data) setComments(data)
-                    })
-                    .catch(console.error)
-                }}
-              />
-            )}
-            <CommentMargin
-              noteId={selectedNoteId}
-              anchorTops={anchorTops}
-              containerHeight={panelContentHeight}
-              activeCommentId={activeCommentId}
-              onCommentClick={(from, to) => scrollToAnchor(editorViewRef.current, from, to)}
-              onHoverComment={(id) => setEditorHoverAnchor(editorViewRef.current, id)}
-            />
-          </>
+      <div
+        className="notepad-view__rail"
+        hidden={!selectedNoteId || (!showOutline && !showComments)}
+      >
+        {selectedNoteId && showOutline && (
+          <NoteOutline
+            onSelect={(pos) => scrollToPosition(editorViewRef.current, pos)}
+            onClose={() => setShowOutline(false)}
+          />
         )}
+        <div className="notepad-view__comments" ref={commentPanelRef} hidden={!showComments}>
+          {selectedNoteId && (
+            <>
+              {composingAnchor && (
+                <CommentComposer
+                  anchor={{
+                    noteId: selectedNoteId,
+                    from: composingAnchor.from,
+                    to: composingAnchor.to,
+                    quote: composingAnchor.quote,
+                    prefix: composingAnchor.prefix,
+                    suffix: composingAnchor.suffix,
+                  }}
+                  onClose={() => setComposingAnchor(null)}
+                  onCreated={() => {
+                    setComposingAnchor(null)
+                    window.electronAPI.extensionBridge
+                      .invoke('terminator.notepad:comments.list', { noteId: selectedNoteId })
+                      .then((r) => {
+                        const data = (r as { data?: Comment[] }).data
+                        if (data) setComments(data)
+                      })
+                      .catch(console.error)
+                  }}
+                />
+              )}
+              <CommentMargin
+                noteId={selectedNoteId}
+                anchorTops={anchorTops}
+                containerHeight={panelContentHeight}
+                activeCommentId={activeCommentId}
+                onCommentClick={(from, to) => scrollToAnchor(editorViewRef.current, from, to)}
+                onHoverComment={(id) => setEditorHoverAnchor(editorViewRef.current, id)}
+              />
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

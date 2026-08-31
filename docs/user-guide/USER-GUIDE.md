@@ -86,7 +86,7 @@ The **status bar** at the bottom of the window shows live CPU, Memory, and Netwo
 A workspace maps to a directory on disk — typically a git repository. Each workspace appears as a named, colour-coded card in the left rail. Click a workspace name to expand it in the main sidebar.
 
 - **Create a workspace:** Click `+` in the sidebar header and choose a directory.
-- **Color coding:** Each repo has a distinct accent colour visible on its branch rows and headers.
+- **Color coding:** Each repo has a distinct accent colour, and the sidebar wears it: a branch header is washed in a muted version of that colour and carries it as a left edge marker, each of its session rows repeats the marker, and hovering or selecting a row keeps the highlight in the same hue. A run of rows therefore reads as one workspace's territory at a glance. A session row takes the colour from its own branch, so it stays right even when the sidebar is grouped by status or by branch, where one group holds sessions from several workspaces. Scratch terminals belong to no workspace and stay on the neutral surface.
 - **Keyboard access:** `Cmd+1`–`Cmd+9` focuses and expands the corresponding workspace; `Cmd++` / `Cmd+-` cycles through them.
 - **Toggle sidebar:** `Cmd+B`.
 
@@ -590,6 +590,7 @@ The **new item dialog** offers three types:
 ### Note features
 
 - **Live preview** — toggle between edit and rendered Markdown view.
+- **Outline** — the open note's headings, in the right rail above the comments, nested by heading level. Click one to jump the editor to that heading. With the comments open the two split the rail evenly — half each, whatever either one holds; with one closed the other takes the whole rail. Close the outline from the button in its header and bring it back with **Outline** in the toolbar; closing both gives the whole width to the editor. The same panel is in a popped-out note window. Headings inside fenced code blocks are not listed, and depth is measured from the note's own top heading, so a note that starts at `##` is not indented for it.
 - **Margin comments** — pin comments at any position in the note body.
 - **Full-text search** — type in the search bar to filter notes by content.
 - **Multi-tag filter** — click the Tags button in the sidebar to open a multiselect dropdown and filter by one or more tags simultaneously.

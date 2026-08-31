@@ -334,6 +334,17 @@ export function UnifiedSidebar({
   const projectById = useMemo(() => new Map(allProjects.map((p) => [p.id, p])), [allProjects])
   const workspaceById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
 
+  /**
+   * A session's workspace colour, resolved through its own project rather than
+   * through its group. Grouped by status or branch a group spans workspaces, so
+   * the group has no colour to hand down and the row has to look its own up.
+   * Empty for a scratch terminal, which belongs to no workspace.
+   */
+  function workspaceColorForSession(projectId: string): string {
+    const workspaceId = projectById.get(projectId)?.workspaceId
+    return (workspaceId === undefined ? undefined : workspaceById.get(workspaceId)?.color) ?? ''
+  }
+
   // FR-027 lists three ways to reach a scope action: the group header, the row
   // scope menu, and the command palette. This is the third.
   const registerCommand = useExtensionRegistry((s) => s.registerCommand)
@@ -609,7 +620,7 @@ export function UnifiedSidebar({
                 isActive={projectViews.get(session.projectId)?.activeSessionId === session.id}
                 isBusy={isSessionBusy(session.id)}
                 bellCount={getBellCountForSession(session.id)}
-                workspaceColor={workspace?.color ?? ''}
+                workspaceColor={workspaceColorForSession(session.projectId)}
                 now={clock}
                 projectBadge={
                   group.scope?.kind === 'project'
@@ -742,7 +753,7 @@ export function UnifiedSidebar({
                     isActive={activeScratchSessionId === session.id}
                     isBusy={isSessionBusy(session.id)}
                     bellCount={getBellCountForSession(session.id)}
-                    workspaceColor=""
+                    workspaceColor={workspaceColorForSession(session.projectId)}
                     now={clock}
                     onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
                     onSelect={() => onSelectScratchSession(session.id)}
