@@ -12,17 +12,23 @@
   align-items: center;
   gap: 4px;
   padding-left: 0;
+  /* The row closes its workspace's run, so it stands on the same surface the
+     rows above it do — at the same strength, or the column would end a row
+     early. */
+  background: color-mix(in srgb, var(--ws-color, transparent) 5%, transparent);
 }
 
+/* Full height and no radius: this is the last segment of the rail that runs
+   down every header and row above it, so it has to meet them end to end. Its
+   strength matches the rows' rail for the same reason. */
 .ws-row__band {
   position: absolute;
   left: 0;
-  top: 4px;
-  bottom: 4px;
+  top: 0;
+  bottom: 0;
   width: 2px;
-  border-radius: 1px;
   background: var(--ws-color, var(--accent));
-  opacity: 0.55;
+  opacity: 0.3;
 }
 
 .ws-row__add {

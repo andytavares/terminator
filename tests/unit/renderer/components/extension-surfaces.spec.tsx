@@ -25,9 +25,6 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({ useBranchSync: vi.fn() }))
-vi.mock('../../../../src/renderer/components/sidebar/BranchSwitcher', () => ({
-  BranchSwitcher: () => <div data-testid="branch-switcher" />,
-}))
 vi.mock('../../../../src/renderer/components/sidebar/CreateProjectDialog', () => ({
   CreateProjectDialog: () => null,
 }))
@@ -244,13 +241,13 @@ describe('scope actions are reachable from the command palette (FR-027)', () => 
   it('registers a new-terminal command per project', () => {
     renderSidebar('project')
     const labels = mockRegistryState.registerCommand.mock.calls.map((c) => c[0].label)
-    expect(labels).toContain('New terminal — Backend · API')
+    expect(labels).toContain('New terminal — Backend · main')
   })
 
   it('creates the session when the palette command runs', () => {
     renderSidebar('project')
     const command = mockRegistryState.registerCommand.mock.calls.find(
-      (c) => c[0].label === 'New terminal — Backend · API'
+      (c) => c[0].label === 'New terminal — Backend · main'
     )![0]
     command.action()
     expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)

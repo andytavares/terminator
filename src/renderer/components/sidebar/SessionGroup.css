@@ -12,9 +12,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 22px;
-  padding: 0 var(--sidebar-gutter, 10px);
-  margin-top: 6px;
+  /* The space above a header is padding, not margin, so the wash and the rail
+     run through it instead of stopping at it. A group with no colour is
+     unchanged by that: 6px of its own transparent surface looks exactly like
+     the 6px of bare sidebar a margin gave it. */
+  height: 28px;
+  padding: 6px var(--sidebar-gutter, 10px) 0;
   cursor: pointer;
   color: var(--ws-color, var(--text-secondary));
   font-size: 10px;
@@ -27,7 +30,10 @@
      Every mix spells the `transparent` fallback, because a group with no
      workspace — a status bucket, scratch — sets no --ws-color at all, and an
      unresolved var voids the whole declaration rather than the one term.
-     The wash is deliberately shallow: the text on it is the same hue. */
+     The wash is deliberately shallow: the text on it is the same hue.
+     No rule across the top: one group is separated from the next by its own
+     colour and by the step in wash strength, not by a line drawn between
+     them. */
   background: color-mix(in srgb, var(--ws-color, transparent) 10%, transparent);
   box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 70%, transparent);
 }
@@ -117,19 +123,6 @@
   opacity: 0.65;
 }
 
-.session-group__branch-secondary {
-  margin-left: 6px;
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.55;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
 .session-group__repo-path {
   margin-left: 6px;
   /* Absorbs the shrinking so the repo name does not — an unbounded path pushed
@@ -189,9 +182,13 @@
 }
 
 /* The project layer inside a workspace group: indented, and quieter than the
-   workspace header above it. */
+   workspace header above it. It sits closer to what it belongs to — the same
+   2px it always did, now as painted padding rather than a gap. Indentation and
+   type size are what separate it from that header; a rule between them read as
+   the tint being cut, which is the thing this file exists to avoid. */
 .session-group--nested > .session-group__header {
-  margin-top: 2px;
+  height: 24px;
+  padding-top: 2px;
   padding-left: var(--sidebar-content-indent, 20px);
   letter-spacing: 0.04em;
   text-transform: none;
@@ -252,17 +249,6 @@
 .session-group__ws-tab--active {
   opacity: 1;
   background: var(--bg-card-hover);
-}
-
-.session-group__branch-row {
-  padding: 2px var(--sidebar-gutter, 10px) 4px var(--sidebar-content-indent, 20px);
-}
-
-/* The switcher is a secondary control here, not a form field. */
-.session-group__branch-row :is(button, select, .branch-switcher__trigger) {
-  height: 22px;
-  min-height: 0;
-  font-size: 10px;
 }
 
 .session-group__rename-input {

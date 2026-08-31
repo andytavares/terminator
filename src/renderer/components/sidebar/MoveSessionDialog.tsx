@@ -6,6 +6,7 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { useModalEffect } from '../../stores/modal.store'
 import './Dialog.css'
 import './MoveSessionDialog.css'
+import { branchLabel } from '../../sidebar/branch-display'
 
 interface Props {
   sessionId: string
@@ -150,7 +151,7 @@ export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.E
                         onClick={() => void handleSelectProject(project.id, ws.id)}
                         disabled={project.id === currentProjectId}
                       >
-                        {project.name}
+                        {branchLabel(project)}
                         {project.id === currentProjectId && (
                           <span className="move-session-dialog__current-label">current</span>
                         )}

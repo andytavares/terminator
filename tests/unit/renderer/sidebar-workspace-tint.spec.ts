@@ -12,6 +12,7 @@ import { WORKSPACE_PRESET_COLORS } from '../../../src/renderer/components/sideba
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
 
 const GROUP_CSS = read('../../../src/renderer/components/sidebar/SessionGroup.css')
+const WS_CSS = read('../../../src/renderer/components/sidebar/WorkspaceRow.css')
 const ROW_CSS = read('../../../src/renderer/components/sidebar/SessionRow.css')
 const ROW_TSX = read('../../../src/renderer/components/sidebar/SessionRow.tsx')
 const SIDEBAR_TSX = read('../../../src/renderer/components/sidebar/UnifiedSidebar.tsx')
@@ -118,7 +119,7 @@ describe('the sidebar wears its workspace colour', () => {
     // Scratch terminals and status buckets set no --ws-color. The fallback has
     // to be spelled on every wash, or the whole declaration is dropped as
     // invalid at computed-value time and the surface loses its background.
-    for (const css of [GROUP_CSS, ROW_CSS]) {
+    for (const css of [GROUP_CSS, ROW_CSS, WS_CSS]) {
       const mixes = [...css.matchAll(/color-mix\(in srgb,\s*var\(--ws-color[^)]*\)/g)]
       expect(mixes.length).toBeGreaterThan(0)
       for (const [text] of mixes) expect(text).toContain('var(--ws-color, transparent)')
@@ -133,18 +134,62 @@ describe('the sidebar wears its workspace colour', () => {
   })
 })
 
+describe('the colour runs unbroken down the column', () => {
+  // Every surface between a group's header and the row that closes its run has
+  // to be painted. Where one was not, the workspace's territory showed a hole
+  // straight through to the sidebar, which reads as the tint being broken
+  // rather than as the column ending.
+
+  it('washes a row at rest, not only under the cursor', () => {
+    const rest = wash(ROW_CSS, '.session-row').percent
+    expect(rest).toBeGreaterThan(0)
+    expect(rest).toBeLessThan(wash(ROW_CSS, '.session-row:hover').percent)
+  })
+
+  it('separates one group from the next without a line or a hole', () => {
+    // The margin sat outside the border box, so both the wash and the inset
+    // rail stopped at it. The same space is padding now — and it stays a plain
+    // step in colour: a rule drawn across the top of a header reads as the tint
+    // being cut, which is the whole thing this file is guarding.
+    const header = ruleBody(GROUP_CSS, '.session-group__header')
+    expect(header).not.toMatch(/margin-top:/)
+    expect(header).toMatch(/padding: 6px/)
+    expect(header).not.toMatch(/inset 0 1px/)
+    expect(header).not.toMatch(/border-(top|bottom):/)
+    expect(ruleBody(GROUP_CSS, '.session-group--nested > .session-group__header')).not.toMatch(
+      /margin-top:|inset 0 1px|border-(top|bottom):/
+    )
+  })
+
+  it('runs the workspace row band the full height of its row', () => {
+    const band = ruleBody(WS_CSS, '.ws-row__band')
+    expect(band).toMatch(/top:\s*0;/)
+    expect(band).toMatch(/bottom:\s*0;/)
+  })
+
+  it('washes the workspace row that closes the run', () => {
+    expect(wash(WS_CSS, '.ws-row').percent).toBeGreaterThan(0)
+  })
+})
+
 describe('the wash stays a tint (WCAG AA)', () => {
-  const NEUTRAL_SURFACES = ['.session-row:hover', '.session-row--active'] as const
+  const WASHED: { css: string; selector: string; textFrom?: string }[] = [
+    { css: ROW_CSS, selector: '.session-row' },
+    { css: ROW_CSS, selector: '.session-row:hover' },
+    { css: ROW_CSS, selector: '.session-row--active' },
+    // The workspace row's colour is on the button that fills it, not the row.
+    { css: WS_CSS, selector: '.ws-row', textFrom: '.ws-row__add' },
+  ]
 
   for (const [theme, block] of THEMES) {
     it(`${theme}: row text clears AA on every washed surface, for every preset`, () => {
-      for (const selector of NEUTRAL_SURFACES) {
-        const spec = wash(ROW_CSS, selector)
+      for (const { css, selector, textFrom } of WASHED) {
+        const spec = wash(css, selector)
         const base = surface(block, spec.over)
         // The token the rule itself sets, so changing the row's text colour
         // moves this check with it instead of leaving it measuring a colour
         // that no longer renders there.
-        const text = toRgb(token(block, textToken(ROW_CSS, selector)))
+        const text = toRgb(token(block, textToken(css, textFrom ?? selector)))
         for (const preset of WORKSPACE_PRESET_COLORS) {
           expect(
             contrast(text, mix(preset, spec.percent, base)),

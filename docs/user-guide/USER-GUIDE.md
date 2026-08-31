@@ -86,7 +86,7 @@ The **status bar** at the bottom of the window shows live CPU, Memory, and Netwo
 A workspace maps to a directory on disk — typically a git repository. Each workspace appears as a named, colour-coded card in the left rail. Click a workspace name to expand it in the main sidebar.
 
 - **Create a workspace:** Click `+` in the sidebar header and choose a directory.
-- **Color coding:** Each repo has a distinct accent colour, and the sidebar wears it: a branch header is washed in a muted version of that colour and carries it as a left edge marker, each of its session rows repeats the marker, and hovering or selecting a row keeps the highlight in the same hue. A run of rows therefore reads as one workspace's territory at a glance. A session row takes the colour from its own branch, so it stays right even when the sidebar is grouped by status or by branch, where one group holds sessions from several workspaces. Scratch terminals belong to no workspace and stay on the neutral surface.
+- **Color coding:** Each repo has a distinct accent colour, and the sidebar wears it: a branch header is washed in a muted version of that colour, and the wash and its left-edge marker carry on unbroken down every row beneath it — each session, and the `+ New branch` row that closes the run — with hovering or selecting a row keeping the highlight in the same hue. A workspace's rows therefore read as one continuous territory, and the next workspace begins where the colour changes — no gaps and no dividing lines. A session row takes the colour from its own branch, so it stays right even when the sidebar is grouped by status or by branch, where one group holds sessions from several workspaces. Scratch terminals belong to no workspace and stay on the neutral surface.
 - **Keyboard access:** `Cmd+1`–`Cmd+9` focuses and expands the corresponding workspace; `Cmd++` / `Cmd+-` cycles through them.
 - **Toggle sidebar:** `Cmd+B`.
 
@@ -95,6 +95,7 @@ A workspace maps to a directory on disk — typically a git repository. Each wor
 Projects live inside a workspace and hold one or more terminal sessions scoped to a task or branch.
 
 - **Create a branch:** Click `+ New branch` under any repo. A branch can be a plain checkout or its own git worktree; the sidebar marks which with a distinct glyph.
+- **Naming:** A branch is named by its branch — there is nothing else to name and nothing to rename. Check out a different branch in a plain checkout's own terminal and its card follows within a moment. A worktree's branch is fixed when you create it. (A workspace whose folder is not a git repository has no branch to take a name from, so there you are asked for one and can rename it.)
 - **Sessions per branch:** A branch can hold multiple named terminal tabs. Sessions are grouped under the branch in the sidebar, and the session tab bar states which branch's terminals it is showing.
 - **Per-workspace settings:** Theme, scrollback limit, and default shell can be overridden per workspace via Settings.
 

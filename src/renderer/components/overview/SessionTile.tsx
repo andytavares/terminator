@@ -8,6 +8,7 @@ import type {
 import { ActivitySpinner } from '../ActivitySpinner'
 import { useSessionStore } from '../../stores/session.store'
 import './SessionTile.css'
+import { branchLabel } from '../../sidebar/branch-display'
 
 function formatRss(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
@@ -57,7 +58,7 @@ function SessionTileInner({
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') onNavigate()
       }}
-      aria-label={`Switch to ${project.name} — ${session.tabTitle}`}
+      aria-label={`Switch to ${branchLabel(project)} — ${session.tabTitle}`}
     >
       <div className="session-tile__thumb">
         <div ref={previewRef} className="session-tile__preview" />
@@ -79,7 +80,7 @@ function SessionTileInner({
       <div className="session-tile__footer">
         <div className="session-tile__header">
           <span className="session-tile__workspace">{workspace.name}</span>
-          <span className="session-tile__project">{project.name}</span>
+          <span className="session-tile__project">{branchLabel(project)}</span>
           <span className="session-tile__tab">{session.tabTitle}</span>
         </div>
 

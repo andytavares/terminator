@@ -534,7 +534,6 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 │       ├── SessionGroup[] — under workspace grouping only: one nested project group
 │       │     per project of that workspace, rendered by the same component so a
 │       │     project keeps its header actions without changing the grouping
-│       ├── BranchSwitcher (branch groups only)
 │       └── SessionRow[] — state glyph / spinner / bell, relative activity, optional
 │             note, branch badge (which opens ScopeMenu when the header does not
 │             already name the branch), and a needs-you edge bar + pill.
@@ -551,8 +550,21 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 `src/renderer/sidebar/` holds the pure core: `view-model.ts` (`buildGroups`, `isStale`),
 `views.ts` (built-in views as data + persistence — Everything, the default view, groups
 by workspace), `agent-state.ts`, `session-status.ts` (state → glyph/label, total over
-`AgentState`), `branch-display.ts` (`displayName`, `abbreviatePath`,
+`AgentState`), `branch-display.ts` (`branchLabel`, `abbreviatePath`,
 `qualifiedBranchLabel`), `collapse-state.ts`, and `relative-time.ts`.
+
+### A branch is named by its branch
+
+`branchLabel(project)` returns `project.gitBranch`, and every surface that names a branch —
+group header, session row badge, scope menu, move and link dialogs, removal confirmation,
+overview tiles, command palette — goes through it. `Project.name` is read only when there
+is no branch to read instead, which is a workspace whose folder is not a git repository;
+that is also the only case where the create dialog asks for a name and the header context
+menu offers Rename. `useBranchSync`, called from `App` over every non-worktree project,
+keeps `gitBranch` equal to the branch the working tree is actually on, so a `git switch` in
+a branch's own terminal renames its card within five seconds. It polls, because
+`fs:changed` never fires — nothing calls `fs.watchStart` — and a hidden window is not
+polled at all. See ADR 034.
 
 ### Change statistics sit beside the pure layer, not in it
 
@@ -605,7 +617,7 @@ Each workspace has a `color` field (hex string). `SessionGroup` sets `style={{ '
 
 `SessionRow` also sets `--ws-color` on its own root, from a `workspaceColor` prop `UnifiedSidebar` resolves through the session's project (`workspaceColorForSession`). Inheritance alone is not enough: under `status`, `branch` or `none` grouping a group spans workspaces, so its header has no colour to hand down.
 
-The colour is spent as muted `color-mix` washes — the group header, and a session row's hover and selected states — plus left-edge rails on the header and every row. Every mix spells its fallback as `var(--ws-color, transparent)`: a group with no workspace (a status bucket, Scratch) sets no `--ws-color` at all, and an unresolved custom property makes the _whole_ declaration invalid at computed-value time rather than just that term, which would leave the surface with no background. `tests/unit/renderer/sidebar-workspace-tint.spec.ts` reads the real CSS and asserts both the fallback and that each wash is shallow enough to keep the text on it at WCAG AA for all ten preset colours in both themes.
+The colour is spent as muted `color-mix` washes and left-edge rails, and it runs the whole column without a break: the group header at 10%, everything under it — the session rows at rest, and the workspace's `+ New branch` row that closes the run — at 5%, and a row's hover and selected states at 14% and 22%. Continuity is the point: an unpainted element in the middle of a run reads as the tint breaking rather than as the run ending, so the space above a header is `padding` rather than `margin` (a margin sits outside the border box, which cut both the wash and the rail). Nothing is drawn between one group and the next — the change of colour and the step in wash strength are the separation; a rule across a header reads as the tint being cut, which is the thing the continuity is for. A group with no colour is unaffected by that: its 6px of transparent padding looks exactly like the 6px of bare sidebar the margin gave it. Every mix spells its fallback as `var(--ws-color, transparent)`: a group with no workspace (a status bucket, Scratch) sets no `--ws-color` at all, and an unresolved custom property makes the _whole_ declaration invalid at computed-value time rather than just that term, which would leave the surface with no background. `tests/unit/renderer/sidebar-workspace-tint.spec.ts` reads the real CSS and asserts both the fallback and that each wash is shallow enough to keep the text on it at WCAG AA for all ten preset colours in both themes.
 
 ### Collapse persistence
 

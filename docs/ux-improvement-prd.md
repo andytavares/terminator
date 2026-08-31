@@ -496,7 +496,6 @@ Animate with a shimmer effect (`background: linear-gradient(90deg, transparent, 
 | `WorkspaceTile`               | No keyboard activation                   | Add `tabIndex={0}` + `onKeyDown` Enter/Space handler                   |
 | `ProjectCard`                 | No `role` attribute                      | `role="option"` in a `role="listbox"` parent                           |
 | `TabBar` tabs                 | No `role="tab"`                          | Wrap in `role="tablist"`, each tab gets `role="tab"` + `aria-selected` |
-| `BranchSwitcher` dropdown     | No `role="listbox"`                      | Add ARIA listbox pattern                                               |
 | Settings panel nav            | No `role="navigation"`                   | Add `role="navigation"` to the sidebar nav                             |
 | `ConfirmDialog` (to-be-built) | Needs focus trap                         | Use a `FocusTrap` wrapper to prevent Tab-escaping the modal            |
 | Color-only status indicators  | Risk dots convey meaning via color alone | Add text label or `aria-label` to every risk dot                       |

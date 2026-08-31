@@ -9,10 +9,13 @@
   font-size: 11px;
   font-family: var(--font-mono);
   user-select: none;
-  /* A faint rail in the workspace's colour, so a run of rows reads as that
-     workspace's territory even when the grouping above them spans several.
-     Rows with no workspace — scratch — resolve it to transparent and keep the
-     flush left edge they had. */
+  /* A faint rail and a fainter wash in the workspace's colour, so a run of
+     rows reads as that workspace's territory even when the grouping above them
+     spans several. The wash is at rest, not only under the cursor: without it
+     the rows were the one unpainted stretch of an otherwise washed column.
+     Rows with no workspace — scratch — resolve both to transparent and keep the
+     flush left edge and the bare surface they had. */
+  background: color-mix(in srgb, var(--ws-color, transparent) 5%, transparent);
   box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 30%, transparent);
 }
 
