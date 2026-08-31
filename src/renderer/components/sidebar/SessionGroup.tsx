@@ -40,12 +40,6 @@ export interface SessionGroupProps {
   /** True for a project group rendered inside its workspace's group. */
   nested?: boolean
   busy?: boolean
-  /**
-   * Rendered under the header, but only for the project you are working in.
-   * On every group at once it dominated the list; the design keeps the resting
-   * state to project names and sessions.
-   */
-  branchSwitcher?: React.ReactNode
   /** True when this group's scope is the active project. */
   isActiveScope?: boolean
   /**
@@ -127,7 +121,6 @@ export function SessionGroup({
   repoPath,
   nested,
   busy,
-  branchSwitcher,
   isActiveScope,
   issueBadge,
   issueActions,
@@ -306,12 +299,6 @@ export function SessionGroup({
           </button>
         )}
       </div>
-
-      {branchSwitcher && isActiveScope && !collapsed && (
-        <div className="session-group__branch-row" onClick={(e) => e.stopPropagation()}>
-          {branchSwitcher}
-        </div>
-      )}
 
       {!collapsed && <div className="session-group__sessions">{children}</div>}
 

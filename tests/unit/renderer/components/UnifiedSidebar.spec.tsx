@@ -26,9 +26,6 @@ vi.mock('../../../../src/renderer/components/integrations/LinkIssueDialog', () =
     <div data-testid="link-issue-dialog">{projectName}</div>
   ),
 }))
-vi.mock('../../../../src/renderer/components/sidebar/BranchSwitcher', () => ({
-  BranchSwitcher: () => <div data-testid="branch-switcher" />,
-}))
 vi.mock('../../../../src/renderer/components/sidebar/CreateProjectDialog', () => ({
   CreateProjectDialog: ({ onClose }: { workspaceId: string; onClose: () => void }) => (
     <div data-testid="create-project-dialog">
@@ -352,17 +349,6 @@ describe('UnifiedSidebar — collapse state', () => {
 })
 
 describe('UnifiedSidebar — scope actions on the group header (FR-026)', () => {
-  it('hosts a branch switcher on the active project only', () => {
-    mockWorkspaceStore.activeProjectId = 'p1'
-    renderSidebar()
-    expect(screen.getAllByTestId('branch-switcher')).toHaveLength(1)
-  })
-
-  it('shows no branch switcher at all when no project is active', () => {
-    renderSidebar()
-    expect(screen.queryByTestId('branch-switcher')).toBeNull()
-  })
-
   it('creates a session in the group project', () => {
     renderSidebar()
     fireEvent.click(screen.getAllByTitle('New terminal')[1])
@@ -543,7 +529,7 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('300px')
   })
 
-  it('opens at the branch-row default width when nothing is stored', () => {
+  it('opens at the default width when nothing is stored', () => {
     const { container } = renderSidebar()
     expect((container.querySelector('.unified-sidebar') as HTMLElement).style.width).toBe('300px')
   })
@@ -671,7 +657,6 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
   it('offers no project-scoped header actions when the grouping is not a scope', () => {
     const { container } = renderSidebar({ initialViewId: 'by-status' })
     expect(container.querySelector('.session-group__add')).toBeNull()
-    expect(screen.queryByTestId('branch-switcher')).toBeNull()
   })
 
   it('still resolves activeProjectId when selecting under status grouping (SC-010)', () => {
@@ -1022,12 +1007,6 @@ describe('UnifiedSidebar — workspace grouping keeps the project layer (default
     fireEvent.click(jobs.querySelector('.session-group__add')!)
     expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p2')
     expect(mockCreateSession).toHaveBeenCalled()
-  })
-
-  it('offers the branch switcher on the nested project that is active', () => {
-    mockWorkspaceStore.activeProjectId = 'p1'
-    renderSidebar()
-    expect(screen.getAllByTestId('branch-switcher')).toHaveLength(1)
   })
 
   it('names no workspace on a nested project — its header already says it', () => {

@@ -34,7 +34,6 @@ import { SessionGroup } from './SessionGroup'
 import { SessionRow } from './SessionRow'
 import { WorkspaceRow } from './WorkspaceRow'
 import { ViewBar } from './ViewBar'
-import { BranchSwitcher } from './BranchSwitcher'
 import { BulkCloseDialog } from './BulkCloseDialog'
 import './UnifiedSidebar.css'
 
@@ -584,15 +583,6 @@ export function UnifiedSidebar({
         // else a project header is a bare name with no home.
         workspaceName={project && !nested ? workspace?.name : undefined}
         busy={group.sessions.some((s) => isSessionBusy(s.id))}
-        branchSwitcher={
-          project && workspace ? (
-            <BranchSwitcher
-              project={project}
-              workspaceFolderPath={workspace.folderPath}
-              workspaceId={workspace.id}
-            />
-          ) : undefined
-        }
         isActiveScope={project !== undefined && project.id === activeProjectId}
         issueBadge={renderIssueBadge(project?.id)}
         issueActions={project ? issueActionsFor(project.id) : undefined}

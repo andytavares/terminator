@@ -140,13 +140,6 @@ describe('the colour runs unbroken down the column', () => {
   // straight through to the sidebar, which reads as the tint being broken
   // rather than as the column ending.
 
-  it('washes and rails the branch strip between a header and its rows', () => {
-    expect(wash(GROUP_CSS, '.session-group__branch-row').percent).toBeGreaterThan(0)
-    expect(ruleBody(GROUP_CSS, '.session-group__branch-row')).toMatch(
-      /box-shadow:\s*inset\s+2px 0 0 color-mix\(in srgb, var\(--ws-color, transparent\)/
-    )
-  })
-
   it('washes a row at rest, not only under the cursor', () => {
     const rest = wash(ROW_CSS, '.session-row').percent
     expect(rest).toBeGreaterThan(0)
@@ -184,7 +177,6 @@ describe('the wash stays a tint (WCAG AA)', () => {
     { css: ROW_CSS, selector: '.session-row' },
     { css: ROW_CSS, selector: '.session-row:hover' },
     { css: ROW_CSS, selector: '.session-row--active' },
-    { css: GROUP_CSS, selector: '.session-group__branch-row' },
     // The workspace row's colour is on the button that fills it, not the row.
     { css: WS_CSS, selector: '.ws-row', textFrom: '.ws-row__add' },
   ]

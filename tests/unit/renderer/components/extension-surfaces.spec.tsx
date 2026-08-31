@@ -25,9 +25,6 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({ useBranchSync: vi.fn() }))
-vi.mock('../../../../src/renderer/components/sidebar/BranchSwitcher', () => ({
-  BranchSwitcher: () => <div data-testid="branch-switcher" />,
-}))
 vi.mock('../../../../src/renderer/components/sidebar/CreateProjectDialog', () => ({
   CreateProjectDialog: () => null,
 }))

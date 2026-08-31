@@ -264,22 +264,6 @@
   background: var(--bg-card-hover);
 }
 
-/* The strip belongs to the header above it, so it carries the same surface —
-   at the rows' strength, not the header's. Unpainted, it punched a hole
-   through the workspace's territory between the header and its first row. */
-.session-group__branch-row {
-  padding: 2px var(--sidebar-gutter, 10px) 4px var(--sidebar-content-indent, 20px);
-  background: color-mix(in srgb, var(--ws-color, transparent) 5%, transparent);
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 30%, transparent);
-}
-
-/* The switcher is a secondary control here, not a form field. */
-.session-group__branch-row :is(button, select, .branch-switcher__trigger) {
-  height: 22px;
-  min-height: 0;
-  font-size: 10px;
-}
-
 .session-group__rename-input {
   flex: 1;
   min-width: 0;

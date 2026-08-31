@@ -90,25 +90,6 @@ describe('SessionGroup — a scope-bearing header (FR-026)', () => {
     expect(root.style.getPropertyValue('--ws-color')).toBe('#abcdef')
   })
 
-  it('hosts the branch switcher for the project you are working in', () => {
-    renderGroup({ isActiveScope: true, branchSwitcher: <div data-testid="branch" /> })
-    expect(screen.getByTestId('branch')).toBeTruthy()
-  })
-
-  it('keeps the branch switcher out of every other group, so the list stays names and sessions', () => {
-    renderGroup({ branchSwitcher: <div data-testid="branch" /> })
-    expect(screen.queryByTestId('branch')).toBeNull()
-  })
-
-  it('hides the branch switcher when collapsed', () => {
-    renderGroup({
-      collapsed: true,
-      isActiveScope: true,
-      branchSwitcher: <div data-testid="branch" />,
-    })
-    expect(screen.queryByTestId('branch')).toBeNull()
-  })
-
   it('creates a session from the header without toggling collapse', () => {
     const onAddSession = vi.fn()
     renderGroup({ onAddSession })
