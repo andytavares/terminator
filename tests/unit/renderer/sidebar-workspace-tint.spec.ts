@@ -153,18 +153,18 @@ describe('the colour runs unbroken down the column', () => {
     expect(rest).toBeLessThan(wash(ROW_CSS, '.session-row:hover').percent)
   })
 
-  it('separates one group from the next with a line, not a hole', () => {
+  it('separates one group from the next without a line or a hole', () => {
     // The margin sat outside the border box, so both the wash and the inset
-    // rail stopped at it. The same space is padding now, and the separation is
-    // a hairline in the workspace's own colour.
+    // rail stopped at it. The same space is padding now — and it stays a plain
+    // step in colour: a rule drawn across the top of a header reads as the tint
+    // being cut, which is the whole thing this file is guarding.
     const header = ruleBody(GROUP_CSS, '.session-group__header')
     expect(header).not.toMatch(/margin-top:/)
     expect(header).toMatch(/padding: 6px/)
-    expect(header).toMatch(
-      /inset 0 1px 0 color-mix\(in srgb, var\(--ws-color, transparent\)\s*\d+%/
-    )
+    expect(header).not.toMatch(/inset 0 1px/)
+    expect(header).not.toMatch(/border-(top|bottom):/)
     expect(ruleBody(GROUP_CSS, '.session-group--nested > .session-group__header')).not.toMatch(
-      /margin-top:/
+      /margin-top:|inset 0 1px|border-(top|bottom):/
     )
   })
 

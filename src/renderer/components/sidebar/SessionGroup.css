@@ -31,13 +31,11 @@
      workspace — a status bucket, scratch — sets no --ws-color at all, and an
      unresolved var voids the whole declaration rather than the one term.
      The wash is deliberately shallow: the text on it is the same hue.
-     The hairline across the top separates this group from the one above it,
-     which is what the margin used to do — but in the colour, so the separation
-     no longer costs a hole in it. */
+     No rule across the top: one group is separated from the next by its own
+     colour and by the step in wash strength, not by a line drawn between
+     them. */
   background: color-mix(in srgb, var(--ws-color, transparent) 10%, transparent);
-  box-shadow:
-    inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 70%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--ws-color, transparent) 25%, transparent);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 70%, transparent);
 }
 
 .session-group__header:hover {
@@ -198,7 +196,9 @@
 
 /* The project layer inside a workspace group: indented, and quieter than the
    workspace header above it. It sits closer to what it belongs to — the same
-   2px it always did, now as painted padding rather than a gap. */
+   2px it always did, now as painted padding rather than a gap. Indentation and
+   type size are what separate it from that header; a rule between them read as
+   the tint being cut, which is the thing this file exists to avoid. */
 .session-group--nested > .session-group__header {
   height: 24px;
   padding-top: 2px;
