@@ -1,0 +1,41 @@
+tests/e2e/notepad-outline.spec.ts
+  s_a9aedfae6ee380::t_dc3bdff5bc1258 94
+  s_a9aedfae6ee380::t_612be64ece1dbc 1-27,47-93,95-126,135-136,138-141,144-145,150-154,208
+  s_a9aedfae6ee380::t_28de9c15922f16 28-46,127-134,137,142-143,146-149,155-207
+extensions/notepad/src/components/NotepadView.tsx
+  s_a9aedfae6ee380::t_9b772c09436bf0 702-705,714-748
+  s_a9aedfae6ee380::t_106b8adfc03cbe 9,21
+  s_a9aedfae6ee380::t_64e06ce5fd04d9 53,611-616,706-710,712-713
+  s_a9aedfae6ee380::t_713c893fed5bb5 617
+extensions/notepad/src/components/notepad.css
+  s_a9aedfae6ee380::t_79e65998d88d62 160-166,169-170,175-186,188,195-198,206-207,213-223,225,228-229,231,234-236,250,256,276
+  s_a9aedfae6ee380::t_42e64419c3ecd3 187,189-194,199-205,208-212,224,226-227,230,232-233,237-249,251-255,257-275,277-278,280
+  s_a9aedfae6ee380::t_01cb703390f375 279
+extensions/notepad/src/components/NoteOutline.tsx
+  s_a9aedfae6ee380::t_edaa92c19586fd 3-8,11-13,15-20,22-27,29-30,35,53-55
+  s_a9aedfae6ee380::t_4394a993fa020e 1-2,9-10,14,21,28,31-34,36-52
+extensions/notepad/tests/components/NoteOutline.spec.tsx
+  s_a9aedfae6ee380::t_70c48652d6eccd 2,78
+  s_a9aedfae6ee380::t_64688ff87cec1e 27,35,41,48,55,59,61,65,67-70,75
+  s_a9aedfae6ee380::t_9c97ac40281285 1,3-26,28-34,36-40,42-47,49-54,56-58,60,62-64,66,71-74,76-77,79-81
+extensions/notepad/src/components/NoteWindowView.tsx
+  s_a9aedfae6ee380::t_f42a48ec53c0c3 8,14,447-469
+  s_a9aedfae6ee380::t_c3dff4768ebc3c 46,356-362,438-442,445-446,471
+  s_a9aedfae6ee380::t_cc14af1db36040 470
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "f1bf5763d3c2bc9ab498d17231e5bcb2b4fbd94e",
+  "prompts": {},
+  "sessions": {
+    "s_a9aedfae6ee380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6208226c-1f8e-46d4-932c-1ad6f1e6f8de",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
