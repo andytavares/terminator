@@ -157,12 +157,125 @@
   font-size: 13px;
 }
 
-.notepad-view__comments {
+/* The right rail holds the outline over the comments. It owns the width and the
+   border the comments panel used to own, so hiding either one does not leave a
+   stray edge — and hiding both collapses the rail and gives the width back to
+   the editor. */
+.notepad-view__rail {
+  display: flex;
+  flex-direction: column;
   width: 260px;
   min-width: 180px;
+  flex-shrink: 0;
+  overflow: hidden;
   border-left: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
-  overflow-y: scroll;
   background: var(--tm-bg-sidebar, rgba(255, 255, 255, 0.02));
+}
+
+/* `display: flex` above outranks the hidden attribute's UA `display: none`, so
+   the rail needs this or closing both its panels leaves an empty column. */
+.notepad-view__rail[hidden] {
+  display: none;
+}
+
+.notepad-view__comments {
+  flex: 1;
+  min-height: 0;
+  overflow-y: scroll;
+}
+
+/* ── Outline ────────────────────────────────────────────────────
+   The open note's headings, at the top of the right rail. Depth comes in as
+   --outline-depth on each row, set from the heading's level relative to the
+   note's shallowest one. */
+.notepad-outline {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  /* Capped so a heading-heavy note cannot push the comments out of the rail;
+     the comments keep at least half. */
+  max-height: 50%;
+  border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
+}
+
+.notepad-outline__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 6px 0 12px;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.5));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.notepad-outline__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.notepad-outline__close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
+  opacity: 1;
+}
+
+.notepad-outline__close svg {
+  width: 13px;
+  height: 13px;
+}
+
+.notepad-outline__title {
+  flex: 1;
+}
+
+.notepad-outline__count {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.notepad-outline__items {
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.notepad-outline__item {
+  display: block;
+  width: 100%;
+  padding: 3px 12px 3px calc(12px + var(--outline-depth, 0) * 12px);
+  border: none;
+  background: transparent;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.55));
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notepad-outline__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
+}
+
+.notepad-outline__empty {
+  padding: 0 12px 10px;
+  font-size: 11px;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
 }
 
 /* ── Note list ──────────────────────────────────────────────────── */
