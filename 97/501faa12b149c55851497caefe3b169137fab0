@@ -1,0 +1,27 @@
+docs/user-guide/USER-GUIDE.md
+  s_a9aedfae6ee380::t_da3d84d46fb4cc 593
+extensions/notepad/src/components/notepad.css
+  s_a9aedfae6ee380::t_da3d84d46fb4cc 182,194-200
+extensions/notepad/README.md
+  s_a9aedfae6ee380::t_da3d84d46fb4cc 9
+docs/ARCHITECTURE.md
+  s_a9aedfae6ee380::t_da3d84d46fb4cc 760-762,765
+tests/e2e/notepad-outline.spec.ts
+  s_a9aedfae6ee380::t_da3d84d46fb4cc 137-171
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "97501faa12b149c55851497caefe3b169137fab0",
+  "prompts": {},
+  "sessions": {
+    "s_a9aedfae6ee380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6208226c-1f8e-46d4-932c-1ad6f1e6f8de",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
