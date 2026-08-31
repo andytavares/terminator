@@ -1,0 +1,25 @@
+src/renderer/components/sidebar/SessionGroup.css
+  s_7b3421c914bc00::t_ea5b02dd8fcd12 34-36,38,199-201
+tests/unit/renderer/sidebar-workspace-tint.spec.ts
+  s_7b3421c914bc00::t_ea5b02dd8fcd12 156,158-160,164-165,167
+docs/user-guide/USER-GUIDE.md
+  s_7b3421c914bc00::t_222361d002a499 89
+docs/ARCHITECTURE.md
+  s_7b3421c914bc00::t_222361d002a499 608
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "9c5a9908897889a1a3fabb1707fd1db5bbccd862",
+  "prompts": {},
+  "sessions": {
+    "s_7b3421c914bc00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd584800-553c-4e34-8212-80f2239ddc2b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
