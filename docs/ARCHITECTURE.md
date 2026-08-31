@@ -757,9 +757,12 @@ Renderer process (jsdom + React + CM6)
        ├─ NotepadView (main 3-pane layout)
        │    ├─ NoteList (sidebar: search bar, multi-tag dropdown, folder tree, note/diagram rows)
        │    ├─ NoteEditor (CM6 host: livePreviewPlugin + commentAnchorField)
-       │    └─ CommentMargin (right pane: comment cards with anchor status)
+       │    └─ .notepad-view__rail (right rail; collapses when both its panels are off)
+       │         ├─ NoteOutline (the open note's headings, from editor/outline.ts)
+       │         └─ CommentMargin (comment cards with anchor status)
        ├─ QuickCreateOverlay (Cmd+Shift+N floating input)
        ├─ ExportDialog (folder picker + scope selector; exports notes and diagrams)
+       ├─ NoteWindowView (pop-out window for one note; same editor and right rail)
        └─ DiagramWindowView (pop-out window for focused diagram editing)
 ```
 

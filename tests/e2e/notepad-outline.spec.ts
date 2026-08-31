@@ -134,6 +134,41 @@ test('the outline sits in the right rail, above the comments', async () => {
   expect(order[1]).toContain('notepad-view__comments')
 })
 
+test('the rail splits evenly between the outline and the comments', async () => {
+  // The outline sized itself to its headings, so a long note pushed the
+  // comments into a sliver. Neither panel gets to grow at the other's expense.
+  const heights = await inNotepad<{ outline: number; comments: number; rail: number }>(
+    `(() => {
+       const rect = (sel) => document.querySelector(sel).getBoundingClientRect().height
+       return {
+         outline: rect('.notepad-outline'),
+         comments: rect('.notepad-view__comments'),
+         rail: rect('.notepad-view__rail'),
+       }
+     })()`
+  )
+  expect(Math.abs(heights.outline - heights.comments)).toBeLessThan(2)
+  expect(heights.outline + heights.comments).toBeCloseTo(heights.rail, 0)
+})
+
+test('one panel takes the whole rail when the other is closed', async () => {
+  const height = await inNotepad<{ comments: number; rail: number }>(
+    `(async () => {
+       const byLabel = (text) =>
+         [...document.querySelectorAll('.notepad-view__toolbar button')]
+           .find((b) => b.textContent === text)
+       byLabel('Hide outline').click()
+       await new Promise((r) => setTimeout(r, 300))
+       const rect = (sel) => document.querySelector(sel).getBoundingClientRect().height
+       const out = { comments: rect('.notepad-view__comments'), rail: rect('.notepad-view__rail') }
+       byLabel('Outline').click()
+       await new Promise((r) => setTimeout(r, 300))
+       return out
+     })()`
+  )
+  expect(height.comments).toBeCloseTo(height.rail, 0)
+})
+
 test('the outline closes from the panel and comes back from the toolbar', async () => {
   const states = await inNotepad<{ open: number; closed: number; reopened: number }>(
     `(async () => {

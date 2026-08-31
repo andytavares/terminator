@@ -179,7 +179,7 @@
 }
 
 .notepad-view__comments {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: scroll;
 }
@@ -191,10 +191,13 @@
 .notepad-outline {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  /* Capped so a heading-heavy note cannot push the comments out of the rail;
-     the comments keep at least half. */
-  max-height: 50%;
+  /* An even split with whatever else is in the rail, sized by the rail rather
+     than by content: sizing to its headings let a long note push the comments
+     into a sliver. `flex-basis: 0` is what makes the share equal regardless of
+     how much either panel holds, and min-height:0 lets the list inside scroll
+     instead of forcing the panel taller. Alone in the rail it takes all of it. */
+  flex: 1 1 0;
+  min-height: 0;
   border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
 }
 
