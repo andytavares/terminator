@@ -12,9 +12,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 22px;
-  padding: 0 var(--sidebar-gutter, 10px);
-  margin-top: 6px;
+  /* The space above a header is padding, not margin, so the wash and the rail
+     run through it instead of stopping at it. A group with no colour is
+     unchanged by that: 6px of its own transparent surface looks exactly like
+     the 6px of bare sidebar a margin gave it. */
+  height: 28px;
+  padding: 6px var(--sidebar-gutter, 10px) 0;
   cursor: pointer;
   color: var(--ws-color, var(--text-secondary));
   font-size: 10px;
@@ -27,9 +30,14 @@
      Every mix spells the `transparent` fallback, because a group with no
      workspace — a status bucket, scratch — sets no --ws-color at all, and an
      unresolved var voids the whole declaration rather than the one term.
-     The wash is deliberately shallow: the text on it is the same hue. */
+     The wash is deliberately shallow: the text on it is the same hue.
+     The hairline across the top separates this group from the one above it,
+     which is what the margin used to do — but in the colour, so the separation
+     no longer costs a hole in it. */
   background: color-mix(in srgb, var(--ws-color, transparent) 10%, transparent);
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 70%, transparent);
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 70%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--ws-color, transparent) 25%, transparent);
 }
 
 .session-group__header:hover {
@@ -189,9 +197,11 @@
 }
 
 /* The project layer inside a workspace group: indented, and quieter than the
-   workspace header above it. */
+   workspace header above it. It sits closer to what it belongs to — the same
+   2px it always did, now as painted padding rather than a gap. */
 .session-group--nested > .session-group__header {
-  margin-top: 2px;
+  height: 24px;
+  padding-top: 2px;
   padding-left: var(--sidebar-content-indent, 20px);
   letter-spacing: 0.04em;
   text-transform: none;
@@ -254,8 +264,13 @@
   background: var(--bg-card-hover);
 }
 
+/* The strip belongs to the header above it, so it carries the same surface —
+   at the rows' strength, not the header's. Unpainted, it punched a hole
+   through the workspace's territory between the header and its first row. */
 .session-group__branch-row {
   padding: 2px var(--sidebar-gutter, 10px) 4px var(--sidebar-content-indent, 20px);
+  background: color-mix(in srgb, var(--ws-color, transparent) 5%, transparent);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ws-color, transparent) 30%, transparent);
 }
 
 /* The switcher is a secondary control here, not a form field. */
