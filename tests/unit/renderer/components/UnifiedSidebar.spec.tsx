@@ -1003,6 +1003,10 @@ describe('UnifiedSidebar — opening a branch in the editor', () => {
 
   beforeEach(() => {
     openEditor.mockClear()
+    // The real channel always answers with a promise. A bare `vi.fn()` returns
+    // undefined, which is not the contract — and it is what let a `.then` on
+    // undefined reach CI as an unhandled error while every test still passed.
+    openEditor.mockResolvedValue({ ok: true, editor: 'Cursor' })
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
       value: {
@@ -1119,5 +1123,33 @@ describe('UnifiedSidebar — opening in the editor reports back', () => {
     expect(addToast).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.stringMatching(/could not open/i) })
     )
+  })
+})
+
+describe('UnifiedSidebar — where there is no editor API at all', () => {
+  // The browser remote omits the editor channels entirely. Optional chaining
+  // stops at the call, so a bare `.then` on the undefined it returns throws —
+  // which is what CI caught and the local suite did not, because every local
+  // mock happened to supply `open`.
+  beforeEach(() => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        shell: { openExternal: vi.fn() },
+      },
+    })
+  })
+
+  it('renders without an editor API present', async () => {
+    expect(() => renderSidebar()).not.toThrow()
+    await act(async () => {})
+  })
+
+  it('does not throw when the action is invoked anyway', async () => {
+    const { container } = renderSidebar()
+    await act(async () => {})
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(() => fireEvent.click(screen.getByText(/Open in/))).not.toThrow()
   })
 })

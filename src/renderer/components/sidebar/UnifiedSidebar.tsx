@@ -261,12 +261,15 @@ export function UnifiedSidebar({
       say('That branch has no folder on disk yet.')
       return
     }
+    // `?.then`, not `.then`: optional chaining stops at the call, so when the
+    // editor API is absent — the browser remote omits it entirely — `open?.()`
+    // yields undefined and a bare `.then` throws.
     void window.electronAPI?.editor
       ?.open?.(folderPath)
-      .then((result) => {
+      ?.then((result) => {
         if ('error' in result) say(EDITOR_ERRORS[result.error] ?? `Could not open: ${result.error}`)
       })
-      .catch(() => say('Could not open that folder in your editor.'))
+      ?.catch(() => say('Could not open that folder in your editor.'))
   }
 
   // Coming back to the window is the cheapest moment to notice that the working
