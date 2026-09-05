@@ -10,6 +10,14 @@ export interface DialogAction {
   label: string
   onSelect: () => void | Promise<void>
   tone?: 'default' | 'primary' | 'danger'
+  /**
+   * Unavailable, and visibly so.
+   *
+   * Without this a caller has to guard inside `onSelect`, which leaves a button
+   * that looks pressable and does nothing — the exact confusion the audit found
+   * in the git panel's commit controls.
+   */
+  disabled?: boolean
   /** Display-only hint, e.g. "⌘↵". */
   shortcut?: string
 }
@@ -153,6 +161,7 @@ export function DialogActionButton({ action }: { action: DialogAction }): JSX.El
     <button
       type="button"
       className={`tmui-button tmui-button--${action.tone ?? 'default'}`}
+      disabled={action.disabled === true}
       onClick={() => void action.onSelect()}
     >
       {action.label}

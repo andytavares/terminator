@@ -286,3 +286,47 @@ describe('nested surfaces', () => {
     expect(inner).toBeGreaterThan(outer)
   })
 })
+
+// Added after migrating PrDialog: replacing a `disabled` attribute with a guard
+// inside onSelect left a button that looked pressable and did nothing, which is
+// the confusion the audit found in the git panel's commit controls.
+describe('a disabled action', () => {
+  it('is disabled in the DOM, not merely inert', () => {
+    render(
+      <Dialog
+        title="Open Pull Request"
+        actions={[{ label: 'Create PR', disabled: true, onSelect: () => {} }]}
+        onDismiss={() => {}}
+      />
+    )
+    expect((screen.getByRole('button', { name: /Create PR/ }) as HTMLButtonElement).disabled).toBe(
+      true
+    )
+  })
+
+  it('does not fire when clicked', () => {
+    const onSelect = vi.fn()
+    render(
+      <Dialog
+        title="Open Pull Request"
+        actions={[{ label: 'Create PR', disabled: true, onSelect }]}
+        onDismiss={() => {}}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Create PR/ }))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('is enabled by default', () => {
+    render(
+      <Dialog
+        title="Open Pull Request"
+        actions={[{ label: 'Create PR', onSelect: () => {} }]}
+        onDismiss={() => {}}
+      />
+    )
+    expect((screen.getByRole('button', { name: /Create PR/ }) as HTMLButtonElement).disabled).toBe(
+      false
+    )
+  })
+})

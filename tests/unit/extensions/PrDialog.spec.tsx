@@ -53,7 +53,7 @@ describe('PrDialog', () => {
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
     await waitFor(() => screen.getByRole('dialog'))
-    const overlay = document.querySelector('.pr-dialog')
+    const overlay = document.querySelector('.tmui-dialog__scrim')
     if (overlay) fireEvent.click(overlay)
     expect(onClose).toHaveBeenCalled()
   })

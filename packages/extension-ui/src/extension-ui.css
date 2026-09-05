@@ -89,8 +89,13 @@
   cursor: pointer;
 }
 
-.tmui-button:hover {
+.tmui-button:hover:not(:disabled) {
   background: var(--tm-bg-card-hover);
+}
+
+.tmui-button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .tmui-button--primary {
@@ -105,7 +110,7 @@
   color: var(--tm-danger);
 }
 
-.tmui-button--danger:hover {
+.tmui-button--danger:hover:not(:disabled) {
   background: var(--tm-danger);
   color: var(--tm-on-accent);
 }
