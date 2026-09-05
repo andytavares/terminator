@@ -235,17 +235,17 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 **Purpose**: Remove what is now unreachable, and ship the documentation the constitution requires in this PR.
 
 - [x] T087 Delete `buildGroups`, `Group`, `GroupScope` and `BuildResult` from `src/renderer/sidebar/view-model.ts` now that nothing imports them, and delete the corresponding cases in `tests/unit/renderer/sidebar/view-model.spec.ts` and `view-model-performance.spec.ts` (Principle X)
-- [ ] T088 [P] Delete the dead rules in `src/renderer/components/sidebar/SidebarHeader.css` — `__search`, `__search-icon`, `__search-placeholder`, `__actions`, `__tabs`, `__fixed-actions`, `__tab*` — which have had no matching element since the tabs moved to `AppBand`
-- [ ] T089 [P] Delete `.unified-sidebar__add-project` from `src/renderer/components/sidebar/UnifiedSidebar.css` and the `ws-card--dnd-over` class reference in `UnifiedSidebar.tsx`, which never had a CSS rule at all
-- [ ] T090 [P] Delete the unused `notificationPanelOpen`, `scratchActive` and `hasScratchSessions` props from `UnifiedSidebarProps` in `src/renderer/components/sidebar/UnifiedSidebar.tsx` and their pass-through in `src/renderer/App.tsx`
-- [ ] T091 [P] Delete `font-family: var(--font-sans)` from `src/renderer/components/sidebar/SidebarSearch.css:32` — the token is never defined anywhere in `src/` (research.md R-009)
-- [ ] T092 [P] Write `docs/adr/035-the-sidebar-stops-at-the-branch.md` — the decision, the motivation, and the alternatives with their tradeoffs (Principle IX)
-- [ ] T093 [P] Write `docs/adr/036-the-board-is-one-grid-a-lane-is-a-column.md` recording the `mountPreview` constraint and why per-lane containers were rejected (research.md R-003)
-- [ ] T094 [P] Write `docs/adr/037-repo-colour-reduced-to-one-rail.md` superseding ADR-033 rather than editing it, and recording the light-theme AA fix (Principle IX immutability)
-- [ ] T095 Rewrite the "Navigation Chrome — UnifiedSidebar" section of `docs/ARCHITECTURE.md` for the branch-first list, the two-band chrome, the single-grid board, and the colour reduction (Principle VIII)
-- [ ] T096 [P] Update `docs/user-guide/USER-GUIDE.md` for the branch list, the board, and the tab-bar state glyphs
-- [ ] T097 [P] Update `README.md` where it describes the sidebar
-- [ ] T098 Run the Principle II isolation check: grep `src/` for any import, type, string or conditional naming a specific extension; confirm core still builds with any extension directory deleted (`contracts/extension-api-invariants.md`)
+- [x] T088 [P] Delete the dead rules in `src/renderer/components/sidebar/SidebarHeader.css` — `__search`, `__search-icon`, `__search-placeholder`, `__actions`, `__tabs`, `__fixed-actions`, `__tab*` — which have had no matching element since the tabs moved to `AppBand`
+- [x] T089 [P] Delete `.unified-sidebar__add-project` from `src/renderer/components/sidebar/UnifiedSidebar.css` and the `ws-card--dnd-over` class reference in `UnifiedSidebar.tsx`, which never had a CSS rule at all
+- [x] T090 [P] Delete the unused `notificationPanelOpen`, `scratchActive` and `hasScratchSessions` props from `UnifiedSidebarProps` in `src/renderer/components/sidebar/UnifiedSidebar.tsx` and their pass-through in `src/renderer/App.tsx`
+- [x] T091 [P] Delete `font-family: var(--font-sans)` from `src/renderer/components/sidebar/SidebarSearch.css:32` — the token is never defined anywhere in `src/` (research.md R-009)
+- [x] T092 [P] Write `docs/adr/035-the-sidebar-stops-at-the-branch.md` — the decision, the motivation, and the alternatives with their tradeoffs (Principle IX)
+- [x] T093 [P] Write `docs/adr/036-the-board-is-one-grid-a-lane-is-a-column.md` recording the `mountPreview` constraint and why per-lane containers were rejected (research.md R-003)
+- [x] T094 [P] Write `docs/adr/037-repo-colour-reduced-to-one-rail.md` superseding ADR-033 rather than editing it, and recording the light-theme AA fix (Principle IX immutability)
+- [x] T095 Rewrite the "Navigation Chrome — UnifiedSidebar" section of `docs/ARCHITECTURE.md` for the branch-first list, the two-band chrome, the single-grid board, and the colour reduction (Principle VIII)
+- [x] T096 [P] Update `docs/user-guide/USER-GUIDE.md` for the branch list, the board, and the tab-bar state glyphs
+- [x] T097 [P] Update `README.md` where it describes the sidebar
+- [x] T098 Run the Principle II isolation check: grep `src/` for any import, type, string or conditional naming a specific extension; confirm core still builds with any extension directory deleted (`contracts/extension-api-invariants.md`)
 - [ ] T099 Run the full gate in order from the worktree: `npm run format`, then `npm run lint` at 0 errors, then `npx vitest run --coverage` with all four metrics ≥80%, then `npx playwright test`
 - [ ] T100 Walk every scenario in `specs/034-declutter-sidebar/quickstart.md` against the running app, including the preview-survival check and the chrome measurement
 - [ ] T101 Write the PR body from the deletion list in `specs/034-declutter-sidebar/data-model.md` §6, naming every removal — bulk close and stale multi-select above all — as FR-025 requires

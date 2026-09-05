@@ -503,129 +503,86 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 
 ## Navigation Chrome — UnifiedSidebar
 
-The primary navigation is a single resizable sidebar (`UnifiedSidebar`) replacing the old two-column WorkspaceRail + ProjectsPanel layout.
+The primary navigation is a single resizable sidebar (`UnifiedSidebar`) listing **repos and their branches**. Terminals are not sidebar rows: they are tabs in the tab bar above the terminal, and cards on the board (ADR 035).
 
 ### Component hierarchy
 
 ```
 UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
-├── SidebarHeader
-│   ├── AppBand — every app-level surface in one labelled band: core's Overview, the
-│   │     `contributes.globalTab` entries from extension manifests, and the items from
-│   │     api.sidebar.registerItem(). Icon plus visible label, accessible name, keyboard
-│   │     focus order. Both contribution contracts are unchanged — only the render
-│   │     target merged (ADR 033). Replaces the old unlabelled icon strip and the
-│   │     deleted ExtensionFooter.
-│   └── search row — search, notification bell, "+ repo". These act on the list below,
-│         not on the apps above, which is why they sit here and not in the band.
-├── ViewBar — saved-view chips, group-by / sort menus, hide-stale toggle
-├── FilterNotice — "showing N of M · show all"; rendered only while something is hidden
-├── [group list] — SessionGroup per group returned by buildGroups()
-│   └── SessionGroup — the scope-bearing header. When the grouping key is a project or
-│       │             workspace this header IS the row the old tree had, and hosts
-│       │             everything it hosted.
-│       ├── chevron / branch glyph (GitFork for a worktree, GitBranch for a plain
-│       │     checkout) / branch name / worktree tag / workspace name (branch headers
-│       │     outside workspace grouping) / repo folder path (repo headers) /
-│       │     busy aggregate / change statistics / count / + new terminal
-│       ├── workspace tab icons — hover-reveal icons from registerWorkspaceTab(),
-│       │     rendered on each workspace's FIRST group so they appear once per
-│       │     workspace rather than once per project
-│       ├── SessionGroup[] — under workspace grouping only: one nested project group
-│       │     per project of that workspace, rendered by the same component so a
-│       │     project keeps its header actions without changing the grouping
-│       └── SessionRow[] — state glyph / spinner / bell, relative activity, optional
-│             note, branch badge (which opens ScopeMenu when the header does not
-│             already name the branch), and a needs-you edge bar + pill.
-│             The glyph is one of four lucide components chosen by session state
-│             (Play / Circle / Pause / CircleX); selection is the row's own surface.
-│             The two were the same dot until 032 — see below.
-├── scratch group — scratch sessions as an ordinary group with a count, not a pinned
-│     footer with its own vocabulary
-└── bulk bar — selection count + Close selected (Stale view only)
+├── SidebarHeader                     — two bands, and no more (FR-033)
+│   ├── AppBand — every app-level surface as one compact row of icons: core's
+│   │     Overview, the `contributes.globalTab` entries, the items from
+│   │     api.sidebar.registerItem(), and the notification bell pushed to the
+│   │     far edge. Icons only; the 8px text label became the accessible name
+│   │     and tooltip it duplicated. Both contribution contracts unchanged —
+│   │     only the render target and density moved (ADR 033, then FR-036).
+│   └── search row — search, FilterMenu, DisplayMenu, "+ repo". These act on
+│         the list below, which is why they sit here and not in the band.
+├── [list]
+│   ├── RepoHeader — three things at rest: name, branch count, and (only while
+│   │     collapsed) a marker that a branch inside is waiting on you. The
+│   │     colour swatch is not counted; it is identity, not a fact. Hover
+│   │     reveals the chevron, "+ new branch" and the registered repo actions,
+│   │     in reserved space so nothing already drawn moves. Carries the
+│   │     drag handle for reordering repos.
+│   ├── BranchRow[] — at most six things at rest: the state glyph in a fixed
+│   │     16px gutter, the branch-kind glyph, the branch name in mono, the
+│   │     issue key as plain text, the +n/−n change counts, and either a
+│   │     state count or an age. The repo's 2px rail is excluded from the six.
+│   └── scratch section — scratch terminals, drawn with BranchRow because in
+│         that section a scratch terminal IS the unit of work. The one place
+│         a terminal is still a row: nothing else can represent it.
+└── resize handle
 ```
+
+`FilterMenu` and `DisplayMenu` replaced four bands with two controls. Filter holds the saved views, the stale toggle, and a count of what is hidden — that badge is what deleted the standalone filter-notice strip, and it puts the way out of a filter in the same control as the way in. Display holds grouping and sort. Measured against the running app, chrome above the first row of work fell from **165px to 98px**.
 
 ### The view-model layer
 
-`src/renderer/sidebar/` holds the pure core: `view-model.ts` (`buildGroups`, `isStale`),
-`views.ts` (built-in views as data + persistence — Everything, the default view, groups
-by workspace), `agent-state.ts`, `session-status.ts` (state → glyph/label, total over
-`AgentState`), `branch-display.ts` (`branchLabel`, `abbreviatePath`,
-`qualifiedBranchLabel`), `collapse-state.ts`, and `relative-time.ts`.
+`src/renderer/sidebar/` holds the pure core. **These modules import nothing but types** — no React, no store, no `Date.now()`; `now` is always a parameter. `tests/unit/renderer/sidebar/purity.spec.ts` guards the directory rather than any one module, so a file added here inherits the rule.
 
-### A branch is named by its branch
+| Module                                                    | Role                                                                                     |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `branch-rows.ts`                                          | `buildBranchRows` — the sidebar's list: repos, and the branches under them               |
+| `branch-state.ts`                                         | `aggregateBranchState`, `countInState` — a branch's one state, folded from its terminals |
+| `board-lanes.ts`                                          | `buildLanes` — every terminal, in lanes by state; plus the lane-visibility preference    |
+| `view-model.ts`                                           | `STATUS_ORDER`, `isStale`, and the view/filter/sort types                                |
+| `views.ts`                                                | built-in views as data, and their persistence                                            |
+| `session-status.ts`                                       | state → glyph/label, total over `AgentState`                                             |
+| `branch-display.ts`                                       | `branchLabel`, `abbreviatePath`, `qualifiedBranchLabel`                                  |
+| `collapse-state.ts`, `relative-time.ts`, `agent-state.ts` | unchanged                                                                                |
 
-`branchLabel(project)` returns `project.gitBranch`, and every surface that names a branch —
-group header, session row badge, scope menu, move and link dialogs, removal confirmation,
-overview tiles, command palette — goes through it. `Project.name` is read only when there
-is no branch to read instead, which is a workspace whose folder is not a git repository;
-that is also the only case where the create dialog asks for a name and the header context
-menu offers Rename. `useBranchSync`, called from `App` over every non-worktree project,
-keeps `gitBranch` equal to the branch the working tree is actually on, so a `git switch` in
-a branch's own terminal renames its card within five seconds. It polls, because
-`fs:changed` never fires — nothing calls `fs.watchStart` — and a hidden window is not
-polled at all. See ADR 034.
+`buildBranchRows` is the seam the whole list rests on. The rule that matters: **every branch is a row whether or not a terminal is open on it, unconditionally**. Filters lift one level — a branch matches when any of its terminals matches — with `hideStale` the deliberate exception, since it is about abandoned work and has nothing to say about a branch nobody has started.
 
-### Change statistics sit beside the pure layer, not in it
+Deliberately absent from a `BranchRow`: change statistics and the linked issue key. Both arrive from stores on their own schedule, and folding them in would make the result a function of when git or the tracker last answered (ADR 031).
 
-`src/renderer/stores/change-stats.store.ts` holds each branch's `+n/−m`, keyed by branch
-id, with a 15-second TTL and an injected clock. It is deliberately **not** a field on the
-`Project` record: putting it there would make `buildGroups` a function of when git last
-answered, which breaks the determinism the whole pure layer depends on. `ensure()` returns
-`void`, so a component cannot await git during render, and a branch whose statistics are
-missing or errored simply draws none. See ADR 031.
+### One state vocabulary, three surfaces
 
-### Vocabulary: the product says "branch", the code says `Project`
+The sidebar gutter, the terminal tabs and the board lanes all read `STATUS_ORDER` and `statusPresentationFor`, so they cannot disagree about severity or shape. Emphasis is the `--state-op-*` scale in `styles.css` — opacity, never hue, because Constitution XII forbids differentiating an icon's state by colour, and because that is what keeps the four readable in greyscale.
 
-The object between a repo and a session is a branch. Every user-visible string says so;
-the stored entity, its IPC channels and the `api.project.*` Extension API keep the name
-`Project`, because renaming them would break installed extensions and require a data
-migration for no user-visible gain. A lint rule on `src/renderer/components/**` fails the
-build if "project" reaches JSX text, a `label:` value, or a `placeholder`/`title`/
-`aria-label`. See ADR 032.
+Precedence is fixed: waiting on the user, then working, then idle, then exited. A branch with no terminals is **idle, not exited** — folding an empty list would otherwise land on the last entry in the order, and a branch you have not opened is not a finished one.
 
-**These modules import nothing but types.** No React, no store, no `Date.now()` — `now`
-is always a parameter. That physical separation is the point: it makes the whole
-"what is shown" decision a pure function of `(sessions, projects, workspaces, view, now,
-staleAfterMs)`, exhaustively testable without a DOM, and it keeps the layout reversible.
-The components above are a thin rendering of whatever `buildGroups` returns.
+### Selecting a branch
 
-`buildGroups` applies a fixed, observable order: filter → group → sort within each group
-→ sort the groups. `shown` and `total` come back with the groups, which is what
-`FilterNotice` reads.
+Clicking a branch resolves to exactly one terminal: one that is waiting on you, else the one you last had open on that branch (which `session.store`'s `projectViews` has kept all along), else the most recently active. A branch with no terminals is simply selected — `App`'s auto-open effect gives it its first one, and starting one here as well opened two.
 
-Session recency and state are renderer-only view state on `TerminalSession`
-(`lastActivityAt`, `lastAttendedAt`, `agentState`, `note`), following the existing
-`bellCount` / `busy` convention. Sessions are not persisted, so there is no schema
-change and nothing to migrate. Activity stamping is throttled to at most one store write
-per session per second in `session-controller.ts` — `onBusy` fires on every PTY output
-chunk, and the store stays a plain reducer with no timing logic of its own.
+### The board
 
-### Tab activation mutual-exclusion
+`OverviewScreen` hosts two layouts of the same surface: `BoardScreen` (the default) and the flat grid it used to be. **A lane is a `grid-column`, not a container** — every card is a direct child of one grid, emitted in a stable order, so a state change rewrites two style properties and never re-parents the node. That is load-bearing: `mountPreview` moves the single live xterm element into the card's node, and re-parenting would tear the live preview out mid-transition. See ADR 036.
 
-Three tab layers compete for the main content area. Only one is active at a time:
+### Colour propagation
 
-| Layer         | Registry state         | Activated by                                                                                       | Cleared by                                             |
-| ------------- | ---------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Global tab    | `activeGlobalTabId`    | Clicking an icon in `SidebarHeader`                                                                | Activating workspace/project tab, clicking any session |
-| Workspace tab | `activeWorkspaceTabId` | Clicking a hover-reveal icon on a `SessionGroup` header, or the same action in a row's `ScopeMenu` | Activating global/project tab, clicking any session    |
-| Project tab   | `activeProjectTabId`   | Clicking a tab in the project view tab bar                                                         | Activating global/workspace tab                        |
+A repo's `color` appears in exactly two places: a 2px rail on its rows (`box-shadow: inset 2px 0 0 var(--ws-color, transparent)`) and a 7px swatch beside its name. No background tint at rest, on hover, or when selected; hover and selection are neutral theme surfaces identical for every repo; the repo name is `--text-primary`.
 
-### Color propagation
-
-Each workspace has a `color` field (hex string). `SessionGroup` sets `style={{ '--ws-color': workspace.color }}` on its root element. All descendant CSS rules (`SessionRow`, etc.) inherit `var(--ws-color)` for accent colors, tinted backgrounds, and border highlights without any prop drilling.
-
-`SessionRow` also sets `--ws-color` on its own root, from a `workspaceColor` prop `UnifiedSidebar` resolves through the session's project (`workspaceColorForSession`). Inheritance alone is not enough: under `status`, `branch` or `none` grouping a group spans workspaces, so its header has no colour to hand down.
-
-The colour is spent as muted `color-mix` washes and left-edge rails, and it runs the whole column without a break: the group header at 10%, everything under it — the session rows at rest, and the workspace's `+ New branch` row that closes the run — at 5%, and a row's hover and selected states at 14% and 22%. Continuity is the point: an unpainted element in the middle of a run reads as the tint breaking rather than as the run ending, so the space above a header is `padding` rather than `margin` (a margin sits outside the border box, which cut both the wash and the rail). Nothing is drawn between one group and the next — the change of colour and the step in wash strength are the separation; a rule across a header reads as the tint being cut, which is the thing the continuity is for. A group with no colour is unaffected by that: its 6px of transparent padding looks exactly like the 6px of bare sidebar the margin gave it. Every mix spells its fallback as `var(--ws-color, transparent)`: a group with no workspace (a status bucket, Scratch) sets no `--ws-color` at all, and an unresolved custom property makes the _whole_ declaration invalid at computed-value time rather than just that term, which would leave the surface with no background. `tests/unit/renderer/sidebar-workspace-tint.spec.ts` reads the real CSS and asserts both the fallback and that each wash is shallow enough to keep the text on it at WCAG AA for all ten preset colours in both themes.
+Every mix spells its fallback as `var(--ws-color, transparent)`: an unresolved custom property makes the _whole_ declaration invalid at computed-value time rather than just that term, which would leave the surface unpainted. `tests/unit/renderer/sidebar-workspace-tint.spec.ts` asserts the washes are gone, that the colour is used only as a rail and a swatch, and that the text tokens clear AA on the flat surfaces they now sit on, in both themes. See ADR 037.
 
 ### Collapse persistence
 
-`useWorkspaceStore` maintains `expandedWorkspaceIds: Set<string>` initialized from `localStorage` key `terminator.workspace.expanded` (JSON array). `toggleWorkspaceCollapse(id)` updates the set and writes back to localStorage. `setExpandedWorkspaceIds(ids)` replaces the entire set (used by `⌘1–9` to expand one workspace and collapse all others).
+`collapse-state.ts` plus `localStorage` key `terminator.sidebar.collapsed`, keyed by grouping. Board lane visibility is its own key, `terminator.board.lanes`, degrading to all-visible on corrupt storage.
 
 ### Resize
 
-The sidebar has a `div.unified-sidebar__resize-handle` on its right edge. `mousedown` on it starts a document-level `mousemove`/`mouseup` drag. During drag, `widthRef` (a `useRef`) tracks the pixel delta; the sidebar's inline `style.width` is updated directly on each frame to avoid re-renders. On `mouseup`, the value is clamped to `[200, 480]` and committed via `useState` and written to `localStorage` key `terminator.sidebar.width`. Double-click snaps to `260px` (default).
+The sidebar has a `div.unified-sidebar__resize-handle` on its right edge. `mousedown` starts a document-level drag; `widthRef` tracks the delta and the inline `style.width` is updated per frame to avoid re-renders. On `mouseup` the value is clamped to `[200, 480]` and written to `terminator.sidebar.width`. Double-click restores the default.
 
 ---
 

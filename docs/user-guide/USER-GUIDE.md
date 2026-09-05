@@ -67,11 +67,11 @@ npm run dev
 
 The window is divided into three zones:
 
-| Zone             | Description                                                                                                                                                      |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                |
-| **Main sidebar** | A labelled app band at the top (Overview, Notes, Remote Control, Task Vault, Git Changes), then search, then every repo with its branches and terminal sessions. |
-| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, SpecKit, Git).                                                        |
+| Zone             | Description                                                                                                                                                                                                                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                                                                                                                                                        |
+| **Main sidebar** | A compact row of app icons at the top (Overview, Notes, Remote Control, Task Vault, Git Changes, and the notification bell), then search with the Filter and Display menus, then every repo with its branches. Terminals are not listed here — they are tabs above the terminal, and cards on the board. |
+| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, SpecKit, Git).                                                                                                                                                                                                |
 
 The **status bar** at the bottom of the window shows live CPU, Memory, and Network figures when the global metrics bar is enabled in Settings.
 
@@ -86,7 +86,7 @@ The **status bar** at the bottom of the window shows live CPU, Memory, and Netwo
 A workspace maps to a directory on disk — typically a git repository. Each workspace appears as a named, colour-coded card in the left rail. Click a workspace name to expand it in the main sidebar.
 
 - **Create a workspace:** Click `+` in the sidebar header and choose a directory.
-- **Color coding:** Each repo has a distinct accent colour, and the sidebar wears it: a branch header is washed in a muted version of that colour, and the wash and its left-edge marker carry on unbroken down every row beneath it — each session, and the `+ New branch` row that closes the run — with hovering or selecting a row keeping the highlight in the same hue. A workspace's rows therefore read as one continuous territory, and the next workspace begins where the colour changes — no gaps and no dividing lines. A session row takes the colour from its own branch, so it stays right even when the sidebar is grouped by status or by branch, where one group holds sessions from several workspaces. Scratch terminals belong to no workspace and stay on the neutral surface.
+- **Color coding:** Each repo has a distinct accent colour, and it appears in exactly two places: a thin rail down the left edge of that repo's branches, and a small swatch beside the repo's name. Everything else in the column is neutral — hovering and selecting a row look the same whichever repo it belongs to, so what draws your eye is a branch's state rather than its colour. Scratch terminals belong to no repo and draw no rail.
 - **Keyboard access:** `Cmd+1`–`Cmd+9` focuses and expands the corresponding workspace; `Cmd++` / `Cmd+-` cycles through them.
 - **Toggle sidebar:** `Cmd+B`.
 
@@ -94,9 +94,13 @@ A workspace maps to a directory on disk — typically a git repository. Each wor
 
 Projects live inside a workspace and hold one or more terminal sessions scoped to a task or branch.
 
-- **Create a branch:** Click `+ New branch` under any repo. A branch can be a plain checkout or its own git worktree; the sidebar marks which with a distinct glyph.
+- **Create a branch:** Hover a repo's header and click `+`. A branch is usually its own git worktree; the sidebar marks the exception — a plain checkout gets a small branch glyph, and a worktree is left unmarked.
 - **Naming:** A branch is named by its branch — there is nothing else to name and nothing to rename. Check out a different branch in a plain checkout's own terminal and its card follows within a moment. A worktree's branch is fixed when you create it. (A workspace whose folder is not a git repository has no branch to take a name from, so there you are asked for one and can rename it.)
-- **Sessions per branch:** A branch can hold multiple named terminal tabs. Sessions are grouped under the branch in the sidebar, and the session tab bar states which branch's terminals it is showing.
+- **Terminals per branch:** A branch can hold several named terminal tabs. They are listed in the tab bar above the terminal, not in the sidebar — each tab carries its own state glyph and unread bell count, and its note on hover. The tab bar states which branch's terminals it is showing.
+
+- **What a branch row tells you:** its state, folded from its terminals — waiting on you beats working, working beats idle, idle beats exited — plus its name, any linked issue key, how much has changed on it, and either how many terminals share that state or how long since it was last active. A branch with no terminals is still listed, and reads as idle.
+
+- **Collapsing a repo:** click its header. A collapsed repo still shows a marker if a branch inside is waiting on you, so hiding a repo cannot hide the one thing you needed to see.
 - **Per-workspace settings:** Theme, scrollback limit, and default shell can be overridden per workspace via Settings.
 
 ---
@@ -239,6 +243,8 @@ issues.
 
 You can also reach it from the command palette (`⌘K`) with **Link Issue to Project**, scoped to
 whichever branch you are in.
+
+**The key.** Once attached, the branch's row in the sidebar carries the issue key as plain text — click it to open the issue drawer. It used to be a bordered badge with its own state dot; the key alone already said what those said. The paragraph below describes the state colours as they appear in the drawer and the picker.
 
 **The badge.** Once attached, the branch's row in the sidebar carries the issue key with a small
 dot:

@@ -67,7 +67,6 @@ export function App(): JSX.Element {
     getSessionsForProject,
     closeSession,
     projectViews,
-    getScratchSessions,
     sessions,
     setActiveSessionForProject,
   } = useSessionStore()
@@ -76,7 +75,6 @@ export function App(): JSX.Element {
   const {
     addNotification,
     unreadCount,
-    panelOpen: notificationPanelOpen,
     togglePanel: toggleNotificationPanel,
   } = useNotificationStore()
 
@@ -570,7 +568,6 @@ export function App(): JSX.Element {
   }, [])
 
   const showMetricsBar = globalSettings?.ui?.showMetricsBar ?? false
-  const scratchSessions = getScratchSessions()
   // Scratch view takes priority over project view when active
   const displayProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
 
@@ -599,11 +596,8 @@ export function App(): JSX.Element {
               if (activeProjectTabId) setActiveProjectTab(null)
             }}
             unreadNotifications={unreadCount}
-            notificationPanelOpen={notificationPanelOpen}
             onBellClick={toggleNotificationPanel}
             onNewScratch={handleNewScratch}
-            scratchActive={scratchActive}
-            hasScratchSessions={scratchSessions.length > 0}
             activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
             onSelectScratchSession={(sessionId) => {
               setScratchActive(true)

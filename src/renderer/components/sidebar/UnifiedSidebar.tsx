@@ -42,10 +42,7 @@ interface UnifiedSidebarProps {
   onSelectWorkspaceTab: (workspaceId: string, tabId: string) => void
   onSelectProject?: () => void
   unreadNotifications: number
-  notificationPanelOpen: boolean
   onBellClick: () => void
-  scratchActive: boolean
-  hasScratchSessions: boolean
   onNewScratch: () => void
   activeScratchSessionId: string | null
   onSelectScratchSession: (sessionId: string) => void
