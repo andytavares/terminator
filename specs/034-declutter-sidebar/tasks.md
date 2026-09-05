@@ -98,16 +98,16 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 ### Tests for User Story 3 (write first, confirm they fail)
 
-- [ ] T027 [P] [US3] Extend `tests/unit/renderer/components/TabBar.spec.tsx` with failing cases: each tab renders its own state glyph distinguishable by shape; the bell count renders only when non-zero; the note is exposed as `title` and appears in no text node; no tab renders more than four elements
+- [x] T027 [P] [US3] Extend `tests/unit/renderer/components/TabBar.spec.tsx` with failing cases: each tab renders its own state glyph distinguishable by shape; the bell count renders only when non-zero; the note is exposed as `title` and appears in no text node; no tab renders more than four elements
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] Add the four-state glyph to each tab in `src/renderer/components/terminal/TabBar.tsx` via the existing `statusPresentationFor` from `src/renderer/sidebar/session-status.ts` (FR-021)
-- [ ] T029 [US3] Move the terminal note to the tab's `title` attribute in `src/renderer/components/terminal/TabBar.tsx` — never drawn (FR-023 as amended)
-- [ ] T030 [US3] Enforce the four-element cap in `src/renderer/components/terminal/TabBar.tsx`: glyph, title, one trailing slot (bell when it has a count), and close on the active tab only (research.md R-005)
-- [ ] T031 [US3] Update `src/renderer/components/terminal/TabBar.css` for the glyph slot and the cap, keeping `min-width: 100px` for the sessions variant
-- [ ] T032 [US3] Make tab-bar overflow visible in `src/renderer/components/terminal/TabBar.tsx` and `.css` — a pre-existing defect (`docs/ux-improvement-prd.md` §3.4) that adding a glyph makes worse
-- [ ] T033 [US3] Verify rename, close and move-to-branch still work from the tab context menu in `tests/unit/renderer/components/TabBar.spec.tsx` (FR-024)
+- [x] T028 [US3] Add the four-state glyph to each tab in `src/renderer/components/terminal/TabBar.tsx` via the existing `statusPresentationFor` from `src/renderer/sidebar/session-status.ts` (FR-021)
+- [x] T029 [US3] Move the terminal note to the tab's `title` attribute in `src/renderer/components/terminal/TabBar.tsx` — never drawn (FR-023 as amended)
+- [x] T030 [US3] Enforce the four-element cap in `src/renderer/components/terminal/TabBar.tsx`: glyph, title, one trailing slot (bell when it has a count), and close on the active tab only (research.md R-005)
+- [x] T031 [US3] Update `src/renderer/components/terminal/TabBar.css` for the glyph slot and the cap, keeping `min-width: 100px` for the sessions variant
+- [x] T032 [US3] Make tab-bar overflow visible in `src/renderer/components/terminal/TabBar.tsx` and `.css` — a pre-existing defect (`docs/ux-improvement-prd.md` §3.4) that adding a glyph makes worse
+- [x] T033 [US3] Verify rename, close and move-to-branch still work from the tab context menu in `tests/unit/renderer/components/TabBar.spec.tsx` (FR-024)
 
 **Checkpoint**: Everything the terminal rows carried has a home. US1 is now safe to build.
 
