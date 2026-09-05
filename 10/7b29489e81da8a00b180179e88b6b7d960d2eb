@@ -1,0 +1,78 @@
+extensions/notepad/src/components/ExportDialog.tsx
+  s_8aa585ff1f786f::t_2d4729a37de85d 2,96-99,101-113,115,241-246
+  s_8aa585ff1f786f::t_5fe8595b71984c 116-133,135,137-147,149-150,152,154,156,158-159,162-165,168-169,171-172,175,177-190,192-204,208-212,215-220,222-238
+  s_8aa585ff1f786f::t_ed31ccd8c7e07a 240
+packages/extension-ui/src/Toast.tsx
+  s_8aa585ff1f786f::t_5fe8595b71984c 29
+  s_8aa585ff1f786f::t_08477d711de0e3 1-28,30-77
+tests/unit/packages/extension-ui/edges.spec.tsx
+  s_8aa585ff1f786f::t_946c82497edb0b 1-196
+  s_8aa585ff1f786f::t_114f5367ae5b79 197-202
+package.json
+  s_8aa585ff1f786f::t_b6efe879546cb7 19-20
+specs/036-extension-ux-remediation/research.md
+  s_8aa585ff1f786f::t_163cdc5dea92bc 216-228,241-246,248-254,263-270
+  s_8aa585ff1f786f::t_5fe8595b71984c 229-240,247,255-262
+tests/unit/packages/extension-ui/dialog.spec.tsx
+  s_8aa585ff1f786f::t_0afcf3628b2231 1-223,225-288
+  s_8aa585ff1f786f::t_5fe8595b71984c 224
+packages/extension-ui/src/EmptyState.tsx
+  s_8aa585ff1f786f::t_08477d711de0e3 1-48
+src/main/extensions/api.ts
+  s_8aa585ff1f786f::t_89199c996f7e34 224-239,297-315,852-861
+  s_8aa585ff1f786f::t_f6a128ad58d111 862
+src/renderer/components/ConfirmDialog.tsx
+  s_8aa585ff1f786f::t_5a142a54cbc816 1-2,14-29,31
+packages/extension-ui/src/Popover.tsx
+  s_8aa585ff1f786f::t_b936824a58ee15 1-90
+tests/unit/packages/extension-ui/popover.spec.tsx
+  s_8aa585ff1f786f::t_43f65bcad526b6 1-105
+packages/extension-ui/src/focus-trap.ts
+  s_8aa585ff1f786f::t_1009d8bed52b40 1-23,27-28,31-74,83-90
+  s_8aa585ff1f786f::t_f4d72a46d4de1a 75-82
+  s_8aa585ff1f786f::t_6a17282131102e 24-26,29-30
+packages/extension-ui/src/IconButton.tsx
+  s_8aa585ff1f786f::t_08477d711de0e3 1-41
+packages/extension-ui/src/index.ts
+  s_8aa585ff1f786f::t_5fe8595b71984c 29-36
+  s_8aa585ff1f786f::t_b936824a58ee15 14-16
+  s_8aa585ff1f786f::t_2382e82701b9d6 1-13,17-28,37-42
+packages/extension-ui/src/extension-ui.css
+  s_8aa585ff1f786f::t_a653f95e752cd5 1-270
+  s_8aa585ff1f786f::t_b936824a58ee15 271-284
+tests/unit/packages/extension-ui/empty-state.spec.tsx
+  s_8aa585ff1f786f::t_00e12fe837c7fa 1-60,64-164
+  s_8aa585ff1f786f::t_5fe8595b71984c 61-63
+packages/extension-ui/package.json
+  s_8aa585ff1f786f::t_f4d72a46d4de1a 23
+  s_8aa585ff1f786f::t_b6efe879546cb7 7-9,12-13,15,18
+  s_8aa585ff1f786f::t_2382e82701b9d6 22
+packages/extension-ui/src/Dialog.tsx
+  s_8aa585ff1f786f::t_f4d72a46d4de1a 129
+  s_8aa585ff1f786f::t_1d2e492f614d54 1-3,5-128,130-171,176
+  s_8aa585ff1f786f::t_6238d5ee695d3d 4
+  s_8aa585ff1f786f::t_b936824a58ee15 172-175
+tests/unit/ConfirmDialog.spec.tsx
+  s_8aa585ff1f786f::t_378035276575cc 62-68,71-72,74,77-88,91,95
+  s_8aa585ff1f786f::t_4619ce28ffe265 73
+packages/extension-ui/src/ConfirmDialog.tsx
+  s_8aa585ff1f786f::t_08477d711de0e3 1-51
+package-lock.json
+  s_8aa585ff1f786f::t_1a9c6ad6cce585 15608
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "107b29489e81da8a00b180179e88b6b7d960d2eb",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
