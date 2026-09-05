@@ -28,11 +28,11 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 **Purpose**: Pay the pre-existing debt that blocks the first commit, and fix the spec defects found in design review before they are built.
 
-- [ ] T001 Raise `src/renderer/components/sidebar/UnifiedSidebar.tsx` function coverage from 79.2% to ≥80% by extending `tests/unit/renderer/components/UnifiedSidebar.spec.tsx`; verify with `npx vitest run --coverage tests/unit/renderer/components/UnifiedSidebar.spec.tsx` — **`scripts/check-patch-coverage.cjs` refuses any commit staging this file until this passes** (research.md R-012)
-- [ ] T002 [P] Amend FR-040 in `specs/034-declutter-sidebar/spec.md` so the repo rail is the only _colour_ edge and state emphasis lives in the status gutter, resolving the FR-003/FR-040 contradiction (research.md R-011)
-- [ ] T003 [P] Amend FR-003, FR-009, FR-011 and FR-023 in `specs/034-declutter-sidebar/spec.md`: the count agrees with the glyph rather than totalling terminals; an empty _lane_ is silent but an empty _board_ gets one line and one action; the lane transition is 180ms with `prefers-reduced-motion` cutting to position; the terminal note is a tooltip and is never drawn
-- [ ] T004 [P] Add two requirements to `specs/034-declutter-sidebar/spec.md`: mono for machine facts and sans for human language (research.md R-009), and board lanes distinguished without colour per Constitution XII (research.md R-011)
-- [ ] T005 [P] Extend FR-047 in `specs/034-declutter-sidebar/spec.md` to the ordinary case — which terminal focuses when a branch has several (research.md R-004)
+- [x] T001 Raise `src/renderer/components/sidebar/UnifiedSidebar.tsx` function coverage from 79.2% to ≥80% by extending `tests/unit/renderer/components/UnifiedSidebar.spec.tsx`; verify with `npx vitest run --coverage tests/unit/renderer/components/UnifiedSidebar.spec.tsx` — **`scripts/check-patch-coverage.cjs` refuses any commit staging this file until this passes** (research.md R-012)
+- [x] T002 [P] Amend FR-040 in `specs/034-declutter-sidebar/spec.md` so the repo rail is the only _colour_ edge and state emphasis lives in the status gutter, resolving the FR-003/FR-040 contradiction (research.md R-011)
+- [x] T003 [P] Amend FR-003, FR-009, FR-011 and FR-023 in `specs/034-declutter-sidebar/spec.md`: the count agrees with the glyph rather than totalling terminals; an empty _lane_ is silent but an empty _board_ gets one line and one action; the lane transition is 180ms with `prefers-reduced-motion` cutting to position; the terminal note is a tooltip and is never drawn
+- [x] T004 [P] Add two requirements to `specs/034-declutter-sidebar/spec.md`: mono for machine facts and sans for human language (research.md R-009), and board lanes distinguished without colour per Constitution XII (research.md R-011)
+- [x] T005 [P] Extend FR-047 in `specs/034-declutter-sidebar/spec.md` to the ordinary case — which terminal focuses when a branch has several (research.md R-004)
 
 **Checkpoint**: `UnifiedSidebar.tsx` is committable and the spec no longer contains a requirement that cannot be built.
 

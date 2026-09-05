@@ -178,7 +178,7 @@ A user with five repos open can tell at a glance which rows belong to which repo
 
 - **FR-001**: The sidebar MUST list repos and branches only. Terminals MUST NOT be drawn as sidebar rows.
 - **FR-002**: Scratch terminals, which belong to no branch, MUST remain listed in their own section, since no branch row can represent them.
-- **FR-003**: Each branch row MUST show a single aggregate state derived from its terminals, using the fixed precedence: waiting on the user, then working, then idle, then exited. A branch with no terminals MUST read as idle.
+- **FR-003**: Each branch row MUST show a single aggregate state derived from its terminals, using the fixed precedence: waiting on the user, then working, then idle, then exited. A branch with no terminals MUST read as idle. Where the row also shows a count, that count MUST be the number of terminals in the row's own state, not the total — a branch showing the waiting glyph counts what is waiting.
 - **FR-004**: A collapsed repo header MUST report the number of branches it holds and MUST still signal when any hidden branch is waiting on the user.
 - **FR-005**: The always-visible "new branch" row that closes each repo's run MUST be removed, and creating a branch MUST be offered from the repo header instead.
 
@@ -187,9 +187,9 @@ A user with five repos open can tell at a glance which rows belong to which repo
 - **FR-006**: The app MUST provide a board that arranges every open terminal into columns by state, across all repos and branches.
 - **FR-007**: The board's columns MUST be: waiting on the user, working, idle, and exited.
 - **FR-008**: Each column header MUST show a status icon, a text label, and the number of cards in that column.
-- **FR-009**: A column with no cards MUST draw nothing in its body — no placeholder text and no empty-state artwork.
+- **FR-009**: A column with no cards MUST draw nothing in its body — no placeholder text and no empty-state artwork. A board with no cards **at all** is a different case and MUST NOT be left as bare column headers: it MUST offer one line of explanation and one action.
 - **FR-010**: The exited column MUST be presented as history: drawn at lower contrast than the active columns, and hidden entirely while empty.
-- **FR-011**: A card MUST move to the column matching its terminal's state when that state changes, without user action and without a reload.
+- **FR-011**: A card MUST move to the column matching its terminal's state when that state changes, without user action and without a reload. The move MUST be animated over roughly 180ms, affecting only position and opacity, and only on the card that changed. Where the viewer has asked for reduced motion, the card MUST appear in its new column without animating.
 - **FR-012**: A card MUST identify its terminal, the branch it belongs to, and the repo that branch is in, and MUST show when the terminal was last active.
 - **FR-013**: A card MUST omit the line for any optional fact it does not have, rather than drawing an empty one.
 - **FR-014**: Clicking a card MUST make that terminal the active terminal.
@@ -204,7 +204,7 @@ A user with five repos open can tell at a glance which rows belong to which repo
 
 - **FR-021**: Each tab in the tab bar MUST show its terminal's state, distinguishable by shape and not by colour alone.
 - **FR-022**: Each tab MUST show its terminal's unread bell count when there is one.
-- **FR-023**: A terminal's note MUST remain readable and editable from the tab bar.
+- **FR-023**: A terminal's note MUST remain readable and editable from the tab bar. It MUST NOT be drawn on the tab itself — it is revealed on hover. No tab may carry more than four elements at once, so that re-homing this information does not reproduce on the tab bar the density this feature removes from the sidebar.
 - **FR-024**: Every command that acted on a terminal through its sidebar row — rename, note, close, move to another branch — MUST remain available from the tab bar or the terminal's context menu.
 - **FR-025**: Any capability that depended on terminal rows and cannot be re-homed to the tab bar or the board MUST be removed together with its controls and its tests, and its removal MUST be stated in the pull request. It MUST NOT be left reachable but inoperable.
 
@@ -230,7 +230,7 @@ A user with five repos open can tell at a glance which rows belong to which repo
 
 **Colour**
 
-- **FR-040**: A repo's colour MUST appear only as a single coloured edge on the rows belonging to it, and on board cards only as the same single edge.
+- **FR-040**: A repo's colour MUST appear only as a single coloured edge on the rows belonging to it, and on board cards only as the same single edge. That edge belongs to the repo alone: no other signal may claim it. In particular, the emphasis that marks a branch as waiting on the user MUST live in the state indicator rather than on the row's edge, where it would otherwise overwrite the repo's identity.
 - **FR-041**: No row, header, section, or card MUST use the repo colour as a background tint at rest, on hover, or when selected.
 - **FR-042**: Hover and selection surfaces MUST be neutral and identical for every repo.
 - **FR-043**: A repo header's name MUST be drawn in a standard text colour, not in the repo's colour.
@@ -240,9 +240,14 @@ A user with five repos open can tell at a glance which rows belong to which repo
 **Behaviour preserved**
 
 - **FR-046**: The sidebar, the tab bar and the board MUST all be operable by keyboard, and every control MUST have an accessible name.
-- **FR-047**: Selecting a branch with no terminals MUST offer a clear way to start one.
+- **FR-047**: Selecting a branch MUST resolve to exactly one terminal, chosen in this order: one that is waiting on the user, else the one last active on that branch, else the most recently active. Selecting a branch with no terminals MUST offer a clear way to start one.
 - **FR-048**: On launch, the previously active branch MUST be active again with its terminals present in the tab bar.
 - **FR-049**: The width at which a branch row drops facts MUST be re-derived for the new anatomy. A row MUST never drop its branch name or its state.
+
+**Presentation**
+
+- **FR-050**: Machine facts — branch names, change counts, issue keys, paths — MUST be set in the monospaced face. Human language — repo names, terminal titles, labels and chrome — MUST be set in the proportional face. The two faces carry the hierarchy that the removed borders, badges and tints used to carry.
+- **FR-051**: Board columns MUST be distinguishable from one another without colour, by position, label and count. Their state indicators MUST be flat and MUST differentiate by shape and opacity only, never by hue.
 
 ### Key Entities
 

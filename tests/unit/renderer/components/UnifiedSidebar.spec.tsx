@@ -1193,3 +1193,78 @@ describe('UnifiedSidebar — scratch group behaviour retired from ScratchSection
     expect(scratch.querySelector('.session-group__count')!.textContent).toBe('1')
   })
 })
+
+describe('UnifiedSidebar — issue actions on a branch header', () => {
+  // These reach openLinkedIssue and copyIssueKey, which the header context menu
+  // and ScopeMenu both call through issueActionsFor. Nothing exercised them
+  // before, which is what held the file's function coverage under the 80% gate.
+  const link = {
+    projectId: 'p1',
+    tracker: 'linear' as const,
+    key: 'TAV-14',
+    injectContext: false,
+    linkedAt: '',
+  }
+
+  function openBranchMenu(): void {
+    const { container } = renderSidebar()
+    const headers = Array.from(container.querySelectorAll('.session-group__header'))
+    fireEvent.contextMenu(headers.find((h) => h.textContent?.includes('main'))!)
+  }
+
+  beforeEach(() => {
+    mockIntegrationsStore.linkFor.mockImplementation((id: string) => (id === 'p1' ? link : null))
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { shell: { openExternal: vi.fn() } },
+    })
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn() },
+    })
+  })
+
+  it('opens the linked issue in the tracker', () => {
+    mockIntegrationsStore.issueFor.mockReturnValue({ url: 'https://linear.app/x/TAV-14' })
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Open TAV-14 in tracker'))
+    expect(window.electronAPI.shell.openExternal).toHaveBeenCalledWith(
+      'https://linear.app/x/TAV-14'
+    )
+  })
+
+  it('opens nothing when the issue could not be read', () => {
+    // The link is stored but the tracker never answered, so there is no url to
+    // open. Failing quietly beats opening `undefined` in a browser.
+    mockIntegrationsStore.issueFor.mockReturnValue(null)
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Open TAV-14 in tracker'))
+    expect(window.electronAPI.shell.openExternal).not.toHaveBeenCalled()
+  })
+
+  it('copies the issue key', () => {
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Copy issue key'))
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('TAV-14')
+  })
+
+  it('copies nothing when the branch has no link', () => {
+    mockIntegrationsStore.linkFor.mockReturnValue(null)
+    const { container } = renderSidebar()
+    const headers = Array.from(container.querySelectorAll('.session-group__header'))
+    fireEvent.contextMenu(headers.find((h) => h.textContent?.includes('main'))!)
+    expect(screen.queryByText('Copy issue key')).toBeNull()
+  })
+
+  it('reaches the link dialog from "Change linked issue…"', () => {
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Change linked issue…'))
+    expect(mockIntegrationsStore.openLinkDialog).toHaveBeenCalledWith('p1')
+  })
+
+  it('unlinks the issue through the store', () => {
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Unlink TAV-14'))
+    expect(mockIntegrationsStore.unlinkIssue).toHaveBeenCalledWith('p1')
+  })
+})
