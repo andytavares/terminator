@@ -1,0 +1,19 @@
+specs/034-declutter-sidebar/PR.md
+  s_f99ce66da147a0::t_a2fe6f1c9d53e3 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "51295f468f98f6606b13430dccdd84d447574783",
+  "prompts": {},
+  "sessions": {
+    "s_f99ce66da147a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bedd0c8-eeb0-4be7-841a-5f499713ccb3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
