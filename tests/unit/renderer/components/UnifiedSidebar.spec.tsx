@@ -768,15 +768,18 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
   })
 
   it('persists a grouping change for that view across a remount', () => {
+    // Grouping by branch and by status are retired with the terminal rows
+    // (FR-038), and a stored preference naming one now degrades to the view's
+    // own default — so persistence is exercised with a grouping that survives.
     const { unmount } = renderSidebar()
     fireEvent.click(screen.getByText('Group: Workspace'))
-    fireEvent.click(screen.getByText('Branch'))
+    fireEvent.click(screen.getByText('None'))
     unmount()
     const { container } = renderSidebar()
     const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
       (el) => el.firstChild!.textContent
     )
-    expect(labels).toEqual(['main', 'Jobs', 'Web', 'Scratch'])
+    expect(labels).toEqual(['All sessions', 'Scratch'])
   })
 
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
@@ -883,8 +886,10 @@ describe('UnifiedSidebar — stale cleanup (US3)', () => {
 
   it('selects every session in a group', () => {
     const { container } = openStale()
-    fireEvent.click(container.querySelectorAll('.session-group__select-all')[0])
-    expect(screen.getByText('2 selected')).toBeTruthy()
+    const group = container.querySelectorAll('.session-group__select-all')[0]
+    const rows = group.closest('.session-group')!.querySelectorAll('.session-row').length
+    fireEvent.click(group)
+    expect(screen.getByText(`${rows} selected`)).toBeTruthy()
   })
 
   it('deselects a session that is clicked twice', () => {

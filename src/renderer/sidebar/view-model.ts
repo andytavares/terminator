@@ -5,6 +5,14 @@ import type { AgentState, Project, TerminalSession, Workspace } from '../../shar
 // Keeping it free of those imports is what makes the layout reversible and the
 // behaviour exhaustively testable — do not import anything but types here.
 
+/**
+ * How the list is bucketed.
+ *
+ * `project`, `status` and `branch` are retired once a branch becomes the listed
+ * item (FR-038), but they cannot be removed from the union until `buildGroups`
+ * and the view bar that reads them are gone — that happens in one commit at the
+ * end, when nothing imports them any more.
+ */
 export type GroupKey = 'project' | 'workspace' | 'status' | 'branch' | 'none'
 export type SortKey = 'recent' | 'oldest' | 'name' | 'status' | 'manual'
 

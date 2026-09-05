@@ -147,11 +147,11 @@ describe('saveViews', () => {
 
   it("persists a built-in's changed grouping and sort (FR-014)", () => {
     const regrouped = BUILT_IN_VIEWS.map((v) =>
-      v.id === 'everything' ? { ...v, groupBy: 'status' as const, sortBy: 'name' as const } : v
+      v.id === 'everything' ? { ...v, groupBy: 'none' as const, sortBy: 'name' as const } : v
     )
     saveViews(regrouped)
     expect(loadViews().find((v) => v.id === 'everything')).toMatchObject({
-      groupBy: 'status',
+      groupBy: 'none',
       sortBy: 'name',
       builtIn: true,
     })
@@ -201,5 +201,54 @@ describe('saveViews', () => {
       throw new Error('quota')
     })
     expect(() => saveViews([...BUILT_IN_VIEWS, custom])).not.toThrow()
+  })
+})
+
+describe('a preference naming a retired option (VW-1)', () => {
+  // The grouping options narrowed when the list became one of branches. A
+  // preference written before that names a key which no longer exists, and it
+  // must degrade to the built-in's own default rather than empty the sidebar —
+  // the same treatment loadViews already gives corrupt storage.
+  beforeEach(() => localStorage.clear())
+
+  it.each(['status', 'project', 'branch'])(
+    'falls back to the built-in default when the stored grouping is %s',
+    (retired) => {
+      localStorage.setItem(
+        VIEWS_STORAGE_KEY,
+        JSON.stringify({ custom: [], overrides: { everything: { groupBy: retired } } })
+      )
+      const everything = loadViews().find((v) => v.id === 'everything')!
+      expect(everything.groupBy).toBe('workspace')
+    }
+  )
+
+  it('keeps the rest of a preference that also names a retired grouping', () => {
+    localStorage.setItem(
+      VIEWS_STORAGE_KEY,
+      JSON.stringify({
+        custom: [],
+        overrides: { everything: { groupBy: 'status', sortBy: 'name' } },
+      })
+    )
+    const everything = loadViews().find((v) => v.id === 'everything')!
+    expect(everything.groupBy).toBe('workspace')
+    expect(everything.sortBy).toBe('name')
+  })
+
+  it('falls back when the stored sort is one that no longer exists', () => {
+    localStorage.setItem(
+      VIEWS_STORAGE_KEY,
+      JSON.stringify({ custom: [], overrides: { everything: { sortBy: 'nonsense' } } })
+    )
+    expect(loadViews().find((v) => v.id === 'everything')!.sortBy).toBe('manual')
+  })
+
+  it('leaves a valid preference alone', () => {
+    localStorage.setItem(
+      VIEWS_STORAGE_KEY,
+      JSON.stringify({ custom: [], overrides: { everything: { groupBy: 'none' } } })
+    )
+    expect(loadViews().find((v) => v.id === 'everything')!.groupBy).toBe('none')
   })
 })

@@ -121,17 +121,17 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 ### Tests for User Story 1 (write first, confirm they fail)
 
-- [ ] T034 [P] [US1] Write failing spec `tests/unit/renderer/sidebar/branch-rows.spec.ts` covering invariants BR-1 to BR-9, especially BR-1: a branch with no terminals is still a row, unconditionally
-- [ ] T035 [P] [US1] Write failing spec `tests/unit/renderer/sidebar/branch-rows-performance.spec.ts` mirroring `view-model-performance.spec.ts`, asserting `buildBranchRows` stays O(sessions + projects)
-- [ ] T036 [P] [US1] Extend `tests/unit/renderer/sidebar/views.spec.ts` with failing cases for the re-expressed built-ins and invariant VW-1: a stored override naming a retired `groupBy` degrades to the built-in default
+- [x] T034 [P] [US1] Write failing spec `tests/unit/renderer/sidebar/branch-rows.spec.ts` covering invariants BR-1 to BR-9, especially BR-1: a branch with no terminals is still a row, unconditionally
+- [x] T035 [P] [US1] Write failing spec `tests/unit/renderer/sidebar/branch-rows-performance.spec.ts` mirroring `view-model-performance.spec.ts`, asserting `buildBranchRows` stays O(sessions + projects)
+- [x] T036 [P] [US1] Extend `tests/unit/renderer/sidebar/views.spec.ts` with failing cases for the re-expressed built-ins and invariant VW-1: a stored override naming a retired `groupBy` degrades to the built-in default
 - [ ] T037 [P] [US1] Rewrite `tests/unit/renderer/components/SessionGroup.spec.tsx` as failing specs for a repo header and a branch row
 - [ ] T038 [P] [US1] Write failing spec `tests/unit/renderer/components/branch-selection.spec.tsx` for FR-047: a branch with several terminals focuses the one awaiting input, else the last active on that branch, else the most recently active; a branch with none offers to start one
 
 ### Implementation for User Story 1
 
-- [ ] T039 [US1] Implement `buildBranchRows` in `src/renderer/sidebar/branch-rows.ts` beside `buildGroups`, not replacing it (research.md R-001, T034)
-- [ ] T040 [US1] Re-express the four built-ins in `src/renderer/sidebar/views.ts` at branch level — a branch matches when any of its terminals matches — moving `needs-me`, `active` and `stale` to `groupBy: 'workspace'` (research.md R-006)
-- [ ] T041 [US1] Add the retired-`groupBy` degradation to `loadViews()` in `src/renderer/sidebar/views.ts` (T036)
+- [x] T039 [US1] Implement `buildBranchRows` in `src/renderer/sidebar/branch-rows.ts` beside `buildGroups`, not replacing it (research.md R-001, T034)
+- [x] T040 [US1] Re-express the four built-ins in `src/renderer/sidebar/views.ts` at branch level — a branch matches when any of its terminals matches — moving `needs-me`, `active` and `stale` to `groupBy: 'workspace'` (research.md R-006)
+- [x] T041 [US1] Add the retired-`groupBy` degradation to `loadViews()` in `src/renderer/sidebar/views.ts` (T036)
 - [ ] T042 [US1] Rework `src/renderer/components/sidebar/SessionGroup.tsx` into the repo header: name, count, swatch, and hover-only chevron / new-branch / registered repo actions
 - [ ] T043 [US1] Add the branch row with its 16px status gutter to `src/renderer/components/sidebar/SessionGroup.tsx`, reading `aggregateBranchState` (FR-003)
 - [ ] T044 [US1] Narrow `GroupKey` to `'workspace' | 'none'` in `src/renderer/sidebar/view-model.ts` and remove the retired grouping options (FR-038) — safe only after T040
