@@ -19,7 +19,8 @@ import {
   saveCollapseState,
   toggleCollapsed,
 } from '../../sidebar/collapse-state'
-import { useDragReorder } from '../../hooks/useDragReorder'
+import { useDragReorder, type DragItemProps } from '../../hooks/useDragReorder'
+import { mergeReorder } from '../../sidebar/manual-order'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
@@ -108,6 +109,7 @@ export function UnifiedSidebar({
     setActiveWorkspace,
     loadProjects,
     reorderWorkspaces,
+    reorderProjects,
     deleteProject,
     deleteWorkspace,
     renameProject,
@@ -174,9 +176,7 @@ export function UnifiedSidebar({
   const widthRef = useRef(width)
   const dragStartXRef = useRef<number | null>(null)
 
-  const { dragOverIndex, getItemProps } = useDragReorder(workspaces, (reordered) =>
-    reorderWorkspaces(reordered.map((w) => w.id))
-  )
+  // The repo drag lives further down, next to the drawn order it reorders.
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -368,6 +368,34 @@ export function UnifiedSidebar({
   const projectById = useMemo(() => new Map(allProjects.map((p) => [p.id, p])), [allProjects])
   const workspaceById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
 
+  // ── Dragging is how the manual order is written ───────────────────────────
+  //
+  // A drag reorders the list as drawn, which is not the list as stored the
+  // moment a computed sort or a filter is on. So the hook is given the drawn
+  // repos, and `mergeReorder` folds the result back into the stored list.
+  //
+  // Committing it also switches the view to Manual: any other sort would
+  // recompute the order on the next render and the drag would vanish, which is
+  // exactly what it did.
+  const orderedWorkspaces = useMemo(
+    () => groups.flatMap((g) => workspaceById.get(g.workspaceId) ?? []),
+    [groups, workspaceById]
+  )
+  const { dragOverIndex, getItemProps } = useDragReorder(orderedWorkspaces, (reordered) => {
+    void reorderWorkspaces(mergeReorder(workspaces, reordered, (w) => w.id).map((w) => w.id))
+    changeActiveView({ sortBy: 'manual' })
+  })
+
+  function reorderBranches(workspaceId: string, rows: BranchRowData[]): void {
+    const stored = projectsByWorkspaceId.get(workspaceId) ?? []
+    const dragged = rows.flatMap((row) => projectById.get(row.projectId) ?? [])
+    void reorderProjects(
+      workspaceId,
+      mergeReorder(stored, dragged, (p) => p.id).map((p) => p.id)
+    )
+    changeActiveView({ sortBy: 'manual' })
+  }
+
   // FR-027 lists three ways to reach a scope action: the group header, the row
   // scope menu, and the command palette. This is the third.
   const registerCommand = useExtensionRegistry((s) => s.registerCommand)
@@ -450,20 +478,6 @@ export function UnifiedSidebar({
 
   const workspaceTabList = Array.from(workspaceTabs.values())
 
-  // A workspace with no groups at all still needs a way in — but not while the
-  // view is narrowed, where an empty workspace is noise the filter notice
-  // already accounts for. Mirrors the same rule in the view model.
-  const isNarrowed =
-    view.filters.query !== undefined ||
-    view.filters.states !== undefined ||
-    view.filters.projectIds !== undefined ||
-    view.filters.staleOnly === true
-  const groupedWorkspaceIds = new Set(groups.map((g) => g.workspaceId))
-  const workspacesWithoutGroups =
-    view.groupBy === 'workspace' && !isNarrowed
-      ? workspaces.filter((ws) => !groupedWorkspaceIds.has(ws.id))
-      : []
-
   // ── Attached issues ───────────────────────────────────────────────────────
   //
   // The sidebar's view model knows nothing about issue trackers; it deals in
@@ -539,7 +553,12 @@ export function UnifiedSidebar({
     selectSession(projectId, focus)
   }
 
-  function renderBranch(row: BranchRowData, workspace: Workspace | undefined): JSX.Element {
+  function renderBranch(
+    row: BranchRowData,
+    workspace: Workspace | undefined,
+    dragProps?: DragItemProps,
+    dragOver?: boolean
+  ): JSX.Element {
     const project = projectById.get(row.projectId)
 
     // Asking for a branch's change volume the first time its row renders, and
@@ -551,6 +570,8 @@ export function UnifiedSidebar({
       <BranchRow
         key={row.projectId}
         row={row}
+        dragProps={dragProps}
+        dragOver={dragOver}
         selected={row.projectId === activeProjectId}
         colour={workspace?.color}
         now={clock}
@@ -619,15 +640,14 @@ export function UnifiedSidebar({
             const workspace = workspaceById.get(group.workspaceId)
             const collapsed = isGroupCollapsed(collapseState, view.groupBy, group.workspaceId)
             const ownsTabs = workspace !== undefined
+            const dragIndex = orderedWorkspaces.findIndex((w) => w.id === group.workspaceId)
             return (
               <React.Fragment key={group.workspaceId}>
                 <RepoHeader
                   group={group}
                   pathLabel={abbreviatePath(group.folderPath, homeDir)}
-                  dragProps={getItemProps(workspaces.findIndex((w) => w.id === group.workspaceId))}
-                  dragOver={
-                    dragOverIndex === workspaces.findIndex((w) => w.id === group.workspaceId)
-                  }
+                  dragProps={dragIndex === -1 ? undefined : getItemProps(dragIndex)}
+                  dragOver={dragIndex !== -1 && dragOverIndex === dragIndex}
                   collapsed={collapsed}
                   onToggleCollapse={() => toggleGroup(group.workspaceId)}
                   onAddBranch={workspace ? () => setCreateProjectFor(workspace.id) : undefined}
@@ -643,35 +663,23 @@ export function UnifiedSidebar({
                     workspace ? (tabId) => onSelectWorkspaceTab(workspace.id, tabId) : undefined
                   }
                 />
-                {!collapsed && group.branches.map((row) => renderBranch(row, workspace))}
+                {!collapsed && (
+                  <BranchList
+                    rows={group.branches}
+                    // Under "no grouping" one list holds every repo's branches
+                    // and the stores have nowhere to write an order that
+                    // crosses repos, so there is nothing to drag there.
+                    onReorder={
+                      workspace ? (rows) => reorderBranches(workspace.id, rows) : undefined
+                    }
+                    renderRow={(row, dragProps, dragOver) =>
+                      renderBranch(row, workspace, dragProps, dragOver)
+                    }
+                  />
+                )}
               </React.Fragment>
             )
           })}
-
-          {/* A repo with no branches yet still needs its way in. */}
-          {workspacesWithoutGroups.map((ws) => (
-            <RepoHeader
-              key={ws.id}
-              dragProps={getItemProps(workspaces.findIndex((w) => w.id === ws.id))}
-              dragOver={dragOverIndex === workspaces.findIndex((w) => w.id === ws.id)}
-              group={{
-                workspaceId: ws.id,
-                label: ws.name,
-                color: ws.color,
-                folderPath: ws.folderPath,
-                branches: [],
-                branchCount: 0,
-                needsYou: false,
-              }}
-              collapsed={false}
-              onToggleCollapse={() => toggleGroup(ws.id)}
-              onAddBranch={() => setCreateProjectFor(ws.id)}
-              onEdit={() => setEditWorkspace(ws)}
-              onRemove={() => setConfirmDeleteWorkspace(ws)}
-              onOpenInEditor={() => openInEditor(ws.folderPath)}
-              editorName={editorName}
-            />
-          ))}
 
           {/* Scratch terminals belong to no branch, so they are the one place a
               terminal is still a row. Drawn as branch rows because in this
@@ -716,7 +724,7 @@ export function UnifiedSidebar({
             </div>
           )}
 
-          {groups.length === 0 && workspacesWithoutGroups.length === 0 && (
+          {groups.length === 0 && (
             <div className="unified-sidebar__empty">
               {searchQuery ? `No branches match "${searchQuery}"` : 'No branches yet'}
             </div>
@@ -796,6 +804,36 @@ export function UnifiedSidebar({
           }}
           onClose={() => setConfirmDeleteProject(null)}
         />
+      )}
+    </>
+  )
+}
+
+/**
+ * One repo's branches, drag-reorderable.
+ *
+ * A component rather than a loop in the parent because each repo needs its own
+ * drag state and a hook cannot be called per iteration. It renders nothing of
+ * its own: the row is still the parent's to draw, so nothing had to be threaded
+ * through here to get it.
+ */
+function BranchList({
+  rows,
+  onReorder,
+  renderRow,
+}: {
+  rows: BranchRowData[]
+  /** Absent where a manual order has nowhere to be written. */
+  onReorder?: (rows: BranchRowData[]) => void
+  renderRow: (row: BranchRowData, dragProps?: DragItemProps, dragOver?: boolean) => JSX.Element
+}): JSX.Element {
+  const { dragOverIndex, getItemProps } = useDragReorder(rows, (reordered) =>
+    onReorder?.(reordered)
+  )
+  return (
+    <>
+      {rows.map((row, i) =>
+        renderRow(row, onReorder ? getItemProps(i) : undefined, dragOverIndex === i)
       )}
     </>
   )

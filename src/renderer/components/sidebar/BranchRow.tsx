@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Circle, CircleX, GitBranch, Pause, Play, Plus } from 'lucide-react'
 import type { BranchRow as BranchRowData } from '../../sidebar/branch-rows'
+import type { DragItemProps } from '../../hooks/useDragReorder'
 import type { ChangeStats } from '../../../shared/schemas/git.schema'
 import type { StatusIcon } from '../../sidebar/session-status'
 import { formatRelativeTime } from '../../sidebar/relative-time'
@@ -62,6 +63,12 @@ export interface BranchRowProps {
    * grouping (EA-2). This is the same escape the old ScopeMenu provided.
    */
   repoActions?: Array<{ id: string; label: string; onSelect: () => void }>
+  /**
+   * Drag-to-reorder within the repo. Absent under "no grouping", where the one
+   * list spans every repo and the stores keep no order that crosses them.
+   */
+  dragProps?: DragItemProps
+  dragOver?: boolean
 }
 
 /**
@@ -97,6 +104,8 @@ export function BranchRow({
   editorName,
   issueActions,
   repoActions = [],
+  dragProps,
+  dragOver = false,
 }: BranchRowProps): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [renaming, setRenaming] = useState(false)
@@ -151,7 +160,8 @@ export function BranchRow({
   return (
     <>
       <div
-        className={`branch-row${selected ? ' branch-row--selected' : ''}`}
+        {...dragProps}
+        className={`branch-row${selected ? ' branch-row--selected' : ''}${dragOver ? ' branch-row--dnd-over' : ''}`}
         style={colour ? { ['--ws-color' as string]: colour } : undefined}
         onClick={onSelect}
         onContextMenu={items.length > 0 ? openMenu : undefined}
