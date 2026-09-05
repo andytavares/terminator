@@ -97,6 +97,28 @@ describe('createTerminalSession', () => {
     )
   })
 
+  // A branch whose worktree was removed outside the app: the main process
+  // refuses the spawn, and the operator gets the folder's name rather than a
+  // tab that opens and instantly dies with nothing in it.
+  it('reports a terminal that could not start, and opens no tab', async () => {
+    mockCreateSession.mockRejectedValueOnce(
+      new Error('That folder no longer exists: /repo/.worktrees/removed')
+    )
+
+    await expect(createTerminalSession('proj-1', 'human', 'T', '/gone', 5000)).rejects.toThrow(
+      '/repo/.worktrees/removed'
+    )
+
+    expect(mockDispatchNotification).toHaveBeenCalledWith({
+      type: 'error',
+      title: 'Could not open a terminal',
+      message: 'That folder no longer exists: /repo/.worktrees/removed',
+      key: 'terminalStartFailed',
+    })
+    expect(mockSetTerminalInstance).not.toHaveBeenCalled()
+    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
+  })
+
   it('stores the instance before activating the session', async () => {
     const calls: string[] = []
     mockSetTerminalInstance.mockImplementation(() => calls.push('instance'))

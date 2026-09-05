@@ -129,7 +129,7 @@ export function App(): JSX.Element {
       const next = (projectViews.get(projectId)?.terminalCounter ?? 0) + 1
       setPendingCreate({ projectId, cwd, scrollbackLimit, defaultName: `Terminal ${next}` })
     } else {
-      void createSession(projectId, 'human', '', cwd, scrollbackLimit)
+      void createSession(projectId, 'human', '', cwd, scrollbackLimit).catch(() => {})
     }
   }, [
     scratchActive,
@@ -395,7 +395,9 @@ export function App(): JSX.Element {
     if (getSessionsForProject(activeProjectId).length > 0) return
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
-    void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
+    void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit).catch(
+      () => {}
+    )
   }, [
     activeProjectId,
     activeProjectTabId,
@@ -722,7 +724,7 @@ export function App(): JSX.Element {
               onConfirm={(name) => {
                 const { projectId, cwd, scrollbackLimit } = pendingCreate
                 setPendingCreate(null)
-                void createSession(projectId, 'human', name, cwd, scrollbackLimit)
+                void createSession(projectId, 'human', name, cwd, scrollbackLimit).catch(() => {})
               }}
               onCancel={() => setPendingCreate(null)}
             />

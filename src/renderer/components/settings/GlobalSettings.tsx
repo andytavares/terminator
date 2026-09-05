@@ -16,6 +16,7 @@ const NOTIFICATION_TARGETS: Array<{ value: NotificationTarget; label: string }> 
 const CORE_NOTIFICATION_KEYS: Array<{ key: string; label: string }> = [
   { key: 'terminalBell', label: 'Terminal bell (session needs attention)' },
   { key: 'branchSwitchFailed', label: 'Branch switch failed' },
+  { key: 'terminalStartFailed', label: 'Terminal could not start' },
   { key: 'splitPaneFailed', label: 'Split pane failed' },
   { key: 'closeTerminalFailed', label: 'Close terminal failed' },
   { key: 'remoteTunnelDisconnected', label: 'Remote tunnel disconnected' },

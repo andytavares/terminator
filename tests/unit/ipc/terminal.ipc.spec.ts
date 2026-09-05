@@ -34,6 +34,7 @@ vi.mock('../../../src/main/safe-send.js', () => ({
 }))
 
 import { registerTerminalHandlers } from '../../../src/main/ipc/terminal.ipc.js'
+import { MissingCwdError } from '../../../src/main/terminal/pty-manager.js'
 import type { SessionInfo } from '../../../src/main/terminal/pty-manager.js'
 
 function invokeHandler(channel: string) {
@@ -237,6 +238,34 @@ describe('registerTerminalHandlers', () => {
       expect(ptyManager.resize).toHaveBeenCalledWith('s1', 120, 40)
       sendHandler('terminal:resize')({}, { sessionId: 's1', cols: -1, rows: 0 })
       expect(ptyManager.resize).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('a branch whose folder is gone', () => {
+    // The renderer needs the folder's name to say anything useful, so the
+    // handler reports rather than throws, and carries the message through.
+    it('returns CWD_MISSING naming the folder, and opens no tab', async () => {
+      ptyManager.spawnSession.mockImplementation(() => {
+        throw new MissingCwdError('/repo/.worktrees/removed')
+      })
+
+      const result = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as {
+        error: string
+        message: string
+      }
+
+      expect(result.error).toBe('CWD_MISSING')
+      expect(result.message).toContain('/repo/.worktrees/removed')
+      expect(ptyManager.onData).not.toHaveBeenCalled()
+      expect(ptyManager.onExit).not.toHaveBeenCalled()
+    })
+
+    it('lets any other spawn failure through', () => {
+      ptyManager.spawnSession.mockImplementation(() => {
+        throw new Error('fork failed')
+      })
+
+      expect(() => invokeHandler('terminal:create')({}, VALID_CREATE)).toThrow('fork failed')
     })
   })
 

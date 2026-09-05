@@ -6,6 +6,7 @@ import { sendToWindow } from '../safe-send.js'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { homedir } from 'os'
+import { MissingCwdError } from '../terminal/pty-manager.js'
 import type { PtyManager } from '../terminal/pty-manager.js'
 import type { BrowserWindow } from 'electron'
 import { getGlobalSettings } from '../storage/settings-store.js'
@@ -100,16 +101,26 @@ export function registerTerminalHandlers(
     const sessionId = randomUUID()
     const resolvedCwd = cwd === '~' ? homedir() : cwd
 
-    ptyManager.spawnSession({
-      sessionId,
-      cwd: resolvedCwd,
-      shell: defaultShell,
-      type,
-      origin: 'app',
-      projectId,
-      tabTitle,
-      env: issueEnvFor(projectId),
-    })
+    try {
+      ptyManager.spawnSession({
+        sessionId,
+        cwd: resolvedCwd,
+        shell: defaultShell,
+        type,
+        origin: 'app',
+        projectId,
+        tabTitle,
+        env: issueEnvFor(projectId),
+      })
+    } catch (err) {
+      // Reported rather than thrown, so the renderer can say which folder is
+      // gone. A branch whose worktree was deleted outside the app otherwise
+      // produced a tab that died instantly with nothing written in it.
+      if (err instanceof MissingCwdError) {
+        return { error: 'CWD_MISSING', message: err.message }
+      }
+      throw err
+    }
     ptyManager.onData(sessionId, (data) => {
       const win = getWindow()
       if (win && !win.isDestroyed()) win.webContents.send('terminal:output', { sessionId, data })

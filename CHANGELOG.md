@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **A branch whose folder is gone no longer opens a terminal that instantly dies.** `pty.spawn` accepts a `cwd` that does not exist: the child forks, cannot `chdir`, and exits with status 1 having printed nothing — so a worktree removed outside Terminator, or a repo folder deleted on disk, produced a tab that appeared and died with a blank screen and no reason given. `PtyManager.spawnSession` now refuses such a `cwd` up front (`MissingCwdError`), `terminal:create` reports it as `CWD_MISSING` with the folder's path, and the renderer raises it as an error notification — which the notification system always delivers as a toast, whatever the operator's per-key settings say. No tab is opened. Being the single spawn point, the guard covers `api.pty` too, and the remote server's `POST /api/terminals` now answers `400 CWD_MISSING` instead of handing back a session that was already dead
 - Removed `npm rebuild better-sqlite3 --silent` from `.husky/pre-commit` (pre-commit hook is now fast)
 - Removed `*:focus { outline: none }` rule — keyboard focus rings are now visible (WCAG 2.1 AA)
 - `ConfirmDialog` missing `aria-labelledby` / `id` on title (screen reader accessibility)

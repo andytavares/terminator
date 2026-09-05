@@ -22,10 +22,19 @@ export interface SessionInfo {
   workspaceId?: string
 }
 
+/**
+ * The `name` on the error `spawnSession` throws for a `cwd` that is not an
+ * existing directory. Part of the ExtensionAPI contract, matched by name
+ * because the class itself lives in core and extensions never import from
+ * there.
+ */
+export const MISSING_CWD_ERROR = 'MissingCwdError'
+
 // Mirrors the v1.4.0 session-authority surface of the core PtyManagerAPI
 // (ExtensionAPI contract). PtyManager owns all session state; this extension
 // keeps no session registry of its own.
 export interface PtyManagerAPI {
+  /** Throws with `name === MISSING_CWD_ERROR` if `cwd` is not a directory. */
   spawnSession(opts: SpawnSessionOptions): SessionInfo
   onData(sessionId: string, listener: (data: string) => void): (() => void) | null
   onExit(sessionId: string, listener: (exitCode: number) => void): (() => void) | null

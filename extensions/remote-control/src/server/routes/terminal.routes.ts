@@ -3,6 +3,7 @@ import { homedir } from 'os'
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type WebSocket from 'ws'
+import { MISSING_CWD_ERROR } from '../../types.js'
 import type { PtyManagerAPI } from '../../types.js'
 import type { WsTicketStore } from '../ws-ticket-store.js'
 import type { WsSubscriberManager } from '../ws-subscriber-manager.js'
@@ -82,13 +83,22 @@ export async function registerTerminalRoutes(
     const sessionId = randomUUID()
     const resolvedCwd = cwd.startsWith('~') ? cwd.replace(/^~/, homedir()) : cwd
 
-    ptyManager.spawnSession({
-      sessionId,
-      cwd: resolvedCwd,
-      shell: process.env.SHELL || '/bin/zsh',
-      type,
-      origin: 'remote',
-    })
+    try {
+      ptyManager.spawnSession({
+        sessionId,
+        cwd: resolvedCwd,
+        shell: process.env.SHELL || '/bin/zsh',
+        type,
+        origin: 'remote',
+      })
+    } catch (err) {
+      // The requested folder is not there — a client error, and the caller
+      // needs the path back to make sense of it. Anything else is ours.
+      if (err instanceof Error && err.name === MISSING_CWD_ERROR) {
+        return reply.status(400).send({ error: 'CWD_MISSING', message: err.message })
+      }
+      throw err
+    }
     attachBroadcast(sessionId)
 
     return reply.status(201).send({ sessionId })

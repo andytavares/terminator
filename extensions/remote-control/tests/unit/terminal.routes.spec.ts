@@ -59,6 +59,25 @@ describe('POST /api/terminals', () => {
     )
   })
 
+  it('returns 400 CWD_MISSING, naming the folder, when the cwd is gone', async () => {
+    ptyManager.spawnSession.mockImplementationOnce(() => {
+      const err = new Error('That folder no longer exists: /gone')
+      err.name = 'MissingCwdError'
+      throw err
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/gone', type: 'human' },
+    })
+
+    expect(res.statusCode).toBe(400)
+    const body = JSON.parse(res.body)
+    expect(body.error).toBe('CWD_MISSING')
+    expect(body.message).toContain('/gone')
+  })
+
   it('returns 400 for an invalid payload', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/terminals', payload: { cwd: '' } })
     expect(res.statusCode).toBe(400)

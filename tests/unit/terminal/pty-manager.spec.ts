@@ -20,18 +20,79 @@ vi.mock('electron', () => ({
   },
 }))
 
+const fsMock = vi.hoisted(() => ({
+  // Every cwd is a real directory unless a test says otherwise.
+  statSync: vi.fn(() => ({ isDirectory: () => true })),
+}))
+
 vi.mock('fs', () => ({
   existsSync: vi.fn(() => false),
   readFileSync: vi.fn(() => '[]'),
   writeFileSync: vi.fn(),
+  statSync: fsMock.statSync,
 }))
 
 describe('PtyManager', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    fsMock.statSync.mockImplementation(() => ({ isDirectory: () => true }))
     mockPty.onData.mockImplementation((_cb: unknown) => {})
     mockPty.onExit.mockImplementation((_cb: unknown) => {})
+  })
+
+  describe('a cwd that is not there', () => {
+    // node-pty does not fail this spawn — the child forks, cannot chdir, and
+    // exits 1 with no output, which reaches the operator as a tab that opens
+    // and instantly dies showing nothing. Refusing up front is the only point
+    // at which the reason still exists.
+    it('refuses to spawn, and names the folder', async () => {
+      const { PtyManager, MissingCwdError } = await import('../../../src/main/terminal/pty-manager')
+      const pty = await import('node-pty')
+      fsMock.statSync.mockImplementation(() => {
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      })
+      const mgr = new PtyManager()
+
+      expect(() =>
+        mgr.spawnSession({
+          sessionId: 'gone',
+          cwd: '/repo/.worktrees/removed',
+          shell: '/bin/zsh',
+          type: 'human',
+          origin: 'app',
+        })
+      ).toThrow(MissingCwdError)
+      expect(() =>
+        mgr.spawnSession({
+          sessionId: 'gone',
+          cwd: '/repo/.worktrees/removed',
+          shell: '/bin/zsh',
+          type: 'human',
+          origin: 'app',
+        })
+      ).toThrow('/repo/.worktrees/removed')
+      expect(pty.spawn).not.toHaveBeenCalled()
+      expect(mgr.getSessionIds()).toHaveLength(0)
+    })
+
+    it('refuses a cwd that exists but is a file', async () => {
+      const { PtyManager, MissingCwdError } = await import('../../../src/main/terminal/pty-manager')
+      const pty = await import('node-pty')
+      fsMock.statSync.mockImplementation(() => ({ isDirectory: () => false }))
+      const mgr = new PtyManager()
+
+      expect(() =>
+        mgr.spawnSession({
+          sessionId: 'file',
+          cwd: '/repo/README.md',
+          shell: '/bin/zsh',
+          type: 'human',
+          origin: 'app',
+        })
+      ).toThrow(MissingCwdError)
+      expect(pty.spawn).not.toHaveBeenCalled()
+    })
   })
 
   it('spawn creates a PTY and returns sessionId', async () => {

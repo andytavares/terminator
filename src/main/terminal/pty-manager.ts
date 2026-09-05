@@ -1,5 +1,5 @@
 import * as pty from 'node-pty'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 
@@ -95,6 +95,33 @@ const REGISTRY_FILE = () => join(app.getPath('userData'), 'session-registry.json
  */
 const LATE_ATTACH_GRACE_MS = 60_000
 
+/**
+ * A terminal was asked for in a folder that is not there.
+ *
+ * node-pty does not fail such a spawn: the child forks, cannot chdir, and
+ * exits with status 1 having printed nothing. That reaches the operator as a
+ * tab which appears and immediately dies with a blank screen and no reason
+ * given — the exact shape of "my terminals just exit". A branch whose worktree
+ * was removed outside the app, or a repo folder that has been deleted, is this
+ * case, so the check lives in the one place every caller goes through.
+ */
+export class MissingCwdError extends Error {
+  constructor(readonly cwd: string) {
+    super(`That folder no longer exists: ${cwd}`)
+    this.name = 'MissingCwdError'
+  }
+}
+
+function assertUsableCwd(cwd: string): void {
+  let isDirectory = false
+  try {
+    isDirectory = statSync(cwd).isDirectory()
+  } catch {
+    throw new MissingCwdError(cwd)
+  }
+  if (!isDirectory) throw new MissingCwdError(cwd)
+}
+
 export class PtyManager {
   private sessions = new Map<string, ActiveSession>()
 
@@ -111,6 +138,11 @@ export class PtyManager {
   }
 
   spawnSession(opts: SpawnSessionOptions): SessionInfo {
+    // Before the spawn, not after: a PTY started in a missing directory is
+    // already dead, and nothing downstream can tell that apart from a shell
+    // the operator exited.
+    assertUsableCwd(opts.cwd)
+
     const ptyProcess = pty.spawn(opts.shell, ['-l'], {
       name: 'xterm-256color',
       cols: 80,

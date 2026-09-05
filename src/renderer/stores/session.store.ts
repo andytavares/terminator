@@ -204,7 +204,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       scrollbackLimit,
       cwd,
     })
-    if ('error' in result) throw new Error(result.error)
+    // The message when there is one: 'CWD_MISSING' names the failure, but only
+    // the message names the folder, and the folder is the whole answer.
+    if ('error' in result) throw new Error(result.message ?? result.error)
 
     const { sessionId } = result
     const createdAt = new Date().toISOString()
