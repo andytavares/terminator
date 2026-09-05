@@ -5,7 +5,8 @@
   "main": "out/main/index.js",
   "type": "module",
   "workspaces": [
-    "extensions/*"
+    "extensions/*",
+    "packages/*"
   ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
@@ -13,10 +14,11 @@
   },
   "scripts": {
     "clean": "rm -rf out/main out/preload out/renderer out/renderer-remote",
+    "build:packages": "npm run build --workspace=@terminator/extension-ui",
     "build:extensions": "node scripts/build-extensions.cjs",
     "build:remote": "vite build --config vite.config.remote.ts",
-    "dev": "npm run clean && npm run build:extensions && npm run build:remote && electron-vite dev",
-    "build": "npm run clean && npm run build:extensions && npm run build:remote && electron-vite build",
+    "dev": "npm run clean && npm run build:packages && npm run build:extensions && npm run build:remote && electron-vite dev",
+    "build": "npm run clean && npm run build:packages && npm run build:extensions && npm run build:remote && electron-vite build",
     "preview": "electron-vite preview",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
@@ -45,6 +47,7 @@
     "*.{json,md,css,html,yml,yaml}": "prettier --write"
   },
   "dependencies": {
+    "@terminator/extension-ui": "*",
     "@electric-sql/pglite": "^0.2.17",
     "@fastify/static": "10.1.2",
     "@fastify/websocket": "11.2.0",

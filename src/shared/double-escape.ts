@@ -31,3 +31,56 @@ export function createDoubleEscapeDetector(
     },
   }
 }
+
+// ── The guards ──────────────────────────────────────────────────────────────
+//
+// The pairing above says *when* two presses form the gesture. This says when the
+// gesture must stand down, and it exists because that rule used to be written
+// twice: once in the host window's `useExtensionEscapeExit`, which skipped
+// terminals, text fields and open modals, and once inline in
+// `preload-webview.ts`, which skipped nothing. The extension copy was the one
+// users actually hit, so Escape twice while typing closed the extension and
+// took the draft with it. One decision function now serves both.
+
+export interface EscapeContext {
+  /** Focus is inside a terminal, where Escape belongs to the shell. */
+  inTerminal: boolean
+  /** Focus is inside a text entry control, where Escape belongs to the field. */
+  inTextField: boolean
+  /** How many modal surfaces are open in this document. */
+  modalDepth: number
+}
+
+/**
+ * Whether the exit gesture must stand down. Pure: every input is a parameter,
+ * nothing is read from the DOM or the clock.
+ */
+export function shouldSuppressExitGesture(context: EscapeContext): boolean {
+  return context.inTerminal || context.inTextField || context.modalDepth > 0
+}
+
+/** Selector for the terminal surface, which owns Escape outright. */
+const TERMINAL_SELECTOR = '.xterm'
+
+/**
+ * Derive the context from the element that received the keypress.
+ *
+ * `isContentEditable` is checked through the attribute as well as the property:
+ * the property is unimplemented in jsdom, and a host that reports neither is
+ * treated as "not a text field" rather than throwing.
+ */
+export function escapeContextFromTarget(target: unknown, modalDepth: number): EscapeContext {
+  const el = target instanceof Element ? target : null
+  const inTextField =
+    el !== null &&
+    (el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      (el as HTMLElement).isContentEditable === true ||
+      el.getAttribute('contenteditable') === 'true')
+
+  return {
+    inTerminal: el !== null && el.closest(TERMINAL_SELECTOR) !== null,
+    inTextField,
+    modalDepth,
+  }
+}

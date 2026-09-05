@@ -7,6 +7,7 @@
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },
   "dependencies": {
+    "@terminator/extension-ui": "*",
     "chokidar": "^3.6.0",
     "electron-store": "8.2.0",
     "lucide-react": "^1.16.0",

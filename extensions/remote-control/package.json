@@ -9,6 +9,7 @@
   "dependencies": {
     "@fastify/static": "^10.1.2",
     "@fastify/websocket": "^11.2.0",
+    "@terminator/extension-ui": "*",
     "bcryptjs": "2.4.3",
     "fastify": "5.8.5",
     "lucide-react": "^0.475.0",
