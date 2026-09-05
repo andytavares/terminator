@@ -59,22 +59,40 @@ describe('ConfirmDialog', () => {
     expect(document.activeElement).toBe(cancelBtn)
   })
 
-  it('dialog root has aria-labelledby pointing to title element', () => {
+  // These three used to assert the literal id `confirm-dialog-title` and the
+  // class `.dialog__description`. The dialog now comes from
+  // @terminator/extension-ui and labels itself through `useId`, which is the
+  // better behaviour: a hardcoded id collides the moment two dialogs are open
+  // at once, and this component is now shared with every extension. The
+  // assertions are rewritten to check what they were actually protecting.
+  it('labels the dialog with its own title element', () => {
     const { container } = render(<ConfirmDialog {...baseProps} />)
     const dialog = container.querySelector('[role="dialog"]')
-    expect(dialog?.getAttribute('aria-labelledby')).toBe('confirm-dialog-title')
+    const labelledBy = dialog?.getAttribute('aria-labelledby')
+    expect(labelledBy).toBeTruthy()
+    const title = document.getElementById(labelledBy!)
+    expect(title?.textContent).toBe(baseProps.title)
   })
 
-  it('title element has id="confirm-dialog-title"', () => {
-    const { container } = render(<ConfirmDialog {...baseProps} />)
-    expect(container.querySelector('#confirm-dialog-title')).toBeTruthy()
+  it('gives two dialogs distinct label ids rather than a shared literal', () => {
+    const { container } = render(
+      <>
+        <ConfirmDialog {...baseProps} />
+        <ConfirmDialog {...baseProps} title="Second" />
+      </>
+    )
+    const ids = Array.from(container.querySelectorAll('[role="dialog"]')).map((d) =>
+      d.getAttribute('aria-labelledby')
+    )
+    expect(ids).toHaveLength(2)
+    expect(ids[0]).not.toBe(ids[1])
   })
 
-  it('description paragraph uses CSS class instead of inline styles', () => {
+  it('styles the description by class rather than inline', () => {
     const { container } = render(
       <ConfirmDialog {...baseProps} description="This will delete all 4 projects." />
     )
-    const desc = container.querySelector('.dialog__description')
+    const desc = container.querySelector('.tmui-dialog__description')
     expect(desc).toBeTruthy()
     expect(desc?.getAttribute('style')).toBeFalsy()
   })

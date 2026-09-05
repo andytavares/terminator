@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { X } from 'lucide-react'
+import { Dialog } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 
 type ExportScope = 'all' | 'note'
@@ -93,171 +93,156 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
     both: 'Both',
   }
 
+  const exportLabel = running
+    ? 'Exporting…'
+    : `Export ${scopeCount} ${scopeCount === 1 ? 'note' : 'notes'}`
+
   return (
-    <div
-      className="notepad-overlay-backdrop"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+    <Dialog
+      title="Export to markdown"
+      onDismiss={onClose}
+      actions={[
+        { label: 'Cancel', onSelect: onClose },
+        {
+          label: exportLabel,
+          tone: 'primary',
+          onSelect: () => {
+            if (folder && !running) void handleExport()
+          },
+        },
+      ]}
     >
-      <div
-        className="notepad-export-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Export notes"
-      >
-        {/* Header */}
-        <div className="notepad-export-dialog__header">
-          <span className="notepad-export-dialog__title">Export to markdown</span>
-          <button className="notepad-btn-icon" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
+      <div className="notepad-export-dialog__body">
+        {/* Destination folder */}
+        <div className="notepad-export-dialog__field">
+          <div className="notepad-export-dialog__field-label">Destination folder</div>
+          <div className="notepad-export-dialog__folder-row">
+            <input
+              className="notepad-export-dialog__folder-input"
+              value={folder}
+              onChange={(e) => setFolder(e.target.value)}
+              spellCheck={false}
+              aria-label="Destination folder"
+            />
+            <button
+              className="notepad-export-dialog__choose-btn"
+              onClick={() => void pickFolder()}
+              aria-label="Choose folder"
+            >
+              Choose…
+            </button>
+          </div>
         </div>
 
-        <div className="notepad-export-dialog__body">
-          {/* Destination folder */}
-          <div className="notepad-export-dialog__field">
-            <div className="notepad-export-dialog__field-label">Destination folder</div>
-            <div className="notepad-export-dialog__folder-row">
-              <input
-                className="notepad-export-dialog__folder-input"
-                value={folder}
-                onChange={(e) => setFolder(e.target.value)}
-                spellCheck={false}
-                aria-label="Destination folder"
-              />
+        {/* Scope */}
+        <div className="notepad-export-dialog__field">
+          <div className="notepad-export-dialog__field-label">Scope</div>
+          <div className="notepad-segmented notepad-export-dialog__scope-tabs">
+            <button
+              className={`notepad-segmented__btn${scope === 'all' ? ' notepad-segmented__btn--active' : ''}`}
+              onClick={() => setScope('all')}
+            >
+              All notes ({notes.filter((n) => !n.archivedAt).length})
+            </button>
+            {noteId && (
               <button
-                className="notepad-export-dialog__choose-btn"
-                onClick={() => void pickFolder()}
-                aria-label="Choose folder"
+                className={`notepad-segmented__btn${scope === 'note' ? ' notepad-segmented__btn--active' : ''}`}
+                onClick={() => setScope('note')}
               >
-                Choose…
+                Selected (1)
               </button>
-            </div>
+            )}
           </div>
+        </div>
 
-          {/* Scope */}
-          <div className="notepad-export-dialog__field">
-            <div className="notepad-export-dialog__field-label">Scope</div>
-            <div className="notepad-segmented notepad-export-dialog__scope-tabs">
-              <button
-                className={`notepad-segmented__btn${scope === 'all' ? ' notepad-segmented__btn--active' : ''}`}
-                onClick={() => setScope('all')}
-              >
-                All notes ({notes.filter((n) => !n.archivedAt).length})
-              </button>
-              {noteId && (
-                <button
-                  className={`notepad-segmented__btn${scope === 'note' ? ' notepad-segmented__btn--active' : ''}`}
-                  onClick={() => setScope('note')}
-                >
-                  Selected (1)
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Include diagrams */}
-          {scope === 'all' && (
-            <div className="notepad-export-dialog__toggle-row">
-              <span>
-                Include diagrams{' '}
-                <span className="notepad-export-dialog__toggle-desc">
-                  (saved as .excalidraw files in diagrams/)
-                </span>
+        {/* Include diagrams */}
+        {scope === 'all' && (
+          <div className="notepad-export-dialog__toggle-row">
+            <span>
+              Include diagrams{' '}
+              <span className="notepad-export-dialog__toggle-desc">
+                (saved as .excalidraw files in diagrams/)
               </span>
-              <button
-                className={`notepad-toggle${includeDiagrams ? ' notepad-toggle--on' : ''}`}
-                onClick={() => setIncludeDiagrams((v) => !v)}
-                role="switch"
-                aria-checked={includeDiagrams}
-                aria-label="Include diagrams"
-              />
-            </div>
-          )}
-
-          {/* YAML frontmatter toggle */}
-          <div className="notepad-export-dialog__toggle-row">
-            <span>
-              Include YAML frontmatter{' '}
-              <span className="notepad-export-dialog__toggle-desc">(id, title, tags, dates)</span>
             </span>
             <button
-              className={`notepad-toggle${includeFrontmatter ? ' notepad-toggle--on' : ''}`}
-              onClick={() => setIncludeFrontmatter((v) => !v)}
+              className={`notepad-toggle${includeDiagrams ? ' notepad-toggle--on' : ''}`}
+              onClick={() => setIncludeDiagrams((v) => !v)}
               role="switch"
-              aria-checked={includeFrontmatter}
-              aria-label="Include YAML frontmatter"
+              aria-checked={includeDiagrams}
+              aria-label="Include diagrams"
             />
           </div>
+        )}
 
-          {/* Export comments format */}
-          <div className="notepad-export-dialog__toggle-row">
-            <span>Export comments</span>
-            <div className="notepad-segmented">
-              {(['sidecar', 'inline', 'both'] as CommentFormat[]).map((f) => (
-                <button
-                  key={f}
-                  className={`notepad-segmented__btn${commentFormat === f ? ' notepad-segmented__btn--active' : ''}`}
-                  onClick={() => setCommentFormat(f)}
-                >
-                  {commentFormatLabels[f]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Overwrite toggle */}
-          <div className="notepad-export-dialog__toggle-row">
-            <span>
-              Overwrite existing by id{' '}
-              <span className="notepad-export-dialog__toggle-desc">(idempotent re-export)</span>
-            </span>
-            <button
-              className={`notepad-toggle${overwriteById ? ' notepad-toggle--on' : ''}`}
-              onClick={() => setOverwriteById((v) => !v)}
-              role="switch"
-              aria-checked={overwriteById}
-              aria-label="Overwrite existing by id"
-            />
-          </div>
-
-          {/* Preview box */}
-          {previewNote && (
-            <div className="notepad-export-dialog__preview">
-              <div className="notepad-export-dialog__preview-line notepad-export-dialog__preview-filename">
-                {previewSlug(previewNote.title, previewNote.id)}
-              </div>
-              <div className="notepad-export-dialog__preview-line">---</div>
-              {includeFrontmatter && (
-                <div className="notepad-export-dialog__preview-line">
-                  id: {previewNote.id.slice(0, 8)}… · title: {previewNote.title} · tags: [
-                  {previewNote.tags.join(', ')}]
-                </div>
-              )}
-              <div className="notepad-export-dialog__preview-line">---</div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="notepad-export-dialog__footer">
-          <span className="notepad-export-dialog__footer-meta">
-            {exportResult
-              ? `Last export: ${exportResult.time} → ${exportResult.notes} notes${exportResult.diagrams > 0 ? `, ${exportResult.diagrams} diagrams` : ''}`
-              : `${scopeCount} ${scopeCount === 1 ? 'note' : 'notes'}${diagramCount > 0 ? ` + ${diagramCount} diagrams` : ''} will be exported`}
+        {/* YAML frontmatter toggle */}
+        <div className="notepad-export-dialog__toggle-row">
+          <span>
+            Include YAML frontmatter{' '}
+            <span className="notepad-export-dialog__toggle-desc">(id, title, tags, dates)</span>
           </span>
-          <button className="notepad-btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
           <button
-            className="notepad-btn-primary"
-            onClick={() => void handleExport()}
-            disabled={!folder || running}
-            aria-label="Export"
-          >
-            {running ? 'Exporting…' : `Export ${scopeCount} ${scopeCount === 1 ? 'note' : 'notes'}`}
-          </button>
+            className={`notepad-toggle${includeFrontmatter ? ' notepad-toggle--on' : ''}`}
+            onClick={() => setIncludeFrontmatter((v) => !v)}
+            role="switch"
+            aria-checked={includeFrontmatter}
+            aria-label="Include YAML frontmatter"
+          />
         </div>
+
+        {/* Export comments format */}
+        <div className="notepad-export-dialog__toggle-row">
+          <span>Export comments</span>
+          <div className="notepad-segmented">
+            {(['sidecar', 'inline', 'both'] as CommentFormat[]).map((f) => (
+              <button
+                key={f}
+                className={`notepad-segmented__btn${commentFormat === f ? ' notepad-segmented__btn--active' : ''}`}
+                onClick={() => setCommentFormat(f)}
+              >
+                {commentFormatLabels[f]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Overwrite toggle */}
+        <div className="notepad-export-dialog__toggle-row">
+          <span>
+            Overwrite existing by id{' '}
+            <span className="notepad-export-dialog__toggle-desc">(idempotent re-export)</span>
+          </span>
+          <button
+            className={`notepad-toggle${overwriteById ? ' notepad-toggle--on' : ''}`}
+            onClick={() => setOverwriteById((v) => !v)}
+            role="switch"
+            aria-checked={overwriteById}
+            aria-label="Overwrite existing by id"
+          />
+        </div>
+
+        {/* Preview box */}
+        {previewNote && (
+          <div className="notepad-export-dialog__preview">
+            <div className="notepad-export-dialog__preview-line notepad-export-dialog__preview-filename">
+              {previewSlug(previewNote.title, previewNote.id)}
+            </div>
+            <div className="notepad-export-dialog__preview-line">---</div>
+            {includeFrontmatter && (
+              <div className="notepad-export-dialog__preview-line">
+                id: {previewNote.id.slice(0, 8)}… · title: {previewNote.title} · tags: [
+                {previewNote.tags.join(', ')}]
+              </div>
+            )}
+            <div className="notepad-export-dialog__preview-line">---</div>
+          </div>
+        )}
       </div>
-    </div>
+
+      <p className="notepad-export-dialog__footer-meta">
+        {exportResult
+          ? `Last export: ${exportResult.time} → ${exportResult.notes} notes${exportResult.diagrams > 0 ? `, ${exportResult.diagrams} diagrams` : ''}`
+          : `${scopeCount} ${scopeCount === 1 ? 'note' : 'notes'}${diagramCount > 0 ? ` + ${diagramCount} diagrams` : ''} will be exported`}
+      </p>
+    </Dialog>
   )
 }

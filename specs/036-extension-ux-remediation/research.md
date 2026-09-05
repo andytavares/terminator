@@ -213,3 +213,58 @@ files. The plan's position: **do not perpetuate it** — any component this feat
 adopts CSS-controlled sizing, and the remainder is recorded as follow-up rather than swept
 silently, so the diff stays reviewable (Constitution V: every changed line traces to the
 request).
+
+---
+
+## R10. Correction: "19 modal surfaces" conflates two different things
+
+**Found during implementation, not during Phase 0.**
+
+The audit measured 19 components for five behaviours and called them all "modal and overlay
+surfaces". Reading the actual markup rather than the component names shows two distinct kinds,
+and holding them to one standard is wrong:
+
+**Modal dialogs** — a scrim, focus trapped inside, the rest of the view inert while open:
+
+| Surface                        | Where                            |
+| ------------------------------ | -------------------------------- |
+| notepad ExportDialog           | `ExportDialog.tsx`               |
+| notepad QuickCreateOverlay     | `QuickCreateOverlay.tsx`         |
+| notepad SearchOverlay          | `SearchOverlay.tsx`              |
+| notepad delete confirmation    | `NoteList.tsx`                   |
+| git PrDialog                   | `PrDialog.tsx`                   |
+| git KeepBothModal              | `merge-flow/KeepBothModal.tsx`   |
+| git ReviewSubmitPanel          | `pr-review/PrReviewView.tsx:402` |
+| speckit card drawer            | `renderer/App.tsx:145`           |
+| speckit new-card modal         | `renderer/App.tsx:155`           |
+| task-vault QuickCaptureOverlay | `TaskVaultView.tsx:70,171`       |
+
+**Dismissible overlays** — anchored to a control, the view behind stays live: `LinkPicker`,
+`FileToPicker`, `DateTimePicker`, `KanbanLaneEditor`, `CalendarDrawer`, `TaskDetailPanel`,
+`git CommentComposer`, `pr-review` inline threads.
+
+Three of the four components the audit listed under speckit — `CardBriefEditor`,
+`BatchCheckIn`, `SettingsView` — are **content**, not surfaces at all. They render _inside_ the
+drawer and the new-card modal, whose chrome lives in `renderer/App.tsx`. Scoring them for
+`role="dialog"` and `aria-modal` was scoring the wrong file.
+
+**Consequence for the requirements.** `aria-modal="true"` on a dropdown is a defect, not a fix:
+it tells assistive technology the rest of the page is inert when it is not, and a focus trap on
+a popover strands the keyboard. So the five checks apply as:
+
+| Behaviour                   | Modal dialog | Dismissible overlay |
+| --------------------------- | ------------ | ------------------- |
+| Escape closes               | required     | required            |
+| Focus returns to the opener | required     | required            |
+| Click outside dismisses     | required     | required            |
+| `role="dialog"`             | required     | not applicable      |
+| `aria-modal="true"`         | required     | **must not**        |
+| Focus trapped               | required     | **must not**        |
+
+`@terminator/extension-ui` therefore publishes two primitives, not one: `Dialog` for the first
+column and `Popover` for the second. SC-002 is read against this table rather than against a
+flat nineteen.
+
+**Why it was missed in Phase 0**: the audit enumerated components by name and by the presence
+of dismissal handlers, which is a good way to find surfaces and a poor way to classify them.
+The markup is the authority and was not read until migration began.
