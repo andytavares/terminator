@@ -42,6 +42,21 @@ export const EXTENSION_BASE_CSS = `
   --tm-radius-sm: 6px;
   --tm-radius-md: 10px;
   --tm-radius-lg: 16px;
+  --tm-space-1: 4px;
+  --tm-space-2: 8px;
+  --tm-space-3: 12px;
+  --tm-space-4: 16px;
+  --tm-space-5: 20px;
+  --tm-space-6: 24px;
+  --tm-space-8: 32px;
+  /* The stacking scale. Extension stylesheets reference these instead of raw
+     numbers; without them here every z-index in an extension view resolves to
+     nothing and the stacking order collapses. Must stay in step with
+     packages/extension-ui/src/layers.ts and the :root block in styles.css. */
+  --tm-layer-panel: 100;
+  --tm-layer-overlay: 200;
+  --tm-layer-modal: 300;
+  --tm-layer-toast: 400;
   --tm-font-mono: 'IBM Plex Mono','JetBrains Mono','Fira Code','Courier New',monospace;
   --tm-font-ui: 'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }

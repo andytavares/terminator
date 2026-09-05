@@ -120,10 +120,10 @@ still leaves the core building.
 - [ ] T036 [P] [US2] Migrate task-vault's 7 surfaces (`TaskDetailPanel`, `FileToPicker`, `DateTimePicker`, `QuickCaptureOverlay`, `LinkPicker`, `KanbanLaneEditor`, `CalendarDrawer`) and delete `ExtensionToastContainer.tsx` and `.cal-drawer`
 - [ ] T037 [US2] Audit MergeFlow and the PR review diff pane with a real merge conflict and a real open pull request before migrating them — both were reviewed from source only and have no visual baseline (plan, carried risk)
 - [x] T038 [US2] Remove the five runtime imports of core renderer source: `extensions/notepad/src/components/NoteList.tsx:11`, `extensions/notepad/src/components/NotepadView.tsx:4`, `extensions/git-integration/src/components/GitSidebarPanel.tsx:4`, `extensions/task-vault/src/components/TaskVaultView.tsx:18`, `extensions/task-vault/src/components/ProjectsBrowser.tsx:19` (FR-008)
-- [ ] T039 [US2] Replace every numeric `z-index` in extension CSS with `var(--tm-layer-*)` per the migration map in `contracts/layer-scale.md` (14 distinct values)
-- [ ] T040 [US2] Add an ESLint rule failing a numeric `z-index` literal in `extensions/**/*.css` in `.eslintrc.json`
-- [ ] T041 [US2] Re-export the new component types from `packages/extension-sdk/types/index.d.ts` and bump the contract to v1.3.0, keeping every existing member unchanged (FR-006)
-- [ ] T042 [US2] Verify the isolation gate: `mv extensions/task-vault /tmp/ && npm run build` succeeds, then restore (SC-004)
+- [x] T039 [US2] Replace every numeric `z-index` in extension CSS with `var(--tm-layer-*)` per the migration map in `contracts/layer-scale.md` (14 distinct values)
+- [x] T040 [US2] Add an ESLint rule failing a numeric `z-index` literal in `extensions/**/*.css` in `.eslintrc.json`
+- [x] T041 [US2] Re-export the new component types from `packages/extension-sdk/types/index.d.ts` and bump the contract to v1.3.0, keeping every existing member unchanged (FR-006)
+- [x] T042 [US2] Verify the isolation gate: `mv extensions/task-vault /tmp/ && npm run build` succeeds, then restore (SC-004)
 
 **Checkpoint**: One implementation product-wide; the behaviour matrix is green; the illegal imports are gone.
 

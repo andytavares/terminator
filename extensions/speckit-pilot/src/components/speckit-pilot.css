@@ -1314,7 +1314,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--tm-layer-modal);
 }
 
 .sk-modal {
@@ -2250,7 +2250,7 @@
   background: var(--tm-bg-base, var(--tm-bg-surface));
   border-left: 1px solid var(--tm-border);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.3);
-  z-index: 20;
+  z-index: var(--tm-layer-overlay);
   overflow: hidden;
 }
 .sk-card-detail {
@@ -2287,7 +2287,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 30;
+  z-index: var(--tm-layer-overlay);
 }
 .sk-modal__panel {
   width: min(520px, 92%);
@@ -2472,7 +2472,7 @@
   background: var(--tm-bg-surface);
   border: 1px solid var(--tm-border);
   border-radius: 6px;
-  z-index: 40;
+  z-index: var(--tm-layer-overlay);
   width: 360px;
 }
 .sk-knowledge__result {
@@ -2887,7 +2887,7 @@
      looking at. */
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--tm-layer-panel);
   background: var(--tm-bg, #0b1220);
 }
 .sk-sup__tab {

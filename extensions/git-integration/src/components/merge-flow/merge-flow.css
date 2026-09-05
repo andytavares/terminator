@@ -932,7 +932,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: var(--tm-layer-modal);
 }
 
 .keep-both-modal__overlay {
@@ -943,7 +943,7 @@
 
 .keep-both-modal__content {
   position: relative;
-  z-index: 1;
+  z-index: var(--tm-layer-panel);
   background: var(--tm-bg-surface);
   border: 1px solid var(--tm-border);
   border-radius: 10px;
@@ -1267,7 +1267,7 @@
   border-left: 1px solid var(--tm-border);
   display: flex;
   flex-direction: column;
-  z-index: 50;
+  z-index: var(--tm-layer-overlay);
 }
 
 .ai-suggestion-panel__header {
