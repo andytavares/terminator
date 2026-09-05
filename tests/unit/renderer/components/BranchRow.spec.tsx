@@ -352,3 +352,42 @@ describe('BranchRow — renaming', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 })
+
+describe('BranchRow — open in editor', () => {
+  it('offers the action named after the editor that will run', () => {
+    const { container } = renderRow({}, { onOpenInEditor: vi.fn(), editorName: 'Cursor' })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(screen.getByText('Open in Cursor')).toBeTruthy()
+  })
+
+  it('falls back to a generic label when the editor is not known yet', () => {
+    const { container } = renderRow({}, { onOpenInEditor: vi.fn() })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(screen.getByText('Open in editor')).toBeTruthy()
+  })
+
+  it('opens the branch folder and closes the menu', () => {
+    const onOpenInEditor = vi.fn()
+    const { container } = renderRow({}, { onOpenInEditor, editorName: 'Cursor' })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText('Open in Cursor'))
+    expect(onOpenInEditor).toHaveBeenCalled()
+    expect(document.querySelector('.ctx-menu')).toBeNull()
+  })
+
+  // Remote mode omits the editor API entirely, so the handler is absent and the
+  // item must not appear — an action that cannot work should not be offered.
+  it('offers nothing when there is no way to open an editor', () => {
+    const { container } = renderRow({}, { onRemove: vi.fn() })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(screen.queryByText(/Open in/)).toBeNull()
+  })
+
+  it('does not also select the branch', () => {
+    const onSelect = vi.fn()
+    const { container } = renderRow({}, { onOpenInEditor: vi.fn(), onSelect })
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText('Open in editor'))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+})

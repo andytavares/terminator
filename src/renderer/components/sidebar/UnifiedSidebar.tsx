@@ -158,6 +158,8 @@ export function UnifiedSidebar({
 
   /** Home directory, so a repo's path reads as `~/repos/app` rather than in full. */
   const [homeDir, setHomeDir] = useState<string | undefined>(undefined)
+  /** The editor this machine will use, so the menu can name it. */
+  const [editorName, setEditorName] = useState<string | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
   const [collapseState, setCollapseState] = useState(loadCollapseState)
   const sidebarRef = useRef<HTMLDivElement>(null)
@@ -219,6 +221,29 @@ export function UnifiedSidebar({
       .then((info) => setHomeDir(info.homeDir))
       .catch(() => setHomeDir(undefined))
   }, [])
+
+  useEffect(() => {
+    void window.electronAPI?.editor
+      ?.detect?.()
+      .then((r) => setEditorName(r.editor?.name))
+      .catch(() => setEditorName(undefined))
+  }, [])
+
+  /**
+   * The folder a branch's work happens in: its own working copy when it has
+   * one, else the repo it was checked out from. Same resolution the terminal
+   * and the change statistics use.
+   */
+  function folderForBranch(projectId: string): string | undefined {
+    const project = projectById.get(projectId)
+    if (project === undefined) return undefined
+    return project.worktreePath ?? workspaceById.get(project.workspaceId)?.folderPath
+  }
+
+  function openInEditor(folderPath: string | undefined): void {
+    if (folderPath === undefined) return
+    void window.electronAPI?.editor?.open?.(folderPath)
+  }
 
   // Coming back to the window is the cheapest moment to notice that the working
   // trees moved on while you were away.
@@ -516,6 +541,8 @@ export function UnifiedSidebar({
             : undefined
         }
         onRemove={() => setConfirmDeleteProject({ id: row.projectId, name: row.label })}
+        onOpenInEditor={() => openInEditor(folderForBranch(row.projectId))}
+        editorName={editorName}
         issueActions={issueActionsFor(row.projectId)}
         repoActions={workspaceTabList.map((tab) => ({
           id: tab.id,
@@ -579,6 +606,8 @@ export function UnifiedSidebar({
                   onAddBranch={workspace ? () => setCreateProjectFor(workspace.id) : undefined}
                   onEdit={workspace ? () => setEditWorkspace(workspace) : undefined}
                   onRemove={workspace ? () => setConfirmDeleteWorkspace(workspace) : undefined}
+                  onOpenInEditor={workspace ? () => openInEditor(workspace.folderPath) : undefined}
+                  editorName={editorName}
                   workspaceTabs={ownsTabs ? workspaceTabList : undefined}
                   activeWorkspaceTabId={
                     activeWorkspaceId === group.workspaceId ? activeWorkspaceTabId : null
@@ -612,6 +641,8 @@ export function UnifiedSidebar({
               onAddBranch={() => setCreateProjectFor(ws.id)}
               onEdit={() => setEditWorkspace(ws)}
               onRemove={() => setConfirmDeleteWorkspace(ws)}
+              onOpenInEditor={() => openInEditor(ws.folderPath)}
+              editorName={editorName}
             />
           ))}
 

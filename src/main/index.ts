@@ -11,6 +11,7 @@ import { migrateLegacyCredentials } from './integrations/tracker-store.js'
 import { loadLinks, registerLinkGarbageCollection } from './integrations/issue-link-store.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
+import { registerEditorHandlers } from './ipc/editor.ipc.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { registerLogHandlers } from './ipc/log.ipc.js'
 import { registerNotificationHandlers } from './ipc/notification.ipc.js'
@@ -379,6 +380,7 @@ app.whenReady().then(async () => {
   // survives development and vanishes from the packaged app (ADR-026).
   void ensureHookScript()
   registerShellHandlers()
+  registerEditorHandlers()
   registerFsHandlers(() => mainWindow)
   registerLogHandlers()
   registerNotificationHandlers()

@@ -209,3 +209,33 @@ describe('RepoHeader — hover reveals without moving anything (FR-031)', () => 
     expect(kids.indexOf('repo-header__count')).toBeLessThan(kids.indexOf('repo-header__hover'))
   })
 })
+
+describe('RepoHeader — open in editor', () => {
+  it('offers the action named after the editor that will run', () => {
+    const { container } = renderHeader({}, { onOpenInEditor: vi.fn(), editorName: 'Cursor' })
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    expect(screen.getByText('Open in Cursor')).toBeTruthy()
+  })
+
+  it('opens the repo folder without also collapsing it', () => {
+    const onOpenInEditor = vi.fn()
+    const onToggleCollapse = vi.fn()
+    const { container } = renderHeader({}, { onOpenInEditor, onToggleCollapse })
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    fireEvent.click(screen.getByText('Open in editor'))
+    expect(onOpenInEditor).toHaveBeenCalled()
+    expect(onToggleCollapse).not.toHaveBeenCalled()
+  })
+
+  it('opens a menu for it even when nothing else would', () => {
+    const { container } = renderHeader({}, { onOpenInEditor: vi.fn() })
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    expect(document.querySelector('.ctx-menu')).toBeTruthy()
+  })
+
+  it('offers nothing when there is no way to open an editor', () => {
+    const { container } = renderHeader({}, { onEdit: vi.fn() })
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    expect(screen.queryByText(/Open in/)).toBeNull()
+  })
+})

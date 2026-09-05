@@ -50,6 +50,20 @@ describe('buildElectronApi — native mode', () => {
     expect(t.invoke).toHaveBeenCalledWith('terminal:close', { sessionId: 'sess-1' })
   })
 
+  it('sends the folder as a payload when opening an editor', async () => {
+    const t = makeTransport()
+    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    await api.editor.open('/repos/app')
+    expect(t.invoke).toHaveBeenCalledWith('editor:open', { folderPath: '/repos/app' })
+  })
+
+  it('asks which editor is available with no payload at all', async () => {
+    const t = makeTransport()
+    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    await api.editor.detect()
+    expect(t.invoke).toHaveBeenCalledWith('editor:detect', undefined)
+  })
+
   it('passes the first argument through when no mapper is declared', async () => {
     const t = makeTransport()
     const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any

@@ -86,6 +86,11 @@ interface ElectronAPI {
     ): Promise<{ success: true } | { error: string }>
     listWorktrees(path: string): Promise<{ worktrees: WorktreeInfo[] }>
   }
+  editor: {
+    /** Which editor this machine will use, or null if it has none we know. */
+    detect(): Promise<{ editor: { id: string; name: string } | null }>
+    open(folderPath: string): Promise<{ ok: true; editor: string } | { error: string }>
+  }
   shell: {
     exec(options: {
       command: 'git' | 'gh'

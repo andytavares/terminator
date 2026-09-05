@@ -101,6 +101,8 @@ Projects live inside a workspace and hold one or more terminal sessions scoped t
 - **What a branch row tells you:** its state, folded from its terminals — waiting on you beats working, working beats idle, idle beats exited — plus its name, any linked issue key, how much has changed on it, and either how many terminals share that state or how long since it was last active. A branch with no terminals is still listed, and reads as idle.
 
 - **Collapsing a repo:** click its header. A collapsed repo still shows a marker if a branch inside is waiting on you, so hiding a repo cannot hide the one thing you needed to see.
+
+- **Open in your editor:** right-click a branch and choose **Open in ‹editor›** to open that branch's working copy — its own worktree when it has one, otherwise the repo it was checked out from. The same item is on a repo's header, and opens the repo folder. Terminator finds your editor itself: it looks for Cursor, VS Code, Windsurf, Zed, Sublime Text, WebStorm, IntelliJ and Xcode, preferring one whose command-line launcher is installed, since that opens the folder in a window you already have. To pin a particular one, set `ui.editor` in settings to its id (`cursor`, `vscode`, `windsurf`, `zed`, `sublime`, `webstorm`, `intellij`, `xcode`); leave it empty to keep detecting. The menu item is hidden when no editor is found, and in the browser remote, which has no local editor to launch.
 - **Per-workspace settings:** Theme, scrollback limit, and default shell can be overridden per workspace via Settings.
 
 ---

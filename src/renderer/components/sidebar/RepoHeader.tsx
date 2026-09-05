@@ -13,6 +13,9 @@ export interface RepoHeaderProps {
   onAddBranch?: () => void
   onEdit?: () => void
   onRemove?: () => void
+  /** Opens the repo's folder in the user's editor. */
+  onOpenInEditor?: () => void
+  editorName?: string
   /**
    * Repo-scoped extension buttons, revealed on hover. The contribution contract
    * is unchanged; only where they are drawn moved (FR-037).
@@ -54,6 +57,8 @@ export function RepoHeader({
   onAddBranch,
   onEdit,
   onRemove,
+  onOpenInEditor,
+  editorName,
   workspaceTabs = [],
   activeWorkspaceTabId,
   onSelectWorkspaceTab,
@@ -64,7 +69,7 @@ export function RepoHeader({
   const [menu, setMenu] = React.useState<{ x: number; y: number } | null>(null)
 
   function handleContextMenu(e: React.MouseEvent): void {
-    if (onEdit === undefined && onRemove === undefined) return
+    if (onEdit === undefined && onRemove === undefined && onOpenInEditor === undefined) return
     e.preventDefault()
     e.stopPropagation()
     closeAllContextMenus()
@@ -146,7 +151,20 @@ export function RepoHeader({
           y={menu.y}
           onDismiss={() => setMenu(null)}
           items={[
-            ...(onEdit ? [{ label: 'Edit workspace', onSelect: onEdit }] : []),
+            ...(onOpenInEditor
+              ? [
+                  {
+                    label: editorName ? `Open in ${editorName}` : 'Open in editor',
+                    onSelect: () => {
+                      setMenu(null)
+                      onOpenInEditor()
+                    },
+                  },
+                ]
+              : []),
+            ...(onEdit
+              ? [{ label: 'Edit workspace', separatorBefore: true, onSelect: onEdit }]
+              : []),
             ...(onRemove ? [{ label: 'Remove workspace', danger: true, onSelect: onRemove }] : []),
           ]}
         />

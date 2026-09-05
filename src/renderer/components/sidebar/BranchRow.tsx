@@ -49,6 +49,10 @@ export interface BranchRowProps {
   onAddTerminal?: () => void
   onRename?: (name: string) => void
   onRemove?: () => void
+  /** Opens this branch's working copy in the user's editor. */
+  onOpenInEditor?: () => void
+  /** Names the editor in the menu — "Open in Cursor" beats "Open in editor". */
+  editorName?: string
   issueActions?: IssueMenuActions
   /**
    * Repo-scoped extension actions, reachable from the row's own menu.
@@ -89,6 +93,8 @@ export function BranchRow({
   onAddTerminal,
   onRename,
   onRemove,
+  onOpenInEditor,
+  editorName,
   issueActions,
   repoActions = [],
 }: BranchRowProps): JSX.Element {
@@ -116,6 +122,18 @@ export function BranchRow({
     // Only a branch with no branch to be named by can be renamed: everything
     // else is named by its branch and renaming it would be a lie (ADR-034).
     ...(onRename ? [{ label: 'Rename', onSelect: () => setRenaming(true) }] : []),
+    ...(onOpenInEditor
+      ? [
+          {
+            label: editorName ? `Open in ${editorName}` : 'Open in editor',
+            separatorBefore: onRename !== undefined,
+            onSelect: () => {
+              setMenu(null)
+              onOpenInEditor()
+            },
+          },
+        ]
+      : []),
     ...(issueActions ? issueMenuItems(issueActions, () => setMenu(null)) : []),
     ...repoActions.map((action, i) => ({
       label: action.label,

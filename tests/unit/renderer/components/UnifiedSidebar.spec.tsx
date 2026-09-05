@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
@@ -97,6 +97,9 @@ const jobs: Project = {
   workspaceId: 'ws-1',
   name: 'Jobs',
   isWorktree: true,
+  // A worktree has a directory of its own; the fixture claimed to be one
+  // without saying where, which nothing read until now.
+  worktreePath: '/wt/jobs',
   createdAt: '',
   updatedAt: '',
 }
@@ -991,5 +994,63 @@ describe('UnifiedSidebar — issue actions on a branch header', () => {
     openBranchMenu()
     fireEvent.click(screen.getByText('Unlink TAV-14'))
     expect(mockIntegrationsStore.unlinkIssue).toHaveBeenCalledWith('p1')
+  })
+})
+
+describe('UnifiedSidebar — opening a branch in the editor', () => {
+  const openEditor = vi.fn()
+
+  beforeEach(() => {
+    openEditor.mockClear()
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        editor: {
+          detect: vi.fn().mockResolvedValue({ editor: { id: 'cursor', name: 'Cursor' } }),
+          open: openEditor,
+        },
+        shell: { openExternal: vi.fn() },
+      },
+    })
+  })
+
+  const openRowMenu = (container: HTMLElement, name: string) => {
+    const row = Array.from(container.querySelectorAll('.branch-row')).find(
+      (r) => r.querySelector('.branch-row__name')?.textContent === name
+    )!
+    fireEvent.contextMenu(row)
+  }
+
+  it("opens a branch's own working copy when it has one", async () => {
+    // `jobs` is a worktree, so its own directory is the one to open.
+    const { container } = renderSidebar()
+    await act(async () => {})
+    openRowMenu(container, 'Jobs')
+    fireEvent.click(screen.getByText(/Open in/))
+    expect(openEditor).toHaveBeenCalledWith('/wt/jobs')
+  })
+
+  it('falls back to the repo folder for a plain checkout', async () => {
+    const { container } = renderSidebar()
+    await act(async () => {})
+    openRowMenu(container, 'main')
+    fireEvent.click(screen.getByText(/Open in/))
+    expect(openEditor).toHaveBeenCalledWith('/b')
+  })
+
+  it('opens the repo folder from the repo header', async () => {
+    const { container } = renderSidebar()
+    await act(async () => {})
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    fireEvent.click(screen.getByText(/Open in/))
+    expect(openEditor).toHaveBeenCalledWith('/b')
+  })
+
+  it('names the detected editor in the menu', async () => {
+    const { container } = renderSidebar()
+    await act(async () => {})
+    openRowMenu(container, 'main')
+    expect(screen.getByText('Open in Cursor')).toBeTruthy()
   })
 })
