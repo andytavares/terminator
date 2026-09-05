@@ -1,0 +1,45 @@
+tests/unit/packages/extension-ui/use-dismissible.spec.tsx
+  s_8aa585ff1f786f::t_1491af669cd267 115-150
+  s_8aa585ff1f786f::t_16c8aafe7b3948 151-166
+  s_8aa585ff1f786f::t_e79e04c723a44e 1-114
+extensions/task-vault/src/components/task-vault.css
+  s_8aa585ff1f786f::t_e22bf5183f3987 7871-7875
+extensions/task-vault/src/components/LinkPicker.tsx
+  s_8aa585ff1f786f::t_85d0bac39b248e 12-15,60
+  s_8aa585ff1f786f::t_1823efa4b6ab1b 1-2
+extensions/task-vault/src/components/DateTimePicker.tsx
+  s_8aa585ff1f786f::t_1948bfbfc5375c 3
+  s_8aa585ff1f786f::t_16c8aafe7b3948 209-217,379
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_8aa585ff1f786f::t_bc2939f8343dbf 68-90,160-161
+  s_8aa585ff1f786f::t_e22bf5183f3987 13,243
+extensions/task-vault/src/components/KanbanLaneEditor.tsx
+  s_8aa585ff1f786f::t_050b010e7f3962 2,4,88-96
+  s_8aa585ff1f786f::t_5f7387d6d60f4a 97-100,102-106,108-111,113-121,124-148,150-160,162-182,185-201,205
+extensions/task-vault/src/components/FileToPicker.tsx
+  s_8aa585ff1f786f::t_78b3c5db3207a0 2,35-38,127
+packages/extension-ui/src/useDismissible.ts
+  s_8aa585ff1f786f::t_1c769a8d07d689 1-12,28-44,47,50-55,57-70,77-92,94-100
+  s_8aa585ff1f786f::t_1491af669cd267 13-19,45,48-49,71-76
+  s_8aa585ff1f786f::t_16c8aafe7b3948 20-27,46,56,93
+packages/extension-ui/src/index.ts
+  s_8aa585ff1f786f::t_1c769a8d07d689 42-44
+specs/036-extension-ux-remediation/tasks.md
+  s_8aa585ff1f786f::t_b5e7bb0ef274fc 120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "a6d1df45195570cd0f4109533ebaca94a706f5a3",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
