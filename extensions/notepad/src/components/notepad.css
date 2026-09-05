@@ -1463,20 +1463,6 @@
   overflow: hidden;
 }
 
-.notepad-export-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px 14px;
-  border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
-}
-
-.notepad-export-dialog__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--tm-text-primary, rgba(255, 255, 255, 0.95));
-}
-
 .notepad-export-dialog__body {
   display: flex;
   flex-direction: column;

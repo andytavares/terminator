@@ -633,48 +633,6 @@
   z-index: var(--tm-layer-modal);
 }
 
-.pr-dialog__panel {
-  background: var(--tm-bg-surface);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  padding: 20px;
-  width: 560px;
-  max-width: 90vw;
-  max-height: 85vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.pr-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.pr-dialog__title {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.pr-dialog__close {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 2px 6px;
-  border-radius: var(--tm-radius-xs);
-  line-height: 1;
-}
-
-.pr-dialog__close:hover {
-  background: var(--tm-bg-card-hover);
-  color: var(--tm-text-primary);
-}
-
 .pr-dialog__field {
   display: flex;
   flex-direction: column;
@@ -837,55 +795,11 @@
   border-radius: var(--tm-radius-xs);
 }
 
-.pr-dialog__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 4px;
-}
-
 .pr-dialog__status {
   font-size: 12px;
   color: var(--tm-text-secondary);
   margin-right: auto;
   font-style: italic;
-}
-
-.pr-dialog__cancel-btn {
-  background: transparent;
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-xs);
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-  font-size: 13px;
-  padding: 6px 14px;
-  font-family: inherit;
-}
-
-.pr-dialog__cancel-btn:hover {
-  background: var(--tm-bg-card-hover);
-}
-
-.pr-dialog__submit-btn {
-  background: var(--tm-accent);
-  border: none;
-  border-radius: var(--tm-radius-xs);
-  color: #fff;
-  cursor: pointer;
-  font-size: 13px;
-  padding: 6px 14px;
-  font-family: inherit;
-  font-weight: 500;
-}
-
-.pr-dialog__submit-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.pr-dialog__submit-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 /* Git Full View (project tab: diff LEFT, changes RIGHT) */

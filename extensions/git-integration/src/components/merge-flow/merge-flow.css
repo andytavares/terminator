@@ -935,40 +935,6 @@
   z-index: var(--tm-layer-modal);
 }
 
-.keep-both-modal__overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-}
-
-.keep-both-modal__content {
-  position: relative;
-  z-index: var(--tm-layer-panel);
-  background: var(--tm-bg-surface);
-  border: 1px solid var(--tm-border);
-  border-radius: 10px;
-  padding: 24px;
-  width: 660px;
-  max-width: 95vw;
-  max-height: 88vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.keep-both-modal__header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.keep-both-modal__title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
 .keep-both-modal__subtitle {
   margin: 0;
   font-size: 0.8125rem;
@@ -1202,58 +1168,6 @@
   border: 1px solid rgba(245, 158, 11, 0.3);
   border-radius: 6px;
   background: rgba(245, 158, 11, 0.08);
-}
-
-/* Actions */
-.keep-both-modal__actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  padding-top: 4px;
-  border-top: 1px solid var(--tm-border);
-}
-
-.keep-both-modal__cancel {
-  padding: 8px 16px;
-  border-radius: var(--tm-radius-xs);
-  cursor: pointer;
-  font-size: 0.875rem;
-  background: none;
-  border: 1px solid var(--tm-border);
-  color: var(--tm-text-primary);
-}
-
-.keep-both-modal__cancel:hover {
-  background: var(--tm-bg-elevated);
-}
-
-.keep-both-modal__ai-btn {
-  padding: 8px 16px;
-  border-radius: var(--tm-radius-xs);
-  cursor: pointer;
-  font-size: 0.875rem;
-  background: linear-gradient(135deg, rgba(92, 107, 192, 0.15), rgba(168, 85, 247, 0.15));
-  border: 1px solid rgba(92, 107, 192, 0.4);
-  color: var(--tm-accent);
-}
-
-.keep-both-modal__ai-btn:hover {
-  background: linear-gradient(135deg, rgba(92, 107, 192, 0.25), rgba(168, 85, 247, 0.25));
-}
-
-.keep-both-modal__confirm {
-  padding: 8px 20px;
-  border-radius: var(--tm-radius-xs);
-  cursor: pointer;
-  font-size: 0.875rem;
-  background: var(--tm-success);
-  border: 1px solid var(--tm-success);
-  color: #000;
-  font-weight: 600;
-}
-
-.keep-both-modal__confirm:hover {
-  filter: brightness(1.1);
 }
 
 /* ── AI Suggestion Panel ────────────────────────────────────────────────── */

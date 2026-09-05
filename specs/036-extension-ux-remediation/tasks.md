@@ -118,7 +118,7 @@ still leaves the core building.
 - [x] T034 [P] [US2] Migrate git-integration's 4 surfaces (`PrDialog`, `KeepBothModal`, `ReviewSubmitPanel`, `CommentComposer`) and delete `.pr-dialog`, `.keep-both-modal`, `.pr-review-submit-overlay`
 - [x] T035 [P] [US2] Migrate speckit-pilot's 4 surfaces (`CardDetail`, `CardBriefEditor`, `BatchCheckIn`, `SettingsView`) and delete `.sk-modal`, `.sk-modal-overlay`, `.sk-drawer`
 - [x] T036 [P] [US2] Migrate task-vault's 7 surfaces (`TaskDetailPanel`, `FileToPicker`, `DateTimePicker`, `QuickCaptureOverlay`, `LinkPicker`, `KanbanLaneEditor`, `CalendarDrawer`) and delete `ExtensionToastContainer.tsx` and `.cal-drawer`
-- [ ] T037 [US2] Audit MergeFlow and the PR review diff pane with a real merge conflict and a real open pull request before migrating them — both were reviewed from source only and have no visual baseline (plan, carried risk)
+- [x] T037 [US2] Audit MergeFlow and the PR review diff pane with a real merge conflict and a real open pull request before migrating them — both were reviewed from source only and have no visual baseline (plan, carried risk)
 - [x] T038 [US2] Remove the five runtime imports of core renderer source: `extensions/notepad/src/components/NoteList.tsx:11`, `extensions/notepad/src/components/NotepadView.tsx:4`, `extensions/git-integration/src/components/GitSidebarPanel.tsx:4`, `extensions/task-vault/src/components/TaskVaultView.tsx:18`, `extensions/task-vault/src/components/ProjectsBrowser.tsx:19` (FR-008)
 - [x] T039 [US2] Replace every numeric `z-index` in extension CSS with `var(--tm-layer-*)` per the migration map in `contracts/layer-scale.md` (14 distinct values)
 - [x] T040 [US2] Add an ESLint rule failing a numeric `z-index` literal in `extensions/**/*.css` in `.eslintrc.json`

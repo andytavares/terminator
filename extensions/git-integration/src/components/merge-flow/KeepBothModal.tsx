@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react'
+import { TriangleAlert } from 'lucide-react'
+import { Dialog } from '@terminator/extension-ui'
 import type { ConflictBlock, GitAuthor } from '../../schemas/merge-flow.schema'
 import { highlightBlock, langFromBlockId } from '../../utils/syntax'
 
@@ -175,119 +177,113 @@ export function KeepBothModal({
   }
 
   return (
-    <div className="keep-both-modal" role="dialog" aria-label="Keep both changes">
-      <div className="keep-both-modal__overlay" onClick={onCancel} />
-      <div className="keep-both-modal__content">
-        {/* Title */}
-        <div className="keep-both-modal__header">
-          <h3 className="keep-both-modal__title">Keep both changes — choose order</h3>
-          <p className="keep-both-modal__subtitle">
-            Drag blocks to reorder, or use the toggle buttons.
-          </p>
-        </div>
+    <Dialog
+      title="Keep both changes — choose order"
+      onDismiss={onCancel}
+      actions={[
+        { label: 'Cancel', onSelect: onCancel },
+        {
+          label: 'Use this order',
+          tone: 'primary',
+          onSelect: () => onConfirm(preview, strategy),
+        },
+      ]}
+    >
+      <p className="keep-both-modal__subtitle">
+        Drag blocks to reorder, or use the toggle buttons.
+      </p>
 
-        {/* Order toggle */}
-        <div className="keep-both-modal__toggle">
-          <button
-            className={`keep-both-modal__toggle-btn${order === 'ours-first' ? ' keep-both-modal__toggle-btn--active' : ''}`}
-            aria-label="Mine first"
-            onClick={() => setOrder('ours-first')}
-          >
-            Mine first
-          </button>
-          <button
-            className={`keep-both-modal__toggle-btn${order === 'theirs-first' ? ' keep-both-modal__toggle-btn--active' : ''}`}
-            aria-label="Theirs first"
-            onClick={() => setOrder('theirs-first')}
-          >
-            Theirs first
-          </button>
-        </div>
-
-        {/* First block */}
-        <div
-          className={`keep-both-modal__block-row${dragOver === 'first' ? ' keep-both-modal__block-row--drag-over' : ''}`}
-          draggable
-          onDragStart={(e) => handleDragStart(e, 'first')}
-          onDragOver={(e) => handleDragOver(e, 'first')}
-          onDragLeave={() => setDragOver(null)}
-          onDrop={(e) => handleDrop(e, 'first')}
+      {/* Order toggle */}
+      <div className="keep-both-modal__toggle">
+        <button
+          className={`keep-both-modal__toggle-btn${order === 'ours-first' ? ' keep-both-modal__toggle-btn--active' : ''}`}
+          aria-label="Mine first"
+          onClick={() => setOrder('ours-first')}
         >
-          <div className="keep-both-modal__block-label">
-            <span className="keep-both-modal__block-num">1</span>
-            <span className="keep-both-modal__block-title">{firstName}</span>
-            <span className="keep-both-modal__drag-hint" title="Drag to reorder">
-              ⠿ drag
-            </span>
-          </div>
-          <div className="keep-both-modal__block-card">
-            <AuthorHeader author={first.author} branch={first.branch} />
-            <CodePreview code={first.text} lang={lang} startLine={1} />
-          </div>
-        </div>
-
-        {/* THEN divider */}
-        <div className="keep-both-modal__then">
-          <span className="keep-both-modal__then-line" />
-          <span className="keep-both-modal__then-label">THEN</span>
-          <span className="keep-both-modal__then-line" />
-        </div>
-
-        {/* Second block */}
-        <div
-          className={`keep-both-modal__block-row${dragOver === 'second' ? ' keep-both-modal__block-row--drag-over' : ''}`}
-          draggable
-          onDragStart={(e) => handleDragStart(e, 'second')}
-          onDragOver={(e) => handleDragOver(e, 'second')}
-          onDragLeave={() => setDragOver(null)}
-          onDrop={(e) => handleDrop(e, 'second')}
+          Mine first
+        </button>
+        <button
+          className={`keep-both-modal__toggle-btn${order === 'theirs-first' ? ' keep-both-modal__toggle-btn--active' : ''}`}
+          aria-label="Theirs first"
+          onClick={() => setOrder('theirs-first')}
         >
-          <div className="keep-both-modal__block-label">
-            <span className="keep-both-modal__block-num">2</span>
-            <span className="keep-both-modal__block-title">{secondName}</span>
-            <span className="keep-both-modal__drag-hint" title="Drag to reorder">
-              ⠿ drag
-            </span>
-          </div>
-          <div className="keep-both-modal__block-card">
-            <AuthorHeader author={second.author} branch={second.branch} />
-            <CodePreview code={second.text} lang={lang} startLine={1} />
-          </div>
+          Theirs first
+        </button>
+      </div>
+
+      {/* First block */}
+      <div
+        className={`keep-both-modal__block-row${dragOver === 'first' ? ' keep-both-modal__block-row--drag-over' : ''}`}
+        draggable
+        onDragStart={(e) => handleDragStart(e, 'first')}
+        onDragOver={(e) => handleDragOver(e, 'first')}
+        onDragLeave={() => setDragOver(null)}
+        onDrop={(e) => handleDrop(e, 'first')}
+      >
+        <div className="keep-both-modal__block-label">
+          <span className="keep-both-modal__block-num">1</span>
+          <span className="keep-both-modal__block-title">{firstName}</span>
+          <span className="keep-both-modal__drag-hint" title="Drag to reorder">
+            ⠿ drag
+          </span>
         </div>
-
-        {/* Merged preview */}
-        <div className="keep-both-modal__preview-section">
-          <div className="keep-both-modal__preview-label">↓ MERGED RESULT PREVIEW</div>
-          <pre className="keep-both-modal__preview hljs">
-            <div className="keep-both-modal__code-inner">
-              <div className="keep-both-modal__line-nums" aria-hidden="true">
-                {previewLines.map((_, i) => (
-                  <span key={i}>{i + 1}</span>
-                ))}
-              </div>
-              <code dangerouslySetInnerHTML={{ __html: previewHtml }} />
-            </div>
-          </pre>
-        </div>
-
-        {/* Duplicate warning */}
-        {showDuplicateWarning && (
-          <div className="keep-both-modal__warning" role="alert">
-            ⚠ Warning: This will produce a duplicate identifier. Consider using &quot;Edit
-            manually&quot; to combine them.
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="keep-both-modal__actions">
-          <button className="keep-both-modal__cancel" onClick={onCancel}>
-            Cancel
-          </button>
-          <button className="keep-both-modal__confirm" onClick={() => onConfirm(preview, strategy)}>
-            Use this order →
-          </button>
+        <div className="keep-both-modal__block-card">
+          <AuthorHeader author={first.author} branch={first.branch} />
+          <CodePreview code={first.text} lang={lang} startLine={1} />
         </div>
       </div>
-    </div>
+
+      {/* THEN divider */}
+      <div className="keep-both-modal__then">
+        <span className="keep-both-modal__then-line" />
+        <span className="keep-both-modal__then-label">THEN</span>
+        <span className="keep-both-modal__then-line" />
+      </div>
+
+      {/* Second block */}
+      <div
+        className={`keep-both-modal__block-row${dragOver === 'second' ? ' keep-both-modal__block-row--drag-over' : ''}`}
+        draggable
+        onDragStart={(e) => handleDragStart(e, 'second')}
+        onDragOver={(e) => handleDragOver(e, 'second')}
+        onDragLeave={() => setDragOver(null)}
+        onDrop={(e) => handleDrop(e, 'second')}
+      >
+        <div className="keep-both-modal__block-label">
+          <span className="keep-both-modal__block-num">2</span>
+          <span className="keep-both-modal__block-title">{secondName}</span>
+          <span className="keep-both-modal__drag-hint" title="Drag to reorder">
+            ⠿ drag
+          </span>
+        </div>
+        <div className="keep-both-modal__block-card">
+          <AuthorHeader author={second.author} branch={second.branch} />
+          <CodePreview code={second.text} lang={lang} startLine={1} />
+        </div>
+      </div>
+
+      {/* Merged preview */}
+      <div className="keep-both-modal__preview-section">
+        <div className="keep-both-modal__preview-label">↓ MERGED RESULT PREVIEW</div>
+        <pre className="keep-both-modal__preview hljs">
+          <div className="keep-both-modal__code-inner">
+            <div className="keep-both-modal__line-nums" aria-hidden="true">
+              {previewLines.map((_, i) => (
+                <span key={i}>{i + 1}</span>
+              ))}
+            </div>
+            <code dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          </div>
+        </pre>
+      </div>
+
+      {/* Duplicate warning */}
+      {showDuplicateWarning && (
+        <div className="keep-both-modal__warning" role="alert">
+          <TriangleAlert aria-hidden="true" /> This will produce a duplicate identifier. Consider
+          using &quot;Edit manually&quot; to combine them.
+        </div>
+      )}
+    </Dialog>
   )
 }
