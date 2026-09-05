@@ -69,6 +69,18 @@ describe('useSessionStore', () => {
       ).rejects.toThrow('FAILED')
     })
 
+    // The code names the failure; only the message names the folder, and the
+    // folder is the entire answer to "why did my terminal not open".
+    it('throws the message when the error carries one', async () => {
+      mockElectronAPI.terminal.create.mockResolvedValue({
+        error: 'CWD_MISSING',
+        message: 'That folder no longer exists: /repo/.worktrees/removed',
+      })
+      await expect(
+        useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/gone', 10000)
+      ).rejects.toThrow('That folder no longer exists: /repo/.worktrees/removed')
+    })
+
     it('auto-numbers title as "Terminal 1" when empty title given', async () => {
       mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
       await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)

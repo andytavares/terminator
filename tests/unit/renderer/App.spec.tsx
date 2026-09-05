@@ -41,7 +41,12 @@ vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
   }),
 }))
 vi.mock('../../../src/renderer/hooks/useTerminalSession', () => ({
-  useTerminalSession: vi.fn(() => ({ createSession: vi.fn(), splitSession: vi.fn() })),
+  useTerminalSession: vi.fn(() => ({
+    // Both resolve: the real hook hands back promises, and every call site
+    // attaches a rejection handler to them.
+    createSession: vi.fn().mockResolvedValue('ses-1'),
+    splitSession: vi.fn().mockResolvedValue(undefined),
+  })),
 }))
 type CommandRegistration = { id: string; label: string; action: () => void }
 type PaletteSession = { id: string; projectId: string; tabTitle: string; projectName: string }
@@ -718,7 +723,7 @@ describe('App', () => {
   it('command core.split-vertical action calls splitSession with activeProjectId', async () => {
     const mockSplitSession = vi.fn().mockResolvedValue(undefined)
     vi.mocked(useTerminalSession).mockReturnValue({
-      createSession: vi.fn(),
+      createSession: vi.fn().mockResolvedValue('ses-1'),
       splitSession: mockSplitSession,
     })
     setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
@@ -738,7 +743,7 @@ describe('App', () => {
   it('command core.split-horizontal action calls splitSession with activeProjectId', async () => {
     const mockSplitSession = vi.fn().mockResolvedValue(undefined)
     vi.mocked(useTerminalSession).mockReturnValue({
-      createSession: vi.fn(),
+      createSession: vi.fn().mockResolvedValue('ses-1'),
       splitSession: mockSplitSession,
     })
     setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })

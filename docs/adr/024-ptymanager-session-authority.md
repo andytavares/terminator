@@ -22,7 +22,12 @@ terminal session" had no single answer.
 
 - **`spawnSession(opts)`** spawns with full metadata: `origin` (`'app'` — created
   by the Electron renderer; `'remote'` — created by the remote browser surface),
-  `type`, `projectId`, `tabTitle`, and stamps `createdAt`/`pid`.
+  `type`, `projectId`, `tabTitle`, and stamps `createdAt`/`pid`. It refuses a
+  `cwd` that is not an existing directory, throwing `MissingCwdError` before any
+  process is forked — node-pty accepts such a spawn and the child then exits 1
+  having printed nothing, which is indistinguishable downstream from a shell the
+  operator quit. Being the single spawn point, this covers the IPC layer, the
+  remote routes and `api.pty` alike.
 - **`onData` / `onExit`** are multi-subscriber fan-outs with disposers. Exit
   listeners fire after the session is removed; all listeners die with the
   session.

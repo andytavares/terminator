@@ -49,6 +49,9 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn().mockReturnValue('{}'),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  // Every cwd these tests pass is a real directory; PtyManager refuses one
+  // that is not.
+  statSync: vi.fn(() => ({ isDirectory: () => true })),
 }))
 
 describe('terminal IPC handlers', () => {

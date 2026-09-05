@@ -68,6 +68,22 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
   })
 }
 
+/**
+ * Says why a terminal never opened.
+ *
+ * As an error, which the notification system always delivers as a toast
+ * whatever the operator's settings say — the alternative here is a click that
+ * does nothing at all, which is not an improvement on a tab that dies.
+ */
+function reportStartFailure(error: unknown): void {
+  dispatchNotification({
+    type: 'error',
+    title: 'Could not open a terminal',
+    message: error instanceof Error ? error.message : String(error),
+    key: 'terminalStartFailed',
+  })
+}
+
 export async function createTerminalSession(
   projectId: string,
   type: 'human' | 'agent',
@@ -77,14 +93,20 @@ export async function createTerminalSession(
   parentSessionId?: string
 ): Promise<string> {
   const store = useSessionStore.getState()
-  const sessionId = await store.createSession(
-    projectId,
-    type,
-    title,
-    cwd,
-    scrollbackLimit,
-    parentSessionId
-  )
+  let sessionId: string
+  try {
+    sessionId = await store.createSession(
+      projectId,
+      type,
+      title,
+      cwd,
+      scrollbackLimit,
+      parentSessionId
+    )
+  } catch (error) {
+    reportStartFailure(error)
+    throw error
+  }
   const instance = buildInstance(sessionId, scrollbackLimit)
   // Store the instance first, then activate — TerminalPane's effect fires after
   // both updates land so getTerminalInstance() is guaranteed to return the instance.
@@ -139,6 +161,8 @@ export async function splitTerminalSession(
   const focusedSession = store.sessions.get(focusedId)
   const parentSessionId = focusedSession?.parentSessionId ?? focusedId
 
+  // Rejects to the caller rather than reporting here: the split shortcut has
+  // its own notification key, and two toasts for one failure is noise.
   const sessionId = await store.createSession(
     projectId,
     'human',

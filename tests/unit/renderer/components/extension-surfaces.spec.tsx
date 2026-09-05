@@ -31,7 +31,7 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateProjectDialog', () =>
 vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () => ({
   CreateWorkspaceDialog: () => null,
 }))
-const mockCreateSession = vi.fn()
+const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: () => ({ createSession: mockCreateSession }),
 }))

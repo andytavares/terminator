@@ -209,13 +209,13 @@ export function useKeyboardShortcuts({
         } else if (effectiveProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
-          createSession(
+          void createSession(
             effectiveProjectId,
             'human',
             'Terminal',
             cwd,
             settings.terminal.scrollbackLimit
-          )
+          ).catch(() => {})
         }
         return
       }
@@ -227,11 +227,11 @@ export function useKeyboardShortcuts({
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
           splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit).catch(
-            () =>
+            (error: unknown) =>
               dispatchNotification({
                 type: 'error',
                 title: 'Split pane failed',
-                message: 'Could not create split pane',
+                message: error instanceof Error ? error.message : 'Could not create split pane',
                 key: 'splitPaneFailed',
               })
           )
@@ -246,11 +246,11 @@ export function useKeyboardShortcuts({
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
           splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit).catch(
-            () =>
+            (error: unknown) =>
               dispatchNotification({
                 type: 'error',
                 title: 'Split pane failed',
-                message: 'Could not create split pane',
+                message: error instanceof Error ? error.message : 'Could not create split pane',
                 key: 'splitPaneFailed',
               })
           )

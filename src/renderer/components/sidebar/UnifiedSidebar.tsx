@@ -390,7 +390,7 @@ export function UnifiedSidebar({
             '',
             resolveActiveCwd(),
             settings.terminal.scrollbackLimit
-          )
+          ).catch(() => {})
         },
       })
     )
@@ -445,7 +445,7 @@ export function UnifiedSidebar({
       '',
       resolveActiveCwd(),
       settings.terminal.scrollbackLimit
-    )
+    ).catch(() => {})
   }
 
   const workspaceTabList = Array.from(workspaceTabs.values())

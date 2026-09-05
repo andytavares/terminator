@@ -36,7 +36,7 @@ export interface SerializedNotification {
 
 interface ElectronAPI {
   terminal: {
-    create(payload: unknown): Promise<{ sessionId: string } | { error: string }>
+    create(payload: unknown): Promise<{ sessionId: string } | { error: string; message?: string }>
     close(sessionId: string): Promise<{ success: boolean }>
     /** Says a terminal is on screen; delivers anything held back until now. */
     attach(sessionId: string): Promise<{ released: boolean }>
