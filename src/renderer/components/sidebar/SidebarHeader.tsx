@@ -1,5 +1,5 @@
 import React from 'react'
-import { Bell, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { GlobalTabRegistration, SidebarButtonRegistration } from '../../extensions/registry'
 import { AppBand } from './AppBand'
 import { SidebarSearch } from './SidebarSearch'
@@ -18,6 +18,8 @@ interface SidebarHeaderProps {
   searchQuery?: string
   onSearchChange?: (q: string) => void
   onSearchClear?: () => void
+  /** The Filter and Display menus, which act on the list below. */
+  children?: React.ReactNode
 }
 
 export function SidebarHeader({
@@ -31,16 +33,20 @@ export function SidebarHeader({
   searchQuery = '',
   onSearchChange,
   onSearchClear,
+  children,
 }: SidebarHeaderProps): JSX.Element {
   return (
     <div className="sidebar-header">
-      {/* App-level destinations first, ruled off from the list. The bell and
-          the add control belong with the list they act on, not up here. */}
+      {/* App-level destinations first. The notification bell joins them: it is
+          app-level like everything else in the band, and moving it up frees the
+          row below for the two menus that replaced four bands of chrome. */}
       <AppBand
         globalTabs={globalTabs}
         sidebarItems={sidebarItems}
         activeId={activeGlobalTabId}
         onSelect={onSelectGlobalTab}
+        unreadNotifications={unreadNotifications}
+        onBellClick={onBellClick}
       />
 
       <div className="sidebar-header__search-row">
@@ -49,19 +55,7 @@ export function SidebarHeader({
           onChange={onSearchChange ?? (() => {})}
           onClear={onSearchClear ?? (() => {})}
         />
-        <button
-          className={`sidebar-header__bell${unreadNotifications > 0 ? ' sidebar-header__bell--unread' : ''}`}
-          onClick={onBellClick}
-          title="Notifications"
-          aria-label={`Notifications${unreadNotifications > 0 ? ` (${unreadNotifications} unread)` : ''}`}
-        >
-          <Bell />
-          {unreadNotifications > 0 && (
-            <span className="sidebar-header__bell-badge">
-              {unreadNotifications > 9 ? '9+' : unreadNotifications}
-            </span>
-          )}
-        </button>
+        {children}
         <button
           className="sidebar-header__add"
           onClick={onAddWorkspace}

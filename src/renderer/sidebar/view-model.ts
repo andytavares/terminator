@@ -1,4 +1,4 @@
-import type { AgentState, Project, TerminalSession, Workspace } from '../../shared/types/index'
+import type { AgentState, TerminalSession } from '../../shared/types/index'
 
 // This module is the pure core of the sidebar: it decides *what* is shown from
 // (data, view, now) and knows nothing about React, the stores, or the clock.
@@ -6,14 +6,13 @@ import type { AgentState, Project, TerminalSession, Workspace } from '../../shar
 // behaviour exhaustively testable — do not import anything but types here.
 
 /**
- * How the list is bucketed.
+ * How the branch list is bucketed.
  *
- * `project`, `status` and `branch` are retired once a branch becomes the listed
- * item (FR-038), but they cannot be removed from the union until `buildGroups`
- * and the view bar that reads them are gone — that happens in one commit at the
- * end, when nothing imports them any more.
+ * Narrowed from five. `project` and `branch` collapsed into the row itself once
+ * a branch became the listed item, and `status` became redundant when every row
+ * started carrying its own state glyph (FR-038).
  */
-export type GroupKey = 'project' | 'workspace' | 'status' | 'branch' | 'none'
+export type GroupKey = 'workspace' | 'none'
 export type SortKey = 'recent' | 'oldest' | 'name' | 'status' | 'manual'
 
 export interface SessionFilters {
@@ -33,44 +32,8 @@ export interface SessionView {
   builtIn?: boolean
 }
 
-export type GroupScope =
-  | { kind: 'project'; projectId: string; workspaceId: string }
-  | { kind: 'workspace'; workspaceId: string }
-
-export interface Group {
-  /** Stable within a grouping mode for the lifetime of the underlying entity. */
-  key: string
-  label: string
-  /** Present only when the grouping key is a scope; that is what lets the header host scope actions. */
-  scope?: GroupScope
-  sessions: TerminalSession[]
-  count: number
-  /**
-   * Present only under workspace grouping, where the workspace owns the header
-   * and each of its projects gets one of its own. Without them a project — and
-   * so a branch — has no row to click, no + to press, and starting a terminal
-   * on it means switching the grouping first.
-   */
-  subgroups?: Group[]
-}
-
-export interface BuildResult {
-  groups: Group[]
-  /** Sessions after filtering. */
-  shown: number
-  /** Sessions before filtering — with `shown`, this is what the filter notice reads. */
-  total: number
-}
-
-/** Severity order, shared by status grouping and status sorting so they never disagree. */
+/** Severity order, shared by every surface that ranks states so none disagree. */
 export const STATUS_ORDER: AgentState[] = ['awaiting-input', 'working', 'idle', 'exited']
-
-const STATUS_LABEL: Record<AgentState, string> = {
-  'awaiting-input': 'Awaiting you',
-  working: 'Working',
-  idle: 'Idle',
-  exited: 'Exited',
-}
 
 /**
  * A session is stale when it has exited, or when it has been quiet for longer
@@ -84,211 +47,4 @@ export function isStale(session: TerminalSession, now: number, staleAfterMs: num
   if (session.agentState === 'exited') return true
   if (session.agentState === 'awaiting-input') return false
   return now - session.lastActivityAt > staleAfterMs
-}
-
-function matchesQuery(
-  session: TerminalSession,
-  project: Project | undefined,
-  query: string
-): boolean {
-  const haystack = [session.tabTitle, session.note, project?.name, project?.gitBranch]
-  return haystack.some((field) => field?.toLowerCase().includes(query))
-}
-
-interface Bucket {
-  key: string
-  label: string
-  scope?: GroupScope
-  sessions: TerminalSession[]
-  /** Sorts the groups themselves; lower comes first. */
-  order: number
-}
-
-function bucketFor(
-  groupBy: GroupKey,
-  /** Absent when seeding an empty scope bucket, which has no session to read. */
-  session: TerminalSession | undefined,
-  project: Project,
-  workspace: Workspace | undefined,
-  projects: Project[],
-  workspaces: Workspace[]
-): Bucket {
-  switch (groupBy) {
-    case 'project':
-      return {
-        key: project.id,
-        label: project.name,
-        scope: { kind: 'project', projectId: project.id, workspaceId: project.workspaceId },
-        sessions: [],
-        order: projects.indexOf(project),
-      }
-    case 'workspace':
-      return {
-        key: project.workspaceId,
-        label: workspace?.name ?? project.workspaceId,
-        scope: { kind: 'workspace', workspaceId: project.workspaceId },
-        sessions: [],
-        order: workspace ? workspaces.indexOf(workspace) : Number.MAX_SAFE_INTEGER,
-      }
-    case 'status': {
-      const state = session!.agentState
-      return {
-        key: state,
-        label: STATUS_LABEL[state],
-        sessions: [],
-        order: STATUS_ORDER.indexOf(state),
-      }
-    }
-    case 'branch': {
-      const branch = project.gitBranch ?? ''
-      return {
-        key: `branch:${branch}`,
-        label: branch || 'No branch',
-        sessions: [],
-        order: 0,
-      }
-    }
-    case 'none':
-      return { key: 'all', label: 'All sessions', sessions: [], order: 0 }
-  }
-}
-
-/**
- * The project layer inside a workspace group. Every project of the workspace is
- * listed while browsing, so one that has never had a terminal is still
- * reachable — the same rule the scope groupings follow at the top level.
- */
-function projectSubgroups(
-  workspaceId: string,
-  sessions: TerminalSession[],
-  projects: Project[],
-  isNarrowed: boolean,
-  sortBy: SortKey
-): Group[] {
-  const byProject = new Map<string, TerminalSession[]>()
-  for (const session of sessions) {
-    const bucket = byProject.get(session.projectId)
-    if (bucket) bucket.push(session)
-    else byProject.set(session.projectId, [session])
-  }
-  return projects
-    .filter((project) => project.workspaceId === workspaceId)
-    .filter((project) => !isNarrowed || byProject.has(project.id))
-    .map((project) => {
-      const own = byProject.get(project.id) ?? []
-      return {
-        key: project.id,
-        label: project.name,
-        scope: { kind: 'project' as const, projectId: project.id, workspaceId },
-        sessions: [...own].sort((a, b) => compareSessions(a, b, sortBy)),
-        count: own.length,
-      }
-    })
-}
-
-function compareSessions(a: TerminalSession, b: TerminalSession, sortBy: SortKey): number {
-  switch (sortBy) {
-    case 'recent':
-      return b.lastActivityAt - a.lastActivityAt
-    case 'oldest':
-      return a.lastActivityAt - b.lastActivityAt
-    case 'name':
-      return a.tabTitle.localeCompare(b.tabTitle, undefined, { sensitivity: 'base' })
-    case 'status':
-      return STATUS_ORDER.indexOf(a.agentState) - STATUS_ORDER.indexOf(b.agentState)
-    case 'manual':
-      return 0
-  }
-}
-
-/**
- * Applies a view to the current data: filter, then group, then sort within each
- * group, then sort the groups. Pure — the same arguments always produce a
- * deeply equal result and no input is mutated.
- */
-export function buildGroups(
-  sessions: TerminalSession[],
-  projects: Project[],
-  workspaces: Workspace[],
-  view: SessionView,
-  now: number,
-  staleAfterMs: number
-): BuildResult {
-  const projectById = new Map(projects.map((p) => [p.id, p]))
-  const workspaceById = new Map(workspaces.map((w) => [w.id, w]))
-  const { query, states, projectIds, hideStale, staleOnly } = view.filters
-  const normalisedQuery = query?.trim().toLowerCase()
-
-  const kept = sessions.filter((session) => {
-    const project = projectById.get(session.projectId)
-    if (normalisedQuery && !matchesQuery(session, project, normalisedQuery)) return false
-    if (states && !states.includes(session.agentState)) return false
-    if (projectIds && !projectIds.includes(session.projectId)) return false
-    if (staleOnly && !isStale(session, now, staleAfterMs)) return false
-    if (hideStale && isStale(session, now, staleAfterMs)) return false
-    return true
-  })
-
-  const buckets = new Map<string, Bucket>()
-
-  // A scope grouping seeds a bucket for every project or workspace, so one that
-  // has never had a terminal still shows a header you can start a session from.
-  // The tree always listed them; a flat list built only from sessions would
-  // make them unreachable.
-  //
-  // A narrowing filter suppresses that: in Needs me, Stale, or a search the
-  // user is hunting, and a dozen empty project headers is noise the
-  // FilterNotice already accounts for. `hideStale` is deliberately not counted
-  // — it is a standing preference on top of ordinary browsing, so hiding a
-  // stale session must not also hide the project you wanted to start work in.
-  const isNarrowed =
-    normalisedQuery !== undefined ||
-    states !== undefined ||
-    projectIds !== undefined ||
-    staleOnly === true
-
-  if (!isNarrowed && (view.groupBy === 'project' || view.groupBy === 'workspace')) {
-    for (const project of projects) {
-      const workspace = workspaceById.get(project.workspaceId)
-      const bucket = bucketFor(view.groupBy, undefined, project, workspace, projects, workspaces)
-      if (!buckets.has(bucket.key)) buckets.set(bucket.key, bucket)
-    }
-  }
-
-  for (const session of kept) {
-    const project = projectById.get(session.projectId)
-    // A session whose project has gone is dropped rather than crashing the
-    // sidebar; it still counts towards `total`, which is measured before this.
-    if (!project) continue
-    const workspace = workspaceById.get(project.workspaceId)
-    const bucket = bucketFor(view.groupBy, session, project, workspace, projects, workspaces)
-    const existing = buckets.get(bucket.key)
-    if (existing) existing.sessions.push(session)
-    else buckets.set(bucket.key, { ...bucket, sessions: [session] })
-  }
-
-  const groups = [...buckets.values()]
-    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
-    .map((bucket): Group => {
-      const sessions = [...bucket.sessions].sort((a, b) => compareSessions(a, b, view.sortBy))
-      const group: Group = {
-        key: bucket.key,
-        label: bucket.label,
-        ...(bucket.scope ? { scope: bucket.scope } : {}),
-        sessions,
-        count: bucket.sessions.length,
-      }
-      if (view.groupBy === 'workspace' && bucket.scope?.kind === 'workspace') {
-        group.subgroups = projectSubgroups(
-          bucket.scope.workspaceId,
-          sessions,
-          projects,
-          isNarrowed,
-          view.sortBy
-        )
-      }
-      return group
-    })
-
-  return { groups, shown: kept.length, total: sessions.length }
 }

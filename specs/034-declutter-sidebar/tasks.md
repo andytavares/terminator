@@ -134,7 +134,7 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 - [x] T041 [US1] Add the retired-`groupBy` degradation to `loadViews()` in `src/renderer/sidebar/views.ts` (T036)
 - [x] T042 [US1] Rework `src/renderer/components/sidebar/SessionGroup.tsx` into the repo header: name, count, swatch, and hover-only chevron / new-branch / registered repo actions
 - [x] T043 [US1] Add the branch row with its 16px status gutter to `src/renderer/components/sidebar/SessionGroup.tsx`, reading `aggregateBranchState` (FR-003)
-- [ ] T044 [US1] Narrow `GroupKey` to `'workspace' | 'none'` in `src/renderer/sidebar/view-model.ts` and remove the retired grouping options (FR-038) — safe only after T040
+- [x] T044 [US1] Narrow `GroupKey` to `'workspace' | 'none'` in `src/renderer/sidebar/view-model.ts` and remove the retired grouping options (FR-038) — safe only after T040
 - [x] T045 [US1] Update `src/renderer/components/sidebar/SessionGroup.css` for the repo header, the branch row and the gutter
 - [x] T046 [US1] Switch `src/renderer/components/sidebar/UnifiedSidebar.tsx` from `buildGroups` to `buildBranchRows` and stop rendering terminal rows (FR-001)
 - [x] T047 [US1] Implement branch-selection resolution in `src/renderer/components/sidebar/UnifiedSidebar.tsx` using the store's existing `getActiveSessionForProject` (research.md R-004, T038)
@@ -171,7 +171,7 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 - [x] T062 [US4] Render the state-aware count (terminals in the row's state, only when >1) in `src/renderer/components/sidebar/SessionGroup.tsx` (FR-003 as amended)
 - [x] T063 [US4] Reserve hover-control space in `src/renderer/components/sidebar/SessionGroup.css` so revealing them shifts nothing (FR-031, T056)
 - [x] T064 [US4] Re-derive the `@container sidebar` breakpoints in `src/renderer/components/sidebar/SessionGroup.css` for the new anatomy, guaranteeing a row never drops its branch name or state glyph (FR-049, research.md R-008)
-- [ ] T065 [US4] Confirm change statistics still render from `change-stats.store` without delaying first paint, in `tests/unit/renderer/components/SessionGroup.spec.tsx` (FR-032, ADR-031)
+- [x] T065 [US4] Confirm change statistics still render from `change-stats.store` without delaying first paint, in `tests/unit/renderer/components/SessionGroup.spec.tsx` (FR-032, ADR-031)
 
 **Checkpoint**: Every row is countable and nothing moves under the cursor.
 
@@ -185,23 +185,23 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 ### Tests for User Story 5 (write first, confirm they fail)
 
-- [ ] T066 [P] [US5] Write failing spec `tests/unit/renderer/components/FilterMenu.spec.tsx` for the saved views, the stale toggle, the active-filter count badge, and clearing the filter (FR-035)
-- [ ] T067 [P] [US5] Write failing spec `tests/unit/renderer/components/DisplayMenu.spec.tsx` for grouping and sort
-- [ ] T068 [P] [US5] Write failing spec `tests/unit/renderer/components/sidebar-chrome.spec.tsx` asserting at most two bands sit above the first row of work (FR-033)
+- [x] T066 [P] [US5] Write failing spec `tests/unit/renderer/components/FilterMenu.spec.tsx` for the saved views, the stale toggle, the active-filter count badge, and clearing the filter (FR-035)
+- [x] T067 [P] [US5] Write failing spec `tests/unit/renderer/components/DisplayMenu.spec.tsx` for grouping and sort
+- [x] T068 [P] [US5] Write failing spec `tests/unit/renderer/components/sidebar-chrome.spec.tsx` asserting at most two bands sit above the first row of work (FR-033)
 
 ### Implementation for User Story 5
 
-- [ ] T069 [US5] Create `src/renderer/components/sidebar/FilterMenu.tsx` and `FilterMenu.css` holding the saved views, the hide-stale toggle, and a count badge when anything is hidden (FR-034, FR-035)
-- [ ] T070 [US5] Create `src/renderer/components/sidebar/DisplayMenu.tsx` and `DisplayMenu.css` holding grouping and sort (FR-034)
-- [ ] T071 [US5] Rework the search row in `src/renderer/components/sidebar/SidebarHeader.tsx` and `.css` to hold search, Filter, Display and new-repo
-- [ ] T072 [US5] Render `src/renderer/components/sidebar/AppBand.tsx` as a single compact icon row without text labels, keeping `aria-label` and `title` on every entry (FR-036, invariant EA-4)
-- [ ] T073 [US5] Move the notification bell and its badge from the search row into `src/renderer/components/sidebar/AppBand.tsx` — it is app-level like the rest of the band
-- [ ] T074 [US5] Update `src/renderer/components/sidebar/AppBand.css` for the compact row
-- [ ] T075 [US5] Update the single permitted assertion in `tests/unit/renderer/components/extension-surfaces.spec.tsx` — the 8px label becomes an accessible name; **any other required change means a contract moved** (`contracts/extension-api-invariants.md`)
-- [ ] T076 [US5] Delete `src/renderer/components/sidebar/ViewBar.tsx`, `ViewBar.css` and `tests/unit/renderer/components/ViewBar.spec.tsx` (FR-034)
-- [ ] T077 [US5] Delete `src/renderer/components/sidebar/FilterNotice.tsx`, `FilterNotice.css` and its spec (FR-035)
-- [ ] T078 [US5] Add `scripts/measure-sidebar-chrome.cjs` rendering the sidebar in headless chromium and asserting the top-to-first-row distance is ≤99px, against the 165px baseline (SC-002)
-- [ ] T079 [US5] Verify keyboard reachability and accessible names across the app band and the control row in `tests/unit/renderer/components/sidebar-chrome.spec.tsx` (FR-046)
+- [x] T069 [US5] Create `src/renderer/components/sidebar/FilterMenu.tsx` and `FilterMenu.css` holding the saved views, the hide-stale toggle, and a count badge when anything is hidden (FR-034, FR-035)
+- [x] T070 [US5] Create `src/renderer/components/sidebar/DisplayMenu.tsx` and `DisplayMenu.css` holding grouping and sort (FR-034)
+- [x] T071 [US5] Rework the search row in `src/renderer/components/sidebar/SidebarHeader.tsx` and `.css` to hold search, Filter, Display and new-repo
+- [x] T072 [US5] Render `src/renderer/components/sidebar/AppBand.tsx` as a single compact icon row without text labels, keeping `aria-label` and `title` on every entry (FR-036, invariant EA-4)
+- [x] T073 [US5] Move the notification bell and its badge from the search row into `src/renderer/components/sidebar/AppBand.tsx` — it is app-level like the rest of the band
+- [x] T074 [US5] Update `src/renderer/components/sidebar/AppBand.css` for the compact row
+- [x] T075 [US5] Update the single permitted assertion in `tests/unit/renderer/components/extension-surfaces.spec.tsx` — the 8px label becomes an accessible name; **any other required change means a contract moved** (`contracts/extension-api-invariants.md`)
+- [x] T076 [US5] Delete `src/renderer/components/sidebar/ViewBar.tsx`, `ViewBar.css` and `tests/unit/renderer/components/ViewBar.spec.tsx` (FR-034)
+- [x] T077 [US5] Delete `src/renderer/components/sidebar/FilterNotice.tsx`, `FilterNotice.css` and its spec (FR-035)
+- [x] T078 [US5] Add `scripts/measure-sidebar-chrome.cjs` rendering the sidebar in headless chromium and asserting the top-to-first-row distance is ≤99px, against the 165px baseline (SC-002)
+- [x] T079 [US5] Verify keyboard reachability and accessible names across the app band and the control row in `tests/unit/renderer/components/sidebar-chrome.spec.tsx` (FR-046)
 
 **Checkpoint**: The first row of work is near the top and every control is still reachable.
 
@@ -234,7 +234,7 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 **Purpose**: Remove what is now unreachable, and ship the documentation the constitution requires in this PR.
 
-- [ ] T087 Delete `buildGroups`, `Group`, `GroupScope` and `BuildResult` from `src/renderer/sidebar/view-model.ts` now that nothing imports them, and delete the corresponding cases in `tests/unit/renderer/sidebar/view-model.spec.ts` and `view-model-performance.spec.ts` (Principle X)
+- [x] T087 Delete `buildGroups`, `Group`, `GroupScope` and `BuildResult` from `src/renderer/sidebar/view-model.ts` now that nothing imports them, and delete the corresponding cases in `tests/unit/renderer/sidebar/view-model.spec.ts` and `view-model-performance.spec.ts` (Principle X)
 - [ ] T088 [P] Delete the dead rules in `src/renderer/components/sidebar/SidebarHeader.css` — `__search`, `__search-icon`, `__search-placeholder`, `__actions`, `__tabs`, `__fixed-actions`, `__tab*` — which have had no matching element since the tabs moved to `AppBand`
 - [ ] T089 [P] Delete `.unified-sidebar__add-project` from `src/renderer/components/sidebar/UnifiedSidebar.css` and the `ws-card--dnd-over` class reference in `UnifiedSidebar.tsx`, which never had a CSS rule at all
 - [ ] T090 [P] Delete the unused `notificationPanelOpen`, `scratchActive` and `hasScratchSessions` props from `UnifiedSidebarProps` in `src/renderer/components/sidebar/UnifiedSidebar.tsx` and their pass-through in `src/renderer/App.tsx`

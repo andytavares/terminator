@@ -35,10 +35,17 @@ function renderBand(props: Partial<React.ComponentProps<typeof AppBand>> = {}) {
 }
 
 describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
-  it('shows a visible text label for every entry, not just an icon', () => {
-    renderBand()
+  it('names every entry for a reader, since the band is icons only (FR-036)', () => {
+    // The 8px text label went: at that size it was barely legible and doubled
+    // the band's height for what the accessible name already carries.
+    const { container } = renderBand()
     for (const label of ['Overview', 'Notes', 'Task Vault', 'Git Changes']) {
-      expect(screen.getByText(label)).toBeTruthy()
+      expect(screen.getByRole('button', { name: label })).toBeTruthy()
+    }
+    for (const entry of container.querySelectorAll('.app-band__entry')) {
+      expect(entry.getAttribute('aria-label')).toBeTruthy()
+      expect(entry.getAttribute('title')).toBeTruthy()
+      expect(entry.textContent).toBe('')
     }
   })
 
@@ -74,13 +81,13 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
 
   it('selects a global tab by id', () => {
     renderBand()
-    fireEvent.click(screen.getByText('Notes'))
+    fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
     expect(onSelect).toHaveBeenCalledWith('notes')
   })
 
   it('runs a contributed item action rather than selecting it as a tab', () => {
     renderBand()
-    fireEvent.click(screen.getByText('Git Changes'))
+    fireEvent.click(screen.getByRole('button', { name: 'Git Changes' }))
     expect(onRunItem).toHaveBeenCalledOnce()
     expect(onSelect).not.toHaveBeenCalled()
   })
@@ -126,7 +133,7 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
       globalTabs: [{ id: 'x', label: 'Anything At All', component: noop }],
       sidebarItems: [],
     })
-    expect(screen.getByText('Anything At All')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Anything At All' })).toBeTruthy()
     expect(container.querySelectorAll('.app-band__entry')).toHaveLength(1)
   })
 })

@@ -24,11 +24,11 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
-import { FilterNotice } from './FilterNotice'
 import { LinkIssueDialog } from '../integrations/LinkIssueDialog'
 import { IssueDrawer } from '../integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../stores/integrations.store'
-import { ViewBar } from './ViewBar'
+import { FilterMenu } from './FilterMenu'
+import { DisplayMenu } from './DisplayMenu'
 import { RepoHeader } from './RepoHeader'
 import { BranchRow } from './BranchRow'
 import './UnifiedSidebar.css'
@@ -539,18 +539,20 @@ export function UnifiedSidebar({
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSearchClear={() => setSearchQuery('')}
-        />
-
-        <ViewBar
-          views={views}
-          activeViewId={activeViewId}
-          counts={viewCounts}
-          onSelectView={setActiveViewId}
-          onChangeView={changeActiveView}
-          hideStaleUnavailable={view.filters.staleOnly === true}
-        />
-
-        <FilterNotice shown={shown} total={total} onShowAll={showAll} />
+        >
+          <FilterMenu
+            views={views}
+            activeViewId={activeViewId}
+            counts={viewCounts}
+            onSelectView={setActiveViewId}
+            onChangeView={changeActiveView}
+            hideStaleUnavailable={view.filters.staleOnly === true}
+            shown={shown}
+            total={total}
+            onShowAll={showAll}
+          />
+          <DisplayMenu view={view} onChangeView={changeActiveView} />
+        </SidebarHeader>
 
         <div className="unified-sidebar__list">
           {groups.map((group) => {

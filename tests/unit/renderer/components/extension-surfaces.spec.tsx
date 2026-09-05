@@ -214,8 +214,8 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
 
   it('surface 3: the contributed sidebar item renders once and its click reaches the handler', () => {
     renderSidebar(groupBy)
-    expect(screen.getAllByText('Fake Sidebar Item')).toHaveLength(1)
-    fireEvent.click(screen.getByText('Fake Sidebar Item'))
+    expect(screen.getAllByRole('button', { name: 'Fake Sidebar Item' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Fake Sidebar Item' }))
     expect(sidebarItemAction).toHaveBeenCalledOnce()
   })
 

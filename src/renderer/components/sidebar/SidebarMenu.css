@@ -1,0 +1,122 @@
+/* Filter and Display: the two menus that absorbed the view-chip strip, the
+   group and sort dropdowns, the hide-stale checkbox and the filter notice.
+   Four bands of chrome became one row, and the way out of a filter now sits in
+   the same control as the way in. */
+
+.sidebar-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.sidebar-menu__button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 10px;
+}
+
+.sidebar-menu__button:hover {
+  color: var(--text-primary);
+}
+
+.sidebar-menu__button--on {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.sidebar-menu__button svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
+/* The count the filter notice used to draw in a band of its own. */
+.sidebar-menu__badge {
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-menu__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  min-width: 168px;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 35%);
+}
+
+.sidebar-menu__heading {
+  padding: 5px 8px 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sidebar-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs, 4px);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  text-align: left;
+}
+
+.sidebar-menu__item:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-menu__item:disabled {
+  opacity: 0.4;
+}
+
+.sidebar-menu__item--on {
+  color: var(--text-primary);
+}
+
+.sidebar-menu__item--note {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.sidebar-menu__count,
+.sidebar-menu__tick {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-menu__separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}

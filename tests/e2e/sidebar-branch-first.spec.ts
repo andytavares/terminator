@@ -129,3 +129,50 @@ test('the sidebar says branch, never project', async () => {
     .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''))
   expect(labels.some((l) => l.startsWith('New branch in'))).toBe(true)
 })
+
+test('at most two bands of chrome sit above the first row of work (FR-033, SC-002)', async () => {
+  const measured = await handle.page.evaluate(() => {
+    const sidebar = document.querySelector('.unified-sidebar')
+    const firstRow = document.querySelector('.repo-header')
+    if (sidebar === null || firstRow === null) return null
+    const bands = document.querySelectorAll(
+      '.unified-sidebar > .sidebar-header > *, .unified-sidebar > .view-bar, .unified-sidebar > .filter-notice'
+    ).length
+    return {
+      bands,
+      chrome: Math.round(
+        firstRow.getBoundingClientRect().top - sidebar.getBoundingClientRect().top
+      ),
+    }
+  })
+  expect(measured).not.toBeNull()
+  // Was four bands and 165px on the build this replaces; SC-002 asks for a 40%
+  // cut, which is 99px.
+  expect(measured!.bands).toBeLessThanOrEqual(2)
+  expect(measured!.chrome).toBeLessThanOrEqual(99)
+})
+
+test('the retired chrome is gone entirely', async () => {
+  await expect(handle.page.locator('.view-bar')).toHaveCount(0)
+  await expect(handle.page.locator('.filter-notice')).toHaveCount(0)
+})
+
+test('every view, grouping and sort control lives in two menus (FR-034)', async () => {
+  const filter = handle.page.getByRole('button', { name: /^Filter/ })
+  const display = handle.page.getByRole('button', { name: 'Display' })
+  await expect(filter).toBeVisible()
+  await expect(display).toBeVisible()
+
+  await display.click()
+  for (const name of ['Workspace', 'None', 'Recent', 'Name']) {
+    await expect(handle.page.getByRole('menuitemradio', { name })).toBeVisible()
+  }
+  await handle.page.keyboard.press('Escape')
+  await handle.page.locator('.unified-sidebar__list').click({ position: { x: 5, y: 5 } })
+
+  await filter.click()
+  for (const name of [/Everything/, /Needs me/, /Active/, /Stale/]) {
+    await expect(handle.page.getByRole('menuitemradio', { name })).toBeVisible()
+  }
+  await expect(handle.page.getByRole('menuitemcheckbox', { name: /Hide stale/ })).toBeVisible()
+})

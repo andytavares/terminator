@@ -1,12 +1,19 @@
 /*
- * App-level surfaces. Ruled off from the session list below so the two read as
- * different systems — one is where you go, the other is what you are working on.
+ * App-level surfaces: one compact row of icons.
+ *
+ * The 8px text label under each icon is gone. At that size it was barely
+ * legible and it doubled the band's height for information the accessible name
+ * and tooltip already carry — which is what the label had become anyway, since
+ * a contribution's own name is what both read. Both contribution contracts are
+ * unchanged; only the density moved (FR-036).
  */
 .app-band {
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 7px;
   background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -15,20 +22,20 @@
   display: none;
 }
 
+/* Pushes the bell to the far edge: it is a notification, not a destination. */
+.app-band__spacer {
+  flex: 1 1 auto;
+  min-width: 4px;
+}
+
 .app-band__entry {
-  /* Share the width evenly rather than overflow: a clipped fifth entry is
-     invisible, whereas a truncated label still has its accessible name and
-     tooltip. Beyond about eight entries this needs real overflow behaviour
-     (ADR 033). */
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 6px 7px;
-  border: none;
-  border-bottom: 2px solid transparent;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  position: relative;
+  padding: 5px;
+  border: 0;
+  border-radius: var(--radius-xs, 4px);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
@@ -40,35 +47,38 @@
 }
 
 .app-band__entry:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--text-primary);
   outline-offset: -2px;
 }
 
 .app-band__entry--active {
+  background: var(--bg-card-hover);
   color: var(--text-primary);
-  background: var(--bg-base);
-  border-bottom-color: var(--accent);
 }
 
-/* Flat, currentColor, sized by CSS — never the size prop (Principle XII). */
 .app-band__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 15px;
+  display: grid;
+  place-items: center;
 }
 
 .app-band__icon svg {
   width: 14px;
   height: 14px;
+  display: block;
 }
 
-.app-band__label {
+.app-band__badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-mono);
   font-size: 8px;
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

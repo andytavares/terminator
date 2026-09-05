@@ -691,12 +691,12 @@ describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', 
 
   it('renders each contributed item exactly once', () => {
     renderSidebar()
-    expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
   })
 
   it('fires the item action on click', () => {
     renderSidebar()
-    fireEvent.click(screen.getByText('Git Changes'))
+    fireEvent.click(screen.getByRole('button', { name: 'Git Changes' }))
     expect(action).toHaveBeenCalledOnce()
   })
 
@@ -712,7 +712,7 @@ describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', 
         ])
       )
       renderSidebar({ initialViewId: viewId })
-      expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+      expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
     }
   )
 
@@ -723,11 +723,14 @@ describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', 
   })
 })
 
-describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
-  it('switches grouping from the view bar', () => {
+describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () => {
+  const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
+  const openFilter = () => fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
+
+  it('switches grouping from the Display menu', () => {
     const { container } = renderSidebar()
-    fireEvent.click(screen.getByText('Group: Workspace'))
-    fireEvent.click(screen.getByText('None'))
+    openDisplay()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'None' }))
     const labels = Array.from(container.querySelectorAll('.repo-header__name')).map(
       (el) => el.textContent
     )
@@ -735,12 +738,9 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
   })
 
   it('persists a grouping change for that view across a remount', () => {
-    // Grouping by branch and by status are retired with the terminal rows
-    // (FR-038), and a stored preference naming one now degrades to the view's
-    // own default — so persistence is exercised with a grouping that survives.
     const { unmount } = renderSidebar()
-    fireEvent.click(screen.getByText('Group: Workspace'))
-    fireEvent.click(screen.getByText('None'))
+    openDisplay()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'None' }))
     unmount()
     const { container } = renderSidebar()
     const labels = Array.from(container.querySelectorAll('.repo-header__name')).map(
@@ -749,48 +749,99 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     expect(labels).toEqual(['All branches'])
   })
 
+  it('switches sort from the Display menu', () => {
+    renderSidebar()
+    openDisplay()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Name' }))
+    openDisplay()
+    expect(screen.getByRole('menuitemradio', { name: 'Name' }).getAttribute('aria-checked')).toBe(
+      'true'
+    )
+  })
+
+  it('offers every grouping and sort from the one menu (FR-034)', () => {
+    renderSidebar()
+    openDisplay()
+    for (const label of ['Workspace', 'None', 'Recent', 'Oldest', 'Name', 'Status', 'Manual']) {
+      expect(screen.getByRole('menuitemradio', { name: label })).toBeTruthy()
+    }
+  })
+
+  it('offers every saved view and the stale toggle from the other (FR-034)', () => {
+    renderSidebar()
+    openFilter()
+    for (const label of ['Everything', 'Needs me', 'Active', 'Stale']) {
+      expect(screen.getByRole('menuitemradio', { name: new RegExp(label) })).toBeTruthy()
+    }
+    expect(screen.getByRole('menuitemcheckbox', { name: /Hide stale/ })).toBeTruthy()
+  })
+
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
-    const { container, unmount } = renderSidebar()
-    fireEvent.click(screen.getByText('Needs me'))
-    expect(screen.queryByText('api-shell')).toBeNull()
+    const { unmount } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
+    expect(screen.queryByText('main')).toBeNull()
     unmount()
     renderSidebar()
     expect(screen.getByText('main')).toBeTruthy()
-    expect(container.querySelector('.filter-notice')).toBeNull()
   })
 
-  it('explains a filtered list with shown and total counts (FR-016)', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByText('Needs me'))
-    expect(screen.getByText('Filtered · showing 0 of 3')).toBeTruthy()
+  // FR-035. The notice band is gone: the count sits on the control that caused
+  // the filtering, which is also where the way out is.
+  it('counts what a filter is hiding on the Filter control', () => {
+    const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
+    expect(container.querySelector('.sidebar-menu__badge')!.textContent).toBe('3')
   })
 
-  it('explains a search-filtered list too', () => {
+  it('counts what a search is hiding too', () => {
     const { container } = renderSidebar()
     fireEvent.change(container.querySelector('.sidebar-search input, input')!, {
       target: { value: 'jobs' },
     })
-    expect(screen.getByText('Filtered · showing 1 of 3')).toBeTruthy()
+    expect(container.querySelector('.sidebar-menu__badge')!.textContent).toBe('2')
   })
 
-  it('shows no notice when nothing is filtered', () => {
+  it('draws no notice band at all', () => {
     const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
     expect(container.querySelector('.filter-notice')).toBeNull()
+    expect(container.querySelector('.view-bar')).toBeNull()
   })
 
-  it('restores every session in one interaction from the notice (SC-007)', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByText('Needs me'))
-    fireEvent.click(screen.getByText('show all'))
+  it('shows no badge when nothing is hidden', () => {
+    const { container } = renderSidebar()
+    expect(container.querySelector('.sidebar-menu__badge')).toBeNull()
+  })
+
+  it('restores every branch in one interaction from the same control (SC-007)', () => {
+    const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitem', { name: /show all/ }))
     expect(screen.getByText('main')).toBeTruthy()
-    expect(screen.queryByText('show all')).toBeNull()
+    expect(container.querySelector('.sidebar-menu__badge')).toBeNull()
   })
 
-  it('hides the hide-stale toggle on the Stale view (FR-021)', () => {
+  it('disables the hide-stale toggle on the Stale view (FR-021)', () => {
     renderSidebar()
-    expect(screen.getByText('Hide stale')).toBeTruthy()
-    fireEvent.click(screen.getByText('Stale'))
-    expect(screen.queryByText('Hide stale')).toBeNull()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Stale/ }))
+    openFilter()
+    expect(
+      (screen.getByRole('menuitemcheckbox', { name: /Hide stale/ }) as HTMLButtonElement).disabled
+    ).toBe(true)
+  })
+
+  it('keeps at most two bands of chrome above the first row of work (FR-033)', () => {
+    const { container } = renderSidebar()
+    const header = container.querySelector('.sidebar-header')!
+    expect(header.children).toHaveLength(2)
+    expect(container.querySelector('.app-band')).toBeTruthy()
+    expect(container.querySelector('.sidebar-header__search-row')).toBeTruthy()
   })
 })
 
@@ -850,7 +901,7 @@ describe('UnifiedSidebar — app surfaces have one home, scratch has a group (US
     const { container } = renderSidebar()
     expect(container.querySelector('.extension-footer')).toBeNull()
     expect(container.querySelector('.app-band')).toBeTruthy()
-    expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
     mockRegistryState.sidebarButtons = []
   })
 
