@@ -1,0 +1,51 @@
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_f99ce66da147a0::t_b5c7fde06c309f 217-218
+tests/e2e/sidebar-branch-first.spec.ts
+  s_f99ce66da147a0::t_82421068294f2c 132-178
+src/renderer/components/sidebar/AppBand.tsx
+  s_f99ce66da147a0::t_ee9198d0248fe0 2,11-13,17,26-29,36-37,40,56-66,75,81,97
+src/renderer/components/sidebar/SidebarMenu.css
+  s_f99ce66da147a0::t_e2372b7fc7ded8 1-122
+tests/unit/renderer/components/AppBand.spec.tsx
+  s_f99ce66da147a0::t_d08f1a396bce49 38-41,43-48,84,136
+  s_f99ce66da147a0::t_b5c7fde06c309f 90
+src/renderer/components/sidebar/SidebarHeader.tsx
+  s_f99ce66da147a0::t_5b8f4c8815ebbb 2,21-22,36,40-42,48-49,58
+src/renderer/components/sidebar/AppBand.css
+  s_f99ce66da147a0::t_631ebf60982926 2-8,12-14,16,25-30,32-38,50,55,60-61,67,70-82
+src/renderer/sidebar/view-model.ts
+  s_f99ce66da147a0::t_999775d791240b 1
+  s_f99ce66da147a0::t_27c10d39aca740 9,11-13,15,35
+specs/034-declutter-sidebar/tasks.md
+  s_f99ce66da147a0::t_9875df0d7ed199 137,174,188-190,194-204,237
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_f99ce66da147a0::t_7e5c646dc3f6f9 30-31,542-555
+tests/unit/renderer/components/SidebarHeader.spec.tsx
+  s_f99ce66da147a0::t_c2a0bc72da90c5 91,98,105,132-134,136,139,142,146
+  s_f99ce66da147a0::t_d75fa5fb99446a 22-24
+src/renderer/components/sidebar/FilterMenu.tsx
+  s_f99ce66da147a0::t_5727b7bf47795b 1-133
+src/renderer/components/sidebar/DisplayMenu.tsx
+  s_f99ce66da147a0::t_c264a8ad12070b 1-101
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_f99ce66da147a0::t_7381cd1f2c4544 834-836
+  s_f99ce66da147a0::t_b5c7fde06c309f 694,699,715,904
+  s_f99ce66da147a0::t_6b17857fc1247c 726-727,729-730,732-733,742-743,752-756,760-778,780-783,789-795,798,803,806,808-809,811,814-824,826,829,831-833,837-844
+  s_f99ce66da147a0::t_9875df0d7ed199 728,757-759
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "c78f1f92689f27edfaa9065fa561997325139188",
+  "prompts": {},
+  "sessions": {
+    "s_f99ce66da147a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bedd0c8-eeb0-4be7-841a-5f499713ccb3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
