@@ -82,7 +82,7 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 - [x] T023 [US2] Make `src/renderer/components/overview/OverviewScreen.tsx` host board and list layouts on one surface with board as the default (FR-015)
 - [x] T024 [US2] Rewrite `tests/unit/renderer/components/OverviewScreen.spec.tsx` for the two layouts and the default
 - [x] T025 [US2] Rewrite `tests/unit/renderer/components/SessionTile.spec.tsx` for the card anatomy
-- [ ] T026 [US2] Add `tests/e2e/board.spec.ts` driving four terminals into four states and asserting lane placement, then a state change moving a card
+- [x] T026 [US2] Add `tests/e2e/board.spec.ts` driving four terminals into four states and asserting lane placement, then a state change moving a card
 
 **Checkpoint**: The board answers "which terminal is in what state" for the whole fleet, and the live preview survives a lane change.
 
