@@ -14,8 +14,6 @@ import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
 import { useVaultNavStore } from '../stores/vault-nav.store'
-import { useVaultDataStore } from '../stores/vault-data.store'
-import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { VaultSidebar } from './VaultSidebar'
 import { DailyLog } from './DailyLog'
 import { ProjectsBrowser } from './ProjectsBrowser'
@@ -327,19 +325,10 @@ export function TaskVaultView(): React.JSX.Element {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Consume navigation intent dispatched from App.tsx (works even when this tab was unmounted)
-  const pendingNavigation = useExtensionRegistry((s) => s.pendingNavigations.get('task-vault'))
-  const clearPendingNavigation = useExtensionRegistry((s) => s.clearPendingNavigation)
-
-  useEffect(() => {
-    if (!pendingNavigation) return
-    clearPendingNavigation('task-vault')
-    const payload = pendingNavigation as { taskId: string; date?: string } | string
-    const taskId = typeof payload === 'string' ? payload : payload.taskId
-    const date = typeof payload === 'object' && payload.date ? payload.date : undefined
-    useVaultNavStore.getState().navigateToTask(taskId, date)
-    if (date) void useVaultDataStore.getState().loadDate(date)
-  }, [pendingNavigation, clearPendingNavigation])
+  // Navigation intent arrives on the `task-vault:navigate` bridge channel, which
+  // the effect further down listens to. A second path used to read the core
+  // registry's pendingNavigations map — but this view bundles its own copy of
+  // that store, so nothing was ever put in the map it was reading.
 
   useEffect(() => {
     if (!pendingTaskId || !todayLog) return
@@ -468,10 +457,9 @@ export function TaskVaultView(): React.JSX.Element {
   }, [])
 
   function makeTaskNavHandler(taskId: string): () => void {
-    return () => {
-      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-      useVaultNavStore.getState().navigateToTask(taskId)
-    }
+    // Already inside the vault view; the tab activation this used to do reached
+    // a copy of the core registry bundled into this view and moved nothing.
+    return () => useVaultNavStore.getState().navigateToTask(taskId)
   }
 
   async function handleComplete(taskId: string) {

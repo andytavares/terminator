@@ -1,7 +1,6 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageSquarePlus } from 'lucide-react'
-import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
@@ -498,10 +497,11 @@ export function NotepadView(): React.JSX.Element {
       'terminator.notepad:selectNote',
       (data: unknown) => {
         const id = (data as { id?: string })?.id
-        if (id) {
-          useExtensionRegistry.getState().setActiveGlobalTab('notepad')
-          useNotesStore.getState().setSelected(id)
-        }
+        // The tab activation is the main process's job and it already does it
+        // (index.ts broadcasts extension:activate-global-tab). Calling the core
+        // registry from here reached a *copy* of that store bundled into this
+        // view, so it moved nothing.
+        if (id) useNotesStore.getState().setSelected(id)
       }
     )
     return off

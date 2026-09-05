@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react'
 import { useGitStore } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
-import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { StagingArea } from './StagingArea'
 import { PrDialog } from './PrDialog'
 import './git-integration.css'
@@ -16,7 +15,6 @@ interface Props {
 export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Element {
   useGitStatus(repoRoot)
   const { status, setSelectedFile, setDiff } = useGitStore()
-  const { setActiveProjectTab } = useExtensionRegistry()
 
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
@@ -31,7 +29,11 @@ export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Ele
   const handleFileSelect = useCallback(
     (path: string, staged: boolean) => {
       setSelectedFile(path)
-      setActiveProjectTab('git')
+      // Bring the Git project tab forward so the diff this selection produces is
+      // actually on screen. Goes through the extension's own main-process
+      // handler: this panel is an isolated webview and cannot reach the host's
+      // store directly (and the import that used to try reached a copy).
+      void window.electronAPI.extensionBridge.invoke('git:focus-project-tab', { tabId: 'git' })
       if (repoRoot) {
         void gitAPI.diffFile(repoRoot, path, staged).then((result) => {
           const r = result as { diff: FileDiff } | { error: string }
@@ -39,7 +41,7 @@ export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Ele
         })
       }
     },
-    [repoRoot, setSelectedFile, setActiveProjectTab, setDiff]
+    [repoRoot, setSelectedFile, setDiff]
   )
 
   const handleCommit = useCallback(async () => {

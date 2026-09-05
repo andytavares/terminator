@@ -16,7 +16,6 @@ import {
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { SmartTaskInput } from './SmartTaskInput'
-import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 
 interface AreaOption {
   name: string
@@ -125,23 +124,44 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
   const [activeSessions, setActiveSessions] = useState<
     Array<{ sessionId: string; projectId: string; tabTitle: string }>
   >([])
-  const workspaces = useWorkspaceStore((s) => s.workspaces)
-  const projectsByWs = useWorkspaceStore((s) => s.projectsByWorkspaceId)
+  // Read over the bridge, not from the core store.
+  //
+  // This used to import the host's workspace store directly. That is a
+  // Principle II violation, but it was also simply broken: this view bundles
+  // its own copy of that module, so the store it read was a second, empty
+  // instance nobody populates — every session fell through to the truncated-id
+  // label below.
+  const [workspaces, setWorkspaces] = useState<Array<{ id: string; name: string }>>([])
+  const [projects, setProjects] = useState<
+    Array<{ id: string; name: string; workspaceId: string }>
+  >([])
 
   useEffect(() => {
     if (!linking) return
     void window.electronAPI.terminal.listSessions?.().then((result) => {
       if (Array.isArray(result)) setActiveSessions(result)
     })
+    void (async () => {
+      const list = (await window.electronAPI.workspace.list()) as
+        | Array<{ id: string; name: string }>
+        | undefined
+      if (!Array.isArray(list)) return
+      setWorkspaces(list)
+      const perWorkspace = await Promise.all(
+        list.map(async (w) => {
+          const own = (await window.electronAPI.project.list(w.id)) as
+            | Array<{ id: string; name: string; workspaceId: string }>
+            | undefined
+          return Array.isArray(own) ? own : []
+        })
+      )
+      setProjects(perWorkspace.flat())
+    })()
   }, [linking])
 
   function sessionLabel(s: { sessionId: string; tabTitle: string; projectId: string }): string {
-    let project: { name: string; workspaceId: string } | undefined
-    for (const [, projects] of projectsByWs) {
-      project = projects.find((p) => p.id === s.projectId)
-      if (project) break
-    }
-    const workspace = project ? workspaces.find((w) => w.id === project!.workspaceId) : undefined
+    const project = projects.find((p) => p.id === s.projectId)
+    const workspace = project ? workspaces.find((w) => w.id === project.workspaceId) : undefined
     const parts: string[] = []
     if (workspace) parts.push(workspace.name)
     if (project) parts.push(project.name)

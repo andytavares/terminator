@@ -100,26 +100,26 @@ still leaves the core building.
 
 ### Tests for User Story 2 ⚠️ Write first, confirm they FAIL
 
-- [ ] T022 [P] [US2] Write the failing end-to-end spec `tests/e2e/extension-dialogs.spec.ts` that opens every dismissible surface in the product and asserts all five behaviours on each (Escape closes, `role="dialog"`, `aria-modal`, focus trapped and restored, outside-click dismisses)
-- [ ] T023 [P] [US2] Write failing unit specs for the components in `tests/unit/packages/extension-ui/dialog.spec.tsx` covering focus restoration to the invoking element, the `dismissible: false` escape hatch, and no animation under `prefers-reduced-motion`
-- [ ] T024 [P] [US2] Write the failing spec `tests/unit/packages/extension-ui/empty-state.spec.tsx` asserting an empty state cannot be constructed without at least one action (FR-026)
+- [x] T022 [P] [US2] Write the failing end-to-end spec `tests/e2e/extension-dialogs.spec.ts` that opens every dismissible surface in the product and asserts all five behaviours on each (Escape closes, `role="dialog"`, `aria-modal`, focus trapped and restored, outside-click dismisses)
+- [x] T023 [P] [US2] Write failing unit specs for the components in `tests/unit/packages/extension-ui/dialog.spec.tsx` covering focus restoration to the invoking element, the `dismissible: false` escape hatch, and no animation under `prefers-reduced-motion`
+- [x] T024 [P] [US2] Write the failing spec `tests/unit/packages/extension-ui/empty-state.spec.tsx` asserting an empty state cannot be constructed without at least one action (FR-026)
 
 ### Implementation for User Story 2
 
-- [ ] T025 [P] [US2] Implement the focus trap utility in `packages/extension-ui/src/focus-trap.ts` — capture, cycle, restore; hand-rolled per research R4, no new dependency
-- [ ] T026 [US2] Implement `packages/extension-ui/src/Dialog.tsx` per `contracts/extension-ui-api.md`, consuming only `--tm-*` tokens and registering modal depth on mount
-- [ ] T027 [US2] Implement `packages/extension-ui/src/ConfirmDialog.tsx` by generalising the existing `src/renderer/components/ConfirmDialog.tsx` (61 lines — the reference implementation, per spec Assumptions)
-- [ ] T028 [P] [US2] Implement `packages/extension-ui/src/Toast.tsx` and `ToastRegion`, keeping the core's existing `info | success | warning | error` vocabulary (research R7)
-- [ ] T029 [P] [US2] Implement `packages/extension-ui/src/EmptyState.tsx` modelled on Notepad's `extensions/notepad/src/components/EmptyState.tsx`, with the actions prop typed as non-empty
-- [ ] T030 [P] [US2] Implement `packages/extension-ui/src/IconButton.tsx` with `label` as a required prop and CSS-controlled icon sizing (FR-005, Principle XII)
-- [ ] T031 [US2] Add the `ui` namespace to `src/main/extensions/api.ts` exposing `toast` and the readonly `layers` map, and surface it through `src/main/preload-webview.ts` (FR-001)
-- [ ] T032 [US2] Migrate the core's `src/renderer/components/ConfirmDialog.tsx` and `src/renderer/stores/toast.store.ts` onto the package, leaving no second implementation (FR-007a)
-- [ ] T033 [P] [US2] Migrate Notepad's 4 surfaces onto the primitives and delete `.notepad-overlay-backdrop` and the superseded rules from `extensions/notepad/src/components/notepad.css`
+- [x] T025 [P] [US2] Implement the focus trap utility in `packages/extension-ui/src/focus-trap.ts` — capture, cycle, restore; hand-rolled per research R4, no new dependency
+- [x] T026 [US2] Implement `packages/extension-ui/src/Dialog.tsx` per `contracts/extension-ui-api.md`, consuming only `--tm-*` tokens and registering modal depth on mount
+- [x] T027 [US2] Implement `packages/extension-ui/src/ConfirmDialog.tsx` by generalising the existing `src/renderer/components/ConfirmDialog.tsx` (61 lines — the reference implementation, per spec Assumptions)
+- [x] T028 [P] [US2] Implement `packages/extension-ui/src/Toast.tsx` and `ToastRegion`, keeping the core's existing `info | success | warning | error` vocabulary (research R7)
+- [x] T029 [P] [US2] Implement `packages/extension-ui/src/EmptyState.tsx` modelled on Notepad's `extensions/notepad/src/components/EmptyState.tsx`, with the actions prop typed as non-empty
+- [x] T030 [P] [US2] Implement `packages/extension-ui/src/IconButton.tsx` with `label` as a required prop and CSS-controlled icon sizing (FR-005, Principle XII)
+- [x] T031 [US2] Add the `ui` namespace to `src/main/extensions/api.ts` exposing `toast` and the readonly `layers` map, and surface it through `src/main/preload-webview.ts` (FR-001)
+- [x] T032 [US2] Migrate the core's `src/renderer/components/ConfirmDialog.tsx` and `src/renderer/stores/toast.store.ts` onto the package, leaving no second implementation (FR-007a)
+- [x] T033 [P] [US2] Migrate Notepad's 4 surfaces onto the primitives and delete `.notepad-overlay-backdrop` and the superseded rules from `extensions/notepad/src/components/notepad.css`
 - [ ] T034 [P] [US2] Migrate git-integration's 4 surfaces (`PrDialog`, `KeepBothModal`, `ReviewSubmitPanel`, `CommentComposer`) and delete `.pr-dialog`, `.keep-both-modal`, `.pr-review-submit-overlay`
 - [ ] T035 [P] [US2] Migrate speckit-pilot's 4 surfaces (`CardDetail`, `CardBriefEditor`, `BatchCheckIn`, `SettingsView`) and delete `.sk-modal`, `.sk-modal-overlay`, `.sk-drawer`
 - [ ] T036 [P] [US2] Migrate task-vault's 7 surfaces (`TaskDetailPanel`, `FileToPicker`, `DateTimePicker`, `QuickCaptureOverlay`, `LinkPicker`, `KanbanLaneEditor`, `CalendarDrawer`) and delete `ExtensionToastContainer.tsx` and `.cal-drawer`
 - [ ] T037 [US2] Audit MergeFlow and the PR review diff pane with a real merge conflict and a real open pull request before migrating them — both were reviewed from source only and have no visual baseline (plan, carried risk)
-- [ ] T038 [US2] Remove the five runtime imports of core renderer source: `extensions/notepad/src/components/NoteList.tsx:11`, `extensions/notepad/src/components/NotepadView.tsx:4`, `extensions/git-integration/src/components/GitSidebarPanel.tsx:4`, `extensions/task-vault/src/components/TaskVaultView.tsx:18`, `extensions/task-vault/src/components/ProjectsBrowser.tsx:19` (FR-008)
+- [x] T038 [US2] Remove the five runtime imports of core renderer source: `extensions/notepad/src/components/NoteList.tsx:11`, `extensions/notepad/src/components/NotepadView.tsx:4`, `extensions/git-integration/src/components/GitSidebarPanel.tsx:4`, `extensions/task-vault/src/components/TaskVaultView.tsx:18`, `extensions/task-vault/src/components/ProjectsBrowser.tsx:19` (FR-008)
 - [ ] T039 [US2] Replace every numeric `z-index` in extension CSS with `var(--tm-layer-*)` per the migration map in `contracts/layer-scale.md` (14 distinct values)
 - [ ] T040 [US2] Add an ESLint rule failing a numeric `z-index` literal in `extensions/**/*.css` in `.eslintrc.json`
 - [ ] T041 [US2] Re-export the new component types from `packages/extension-sdk/types/index.d.ts` and bump the contract to v1.3.0, keeping every existing member unchanged (FR-006)

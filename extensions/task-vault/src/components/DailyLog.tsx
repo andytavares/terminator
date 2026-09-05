@@ -23,7 +23,6 @@ import {
 } from 'lucide-react'
 import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
 import { SmartTaskInput } from './SmartTaskInput'
-import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { notify } from '../utils/notify'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 
@@ -166,10 +165,10 @@ function SessionPicker({
 }
 
 function makeTaskNavHandler(taskId: string): () => void {
-  return () => {
-    useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-    useVaultNavStore.getState().navigateToTask(taskId)
-  }
+  // No tab activation here: this row is already inside the vault view, so the
+  // user is looking at it. The call that used to be here reached a copy of the
+  // core registry bundled into this view and moved nothing.
+  return () => useVaultNavStore.getState().navigateToTask(taskId)
 }
 
 function SubtaskRow({

@@ -8,7 +8,7 @@ import {
   Tag as TagIcon,
   Check,
 } from 'lucide-react'
-import { ConfirmDialog } from '../../../../src/renderer/components/ConfirmDialog'
+import { ConfirmDialog } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
