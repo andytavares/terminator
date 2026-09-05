@@ -13,6 +13,7 @@ import { registerBridgeRoute } from './routes/bridge.route.js'
 import { WsTicketStore } from './ws-ticket-store.js'
 import { SessionStore } from './session-store.js'
 import { WsSubscriberManager } from './ws-subscriber-manager.js'
+import { ConnectedDeviceRegistry } from './connected-devices.js'
 
 // CSS injected into every extension iframe so --tm-* variables and layout are defined.
 // Mirrors the EXTENSION_BASE_CSS in src/main/extensions/extension-view-host.ts —
@@ -144,6 +145,8 @@ export interface RemoteServerHandle {
   stop(): Promise<void>
   isListening(): boolean
   disconnectAllClients(): void
+  /** Who is connected, and a subscription to changes, for the view. */
+  devices: ConnectedDeviceRegistry
   inject: FastifyInstance['inject']
 }
 
@@ -213,6 +216,8 @@ export async function createRemoteServer(
 
   const ticketStore = new WsTicketStore()
   const subscriberManager = new WsSubscriberManager()
+  // Who is watching, so the Remote Control view can say so and disconnect one.
+  const deviceRegistry = new ConnectedDeviceRegistry()
   // One session store per browser surface; 8-hour cookie lifetime.
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000
   const appSessionStore = new SessionStore({
@@ -355,6 +360,7 @@ export async function createRemoteServer(
     ptyManager,
     ticketStore,
     subscriberManager,
+    deviceRegistry,
     getMaxSubscribers: deps.getMaxSubscribers,
   })
   const bridgeCleanup = await registerBridgeRoute(fastify, {
@@ -420,6 +426,9 @@ export async function createRemoteServer(
     isListening() {
       return listening
     },
+
+    /** The live device list, and a subscription to changes. */
+    devices: deviceRegistry,
 
     inject: fastify.inject.bind(fastify),
   }

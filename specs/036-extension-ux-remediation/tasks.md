@@ -140,21 +140,21 @@ named failure with a way forward.
 
 ### Tests for User Story 3 ⚠️ Write first, confirm they FAIL
 
-- [ ] T043 [P] [US3] Write failing unit specs for the state machine in `tests/unit/extensions/remote-control/status.spec.ts` covering off → starting → on → failed and the local-only sub-case (data-model §3)
-- [ ] T044 [P] [US3] Write a failing spec asserting the credential is not present in the rendered output until an explicit reveal (FR-013)
+- [x] T043 [P] [US3] Write failing unit specs for the state machine in `tests/unit/extensions/remote-control/status.spec.ts` covering off → starting → on → failed and the local-only sub-case (data-model §3)
+- [x] T044 [P] [US3] Write a failing spec asserting the credential is not present in the rendered output until an explicit reveal (FR-013)
 
 ### Implementation for User Story 3
 
-- [ ] T045 [US3] Add `qrcode.react` pinned exact to `extensions/remote-control/package.json` only — never the root manifest (research R3, Constitution II/IV)
-- [ ] T046 [US3] Implement the status state machine in `extensions/remote-control/src/state/status.ts` as a pure reducer
-- [ ] T047 [US3] Emit connect/disconnect events from `extensions/remote-control/src/server/remote-server.ts` so the device list is pushed rather than polled (research R8)
-- [ ] T048 [US3] Build the status band in `extensions/remote-control/src/components/StatusBand.tsx` — state dot, address with copy, stop control
-- [ ] T049 [US3] Add the concealed credential with reveal and copy actions in `extensions/remote-control/src/components/Credential.tsx`
-- [ ] T050 [US3] Render the scannable code with `QRCodeSVG` in `extensions/remote-control/src/components/ConnectCode.tsx`, taking `fgColor`/`bgColor` from theme tokens and encoding the credential so scanning never requires revealing it
-- [ ] T051 [US3] Add the one-line consequence statement in plain language beside the credential (FR-014)
-- [ ] T052 [US3] Build the connected-devices list with per-device disconnect in `extensions/remote-control/src/components/ConnectedDevices.tsx`
-- [ ] T053 [US3] Implement the four named failure states with a resolving action each, replacing the current silent-failure behaviour (FR-017)
-- [ ] T054 [US3] Demote configuration to a collapsed summary and reorder so the credential requirement precedes optional settings in `extensions/remote-control/src/components/RemoteControlSettings.tsx` (FR-018)
+- [x] T045 [US3] Add `qrcode.react` pinned exact to `extensions/remote-control/package.json` only — never the root manifest (research R3, Constitution II/IV)
+- [x] T046 [US3] Implement the status state machine in `extensions/remote-control/src/state/status.ts` as a pure reducer
+- [x] T047 [US3] Emit connect/disconnect events from `extensions/remote-control/src/server/remote-server.ts` so the device list is pushed rather than polled (research R8)
+- [x] T048 [US3] Build the status band in `extensions/remote-control/src/components/StatusBand.tsx` — state dot, address with copy, stop control
+- [x] T049 [US3] Add the concealed credential with reveal and copy actions in `extensions/remote-control/src/components/Credential.tsx`
+- [x] T050 [US3] Render the scannable code with `QRCodeSVG` in `extensions/remote-control/src/components/ConnectCode.tsx`, taking `fgColor`/`bgColor` from theme tokens and encoding the credential so scanning never requires revealing it
+- [x] T051 [US3] Add the one-line consequence statement in plain language beside the credential (FR-014)
+- [x] T052 [US3] Build the connected-devices list with per-device disconnect in `extensions/remote-control/src/components/ConnectedDevices.tsx`
+- [x] T053 [US3] Implement the four named failure states with a resolving action each, replacing the current silent-failure behaviour (FR-017)
+- [x] T054 [US3] Demote configuration to a collapsed summary and reorder so the credential requirement precedes optional settings in `extensions/remote-control/src/components/RemoteControlSettings.tsx` (FR-018)
 
 **Checkpoint**: Remote Control is a feature screen rather than a settings form.
 
