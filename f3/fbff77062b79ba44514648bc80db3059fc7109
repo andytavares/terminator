@@ -1,0 +1,121 @@
+tests/e2e/git-sidebar.spec.ts
+  s_f99ce66da147a0::t_44efe0a5176d9a 35
+  s_f99ce66da147a0::t_80e4f3397e6f8a 39
+tests/unit/renderer/components/BranchRow.spec.tsx
+  s_f99ce66da147a0::t_14ffb8cdedafbf 101-103
+  s_f99ce66da147a0::t_efceef3be96ba3 266-354
+  s_f99ce66da147a0::t_b613900c444a5e 1-100,104-163,167-265
+  s_f99ce66da147a0::t_1fa8ffbe4ba56c 164-166
+tests/e2e/speckit-supervised-run.spec.ts
+  s_f99ce66da147a0::t_d80c1852a57a11 131,279
+tests/e2e/helpers.ts
+  s_f99ce66da147a0::t_fa23bbdf75982b 85-87,90-92,96-97,101-102,107-109,116-119,123-128,131,137
+src/renderer/App.tsx
+  s_f99ce66da147a0::t_64bf98eefff141 655
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_f99ce66da147a0::t_db219e45c38614 43,202,222-224,228,230
+  s_f99ce66da147a0::t_cdd664a293c22a 204,207-209
+src/renderer/components/sidebar/BranchRow.tsx
+  s_f99ce66da147a0::t_cdd664a293c22a 53-60,93,120-127
+  s_f99ce66da147a0::t_cdc1a317b77a9f 1-39,42-52,61-85,87-92,94-99,101-119,128-158,160-183,201-209,211-232,234-236
+  s_f99ce66da147a0::t_1fa8ffbe4ba56c 100,159,210,233
+  s_f99ce66da147a0::t_d4cd459591134e 40-41,86,184-200
+tests/e2e/sidebar-branch-first.spec.ts
+  s_f99ce66da147a0::t_633197ea9920ff 42-44,48-49,52-75,86,88,91-99,106,116-119
+  s_f99ce66da147a0::t_414a0c16f45f3a 125-130
+  s_f99ce66da147a0::t_d80c1852a57a11 47,80,83
+  s_f99ce66da147a0::t_1fa8ffbe4ba56c 39,90
+src/renderer/components/terminal/TabBar.css
+  s_f99ce66da147a0::t_db08391a0b1ba4 246-257
+tests/e2e/project.spec.ts
+  s_f99ce66da147a0::t_414a0c16f45f3a 25,33
+  s_f99ce66da147a0::t_80e4f3397e6f8a 42
+tests/unit/renderer/sidebar-status-colour-independence.spec.ts
+  s_f99ce66da147a0::t_9dda78b82ecf03 32-45,49,51,53-55,59-66,69-71,88,92
+  s_f99ce66da147a0::t_987504cf2b79b3 12-13
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_f99ce66da147a0::t_ccbe7200bf69e9 527-630
+src/renderer/hooks/useDragReorder.ts
+  s_f99ce66da147a0::t_70ec2d25fbb9bf 4
+src/renderer/components/terminal/TabBar.tsx
+  s_f99ce66da147a0::t_db08391a0b1ba4 29-34,44,59,61-62,123-136,224-240,289,299-303,331,334,342,345,360-361
+  s_f99ce66da147a0::t_4ed000f57e09bc 362
+tests/e2e/terminal.spec.ts
+  s_f99ce66da147a0::t_d80c1852a57a11 57
+src/renderer/components/sidebar/BranchRow.css
+  s_f99ce66da147a0::t_83bb3499512f3e 1-189
+  s_f99ce66da147a0::t_d4cd459591134e 190-200
+tests/unit/renderer/App.spec.tsx
+  s_f99ce66da147a0::t_56cf93dc58b1ec 127,132-133,1469
+  s_f99ce66da147a0::t_bc44bc759ff149 128-131
+  s_f99ce66da147a0::t_b8f98e8005025d 262-263
+specs/034-declutter-sidebar/tasks.md
+  s_f99ce66da147a0::t_85cacd0189a690 127-128,135-136,138-147,218-219,223-226
+tests/unit/renderer/sidebar-workspace-tint.spec.ts
+  s_f99ce66da147a0::t_99cab6d2d6b165 6-17,20-22,25-26,33,37-40,43-44,46,48,52,56-64,67-69,72-74,76,79-81,85-90,93,95-103,107-110,113-116,120-133,135-137,140-154
+src/renderer/components/sidebar/RepoHeader.css
+  s_f99ce66da147a0::t_83bb3499512f3e 1-117
+  s_f99ce66da147a0::t_6465b4f6d3caf1 118-123
+tests/e2e/remote-app.spec.ts
+  s_f99ce66da147a0::t_d80c1852a57a11 51,97
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_f99ce66da147a0::t_cdd664a293c22a 520-524
+  s_f99ce66da147a0::t_8cf0febe406b69 12
+  s_f99ce66da147a0::t_b1930f748e3ca0 480-483,486
+  s_f99ce66da147a0::t_f02bb5aa01a6d4 113
+  s_f99ce66da147a0::t_963376b8d5c68f 3
+  s_f99ce66da147a0::t_87b085623a7df5 409,411-412
+  s_f99ce66da147a0::t_1fa8ffbe4ba56c 304-311
+  s_f99ce66da147a0::t_a5bac3b49b2b80 459-479,484-485,487-491,494,496,499-505,507-509,511,515,518-519,525
+  s_f99ce66da147a0::t_d4cd459591134e 506
+  s_f99ce66da147a0::t_70ec2d25fbb9bf 570-573,596-597
+  s_f99ce66da147a0::t_091290e6f6aba2 10,33-34,294-295
+  s_f99ce66da147a0::t_925f047f67d5c1 563-565,567-569,574-587,592,594,598-612,615-623,633-654,660
+tests/unit/renderer/components/RepoHeader.spec.tsx
+  s_f99ce66da147a0::t_1fa8ffbe4ba56c 22
+  s_f99ce66da147a0::t_e02de2ae68f6b8 1-21,23-150,152-153,155-164
+  s_f99ce66da147a0::t_2b012df5f3aa29 151,154
+tests/e2e/workspace.spec.ts
+  s_f99ce66da147a0::t_1fa8ffbe4ba56c 55-57,72-74
+  s_f99ce66da147a0::t_d80c1852a57a11 30-31,63,71
+src/renderer/components/sidebar/RepoHeader.tsx
+  s_f99ce66da147a0::t_6465b4f6d3caf1 4,23-29,53-54,69-70
+  s_f99ce66da147a0::t_0143cd7e102cf4 111
+  s_f99ce66da147a0::t_6b250ecc840b15 1-3,5-22,30-52,55-68,71-110,112-137,139,142-147
+  s_f99ce66da147a0::t_7f5422b5f0ece5 138
+  s_f99ce66da147a0::t_414a0c16f45f3a 140-141
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_f99ce66da147a0::t_5bba7ef3a7e1ae 283,323-324,392,524-527
+  s_f99ce66da147a0::t_d06da694f574df 246-253,255,259,261-264,267-272,275-277,279,282,284,286-288,292,295-296,299-307,310-318,321-322,325-329,332-342,345-353,359-360,362,367-371,373,375-376,378-380,383,385,387-391,393-396,400-404,407-410,413,415-416,419,421-422,426-430,432-444,447-448,450,452-457,460-463,465-472,476-477,479-483,485,488,490-496,499,501-504,508-523,530-531,535-559,561
+  s_f99ce66da147a0::t_b1930f748e3ca0 356-358,364
+  s_f99ce66da147a0::t_1c554481d7d6f3 758,773,785
+  s_f99ce66da147a0::t_d4d19c5b474e59 598
+  s_f99ce66da147a0::t_1fa8ffbe4ba56c 431,532
+  s_f99ce66da147a0::t_e4eb02a3813dd7 672,674,799-805,809-815
+  s_f99ce66da147a0::t_87ab99c0c86741 55
+  s_f99ce66da147a0::t_0b75e928a8f2bd 730-731,734,746-747,749,765,832
+  s_f99ce66da147a0::t_0fb3d0d107f607 576,583,591,660,881-884,926-929
+  s_f99ce66da147a0::t_d3229b0053ae57 365-366,528-529,533-534,560
+tests/e2e/branch-name.spec.ts
+  s_f99ce66da147a0::t_8d22889ed8f242 72
+  s_f99ce66da147a0::t_d80c1852a57a11 42,64,66
+  s_f99ce66da147a0::t_414a0c16f45f3a 47
+tests/e2e/board.spec.ts
+  s_f99ce66da147a0::t_1fa8ffbe4ba56c 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "f3fbff77062b79ba44514648bc80db3059fc7109",
+  "prompts": {},
+  "sessions": {
+    "s_f99ce66da147a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bedd0c8-eeb0-4be7-841a-5f499713ccb3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
