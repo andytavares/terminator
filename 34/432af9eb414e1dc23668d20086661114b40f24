@@ -1,0 +1,25 @@
+extensions/git-integration/src/components/merge-flow/KeepBothModal.tsx
+  s_8aa585ff1f786f::t_18823cb518f2bc 2-3,180-194,196-201,203-212,214-228,230-232,234,236-253
+  s_8aa585ff1f786f::t_460d42edc1f4c9 254-261,263,265-275,277-278,280-284,286-287
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_8aa585ff1f786f::t_18823cb518f2bc 2,403-405
+  s_8aa585ff1f786f::t_d8950dbd12392d 412
+specs/036-extension-ux-remediation/tasks.md
+  s_8aa585ff1f786f::t_e77f54eeb264bf 121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "34432af9eb414e1dc23668d20086661114b40f24",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
