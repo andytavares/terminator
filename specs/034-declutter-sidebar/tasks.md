@@ -44,11 +44,11 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T006 Export `STATUS_ORDER` from `src/renderer/sidebar/view-model.ts` (currently module-private) so nothing re-declares the severity order — do **not** narrow `GroupKey` yet, that breaks the build until `views.ts` moves in T044
-- [ ] T007 [P] Write failing spec `tests/unit/renderer/sidebar/branch-state.spec.ts` covering invariants BS-1 to BS-5 from `contracts/sidebar-pure-layer.md`, especially BS-1: an empty terminal list aggregates to `idle`, never `exited`
-- [ ] T008 [P] Write failing spec `tests/unit/renderer/sidebar/purity.spec.ts` asserting no module under `src/renderer/sidebar/` imports React, a store, or reads the clock (ADR-027, Constitution XI)
-- [ ] T009 Implement `aggregateBranchState` and `countInState` in `src/renderer/sidebar/branch-state.ts`, importing `STATUS_ORDER` from `view-model.ts` (T006, T007)
-- [ ] T010 [P] Add the shared state-opacity scale to `src/renderer/styles.css` — `awaiting-input` 1.0, `working` 0.85, `idle` 0.34, `exited` 0.24 — as tokens, since three surfaces consume them and Constitution XII forbids differentiating icon state by colour
+- [x] T006 Export `STATUS_ORDER` from `src/renderer/sidebar/view-model.ts` (currently module-private) so nothing re-declares the severity order — do **not** narrow `GroupKey` yet, that breaks the build until `views.ts` moves in T044
+- [x] T007 [P] Write failing spec `tests/unit/renderer/sidebar/branch-state.spec.ts` covering invariants BS-1 to BS-5 from `contracts/sidebar-pure-layer.md`, especially BS-1: an empty terminal list aggregates to `idle`, never `exited`
+- [x] T008 [P] Write failing spec `tests/unit/renderer/sidebar/purity.spec.ts` asserting no module under `src/renderer/sidebar/` imports React, a store, or reads the clock (ADR-027, Constitution XI)
+- [x] T009 Implement `aggregateBranchState` and `countInState` in `src/renderer/sidebar/branch-state.ts`, importing `STATUS_ORDER` from `view-model.ts` (T006, T007)
+- [x] T010 [P] Add the shared state-opacity scale to `src/renderer/styles.css` — `awaiting-input` 1.0, `working` 0.85, `idle` 0.34, `exited` 0.24 — as tokens, since three surfaces consume them and Constitution XII forbids differentiating icon state by colour
 
 **Checkpoint**: One state vocabulary exists and is tested. The three story phases can now proceed.
 

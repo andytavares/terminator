@@ -55,7 +55,7 @@ export interface BuildResult {
 }
 
 /** Severity order, shared by status grouping and status sorting so they never disagree. */
-const STATUS_ORDER: AgentState[] = ['awaiting-input', 'working', 'idle', 'exited']
+export const STATUS_ORDER: AgentState[] = ['awaiting-input', 'working', 'idle', 'exited']
 
 const STATUS_LABEL: Record<AgentState, string> = {
   'awaiting-input': 'Awaiting you',
