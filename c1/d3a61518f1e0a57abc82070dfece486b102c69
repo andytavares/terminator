@@ -1,0 +1,29 @@
+src/renderer/components/terminal/TabBar.css
+  s_f99ce66da147a0::t_bfa4f43bb7875b 205-245
+specs/034-declutter-sidebar/tasks.md
+  s_f99ce66da147a0::t_eabb06e216fd15 101,105-110
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_f99ce66da147a0::t_93fb1a73cc4f69 108-109,119
+  s_f99ce66da147a0::t_a9a24c28e779aa 404,418,430,439,441,448-449,455-456,463,465,471-472,479-488,497
+  s_f99ce66da147a0::t_885fcc373b7f79 120-121,180-181,190-192,200-202,214-216,227-229,240-242,252-253,266-267,279-281,292-294,304-306,317-319,329-331,343-345,358-360,384,405-417,419-429,431-438,440,442-447,450-454,457-462,464,466-470,473-478,489-496,498-526
+src/renderer/components/terminal/TabBar.tsx
+  s_f99ce66da147a0::t_729bfee967831d 2,9,19-26,184,188,190-199
+  s_f99ce66da147a0::t_7d47d0c05908fb 183,185-187,215
+  s_f99ce66da147a0::t_104e0c61922c12 12-18,158-160,223-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "c1d3a61518f1e0a57abc82070dfece486b102c69",
+  "prompts": {},
+  "sessions": {
+    "s_f99ce66da147a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bedd0c8-eeb0-4be7-841a-5f499713ccb3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
