@@ -51,6 +51,12 @@ All with their tests.
 2. **`purity.spec.ts` guards the whole `src/renderer/sidebar/` directory**, so a new module there inherits ADR-027's no-React/no-store/no-clock rule without anyone remembering.
 3. **Two bugs were found only by screenshotting the running app** — the scratch header rendering as bare text, and the board preview being height-constrained. Every unit assertion about both was structural and passed.
 
+## One contract addition
+
+`SidebarContribution` gained an optional `icon?: string`, taking the same lucide names a manifest's `contributes.globalTab.icon` uses. This is the one place FR-037's "contracts unchanged" is relaxed, and it is additive: a contribution that omits it behaves exactly as before.
+
+It had to change. A contributed sidebar item previously **could not supply an icon at all** — the field did not exist — so the host drew a placeholder square. That was tolerable while every band entry had a text label under it; removing the labels left Git Changes as an unidentifiable square next to four real icons. `git-integration` now declares `icon: 'git-branch'`, and the host's last-resort fallback is a puzzle glyph rather than a bare square.
+
 ## Known, not fixed
 
 - `MetricsBar.tsx` imports the shared types one directory level too high. It only compiles because the import is type-only and erased before vite resolves it. Pre-existing, untouched.

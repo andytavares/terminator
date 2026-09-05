@@ -1,5 +1,5 @@
 import React from 'react'
-import { Bell, Square } from 'lucide-react'
+import { Bell, Puzzle } from 'lucide-react'
 import type { GlobalTabRegistration, SidebarButtonRegistration } from '../../extensions/registry'
 import './AppBand.css'
 
@@ -89,10 +89,12 @@ function Entry({
       title={label}
       {...(active ? { 'aria-current': 'page' as const } : {})}
     >
-      {/* A contribution without an icon still gets one, so a missing field
-          cannot leave a hole in the band. */}
+      {/* Every contribution should name an icon — `SidebarContribution.icon`
+          takes the same lucide names a manifest uses. Puzzle is the last
+          resort for one that names none: it at least reads as "an extension",
+          which a bare square did not. */}
       <span className="app-band__icon" aria-hidden="true">
-        {icon ?? <Square />}
+        {icon ?? <Puzzle />}
       </span>
       {badge > 0 && <span className="app-band__badge">{badge > 9 ? '9+' : badge}</span>}
     </button>

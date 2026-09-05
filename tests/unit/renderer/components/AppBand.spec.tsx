@@ -45,6 +45,7 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     for (const entry of container.querySelectorAll('.app-band__entry')) {
       expect(entry.getAttribute('aria-label')).toBeTruthy()
       expect(entry.getAttribute('title')).toBeTruthy()
+      // No drawn label: the band is icons only.
       expect(entry.textContent).toBe('')
     }
   })
@@ -135,5 +136,40 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
     })
     expect(screen.getByRole('button', { name: 'Anything At All' })).toBeTruthy()
     expect(container.querySelectorAll('.app-band__entry')).toHaveLength(1)
+  })
+})
+
+describe('AppBand — icons', () => {
+  it('draws the icon a contribution supplies', () => {
+    const { container } = renderBand({
+      globalTabs: [],
+      sidebarItems: [
+        { id: 'git', label: 'Git Changes', icon: <svg data-testid="git-icon" />, action: noop },
+      ],
+    })
+    expect(container.querySelector('[data-testid="git-icon"]')).toBeTruthy()
+  })
+
+  /**
+   * Every contribution should name one. `SidebarContribution.icon` takes the
+   * same lucide names a manifest uses; before it existed a sidebar item could
+   * not supply an icon at all and the band drew a bare square, which said
+   * nothing once the text labels came off.
+   */
+  it('falls back to an extension glyph, never a bare square', () => {
+    const { container } = renderBand({
+      globalTabs: [],
+      sidebarItems: [{ id: 'x', label: 'No Icon', action: noop }],
+    })
+    const svg = container.querySelector('.app-band__icon svg')!
+    expect(svg.getAttribute('class')).toContain('lucide-puzzle')
+  })
+
+  it('still names an icon-only entry for a reader', () => {
+    renderBand({
+      globalTabs: [],
+      sidebarItems: [{ id: 'git', label: 'Git Changes', action: noop }],
+    })
+    expect(screen.getByRole('button', { name: 'Git Changes' })).toBeTruthy()
   })
 })

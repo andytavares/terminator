@@ -9,7 +9,7 @@ import { useSettingsStore } from '../../stores/settings.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { buildBranchRows, type BranchRow as BranchRowData } from '../../sidebar/branch-rows'
 import { BellAndBusySource } from '../../sidebar/agent-state'
-import { branchLabel, qualifiedBranchLabel } from '../../sidebar/branch-display'
+import { abbreviatePath, branchLabel, qualifiedBranchLabel } from '../../sidebar/branch-display'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
 import {
@@ -156,6 +156,8 @@ export function UnifiedSidebar({
     closeDrawer,
   } = useIntegrationsStore()
 
+  /** Home directory, so a repo's path reads as `~/repos/app` rather than in full. */
+  const [homeDir, setHomeDir] = useState<string | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
   const [collapseState, setCollapseState] = useState(loadCollapseState)
   const sidebarRef = useRef<HTMLDivElement>(null)
@@ -210,6 +212,13 @@ export function UnifiedSidebar({
   useEffect(() => {
     widthRef.current = width
   }, [width])
+
+  useEffect(() => {
+    void window.electronAPI?.app
+      ?.getInfo?.()
+      .then((info) => setHomeDir(info.homeDir))
+      .catch(() => setHomeDir(undefined))
+  }, [])
 
   // Coming back to the window is the cheapest moment to notice that the working
   // trees moved on while you were away.
@@ -560,6 +569,7 @@ export function UnifiedSidebar({
               <React.Fragment key={group.workspaceId}>
                 <RepoHeader
                   group={group}
+                  pathLabel={abbreviatePath(group.folderPath, homeDir)}
                   dragProps={getItemProps(workspaces.findIndex((w) => w.id === group.workspaceId))}
                   dragOver={
                     dragOverIndex === workspaces.findIndex((w) => w.id === group.workspaceId)

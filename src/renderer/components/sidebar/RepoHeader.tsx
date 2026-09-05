@@ -21,6 +21,13 @@ export interface RepoHeaderProps {
   activeWorkspaceTabId?: string | null
   onSelectWorkspaceTab?: (tabId: string) => void
   /**
+   * The folder path, home-abbreviated. Shown as the name's tooltip, not the
+   * row's: a native tooltip is drawn over whatever is beneath it, so a
+   * full-width trigger meant hovering anywhere on the row blanketed the
+   * branches below it.
+   */
+  pathLabel?: string
+  /**
    * Drag-to-reorder for the repo list. It used to hang off the "new branch"
    * row that closed each repo's run; with that row gone the header is the only
    * thing standing for a repo, so it carries the handle.
@@ -50,6 +57,7 @@ export function RepoHeader({
   workspaceTabs = [],
   activeWorkspaceTabId,
   onSelectWorkspaceTab,
+  pathLabel,
   dragProps,
   dragOver = false,
 }: RepoHeaderProps): JSX.Element {
@@ -69,7 +77,6 @@ export function RepoHeader({
         {...dragProps}
         className={`repo-header${dragOver ? ' repo-header--dnd-over' : ''}`}
         style={group.color ? { ['--ws-color' as string]: group.color } : undefined}
-        title={group.folderPath || undefined}
         onClick={onToggleCollapse}
         onContextMenu={handleContextMenu}
         role="button"
@@ -83,7 +90,9 @@ export function RepoHeader({
         }}
       >
         {group.color && <span className="repo-header__swatch" aria-hidden="true" />}
-        <span className="repo-header__name">{group.label}</span>
+        <span className="repo-header__name" title={pathLabel || group.folderPath || undefined}>
+          {group.label}
+        </span>
 
         {/* A collapsed repo must still be able to say something inside it is
             waiting, or hiding a repo hides the one thing you needed to see. */}

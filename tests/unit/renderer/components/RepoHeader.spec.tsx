@@ -37,11 +37,29 @@ describe('RepoHeader', () => {
   })
 
   // FR-030. The path is available, and drawn nowhere.
-  it('offers the folder path as a tooltip rather than drawing it', () => {
+  it('offers the folder path as the name tooltip rather than drawing it', () => {
     const { container } = renderHeader()
-    const header = container.querySelector('.repo-header')!
-    expect(header.getAttribute('title')).toBe('/repos/terminator')
-    expect(header.textContent).not.toContain('/repos/terminator')
+    expect(container.querySelector('.repo-header__name')!.getAttribute('title')).toBe(
+      '/repos/terminator'
+    )
+    expect(container.querySelector('.repo-header')!.textContent).not.toContain('/repos/terminator')
+  })
+
+  it('prefers the abbreviated path when it is given one', () => {
+    const { container } = renderHeader({}, { pathLabel: '~/repos/terminator' })
+    expect(container.querySelector('.repo-header__name')!.getAttribute('title')).toBe(
+      '~/repos/terminator'
+    )
+  })
+
+  /**
+   * A native tooltip is drawn over whatever sits beneath it. On the whole row
+   * it fired from anywhere across 300px and blanketed the branches below;
+   * scoped to the name it appears where the thing it describes is.
+   */
+  it('does not put the tooltip on the whole row', () => {
+    const { container } = renderHeader({}, { pathLabel: '~/repos/terminator' })
+    expect(container.querySelector('.repo-header')!.getAttribute('title')).toBeNull()
   })
 
   // FR-043. The colour is a swatch; the name is ordinary text.
@@ -160,5 +178,34 @@ describe('RepoHeader', () => {
       fireEvent.contextMenu(container.querySelector('.repo-header')!)
       expect(document.querySelector('.ctx-menu')).toBeNull()
     })
+  })
+})
+
+describe('RepoHeader — hover reveals without moving anything (FR-031)', () => {
+  const tabs = [
+    { id: 'a', label: 'Code Reviews', component: () => null },
+    { id: 'b', label: 'SpecKit', component: () => null },
+  ]
+
+  it('keeps the hover controls in flow so nothing reflows when they appear', () => {
+    // opacity, never display — the space is occupied whether or not they show.
+    const { container } = renderHeader({}, { workspaceTabs: tabs, onAddBranch: vi.fn() })
+    const hover = container.querySelector('.repo-header__hover')!
+    expect(hover).toBeTruthy()
+    expect(getComputedStyle(hover).display).not.toBe('none')
+  })
+
+  it('keeps the branch count drawn alongside the controls, however many there are', () => {
+    // A fixed reservation meant four controls overflowed leftward and painted
+    // over the count. The count must survive any number of repo actions.
+    const { container } = renderHeader({}, { workspaceTabs: tabs, onAddBranch: vi.fn() })
+    expect(container.querySelector('.repo-header__count')!.textContent).toBe('4')
+    expect(container.querySelectorAll('.repo-header__action')).toHaveLength(3)
+  })
+
+  it('orders the count before the controls, so it never moves as they appear', () => {
+    const { container } = renderHeader({}, { workspaceTabs: tabs, onAddBranch: vi.fn() })
+    const kids = [...container.querySelector('.repo-header')!.children].map((c) => c.className)
+    expect(kids.indexOf('repo-header__count')).toBeLessThan(kids.indexOf('repo-header__hover'))
   })
 })

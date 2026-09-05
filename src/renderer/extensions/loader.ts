@@ -108,6 +108,7 @@ async function registerContributedSidebarItems(
     registry.registerSidebarButton({
       id: item.id,
       label: item.label,
+      icon: item.icon ? iconFromName(item.icon) : undefined,
       action: () => void window.electronAPI.extension.sidebarItemClick(item.id),
     })
   }

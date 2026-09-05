@@ -51,8 +51,18 @@ test('the branch row names its branch and marks it as a plain checkout', async (
 
 test('the repo header offers its folder path without drawing it', async () => {
   const header = handle.page.locator('.repo-header').first()
-  await expect(header).toHaveAttribute('title', /.+/)
+  // On the name, not the row: a native tooltip covers whatever is beneath it,
+  // and a full-width trigger blanketed the branches below.
+  await expect(header.locator('.repo-header__name')).toHaveAttribute('title', /.+/)
+  await expect(header).not.toHaveAttribute('title', /.+/)
   await expect(header).not.toContainText('/')
+})
+
+test('the folder path is abbreviated to the home directory', async () => {
+  const title = await handle.page.locator('.repo-header__name').first().getAttribute('title')
+  expect(title).not.toBeNull()
+  // A full absolute path made the tooltip wide enough to cover several rows.
+  expect(title!.startsWith('~/') || !title!.startsWith('/Users/')).toBe(true)
 })
 
 test('the repo header draws no more than three things at rest', async () => {

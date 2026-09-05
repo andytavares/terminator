@@ -69,14 +69,17 @@
   flex: 0 0 auto;
 }
 
-/* Reserved space: revealing these must not move anything already on the row. */
+/* Reserved space: revealing these must not move anything already on the row
+   (FR-031). Sized to its own content rather than a fixed width — the number of
+   registered repo actions is not knowable, and a fixed 44px meant four controls
+   overflowed leftward and painted over the branch count. Kept in flow at all
+   times, so only opacity changes and nothing reflows. */
 .repo-header__hover {
   display: flex;
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
   margin-left: 6px;
-  width: 44px;
   justify-content: flex-end;
   opacity: 0;
   transition: opacity 0.12s;
