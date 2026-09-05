@@ -86,6 +86,11 @@ interface ElectronAPI {
     ): Promise<{ success: true } | { error: string }>
     listWorktrees(path: string): Promise<{ worktrees: WorktreeInfo[] }>
   }
+  editor: {
+    /** Which editor this machine will use, or null if it has none we know. */
+    detect(): Promise<{ editor: { id: string; name: string } | null }>
+    open(folderPath: string): Promise<{ ok: true; editor: string } | { error: string }>
+  }
   shell: {
     exec(options: {
       command: 'git' | 'gh'
@@ -147,7 +152,9 @@ interface ElectronAPI {
     }>
     getSettingsValues(): Promise<{ values: Record<string, unknown> }>
     updateSetting(key: string, value: unknown): Promise<{ ok: true }>
-    getSidebarItems(): Promise<{ items: Array<{ id: string; label: string; tooltip?: string }> }>
+    getSidebarItems(): Promise<{
+      items: Array<{ id: string; label: string; tooltip?: string; icon?: string }>
+    }>
     sidebarItemClick(itemId: string): Promise<{ ok: boolean }>
     getContextMenuItems(target: string): Promise<{ items: Array<{ id: string; label: string }> }>
     contextMenuClick(target: string, itemId: string, targetId: string): void

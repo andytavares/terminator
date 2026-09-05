@@ -1,0 +1,126 @@
+/* One repo, and the header its branches sit under.
+
+   Neutral surfaces throughout. The repo's colour appears once, as a small
+   swatch beside the name — never as the name's own colour, which measured
+   between 1.08:1 and 1.52:1 against the surface behind it in the light theme,
+   against the 4.5:1 AA needs (FR-043, FR-044). */
+
+.repo-header {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px 0 8px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text-primary);
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.repo-header:hover {
+  background: var(--bg-card-hover);
+}
+
+.repo-header:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
+}
+
+.repo-header__swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--ws-color, transparent);
+  flex: 0 0 auto;
+}
+
+.repo-header__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Shown only while collapsed, so hiding a repo cannot hide the one thing you
+   needed to see. Opacity carries the emphasis; colour never does. */
+.repo-header__needs-you {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  opacity: var(--state-op-awaiting);
+}
+
+.repo-header__needs-you svg {
+  width: 10px;
+  height: 10px;
+  display: block;
+}
+
+.repo-header__count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+/* Reserved space: revealing these must not move anything already on the row
+   (FR-031). Sized to its own content rather than a fixed width — the number of
+   registered repo actions is not knowable, and a fixed 44px meant four controls
+   overflowed leftward and painted over the branch count. Kept in flow at all
+   times, so only opacity changes and nothing reflows. */
+.repo-header__hover {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: 6px;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.repo-header:hover .repo-header__hover,
+.repo-header:focus-within .repo-header__hover {
+  opacity: 0.8;
+}
+
+.repo-header__action {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font-size: 9px;
+}
+
+.repo-header__action--on {
+  opacity: 1;
+}
+
+.repo-header__action svg,
+.repo-header__chevron svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.repo-header__chevron {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+/* Drop feedback for reordering repos. The old wrapper set a class that had no
+   rule at all, so dragging gave no indication of where it would land. */
+.repo-header--dnd-over {
+  box-shadow: inset 0 2px 0 var(--accent);
+}

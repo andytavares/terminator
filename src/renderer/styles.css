@@ -35,6 +35,17 @@
   --warning: #facc15;
   --agent-clr: #8b5cf6;
 
+  /* agent-state emphasis — the one scale the sidebar gutter, the terminal tab
+     and the board lanes all read, so the three surfaces cannot disagree about
+     which state is loudest. Opacity, never hue: Constitution XII forbids
+     differentiating an icon's state by colour, which is also what keeps these
+     four readable in greyscale. Awaiting-input is the only one at full
+     strength — it is the only state blocked on the user. */
+  --state-op-awaiting: 1;
+  --state-op-working: 0.85;
+  --state-op-idle: 0.34;
+  --state-op-exited: 0.24;
+
   /* diff highlight backgrounds — added/removed line tints. Opacity is low enough
      that every text/syntax token below keeps WCAG AA (>=4.5:1) once composited
      over --bg-base, in both themes (see tests/unit/renderer/diff-syntax-contrast.spec.ts). */

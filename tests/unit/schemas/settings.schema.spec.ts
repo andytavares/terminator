@@ -107,7 +107,7 @@ describe('GlobalSettingsSchema', () => {
     const result = GlobalSettingsSchema.safeParse(withoutUi)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.ui).toEqual({ hasSeenWelcome: false })
+      expect(result.data.ui).toEqual({ hasSeenWelcome: false, editor: '' })
     }
   })
 
@@ -369,5 +369,26 @@ describe('GlobalSettingsSchema — sidebar staleness (FR-020)', () => {
 
   it('ships the default in DEFAULT_GLOBAL_SETTINGS so the panel has a value on first run', () => {
     expect(DEFAULT_GLOBAL_SETTINGS.sidebar.staleAfterMs).toBe(7_200_000)
+  })
+})
+
+describe('GlobalSettingsSchema — the editor override', () => {
+  it('defaults to empty, which means detect rather than a choice you must make', () => {
+    const { ui: _ui, ...withoutUi } = validGlobal
+    const result = GlobalSettingsSchema.safeParse(withoutUi)
+    expect(result.success && result.data.ui.editor).toBe('')
+  })
+
+  it('accepts an editor id', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      ui: { hasSeenWelcome: true, editor: 'sublime' },
+    })
+    expect(result.success && result.data.ui.editor).toBe('sublime')
+  })
+
+  it('fills the default in when only hasSeenWelcome is given', () => {
+    const result = GlobalSettingsSchema.safeParse({ ...validGlobal, ui: { hasSeenWelcome: true } })
+    expect(result.success && result.data.ui.editor).toBe('')
   })
 })

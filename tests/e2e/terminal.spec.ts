@@ -54,7 +54,7 @@ test('US3-5: Cmd+1 activates and expands the first workspace', async () => {
   const { page } = handle
   await page.keyboard.press('Meta+1')
   // Cmd+1 expands the first workspace and collapses the others.
-  await expect(page.locator('.session-group').first()).toBeVisible()
+  await expect(page.locator('.branch-row').first()).toBeVisible()
 })
 
 test('US3-6: Cmd+ArrowRight cycles to the next session tab', async () => {

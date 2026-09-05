@@ -7,141 +7,10 @@
   border-bottom: 1px solid var(--border);
 }
 
-.sidebar-header__search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  height: 26px;
-  padding: 0 8px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-family: var(--font-ui);
-  cursor: text;
-  text-align: left;
-}
-
-.sidebar-header__search:hover {
-  border-color: var(--border-strong);
-  background: var(--bg-card);
-}
-
-.sidebar-header__search-icon {
-  font-size: 12px;
-  opacity: 0.6;
-}
-
-.sidebar-header__search-placeholder {
-  flex: 1;
-}
-
-.sidebar-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-
-.sidebar-header__tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  flex: 1;
-  min-width: 0;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.sidebar-header__tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.sidebar-header__fixed-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.sidebar-header__tab {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 24px;
-  background: transparent;
-  border: none;
-  outline: none;
-  border-radius: var(--radius-xs);
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.sidebar-header__tab svg,
-.sidebar-header__bell svg,
 .sidebar-header__add svg {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-}
-
-.sidebar-header__tab:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-}
-
-.sidebar-header__tab--active {
-  color: var(--accent);
-}
-
-.sidebar-header__bell {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 24px;
-  background: transparent;
-  border: none;
-  outline: none;
-  border-radius: var(--radius-xs);
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.sidebar-header__bell:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-}
-
-.sidebar-header__bell--unread {
-  color: var(--text-primary);
-}
-
-.sidebar-header__bell-badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 12px;
-  height: 12px;
-  padding: 0 2px;
-  background: var(--accent);
-  border-radius: 6px;
-  color: #fff;
-  font-size: 8px;
-  font-weight: 600;
-  line-height: 12px;
-  text-align: center;
-  pointer-events: none;
 }
 
 .sidebar-header__add {
@@ -165,20 +34,31 @@
 }
 
 /* Search plus the two controls that act on the list beneath it. */
+
+/* The control row: search, the two menus, and new-repo. One line, never wrapped
+   — the search box gives up width so the menus keep theirs, and below 260px the
+   menus drop their text labels rather than pushing anything onto a second row.
+   This band and the app band are the only two above the list (FR-033). */
 .sidebar-header__search-row {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
-  padding: 8px var(--sidebar-gutter, 10px);
+  gap: 5px;
+  padding: 7px var(--sidebar-gutter, 10px);
 }
 
 .sidebar-header__search-row .sidebar-search {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-.sidebar-header__search-row .sidebar-header__bell svg,
 .sidebar-header__search-row .sidebar-header__add svg {
   width: 14px;
   height: 14px;
+}
+
+@container sidebar (max-width: 275px) {
+  .sidebar-header__search-row .sidebar-menu__label {
+    display: none;
+  }
 }

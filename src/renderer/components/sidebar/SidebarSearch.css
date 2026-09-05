@@ -29,7 +29,6 @@
   font-size: 10px;
   flex: 1;
   min-width: 0;
-  font-family: var(--font-sans);
 }
 
 .sidebar-search__input::placeholder {

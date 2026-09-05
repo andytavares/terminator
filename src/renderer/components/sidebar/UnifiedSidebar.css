@@ -64,29 +64,6 @@
   text-align: center;
 }
 
-.unified-sidebar__add-project {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  width: 100%;
-  height: 24px;
-  padding: 0 8px 0 22px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  text-align: left;
-  opacity: 0.7;
-}
-
-.unified-sidebar__add-project:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-  opacity: 1;
-}
-
 .unified-sidebar__bulk-bar {
   display: flex;
   align-items: center;
@@ -146,10 +123,39 @@
   transition: opacity 0.1s ease;
 }
 
-.unified-sidebar__scratch .session-group__header:hover .unified-sidebar__scratch-add {
+.unified-sidebar__scratch-head:hover .unified-sidebar__scratch-add {
   opacity: 0.75;
 }
 
 .unified-sidebar__scratch-add:hover {
   opacity: 1;
+}
+
+/* The scratch section. Its header used to borrow the group header's styling;
+   with that component gone it needs its own, and without it the label and count
+   rendered as bare text — which only a screenshot of the running app caught. */
+.unified-sidebar__scratch {
+  margin-top: 10px;
+}
+
+.unified-sidebar__scratch-head {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px 0 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.unified-sidebar__scratch-count {
+  margin-left: auto;
+  margin-right: 4px;
+  font-size: 10px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }

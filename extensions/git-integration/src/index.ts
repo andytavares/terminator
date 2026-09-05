@@ -153,6 +153,7 @@ export function activate(api: ExtensionAPI): void {
       id: 'git-sidebar-toggle',
       label: 'Git Changes',
       tooltip: 'Toggle Git Changes sidebar',
+      icon: 'git-branch',
       onClick: () => api.sidebar.togglePanel(),
     })
   )

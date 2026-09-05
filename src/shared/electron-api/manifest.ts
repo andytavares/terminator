@@ -355,6 +355,20 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     remote: 'stub',
   },
 
+  // ── editor ────────────────────────────────────────────────────────────────
+  // Opening a folder in the user's editor. Omitted remotely rather than
+  // stubbed: a browser tab has no local editor, and the folder is on the host
+  // machine anyway. Absent means the menu item hides itself, which is honest —
+  // a stub that always errors is an item that looks available and is not.
+  { path: 'editor.detect', kind: 'invoke', channel: 'editor:detect', remote: 'omit' },
+  {
+    path: 'editor.open',
+    kind: 'invoke',
+    channel: 'editor:open',
+    toPayload: (folderPath: string) => ({ folderPath }),
+    remote: 'omit',
+  },
+
   // ── fs ────────────────────────────────────────────────────────────────────
   {
     path: 'fs.watchStart',

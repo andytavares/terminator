@@ -22,7 +22,7 @@ test.afterAll(async () => {
 
 test('US2-1: clicking Add Branch shows the Create Branch dialog', async () => {
   const { page } = handle
-  await workspaceRow(page, WS).locator('.ws-row__add').click()
+  await workspaceRow(page, WS).locator('.repo-header__action[aria-label^="New branch in"]').click()
   await expect(page.locator('.dialog__title')).toContainText('Create Branch')
   await page.getByRole('button', { name: 'Cancel' }).click()
   await expect(page.locator('.dialog__title')).toHaveCount(0)
@@ -30,7 +30,7 @@ test('US2-1: clicking Add Branch shows the Create Branch dialog', async () => {
 
 test('US2-2: a created project appears under its workspace', async () => {
   const { page } = handle
-  await workspaceRow(page, WS).locator('.ws-row__add').click()
+  await workspaceRow(page, WS).locator('.repo-header__action[aria-label^="New branch in"]').click()
   await page.waitForSelector('.dialog__title')
   await page.getByPlaceholder('My branch').fill('alpha-project')
   await page.click('.dialog__btn-primary')
@@ -39,7 +39,7 @@ test('US2-2: a created project appears under its workspace', async () => {
 
 test('US2-3: clicking a project switches the main area to the tabbed terminal view', async () => {
   const { page } = handle
-  await projectGroup(page, 'alpha-project').locator('.session-group__header').click()
+  await projectGroup(page, 'alpha-project').click()
   // A project view has a primary tab bar (Terminal/Git/…) and a session tab bar.
   await expect(page.locator('.tab-bar--sessions')).toBeVisible()
   // Selecting a project auto-creates its first terminal session.

@@ -105,8 +105,8 @@ describe('TabBar', () => {
 
   it('renders sessions as tabs without agent badge', () => {
     mockGetSessions.mockReturnValue([
-      { id: 'ses-1', tabTitle: 'bash', type: 'human' },
-      { id: 'ses-2', tabTitle: 'Agent', type: 'human' },
+      { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      { id: 'ses-2', tabTitle: 'Agent', type: 'human', agentState: 'idle' },
     ])
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
@@ -116,7 +116,9 @@ describe('TabBar', () => {
   })
 
   it('calls closeSession when close button is clicked', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetSessions.mockReturnValue([
+      { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+    ])
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
     fireEvent.click(screen.getByTitle('Close tab'))
@@ -175,8 +177,8 @@ describe('TabBar', () => {
 
   it('calls setActiveSessionForProject when session tab is clicked', () => {
     mockGetSessions.mockReturnValue([
-      { id: 'ses-1', tabTitle: 'bash', type: 'human' },
-      { id: 'ses-2', tabTitle: 'zsh', type: 'human' },
+      { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      { id: 'ses-2', tabTitle: 'zsh', type: 'human', agentState: 'idle' },
     ])
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
@@ -185,7 +187,9 @@ describe('TabBar', () => {
   })
 
   it('double-click on session title shows rename input', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetSessions.mockReturnValue([
+      { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+    ])
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
     fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
@@ -193,7 +197,9 @@ describe('TabBar', () => {
   })
 
   it('Enter in rename input commits the rename', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetSessions.mockReturnValue([
+      { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+    ])
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
     fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
@@ -205,7 +211,9 @@ describe('TabBar', () => {
   })
 
   it('Escape in rename input cancels the rename', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetSessions.mockReturnValue([
+      { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+    ])
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
     fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
@@ -216,7 +224,9 @@ describe('TabBar', () => {
   })
 
   it('blur on rename input commits the rename', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetSessions.mockReturnValue([
+      { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+    ])
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
     fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
@@ -227,7 +237,9 @@ describe('TabBar', () => {
   })
 
   it('close button is hidden while renaming', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetSessions.mockReturnValue([
+      { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+    ])
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
     fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
@@ -237,8 +249,8 @@ describe('TabBar', () => {
   describe('tab reordering', () => {
     it('calls reorderSessions on drop', () => {
       mockGetSessions.mockReturnValue([
-        { id: 'ses-1', tabTitle: 'Tab 1', type: 'human' },
-        { id: 'ses-2', tabTitle: 'Tab 2', type: 'human' },
+        { id: 'ses-1', tabTitle: 'Tab 1', type: 'human', agentState: 'idle' },
+        { id: 'ses-2', tabTitle: 'Tab 2', type: 'human', agentState: 'idle' },
       ])
       mockGetActive.mockReturnValue('ses-1')
       renderTabBar()
@@ -251,8 +263,8 @@ describe('TabBar', () => {
 
     it('does not reorder when dropping on the same index', () => {
       mockGetSessions.mockReturnValue([
-        { id: 'ses-1', tabTitle: 'Tab 1', type: 'human' },
-        { id: 'ses-2', tabTitle: 'Tab 2', type: 'human' },
+        { id: 'ses-1', tabTitle: 'Tab 1', type: 'human', agentState: 'idle' },
+        { id: 'ses-2', tabTitle: 'Tab 2', type: 'human', agentState: 'idle' },
       ])
       renderTabBar()
       const tabs = document.querySelectorAll('.tab-bar__tab--session')
@@ -264,7 +276,9 @@ describe('TabBar', () => {
 
   describe('context menu', () => {
     it('shows context menu on right-click of a session tab', () => {
-      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      ])
       mockGetActive.mockReturnValue('ses-1')
       renderTabBar()
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
@@ -275,7 +289,9 @@ describe('TabBar', () => {
     })
 
     it('opens MoveSessionDialog when Move to project is clicked', () => {
-      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      ])
       mockGetActive.mockReturnValue('ses-1')
       renderTabBar()
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
@@ -285,7 +301,9 @@ describe('TabBar', () => {
     })
 
     it('closes context menu on global click', () => {
-      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      ])
       mockGetActive.mockReturnValue('ses-1')
       renderTabBar()
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
@@ -296,7 +314,9 @@ describe('TabBar', () => {
     })
 
     it('closes tab via context menu Close tab option calls closeSession', () => {
-      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      ])
       mockGetActive.mockReturnValue('ses-1')
       renderTabBar()
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
@@ -306,7 +326,9 @@ describe('TabBar', () => {
     })
 
     it('opens rename inline via context menu Rename option', () => {
-      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      ])
       mockGetActive.mockReturnValue('ses-1')
       renderTabBar()
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
@@ -318,7 +340,9 @@ describe('TabBar', () => {
 
   describe('MoveSessionDialog onMoved callback', () => {
     it('closes MoveSessionDialog when onMoved fires without onScratchDeactivate', () => {
-      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      ])
       mockGetActive.mockReturnValue('ses-1')
       renderTabBar()
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
@@ -331,7 +355,9 @@ describe('TabBar', () => {
 
     it('calls onScratchDeactivate when MoveSessionDialog onMoved fires', () => {
       const onScratchDeactivate = vi.fn()
-      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      ])
       mockGetActive.mockReturnValue('ses-1')
       renderTabBar({ onScratchDeactivate })
       const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
@@ -355,7 +381,7 @@ describe('TabBar — the session bar states whose terminals it shows (US3, FR-01
       ]),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     mockGetSessions.mockReturnValue([
-      { id: 's1', projectId: 'proj-1', tabTitle: 'tests', status: 'active' },
+      { id: 's1', projectId: 'proj-1', tabTitle: 'tests', status: 'active', agentState: 'idle' },
     ])
     mockGetActive.mockReturnValue('s1')
   })
@@ -373,5 +399,232 @@ describe('TabBar — the session bar states whose terminals it shows (US3, FR-01
     fireEvent.contextMenu(tab)
     expect(screen.queryByText(/Move to project/i)).toBeNull()
     expect(screen.getByText(/Move to branch/i)).toBeTruthy()
+  })
+})
+
+describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
+  const session = (id: string, patch: Record<string, unknown> = {}) => ({
+    id,
+    projectId: 'proj-1',
+    tabTitle: id,
+    status: 'active',
+    type: 'agent',
+    scrollbackLimit: 10000,
+    createdAt: '',
+    lastActivityAt: 0,
+    agentState: 'idle',
+    ...patch,
+  })
+
+  const tabs = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('.tab-bar__tab--session'))
+
+  // FR-021. The sidebar no longer carries per-terminal state, so the tab must.
+  it('gives every tab its own state glyph', () => {
+    mockGetSessions.mockReturnValue([
+      session('a', { agentState: 'awaiting-input' }),
+      session('b', { agentState: 'working' }),
+      session('c', { agentState: 'idle' }),
+      session('d', { agentState: 'exited' }),
+    ])
+    const { container } = renderTabBar()
+    const states = tabs(container).map((t) =>
+      t.querySelector('.tab-bar__state svg')?.getAttribute('data-state')
+    )
+    expect(states).toEqual(['awaiting-input', 'working', 'idle', 'exited'])
+  })
+
+  it('distinguishes the four states by shape, not by colour', () => {
+    mockGetSessions.mockReturnValue([
+      session('a', { agentState: 'awaiting-input' }),
+      session('b', { agentState: 'working' }),
+      session('c', { agentState: 'idle' }),
+      session('d', { agentState: 'exited' }),
+    ])
+    const { container } = renderTabBar()
+    const shapes = tabs(container).map((t) => t.querySelector('.tab-bar__state svg')?.innerHTML)
+    expect(new Set(shapes).size).toBe(4)
+    for (const t of tabs(container)) {
+      const svg = t.querySelector<SVGElement>('.tab-bar__state svg')!
+      expect(svg.getAttribute('style')).toBeNull()
+      expect(svg.getAttribute('stroke')).toBe('currentColor')
+    }
+  })
+
+  it('names the state for a reader, since a shape says nothing aloud', () => {
+    mockGetSessions.mockReturnValue([session('a', { agentState: 'awaiting-input' })])
+    const { container } = renderTabBar()
+    expect(container.querySelector('.tab-bar__state')!.getAttribute('aria-label')).toBe(
+      'Waiting on you'
+    )
+  })
+
+  // FR-022.
+  it('shows the unread bell count', () => {
+    mockGetSessions.mockReturnValue([session('a'), session('b')])
+    mockGetActive.mockReturnValue('a')
+    mockGetBell.mockImplementation((id: string) => (id === 'b' ? 4 : 0))
+    const { container } = renderTabBar()
+    expect(container.textContent).toContain('4')
+  })
+
+  // FR-023 as amended. The note is reachable, and drawn nowhere.
+  it('carries a terminal note as a tooltip and never as text', () => {
+    mockGetSessions.mockReturnValue([session('a', { note: 'rebasing onto main' })])
+    const { container } = renderTabBar()
+    const tab = tabs(container)[0]
+    expect(tab.getAttribute('title')).toContain('rebasing onto main')
+    expect(tab.textContent).not.toContain('rebasing onto main')
+  })
+
+  it('falls back to the rename hint when there is no note', () => {
+    mockGetSessions.mockReturnValue([session('a')])
+    const { container } = renderTabBar()
+    expect(tabs(container)[0].getAttribute('title')).toMatch(/rename/i)
+  })
+
+  // The cap that stops this repeating what 032 did to the 24px row.
+  it('draws no more than four elements on a tab', () => {
+    mockGetSessions.mockReturnValue([session('a', { agentState: 'awaiting-input', note: 'x' })])
+    mockGetActive.mockReturnValue('a')
+    mockGetBell.mockReturnValue(9)
+    const { container } = renderTabBar()
+    expect(tabs(container)[0].children.length).toBeLessThanOrEqual(4)
+  })
+
+  it('offers close on the active tab only', () => {
+    mockGetSessions.mockReturnValue([session('a'), session('b')])
+    mockGetActive.mockReturnValue('a')
+    const { container } = renderTabBar()
+    const [a, b] = tabs(container)
+    expect(a.querySelector('.tab-bar__close')).toBeTruthy()
+    expect(b.querySelector('.tab-bar__close')).toBeNull()
+  })
+
+  // FR-024. Everything the sidebar row could do, the tab still can.
+  it('still renames, closes and moves from the tab', () => {
+    mockGetSessions.mockReturnValue([session('a')])
+    mockGetActive.mockReturnValue('a')
+    const { container } = renderTabBar()
+    const tab = tabs(container)[0]
+
+    fireEvent.click(tab.querySelector('.tab-bar__close')!)
+    expect(mockCloseSession).toHaveBeenCalledWith('a')
+
+    fireEvent.contextMenu(tab)
+    expect(screen.getByText(/Move to branch/i)).toBeTruthy()
+    expect(screen.getByText(/Rename/i)).toBeTruthy()
+  })
+
+  it('marks the row overflowed so the hidden tabs are discoverable', () => {
+    mockGetSessions.mockReturnValue(Array.from({ length: 12 }, (_, i) => session(`s${i}`)))
+    const { container } = renderTabBar()
+    expect(container.querySelector('.tab-bar--sessions')!.classList.toString()).toMatch(
+      /tab-bar--scrollable/
+    )
+  })
+})
+
+describe('TabBar — the note found a new home (US3, FR-023)', () => {
+  const noted = (patch: Record<string, unknown> = {}) => ({
+    id: 'ses-1',
+    projectId: 'proj-1',
+    tabTitle: 'claude',
+    status: 'active',
+    type: 'human',
+    agentState: 'idle',
+    ...patch,
+  })
+
+  const mockSetSessionNote = vi.fn()
+
+  beforeEach(() => {
+    vi.mocked(useSessionStore).mockReturnValue({
+      getSessionsForProject: mockGetSessions,
+      closeSession: mockCloseSession,
+      setActiveSessionForProject: mockSetActive,
+      getActiveSessionForProject: mockGetActive,
+      getBellCountForSession: mockGetBell,
+      isSessionBusy: vi.fn().mockReturnValue(false),
+      renameSession: mockRenameSession,
+      reorderSessions: mockReorderSessions,
+      setSessionNote: mockSetSessionNote,
+    } as unknown as ReturnType<typeof useSessionStore>)
+    mockGetSessions.mockReturnValue([noted()])
+    mockGetActive.mockReturnValue('ses-1')
+  })
+
+  it('opens the editor when the shortcut names a terminal', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    expect(container.querySelector('.tab-bar__note-input')).toBeTruthy()
+  })
+
+  it('opens with the note already there, so editing is not retyping', () => {
+    mockGetSessions.mockReturnValue([noted({ note: 'rebasing' })])
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    expect(container.querySelector<HTMLInputElement>('.tab-bar__note-input')!.value).toBe(
+      'rebasing'
+    )
+  })
+
+  it('ignores a shortcut naming a terminal that is not here', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'gone' })
+    expect(container.querySelector('.tab-bar__note-input')).toBeNull()
+  })
+
+  it('opens nothing when the shortcut names no terminal', () => {
+    const { container } = renderTabBar({ editNoteSessionId: null })
+    expect(container.querySelector('.tab-bar__note-input')).toBeNull()
+  })
+
+  it('saves on Enter', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
+    fireEvent.change(input, { target: { value: 'rebasing onto main' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(mockSetSessionNote).toHaveBeenCalledWith('ses-1', 'rebasing onto main')
+    expect(container.querySelector('.tab-bar__note-input')).toBeNull()
+  })
+
+  it('saves on blur', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
+    fireEvent.change(input, { target: { value: 'blurred' } })
+    fireEvent.blur(input)
+    expect(mockSetSessionNote).toHaveBeenCalledWith('ses-1', 'blurred')
+  })
+
+  it('abandons on Escape', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
+    fireEvent.change(input, { target: { value: 'nope' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(mockSetSessionNote).not.toHaveBeenCalled()
+    expect(container.querySelector('.tab-bar__note-input')).toBeNull()
+  })
+
+  it('does not switch terminal while typing in the editor', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    fireEvent.click(container.querySelector('.tab-bar__note-input')!)
+    expect(mockSetActive).not.toHaveBeenCalled()
+  })
+
+  it('bounds the note so a tab cannot be made unreadable by one', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    expect(container.querySelector('.tab-bar__note-input')!.getAttribute('maxLength')).toBe('120')
+  })
+
+  it('offers adding a note from the tab menu', () => {
+    const { container } = renderTabBar()
+    fireEvent.contextMenu(container.querySelector('.tab-bar__tab--session')!)
+    fireEvent.click(screen.getByText('Add note…'))
+    expect(container.querySelector('.tab-bar__note-input')).toBeTruthy()
+  })
+
+  it('offers editing an existing note instead', () => {
+    mockGetSessions.mockReturnValue([noted({ note: 'rebasing' })])
+    const { container } = renderTabBar()
+    fireEvent.contextMenu(container.querySelector('.tab-bar__tab--session')!)
+    expect(screen.getByText('Edit note…')).toBeTruthy()
   })
 })

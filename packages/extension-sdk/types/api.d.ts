@@ -65,6 +65,16 @@ export interface SidebarContribution {
   id: string
   label: string
   tooltip?: string
+  /**
+   * A lucide icon name, resolved by the host — the same vocabulary a manifest's
+   * `contributes.globalTab.icon` uses (`git-branch`, `wifi`, `calendar`, …).
+   *
+   * Optional and additive: a contribution that omits it behaves exactly as
+   * before. Before this existed a sidebar item could not supply an icon at all,
+   * so the host drew a placeholder — which said nothing once the app band
+   * dropped its text labels.
+   */
+  icon?: string
   onClick(): void
 }
 

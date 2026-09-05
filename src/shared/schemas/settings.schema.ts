@@ -20,8 +20,14 @@ export const GlobalSettingsSchema = z.object({
   ui: z
     .object({
       hasSeenWelcome: z.boolean(),
+      /**
+       * Which editor "Open in editor" launches, by id. Empty means detect —
+       * the common case, and why this is not a required choice buried in
+       * settings before the feature works at all.
+       */
+      editor: z.string().default(''),
     })
-    .default({ hasSeenWelcome: false }),
+    .default({ hasSeenWelcome: false, editor: '' }),
   // Bounded 1 minute to 30 days so "zero" or "a year" is a validation failure
   // rather than a view that shows everything or nothing.
   sidebar: z
@@ -82,7 +88,7 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
-  ui: { hasSeenWelcome: false },
+  ui: { hasSeenWelcome: false, editor: '' },
   sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
   notifications: {
     defaultTargets: ['system', 'center', 'toast'] as ('system' | 'center' | 'toast')[],

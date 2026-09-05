@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GlobalTabRegistration } from '../../extensions/registry'
-import type { Group, SessionView } from '../../sidebar/view-model'
+import type { SessionView } from '../../sidebar/view-model'
 import type { Workspace } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { useSettingsStore } from '../../stores/settings.store'
+import { useToastStore } from '../../stores/toast.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
-import { buildGroups } from '../../sidebar/view-model'
+import { buildBranchRows, type BranchRow as BranchRowData } from '../../sidebar/branch-rows'
 import { BellAndBusySource } from '../../sidebar/agent-state'
 import { abbreviatePath, branchLabel, qualifiedBranchLabel } from '../../sidebar/branch-display'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
@@ -24,22 +25,17 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
-import { FilterNotice } from './FilterNotice'
-import { ScopeMenu } from './ScopeMenu'
-import { IssueBadge } from '../integrations/IssueBadge'
 import { LinkIssueDialog } from '../integrations/LinkIssueDialog'
 import { IssueDrawer } from '../integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../stores/integrations.store'
-import { SessionGroup } from './SessionGroup'
-import { SessionRow } from './SessionRow'
-import { WorkspaceRow } from './WorkspaceRow'
-import { ViewBar } from './ViewBar'
-import { BulkCloseDialog } from './BulkCloseDialog'
+import { FilterMenu } from './FilterMenu'
+import { DisplayMenu } from './DisplayMenu'
+import { RepoHeader } from './RepoHeader'
+import { BranchRow } from './BranchRow'
 import './UnifiedSidebar.css'
 
 interface UnifiedSidebarProps {
   /** Session whose note the host asked to edit (Cmd+I). */
-  editNoteSessionId?: string | null
   globalTabs: GlobalTabRegistration[]
   activeGlobalTabId: string | null
   onSelectGlobalTab: (id: string) => void
@@ -47,10 +43,7 @@ interface UnifiedSidebarProps {
   onSelectWorkspaceTab: (workspaceId: string, tabId: string) => void
   onSelectProject?: () => void
   unreadNotifications: number
-  notificationPanelOpen: boolean
   onBellClick: () => void
-  scratchActive: boolean
-  hasScratchSessions: boolean
   onNewScratch: () => void
   activeScratchSessionId: string | null
   onSelectScratchSession: (sessionId: string) => void
@@ -68,6 +61,13 @@ const SIDEBAR_WIDTH_KEY = 'terminator.sidebar.width'
 const DEFAULT_WIDTH = 300
 const MIN_WIDTH = 200
 const MAX_WIDTH = 480
+/** What each failure means, said in the user's terms rather than the code's. */
+const EDITOR_ERRORS: Record<string, string> = {
+  FOLDER_NOT_FOUND: 'That folder is no longer on disk.',
+  NO_EDITOR_FOUND: 'No supported editor found. Install one, or set ui.editor in settings.',
+  VALIDATION_ERROR: 'That folder could not be opened.',
+}
+
 const DEFAULT_STALE_AFTER_MS = 2 * 60 * 60 * 1000
 
 function readStoredWidth(): number {
@@ -98,7 +98,6 @@ export function UnifiedSidebar({
   visible,
   now,
   initialViewId = DEFAULT_VIEW_ID,
-  editNoteSessionId,
 }: UnifiedSidebarProps): JSX.Element {
   const {
     workspaces,
@@ -115,8 +114,7 @@ export function UnifiedSidebar({
     resolveActiveCwd,
   } = useWorkspaceStore()
   const sessionStore = useSessionStore()
-  const { getScratchSessions, sessions, projectViews, isSessionBusy, getBellCountForSession } =
-    sessionStore
+  const { sessions, projectViews } = sessionStore
   const { resolveSettings } = useSettingsStore()
   const {
     statsFor,
@@ -126,14 +124,10 @@ export function UnifiedSidebar({
   } = useChangeStatsStore()
   /** Last activity seen per branch, so work in a terminal refreshes its statistics. */
   const lastActivityByBranch = useRef(new Map<string, number>())
-  /** Home directory, so a repo path reads as `~/repos/app`. */
-  const [homeDir, setHomeDir] = useState<string | undefined>(undefined)
   const staleAfterMs = resolveSettings().sidebar?.staleAfterMs ?? DEFAULT_STALE_AFTER_MS
   const { createSession } = useTerminalSession()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
   const sidebarButtons = useExtensionRegistry((s) => s.sidebarButtons)
-
-  const scratchSessions = getScratchSessions()
 
   // Eager-load projects for every workspace that has not been fetched yet.
   // The flat list shows all workspaces at once, so we cannot rely on
@@ -155,9 +149,6 @@ export function UnifiedSidebar({
     id: string
     name: string
   } | null>(null)
-  const [noteEditingId, setNoteEditingId] = useState<string | null>(null)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [bulkCloseOpen, setBulkCloseOpen] = useState(false)
   const {
     linkFor: issueLinkFor,
     issueFor,
@@ -173,11 +164,10 @@ export function UnifiedSidebar({
     closeDrawer,
   } = useIntegrationsStore()
 
-  const [scopeMenu, setScopeMenu] = useState<{
-    x: number
-    y: number
-    projectId: string
-  } | null>(null)
+  /** Home directory, so a repo's path reads as `~/repos/app` rather than in full. */
+  const [homeDir, setHomeDir] = useState<string | undefined>(undefined)
+  /** The editor this machine will use, so the menu can name it. */
+  const [editorName, setEditorName] = useState<string | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
   const [collapseState, setCollapseState] = useState(loadCollapseState)
   const sidebarRef = useRef<HTMLDivElement>(null)
@@ -234,15 +224,53 @@ export function UnifiedSidebar({
   }, [width])
 
   useEffect(() => {
-    if (editNoteSessionId) setNoteEditingId(editNoteSessionId)
-  }, [editNoteSessionId])
-
-  useEffect(() => {
     void window.electronAPI?.app
       ?.getInfo?.()
       .then((info) => setHomeDir(info.homeDir))
       .catch(() => setHomeDir(undefined))
   }, [])
+
+  useEffect(() => {
+    void window.electronAPI?.editor
+      ?.detect?.()
+      .then((r) => setEditorName(r.editor?.name))
+      .catch(() => setEditorName(undefined))
+  }, [])
+
+  /**
+   * The folder a branch's work happens in: its own working copy when it has
+   * one, else the repo it was checked out from. Same resolution the terminal
+   * and the change statistics use.
+   */
+  function folderForBranch(projectId: string): string | undefined {
+    const project = projectById.get(projectId)
+    if (project === undefined) return undefined
+    return project.worktreePath ?? workspaceById.get(project.workspaceId)?.folderPath
+  }
+
+  /**
+   * Opening reports back. The first version discarded the result, so a folder
+   * that had moved, or a machine with no editor, produced exactly nothing on
+   * screen — indistinguishable from the action not being wired up at all.
+   */
+  function openInEditor(folderPath: string | undefined): void {
+    const say = (message: string): void =>
+      useToastStore.getState().addToast({ type: 'error', message })
+
+    if (folderPath === undefined) {
+      say('That branch has no folder on disk yet.')
+      return
+    }
+    // `?.then`, not `.then`: optional chaining stops at the call, so when the
+    // editor API is absent — the browser remote omits it entirely — `open?.()`
+    // yields undefined and a bare `.then` throws.
+    void window.electronAPI?.editor
+      ?.open?.(folderPath)
+      ?.then((result) => {
+        if ('error' in result) say(EDITOR_ERRORS[result.error] ?? `Could not open: ${result.error}`)
+      })
+      ?.catch(() => say('Could not open that folder in your editor.'))
+  }
 
   // Coming back to the window is the cheapest moment to notice that the working
   // trees moved on while you were away.
@@ -315,8 +343,8 @@ export function UnifiedSidebar({
   }, [sessionList, invalidateStats])
 
   const clock = now ?? Date.now()
-  const { groups, shown, total } = useMemo(
-    () => buildGroups(sessionList, allProjects, workspaces, view, clock, staleAfterMs),
+  const { groups, scratch, shown, total } = useMemo(
+    () => buildBranchRows(sessionList, allProjects, workspaces, view, clock, staleAfterMs),
     [sessionList, allProjects, workspaces, view, clock, staleAfterMs]
   )
 
@@ -325,24 +353,20 @@ export function UnifiedSidebar({
   const viewCounts = useMemo(() => {
     const out: Record<string, number> = {}
     for (const v of views) {
-      out[v.id] = buildGroups(sessionList, allProjects, workspaces, v, clock, staleAfterMs).shown
+      out[v.id] = buildBranchRows(
+        sessionList,
+        allProjects,
+        workspaces,
+        v,
+        clock,
+        staleAfterMs
+      ).shown
     }
     return out
   }, [views, sessionList, allProjects, workspaces, clock, staleAfterMs])
 
   const projectById = useMemo(() => new Map(allProjects.map((p) => [p.id, p])), [allProjects])
   const workspaceById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
-
-  /**
-   * A session's workspace colour, resolved through its own project rather than
-   * through its group. Grouped by status or branch a group spans workspaces, so
-   * the group has no colour to hand down and the row has to look its own up.
-   * Empty for a scratch terminal, which belongs to no workspace.
-   */
-  function workspaceColorForSession(projectId: string): string {
-    const workspaceId = projectById.get(projectId)?.workspaceId
-    return (workspaceId === undefined ? undefined : workspaceById.get(workspaceId)?.color) ?? ''
-  }
 
   // FR-027 lists three ways to reach a scope action: the group header, the row
   // scope menu, and the command palette. This is the third.
@@ -372,36 +396,6 @@ export function UnifiedSidebar({
     )
     return () => disposers.forEach((dispose) => dispose())
   }, [allProjects, registerCommand, createSession, resolveActiveCwd, resolveSettings])
-
-  // Multi-select exists only in the Stale view. Extending it to every view is
-  // out of scope, and offering it where nothing is safe to bulk-close would be
-  // an invitation to a mistake.
-  const selectionEnabled = view.filters.staleOnly === true
-  const orderedIds = groups.flatMap((g) => g.sessions.map((s) => s.id))
-  const lastClickedRef = useRef<string | null>(null)
-
-  function toggleSelection(sessionId: string, shiftKey: boolean): void {
-    const anchor = lastClickedRef.current
-    if (shiftKey && anchor) {
-      const from = orderedIds.indexOf(anchor)
-      const to = orderedIds.indexOf(sessionId)
-      if (from !== -1 && to !== -1) {
-        const range = orderedIds.slice(Math.min(from, to), Math.max(from, to) + 1)
-        setSelectedIds((prev) => [...new Set([...prev, ...range])])
-        return
-      }
-    }
-    lastClickedRef.current = sessionId
-    setSelectedIds((prev) =>
-      prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [...prev, sessionId]
-    )
-  }
-
-  function selectGroup(groupKey: string): void {
-    const group = groups.find((g) => g.key === groupKey)
-    if (!group) return
-    setSelectedIds((prev) => [...new Set([...prev, ...group.sessions.map((s) => s.id)])])
-  }
 
   function toggleGroup(key: string): void {
     const next = toggleCollapsed(collapseState, view.groupBy, key)
@@ -454,26 +448,8 @@ export function UnifiedSidebar({
     )
   }
 
-  // Workspace-scoped extension buttons belong on the first group of each
-  // workspace, so they appear exactly once per workspace however many projects
-  // that workspace has (surface 2).
-  const firstGroupKeyByWorkspace = new Map<string, string>()
-  for (const group of groups) {
-    const workspaceId = group.scope?.workspaceId
-    if (workspaceId && !firstGroupKeyByWorkspace.has(workspaceId)) {
-      firstGroupKeyByWorkspace.set(workspaceId, group.key)
-    }
-  }
-
   const workspaceTabList = Array.from(workspaceTabs.values())
 
-  // Which group closes out each workspace's run, so the "new project" entry can
-  // sit with the workspace it belongs to instead of in a heap at the bottom.
-  const lastGroupKeyByWorkspace = new Map<string, string>()
-  for (const group of groups) {
-    const workspaceId = group.scope?.workspaceId
-    if (workspaceId) lastGroupKeyByWorkspace.set(workspaceId, group.key)
-  }
   // A workspace with no groups at all still needs a way in — but not while the
   // view is narrowed, where an empty workspace is noise the filter notice
   // already accounts for. Mirrors the same rule in the view model.
@@ -482,9 +458,10 @@ export function UnifiedSidebar({
     view.filters.states !== undefined ||
     view.filters.projectIds !== undefined ||
     view.filters.staleOnly === true
+  const groupedWorkspaceIds = new Set(groups.map((g) => g.workspaceId))
   const workspacesWithoutGroups =
-    (view.groupBy === 'project' || view.groupBy === 'workspace') && !isNarrowed
-      ? workspaces.filter((ws) => !lastGroupKeyByWorkspace.has(ws.id))
+    view.groupBy === 'workspace' && !isNarrowed
+      ? workspaces.filter((ws) => !groupedWorkspaceIds.has(ws.id))
       : []
 
   // ── Attached issues ───────────────────────────────────────────────────────
@@ -502,23 +479,7 @@ export function UnifiedSidebar({
     for (const project of allProjects) void loadLink(project.id)
   }, [allProjects, loadLink])
 
-  function renderIssueBadge(projectId: string | undefined): React.ReactNode {
-    if (projectId === undefined) return undefined
-    const link = issueLinkFor(projectId)
-    if (link === null) return undefined
-    const issue = issueFor(projectId)
-    return (
-      <IssueBadge
-        tracker={link.tracker}
-        issueKey={link.key}
-        state={issue?.state ?? null}
-        title={issue?.title}
-        onClick={() => openDrawer(projectId)}
-      />
-    )
-  }
-
-  /** One definition, handed to both the group header's menu and ScopeMenu. */
+  /** One definition, handed to the branch row's menu. */
   function issueActionsFor(projectId: string) {
     return {
       issueKey: issueLinkFor(projectId)?.key ?? null,
@@ -547,102 +508,75 @@ export function UnifiedSidebar({
    * project keeps its header actions (select, +, branch switcher, issue, rename,
    * remove) whichever grouping the user is in.
    */
-  function renderGroup(group: Group, nested: boolean): JSX.Element {
-    const project =
-      group.scope?.kind === 'project' ? projectById.get(group.scope.projectId) : undefined
-    const workspaceId = group.scope?.workspaceId
-    const workspace = workspaceId ? workspaceById.get(workspaceId) : undefined
-    const ownsWorkspaceTabs =
-      workspaceId !== undefined && firstGroupKeyByWorkspace.get(workspaceId) === group.key
-    const collapsed = isGroupCollapsed(collapseState, view.groupBy, group.key)
+  /**
+   * Which terminal a branch opens on (FR-047).
+   *
+   * One that is waiting on you first — it is the only state blocked on you and
+   * the reason you clicked. Then the one you last had open on this branch,
+   * which the store has kept all along. Then the most recently active. A branch
+   * with none is left to the caller to offer starting one.
+   */
+  function terminalToFocus(projectId: string): string | undefined {
+    const own = sessionList.filter((s) => s.projectId === projectId)
+    if (own.length === 0) return undefined
+    const waiting = own.find((s) => s.agentState === 'awaiting-input')
+    if (waiting) return waiting.id
+    const last = projectViews.get(projectId)?.activeSessionId
+    if (last !== undefined && own.some((s) => s.id === last)) return last
+    return [...own].sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0].id
+  }
+
+  function selectBranch(projectId: string): void {
+    const focus = terminalToFocus(projectId)
+    if (focus === undefined) {
+      // Nothing running on it. Selecting the branch is enough: App's auto-open
+      // effect gives a branch with no terminals its first one, so starting one
+      // here as well would open two.
+      selectProjectScope(projectId)
+      return
+    }
+    selectProjectScope(projectId)
+    selectSession(projectId, focus)
+  }
+
+  function renderBranch(row: BranchRowData, workspace: Workspace | undefined): JSX.Element {
+    const project = projectById.get(row.projectId)
 
     // Asking for a branch's change volume the first time its row renders, and
-    // never awaiting the answer. A collapsed group costs nothing.
+    // never awaiting the answer.
     const branchCwd = project ? (project.worktreePath ?? workspace?.folderPath) : undefined
-    if (project && branchCwd) ensureChangeStats(project.id, branchCwd, clock)
-    const statsEntry = project ? statsFor(project.id) : undefined
+    if (project && branchCwd) ensureChangeStats(row.projectId, branchCwd, clock)
 
     return (
-      <SessionGroup
-        key={group.key}
-        group={group}
-        nested={nested}
-        collapsed={collapsed}
-        onToggleCollapse={() => toggleGroup(group.key)}
-        workspaceColor={workspace?.color}
-        branchName={project ? branchLabel(project) : undefined}
-        isWorktree={project ? project.isWorktree : undefined}
-        worktreePath={project?.worktreePath}
-        changeStats={statsEntry?.stats}
-        repoPath={
-          group.scope?.kind === 'workspace' && workspace
-            ? abbreviatePath(workspace.folderPath, homeDir)
-            : undefined
-        }
-        // Nested under its workspace the question is already answered; anywhere
-        // else a project header is a bare name with no home.
-        workspaceName={project && !nested ? workspace?.name : undefined}
-        busy={group.sessions.some((s) => isSessionBusy(s.id))}
-        isActiveScope={project !== undefined && project.id === activeProjectId}
-        issueBadge={renderIssueBadge(project?.id)}
-        issueActions={project ? issueActionsFor(project.id) : undefined}
-        onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
-        onAddSession={project ? () => addSessionToProject(project.id) : undefined}
-        onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
+      <BranchRow
+        key={row.projectId}
+        row={row}
+        selected={row.projectId === activeProjectId}
+        colour={workspace?.color}
+        now={clock}
+        issueKey={issueLinkFor(row.projectId)?.key ?? null}
+        onIssueClick={() => openDrawer(row.projectId)}
+        changeStats={statsFor(row.projectId)?.stats}
+        onSelect={() => selectBranch(row.projectId)}
+        onAddTerminal={() => addSessionToProject(row.projectId)}
         // A branch is named by its branch (ADR-034), so there is nothing to
-        // rename. A project in a folder that is not a repo has no branch, and
+        // rename. A branch in a folder that is not a repo has no branch, and
         // its stored name is the only name it has.
         onRename={
           project && project.gitBranch === undefined
-            ? (name) => void renameProject(project.id, name)
+            ? (name) => void renameProject(row.projectId, name)
             : undefined
         }
-        onRemove={
-          project
-            ? () => setConfirmDeleteProject({ id: project.id, name: branchLabel(project) })
-            : undefined
-        }
-        workspaceTabs={ownsWorkspaceTabs ? workspaceTabList : undefined}
-        activeWorkspaceTabId={activeWorkspaceId === workspaceId ? activeWorkspaceTabId : null}
-        onSelectWorkspaceTab={
-          workspaceId ? (tabId) => onSelectWorkspaceTab(workspaceId, tabId) : undefined
-        }
-      >
-        {group.subgroups
-          ? group.subgroups.map((subgroup) => renderGroup(subgroup, true))
-          : group.sessions.map((session) => (
-              <SessionRow
-                key={session.id}
-                session={session}
-                isActive={projectViews.get(session.projectId)?.activeSessionId === session.id}
-                isBusy={isSessionBusy(session.id)}
-                bellCount={getBellCountForSession(session.id)}
-                workspaceColor={workspaceColorForSession(session.projectId)}
-                now={clock}
-                projectBadge={(() => {
-                  if (group.scope?.kind === 'project') return undefined
-                  const p = projectById.get(session.projectId)
-                  return p ? branchLabel(p) : undefined
-                })()}
-                onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
-                noteEditing={noteEditingId === session.id}
-                onNoteEditingChange={(editing) => setNoteEditingId(editing ? session.id : null)}
-                selectable={selectionEnabled}
-                selected={selectedIds.includes(session.id)}
-                onToggleSelected={(shiftKey) => toggleSelection(session.id, shiftKey)}
-                onScopeClick={(e) =>
-                  setScopeMenu({
-                    x: e.clientX,
-                    y: e.clientY,
-                    projectId: session.projectId,
-                  })
-                }
-                isSubSession={session.parentSessionId !== undefined}
-                onSelect={() => selectSession(session.projectId, session.id)}
-                onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
-              />
-            ))}
-      </SessionGroup>
+        onRemove={() => setConfirmDeleteProject({ id: row.projectId, name: row.label })}
+        onOpenInEditor={() => openInEditor(folderForBranch(row.projectId))}
+        editorName={editorName}
+        issueActions={issueActionsFor(row.projectId)}
+        repoActions={workspaceTabList.map((tab) => ({
+          id: tab.id,
+          label: tab.label,
+          onSelect: () => onSelectWorkspaceTab(row.workspaceId, tab.id),
+        }))}
+      />
     )
   }
 
@@ -665,74 +599,89 @@ export function UnifiedSidebar({
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSearchClear={() => setSearchQuery('')}
-        />
-
-        <ViewBar
-          views={views}
-          activeViewId={activeViewId}
-          counts={viewCounts}
-          onSelectView={setActiveViewId}
-          onChangeView={changeActiveView}
-          hideStaleUnavailable={view.filters.staleOnly === true}
-        />
-
-        <FilterNotice shown={shown} total={total} onShowAll={showAll} />
+        >
+          <FilterMenu
+            views={views}
+            activeViewId={activeViewId}
+            counts={viewCounts}
+            onSelectView={setActiveViewId}
+            onChangeView={changeActiveView}
+            hideStaleUnavailable={view.filters.staleOnly === true}
+            shown={shown}
+            total={total}
+            onShowAll={showAll}
+          />
+          <DisplayMenu view={view} onChangeView={changeActiveView} />
+        </SidebarHeader>
 
         <div className="unified-sidebar__list">
           {groups.map((group) => {
-            const workspaceId = group.scope?.workspaceId
-            const workspace = workspaceId ? workspaceById.get(workspaceId) : undefined
-            const closesWorkspace =
-              workspaceId !== undefined && lastGroupKeyByWorkspace.get(workspaceId) === group.key
-
+            const workspace = workspaceById.get(group.workspaceId)
+            const collapsed = isGroupCollapsed(collapseState, view.groupBy, group.workspaceId)
+            const ownsTabs = workspace !== undefined
             return (
-              <React.Fragment key={group.key}>
-                {renderGroup(group, false)}
-
-                {closesWorkspace && workspace && (
-                  <div
-                    {...getItemProps(workspaces.findIndex((w) => w.id === workspace.id))}
-                    className={`unified-sidebar__ws-actions${
-                      dragOverIndex === workspaces.findIndex((w) => w.id === workspace.id)
-                        ? ' ws-card--dnd-over'
-                        : ''
-                    }`}
-                  >
-                    <WorkspaceRow
-                      workspace={workspace}
-                      onAddProject={() => setCreateProjectFor(workspace.id)}
-                      onEdit={() => setEditWorkspace(workspace)}
-                      onRemove={() => setConfirmDeleteWorkspace(workspace)}
-                    />
-                  </div>
-                )}
+              <React.Fragment key={group.workspaceId}>
+                <RepoHeader
+                  group={group}
+                  pathLabel={abbreviatePath(group.folderPath, homeDir)}
+                  dragProps={getItemProps(workspaces.findIndex((w) => w.id === group.workspaceId))}
+                  dragOver={
+                    dragOverIndex === workspaces.findIndex((w) => w.id === group.workspaceId)
+                  }
+                  collapsed={collapsed}
+                  onToggleCollapse={() => toggleGroup(group.workspaceId)}
+                  onAddBranch={workspace ? () => setCreateProjectFor(workspace.id) : undefined}
+                  onEdit={workspace ? () => setEditWorkspace(workspace) : undefined}
+                  onRemove={workspace ? () => setConfirmDeleteWorkspace(workspace) : undefined}
+                  onOpenInEditor={workspace ? () => openInEditor(workspace.folderPath) : undefined}
+                  editorName={editorName}
+                  workspaceTabs={ownsTabs ? workspaceTabList : undefined}
+                  activeWorkspaceTabId={
+                    activeWorkspaceId === group.workspaceId ? activeWorkspaceTabId : null
+                  }
+                  onSelectWorkspaceTab={
+                    workspace ? (tabId) => onSelectWorkspaceTab(workspace.id, tabId) : undefined
+                  }
+                />
+                {!collapsed && group.branches.map((row) => renderBranch(row, workspace))}
               </React.Fragment>
             )
           })}
 
-          {/* A workspace with no projects yet still needs its way in. */}
+          {/* A repo with no branches yet still needs its way in. */}
           {workspacesWithoutGroups.map((ws) => (
-            <div
+            <RepoHeader
               key={ws.id}
-              {...getItemProps(workspaces.findIndex((w) => w.id === ws.id))}
-              className="unified-sidebar__ws-actions"
-            >
-              <WorkspaceRow
-                workspace={ws}
-                onAddProject={() => setCreateProjectFor(ws.id)}
-                onEdit={() => setEditWorkspace(ws)}
-                onRemove={() => setConfirmDeleteWorkspace(ws)}
-              />
-            </div>
+              dragProps={getItemProps(workspaces.findIndex((w) => w.id === ws.id))}
+              dragOver={dragOverIndex === workspaces.findIndex((w) => w.id === ws.id)}
+              group={{
+                workspaceId: ws.id,
+                label: ws.name,
+                color: ws.color,
+                folderPath: ws.folderPath,
+                branches: [],
+                branchCount: 0,
+                needsYou: false,
+              }}
+              collapsed={false}
+              onToggleCollapse={() => toggleGroup(ws.id)}
+              onAddBranch={() => setCreateProjectFor(ws.id)}
+              onEdit={() => setEditWorkspace(ws)}
+              onRemove={() => setConfirmDeleteWorkspace(ws)}
+              onOpenInEditor={() => openInEditor(ws.folderPath)}
+              editorName={editorName}
+            />
           ))}
 
-          {/* Scratch terminals belong to no repo, so they get their own group
-              rather than a pinned footer with its own separate vocabulary. */}
-          {(scratchSessions.length > 0 || groups.length > 0) && (
-            <div className="session-group unified-sidebar__scratch">
-              <div className="session-group__header">
-                <span className="session-group__label">Scratch</span>
-                <span className="session-group__count">{scratchSessions.length}</span>
+          {/* Scratch terminals belong to no branch, so they are the one place a
+              terminal is still a row. Drawn as branch rows because in this
+              section a scratch terminal IS the unit of work — same anatomy,
+              same vocabulary, and no colour rail because it has no repo. */}
+          {(scratch.length > 0 || groups.length > 0) && (
+            <div className="unified-sidebar__scratch">
+              <div className="unified-sidebar__scratch-head">
+                <span className="unified-sidebar__scratch-label">Scratch</span>
+                <span className="unified-sidebar__scratch-count">{scratch.length}</span>
                 <button
                   className="unified-sidebar__scratch-add"
                   title="New scratch terminal"
@@ -742,41 +691,37 @@ export function UnifiedSidebar({
                   +
                 </button>
               </div>
-              <div className="session-group__sessions">
-                {scratchSessions.map((session) => (
-                  <SessionRow
-                    key={session.id}
-                    session={session}
-                    isActive={activeScratchSessionId === session.id}
-                    isBusy={isSessionBusy(session.id)}
-                    bellCount={getBellCountForSession(session.id)}
-                    workspaceColor={workspaceColorForSession(session.projectId)}
-                    now={clock}
-                    onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
-                    onSelect={() => onSelectScratchSession(session.id)}
-                    onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
-                  />
-                ))}
-              </div>
+              {scratch.map((session) => (
+                <BranchRow
+                  key={session.id}
+                  row={{
+                    projectId: session.id,
+                    label: session.tabTitle,
+                    // No kind marker: a scratch folder is neither a worktree nor
+                    // a checkout, and the glyph would be answering a question
+                    // nobody asked of it.
+                    isWorktree: true,
+                    state: session.agentState,
+                    stateCount: 1,
+                    sessionCount: 1,
+                    lastActivityAt: session.lastActivityAt,
+                    workspaceId: '',
+                  }}
+                  selected={activeScratchSessionId === session.id}
+                  now={clock}
+                  onSelect={() => onSelectScratchSession(session.id)}
+                  onRename={(title) => sessionStore.renameSession(session.id, title)}
+                />
+              ))}
             </div>
           )}
 
           {groups.length === 0 && workspacesWithoutGroups.length === 0 && (
             <div className="unified-sidebar__empty">
-              {searchQuery ? `No sessions match "${searchQuery}"` : 'No sessions yet'}
+              {searchQuery ? `No branches match "${searchQuery}"` : 'No branches yet'}
             </div>
           )}
         </div>
-
-        {selectionEnabled && selectedIds.length > 0 && (
-          <div className="unified-sidebar__bulk-bar">
-            <span>{selectedIds.length} selected</span>
-            <button onClick={() => setSelectedIds([])}>Clear</button>
-            <button className="unified-sidebar__bulk-close" onClick={() => setBulkCloseOpen(true)}>
-              Close selected
-            </button>
-          </div>
-        )}
 
         <div
           className="unified-sidebar__resize-handle"
@@ -784,27 +729,6 @@ export function UnifiedSidebar({
           onDoubleClick={handleResizeDblClick}
         />
       </div>
-
-      {scopeMenu &&
-        (() => {
-          const project = projectById.get(scopeMenu.projectId)
-          if (!project) return null
-          return (
-            <ScopeMenu
-              x={scopeMenu.x}
-              y={scopeMenu.y}
-              projectName={branchLabel(project)}
-              issueActions={issueActionsFor(project.id)}
-              workspaceTabs={workspaceTabList}
-              onSelectWorkspaceTab={(tabId) => onSelectWorkspaceTab(project.workspaceId, tabId)}
-              onAddSession={() => addSessionToProject(project.id)}
-              onRemoveProject={() =>
-                setConfirmDeleteProject({ id: project.id, name: branchLabel(project) })
-              }
-              onDismiss={() => setScopeMenu(null)}
-            />
-          )
-        })()}
 
       {linkDialogProjectId !== null &&
         (() => {
@@ -838,22 +762,6 @@ export function UnifiedSidebar({
             </div>
           )
         })()}
-
-      {bulkCloseOpen && (
-        <BulkCloseDialog
-          sessions={sessionList.filter((s) => selectedIds.includes(s.id))}
-          projectById={projectById}
-          onConfirm={(sessionIds, worktreeProjectIds) => {
-            for (const id of sessionIds) void sessionStore.closeSession(id)
-            // Worktree removal already happens inside project:delete, so this
-            // reuses that path rather than adding a second way to do it.
-            for (const projectId of worktreeProjectIds) void deleteProject(projectId)
-            setSelectedIds([])
-            setBulkCloseOpen(false)
-          }}
-          onClose={() => setBulkCloseOpen(false)}
-        />
-      )}
 
       {createWsOpen && <CreateWorkspaceDialog onClose={() => setCreateWsOpen(false)} />}
       {editWorkspace && (

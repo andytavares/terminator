@@ -19,6 +19,9 @@ const defaultProps = {
   onSelectGlobalTab: vi.fn(),
   onSearchFocus: vi.fn(),
   onAddWorkspace: vi.fn(),
+  // The bell lives in the app band now and only renders with a handler — a
+  // bell you cannot click is not worth drawing.
+  onBellClick: vi.fn(),
 }
 
 beforeEach(() => {
@@ -85,21 +88,21 @@ describe('SidebarHeader', () => {
 
   it('renders bell badge when unreadNotifications > 0', () => {
     const { container } = render(<SidebarHeader {...defaultProps} unreadNotifications={3} />)
-    const badge = container.querySelector('.sidebar-header__bell-badge')
+    const badge = container.querySelector('.app-band__badge')
     expect(badge).toBeTruthy()
     expect(badge?.textContent).toBe('3')
   })
 
   it('renders 9+ badge when unreadNotifications exceeds 9', () => {
     const { container } = render(<SidebarHeader {...defaultProps} unreadNotifications={12} />)
-    const badge = container.querySelector('.sidebar-header__bell-badge')
+    const badge = container.querySelector('.app-band__badge')
     expect(badge).toBeTruthy()
     expect(badge?.textContent).toBe('9+')
   })
 
   it('does not render bell badge when unreadNotifications is 0', () => {
     const { container } = render(<SidebarHeader {...defaultProps} unreadNotifications={0} />)
-    expect(container.querySelector('.sidebar-header__bell-badge')).toBeNull()
+    expect(container.querySelector('.app-band__badge')).toBeNull()
   })
 })
 
@@ -126,18 +129,21 @@ describe('SidebarHeader — the app band sits above, list controls sit with the 
     expect(container.querySelector('.sidebar-header__tabs')).toBeNull()
   })
 
-  it('puts the bell and add-repo controls on the search row, where the list is', () => {
+  it('puts the bell with the app surfaces and add-repo with the list', () => {
+    // The bell is app-level like everything else in the band, and moving it up
+    // frees the row below for the two menus that replaced four bands of chrome.
     const { container } = renderHeader()
+    expect(container.querySelector('.app-band .app-band__badge, .app-band')).toBeTruthy()
     const row = container.querySelector('.sidebar-header__search-row')!
-    expect(row.querySelector('.sidebar-header__bell')).toBeTruthy()
     expect(row.querySelector('.sidebar-header__add')).toBeTruthy()
+    expect(row.querySelector('.sidebar-header__bell')).toBeNull()
   })
 
-  it('labels every app-band entry', () => {
+  it('names every app-band entry for a reader', () => {
     renderHeader({
       globalTabs: [makeTab('overview', 'Overview')],
     })
-    expect(screen.getByText('Overview')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy()
   })
 })
 

@@ -82,15 +82,12 @@ vi.mock('../../../src/renderer/components/sidebar/UnifiedSidebar', () => ({
     onSelectScratchSession,
     onSelectProject,
     visible,
-    editNoteSessionId,
   }: {
     onSelectGlobalTab: GlobalTabCallback
     onSelectScratchSession: (sessionId: string) => void
     onSelectProject?: () => void
     visible: boolean
-    editNoteSessionId?: string | null
   }) => {
-    capturedEditNoteSessionId = editNoteSessionId ?? null
     capturedOnSelectGlobalTab = onSelectGlobalTab
     capturedOnSelectSession = onSelectScratchSession
     capturedOnSelectProject = onSelectProject ?? null
@@ -127,7 +124,13 @@ vi.mock('../../../src/renderer/components/terminal/TerminalPane', () => ({
   TerminalPane: () => <div data-testid="terminal-pane" />,
 }))
 vi.mock('../../../src/renderer/components/terminal/TabBar', () => ({
-  TabBar: () => <div data-testid="tab-bar" />,
+  TabBar: ({ editNoteSessionId }: { editNoteSessionId?: string | null }) => {
+    // App sets the id then clears it on a microtask, so pressing the shortcut
+    // twice reopens the editor. The last render therefore always sees null —
+    // what the test is asking is whether the tab bar was ever handed the id.
+    if (editNoteSessionId) capturedEditNoteSessionId = editNoteSessionId
+    return <div data-testid="tab-bar" />
+  },
 }))
 vi.mock('../../../src/renderer/components/settings/SettingsPanel', () => ({
   SettingsPanel: ({ onClose }: { onClose: () => void }) => (
@@ -256,6 +259,8 @@ const mockSetActiveSessionForProject = vi.fn()
 let mockUnsubscribe: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
+  capturedEditNoteSessionId = null
+
   vi.clearAllMocks()
   capturedPaletteCommands = []
   capturedOnSelectGlobalTab = null
@@ -1461,7 +1466,7 @@ describe('App — command palette sessions and note editing (US6)', () => {
     expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's1')
   })
 
-  it('asks the sidebar to edit the active session note on Cmd+I', () => {
+  it('asks the tab bar to edit the active terminal note on Cmd+I', () => {
     setupMocks({
       activeProjectId: 'proj-1',
       sessions: new Map([['s1', paletteSession]]),

@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url'
 
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
 
-const ROW_CSS = read('../../../src/renderer/components/sidebar/SessionRow.css')
-const ROW_TSX = read('../../../src/renderer/components/sidebar/SessionRow.tsx')
+const ROW_CSS = read('../../../src/renderer/components/sidebar/BranchRow.css')
+const ROW_TSX = read('../../../src/renderer/components/sidebar/BranchRow.tsx')
 
 function ruleBody(css: string, selector: string): string {
   const start = css.indexOf(`${selector} {`)
@@ -29,33 +29,46 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
     expect(new Set(icons).size).toBe(4)
   })
 
-  it('reserves opacity for receding the states that are not asking for anything', () => {
-    const idle = ruleBody(ROW_CSS, ".session-row__status svg[data-state='idle']")
-    const exited = ruleBody(ROW_CSS, ".session-row__status svg[data-state='exited']")
-    const value = (body: string) => Number(/opacity:\s*([\d.]+)/.exec(body)![1])
-    expect(Math.abs(value(idle) - value(exited))).toBeGreaterThanOrEqual(0.15)
+  it('separates the four states on one opacity scale, defined once', () => {
+    // The scale is a set of tokens rather than four literals, so the sidebar
+    // gutter, the terminal tabs and the board lanes read the same values and
+    // cannot drift apart.
+    const TOKENS = read('../../../src/renderer/styles.css')
+    const scale = ['awaiting', 'working', 'idle', 'exited'].map((state) => {
+      const m = new RegExp(`--state-op-${state}:\\s*([\\d.]+);`).exec(TOKENS)
+      if (!m) throw new Error(`missing --state-op-${state}`)
+      return Number(m[1])
+    })
+    expect(scale).toEqual([...scale].sort((a, b) => b - a))
+    expect(scale[0]).toBe(1)
+    // Idle and exited must be told apart, not merely both dim.
+    expect(Math.abs(scale[2] - scale[3])).toBeGreaterThanOrEqual(0.05)
   })
 
   it('puts no colour on the status glyph — shape is the only state channel', () => {
-    const statusRules = [...ROW_CSS.matchAll(/\.session-row__status[^{]*\{([^}]*)\}/g)]
+    const statusRules = [...ROW_CSS.matchAll(/\.branch-row__(gutter|state)[^{]*\{([^}]*)\}/g)]
     expect(statusRules.length).toBeGreaterThan(0)
-    for (const [, body] of statusRules) {
-      expect(body).not.toMatch(/(^|\s)color:/)
+    for (const [, , body] of statusRules) {
       expect(body).not.toMatch(/(^|\s)fill:/)
+      // The gutter sets a text colour so the glyph inherits currentColor; what
+      // it must never do is vary that colour by state.
+      expect(body).not.toMatch(/color:\s*var\(--(danger|success|warning|accent)\)/)
     }
   })
 
-  it('marks awaiting-input with a shape cue — a left edge bar', () => {
-    expect(ruleBody(ROW_CSS, '.session-row--needs-you')).toMatch(/box-shadow:\s*inset\s+3px/)
+  it('marks awaiting-input by emphasis in the gutter, not by an edge of its own', () => {
+    // The needs-you bar used to be a left edge, which meant it overwrote the
+    // repo's rail — two signals fighting for the same three pixels. The
+    // emphasis moved into the status gutter, and the edge belongs to the repo.
+    expect(ruleBody(ROW_CSS, '.branch-row__state--awaiting-input')).toMatch(
+      /opacity:\s*var\(--state-op-awaiting\)/
+    )
+    expect(ROW_CSS).not.toMatch(/\.branch-row--needs-you/)
   })
 
-  it('marks awaiting-input with a text cue as well as the bar', () => {
-    expect(ROW_TSX).toContain('needs you')
-    expect(ROW_TSX).toMatch(/session-row__needs-you-pill/)
-  })
-
-  it('gives the needs-you pill a border, so it reads as a pill without colour', () => {
-    expect(ruleBody(ROW_CSS, '.session-row__needs-you-pill')).toMatch(/border:\s*1px solid/)
+  it('names the state in words, since a shape says nothing aloud', () => {
+    expect(ROW_TSX).toMatch(/STATE_LABEL/)
+    expect(ROW_TSX).toContain('Waiting on you')
   })
 
   it('uses no unicode glyphs for status — they font-fallback at a different baseline', () => {
@@ -72,10 +85,10 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
   it('draws its status glyphs from lucide, sized by CSS rather than the size prop', () => {
     expect(ROW_TSX).toMatch(/from 'lucide-react'/)
     expect(ROW_TSX).not.toMatch(/size=\{/)
-    expect(ROW_CSS).toMatch(/\.session-row__status svg\s*\{[^}]*width:/)
+    expect(ROW_CSS).toMatch(/\.branch-row__gutter svg\s*\{[^}]*width:/)
   })
 
   it('never sets an explicit colour on an icon', () => {
-    expect(ROW_CSS).not.toMatch(/\.session-row__prefix\s*\{[^}]*color:/)
+    expect(ROW_CSS).not.toMatch(/\.branch-row__kind\s*svg\s*\{[^}]*color:/)
   })
 })

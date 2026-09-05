@@ -202,3 +202,56 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Per-terminal state on the tab (US3) ───────────────────────
+   The sidebar stopped listing terminals, so the tab carries what its row
+   used to. Capped at four elements — glyph, title, one trailing slot, and
+   close on the active tab only — because adding three things to a 100px box
+   is exactly what put ten elements on a 24px sidebar row. */
+
+.tab-bar__state {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.tab-bar__state svg {
+  width: 10px;
+  height: 10px;
+  display: block;
+}
+
+/* Opacity, never hue — the same scale the sidebar gutter and board lanes read. */
+.tab-bar__state svg[data-state='awaiting-input'] {
+  opacity: var(--state-op-awaiting);
+}
+.tab-bar__state svg[data-state='working'] {
+  opacity: var(--state-op-working);
+}
+.tab-bar__state svg[data-state='idle'] {
+  opacity: var(--state-op-idle);
+}
+.tab-bar__state svg[data-state='exited'] {
+  opacity: var(--state-op-exited);
+}
+
+/* Overflow was invisible: the row simply clipped, with nothing to say more
+   tabs existed. It scrolls now, and the edge is shaded so it reads as cut off. */
+.tab-bar--scrollable {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+}
+
+/* The note is edited in place on the tab, the way it used to be on the row. */
+.tab-bar__note-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-xs, 4px);
+  color: var(--text-primary);
+  padding: 0 4px;
+}

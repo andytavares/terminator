@@ -26,10 +26,12 @@ export const BUILT_IN_VIEWS: SessionView[] = [
   {
     id: 'needs-me',
     name: 'Needs me',
-    // Grouped by status, not project: the whole point of this view is that it
-    // is cross-project, so one "Awaiting you" section with a project badge per
-    // row beats the same six sessions split across five headings.
-    groupBy: 'status',
+    // Was grouped by status, because the view listed terminals and one
+    // "Awaiting you" section beat the same six split across five headings.
+    // The list is branches now: each row already shows its own state, and the
+    // grouping is one level rather than five, so the repo grouping is the
+    // useful one. A branch is kept when any of its terminals is waiting.
+    groupBy: 'workspace',
     sortBy: 'recent',
     filters: { states: ['awaiting-input'] },
     builtIn: true,
@@ -37,7 +39,7 @@ export const BUILT_IN_VIEWS: SessionView[] = [
   {
     id: 'active',
     name: 'Active',
-    groupBy: 'project',
+    groupBy: 'workspace',
     sortBy: 'recent',
     filters: { states: ['working'] },
     builtIn: true,
@@ -45,7 +47,7 @@ export const BUILT_IN_VIEWS: SessionView[] = [
   {
     id: 'stale',
     name: 'Stale',
-    groupBy: 'project',
+    groupBy: 'workspace',
     sortBy: 'oldest',
     filters: { staleOnly: true },
     builtIn: true,
@@ -53,6 +55,10 @@ export const BUILT_IN_VIEWS: SessionView[] = [
 ]
 
 const BUILT_IN_IDS = new Set(BUILT_IN_VIEWS.map((v) => v.id))
+
+/** The keys that still mean something now the list is of branches. */
+const VALID_GROUP_KEYS = new Set<string>(['workspace', 'none'])
+const VALID_SORT_KEYS = new Set<string>(['recent', 'oldest', 'name', 'status', 'manual'])
 
 function isSessionView(value: unknown): value is SessionView {
   if (typeof value !== 'object' || value === null) return false
@@ -93,7 +99,15 @@ export function loadViews(): SessionView[] {
 
     const builtIns = BUILT_IN_VIEWS.map((v) => {
       const patch = overrides[v.id]
-      return isRecord(patch) ? ({ ...v, ...patch, id: v.id, builtIn: true } as SessionView) : v
+      if (!isRecord(patch)) return v
+      // A preference written before the grouping options narrowed can name a
+      // key that no longer exists. Falling back to the built-in's own default
+      // is the same degradation this function already applies to corrupt
+      // storage — one stale preference must not empty the sidebar.
+      const merged = { ...v, ...patch, id: v.id, builtIn: true } as SessionView
+      if (!VALID_GROUP_KEYS.has(merged.groupBy)) merged.groupBy = v.groupBy
+      if (!VALID_SORT_KEYS.has(merged.sortBy)) merged.sortBy = v.sortBy
+      return merged
     })
     // A stored view may not squat on a built-in id, or it would shadow a view
     // the user cannot then get back.

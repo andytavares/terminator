@@ -1,11 +1,12 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
@@ -52,7 +53,7 @@ const mockCreateSession = vi.fn()
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: () => ({ createSession: mockCreateSession }),
 }))
-let staleAfterMs = 2 * 60 * 60 * 1000
+const staleAfterMs = 2 * 60 * 60 * 1000
 vi.mock('../../../../src/renderer/stores/settings.store', () => ({
   useSettingsStore: () => ({
     resolveSettings: () => ({
@@ -97,6 +98,9 @@ const jobs: Project = {
   workspaceId: 'ws-1',
   name: 'Jobs',
   isWorktree: true,
+  // A worktree has a directory of its own; the fixture claimed to be one
+  // without saying where, which nothing read until now.
+  worktreePath: '/wt/jobs',
   createdAt: '',
   updatedAt: '',
 }
@@ -243,192 +247,322 @@ beforeEach(() => {
 
 const renderSidebar = (props = {}) => render(<UnifiedSidebar {...defaultProps} {...props} />)
 
-describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
-  it('renders every session on first paint with nothing expanded by the user (SC-001)', () => {
-    renderSidebar()
+describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
+  const branchRows = (c: HTMLElement) => Array.from(c.querySelectorAll('.branch-row'))
+  const branchNames = (c: HTMLElement) =>
+    branchRows(c).map((r) => r.querySelector('.branch-row__name')!.textContent)
+
+  it('lists one row per branch and no terminals at all', () => {
+    const { container } = renderSidebar()
+    expect(branchNames(container)).toEqual(['main', 'Jobs', 'Web'])
     for (const title of ['api-shell', 'api-agent', 'jobs-run', 'web-dev']) {
-      expect(screen.getByText(title)).toBeTruthy()
+      expect(screen.queryByText(title)).toBeNull()
     }
   })
 
-  it('defaults every group to expanded (FR-008)', () => {
+  it('groups the branches under their repos', () => {
     const { container } = renderSidebar()
-    // Two workspaces, the three project groups nested inside them, and scratch.
-    expect(container.querySelectorAll('.session-group__sessions')).toHaveLength(6)
-  })
-
-  it('shows a relative last-activity label on each row', () => {
-    renderSidebar()
-    expect(screen.getByText('5m')).toBeTruthy()
-  })
-
-  it('omits the project badge under project grouping — the header already says it', () => {
-    const { container } = renderSidebar()
-    expect(container.querySelector('.session-row__project-badge')).toBeNull()
-  })
-
-  it('still lists every project when no session exists, so you can start one', () => {
-    mockSessionStore.sessions = new Map()
-    const { container } = renderSidebar()
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
-      (el) => el.textContent
+    const names = Array.from(container.querySelectorAll('.repo-header__name')).map(
+      (h) => h.textContent
     )
-    expect(labels).toEqual(['Backend', 'main', 'Jobs', 'Frontend', 'Web', 'Scratch'])
-    expect(container.querySelectorAll('.session-group__add')).toHaveLength(3)
+    expect(names).toEqual(['Backend', 'Frontend'])
   })
 
-  it('offers a way into a workspace that has no projects yet', () => {
-    mockSessionStore.sessions = new Map()
-    mockWorkspaceStore.projectsByWorkspaceId = new Map()
-    renderSidebar()
-    // Not an empty state — the workspaces are still reachable, which is the
-    // only route to creating that first project.
-    expect(screen.getByText('Backend')).toBeTruthy()
-    expect(screen.getByText('Frontend')).toBeTruthy()
-    expect(screen.queryByText('No sessions yet')).toBeNull()
+  it('counts branches on the repo header, not terminals', () => {
+    const { container } = renderSidebar()
+    const counts = Array.from(container.querySelectorAll('.repo-header__count')).map(
+      (c) => c.textContent
+    )
+    expect(counts).toEqual(['2', '1'])
   })
 
-  it('renders an empty state only when there is no workspace either', () => {
-    mockSessionStore.sessions = new Map()
+  it('still lists a branch with no terminals, so you can start one', () => {
+    sessions = new Map()
+    mockSessionStore.sessions = sessions
+    const { container } = renderSidebar()
+    expect(branchNames(container)).toEqual(['main', 'Jobs', 'Web'])
+  })
+
+  it('shows a branch state folded from its terminals', () => {
+    sessions = new Map([['s1', session('s1', 'p1', { bellCount: 1 })]])
+    mockSessionStore.sessions = sessions
+    const { container } = renderSidebar()
+    const main = branchRows(container)[0]
+    expect(main.querySelector('.branch-row__gutter svg')!.getAttribute('data-state')).toBe(
+      'awaiting-input'
+    )
+  })
+
+  it('renders an empty state only when there is no repo either', () => {
     mockWorkspaceStore.projectsByWorkspaceId = new Map()
     mockWorkspaceStore.workspaces = []
-    renderSidebar()
-    expect(screen.getByText('No sessions yet')).toBeTruthy()
+    const { container } = renderSidebar()
+    expect(container.querySelector('.unified-sidebar__empty')).toBeTruthy()
     mockWorkspaceStore.workspaces = [ws1, ws2]
   })
-})
 
-describe('UnifiedSidebar — selection keeps project-scoped state resolved (I4, SC-010)', () => {
-  it('sets activeProjectId to the selected session project', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByText('jobs-run'))
-    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p2')
-  })
-
-  it('sets the active session for that project', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByText('jobs-run'))
-    expect(mockSessionStore.setActiveSessionForProject).toHaveBeenCalledWith('p2', 's3')
-  })
-
-  it('switches the active workspace to the one owning the session', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByText('web-dev'))
-    expect(mockWorkspaceStore.setActiveWorkspace).toHaveBeenCalledWith('ws-2')
-  })
-
-  it('notifies the host that a project was selected', () => {
-    const onSelectProject = vi.fn()
-    renderSidebar({ onSelectProject })
-    fireEvent.click(screen.getByText('api-shell'))
-    expect(onSelectProject).toHaveBeenCalledOnce()
-  })
-})
-
-describe('UnifiedSidebar — collapse state', () => {
-  it('selects the project when its header is clicked', () => {
+  it('offers a repo with no branches its own way in', () => {
+    mockWorkspaceStore.projectsByWorkspaceId = new Map([['ws-1', [api, jobs]]])
     const { container } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.session-group__header')[1])
+    const names = Array.from(container.querySelectorAll('.repo-header__name')).map(
+      (h) => h.textContent
+    )
+    expect(names).toContain('Frontend')
+  })
+})
+
+describe('UnifiedSidebar — selecting a branch (FR-047)', () => {
+  const clickBranch = (container: HTMLElement, index = 0) =>
+    fireEvent.click(container.querySelectorAll('.branch-row')[index])
+
+  it('activates the branch and its repo', () => {
+    const { container } = renderSidebar()
+    clickBranch(container)
+    expect(mockWorkspaceStore.setActiveWorkspace).toHaveBeenCalledWith('ws-1')
     expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p1')
   })
 
-  it('collapses a group and hides only its sessions', () => {
+  it('focuses the terminal that is waiting on you', () => {
+    sessions = new Map([
+      ['s1', session('s1', 'p1', { lastActivityAt: NOW })],
+      ['s2', session('s2', 'p1', { bellCount: 1, lastActivityAt: NOW - 900_000 })],
+    ])
+    mockSessionStore.sessions = sessions
     const { container } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.session-group__chevron')[1])
-    expect(screen.queryByText('api-shell')).toBeNull()
-    expect(screen.getByText('jobs-run')).toBeTruthy()
+    clickBranch(container)
+    expect(mockSessionStore.setActiveSessionForProject).toHaveBeenCalledWith('p1', 's2')
   })
 
-  it('persists the collapsed group across a remount', () => {
-    const { container, unmount } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.session-group__chevron')[1])
-    unmount()
-    renderSidebar()
-    expect(screen.queryByText('api-shell')).toBeNull()
+  it('falls back to the one you last had open on that branch', () => {
+    sessions = new Map([
+      ['s1', session('s1', 'p1', { lastActivityAt: NOW - 900_000 })],
+      ['s2', session('s2', 'p1', { lastActivityAt: NOW })],
+    ])
+    mockSessionStore.sessions = sessions
+    mockSessionStore.projectViews = new Map([['p1', { activeSessionId: 's1' }]])
+    const { container } = renderSidebar()
+    clickBranch(container)
+    expect(mockSessionStore.setActiveSessionForProject).toHaveBeenCalledWith('p1', 's1')
+    mockSessionStore.projectViews = new Map()
+  })
+
+  it('falls back to the most recently active when there is no memory of one', () => {
+    sessions = new Map([
+      ['s1', session('s1', 'p1', { lastActivityAt: NOW - 900_000 })],
+      ['s2', session('s2', 'p1', { lastActivityAt: NOW })],
+    ])
+    mockSessionStore.sessions = sessions
+    const { container } = renderSidebar()
+    clickBranch(container)
+    expect(mockSessionStore.setActiveSessionForProject).toHaveBeenCalledWith('p1', 's2')
+  })
+
+  it('selects a branch with no terminals and lets the app open its first', () => {
+    // App's auto-open effect gives a newly selected branch its first terminal.
+    // Starting one here as well opened two, which the e2e caught.
+    sessions = new Map()
+    mockSessionStore.sessions = sessions
+    const { container } = renderSidebar()
+    clickBranch(container)
+    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p1')
+    expect(mockCreateSession).not.toHaveBeenCalled()
+  })
+
+  it('tells the host a branch was selected', () => {
+    const onSelectProject = vi.fn()
+    const { container } = renderSidebar({ onSelectProject })
+    clickBranch(container)
+    expect(onSelectProject).toHaveBeenCalled()
   })
 })
 
-describe('UnifiedSidebar — scope actions on the group header (FR-026)', () => {
-  it('creates a session in the group project', () => {
-    renderSidebar()
-    fireEvent.click(screen.getAllByTitle('New terminal')[1])
-    expect(mockCreateSession).toHaveBeenCalledWith('p2', 'human', '', '/b', 5000)
-  })
-
-  it('selects the project it just started a terminal in', () => {
-    renderSidebar()
-    fireEvent.click(screen.getAllByTitle('New terminal')[1])
-    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p2')
-    expect(mockWorkspaceStore.setActiveWorkspace).toHaveBeenCalledWith('ws-1')
-  })
-
-  it('offers project removal from the header context menu', () => {
+describe('UnifiedSidebar — collapse', () => {
+  it('hides a repo branches without hiding the repo', () => {
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
-    fireEvent.click(screen.getByText('Remove'))
-    expect(screen.getByText('Remove branch "main"?')).toBeTruthy()
+    fireEvent.click(container.querySelector('.repo-header')!)
+    expect(container.querySelectorAll('.branch-row')).toHaveLength(1)
+    expect(container.querySelectorAll('.repo-header')).toHaveLength(2)
   })
 
-  it('deletes the project once removal is confirmed', () => {
+  it('remembers a collapsed repo across a remount', () => {
+    const { container, unmount } = renderSidebar()
+    fireEvent.click(container.querySelector('.repo-header')!)
+    unmount()
+    const second = renderSidebar()
+    expect(second.container.querySelectorAll('.branch-row')).toHaveLength(1)
+  })
+
+  it('still signals a waiting branch under a collapsed repo', () => {
+    sessions = new Map([['s1', session('s1', 'p1', { bellCount: 1 })]])
+    mockSessionStore.sessions = sessions
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
+    fireEvent.click(container.querySelector('.repo-header')!)
+    expect(container.querySelector('.repo-header__needs-you')).toBeTruthy()
+  })
+})
+
+describe('UnifiedSidebar — branch actions', () => {
+  it('starts a terminal on a branch from its row', () => {
+    const { container } = renderSidebar()
+    fireEvent.click(container.querySelector('.branch-row__action')!)
+    expect(mockCreateSession).toHaveBeenCalled()
+  })
+
+  it('creates a branch from the repo header', () => {
+    const { container } = renderSidebar()
+    fireEvent.click(container.querySelector('.repo-header__action')!)
+    expect(screen.getByTestId('create-project-dialog')).toBeTruthy()
+  })
+
+  it('offers branch removal from the row menu', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(screen.getByText('Remove branch')).toBeTruthy()
+  })
+
+  it('deletes the branch once removal is confirmed', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText('Remove branch'))
     fireEvent.click(screen.getByText('Remove'))
-    fireEvent.click(screen.getAllByText('Remove').at(-1)!)
     expect(mockWorkspaceStore.deleteProject).toHaveBeenCalledWith('p1')
   })
+
+  it('renames a branch that has no branch to be named by', () => {
+    const { container } = renderSidebar()
+    // `web` sits in a folder that is not a repo, so its stored name is its only name.
+    const rows = Array.from(container.querySelectorAll('.branch-row'))
+    const webRow = rows.find((r) => r.querySelector('.branch-row__name')!.textContent === 'Web')!
+    fireEvent.contextMenu(webRow)
+    fireEvent.click(screen.getByText('Rename'))
+    const input = container.querySelector('.branch-row__rename') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'Web v2' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(mockWorkspaceStore.renameProject).toHaveBeenCalledWith('p3', 'Web v2')
+  })
+
+  it('offers no rename on a branch named by its branch (ADR-034)', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(screen.queryByText('Rename')).toBeNull()
+  })
 })
 
-describe('UnifiedSidebar — workspace extension buttons (surface 2)', () => {
-  beforeEach(() => {
+describe('UnifiedSidebar — repo extension surfaces', () => {
+  it('renders the repo buttons once per repo', () => {
     mockRegistryState.workspaceTabs = new Map([
-      ['speckit', { id: 'speckit', label: 'SpecKit', component: () => null }],
-      ['reviews', { id: 'reviews', label: 'Code Reviews', component: () => null }],
+      ['t1', { id: 't1', label: 'Fake Tab', component: () => null }],
     ])
-  })
-
-  it('renders the buttons once per workspace, not once per project', () => {
-    renderSidebar()
-    // Two workspaces are on screen; ws-1 has two projects but must show one strip.
-    expect(screen.getAllByTitle('SpecKit')).toHaveLength(2)
-  })
-
-  it('fires the tab with the owning workspace id', () => {
-    const onSelectWorkspaceTab = vi.fn()
-    renderSidebar({ onSelectWorkspaceTab })
-    fireEvent.click(screen.getAllByTitle('Code Reviews')[1])
-    expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-2', 'reviews')
-  })
-})
-
-describe('UnifiedSidebar — search filters rather than dims (FR-031)', () => {
-  it('removes non-matching sessions instead of dimming them', () => {
     const { container } = renderSidebar()
-    fireEvent.change(
-      container.querySelector('.sidebar-search input') ?? container.querySelector('input')!,
-      { target: { value: 'jobs' } }
+    const buttons = Array.from(container.querySelectorAll('.repo-header__action')).filter(
+      (b) => b.getAttribute('aria-label') === 'Fake Tab'
     )
-    expect(screen.getByText('jobs-run')).toBeTruthy()
-    expect(screen.queryByText('api-shell')).toBeNull()
-    expect(container.querySelector('.project-row--dimmed')).toBeNull()
+    expect(buttons).toHaveLength(2)
+    mockRegistryState.workspaceTabs = new Map()
   })
 
-  it('matches on project name, not only session title', () => {
-    const { container } = renderSidebar()
-    fireEvent.change(container.querySelector('input')!, { target: { value: 'Web' } })
-    expect(screen.getByText('web-dev')).toBeTruthy()
-    expect(screen.queryByText('api-shell')).toBeNull()
-  })
-
-  it('explains an empty result rather than showing a blank list', () => {
-    const { container } = renderSidebar()
-    fireEvent.change(container.querySelector('input')!, { target: { value: 'zzzz' } })
-    // A query that matches nothing narrows the view, so the workspace rows are
-    // suppressed too and only the explanation is left.
-    expect(screen.getByText('No sessions match "zzzz"')).toBeTruthy()
-    expect(screen.queryByText('Backend')).toBeNull()
+  it('fires a repo button with the owning repo id', () => {
+    mockRegistryState.workspaceTabs = new Map([
+      ['t1', { id: 't1', label: 'Fake Tab', component: () => null }],
+    ])
+    const onSelectWorkspaceTab = vi.fn()
+    const { container } = renderSidebar({ onSelectWorkspaceTab })
+    fireEvent.click(
+      Array.from(container.querySelectorAll('.repo-header__action')).find(
+        (b) => b.getAttribute('aria-label') === 'Fake Tab'
+      )!
+    )
+    expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 't1')
+    mockRegistryState.workspaceTabs = new Map()
   })
 })
 
+describe('UnifiedSidebar — search', () => {
+  it('removes non-matching branches instead of dimming them', () => {
+    const { container } = renderSidebar()
+    fireEvent.change(container.querySelector('.sidebar-search input')!, {
+      target: { value: 'jobs' },
+    })
+    const names = Array.from(container.querySelectorAll('.branch-row__name')).map(
+      (n) => n.textContent
+    )
+    expect(names).toEqual(['Jobs'])
+  })
+
+  it('matches on the repo name too', () => {
+    const { container } = renderSidebar()
+    fireEvent.change(container.querySelector('.sidebar-search input')!, {
+      target: { value: 'frontend' },
+    })
+    const names = Array.from(container.querySelectorAll('.branch-row__name')).map(
+      (n) => n.textContent
+    )
+    expect(names).toEqual(['Web'])
+  })
+
+  it('says so when nothing matches', () => {
+    const { container } = renderSidebar()
+    fireEvent.change(container.querySelector('.sidebar-search input')!, {
+      target: { value: 'zzzz' },
+    })
+    expect(container.querySelector('.unified-sidebar__empty')!.textContent).toContain('zzzz')
+  })
+})
+
+describe('UnifiedSidebar — scratch is the one place a terminal is still a row', () => {
+  beforeEach(() => {
+    sessions = new Map([
+      ['sc1', session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })],
+    ])
+    mockSessionStore.sessions = sessions
+  })
+
+  it('lists a scratch terminal in its own section', () => {
+    const { container } = renderSidebar()
+    const scratch = container.querySelector('.unified-sidebar__scratch')!
+    expect(scratch.textContent).toContain('notes')
+  })
+
+  it('never lists a scratch terminal as a branch', () => {
+    const { container } = renderSidebar()
+    const inList = Array.from(
+      container.querySelectorAll('.unified-sidebar__list > .branch-row .branch-row__name')
+    ).map((n) => n.textContent)
+    expect(inList).not.toContain('notes')
+  })
+
+  it('counts them on the section header', () => {
+    const { container } = renderSidebar()
+    expect(container.querySelector('.unified-sidebar__scratch-count')!.textContent).toBe('1')
+  })
+
+  it('selects a scratch terminal when its row is clicked', () => {
+    const onSelectScratchSession = vi.fn()
+    const { container } = renderSidebar({ onSelectScratchSession })
+    const scratch = container.querySelector('.unified-sidebar__scratch')!
+    fireEvent.click(scratch.querySelector('.branch-row')!)
+    expect(onSelectScratchSession).toHaveBeenCalledWith('sc1')
+  })
+
+  it('marks the active scratch terminal', () => {
+    const { container } = renderSidebar({ activeScratchSessionId: 'sc1' })
+    const scratch = container.querySelector('.unified-sidebar__scratch')!
+    expect(scratch.querySelector('.branch-row--selected')).toBeTruthy()
+  })
+
+  it('starts a new scratch terminal from the section header', () => {
+    const onNewScratch = vi.fn()
+    const { container } = renderSidebar({ onNewScratch })
+    fireEvent.click(container.querySelector('.unified-sidebar__scratch-add')!)
+    expect(onNewScratch).toHaveBeenCalled()
+  })
+
+  it('draws no repo rail on a scratch row, since it has no repo', () => {
+    const { container } = renderSidebar()
+    const row = container.querySelector<HTMLElement>('.unified-sidebar__scratch .branch-row')!
+    expect(row.style.getPropertyValue('--ws-color')).toBe('')
+  })
+})
 describe('UnifiedSidebar — shell behaviour preserved', () => {
   it('stays mounted but hidden when not visible', () => {
     const { container } = renderSidebar({ visible: false })
@@ -441,41 +575,16 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     expect(screen.getByTestId('create-workspace-dialog')).toBeTruthy()
   })
 
-  it("puts each workspace's new-project row with that workspace, not in a heap at the bottom", () => {
-    const { container } = renderSidebar()
-    // ws-1 owns API and Jobs; ws-2 owns Web. The row for a workspace must come
-    // straight after that workspace's last project group.
-    const order = Array.from(
-      container.querySelectorAll('.session-group__label, .ws-row__name')
-    ).map((el) => el.textContent)
-    expect(order).toEqual([
-      'Backend',
-      'main',
-      'Jobs',
-      'Backend',
-      'Frontend',
-      'Web',
-      'Frontend',
-      'Scratch',
-    ])
-  })
-
-  it('offers a create-project entry point per workspace', () => {
-    const { container } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.ws-row__name')[1])
-    expect(screen.getByTestId('create-project-dialog')).toBeTruthy()
-  })
-
   it('keeps workspace edit and remove reachable under project grouping', () => {
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.ws-row')[0])
+    fireEvent.contextMenu(container.querySelectorAll('.repo-header')[0])
     fireEvent.click(screen.getByText('Remove workspace'))
     expect(screen.getByText('Remove workspace "Backend"?')).toBeTruthy()
   })
 
   it('deletes the workspace once removal is confirmed', () => {
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.ws-row')[0])
+    fireEvent.contextMenu(container.querySelectorAll('.repo-header')[0])
     fireEvent.click(screen.getByText('Remove workspace'))
     fireEvent.click(screen.getAllByText('Remove').at(-1)!)
     expect(mockWorkspaceStore.deleteWorkspace).toHaveBeenCalledWith('ws-1')
@@ -483,14 +592,14 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
 
   it('opens the workspace editor', () => {
     const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.ws-row')[0])
+    fireEvent.contextMenu(container.querySelectorAll('.repo-header')[0])
     fireEvent.click(screen.getByText('Edit workspace'))
     expect(screen.getByTestId('edit-workspace-dialog')).toBeTruthy()
   })
 
   it('closes the create-project dialog when it asks to close', () => {
     const { container } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.ws-row__name')[1])
+    fireEvent.click(container.querySelectorAll('.repo-header__action')[0])
     fireEvent.click(screen.getByText('close-project'))
     expect(screen.queryByTestId('create-project-dialog')).toBeNull()
   })
@@ -552,39 +661,10 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
 
   it('reorders workspaces on drop', () => {
     const { container } = renderSidebar()
-    const targets = container.querySelectorAll('.unified-sidebar__ws-actions')
+    const targets = container.querySelectorAll('.repo-header')
     fireEvent.dragStart(targets[0])
     fireEvent.drop(targets[1])
     expect(mockWorkspaceStore.reorderWorkspaces).toHaveBeenCalledWith(['ws-2', 'ws-1'])
-  })
-
-  it('renames a branchless project through the store', () => {
-    // `web` sits in a folder that is not a repo, so its stored name is the only
-    // name it has and renaming it is the only way to change it.
-    const { container } = renderSidebar()
-    const headers = Array.from(container.querySelectorAll('.session-group__header'))
-    fireEvent.contextMenu(headers.find((h) => h.textContent?.includes('Web'))!)
-    fireEvent.click(screen.getByText('Rename'))
-    const input = container.querySelector('.session-group__rename-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'Web v2' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(mockWorkspaceStore.renameProject).toHaveBeenCalledWith('p3', 'Web v2')
-  })
-
-  it('offers no rename on a branch — it is named by its branch (ADR-034)', () => {
-    const { container } = renderSidebar()
-    const headers = Array.from(container.querySelectorAll('.session-group__header'))
-    fireEvent.contextMenu(headers.find((h) => h.textContent?.includes('main'))!)
-    expect(screen.queryByText('Rename')).toBeNull()
-  })
-
-  it('renames a session through the store', () => {
-    renderSidebar()
-    fireEvent.doubleClick(screen.getByText('api-shell'))
-    const input = document.querySelector('.session-row__rename-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'renamed' } })
-    fireEvent.blur(input)
-    expect(mockSessionStore.renameSession).toHaveBeenCalledWith('s1', 'renamed')
   })
 
   it('clears the search from the header control', () => {
@@ -593,9 +673,9 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
       container.querySelector('.sidebar-search input') ?? container.querySelector('input')!,
       { target: { value: 'jobs' } }
     )
-    expect(screen.queryByText('api-shell')).toBeNull()
+    expect(screen.queryByText('main')).toBeNull()
     fireEvent.click(container.querySelector('.sidebar-search__clear')!)
-    expect(screen.getByText('api-shell')).toBeTruthy()
+    expect(screen.getByText('main')).toBeTruthy()
   })
 
   it('closes the create-workspace dialog when it asks to close', () => {
@@ -603,115 +683,6 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     fireEvent.click(container.querySelector('.sidebar-header__add')!)
     fireEvent.click(screen.getByText('close-workspace'))
     expect(screen.queryByTestId('create-workspace-dialog')).toBeNull()
-  })
-
-  it('leaves the project alone when removal is cancelled', () => {
-    const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
-    fireEvent.click(screen.getByText('Remove'))
-    fireEvent.click(screen.getByText('Cancel'))
-    expect(mockWorkspaceStore.deleteProject).not.toHaveBeenCalled()
-    expect(screen.queryByText('Remove branch "main"?')).toBeNull()
-  })
-
-  it('marks a busy group with the aggregate indicator', () => {
-    mockSessionStore.isSessionBusy.mockImplementation((id: string) => id === 's3')
-    const { container } = renderSidebar()
-    // The workspace header aggregates its projects, so both it and the project
-    // group carry the indicator.
-    expect(container.querySelectorAll('.session-group__busy')).toHaveLength(2)
-    mockSessionStore.isSessionBusy.mockReturnValue(false)
-  })
-
-  it('renders a split child row as a sub-session', () => {
-    sessions.set('s5', session('s5', 'p1', { tabTitle: 'split', parentSessionId: 's1' }))
-    const { container } = renderSidebar()
-    expect(container.querySelectorAll('.session-row--sub')).toHaveLength(1)
-  })
-})
-
-describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
-  beforeEach(() => {
-    localStorage.setItem(
-      'terminator.sidebar.views',
-      JSON.stringify([
-        { id: 'by-status', name: 'By status', groupBy: 'status', sortBy: 'name', filters: {} },
-        {
-          id: 'by-workspace',
-          name: 'By workspace',
-          groupBy: 'workspace',
-          sortBy: 'name',
-          filters: {},
-        },
-        { id: 'flat', name: 'Flat', groupBy: 'none', sortBy: 'name', filters: {} },
-      ])
-    )
-  })
-
-  it('groups by workspace and keeps the workspace scope on the header', () => {
-    const { container } = renderSidebar({ initialViewId: 'by-workspace' })
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
-      el.textContent!.trim()
-    )
-    expect(labels).toEqual(['Backend', 'main', 'Jobs', 'Frontend', 'Web', 'Scratch'])
-  })
-
-  it('shows the project badge on every row once the header stops naming the project', () => {
-    renderSidebar({ initialViewId: 'by-status' })
-    const badges = Array.from(document.querySelectorAll('.session-row__project-badge')).map(
-      (el) => el.textContent
-    )
-    expect(badges.sort()).toEqual(['Jobs', 'Web', 'main', 'main'])
-  })
-
-  it('offers no project-scoped header actions when the grouping is not a scope', () => {
-    const { container } = renderSidebar({ initialViewId: 'by-status' })
-    expect(container.querySelector('.session-group__add')).toBeNull()
-  })
-
-  it('still resolves activeProjectId when selecting under status grouping (SC-010)', () => {
-    renderSidebar({ initialViewId: 'by-status' })
-    fireEvent.click(screen.getByText('web-dev'))
-    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p3')
-  })
-
-  it('collapses one group without touching the same key in another grouping mode', () => {
-    const { container, unmount } = renderSidebar({ initialViewId: 'by-status' })
-    fireEvent.click(container.querySelectorAll('.session-group__chevron')[0])
-    expect(screen.queryByText('api-shell')).toBeNull()
-    unmount()
-    renderSidebar()
-    expect(screen.getByText('api-shell')).toBeTruthy()
-  })
-
-  it('renders a single group when grouping is switched off', () => {
-    const { container } = renderSidebar({ initialViewId: 'flat' })
-    // The flat group, plus the scratch group which belongs to no grouping.
-    expect(container.querySelectorAll('.session-group')).toHaveLength(2)
-    expect(container.querySelector('.session-group__label')!.textContent).toBe('All sessions')
-  })
-
-  it('hosts the workspace extension buttons on a workspace group header', () => {
-    mockRegistryState.workspaceTabs = new Map([
-      ['speckit', { id: 'speckit', label: 'SpecKit', component: () => null }],
-    ])
-    renderSidebar({ initialViewId: 'by-workspace' })
-    expect(screen.getAllByTitle('SpecKit')).toHaveLength(2)
-  })
-
-  it('falls back to the default view when the stored view id is unknown', () => {
-    const { container } = renderSidebar({ initialViewId: 'nope' })
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
-      el.textContent!.trim()
-    )
-    expect(labels).toEqual(['Backend', 'main', 'Jobs', 'Frontend', 'Web', 'Scratch'])
-  })
-
-  it('highlights the workspace drop target during a drag', () => {
-    const { container } = renderSidebar()
-    const targets = container.querySelectorAll('.unified-sidebar__ws-actions')
-    fireEvent.dragOver(targets[1])
-    expect(container.querySelector('.ws-card--dnd-over')).toBeTruthy()
   })
 })
 
@@ -724,12 +695,12 @@ describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', 
 
   it('renders each contributed item exactly once', () => {
     renderSidebar()
-    expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
   })
 
   it('fires the item action on click', () => {
     renderSidebar()
-    fireEvent.click(screen.getByText('Git Changes'))
+    fireEvent.click(screen.getByRole('button', { name: 'Git Changes' }))
     expect(action).toHaveBeenCalledOnce()
   })
 
@@ -745,7 +716,7 @@ describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', 
         ])
       )
       renderSidebar({ initialViewId: viewId })
-      expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+      expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
     }
   )
 
@@ -756,300 +727,147 @@ describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', 
   })
 })
 
-describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
-  it('switches grouping from the view bar', () => {
+describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () => {
+  const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
+  const openFilter = () => fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
+
+  it('switches grouping from the Display menu', () => {
     const { container } = renderSidebar()
-    fireEvent.click(screen.getByText('Group: Workspace'))
-    fireEvent.click(screen.getByText('Status'))
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
+    openDisplay()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'None' }))
+    const labels = Array.from(container.querySelectorAll('.repo-header__name')).map(
       (el) => el.textContent
     )
-    expect(labels).toEqual(['Idle', 'Scratch'])
+    expect(labels).toEqual(['All branches'])
   })
 
   it('persists a grouping change for that view across a remount', () => {
     const { unmount } = renderSidebar()
-    fireEvent.click(screen.getByText('Group: Workspace'))
-    fireEvent.click(screen.getByText('Branch'))
+    openDisplay()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'None' }))
     unmount()
     const { container } = renderSidebar()
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
-      (el) => el.firstChild!.textContent
+    const labels = Array.from(container.querySelectorAll('.repo-header__name')).map(
+      (el) => el.textContent
     )
-    expect(labels).toEqual(['main', 'Jobs', 'Web', 'Scratch'])
+    expect(labels).toEqual(['All branches'])
+  })
+
+  it('switches sort from the Display menu', () => {
+    renderSidebar()
+    openDisplay()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Name' }))
+    openDisplay()
+    expect(screen.getByRole('menuitemradio', { name: 'Name' }).getAttribute('aria-checked')).toBe(
+      'true'
+    )
+  })
+
+  it('offers every grouping and sort from the one menu (FR-034)', () => {
+    renderSidebar()
+    openDisplay()
+    for (const label of ['Workspace', 'None', 'Recent', 'Oldest', 'Name', 'Status', 'Manual']) {
+      expect(screen.getByRole('menuitemradio', { name: label })).toBeTruthy()
+    }
+  })
+
+  it('offers every saved view and the stale toggle from the other (FR-034)', () => {
+    renderSidebar()
+    openFilter()
+    for (const label of ['Everything', 'Needs me', 'Active', 'Stale']) {
+      expect(screen.getByRole('menuitemradio', { name: new RegExp(label) })).toBeTruthy()
+    }
+    expect(screen.getByRole('menuitemcheckbox', { name: /Hide stale/ })).toBeTruthy()
   })
 
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
-    const { container, unmount } = renderSidebar()
-    fireEvent.click(screen.getByText('Needs me'))
-    expect(screen.queryByText('api-shell')).toBeNull()
+    const { unmount } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
+    expect(screen.queryByText('main')).toBeNull()
     unmount()
     renderSidebar()
-    expect(screen.getByText('api-shell')).toBeTruthy()
-    expect(container.querySelector('.filter-notice')).toBeNull()
+    expect(screen.getByText('main')).toBeTruthy()
   })
 
-  it('explains a filtered list with shown and total counts (FR-016)', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByText('Needs me'))
-    expect(screen.getByText('Filtered · showing 0 of 4')).toBeTruthy()
+  // FR-035. The notice band is gone: the count sits on the control that caused
+  // the filtering, which is also where the way out is.
+  it('counts what a filter is hiding on the Filter control', () => {
+    const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
+    expect(container.querySelector('.sidebar-menu__badge')!.textContent).toBe('3')
   })
 
-  it('explains a search-filtered list too', () => {
+  it('counts what a search is hiding too', () => {
     const { container } = renderSidebar()
     fireEvent.change(container.querySelector('.sidebar-search input, input')!, {
       target: { value: 'jobs' },
     })
-    expect(screen.getByText('Filtered · showing 1 of 4')).toBeTruthy()
+    expect(container.querySelector('.sidebar-menu__badge')!.textContent).toBe('2')
   })
 
-  it('shows no notice when nothing is filtered', () => {
+  it('draws no notice band at all', () => {
     const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
     expect(container.querySelector('.filter-notice')).toBeNull()
+    expect(container.querySelector('.view-bar')).toBeNull()
   })
 
-  it('restores every session in one interaction from the notice (SC-007)', () => {
+  it('shows no badge when nothing is hidden', () => {
+    const { container } = renderSidebar()
+    expect(container.querySelector('.sidebar-menu__badge')).toBeNull()
+  })
+
+  it('restores every branch in one interaction from the same control (SC-007)', () => {
+    const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitem', { name: /show all/ }))
+    expect(screen.getByText('main')).toBeTruthy()
+    expect(container.querySelector('.sidebar-menu__badge')).toBeNull()
+  })
+
+  it('disables the hide-stale toggle on the Stale view (FR-021)', () => {
     renderSidebar()
-    fireEvent.click(screen.getByText('Needs me'))
-    fireEvent.click(screen.getByText('show all'))
-    expect(screen.getByText('api-shell')).toBeTruthy()
-    expect(screen.queryByText('show all')).toBeNull()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Stale/ }))
+    openFilter()
+    expect(
+      (screen.getByRole('menuitemcheckbox', { name: /Hide stale/ }) as HTMLButtonElement).disabled
+    ).toBe(true)
   })
 
-  it('hides the hide-stale toggle on the Stale view (FR-021)', () => {
-    renderSidebar()
-    expect(screen.getByText('Hide stale')).toBeTruthy()
-    fireEvent.click(screen.getByText('Stale'))
-    expect(screen.queryByText('Hide stale')).toBeNull()
-  })
-
-  it('hides stale sessions when the toggle is turned on', () => {
-    sessions.set('old', session('old', 'p1', { tabTitle: 'ancient', lastActivityAt: 0 }))
-    renderSidebar()
-    expect(screen.getByText('ancient')).toBeTruthy()
-    fireEvent.click(screen.getByLabelText('Hide stale'))
-    expect(screen.queryByText('ancient')).toBeNull()
-  })
-})
-
-describe('UnifiedSidebar — stale cleanup (US3)', () => {
-  beforeEach(() => {
-    // Four stale sessions: three idle-and-old, one waiting on the user.
-    sessions = new Map([
-      ['a', session('a', 'p1', { tabTitle: 'old-a', lastActivityAt: 0 })],
-      ['b', session('b', 'p1', { tabTitle: 'old-b', lastActivityAt: 0 })],
-      ['c', session('c', 'p2', { tabTitle: 'old-c', lastActivityAt: 0 })],
-      [
-        'w',
-        // Expressed through the signal that produces the state, not the derived
-        // field — agentState is computed from the bell, so setting it directly
-        // would be overwritten.
-        session('w', 'p1', {
-          tabTitle: 'waiting',
-          lastActivityAt: 0,
-          bellCount: 1,
-        }),
-      ],
-    ])
-    mockSessionStore.sessions = sessions
-    mockSessionStore.closeSession = vi.fn()
-  })
-
-  const openStale = () => {
-    const r = renderSidebar()
-    fireEvent.click(screen.getByText('Stale'))
-    return r
-  }
-
-  it('lists only stale sessions, never one that is waiting on you (FR-018)', () => {
-    openStale()
-    expect(screen.getByText('old-a')).toBeTruthy()
-    expect(screen.queryByText('waiting')).toBeNull()
-  })
-
-  it('offers selection only in the Stale view', () => {
+  it('keeps at most two bands of chrome above the first row of work (FR-033)', () => {
     const { container } = renderSidebar()
-    expect(container.querySelector('.session-row__select')).toBeNull()
-    fireEvent.click(screen.getByText('Stale'))
-    expect(container.querySelector('.session-row__select')).toBeTruthy()
-  })
-
-  it('selects a range with shift-click', () => {
-    openStale()
-    fireEvent.click(screen.getByLabelText('Select old-a'))
-    fireEvent.click(screen.getByLabelText('Select old-c'), { shiftKey: true })
-    expect(screen.getByText('3 selected')).toBeTruthy()
-  })
-
-  it('selects every session in a group', () => {
-    const { container } = openStale()
-    fireEvent.click(container.querySelectorAll('.session-group__select-all')[0])
-    expect(screen.getByText('2 selected')).toBeTruthy()
-  })
-
-  it('deselects a session that is clicked twice', () => {
-    openStale()
-    fireEvent.click(screen.getByLabelText('Select old-a'))
-    fireEvent.click(screen.getByLabelText('Select old-a'))
-    expect(screen.queryByText(/selected/)).toBeNull()
-  })
-
-  it('clears the selection', () => {
-    openStale()
-    fireEvent.click(screen.getByLabelText('Select old-a'))
-    fireEvent.click(screen.getByText('Clear'))
-    expect(screen.queryByText(/selected/)).toBeNull()
-  })
-
-  it('closes exactly the selected sessions (SC-005)', () => {
-    openStale()
-    fireEvent.click(screen.getByLabelText('Select old-a'))
-    fireEvent.click(screen.getByLabelText('Select old-c'), { shiftKey: true })
-    fireEvent.click(screen.getByText('Close selected'))
-    fireEvent.click(screen.getByText('Close sessions'))
-    expect(mockSessionStore.closeSession.mock.calls.map((c) => c[0]).sort()).toEqual([
-      'a',
-      'b',
-      'c',
-    ])
-  })
-
-  it('removes a worktree-backed project through the existing delete path', () => {
-    mockWorkspaceStore.projectsByWorkspaceId = new Map([
-      ['ws-1', [api, { ...jobs, worktreePath: '/repo/.worktrees/jobs' }]],
-      ['ws-2', [web]],
-    ])
-    openStale()
-    fireEvent.click(screen.getByLabelText('Select old-c'))
-    fireEvent.click(screen.getByText('Close selected'))
-    expect(screen.getByText('/repo/.worktrees/jobs')).toBeTruthy()
-    fireEvent.click(screen.getByText('Close sessions'))
-    expect(mockWorkspaceStore.deleteProject).toHaveBeenCalledWith('p2')
-    mockWorkspaceStore.projectsByWorkspaceId = new Map([
-      ['ws-1', [api, jobs]],
-      ['ws-2', [web]],
-    ])
-  })
-
-  it('reflects a changed staleness threshold without a restart (FR-019)', () => {
-    sessions.set('recent', session('recent', 'p1', { tabTitle: 'recent', lastActivityAt: NOW }))
-    // Two hours is the default, so a session active a minute ago is not stale.
-    const { unmount } = renderSidebar({ now: NOW + 60_000 })
-    fireEvent.click(screen.getByText('Stale'))
-    expect(screen.queryByText('recent')).toBeNull()
-    unmount()
-
-    staleAfterMs = 30_000
-    renderSidebar({ now: NOW + 60_000 })
-    fireEvent.click(screen.getByText('Stale'))
-    expect(screen.getByText('recent')).toBeTruthy()
-    staleAfterMs = 2 * 60 * 60 * 1000
-  })
-})
-
-describe('UnifiedSidebar — session notes (FR-005)', () => {
-  beforeEach(() => {
-    mockSessionStore.setSessionNote = vi.fn()
-  })
-
-  it('opens the note editor for the session the host names (Cmd+I)', () => {
-    const { container } = renderSidebar({ editNoteSessionId: 's1' })
-    expect(container.querySelector('.session-row__note-input')).toBeTruthy()
-  })
-
-  it('saves the note on Enter', () => {
-    const { container } = renderSidebar({ editNoteSessionId: 's1' })
-    const input = container.querySelector('.session-row__note-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'waiting on review' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(mockSessionStore.setSessionNote).toHaveBeenCalledWith('s1', 'waiting on review')
-  })
-
-  it('saves the note on blur', () => {
-    const { container } = renderSidebar({ editNoteSessionId: 's1' })
-    const input = container.querySelector('.session-row__note-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'blurred' } })
-    fireEvent.blur(input)
-    expect(mockSessionStore.setSessionNote).toHaveBeenCalledWith('s1', 'blurred')
-  })
-
-  it('abandons the edit on Escape', () => {
-    const { container } = renderSidebar({ editNoteSessionId: 's1' })
-    fireEvent.keyDown(container.querySelector('.session-row__note-input')!, { key: 'Escape' })
-    expect(mockSessionStore.setSessionNote).not.toHaveBeenCalled()
-    expect(container.querySelector('.session-row__note-input')).toBeNull()
-  })
-
-  it('shows an existing note on the row', () => {
-    sessions.set('s1', session('s1', 'p1', { tabTitle: 'api-shell', note: 'blocked on infra' }))
-    renderSidebar()
-    expect(screen.getByText('blocked on infra')).toBeTruthy()
-  })
-
-  it('matches a note in search (FR-031)', () => {
-    sessions.set('s1', session('s1', 'p1', { tabTitle: 'api-shell', note: 'blocked on infra' }))
-    const { container } = renderSidebar()
-    fireEvent.change(container.querySelector('input')!, { target: { value: 'infra' } })
-    expect(screen.getByText('api-shell')).toBeTruthy()
-    expect(screen.queryByText('web-dev')).toBeNull()
-  })
-
-  it('shows no note element when the session has none', () => {
-    const { container } = renderSidebar()
-    expect(container.querySelector('.session-row__note')).toBeNull()
-  })
-})
-
-describe('UnifiedSidebar — workspace grouping keeps the project layer (default view)', () => {
-  it('nests each project under its workspace', () => {
-    const { container } = renderSidebar()
-    const labels = Array.from(container.querySelectorAll('.session-group__label')).map((el) =>
-      el.textContent!.trim()
-    )
-    expect(labels).toEqual(['Backend', 'main', 'Jobs', 'Frontend', 'Web', 'Scratch'])
-  })
-
-  it('starts a terminal on a nested project without changing the grouping', () => {
-    const { container } = renderSidebar()
-    const jobs = Array.from(container.querySelectorAll('.session-group--nested')).find((el) =>
-      el.querySelector('.session-group__label')!.textContent!.startsWith('Jobs')
-    )!
-    fireEvent.click(jobs.querySelector('.session-group__add')!)
-    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p2')
-    expect(mockCreateSession).toHaveBeenCalled()
-  })
-
-  it('names no workspace on a nested project — its header already says it', () => {
-    const { container } = renderSidebar()
-    expect(container.querySelector('.session-group__workspace')).toBeNull()
-  })
-
-  it('names the workspace on every project header under project grouping', () => {
-    localStorage.setItem(
-      'terminator.sidebar.views',
-      JSON.stringify([
-        { id: 'by-project', name: 'P', groupBy: 'project', sortBy: 'name', filters: {} },
-      ])
-    )
-    const { container } = renderSidebar({ initialViewId: 'by-project' })
-    const names = Array.from(container.querySelectorAll('.session-group__workspace')).map(
-      (el) => el.textContent
-    )
-    expect(names).toEqual(['Backend', 'Backend', 'Frontend'])
+    const header = container.querySelector('.sidebar-header')!
+    expect(header.children).toHaveLength(2)
+    expect(container.querySelector('.app-band')).toBeTruthy()
+    expect(container.querySelector('.sidebar-header__search-row')).toBeTruthy()
   })
 })
 
 describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes', () => {
   it('treats a session with an unread bell as awaiting input', () => {
-    sessions.set('s6', session('s6', 'p1', { tabTitle: 'claude', bellCount: 2 }))
-    renderSidebar({ initialViewId: 'needs-me' })
-    expect(screen.getByText('claude')).toBeTruthy()
+    sessions = new Map([['s6', session('s6', 'p1', { tabTitle: 'claude', bellCount: 2 })]])
+    mockSessionStore.sessions = sessions
+    const { container } = renderSidebar({ initialViewId: 'needs-me' })
+    const names = Array.from(container.querySelectorAll('.branch-row__name')).map(
+      (n) => n.textContent
+    )
+    expect(names).toEqual(['main'])
   })
 
   it('treats a session producing output as working', () => {
-    sessions.set('s7', session('s7', 'p1', { tabTitle: 'build', busy: true }))
-    renderSidebar({ initialViewId: 'active' })
-    expect(screen.getByText('build')).toBeTruthy()
+    sessions = new Map([['s7', session('s7', 'p1', { tabTitle: 'build', busy: true })]])
+    mockSessionStore.sessions = sessions
+    const { container } = renderSidebar({ initialViewId: 'active' })
+    const names = Array.from(container.querySelectorAll('.branch-row__name')).map(
+      (n) => n.textContent
+    )
+    expect(names).toEqual(['main'])
   })
 
   it('leaves a quiet session idle, so it appears in neither', () => {
@@ -1066,60 +884,9 @@ describe('UnifiedSidebar — agent state is derived, not read from a field nobod
     sessions.clear()
     sessions.set('s9', session('s9', 'p1', { tabTitle: 'gone', status: 'closed' }))
     const { container } = renderSidebar()
-    expect(container.querySelector('.session-row__status svg')!.getAttribute('data-state')).toBe(
+    expect(container.querySelector('.branch-row__gutter svg')!.getAttribute('data-state')).toBe(
       'exited'
     )
-  })
-})
-
-describe('UnifiedSidebar — one name identifies one thing (US3)', () => {
-  it('qualifies every new-terminal command with its repo, so six mains are six commands', () => {
-    // Every repo's default branch is called main; the palette used to list six
-    // identical "New terminal in main" rows.
-    const repos = ['ws-1', 'ws-2', 'ws-3', 'ws-4', 'ws-5', 'ws-6']
-    mockWorkspaceStore.workspaces = repos.map((id, i) => ({
-      ...ws1,
-      id,
-      name: `Repo ${i + 1}`,
-    }))
-    mockWorkspaceStore.projectsByWorkspaceId = new Map(
-      repos.map((id, i) => [
-        id,
-        [{ ...api, id: `p-${i}`, workspaceId: id, name: 'main', gitBranch: 'main' }],
-      ])
-    )
-    renderSidebar()
-
-    const labels = mockRegistryState.registerCommand.mock.calls
-      .map(([cmd]) => (cmd as { label: string }).label)
-      .filter((l) => l.toLowerCase().includes('terminal'))
-
-    // Registration may run more than once per render pass; what matters is
-    // that the six repos yield six *distinct* labels (SC-002).
-    expect(new Set(labels).size).toBe(6)
-
-    mockWorkspaceStore.workspaces = [ws1, ws2]
-  })
-
-  it('says branch, never project, in the commands it registers', () => {
-    renderSidebar()
-    for (const [cmd] of mockRegistryState.registerCommand.mock.calls) {
-      expect((cmd as { label: string }).label.toLowerCase()).not.toContain('project')
-    }
-  })
-
-  it('offers a new branch, not a new project, under each repo', () => {
-    const { container } = renderSidebar()
-    const text = container.textContent ?? ''
-    expect(text).toContain('New branch in')
-    expect(text.toLowerCase()).not.toContain('new project')
-  })
-
-  it('names the branch, not the project, when confirming removal', () => {
-    const { container } = renderSidebar()
-    fireEvent.contextMenu(container.querySelectorAll('.session-group__header')[1])
-    fireEvent.click(screen.getByText('Remove'))
-    expect(screen.getByText(/Remove branch "main"\?/)).toBeTruthy()
   })
 })
 
@@ -1138,22 +905,8 @@ describe('UnifiedSidebar — app surfaces have one home, scratch has a group (US
     const { container } = renderSidebar()
     expect(container.querySelector('.extension-footer')).toBeNull()
     expect(container.querySelector('.app-band')).toBeTruthy()
-    expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
     mockRegistryState.sidebarButtons = []
-  })
-
-  it('renders scratch sessions as a group with a count, not a pinned footer', () => {
-    sessions.set(
-      'sc1',
-      session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })
-    )
-    const { container } = renderSidebar()
-    expect(container.querySelector('.scratch-section')).toBeNull()
-    const labels = [...container.querySelectorAll('.session-group__label')].map((el) =>
-      el.textContent!.trim()
-    )
-    expect(labels).toContain('Scratch')
-    expect(screen.getByText('notes')).toBeTruthy()
   })
 
   it('offers a way to start a scratch terminal from that group', () => {
@@ -1166,30 +919,237 @@ describe('UnifiedSidebar — app surfaces have one home, scratch has a group (US
   })
 })
 
-describe('UnifiedSidebar — scratch group behaviour retired from ScratchSection', () => {
+describe('UnifiedSidebar — issue actions on a branch header', () => {
+  // These reach openLinkedIssue and copyIssueKey, which the header context menu
+  // and ScopeMenu both call through issueActionsFor. Nothing exercised them
+  // before, which is what held the file's function coverage under the 80% gate.
+  const link = {
+    projectId: 'p1',
+    tracker: 'linear' as const,
+    key: 'TAV-14',
+    injectContext: false,
+    linkedAt: '',
+  }
+
+  function openBranchMenu(): void {
+    const { container } = renderSidebar()
+    const rows = Array.from(container.querySelectorAll('.branch-row'))
+    fireEvent.contextMenu(
+      rows.find((r) => r.querySelector('.branch-row__name')?.textContent === 'main')!
+    )
+  }
+
   beforeEach(() => {
-    sessions.set(
-      'sc1',
-      session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })
+    mockIntegrationsStore.linkFor.mockImplementation((id: string) => (id === 'p1' ? link : null))
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { shell: { openExternal: vi.fn() } },
+    })
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn() },
+    })
+  })
+
+  it('opens the linked issue in the tracker', () => {
+    mockIntegrationsStore.issueFor.mockReturnValue({ url: 'https://linear.app/x/TAV-14' })
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Open TAV-14 in tracker'))
+    expect(window.electronAPI.shell.openExternal).toHaveBeenCalledWith(
+      'https://linear.app/x/TAV-14'
     )
   })
 
-  it('selects a scratch session when its row is clicked', () => {
-    const onSelectScratchSession = vi.fn()
-    renderSidebar({ onSelectScratchSession })
-    fireEvent.click(screen.getByText('notes'))
-    expect(onSelectScratchSession).toHaveBeenCalledWith('sc1')
+  it('opens nothing when the issue could not be read', () => {
+    // The link is stored but the tracker never answered, so there is no url to
+    // open. Failing quietly beats opening `undefined` in a browser.
+    mockIntegrationsStore.issueFor.mockReturnValue(null)
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Open TAV-14 in tracker'))
+    expect(window.electronAPI.shell.openExternal).not.toHaveBeenCalled()
   })
 
-  it('marks the active scratch session', () => {
-    const { container } = renderSidebar({ activeScratchSessionId: 'sc1' })
-    const scratch = container.querySelector('.unified-sidebar__scratch')!
-    expect(scratch.querySelector('.session-row--active')).toBeTruthy()
+  it('copies the issue key', () => {
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Copy issue key'))
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('TAV-14')
   })
 
-  it('counts the scratch sessions on the group header', () => {
+  it('copies nothing when the branch has no link', () => {
+    mockIntegrationsStore.linkFor.mockReturnValue(null)
     const { container } = renderSidebar()
-    const scratch = container.querySelector('.unified-sidebar__scratch')!
-    expect(scratch.querySelector('.session-group__count')!.textContent).toBe('1')
+    const rows = Array.from(container.querySelectorAll('.branch-row'))
+    fireEvent.contextMenu(
+      rows.find((r) => r.querySelector('.branch-row__name')?.textContent === 'main')!
+    )
+    expect(screen.queryByText('Copy issue key')).toBeNull()
+  })
+
+  it('reaches the link dialog from "Change linked issue…"', () => {
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Change linked issue…'))
+    expect(mockIntegrationsStore.openLinkDialog).toHaveBeenCalledWith('p1')
+  })
+
+  it('unlinks the issue through the store', () => {
+    openBranchMenu()
+    fireEvent.click(screen.getByText('Unlink TAV-14'))
+    expect(mockIntegrationsStore.unlinkIssue).toHaveBeenCalledWith('p1')
+  })
+})
+
+describe('UnifiedSidebar — opening a branch in the editor', () => {
+  const openEditor = vi.fn()
+
+  beforeEach(() => {
+    openEditor.mockClear()
+    // The real channel always answers with a promise. A bare `vi.fn()` returns
+    // undefined, which is not the contract — and it is what let a `.then` on
+    // undefined reach CI as an unhandled error while every test still passed.
+    openEditor.mockResolvedValue({ ok: true, editor: 'Cursor' })
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        editor: {
+          detect: vi.fn().mockResolvedValue({ editor: { id: 'cursor', name: 'Cursor' } }),
+          open: openEditor,
+        },
+        shell: { openExternal: vi.fn() },
+      },
+    })
+  })
+
+  const openRowMenu = (container: HTMLElement, name: string) => {
+    const row = Array.from(container.querySelectorAll('.branch-row')).find(
+      (r) => r.querySelector('.branch-row__name')?.textContent === name
+    )!
+    fireEvent.contextMenu(row)
+  }
+
+  it("opens a branch's own working copy when it has one", async () => {
+    // `jobs` is a worktree, so its own directory is the one to open.
+    const { container } = renderSidebar()
+    await act(async () => {})
+    openRowMenu(container, 'Jobs')
+    fireEvent.click(screen.getByText(/Open in/))
+    expect(openEditor).toHaveBeenCalledWith('/wt/jobs')
+  })
+
+  it('falls back to the repo folder for a plain checkout', async () => {
+    const { container } = renderSidebar()
+    await act(async () => {})
+    openRowMenu(container, 'main')
+    fireEvent.click(screen.getByText(/Open in/))
+    expect(openEditor).toHaveBeenCalledWith('/b')
+  })
+
+  it('opens the repo folder from the repo header', async () => {
+    const { container } = renderSidebar()
+    await act(async () => {})
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    fireEvent.click(screen.getByText(/Open in/))
+    expect(openEditor).toHaveBeenCalledWith('/b')
+  })
+
+  it('names the detected editor in the menu', async () => {
+    const { container } = renderSidebar()
+    await act(async () => {})
+    openRowMenu(container, 'main')
+    expect(screen.getByText('Open in Cursor')).toBeTruthy()
+  })
+})
+
+describe('UnifiedSidebar — opening in the editor reports back', () => {
+  // The first version discarded the result, so a failure looked exactly like
+  // the action not being wired up: nothing at all on screen.
+  const addToast = vi.fn()
+  const openEditor = vi.fn()
+
+  beforeEach(() => {
+    addToast.mockClear()
+    openEditor.mockClear()
+    useToastStore.setState({ addToast } as never)
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+        shell: { openExternal: vi.fn() },
+      },
+    })
+  })
+
+  const openMenuAndClick = async (container: HTMLElement) => {
+    await act(async () => {})
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText(/Open in/))
+    await act(async () => {})
+  }
+
+  it('says nothing when it worked', async () => {
+    openEditor.mockResolvedValue({ ok: true, editor: 'Cursor' })
+    const { container } = renderSidebar()
+    await openMenuAndClick(container)
+    expect(addToast).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['FOLDER_NOT_FOUND', /no longer on disk/i],
+    ['NO_EDITOR_FOUND', /no supported editor/i],
+    ['VALIDATION_ERROR', /could not be opened/i],
+  ])('explains %s in the user own terms', async (error, expected) => {
+    openEditor.mockResolvedValue({ error })
+    const { container } = renderSidebar()
+    await openMenuAndClick(container)
+    expect(addToast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error', message: expect.stringMatching(expected) })
+    )
+  })
+
+  it('passes an unrecognised failure through rather than swallowing it', async () => {
+    openEditor.mockResolvedValue({ error: 'EACCES' })
+    const { container } = renderSidebar()
+    await openMenuAndClick(container)
+    expect(addToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('EACCES') })
+    )
+  })
+
+  it('survives the call rejecting outright', async () => {
+    openEditor.mockRejectedValue(new Error('bridge gone'))
+    const { container } = renderSidebar()
+    await openMenuAndClick(container)
+    expect(addToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringMatching(/could not open/i) })
+    )
+  })
+})
+
+describe('UnifiedSidebar — where there is no editor API at all', () => {
+  // The browser remote omits the editor channels entirely. Optional chaining
+  // stops at the call, so a bare `.then` on the undefined it returns throws —
+  // which is what CI caught and the local suite did not, because every local
+  // mock happened to supply `open`.
+  beforeEach(() => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        shell: { openExternal: vi.fn() },
+      },
+    })
+  })
+
+  it('renders without an editor API present', async () => {
+    expect(() => renderSidebar()).not.toThrow()
+    await act(async () => {})
+  })
+
+  it('does not throw when the action is invoked anyway', async () => {
+    const { container } = renderSidebar()
+    await act(async () => {})
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    expect(() => fireEvent.click(screen.getByText(/Open in/))).not.toThrow()
   })
 })

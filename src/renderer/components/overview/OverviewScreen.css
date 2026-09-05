@@ -4,12 +4,54 @@
   height: 100%;
   background: var(--bg-base);
   overflow: hidden;
+  container-type: inline-size;
 }
 
+/* One row of chrome, holding the layout choice and nothing else. */
+.overview-screen__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.overview-screen__layouts {
+  display: flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.overview-screen__layout {
+  display: grid;
+  place-items: center;
+  padding: 4px 9px;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+}
+
+.overview-screen__layout + .overview-screen__layout {
+  border-left: 1px solid var(--border-strong);
+}
+
+.overview-screen__layout svg {
+  width: 13px;
+  height: 13px;
+}
+
+.overview-screen__layout[aria-pressed='true'] {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+/* The flat arrangement this screen used to be, kept as the other layout. */
 .overview-screen__grid {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
   padding: 16px;
   overflow-y: auto;
