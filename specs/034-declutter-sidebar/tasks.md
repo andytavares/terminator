@@ -246,9 +246,9 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 - [x] T096 [P] Update `docs/user-guide/USER-GUIDE.md` for the branch list, the board, and the tab-bar state glyphs
 - [x] T097 [P] Update `README.md` where it describes the sidebar
 - [x] T098 Run the Principle II isolation check: grep `src/` for any import, type, string or conditional naming a specific extension; confirm core still builds with any extension directory deleted (`contracts/extension-api-invariants.md`)
-- [ ] T099 Run the full gate in order from the worktree: `npm run format`, then `npm run lint` at 0 errors, then `npx vitest run --coverage` with all four metrics ≥80%, then `npx playwright test`
-- [ ] T100 Walk every scenario in `specs/034-declutter-sidebar/quickstart.md` against the running app, including the preview-survival check and the chrome measurement
-- [ ] T101 Write the PR body from the deletion list in `specs/034-declutter-sidebar/data-model.md` §6, naming every removal — bulk close and stale multi-select above all — as FR-025 requires
+- [x] T099 Run the full gate in order from the worktree: `npm run format`, then `npm run lint` at 0 errors, then `npx vitest run --coverage` with all four metrics ≥80%, then `npx playwright test`
+- [x] T100 Walk every scenario in `specs/034-declutter-sidebar/quickstart.md` against the running app, including the preview-survival check and the chrome measurement
+- [x] T101 Write the PR body from the deletion list in `specs/034-declutter-sidebar/data-model.md` §6, naming every removal — bulk close and stale multi-select above all — as FR-025 requires
 
 ---
 

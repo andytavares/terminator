@@ -33,7 +33,11 @@
 /* ── The live preview ──────────────────────────────────────── */
 
 .session-tile__thumb {
-  height: 84px;
+  /* mountPreview scales to fit both axes, so a short box makes the preview
+     height-constrained and it renders narrow with dead space beside it. 104px
+     lets a standard 80x24 terminal fill the card's width, which is the whole
+     reason a card beats a row. */
+  height: 104px;
   background: var(--bg-base);
   overflow: hidden;
   position: relative;
