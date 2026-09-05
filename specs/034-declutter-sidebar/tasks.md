@@ -158,19 +158,19 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 ### Tests for User Story 4 (write first, confirm they fail)
 
-- [ ] T055 [P] [US4] Write failing spec `tests/unit/renderer/components/row-anatomy.spec.tsx` asserting no branch row renders more than six elements at rest and no repo header more than three (FR-026, FR-027)
-- [ ] T056 [P] [US4] Write failing spec in `tests/unit/renderer/components/row-anatomy.spec.tsx` asserting hover controls occupy reserved space so no resting element changes position (FR-031)
+- [x] T055 [P] [US4] Write failing spec `tests/unit/renderer/components/row-anatomy.spec.tsx` asserting no branch row renders more than six elements at rest and no repo header more than three (FR-026, FR-027)
+- [x] T056 [P] [US4] Write failing spec in `tests/unit/renderer/components/row-anatomy.spec.tsx` asserting hover controls occupy reserved space so no resting element changes position (FR-031)
 
 ### Implementation for User Story 4
 
-- [ ] T057 [US4] Swap the type roles in `src/renderer/components/sidebar/SessionGroup.css`: branch name to `var(--font-mono)`, repo name to `var(--font-ui)` (research.md R-009)
-- [ ] T058 [US4] Mark only the plain checkout with the kind glyph and delete the "worktree" tag chip from `src/renderer/components/sidebar/SessionGroup.tsx` and `.css` (FR-028)
-- [ ] T059 [US4] Render a linked issue key as plain mono text in `src/renderer/components/integrations/IssueBadge.tsx` — no border, no background, no state dot (FR-029)
-- [ ] T060 [US4] Move the repo folder path to a `title` on the repo header in `src/renderer/components/sidebar/SessionGroup.tsx`; never drawn at rest (FR-030)
-- [ ] T061 [US4] Delete the repo-name qualifier and the busy dot from `src/renderer/components/sidebar/SessionGroup.tsx` — both duplicate something already on screen
-- [ ] T062 [US4] Render the state-aware count (terminals in the row's state, only when >1) in `src/renderer/components/sidebar/SessionGroup.tsx` (FR-003 as amended)
-- [ ] T063 [US4] Reserve hover-control space in `src/renderer/components/sidebar/SessionGroup.css` so revealing them shifts nothing (FR-031, T056)
-- [ ] T064 [US4] Re-derive the `@container sidebar` breakpoints in `src/renderer/components/sidebar/SessionGroup.css` for the new anatomy, guaranteeing a row never drops its branch name or state glyph (FR-049, research.md R-008)
+- [x] T057 [US4] Swap the type roles in `src/renderer/components/sidebar/SessionGroup.css`: branch name to `var(--font-mono)`, repo name to `var(--font-ui)` (research.md R-009)
+- [x] T058 [US4] Mark only the plain checkout with the kind glyph and delete the "worktree" tag chip from `src/renderer/components/sidebar/SessionGroup.tsx` and `.css` (FR-028)
+- [x] T059 [US4] Render a linked issue key as plain mono text in `src/renderer/components/integrations/IssueBadge.tsx` — no border, no background, no state dot (FR-029)
+- [x] T060 [US4] Move the repo folder path to a `title` on the repo header in `src/renderer/components/sidebar/SessionGroup.tsx`; never drawn at rest (FR-030)
+- [x] T061 [US4] Delete the repo-name qualifier and the busy dot from `src/renderer/components/sidebar/SessionGroup.tsx` — both duplicate something already on screen
+- [x] T062 [US4] Render the state-aware count (terminals in the row's state, only when >1) in `src/renderer/components/sidebar/SessionGroup.tsx` (FR-003 as amended)
+- [x] T063 [US4] Reserve hover-control space in `src/renderer/components/sidebar/SessionGroup.css` so revealing them shifts nothing (FR-031, T056)
+- [x] T064 [US4] Re-derive the `@container sidebar` breakpoints in `src/renderer/components/sidebar/SessionGroup.css` for the new anatomy, guaranteeing a row never drops its branch name or state glyph (FR-049, research.md R-008)
 - [ ] T065 [US4] Confirm change statistics still render from `change-stats.store` without delaying first paint, in `tests/unit/renderer/components/SessionGroup.spec.tsx` (FR-032, ADR-031)
 
 **Checkpoint**: Every row is countable and nothing moves under the cursor.
@@ -224,7 +224,7 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 - [x] T083 [US6] Make hover and selection neutral `--bg-elevated` / `--bg-card-hover` in `src/renderer/components/sidebar/SessionGroup.css`, identical for every repo (FR-042)
 - [x] T084 [US6] Draw the repo name in `--text-primary` with a 7px colour swatch in `src/renderer/components/sidebar/SessionGroup.tsx` and `.css`, fixing the light-theme contrast failure measured at 1.08 : 1 (FR-043, research.md R-010)
 - [x] T085 [US6] Ensure a row or card with no repo draws no rail and is otherwise laid out identically, in `src/renderer/components/sidebar/SessionGroup.css` and `src/renderer/components/overview/SessionTile.css` (FR-045)
-- [ ] T086 [US6] Verify all ten preset colours meet AA in both themes by rendering, and record the measured ratios in `tests/unit/renderer/sidebar-workspace-tint.spec.ts` (FR-044, SC-015)
+- [x] T086 [US6] Verify all ten preset colours meet AA in both themes by rendering, and record the measured ratios in `tests/unit/renderer/sidebar-workspace-tint.spec.ts` (FR-044, SC-015)
 
 **Checkpoint**: Colour means "which repo" and nothing else, and a pre-existing AA failure is fixed.
 

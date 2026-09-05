@@ -25,7 +25,6 @@ import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
 import { FilterNotice } from './FilterNotice'
-import { ScopeMenu } from './ScopeMenu'
 import { LinkIssueDialog } from '../integrations/LinkIssueDialog'
 import { IssueDrawer } from '../integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../stores/integrations.store'
@@ -160,11 +159,6 @@ export function UnifiedSidebar({
     closeDrawer,
   } = useIntegrationsStore()
 
-  const [scopeMenu, setScopeMenu] = useState<{
-    x: number
-    y: number
-    projectId: string
-  } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [collapseState, setCollapseState] = useState(loadCollapseState)
   const sidebarRef = useRef<HTMLDivElement>(null)
@@ -427,7 +421,7 @@ export function UnifiedSidebar({
     for (const project of allProjects) void loadLink(project.id)
   }, [allProjects, loadLink])
 
-  /** One definition, handed to both the group header's menu and ScopeMenu. */
+  /** One definition, handed to the branch row's menu. */
   function issueActionsFor(projectId: string) {
     return {
       issueKey: issueLinkFor(projectId)?.key ?? null,
@@ -668,27 +662,6 @@ export function UnifiedSidebar({
           onDoubleClick={handleResizeDblClick}
         />
       </div>
-
-      {scopeMenu &&
-        (() => {
-          const project = projectById.get(scopeMenu.projectId)
-          if (!project) return null
-          return (
-            <ScopeMenu
-              x={scopeMenu.x}
-              y={scopeMenu.y}
-              projectName={branchLabel(project)}
-              issueActions={issueActionsFor(project.id)}
-              workspaceTabs={workspaceTabList}
-              onSelectWorkspaceTab={(tabId) => onSelectWorkspaceTab(project.workspaceId, tabId)}
-              onAddSession={() => addSessionToProject(project.id)}
-              onRemoveProject={() =>
-                setConfirmDeleteProject({ id: project.id, name: branchLabel(project) })
-              }
-              onDismiss={() => setScopeMenu(null)}
-            />
-          )
-        })()}
 
       {linkDialogProjectId !== null &&
         (() => {
