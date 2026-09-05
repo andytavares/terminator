@@ -1,0 +1,33 @@
+extensions/git-integration/src/components/GitSidebarPanel.tsx
+  s_8aa585ff1f786f::t_e7f1f481bd8ee6 32-36,44
+extensions/notepad/src/components/NotepadView.tsx
+  s_8aa585ff1f786f::t_0244422643f993 500-504
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_8aa585ff1f786f::t_89f4337d931301 328-331,460-462
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_8aa585ff1f786f::t_30d9d3fe97416e 127-137,144-159,163-164
+extensions/task-vault/src/components/DailyLog.tsx
+  s_8aa585ff1f786f::t_0244422643f993 168-171
+extensions/git-integration/src/index.ts
+  s_8aa585ff1f786f::t_e7f1f481bd8ee6 79-92
+extensions/notepad/src/components/NoteList.tsx
+  s_8aa585ff1f786f::t_e7f1f481bd8ee6 11
+specs/036-extension-ux-remediation/tasks.md
+  s_8aa585ff1f786f::t_151f85af65d01c 103-105,109-117,122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "71554a317ab28459b99690471e0779070dca4ddb",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
