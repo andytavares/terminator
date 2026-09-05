@@ -1,0 +1,38 @@
+src/renderer/components/sidebar/SidebarHeader.css
+  s_f99ce66da147a0::t_f939c0d66c2cf1 37-41,44,46-47,51,59-64
+docs/ARCHITECTURE.md
+  s_f99ce66da147a0::t_7edf258604ed02 506,512-535,538,540,542,555,557,559,561,563,565,567,569,571,573,575,581,585
+  s_f99ce66da147a0::t_39b572d58936aa 544-553,577
+specs/034-declutter-sidebar/tasks.md
+  s_f99ce66da147a0::t_3ef56415e0fa9e 238-248
+docs/adr/035-the-sidebar-stops-at-the-branch.md
+  s_f99ce66da147a0::t_39b572d58936aa 26,40
+  s_f99ce66da147a0::t_7ef7ed4bf5693d 1-25,27-39,41-50
+docs/adr/036-the-board-is-one-grid.md
+  s_f99ce66da147a0::t_4421e6d568e2ba 1-60
+docs/adr/037-repo-colour-is-one-rail.md
+  s_f99ce66da147a0::t_e1c93ca0131ca4 1-12,15,21-25,27-29,32-52,54-61
+  s_f99ce66da147a0::t_39b572d58936aa 13-14,16-20,26,30-31,53
+README.md
+  s_f99ce66da147a0::t_39b572d58936aa 8,17,28,30
+docs/user-guide/USER-GUIDE.md
+  s_f99ce66da147a0::t_39b572d58936aa 70-72,74
+  s_f99ce66da147a0::t_851ca4f44d4288 73,89,97,99-103,247
+  s_f99ce66da147a0::t_a56330ad42e1ca 248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "9744c98f145771d6266cb1036f1ae789a78c5d59",
+  "prompts": {},
+  "sessions": {
+    "s_f99ce66da147a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bedd0c8-eeb0-4be7-841a-5f499713ccb3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
