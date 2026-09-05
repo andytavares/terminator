@@ -6,6 +6,7 @@ import { useExtensionRegistry } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { useSettingsStore } from '../../stores/settings.store'
+import { useToastStore } from '../../stores/toast.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { buildBranchRows, type BranchRow as BranchRowData } from '../../sidebar/branch-rows'
 import { BellAndBusySource } from '../../sidebar/agent-state'
@@ -60,6 +61,13 @@ const SIDEBAR_WIDTH_KEY = 'terminator.sidebar.width'
 const DEFAULT_WIDTH = 300
 const MIN_WIDTH = 200
 const MAX_WIDTH = 480
+/** What each failure means, said in the user's terms rather than the code's. */
+const EDITOR_ERRORS: Record<string, string> = {
+  FOLDER_NOT_FOUND: 'That folder is no longer on disk.',
+  NO_EDITOR_FOUND: 'No supported editor found. Install one, or set ui.editor in settings.',
+  VALIDATION_ERROR: 'That folder could not be opened.',
+}
+
 const DEFAULT_STALE_AFTER_MS = 2 * 60 * 60 * 1000
 
 function readStoredWidth(): number {
@@ -240,9 +248,25 @@ export function UnifiedSidebar({
     return project.worktreePath ?? workspaceById.get(project.workspaceId)?.folderPath
   }
 
+  /**
+   * Opening reports back. The first version discarded the result, so a folder
+   * that had moved, or a machine with no editor, produced exactly nothing on
+   * screen — indistinguishable from the action not being wired up at all.
+   */
   function openInEditor(folderPath: string | undefined): void {
-    if (folderPath === undefined) return
-    void window.electronAPI?.editor?.open?.(folderPath)
+    const say = (message: string): void =>
+      useToastStore.getState().addToast({ type: 'error', message })
+
+    if (folderPath === undefined) {
+      say('That branch has no folder on disk yet.')
+      return
+    }
+    void window.electronAPI?.editor
+      ?.open?.(folderPath)
+      .then((result) => {
+        if ('error' in result) say(EDITOR_ERRORS[result.error] ?? `Could not open: ${result.error}`)
+      })
+      .catch(() => say('Could not open that folder in your editor.'))
   }
 
   // Coming back to the window is the cheapest moment to notice that the working

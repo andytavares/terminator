@@ -64,10 +64,17 @@ describe('detectEditor', () => {
 })
 
 describe('openInEditor', () => {
-  it('launches the CLI with the folder as a single argument', async () => {
+  // On macOS the app is opened rather than the CLI run, so the editor comes to
+  // the front. The CLI hands the folder to a running instance and leaves it
+  // where it was, which is what made this look like it did nothing.
+  it('opens and raises the application', async () => {
     present('/repos/app', '/usr/local/bin/cursor')
     const result = await openInEditor('/repos/app')
-    expect(execFile).toHaveBeenCalledWith('cursor', ['/repos/app'], expect.any(Function))
+    expect(execFile).toHaveBeenCalledWith(
+      'open',
+      ['-a', 'Cursor', '/repos/app'],
+      expect.any(Function)
+    )
     expect(result).toEqual({ ok: true, editor: 'Cursor' })
   })
 
@@ -87,14 +94,14 @@ describe('openInEditor', () => {
     const nasty = '/repos/app; rm -rf ~'
     present(nasty, '/usr/local/bin/cursor')
     await openInEditor(nasty)
-    expect(execFile).toHaveBeenCalledWith('cursor', [nasty], expect.any(Function))
+    expect(execFile).toHaveBeenCalledWith('open', ['-a', 'Cursor', nasty], expect.any(Function))
   })
 
   it('keeps a path with spaces intact', async () => {
     const spaced = '/Users/me/my repos/app'
     present(spaced, '/usr/local/bin/cursor')
     await openInEditor(spaced)
-    expect(execFile).toHaveBeenCalledWith('cursor', [spaced], expect.any(Function))
+    expect(execFile).toHaveBeenCalledWith('open', ['-a', 'Cursor', spaced], expect.any(Function))
   })
 
   it('refuses a folder that is not there rather than launching anything', async () => {
@@ -120,7 +127,11 @@ describe('openInEditor', () => {
   it('uses the configured editor when one is set', async () => {
     present('/repos/app', '/usr/local/bin/cursor', '/usr/local/bin/subl')
     const result = await openInEditor('/repos/app', 'sublime')
-    expect(execFile).toHaveBeenCalledWith('subl', ['/repos/app'], expect.any(Function))
+    expect(execFile).toHaveBeenCalledWith(
+      'open',
+      ['-a', 'Sublime Text', '/repos/app'],
+      expect.any(Function)
+    )
     expect(result).toEqual({ ok: true, editor: 'Sublime Text' })
   })
 })

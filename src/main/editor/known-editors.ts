@@ -7,8 +7,7 @@
  * system.
  *
  * Order is preference order when several are installed. It is not a ranking of
- * editors — it puts the ones whose CLI is unambiguous first, since a CLI opens
- * a folder in an existing window rather than launching a second copy of the app.
+ * editors.
  */
 export interface KnownEditor {
   id: string
@@ -53,14 +52,26 @@ export function pickEditor(
 /**
  * How to launch it, as a command and an argument list.
  *
+ * On macOS `open -a` wins over the editor's own CLI even when the CLI is
+ * installed. The VS Code-family launchers — `code`, `cursor`, `windsurf` —
+ * hand the folder to a running instance and leave the app exactly where it
+ * was, so the folder opened behind Terminator and clicking the menu item
+ * looked like it did nothing. `open -a` raises the app too. It also needs no
+ * PATH, which an app launched from Finder does not reliably have: macOS gives
+ * it a minimal one that omits /usr/local/bin.
+ *
  * Never a shell string. The folder is passed as one argument, so a directory
  * whose name contains a space, a quote or a semicolon is a directory name and
  * not a second command.
  */
 export function launchArgvFor(
   editor: KnownEditor,
-  folderPath: string
+  folderPath: string,
+  platform: NodeJS.Platform = process.platform
 ): { command: string; args: string[] } {
+  if (platform === 'darwin' && editor.macApp) {
+    return { command: 'open', args: ['-a', editor.macApp, folderPath] }
+  }
   if (editor.cli) return { command: editor.cli, args: [folderPath] }
   return { command: 'open', args: ['-a', editor.macApp as string, folderPath] }
 }

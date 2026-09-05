@@ -6,6 +6,7 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
@@ -1052,5 +1053,71 @@ describe('UnifiedSidebar — opening a branch in the editor', () => {
     await act(async () => {})
     openRowMenu(container, 'main')
     expect(screen.getByText('Open in Cursor')).toBeTruthy()
+  })
+})
+
+describe('UnifiedSidebar — opening in the editor reports back', () => {
+  // The first version discarded the result, so a failure looked exactly like
+  // the action not being wired up: nothing at all on screen.
+  const addToast = vi.fn()
+  const openEditor = vi.fn()
+
+  beforeEach(() => {
+    addToast.mockClear()
+    openEditor.mockClear()
+    useToastStore.setState({ addToast } as never)
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+        shell: { openExternal: vi.fn() },
+      },
+    })
+  })
+
+  const openMenuAndClick = async (container: HTMLElement) => {
+    await act(async () => {})
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    fireEvent.click(screen.getByText(/Open in/))
+    await act(async () => {})
+  }
+
+  it('says nothing when it worked', async () => {
+    openEditor.mockResolvedValue({ ok: true, editor: 'Cursor' })
+    const { container } = renderSidebar()
+    await openMenuAndClick(container)
+    expect(addToast).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['FOLDER_NOT_FOUND', /no longer on disk/i],
+    ['NO_EDITOR_FOUND', /no supported editor/i],
+    ['VALIDATION_ERROR', /could not be opened/i],
+  ])('explains %s in the user own terms', async (error, expected) => {
+    openEditor.mockResolvedValue({ error })
+    const { container } = renderSidebar()
+    await openMenuAndClick(container)
+    expect(addToast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error', message: expect.stringMatching(expected) })
+    )
+  })
+
+  it('passes an unrecognised failure through rather than swallowing it', async () => {
+    openEditor.mockResolvedValue({ error: 'EACCES' })
+    const { container } = renderSidebar()
+    await openMenuAndClick(container)
+    expect(addToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('EACCES') })
+    )
+  })
+
+  it('survives the call rejecting outright', async () => {
+    openEditor.mockRejectedValue(new Error('bridge gone'))
+    const { container } = renderSidebar()
+    await openMenuAndClick(container)
+    expect(addToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringMatching(/could not open/i) })
+    )
   })
 })
