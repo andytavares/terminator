@@ -146,6 +146,7 @@ const mockWorkspaceStore = {
   setActiveProject: vi.fn(),
   loadProjects: vi.fn().mockResolvedValue(undefined),
   reorderWorkspaces: vi.fn().mockResolvedValue(undefined),
+  reorderProjects: vi.fn().mockResolvedValue(undefined),
   deleteProject: vi.fn().mockResolvedValue(undefined),
   renameProject: vi.fn().mockResolvedValue(undefined),
   resolveActiveCwd: vi.fn().mockReturnValue('/b'),
@@ -1151,5 +1152,88 @@ describe('UnifiedSidebar — where there is no editor API at all', () => {
     await act(async () => {})
     fireEvent.contextMenu(container.querySelector('.branch-row')!)
     expect(() => fireEvent.click(screen.getByText(/Open in/))).not.toThrow()
+  })
+})
+
+describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', () => {
+  const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
+  const pickSort = (label: string) => {
+    openDisplay()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: label }))
+  }
+  const checkedSort = () => {
+    openDisplay()
+    return ['Recent', 'Oldest', 'Name', 'Status', 'Manual'].find(
+      (label) =>
+        screen.getByRole('menuitemradio', { name: label }).getAttribute('aria-checked') === 'true'
+    )
+  }
+  const repoNames = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll('.repo-header__name')).map((el) => el.textContent)
+
+  // The store's order and the drawn order are two different things the moment a
+  // computed sort is on. A drop has to move the row the user actually dragged,
+  // so the indices it works in are the drawn ones.
+  it('reorders by what is on screen, not by the stored order', () => {
+    mockWorkspaceStore.workspaces = [ws2, ws1]
+    const { container } = renderSidebar()
+    pickSort('Name')
+    expect(repoNames(container)).toEqual(['Backend', 'Frontend'])
+
+    const headers = container.querySelectorAll('.repo-header')
+    fireEvent.dragStart(headers[0])
+    fireEvent.drop(headers[1])
+
+    expect(mockWorkspaceStore.reorderWorkspaces).toHaveBeenCalledWith(['ws-2', 'ws-1'])
+    mockWorkspaceStore.workspaces = [ws1, ws2]
+  })
+
+  // Dropping under a computed sort used to write an order nothing would ever
+  // draw. The drag is the user saying "this is my order", so it says so.
+  it('switches the view to Manual so the drop is visible', () => {
+    const { container } = renderSidebar()
+    pickSort('Name')
+    const headers = container.querySelectorAll('.repo-header')
+    fireEvent.dragStart(headers[0])
+    fireEvent.drop(headers[1])
+    expect(checkedSort()).toBe('Manual')
+  })
+
+  it('reorders the branches inside one repo on drop', () => {
+    const { container } = renderSidebar()
+    const rows = container.querySelectorAll('.branch-row')
+    fireEvent.dragStart(rows[0])
+    fireEvent.drop(rows[1])
+    expect(mockWorkspaceStore.reorderProjects).toHaveBeenCalledWith('ws-1', ['p2', 'p1'])
+  })
+
+  it('switches the view to Manual when a branch is dropped', () => {
+    const { container } = renderSidebar()
+    pickSort('Name')
+    const rows = container.querySelectorAll('.branch-row')
+    fireEvent.dragStart(rows[0])
+    fireEvent.drop(rows[1])
+    expect(checkedSort()).toBe('Manual')
+  })
+
+  // Branches from every repo share one list under "no grouping", and the stores
+  // have nowhere to write an order that crosses repos.
+  it('does not offer a branch drag when grouping is off', () => {
+    const { container } = renderSidebar()
+    openDisplay()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'None' }))
+    const rows = container.querySelectorAll('.branch-row')
+    fireEvent.dragStart(rows[0])
+    fireEvent.drop(rows[1])
+    expect(mockWorkspaceStore.reorderProjects).not.toHaveBeenCalled()
+  })
+
+  it('sorts a repo with no branches among the rest', () => {
+    const ws3: Workspace = { ...ws1, id: 'ws-3', name: 'Aardvark' }
+    mockWorkspaceStore.workspaces = [ws1, ws2, ws3]
+    const { container } = renderSidebar()
+    pickSort('Name')
+    expect(repoNames(container)).toEqual(['Aardvark', 'Backend', 'Frontend'])
+    mockWorkspaceStore.workspaces = [ws1, ws2]
   })
 })

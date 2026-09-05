@@ -29,6 +29,14 @@
   color: var(--text-primary);
 }
 
+/* The drop line, drawn alongside the colour rail rather than replacing it —
+   a row that loses its repo colour mid-drag reads as having left the repo. */
+.branch-row--dnd-over {
+  box-shadow:
+    inset 2px 0 0 var(--ws-color, transparent),
+    inset 0 2px 0 var(--accent);
+}
+
 .branch-row:focus-visible {
   outline: 2px solid var(--text-primary);
   outline-offset: -2px;

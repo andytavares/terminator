@@ -546,6 +546,7 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 | `branch-rows.ts`                                          | `buildBranchRows` — the sidebar's list: repos, and the branches under them               |
 | `branch-state.ts`                                         | `aggregateBranchState`, `countInState` — a branch's one state, folded from its terminals |
 | `board-lanes.ts`                                          | `buildLanes` — every terminal, in lanes by state; plus the lane-visibility preference    |
+| `manual-order.ts`                                         | `mergeReorder` — folds a drag over the visible rows back into the stored list            |
 | `view-model.ts`                                           | `STATUS_ORDER`, `isStale`, and the view/filter/sort types                                |
 | `views.ts`                                                | built-in views as data, and their persistence                                            |
 | `session-status.ts`                                       | state → glyph/label, total over `AgentState`                                             |
@@ -553,6 +554,10 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 | `collapse-state.ts`, `relative-time.ts`, `agent-state.ts` | unchanged                                                                                |
 
 `buildBranchRows` is the seam the whole list rests on. The rule that matters: **every branch is a row whether or not a terminal is open on it, unconditionally**. Filters lift one level — a branch matches when any of its terminals matches — with `hideStale` the deliberate exception, since it is about abandoned work and has nothing to say about a branch nobody has started.
+
+**Ordering is `buildBranchRows`' job at both levels.** The sort key orders the repo groups as well as the branches inside each one — a sort that only reached inside a repo read as a sort that did nothing, because the group order was hard-coded alphabetical. `manual` is the order the stores hand the lists over in, read through an index map (`workspaces` for repos, `projects` within a repo) rather than left to a stable sort. Every computed key falls back to the repo name so equally quiet repos hold a fixed order; `manual` takes no such tie-break, because an alphabetical fallback is exactly what would swallow a drag. A repo with no branches is seeded as an empty group here rather than appended by the component, so it sorts and reorders with the rest instead of being pinned below them.
+
+`UnifiedSidebar` writes that order back. `useDragReorder` is given the list **as drawn**, which is not the list as stored once a computed sort or a filter is on; `mergeReorder` rewrites only the slots the visible rows occupy, so a filtered-out repo keeps its place instead of being swept to the end by an order that never mentioned it. Committing a drop also sets the view's sort to `manual` — under any other key the next render would recompute the order and the drag would vanish. Repos reorder through `workspace:reorder`, branches through `project:reorder`; branch rows are not draggable under `groupBy: 'none'`, where one list spans every repo and the stores keep no order that crosses them.
 
 Deliberately absent from a `BranchRow`: change statistics and the linked issue key. Both arrive from stores on their own schedule, and folding them in would make the result a function of when git or the tracker last answered (ADR 031).
 

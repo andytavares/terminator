@@ -321,14 +321,144 @@ describe('buildBranchRows', () => {
       expect(group.branches.map((b) => b.projectId)).toEqual(['p2', 'p1'])
     })
 
-    it('sorts repos by name', () => {
+    // The repo headers are half the list. A sort that only reaches inside them
+    // reads as a sort that does nothing, which is what shipped: the group order
+    // was hard-coded alphabetical and neither the sort key nor a drag could
+    // move it.
+    it('sorts repos by name when asked', () => {
+      expect(build([], view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
+        'kalli',
+        'terminator',
+      ])
+    })
+
+    it('falls back to name when two repos are equally recent', () => {
       expect(build([]).groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+    })
+
+    it('sorts repos by their most recent branch', () => {
+      const result = build([
+        session('a', 'p1', { lastActivityAt: 10 }),
+        session('b', 'p3', { lastActivityAt: 99 }),
+      ])
+      expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+    })
+
+    it('sorts repos by their oldest branch when asked', () => {
+      const result = build(
+        [session('a', 'p1', { lastActivityAt: 10 }), session('b', 'p3', { lastActivityAt: 99 })],
+        view({ sortBy: 'oldest' })
+      )
+      expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
+    })
+
+    it('sorts repos by their most severe branch when asked', () => {
+      const result = build(
+        [
+          session('a', 'p1', { agentState: 'idle' }),
+          session('b', 'p3', { agentState: 'awaiting-input' }),
+        ],
+        view({ sortBy: 'status' })
+      )
+      expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+    })
+
+    // Manual is the user's own order, and the only place it is written down is
+    // the order the stores hand over — workspaces for repos, projects within a
+    // repo. Alphabetising either one silently discards a drag.
+    it('keeps repos in the stored order under a manual sort', () => {
+      const result = build([], view({ sortBy: 'manual' }))
+      expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
+    })
+
+    it('keeps branches in the stored order under a manual sort', () => {
+      const result = build(
+        [session('a', 'p1', { lastActivityAt: 10 }), session('b', 'p2', { lastActivityAt: 99 })],
+        view({ sortBy: 'manual' })
+      )
+      const group = result.groups.find((g) => g.label === 'terminator')!
+      expect(group.branches.map((b) => b.projectId)).toEqual(['p1', 'p2'])
+    })
+
+    it('orders repos by the workspace list, not by the order branches arrive in', () => {
+      const result = buildBranchRows(
+        [],
+        [branchless, feature, main],
+        [repoA, repoB],
+        view({ sortBy: 'manual' }),
+        NOW,
+        STALE_AFTER
+      )
+      expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
     })
 
     it('puts everything in one group when grouping is off', () => {
       const { groups } = build([], view({ groupBy: 'none' }))
       expect(groups).toHaveLength(1)
       expect(groups[0].branches).toHaveLength(3)
+    })
+  })
+
+  // A repo with no branches yet was drawn in a block of its own after every
+  // group, so any order it was given — dragged or sorted — could not move it
+  // out of the bottom of the list. It is a group like the others.
+  describe('repos with no branches', () => {
+    const emptyRepo: Workspace = { ...repoA, id: 'ws-3', name: 'aardvark', folderPath: '/repos/aa' }
+
+    const withEmpty = (v: SessionView = view()) =>
+      buildBranchRows([], PROJECTS, [repoA, repoB, emptyRepo], v, NOW, STALE_AFTER)
+
+    it('lists an empty repo as a group of its own', () => {
+      const group = withEmpty().groups.find((g) => g.label === 'aardvark')
+      expect(group).toBeTruthy()
+      expect(group!.branches).toHaveLength(0)
+      expect(group!.branchCount).toBe(0)
+    })
+
+    it('sorts an empty repo among the rest rather than after them', () => {
+      expect(withEmpty(view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
+        'aardvark',
+        'kalli',
+        'terminator',
+      ])
+    })
+
+    it('keeps an empty repo in its stored place under a manual sort', () => {
+      expect(withEmpty(view({ sortBy: 'manual' })).groups.map((g) => g.label)).toEqual([
+        'terminator',
+        'kalli',
+        'aardvark',
+      ])
+    })
+
+    it('drops an empty repo from a narrowed view, which has nothing to say about it', () => {
+      const labels = withEmpty(view({ filters: { query: 'main' } })).groups.map((g) => g.label)
+      expect(labels).not.toContain('aardvark')
+    })
+
+    it('does not invent a repo header when grouping is off', () => {
+      const { groups } = withEmpty(view({ groupBy: 'none' }))
+      expect(groups).toHaveLength(1)
+    })
+
+    it('ranks an empty repo as idle under a status sort', () => {
+      const result = buildBranchRows(
+        [
+          session('a', 'p1', { agentState: 'awaiting-input' }),
+          session('b', 'p3', { agentState: 'exited' }),
+        ],
+        PROJECTS,
+        [repoA, repoB, emptyRepo],
+        view({ sortBy: 'status' }),
+        NOW,
+        STALE_AFTER
+      )
+      expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'aardvark', 'kalli'])
+    })
+
+    it('counts only branches, so an empty repo changes no total', () => {
+      expect(withEmpty().total).toBe(3)
+      expect(withEmpty().shown).toBe(3)
     })
   })
 
