@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useDismissible } from '@terminator/extension-ui'
 import { X } from 'lucide-react'
 import type { IndexedProject } from '../vault/types'
 
@@ -31,6 +32,10 @@ export function FileToPicker({
   const [loading, setLoading] = useState(true)
   const [highlighted, setHighlighted] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Escape already worked while focus sat in the field; the hook adds the two
+  // that did not — a click outside, and focus returning to whatever opened it.
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  useDismissible({ ref: surfaceRef, onDismiss: onClose, manageFocus: false })
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -119,7 +124,7 @@ export function FileToPicker({
   }
 
   return (
-    <div className="file-to-picker">
+    <div className="file-to-picker" ref={surfaceRef} data-tmui-surface="">
       <div className="file-to-picker__header">
         <input
           ref={inputRef}

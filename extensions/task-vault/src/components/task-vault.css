@@ -7868,3 +7868,8 @@ h2.daily-log__date {
 .ext-toast__close:hover {
   opacity: 1;
 }
+
+/* Data tools: the DB admin tab needs more room than a dialog's default width. */
+.tv-data-tools[data-wide] {
+  width: min(760px, 86vw);
+}

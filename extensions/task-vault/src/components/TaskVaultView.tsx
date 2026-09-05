@@ -10,6 +10,7 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { Dialog } from '@terminator/extension-ui'
 import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
@@ -64,37 +65,29 @@ export function CaptureModal(): React.JSX.Element | null {
   }
 
   return createPortal(
-    <div className="capture-modal__backdrop" onClick={close}>
-      <div className="capture-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="capture-modal__header">
-          <span className="capture-modal__title">Capture to Inbox</span>
-          <button className="capture-modal__close" onClick={close}>
-            <X size={14} />
-          </button>
-        </div>
-        <div className="capture-modal__body">
-          <SmartTaskInput
-            value={text}
-            onChange={setText}
-            onSubmit={handleCapture}
-            onCancel={close}
-            disabled={capturing}
-            autoFocus
-            placeholder="Task text… @project #area +context due:YYYY-MM-DD"
-          />
-        </div>
-        <div className="capture-modal__footer">
-          <button
-            className="capture-modal__capture-btn"
-            onClick={handleCapture}
-            disabled={capturing || !text.trim()}
-          >
-            {capturing ? '…' : 'Capture'}
-          </button>
-          <span className="capture-modal__hint">Esc to dismiss · Enter to capture</span>
-        </div>
-      </div>
-    </div>,
+    <Dialog
+      title="Capture to Inbox"
+      onDismiss={close}
+      actions={[
+        {
+          label: capturing ? '…' : 'Capture',
+          tone: 'primary',
+          disabled: capturing || !text.trim(),
+          shortcut: '↵',
+          onSelect: () => void handleCapture(),
+        },
+      ]}
+    >
+      <SmartTaskInput
+        value={text}
+        onChange={setText}
+        onSubmit={handleCapture}
+        onCancel={close}
+        disabled={capturing}
+        autoFocus
+        placeholder="Task text… @project #area +context due:YYYY-MM-DD"
+      />
+    </Dialog>,
     document.body
   )
 }
@@ -164,12 +157,8 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
   }
 
   return createPortal(
-    <div className="capture-modal__backdrop" onClick={onClose}>
-      <div
-        className="capture-modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: tab === 'admin' ? 780 : 420, width: '90vw' }}
-      >
+    <Dialog title="Data tools" onDismiss={onClose} actions={[]}>
+      <div className="tv-data-tools" data-wide={tab === 'admin' ? '' : undefined}>
         <div className="capture-modal__header">
           <div className="tv-modal-tabs">
             <button
@@ -251,7 +240,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
           </div>
         )}
       </div>
-    </div>,
+    </Dialog>,
     document.body
   )
 }

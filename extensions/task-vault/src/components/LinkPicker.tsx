@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
+import { useDismissible } from '@terminator/extension-ui'
 import type { IndexedTask, IndexedProject } from '../vault/types'
 
 interface LinkPickerProps {
@@ -8,6 +9,10 @@ interface LinkPickerProps {
 }
 
 export function LinkPicker({ targetId, onLink, onCancel }: LinkPickerProps): React.JSX.Element {
+  // Escape and click-outside came from the shared hook; this picker managed
+  // focus by hand and answered neither.
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  useDismissible({ ref: surfaceRef, onDismiss: onCancel })
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<(IndexedTask | IndexedProject)[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -52,7 +57,7 @@ export function LinkPicker({ targetId, onLink, onCancel }: LinkPickerProps): Rea
   }
 
   return (
-    <div className="link-picker">
+    <div className="link-picker" ref={surfaceRef} data-tmui-surface="">
       <div className="link-picker__header">
         <p className="link-picker__title">Link to vault item</p>
         <button className="link-picker__close" onClick={onCancel} aria-label="Cancel">
