@@ -30,14 +30,23 @@ describe('the sidebar pure layer imports nothing but types', () => {
     expect(modules.length).toBeGreaterThan(0)
   })
 
+  /**
+   * A value import is allowed from a sibling in this directory, or from the
+   * shared type module — which is the type graph itself, and holds frozen
+   * identifiers like SCRATCH_PROJECT_ID alongside the types. Neither can make
+   * a function non-deterministic. Everything else is banned, and the React,
+   * store and clock rules below are asserted separately so this relaxation
+   * cannot quietly widen them.
+   */
+  const TYPE_GRAPH = '../../shared/types/index'
+
   it.each(modules)('%s imports no runtime module outside the type graph', (file) => {
     const imports = [...code(file).matchAll(/^\s*import\s+([\s\S]*?)from\s+'([^']+)'/gm)]
     for (const [, clause, specifier] of imports) {
       const isTypeOnly = /^\s*type\b/.test(clause)
       if (isTypeOnly) continue
-      // A value import is allowed only from another module in this directory.
       expect(
-        specifier.startsWith('./'),
+        specifier.startsWith('./') || specifier === TYPE_GRAPH,
         `${file} value-imports '${specifier}' from outside the pure layer`
       ).toBe(true)
     }

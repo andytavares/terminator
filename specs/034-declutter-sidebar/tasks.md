@@ -64,21 +64,21 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 ### Tests for User Story 2 (write first, confirm they fail)
 
-- [ ] T011 [P] [US2] Write failing spec `tests/unit/renderer/sidebar/board-lanes.spec.ts` covering invariants BL-1 to BL-7 from `contracts/sidebar-pure-layer.md`
-- [ ] T012 [P] [US2] Write failing spec `tests/unit/renderer/components/BoardScreen.spec.tsx` for lane headers (glyph, label, count), FR-039 count-equals-cards, and FR-009 empty lane drawing nothing in its body
-- [ ] T013 [P] [US2] Write failing spec `tests/unit/renderer/components/board-lane-visibility.spec.ts` for the `terminator.board.lanes` localStorage key, including degrading corrupt storage to all-visible rather than throwing
+- [x] T011 [P] [US2] Write failing spec `tests/unit/renderer/sidebar/board-lanes.spec.ts` covering invariants BL-1 to BL-7 from `contracts/sidebar-pure-layer.md`
+- [x] T012 [P] [US2] Write failing spec `tests/unit/renderer/components/BoardScreen.spec.tsx` for lane headers (glyph, label, count), FR-039 count-equals-cards, and FR-009 empty lane drawing nothing in its body
+- [x] T013 [P] [US2] Write failing spec `tests/unit/renderer/components/board-lane-visibility.spec.ts` for the `terminator.board.lanes` localStorage key, including degrading corrupt storage to all-visible rather than throwing
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] Implement `buildLanes` in `src/renderer/sidebar/board-lanes.ts` returning lanes in `STATUS_ORDER`, with `exited` marked `isHistory` and invisible while empty (T011)
-- [ ] T015 [US2] Create `src/renderer/components/overview/BoardScreen.tsx` rendering **one CSS grid containing every card**, with a card's lane expressed as `grid-column` — cards must never be re-parented (research.md R-003)
-- [ ] T016 [US2] Create `src/renderer/components/overview/BoardScreen.css` — grid template, lane headers in row 1, exited lane at 42% opacity, `min-height` so an empty lane keeps its header without a placeholder
-- [ ] T017 [US2] **Write the preview-survival test** in `tests/unit/renderer/components/BoardScreen.spec.tsx`: assert a card's DOM node identity is unchanged across a state change, because `mountPreview` moves the one live xterm element into that node and re-parenting tears it out (`src/renderer/components/terminal/TerminalSession.tsx:471`)
+- [x] T014 [US2] Implement `buildLanes` in `src/renderer/sidebar/board-lanes.ts` returning lanes in `STATUS_ORDER`, with `exited` marked `isHistory` and invisible while empty (T011)
+- [x] T015 [US2] Create `src/renderer/components/overview/BoardScreen.tsx` rendering **one CSS grid containing every card**, with a card's lane expressed as `grid-column` — cards must never be re-parented (research.md R-003)
+- [x] T016 [US2] Create `src/renderer/components/overview/BoardScreen.css` — grid template, lane headers in row 1, exited lane at 42% opacity, `min-height` so an empty lane keeps its header without a placeholder
+- [x] T017 [US2] **Write the preview-survival test** in `tests/unit/renderer/components/BoardScreen.spec.tsx`: assert a card's DOM node identity is unchanged across a state change, because `mountPreview` moves the one live xterm element into that node and re-parenting tears it out (`src/renderer/components/terminal/TerminalSession.tsx:471`)
 - [ ] T018 [US2] Rework `src/renderer/components/overview/SessionTile.tsx` into the card: title in sans, `"<repo> / <branch>"` in mono, bell only when non-zero, and every optional line **omitted rather than drawn empty** (FR-013)
 - [ ] T019 [US2] Rework `src/renderer/components/overview/SessionTile.css` — 2px repo rail replacing the colour dot, preserved live-preview container (FR-020, FR-040)
-- [ ] T020 [US2] Add the 180ms `transform`/`opacity` transition to the card that changed lane in `src/renderer/components/overview/BoardScreen.css`, with `@media (prefers-reduced-motion: reduce)` cutting straight to position (FR-011)
+- [x] T020 [US2] Add the 180ms `transform`/`opacity` transition to the card that changed lane in `src/renderer/components/overview/BoardScreen.css`, with `@media (prefers-reduced-motion: reduce)` cutting straight to position (FR-011)
 - [ ] T021 [US2] Implement lane visibility (show/hide per lane) with `terminator.board.lanes` persistence in `src/renderer/components/overview/BoardScreen.tsx` (FR-016, T013)
-- [ ] T022 [US2] Implement the empty-board state — one line and one action, distinct from an empty lane — in `src/renderer/components/overview/BoardScreen.tsx` (FR-009 as amended, T003)
+- [x] T022 [US2] Implement the empty-board state — one line and one action, distinct from an empty lane — in `src/renderer/components/overview/BoardScreen.tsx` (FR-009 as amended, T003)
 - [ ] T023 [US2] Make `src/renderer/components/overview/OverviewScreen.tsx` host board and list layouts on one surface with board as the default (FR-015)
 - [ ] T024 [US2] Rewrite `tests/unit/renderer/components/OverviewScreen.spec.tsx` for the two layouts and the default
 - [ ] T025 [US2] Rewrite `tests/unit/renderer/components/SessionTile.spec.tsx` for the card anatomy
