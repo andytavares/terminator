@@ -32,11 +32,11 @@ test.beforeAll(async () => {
   await createWorkspace(handle.page, WS, gitRepoDir)
   // The innermost group is a project: under the default workspace grouping the
   // project group is nested inside its workspace's group.
-  const firstProject = handle.page.locator('.session-group:not(:has(.session-group))').first()
+  const firstProject = handle.page.locator('.branch-row').first()
   await expect(firstProject).toBeVisible()
   // The header click is what selects the project, which is what gives the git
   // panels a repoRoot and puts the Git project tab in the primary bar.
-  await firstProject.locator('.session-group__header').click()
+  await firstProject.click()
 })
 
 test.afterAll(async () => {

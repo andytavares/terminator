@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type React from 'react'
 
-interface DragItemProps {
+export interface DragItemProps {
   draggable: true
   onDragStart: () => void
   onDragOver: (e: React.DragEvent) => void

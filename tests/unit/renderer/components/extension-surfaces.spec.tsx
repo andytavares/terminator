@@ -40,7 +40,7 @@ vi.mock('../../../../src/renderer/stores/settings.store', () => ({
 }))
 
 const NOW = 1_000_000_000
-const GROUPINGS: GroupKey[] = ['project', 'workspace', 'status', 'branch', 'none']
+const GROUPINGS: GroupKey[] = ['workspace', 'none']
 
 const ws1: Workspace = {
   id: 'ws-1',
@@ -199,13 +199,14 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
         onSelectWorkspaceTab={onSelectWorkspaceTab}
       />
     )
-    const headerButton = screen.queryByTitle('Fake Workspace Tab')
+    const headerButton = container.querySelector('.repo-header__action')
     if (headerButton) {
-      // Scope grouping: the group header is the host.
+      // Grouped by repo: the repo header is the host.
       fireEvent.click(headerButton)
     } else {
-      // Non-scope grouping: the row's project badge opens the scope menu (I3).
-      fireEvent.click(container.querySelector('.session-row__project-badge')!)
+      // Ungrouped: there is no repo header, so the branch row's own menu is
+      // the way in — a contributed surface has to be reachable either way.
+      fireEvent.contextMenu(container.querySelector('.branch-row')!)
       fireEvent.click(screen.getByText('Fake Workspace Tab'))
     }
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
@@ -218,21 +219,15 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
     expect(sidebarItemAction).toHaveBeenCalledOnce()
   })
 
-  it('surface 4: selecting a session leaves activeProjectId resolved for the project tab', () => {
-    renderSidebar(groupBy)
-    fireEvent.click(screen.getByText('api-shell'))
+  it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', () => {
+    const { container } = renderSidebar(groupBy)
+    fireEvent.click(container.querySelector('.branch-row')!)
     expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p1')
   })
 
-  it('a new terminal can be created for the session scope', () => {
+  it('a new terminal can be created for the branch scope', () => {
     const { container } = renderSidebar(groupBy)
-    const headerAdd = container.querySelector('.session-group__add')
-    if (headerAdd) {
-      fireEvent.click(headerAdd)
-    } else {
-      fireEvent.click(container.querySelector('.session-row__project-badge')!)
-      fireEvent.click(screen.getByText('New terminal'))
-    }
+    fireEvent.click(container.querySelector('.branch-row__action')!)
     expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)
   })
 })

@@ -1,0 +1,200 @@
+/* One branch.
+
+   The repo's colour is a single 2px rail and nothing else: no wash at rest, on
+   hover, or when selected. Hover and selection are neutral surfaces, identical
+   whichever repo the row belongs to, so the eye is drawn by state rather than
+   by a tint (FR-041, FR-042). */
+
+.branch-row {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 0;
+  box-shadow: inset 2px 0 0 var(--ws-color, transparent);
+  color: var(--text-secondary);
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.branch-row:hover {
+  background: var(--bg-elevated);
+}
+
+.branch-row--selected {
+  background: var(--bg-card-hover);
+}
+
+.branch-row--selected .branch-row__name {
+  color: var(--text-primary);
+}
+
+.branch-row:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
+}
+
+/* ── The status gutter ─────────────────────────────────────────
+   A fixed column holding exactly one glyph, never shifted by a longer name
+   above it, so "what needs me" is a vertical scan of one column. */
+
+.branch-row__gutter {
+  width: 16px;
+  margin-left: 8px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--text-primary);
+}
+
+.branch-row__gutter svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
+/* Opacity, never hue — Constitution XII, and it is what keeps the four states
+   readable in greyscale. Waiting is the only one at full strength. */
+.branch-row__state--awaiting-input {
+  opacity: var(--state-op-awaiting);
+}
+.branch-row__state--working {
+  opacity: var(--state-op-working);
+}
+.branch-row__state--idle {
+  opacity: var(--state-op-idle);
+}
+.branch-row__state--exited {
+  opacity: var(--state-op-exited);
+}
+
+/* Always occupied so the name starts in the same place whether or not the row
+   is a plain checkout. */
+.branch-row__kind {
+  width: 13px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.branch-row__kind svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
+/* A machine fact: the name you would have to type exactly. */
+.branch-row__name {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 4px;
+  min-width: 0;
+}
+
+.branch-row__rename {
+  flex: 1;
+  min-width: 0;
+  margin-left: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-xs, 4px);
+  color: var(--text-primary);
+  padding: 0 4px;
+}
+
+.branch-row__meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  padding-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Plain text. The badge, its border and its state dot were three marks for one
+   fact that the key alone already carries (FR-029). */
+.branch-row__issue {
+  white-space: nowrap;
+}
+
+.branch-row__stats b {
+  color: var(--success);
+  font-weight: 400;
+}
+
+.branch-row__stats i {
+  color: var(--danger);
+  font-style: normal;
+}
+
+.branch-row__count {
+  color: var(--text-primary);
+}
+
+.branch-row__hover {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 16px;
+  justify-content: flex-end;
+  margin-left: 6px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.branch-row:hover .branch-row__hover,
+.branch-row:focus-within .branch-row__hover {
+  opacity: 0.85;
+}
+
+.branch-row__action {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+}
+
+.branch-row__action svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+/* Re-derived for the new anatomy rather than inherited from a 13-element
+   header. A row never drops its branch name or its state glyph (FR-049). */
+@container sidebar (max-width: 250px) {
+  .branch-row__stats {
+    display: none;
+  }
+}
+
+@container sidebar (max-width: 215px) {
+  .branch-row__issue {
+    display: none;
+  }
+}
+
+/* The key is a control, not a badge: no border, no background, no state dot —
+   it just still opens the drawer the badge used to open (FR-029). */
+button.branch-row__issue {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}

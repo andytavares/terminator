@@ -82,56 +82,57 @@ export async function createWorkspace(page: Page, name: string, folderPath: stri
 }
 
 /**
- * The workspace's row in the flat sidebar. The tree's `.ws-card` is gone —
- * grouping by project means a workspace has no card of its own, so its name,
- * colour band, tags and context menu live on this row instead.
+ * A repo's header in the sidebar. The `.ws-row` this replaced was an
+ * always-visible "new branch" strip closing each repo's run; with that gone the
+ * header is the only thing standing for a repo, and it hosts what the row did.
  */
 export function workspaceRow(page: Page, name: string) {
-  return page.locator('.ws-row').filter({ has: page.locator('.ws-row__name', { hasText: name }) })
+  return page
+    .locator('.repo-header')
+    .filter({ has: page.locator('.repo-header__name', { hasText: name }) })
 }
 
 /**
- * A project's group header. Projects are groups now, and a project with no
- * sessions still gets a header so it can be selected and started in.
- *
- * Under the default workspace grouping a project group is nested inside its
- * workspace's group, so the filter matches both; the last match is always the
- * innermost one, which is the project.
+ * A branch's row. Every branch is a row whether or not a terminal is open on
+ * it, so this is present as soon as the branch exists.
  */
 export function projectGroup(page: Page, projectName: string) {
   return page
-    .locator('.session-group')
-    .filter({ has: page.locator('.session-group__label', { hasText: projectName }) })
+    .locator('.branch-row')
+    .filter({ has: page.locator('.branch-row__name', { hasText: projectName }) })
     .last()
 }
 
 /**
- * Add a plain (non-git) project to a workspace and click it. Selecting a project
- * is what sets the active workspace, which several panels (e.g. Workspace
- * Settings) require. Returns once the project group is present.
+ * Add a plain (non-git) branch to a repo and select it. Selecting a branch is
+ * what sets the active repo, which several panels require. Returns once the
+ * branch has a terminal.
  */
 export async function addAndSelectProject(
   page: Page,
   workspaceName: string,
   projectName: string
 ): Promise<void> {
-  await workspaceRow(page, workspaceName).locator('.ws-row__add').click()
+  await workspaceRow(page, workspaceName).hover()
+  await workspaceRow(page, workspaceName)
+    .locator(`.repo-header__action[aria-label="New branch in ${workspaceName}"]`)
+    .click()
   await expect(page.locator('.dialog__title')).toContainText('Create Branch')
   await page.getByPlaceholder('My branch').fill(projectName)
   await page.click('.dialog__btn-primary')
-  const group = projectGroup(page, projectName)
-  await expect(group).toBeVisible()
-  // Clicking the header selects the project, exactly as clicking the tree's
-  // project row did; the app's auto-open effect creates its first session.
-  await group.locator('.session-group__header').click()
-  await expect(group.locator('.session-row')).toHaveCount(1)
+  const row = projectGroup(page, projectName)
+  await expect(row).toBeVisible()
+  // Clicking the row selects the branch; the app's auto-open effect gives it
+  // its first terminal, which now shows in the tab bar rather than the sidebar.
+  await row.click()
+  await page.waitForSelector('.tab-bar__tab--session', { timeout: 15000 })
 }
 
-/** Re-select an existing project by activating its first session. */
+/** Re-select an existing branch. */
 export async function selectProject(
   page: Page,
   workspaceName: string,
   projectName: string
 ): Promise<void> {
-  await projectGroup(page, projectName).locator('.session-group__header').click()
+  await projectGroup(page, projectName).click()
 }

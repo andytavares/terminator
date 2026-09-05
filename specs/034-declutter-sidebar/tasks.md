@@ -124,27 +124,27 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 - [x] T034 [P] [US1] Write failing spec `tests/unit/renderer/sidebar/branch-rows.spec.ts` covering invariants BR-1 to BR-9, especially BR-1: a branch with no terminals is still a row, unconditionally
 - [x] T035 [P] [US1] Write failing spec `tests/unit/renderer/sidebar/branch-rows-performance.spec.ts` mirroring `view-model-performance.spec.ts`, asserting `buildBranchRows` stays O(sessions + projects)
 - [x] T036 [P] [US1] Extend `tests/unit/renderer/sidebar/views.spec.ts` with failing cases for the re-expressed built-ins and invariant VW-1: a stored override naming a retired `groupBy` degrades to the built-in default
-- [ ] T037 [P] [US1] Rewrite `tests/unit/renderer/components/SessionGroup.spec.tsx` as failing specs for a repo header and a branch row
-- [ ] T038 [P] [US1] Write failing spec `tests/unit/renderer/components/branch-selection.spec.tsx` for FR-047: a branch with several terminals focuses the one awaiting input, else the last active on that branch, else the most recently active; a branch with none offers to start one
+- [x] T037 [P] [US1] Rewrite `tests/unit/renderer/components/SessionGroup.spec.tsx` as failing specs for a repo header and a branch row
+- [x] T038 [P] [US1] Write failing spec `tests/unit/renderer/components/branch-selection.spec.tsx` for FR-047: a branch with several terminals focuses the one awaiting input, else the last active on that branch, else the most recently active; a branch with none offers to start one
 
 ### Implementation for User Story 1
 
 - [x] T039 [US1] Implement `buildBranchRows` in `src/renderer/sidebar/branch-rows.ts` beside `buildGroups`, not replacing it (research.md R-001, T034)
 - [x] T040 [US1] Re-express the four built-ins in `src/renderer/sidebar/views.ts` at branch level — a branch matches when any of its terminals matches — moving `needs-me`, `active` and `stale` to `groupBy: 'workspace'` (research.md R-006)
 - [x] T041 [US1] Add the retired-`groupBy` degradation to `loadViews()` in `src/renderer/sidebar/views.ts` (T036)
-- [ ] T042 [US1] Rework `src/renderer/components/sidebar/SessionGroup.tsx` into the repo header: name, count, swatch, and hover-only chevron / new-branch / registered repo actions
-- [ ] T043 [US1] Add the branch row with its 16px status gutter to `src/renderer/components/sidebar/SessionGroup.tsx`, reading `aggregateBranchState` (FR-003)
+- [x] T042 [US1] Rework `src/renderer/components/sidebar/SessionGroup.tsx` into the repo header: name, count, swatch, and hover-only chevron / new-branch / registered repo actions
+- [x] T043 [US1] Add the branch row with its 16px status gutter to `src/renderer/components/sidebar/SessionGroup.tsx`, reading `aggregateBranchState` (FR-003)
 - [ ] T044 [US1] Narrow `GroupKey` to `'workspace' | 'none'` in `src/renderer/sidebar/view-model.ts` and remove the retired grouping options (FR-038) — safe only after T040
-- [ ] T045 [US1] Update `src/renderer/components/sidebar/SessionGroup.css` for the repo header, the branch row and the gutter
-- [ ] T046 [US1] Switch `src/renderer/components/sidebar/UnifiedSidebar.tsx` from `buildGroups` to `buildBranchRows` and stop rendering terminal rows (FR-001)
-- [ ] T047 [US1] Implement branch-selection resolution in `src/renderer/components/sidebar/UnifiedSidebar.tsx` using the store's existing `getActiveSessionForProject` (research.md R-004, T038)
-- [ ] T048 [US1] Render the collapsed-repo waiting signal from `hiddenNeedsYou` in `src/renderer/components/sidebar/SessionGroup.tsx` (FR-004)
-- [ ] T049 [US1] Render the scratch section from `BranchRowsResult.scratch` in `src/renderer/components/sidebar/UnifiedSidebar.tsx` — the one place a terminal is still a row (FR-002)
-- [ ] T050 [US1] Delete `src/renderer/components/sidebar/SessionRow.tsx`, `SessionRow.css` and `tests/unit/renderer/components/SessionRow.spec.tsx` (FR-001)
-- [ ] T051 [US1] Delete `src/renderer/components/sidebar/WorkspaceRow.tsx`, `WorkspaceRow.css` and `tests/unit/renderer/components/WorkspaceRow.spec.tsx`, moving branch creation to the repo header's hover `+` (FR-005)
-- [ ] T052 [US1] Delete `src/renderer/components/sidebar/BulkCloseDialog.tsx`, `BulkCloseDialog.css`, its spec, and the multi-select state in `UnifiedSidebar.tsx` — nothing left to select (research.md R-007, FR-025); **name the deletion in the PR body**
-- [ ] T053 [US1] Rewrite `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` for the branch list
-- [ ] T054 [US1] Rewrite `tests/e2e/sidebar-branch-first.spec.ts` for repos and branches with no terminal rows
+- [x] T045 [US1] Update `src/renderer/components/sidebar/SessionGroup.css` for the repo header, the branch row and the gutter
+- [x] T046 [US1] Switch `src/renderer/components/sidebar/UnifiedSidebar.tsx` from `buildGroups` to `buildBranchRows` and stop rendering terminal rows (FR-001)
+- [x] T047 [US1] Implement branch-selection resolution in `src/renderer/components/sidebar/UnifiedSidebar.tsx` using the store's existing `getActiveSessionForProject` (research.md R-004, T038)
+- [x] T048 [US1] Render the collapsed-repo waiting signal from `hiddenNeedsYou` in `src/renderer/components/sidebar/SessionGroup.tsx` (FR-004)
+- [x] T049 [US1] Render the scratch section from `BranchRowsResult.scratch` in `src/renderer/components/sidebar/UnifiedSidebar.tsx` — the one place a terminal is still a row (FR-002)
+- [x] T050 [US1] Delete `src/renderer/components/sidebar/SessionRow.tsx`, `SessionRow.css` and `tests/unit/renderer/components/SessionRow.spec.tsx` (FR-001)
+- [x] T051 [US1] Delete `src/renderer/components/sidebar/WorkspaceRow.tsx`, `WorkspaceRow.css` and `tests/unit/renderer/components/WorkspaceRow.spec.tsx`, moving branch creation to the repo header's hover `+` (FR-005)
+- [x] T052 [US1] Delete `src/renderer/components/sidebar/BulkCloseDialog.tsx`, `BulkCloseDialog.css`, its spec, and the multi-select state in `UnifiedSidebar.tsx` — nothing left to select (research.md R-007, FR-025); **name the deletion in the PR body**
+- [x] T053 [US1] Rewrite `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` for the branch list
+- [x] T054 [US1] Rewrite `tests/e2e/sidebar-branch-first.spec.ts` for repos and branches with no terminal rows
 
 **Checkpoint**: 45 rows become 15 for the same 30 terminals, and nothing that mattered was destroyed.
 
@@ -215,15 +215,15 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 
 ### Tests for User Story 6 (write first, confirm they fail)
 
-- [ ] T080 [P] [US6] Retarget `tests/unit/renderer/sidebar-workspace-tint.spec.ts` from the four washes to the rail and the swatch, rendering in headless chromium because jsdom cannot compute `color-mix` (research.md R-010)
-- [ ] T081 [P] [US6] Add failing assertions to `tests/unit/renderer/sidebar-workspace-tint.spec.ts`: every row background at rest computes to `rgba(0, 0, 0, 0)`, and hover and selection resolve to identical neutral tokens for all ten preset colours (FR-041, FR-042)
+- [x] T080 [P] [US6] Retarget `tests/unit/renderer/sidebar-workspace-tint.spec.ts` from the four washes to the rail and the swatch, rendering in headless chromium because jsdom cannot compute `color-mix` (research.md R-010)
+- [x] T081 [P] [US6] Add failing assertions to `tests/unit/renderer/sidebar-workspace-tint.spec.ts`: every row background at rest computes to `rgba(0, 0, 0, 0)`, and hover and selection resolve to identical neutral tokens for all ten preset colours (FR-041, FR-042)
 
 ### Implementation for User Story 6
 
-- [ ] T082 [US6] Remove the 10%, 5%, 14% and 22% washes from `src/renderer/components/sidebar/SessionGroup.css`, leaving one 2px repo rail (FR-025 of the colour section, FR-040)
-- [ ] T083 [US6] Make hover and selection neutral `--bg-elevated` / `--bg-card-hover` in `src/renderer/components/sidebar/SessionGroup.css`, identical for every repo (FR-042)
-- [ ] T084 [US6] Draw the repo name in `--text-primary` with a 7px colour swatch in `src/renderer/components/sidebar/SessionGroup.tsx` and `.css`, fixing the light-theme contrast failure measured at 1.08 : 1 (FR-043, research.md R-010)
-- [ ] T085 [US6] Ensure a row or card with no repo draws no rail and is otherwise laid out identically, in `src/renderer/components/sidebar/SessionGroup.css` and `src/renderer/components/overview/SessionTile.css` (FR-045)
+- [x] T082 [US6] Remove the 10%, 5%, 14% and 22% washes from `src/renderer/components/sidebar/SessionGroup.css`, leaving one 2px repo rail (FR-025 of the colour section, FR-040)
+- [x] T083 [US6] Make hover and selection neutral `--bg-elevated` / `--bg-card-hover` in `src/renderer/components/sidebar/SessionGroup.css`, identical for every repo (FR-042)
+- [x] T084 [US6] Draw the repo name in `--text-primary` with a 7px colour swatch in `src/renderer/components/sidebar/SessionGroup.tsx` and `.css`, fixing the light-theme contrast failure measured at 1.08 : 1 (FR-043, research.md R-010)
+- [x] T085 [US6] Ensure a row or card with no repo draws no rail and is otherwise laid out identically, in `src/renderer/components/sidebar/SessionGroup.css` and `src/renderer/components/overview/SessionTile.css` (FR-045)
 - [ ] T086 [US6] Verify all ten preset colours meet AA in both themes by rendering, and record the measured ratios in `tests/unit/renderer/sidebar-workspace-tint.spec.ts` (FR-044, SC-015)
 
 **Checkpoint**: Colour means "which repo" and nothing else, and a pre-existing AA failure is fixed.

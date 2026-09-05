@@ -524,3 +524,107 @@ describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
     )
   })
 })
+
+describe('TabBar — the note found a new home (US3, FR-023)', () => {
+  const noted = (patch: Record<string, unknown> = {}) => ({
+    id: 'ses-1',
+    projectId: 'proj-1',
+    tabTitle: 'claude',
+    status: 'active',
+    type: 'human',
+    agentState: 'idle',
+    ...patch,
+  })
+
+  const mockSetSessionNote = vi.fn()
+
+  beforeEach(() => {
+    vi.mocked(useSessionStore).mockReturnValue({
+      getSessionsForProject: mockGetSessions,
+      closeSession: mockCloseSession,
+      setActiveSessionForProject: mockSetActive,
+      getActiveSessionForProject: mockGetActive,
+      getBellCountForSession: mockGetBell,
+      isSessionBusy: vi.fn().mockReturnValue(false),
+      renameSession: mockRenameSession,
+      reorderSessions: mockReorderSessions,
+      setSessionNote: mockSetSessionNote,
+    } as unknown as ReturnType<typeof useSessionStore>)
+    mockGetSessions.mockReturnValue([noted()])
+    mockGetActive.mockReturnValue('ses-1')
+  })
+
+  it('opens the editor when the shortcut names a terminal', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    expect(container.querySelector('.tab-bar__note-input')).toBeTruthy()
+  })
+
+  it('opens with the note already there, so editing is not retyping', () => {
+    mockGetSessions.mockReturnValue([noted({ note: 'rebasing' })])
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    expect(container.querySelector<HTMLInputElement>('.tab-bar__note-input')!.value).toBe(
+      'rebasing'
+    )
+  })
+
+  it('ignores a shortcut naming a terminal that is not here', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'gone' })
+    expect(container.querySelector('.tab-bar__note-input')).toBeNull()
+  })
+
+  it('opens nothing when the shortcut names no terminal', () => {
+    const { container } = renderTabBar({ editNoteSessionId: null })
+    expect(container.querySelector('.tab-bar__note-input')).toBeNull()
+  })
+
+  it('saves on Enter', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
+    fireEvent.change(input, { target: { value: 'rebasing onto main' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(mockSetSessionNote).toHaveBeenCalledWith('ses-1', 'rebasing onto main')
+    expect(container.querySelector('.tab-bar__note-input')).toBeNull()
+  })
+
+  it('saves on blur', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
+    fireEvent.change(input, { target: { value: 'blurred' } })
+    fireEvent.blur(input)
+    expect(mockSetSessionNote).toHaveBeenCalledWith('ses-1', 'blurred')
+  })
+
+  it('abandons on Escape', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
+    fireEvent.change(input, { target: { value: 'nope' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(mockSetSessionNote).not.toHaveBeenCalled()
+    expect(container.querySelector('.tab-bar__note-input')).toBeNull()
+  })
+
+  it('does not switch terminal while typing in the editor', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    fireEvent.click(container.querySelector('.tab-bar__note-input')!)
+    expect(mockSetActive).not.toHaveBeenCalled()
+  })
+
+  it('bounds the note so a tab cannot be made unreadable by one', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    expect(container.querySelector('.tab-bar__note-input')!.getAttribute('maxLength')).toBe('120')
+  })
+
+  it('offers adding a note from the tab menu', () => {
+    const { container } = renderTabBar()
+    fireEvent.contextMenu(container.querySelector('.tab-bar__tab--session')!)
+    fireEvent.click(screen.getByText('Add note…'))
+    expect(container.querySelector('.tab-bar__note-input')).toBeTruthy()
+  })
+
+  it('offers editing an existing note instead', () => {
+    mockGetSessions.mockReturnValue([noted({ note: 'rebasing' })])
+    const { container } = renderTabBar()
+    fireEvent.contextMenu(container.querySelector('.tab-bar__tab--session')!)
+    expect(screen.getByText('Edit note…')).toBeTruthy()
+  })
+})

@@ -128,7 +128,7 @@ test('starting a phase opens a project and a terminal running claude', async () 
 
   // The worktree became a project in the sidebar, named for its branch.
   // Named for the branch the card cut, which is what makes it findable at all.
-  const project = page.locator('.session-group__label').filter({ hasText: 'e2e-1' })
+  const project = page.locator('.branch-row__name').filter({ hasText: 'e2e-1' })
   await expect(project.first()).toBeVisible({ timeout: 60_000 })
 
   // And it is running in a terminal, with the command visible in it — held
@@ -276,7 +276,7 @@ async function pilotScreenText(): Promise<string> {
 test('the supervision panel is on screen, not merely built', async () => {
   test.setTimeout(180_000)
   const { page } = handle
-  const tabs = page.locator('.session-group__ws-tab')
+  const tabs = page.locator('.repo-header__action')
   const count = await tabs.count()
   for (let i = 0; i < count; i++) {
     if ((await tabs.nth(i).getAttribute('title')) === 'SpecKit') {

@@ -26,6 +26,12 @@ const STATUS_ICON: Record<StatusIcon, typeof Circle> = {
 
 interface Props {
   projectId: string
+  /**
+   * Opens the note editor on this terminal. The note used to be edited on the
+   * sidebar row; with the rows gone the tab is where the note lives, so the
+   * ⌘I shortcut points here instead (FR-023).
+   */
+  editNoteSessionId?: string | null
   activeProjectTabId: string | null
   projectTabs: ProjectTabRegistration[]
   onSelectProjectTab: (tabId: string | null) => void
@@ -35,6 +41,7 @@ interface Props {
 
 export function TabBar({
   projectId,
+  editNoteSessionId,
   activeProjectTabId,
   projectTabs,
   onSelectProjectTab,
@@ -49,7 +56,10 @@ export function TabBar({
     getBellCountForSession,
     renameSession,
     reorderSessions,
+    setSessionNote,
   } = useSessionStore()
+  const [notingId, setNotingId] = useState<string | null>(null)
+  const [noteValue, setNoteValue] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
@@ -108,6 +118,20 @@ export function TabBar({
   function handleTabDragOver(e: React.DragEvent, index: number): void {
     e.preventDefault()
     setDragOverIndex(index)
+  }
+
+  React.useEffect(() => {
+    if (!editNoteSessionId) return
+    const target = allSessions.find((s) => s.id === editNoteSessionId)
+    if (target === undefined) return
+    setNotingId(editNoteSessionId)
+    setNoteValue(target.note ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editNoteSessionId])
+
+  function commitNote(sessionId: string): void {
+    setSessionNote(sessionId, noteValue.trim())
+    setNotingId(null)
   }
 
   function handleTabDrop(dropIndex: number): void {
@@ -197,7 +221,23 @@ export function TabBar({
                     </span>
                   )
                 })()}
-              {renamingId === session.id ? (
+              {notingId === session.id ? (
+                <input
+                  className="tab-bar__note-input"
+                  value={noteValue}
+                  maxLength={120}
+                  placeholder="note"
+                  autoFocus
+                  onChange={(e) => setNoteValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation()
+                    if (e.key === 'Enter') commitNote(session.id)
+                    if (e.key === 'Escape') setNotingId(null)
+                  }}
+                  onBlur={() => commitNote(session.id)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : renamingId === session.id ? (
                 <input
                   className="tab-bar__rename-input"
                   value={renameValue}
@@ -246,6 +286,7 @@ export function TabBar({
           y={ctxMenu.y}
           sessionId={ctxMenu.sessionId}
           currentTitle={sessions.find((s) => s.id === ctxMenu.sessionId)?.tabTitle ?? ''}
+          currentNote={sessions.find((s) => s.id === ctxMenu.sessionId)?.note ?? ''}
           onRename={(id, title) => {
             setCtxMenu(null)
             setRenamingId(id)
@@ -254,6 +295,11 @@ export function TabBar({
           onMove={(id) => {
             setCtxMenu(null)
             setMoveDialogSessionId(id)
+          }}
+          onNote={(id, note) => {
+            setCtxMenu(null)
+            setNotingId(id)
+            setNoteValue(note)
           }}
           onClose={() => setCtxMenu(null)}
           onCloseTab={(id) => {
@@ -282,8 +328,10 @@ function SessionTabCtxMenu({
   y,
   sessionId,
   currentTitle,
+  currentNote,
   onRename,
   onMove,
+  onNote,
   onClose,
   onCloseTab,
 }: {
@@ -291,8 +339,10 @@ function SessionTabCtxMenu({
   y: number
   sessionId: string
   currentTitle: string
+  currentNote: string
   onRename: (id: string, title: string) => void
   onMove: (id: string) => void
+  onNote: (id: string, note: string) => void
   onClose: () => void
   onCloseTab: (id: string) => void
 }): JSX.Element {
@@ -306,6 +356,9 @@ function SessionTabCtxMenu({
     <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
       <button className="ctx-menu__item" onClick={() => onRename(sessionId, currentTitle)}>
         Rename
+      </button>
+      <button className="ctx-menu__item" onClick={() => onNote(sessionId, currentNote)}>
+        {currentNote ? 'Edit note…' : 'Add note…'}
       </button>
       <div className="ctx-menu__separator" />
       <button className="ctx-menu__item" onClick={() => onMove(sessionId)}>

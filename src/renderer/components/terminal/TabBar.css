@@ -243,3 +243,15 @@
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
   mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
 }
+
+/* The note is edited in place on the tab, the way it used to be on the row. */
+.tab-bar__note-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-xs, 4px);
+  color: var(--text-primary);
+  padding: 0 4px;
+}

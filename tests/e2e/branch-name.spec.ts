@@ -39,12 +39,12 @@ test.afterAll(async () => {
 
 test('a workspace over a repo names its first card after the checked-out branch', async () => {
   const { page } = handle
-  await expect(page.locator('.session-group__label', { hasText: /^main$/ }).first()).toBeVisible()
+  await expect(page.locator('.branch-row__name', { hasText: /^main$/ }).first()).toBeVisible()
 })
 
 test('the create dialog asks for a branch and no other name', async () => {
   const { page } = handle
-  await workspaceRow(page, WS).locator('.ws-row__add').click()
+  await workspaceRow(page, WS).locator('.repo-header__action[aria-label^="New branch in"]').click()
   await expect(page.locator('.dialog__title')).toContainText('Create Branch')
   // The Name field only exists where there is no branch to take a name from.
   await expect(page.getByPlaceholder('My branch')).toHaveCount(0)
@@ -61,15 +61,15 @@ test('the card follows a checkout made outside the app', async () => {
   git('checkout', '-b', 'feature/renamed-by-git')
   // Polled, so allow more than one interval before calling it a failure.
   await expect(
-    page.locator('.session-group__label', { hasText: 'feature/renamed-by-git' }).first()
+    page.locator('.branch-row__name', { hasText: 'feature/renamed-by-git' }).first()
   ).toBeVisible({ timeout: 20000 })
-  await expect(page.locator('.session-group__label', { hasText: /^main$/ })).toHaveCount(0)
+  await expect(page.locator('.branch-row__name', { hasText: /^main$/ })).toHaveCount(0)
 })
 
 test('a branch offers no rename, because there is nothing else to name', async () => {
   const { page } = handle
   await page
-    .locator('.session-group__header')
+    .locator('.branch-row')
     .filter({ hasText: 'feature/renamed-by-git' })
     .last()
     .click({ button: 'right' })

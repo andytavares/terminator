@@ -611,7 +611,6 @@ export function App(): JSX.Element {
               useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
             }}
             visible={sidebarVisible}
-            editNoteSessionId={editNoteSessionId}
           />
 
           <div className="app-main-area">
@@ -653,6 +652,7 @@ export function App(): JSX.Element {
                   <>
                     <TabBar
                       projectId={displayProjectId}
+                      editNoteSessionId={editNoteSessionId}
                       activeProjectTabId={activeProjectTabId}
                       projectTabs={Array.from(projectTabs.values())}
                       onSelectProjectTab={setActiveProjectTab}

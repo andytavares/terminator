@@ -51,10 +51,7 @@ const openBoard = async (): Promise<void> => {
  * sidebar stops listing terminals in this same feature.
  */
 const startTerminal = async (): Promise<void> => {
-  await handle.page
-    .locator('.session-group:not(:has(.session-group)) .session-group__header')
-    .first()
-    .click()
+  await handle.page.locator('.branch-row').first().click()
   await handle.page.waitForSelector('.tab-bar__tab', { timeout: 15000 })
 }
 
