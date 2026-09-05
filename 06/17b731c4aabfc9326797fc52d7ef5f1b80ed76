@@ -1,0 +1,24 @@
+specs/034-declutter-sidebar/spec.md
+  s_f99ce66da147a0::t_f88dc0de6b50aa 181,190,192,207,233,243,247-250
+  s_f99ce66da147a0::t_c7af3b82f8569e 251
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_f99ce66da147a0::t_955726e87a7b73 1196-1270
+specs/034-declutter-sidebar/tasks.md
+  s_f99ce66da147a0::t_f04827a9bef79b 31-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "0617b731c4aabfc9326797fc52d7ef5f1b80ed76",
+  "prompts": {},
+  "sessions": {
+    "s_f99ce66da147a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bedd0c8-eeb0-4be7-841a-5f499713ccb3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
