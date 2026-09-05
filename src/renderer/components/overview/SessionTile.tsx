@@ -1,14 +1,10 @@
 import React, { memo, useRef, useLayoutEffect } from 'react'
-import type {
-  TerminalSession,
-  Workspace,
-  Project,
-  ProcessMetrics,
-} from '../../../../shared/types/index'
-import { ActivitySpinner } from '../ActivitySpinner'
+import { Bell, X } from 'lucide-react'
+import type { ProcessMetrics } from '../../../shared/types/index'
+import type { BoardCard } from '../../sidebar/board-lanes'
+import { formatRelativeTime } from '../../sidebar/relative-time'
 import { useSessionStore } from '../../stores/session.store'
 import './SessionTile.css'
-import { branchLabel } from '../../sidebar/branch-display'
 
 function formatRss(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
@@ -17,79 +13,86 @@ function formatRss(bytes: number): string {
 }
 
 interface Props {
-  session: TerminalSession
-  workspace: Workspace
-  project: Project
+  card: BoardCard
   processMetrics: ProcessMetrics | null
-  tileIndex: number
+  /** Passed rather than read, so a card's age is testable at its boundaries. */
+  now: number
   onNavigate: () => void
 }
 
-function SessionTileInner({
-  session,
-  workspace,
-  project,
-  processMetrics,
-  onNavigate,
-}: Props): JSX.Element {
+/**
+ * One terminal, as the board draws it.
+ *
+ * The live preview is what makes a card worth more than a row — you can read
+ * the question an agent is actually asking without opening it. `mountPreview`
+ * moves the single live xterm element in here, so this component must keep the
+ * same DOM node across a state change; the board guarantees that by never
+ * re-parenting it (see BoardScreen).
+ *
+ * Every optional fact is omitted rather than drawn empty (FR-013): a terminal
+ * with no bells has no bell, not a zero.
+ */
+function SessionTileInner({ card, processMetrics, now, onNavigate }: Props): JSX.Element {
   const previewRef = useRef<HTMLDivElement>(null)
-  const { getTerminalInstance, isSessionBusy, closeSession } = useSessionStore()
-  const isBusy = isSessionBusy(session.id)
+  const { getTerminalInstance, closeSession } = useSessionStore()
 
   function handleClose(e: React.MouseEvent): void {
     e.stopPropagation()
-    void closeSession(session.id)
+    void closeSession(card.sessionId)
   }
 
   useLayoutEffect(() => {
-    const instance = getTerminalInstance(session.id)
+    const instance = getTerminalInstance(card.sessionId)
     if (!instance || !previewRef.current) return
     const cleanup = instance.mountPreview(previewRef.current)
     return cleanup ?? undefined
-  }, [session.id, getTerminalInstance])
+  }, [card.sessionId, getTerminalInstance])
 
   return (
     <div
       className="session-tile"
-      style={{ ['--tile-ws-color' as string]: workspace.color }}
+      style={
+        card.workspaceColor === null
+          ? undefined
+          : { ['--tile-ws-color' as string]: card.workspaceColor }
+      }
       onClick={onNavigate}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') onNavigate()
       }}
-      aria-label={`Switch to ${branchLabel(project)} — ${session.tabTitle}`}
+      aria-label={`Switch to ${card.title} — ${card.sourceLabel}`}
     >
       <div className="session-tile__thumb">
         <div ref={previewRef} className="session-tile__preview" />
-        {isBusy && (
-          <div className="session-tile__busy">
-            <ActivitySpinner />
-          </div>
-        )}
         <button
           className="session-tile__close"
           onClick={handleClose}
-          aria-label={`Close ${session.tabTitle}`}
+          aria-label={`Close ${card.title}`}
           tabIndex={-1}
         >
-          ✕
+          <X aria-hidden="true" />
         </button>
       </div>
 
-      <div className="session-tile__footer">
-        <div className="session-tile__header">
-          <span className="session-tile__workspace">{workspace.name}</span>
-          <span className="session-tile__project">{branchLabel(project)}</span>
-          <span className="session-tile__tab">{session.tabTitle}</span>
+      <div className="session-tile__body">
+        <div className="session-tile__title">{card.title}</div>
+        <div className="session-tile__source">{card.sourceLabel}</div>
+        <div className="session-tile__foot">
+          {card.bellCount > 0 && (
+            <span className="session-tile__bell">
+              <Bell aria-hidden="true" />
+              {card.bellCount}
+            </span>
+          )}
+          {processMetrics && (
+            <span className="session-tile__metrics">
+              {processMetrics.cpuPercent.toFixed(1)}% · {formatRss(processMetrics.rssBytes)}
+            </span>
+          )}
+          <span className="session-tile__age">{formatRelativeTime(card.lastActivityAt, now)}</span>
         </div>
-
-        {processMetrics && (
-          <div className="session-tile__metrics">
-            <span>CPU {processMetrics.cpuPercent.toFixed(1)}%</span>
-            <span>{formatRss(processMetrics.rssBytes)}</span>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -97,8 +100,13 @@ function SessionTileInner({
 
 export const SessionTile = memo(SessionTileInner, (prev, next) => {
   return (
-    prev.session.id === next.session.id &&
-    prev.session.tabTitle === next.session.tabTitle &&
+    prev.card.sessionId === next.card.sessionId &&
+    prev.card.title === next.card.title &&
+    prev.card.sourceLabel === next.card.sourceLabel &&
+    prev.card.bellCount === next.card.bellCount &&
+    prev.card.lastActivityAt === next.card.lastActivityAt &&
+    prev.card.workspaceColor === next.card.workspaceColor &&
+    prev.now === next.now &&
     prev.processMetrics?.cpuPercent === next.processMetrics?.cpuPercent &&
     prev.processMetrics?.rssBytes === next.processMetrics?.rssBytes
   )

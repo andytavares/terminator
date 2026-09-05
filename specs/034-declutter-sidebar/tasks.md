@@ -74,14 +74,14 @@ Single project, renderer-only. Sources under `src/renderer/`, specs under `tests
 - [x] T015 [US2] Create `src/renderer/components/overview/BoardScreen.tsx` rendering **one CSS grid containing every card**, with a card's lane expressed as `grid-column` — cards must never be re-parented (research.md R-003)
 - [x] T016 [US2] Create `src/renderer/components/overview/BoardScreen.css` — grid template, lane headers in row 1, exited lane at 42% opacity, `min-height` so an empty lane keeps its header without a placeholder
 - [x] T017 [US2] **Write the preview-survival test** in `tests/unit/renderer/components/BoardScreen.spec.tsx`: assert a card's DOM node identity is unchanged across a state change, because `mountPreview` moves the one live xterm element into that node and re-parenting tears it out (`src/renderer/components/terminal/TerminalSession.tsx:471`)
-- [ ] T018 [US2] Rework `src/renderer/components/overview/SessionTile.tsx` into the card: title in sans, `"<repo> / <branch>"` in mono, bell only when non-zero, and every optional line **omitted rather than drawn empty** (FR-013)
-- [ ] T019 [US2] Rework `src/renderer/components/overview/SessionTile.css` — 2px repo rail replacing the colour dot, preserved live-preview container (FR-020, FR-040)
+- [x] T018 [US2] Rework `src/renderer/components/overview/SessionTile.tsx` into the card: title in sans, `"<repo> / <branch>"` in mono, bell only when non-zero, and every optional line **omitted rather than drawn empty** (FR-013)
+- [x] T019 [US2] Rework `src/renderer/components/overview/SessionTile.css` — 2px repo rail replacing the colour dot, preserved live-preview container (FR-020, FR-040)
 - [x] T020 [US2] Add the 180ms `transform`/`opacity` transition to the card that changed lane in `src/renderer/components/overview/BoardScreen.css`, with `@media (prefers-reduced-motion: reduce)` cutting straight to position (FR-011)
-- [ ] T021 [US2] Implement lane visibility (show/hide per lane) with `terminator.board.lanes` persistence in `src/renderer/components/overview/BoardScreen.tsx` (FR-016, T013)
+- [x] T021 [US2] Implement lane visibility (show/hide per lane) with `terminator.board.lanes` persistence in `src/renderer/components/overview/BoardScreen.tsx` (FR-016, T013)
 - [x] T022 [US2] Implement the empty-board state — one line and one action, distinct from an empty lane — in `src/renderer/components/overview/BoardScreen.tsx` (FR-009 as amended, T003)
-- [ ] T023 [US2] Make `src/renderer/components/overview/OverviewScreen.tsx` host board and list layouts on one surface with board as the default (FR-015)
-- [ ] T024 [US2] Rewrite `tests/unit/renderer/components/OverviewScreen.spec.tsx` for the two layouts and the default
-- [ ] T025 [US2] Rewrite `tests/unit/renderer/components/SessionTile.spec.tsx` for the card anatomy
+- [x] T023 [US2] Make `src/renderer/components/overview/OverviewScreen.tsx` host board and list layouts on one surface with board as the default (FR-015)
+- [x] T024 [US2] Rewrite `tests/unit/renderer/components/OverviewScreen.spec.tsx` for the two layouts and the default
+- [x] T025 [US2] Rewrite `tests/unit/renderer/components/SessionTile.spec.tsx` for the card anatomy
 - [ ] T026 [US2] Add `tests/e2e/board.spec.ts` driving four terminals into four states and asserting lane placement, then a state change moving a card
 
 **Checkpoint**: The board answers "which terminal is in what state" for the whole fleet, and the live preview survives a lane change.

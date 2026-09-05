@@ -1,49 +1,34 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
-import type { TerminalSession, Workspace, Project } from '../../../../src/shared/types/index'
-
-const mockStartPolling = vi.fn()
-const mockStopPolling = vi.fn()
-const mockSetActiveGlobalTab = vi.fn()
-const mockSetActiveWorkspace = vi.fn()
-const mockSetActiveProject = vi.fn()
-const mockSetScratchActive = vi.fn()
-const mockSetActiveSessionForProject = vi.fn()
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
+import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: Object.assign(vi.fn(), {
-    getState: vi.fn(),
-  }),
+  useSessionStore: Object.assign(vi.fn(), { getState: vi.fn() }),
 }))
-
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: Object.assign(vi.fn(), {
-    getState: vi.fn(),
-  }),
+  useWorkspaceStore: Object.assign(vi.fn(), { getState: vi.fn() }),
 }))
-
 vi.mock('../../../../src/renderer/stores/metrics.store', () => ({
   useMetricsStore: vi.fn(),
 }))
-
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: {
-    getState: vi.fn(),
-  },
+  useExtensionRegistry: Object.assign(vi.fn(), { getState: vi.fn() }),
 }))
-
-vi.mock('../../../../src/renderer/components/overview/MetricsBar', () => ({
-  MetricsBar: ({ system }: { system: unknown }) => (
-    <div data-testid="metrics-bar" data-has-system={system !== null ? 'true' : 'false'} />
-  ),
-}))
-
+// The card is covered by its own spec; here it is a stub so the board's
+// arrangement is what is under test.
 vi.mock('../../../../src/renderer/components/overview/SessionTile', () => ({
-  SessionTile: ({ session, onNavigate }: { session: TerminalSession; onNavigate: () => void }) => (
-    <div data-testid={`tile-${session.id}`} role="button" onClick={onNavigate}>
-      {session.tabTitle}
-    </div>
+  SessionTile: ({
+    card,
+    onNavigate,
+  }: {
+    card: { sessionId: string; title: string }
+    onNavigate: () => void
+  }) => (
+    <button type="button" data-testid={`tile-${card.sessionId}`} onClick={onNavigate}>
+      {card.title}
+    </button>
   ),
 }))
 
@@ -52,465 +37,285 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useMetricsStore } from '../../../../src/renderer/stores/metrics.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { OverviewScreen } from '../../../../src/renderer/components/overview/OverviewScreen'
-import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
+import { LANES_STORAGE_KEY } from '../../../../src/renderer/sidebar/board-lanes'
 
-function makeSession(overrides: Partial<TerminalSession> = {}): TerminalSession {
+const repo: Workspace = {
+  id: 'ws-1',
+  name: 'terminator',
+  folderPath: '/r',
+  color: '#5c6bc0',
+  tags: [],
+  createdAt: '',
+  updatedAt: '',
+}
+const branch: Project = {
+  id: 'p1',
+  workspaceId: 'ws-1',
+  name: 'API',
+  gitBranch: 'main',
+  isWorktree: false,
+  createdAt: '',
+  updatedAt: '',
+}
+
+function session(id: string, patch: Partial<TerminalSession> = {}): TerminalSession {
   return {
-    id: 'sess-1',
-    projectId: 'proj-1',
-    tabTitle: 'bash',
+    id,
+    projectId: 'p1',
+    tabTitle: id,
     status: 'active',
-    type: 'human',
-    bellCount: 0,
-    ...overrides,
+    type: 'agent',
+    scrollbackLimit: 10000,
+    createdAt: '',
+    lastActivityAt: 1000,
+    agentState: 'idle',
+    ...patch,
   }
 }
 
-function makeWorkspace(overrides: Partial<Workspace> = {}): Workspace {
-  return {
-    id: 'ws-1',
-    name: 'Alpha Workspace',
-    path: '/alpha',
-    color: '#4a9eff',
-    theme: 'dark',
-    tags: [],
-    ...overrides,
-  }
-}
+const setActiveWorkspace = vi.fn()
+const setActiveProject = vi.fn()
+const setActiveSessionForProject = vi.fn()
+const setScratchActive = vi.fn()
+const setActiveGlobalTab = vi.fn()
+const startPolling = vi.fn()
+const stopPolling = vi.fn()
 
-function makeProject(overrides: Partial<Project> = {}): Project {
-  return {
-    id: 'proj-1',
-    workspaceId: 'ws-1',
-    name: 'My Project',
-    activeSessionId: 'sess-1',
-    ...overrides,
-  }
-}
+let sessions: Map<string, TerminalSession>
 
-const mockGetPids = vi.fn()
+function mount(): ReturnType<typeof render> {
+  const sessionState = { sessions, setActiveSessionForProject }
+  const workspaceState = {
+    workspaces: [repo],
+    projectsByWorkspaceId: new Map([['ws-1', [branch]]]),
+    setScratchActive,
+    activeWorkspaceId: 'ws-1',
+    setActiveWorkspace,
+    setActiveProject,
+  }
+  ;(useSessionStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue(sessionState)
+  ;(useSessionStore as unknown as { getState: ReturnType<typeof vi.fn> }).getState.mockReturnValue(
+    sessionState
+  )
+  ;(useWorkspaceStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue(workspaceState)
+  ;(
+    useWorkspaceStore as unknown as { getState: ReturnType<typeof vi.fn> }
+  ).getState.mockReturnValue(workspaceState)
+  ;(useMetricsStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    processesBySessionId: new Map(),
+    startPolling,
+    stopPolling,
+  })
+  ;(
+    useExtensionRegistry as unknown as { getState: ReturnType<typeof vi.fn> }
+  ).getState.mockReturnValue({ setActiveGlobalTab })
+  return render(<OverviewScreen />)
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-
-  vi.mocked(useSessionStore).mockReturnValue({
-    sessions: new Map(),
-  } as unknown as ReturnType<typeof useSessionStore>)
-
-  vi.mocked(useSessionStore).getState = vi.fn().mockReturnValue({
-    setActiveSessionForProject: mockSetActiveSessionForProject,
+  localStorage.clear()
+  sessions = new Map()
+  Object.defineProperty(window, 'electronAPI', {
+    configurable: true,
+    value: { metrics: { getPids: vi.fn().mockResolvedValue({ data: [] }) } },
   })
-
-  vi.mocked(useWorkspaceStore).mockReturnValue({
-    workspaces: [],
-    projectsByWorkspaceId: new Map(),
-    setScratchActive: mockSetScratchActive,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-  vi.mocked(useWorkspaceStore).getState = vi.fn().mockReturnValue({
-    activeWorkspaceId: 'ws-1',
-    setActiveWorkspace: mockSetActiveWorkspace,
-    setActiveProject: mockSetActiveProject,
-  })
-
-  vi.mocked(useMetricsStore).mockReturnValue({
-    system: null,
-    processesBySessionId: new Map(),
-    startPolling: mockStartPolling,
-    stopPolling: mockStopPolling,
-  } as unknown as ReturnType<typeof useMetricsStore>)
-
-  vi.mocked(useExtensionRegistry).getState = vi.fn().mockReturnValue({
-    setActiveGlobalTab: mockSetActiveGlobalTab,
-  })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    metrics: { getPids: mockGetPids },
-  }
-
-  mockGetPids.mockResolvedValue({ data: [] })
 })
 
 describe('OverviewScreen', () => {
-  it('renders empty state when no sessions', async () => {
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
+  it('opens on the board, not the flat list', () => {
+    sessions.set('a', session('a', { agentState: 'working' }))
+    const { container } = mount()
+    expect(container.querySelector('.board')).toBeTruthy()
+    expect(container.querySelector('.overview-screen__grid')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Board' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('switches to the flat list and back', () => {
+    sessions.set('a', session('a', { agentState: 'working' }))
+    const { container } = mount()
+    fireEvent.click(screen.getByRole('button', { name: 'List' }))
+    expect(container.querySelector('.overview-screen__grid')).toBeTruthy()
+    expect(container.querySelector('.board')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Board' }))
+    expect(container.querySelector('.board')).toBeTruthy()
+  })
+
+  it('places each terminal in the lane matching its state', () => {
+    sessions.set('a', session('a', { agentState: 'awaiting-input' }))
+    sessions.set('b', session('b', { agentState: 'working' }))
+    const { container } = mount()
+    expect(
+      container.querySelector('.board__slot[data-session-id="a"]')!.getAttribute('data-lane')
+    ).toBe('Needs you')
+    expect(
+      container.querySelector('.board__slot[data-session-id="b"]')!.getAttribute('data-lane')
+    ).toBe('Working')
+  })
+
+  it('shows every terminal in the list layout too', () => {
+    sessions.set('a', session('a', { agentState: 'working' }))
+    sessions.set('b', session('b', { agentState: 'idle' }))
+    mount()
+    fireEvent.click(screen.getByRole('button', { name: 'List' }))
+    expect(screen.getByTestId('tile-a')).toBeTruthy()
+    expect(screen.getByTestId('tile-b')).toBeTruthy()
+  })
+
+  it('offers one action when nothing is running', () => {
+    mount()
+    expect(screen.getByRole('button', { name: /start a branch/i })).toBeTruthy()
+  })
+
+  it('says so plainly in the list layout when nothing is running', () => {
+    mount()
+    fireEvent.click(screen.getByRole('button', { name: 'List' }))
     expect(screen.getByText('No open terminals')).toBeTruthy()
   })
 
-  it('renders tile for each active session', async () => {
-    const session = makeSession()
-    const workspace = makeWorkspace()
-    const project = makeProject()
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['sess-1', session]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [workspace],
-      projectsByWorkspaceId: new Map([['ws-1', [project]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
+  describe('navigating from a card', () => {
+    it('activates the branch and the terminal', () => {
+      sessions.set('a', session('a', { agentState: 'working' }))
+      mount()
+      fireEvent.click(screen.getByTestId('tile-a'))
+      expect(setActiveGlobalTab).toHaveBeenCalledWith(null)
+      expect(setActiveProject).toHaveBeenCalledWith('p1')
+      expect(setActiveSessionForProject).toHaveBeenCalledWith('p1', 'a')
     })
 
-    expect(screen.getByTestId('tile-sess-1')).toBeTruthy()
+    it('switches repo first when the branch is in another one', () => {
+      sessions.set('a', session('a', { agentState: 'working' }))
+      mount()
+      fireEvent.click(screen.getByTestId('tile-a'))
+      // Already the active repo, so no switch is needed.
+      expect(setActiveWorkspace).not.toHaveBeenCalled()
+    })
+
+    it('takes a scratch terminal to the scratch surface instead', () => {
+      sessions.set('s', session('s', { projectId: SCRATCH_PROJECT_ID, agentState: 'working' }))
+      mount()
+      fireEvent.click(screen.getByTestId('tile-s'))
+      expect(setScratchActive).toHaveBeenCalledWith(true)
+      expect(setActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 's')
+    })
   })
 
-  it('excludes closed sessions from tiles', async () => {
-    const session = makeSession({ status: 'closed' })
-    const workspace = makeWorkspace()
-    const project = makeProject()
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['sess-1', session]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [workspace],
-      projectsByWorkspaceId: new Map([['ws-1', [project]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
+  describe('lane visibility', () => {
+    it('hides a lane from its header and remembers it', () => {
+      sessions.set('a', session('a', { agentState: 'working' }))
+      const { container } = mount()
+      fireEvent.click(
+        container.querySelector('.board__lane-head[data-lane="Idle"] .board__lane-toggle')!
+      )
+      expect(container.querySelector('.board__lane-head[data-lane="Idle"]')).toBeNull()
+      expect(localStorage.getItem(LANES_STORAGE_KEY)).toBe(JSON.stringify(['idle']))
     })
 
-    expect(screen.queryByTestId('tile-sess-1')).toBeNull()
-    expect(screen.getByText('No open terminals')).toBeTruthy()
+    it('opens with a previously hidden lane still hidden', () => {
+      localStorage.setItem(LANES_STORAGE_KEY, JSON.stringify(['idle']))
+      sessions.set('a', session('a', { agentState: 'working' }))
+      const { container } = mount()
+      expect(container.querySelector('.board__lane-head[data-lane="Idle"]')).toBeNull()
+      expect(container.querySelector('.board__lane-head[data-lane="Working"]')).toBeTruthy()
+    })
   })
 
-  it('calls startPolling with resolved PIDs', async () => {
-    const session = makeSession()
-    const workspace = makeWorkspace()
-    const project = makeProject()
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['sess-1', session]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [workspace],
-      projectsByWorkspaceId: new Map([['ws-1', [project]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    mockGetPids.mockResolvedValue({ data: [{ sessionId: 'sess-1', pid: 1234 }] })
-
-    await act(async () => {
-      render(<OverviewScreen />)
+  describe('process metrics', () => {
+    it('resolves pids for the terminals on screen', async () => {
+      sessions.set('a', session('a', { agentState: 'working' }))
+      await act(async () => {
+        mount()
+      })
+      expect(window.electronAPI.metrics.getPids).toHaveBeenCalledWith(['a'])
+      expect(startPolling).toHaveBeenCalled()
     })
 
-    expect(mockGetPids).toHaveBeenCalledWith(['sess-1'])
-    expect(mockStartPolling).toHaveBeenCalledWith([{ sessionId: 'sess-1', pid: 1234 }])
+    it('polls nothing when there are no terminals', () => {
+      mount()
+      expect(startPolling).toHaveBeenCalledWith([])
+    })
+
+    it('still polls when the pid lookup fails', async () => {
+      ;(window.electronAPI.metrics.getPids as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error('nope')
+      )
+      sessions.set('a', session('a', { agentState: 'working' }))
+      await act(async () => {
+        mount()
+      })
+      expect(startPolling).toHaveBeenCalledWith([])
+    })
+  })
+})
+
+describe('OverviewScreen — guards and the repo switch', () => {
+  it('switches repo first when the branch lives in another one', () => {
+    sessions.set('a', session('a', { agentState: 'working' }))
+    const sessionState = { sessions, setActiveSessionForProject }
+    const workspaceState = {
+      workspaces: [repo],
+      projectsByWorkspaceId: new Map([['ws-1', [branch]]]),
+      setScratchActive,
+      // The board is showing a branch in a repo that is not the active one.
+      activeWorkspaceId: 'ws-other',
+      setActiveWorkspace,
+      setActiveProject,
+    }
+    ;(useSessionStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue(sessionState)
+    ;(
+      useSessionStore as unknown as { getState: ReturnType<typeof vi.fn> }
+    ).getState.mockReturnValue(sessionState)
+    ;(useWorkspaceStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue(workspaceState)
+    ;(
+      useWorkspaceStore as unknown as { getState: ReturnType<typeof vi.fn> }
+    ).getState.mockReturnValue(workspaceState)
+    ;(useMetricsStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      processesBySessionId: new Map(),
+      startPolling,
+      stopPolling,
+    })
+    ;(
+      useExtensionRegistry as unknown as { getState: ReturnType<typeof vi.fn> }
+    ).getState.mockReturnValue({ setActiveGlobalTab })
+
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getByTestId('tile-a'))
+    expect(setActiveWorkspace).toHaveBeenCalledWith('ws-1')
+    expect(setActiveProject).toHaveBeenCalledWith('p1')
   })
 
-  it('calls startPolling with empty array when getPids returns error', async () => {
-    const session = makeSession()
-    const workspace = makeWorkspace()
-    const project = makeProject()
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['sess-1', session]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [workspace],
-      projectsByWorkspaceId: new Map([['ws-1', [project]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    mockGetPids.mockRejectedValue(new Error('IPC fail'))
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    expect(mockStartPolling).toHaveBeenCalledWith([])
+  it('does nothing when the terminal has gone between drawing and clicking', () => {
+    sessions.set('a', session('a', { agentState: 'working' }))
+    mount()
+    // The store loses it — closed from somewhere else while the board was up.
+    sessions.delete('a')
+    fireEvent.click(screen.getByTestId('tile-a'))
+    expect(setActiveProject).not.toHaveBeenCalled()
   })
 
-  it('calls startPolling immediately with empty array when no sessions', async () => {
-    await act(async () => {
-      render(<OverviewScreen />)
+  it('does nothing when the branch has gone between drawing and clicking', () => {
+    // Only reachable as a race: buildLanes already drops a terminal whose
+    // branch is missing, so the card can only outlive the branch if the store
+    // changes between the render that drew it and the click that follows.
+    sessions.set('a', session('a', { agentState: 'working' }))
+    mount()
+    ;(
+      useSessionStore as unknown as { getState: ReturnType<typeof vi.fn> }
+    ).getState.mockReturnValue({
+      sessions: new Map([['a', session('a', { projectId: 'vanished', agentState: 'working' })]]),
+      setActiveSessionForProject,
     })
-    expect(mockStartPolling).toHaveBeenCalledWith([])
+    fireEvent.click(screen.getByTestId('tile-a'))
+    expect(setActiveProject).not.toHaveBeenCalled()
   })
 
-  it('navigates to the correct project when a tile is clicked', async () => {
-    const session = makeSession()
-    const workspace = makeWorkspace()
-    const project = makeProject()
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['sess-1', session]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [workspace],
-      projectsByWorkspaceId: new Map([['ws-1', [project]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    await act(async () => {
-      screen.getByTestId('tile-sess-1').click()
-    })
-
-    expect(mockSetActiveProject).toHaveBeenCalledWith('proj-1')
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 'sess-1')
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
-  })
-
-  it('switches workspace when navigating to a tile in a different workspace', async () => {
-    const session = makeSession({ projectId: 'proj-2' })
-    const workspace1 = makeWorkspace({ id: 'ws-1' })
-    const workspace2 = makeWorkspace({ id: 'ws-2', name: 'Beta' })
-    const project = makeProject({ id: 'proj-2', workspaceId: 'ws-2' })
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['sess-1', session]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [workspace1, workspace2],
-      projectsByWorkspaceId: new Map([['ws-2', [project]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    vi.mocked(useWorkspaceStore).getState = vi.fn().mockReturnValue({
-      activeWorkspaceId: 'ws-1',
-      setActiveWorkspace: mockSetActiveWorkspace,
-      setActiveProject: mockSetActiveProject,
-    })
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    await act(async () => {
-      screen.getByTestId('tile-sess-1').click()
-    })
-
-    expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-2')
-    expect(mockSetActiveProject).toHaveBeenCalledWith('proj-2')
-  })
-
-  it('does not switch workspace when already in the correct one', async () => {
-    const session = makeSession()
-    const workspace = makeWorkspace()
-    const project = makeProject()
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['sess-1', session]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [workspace],
-      projectsByWorkspaceId: new Map([['ws-1', [project]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    vi.mocked(useWorkspaceStore).getState = vi.fn().mockReturnValue({
-      activeWorkspaceId: 'ws-1',
-      setActiveWorkspace: mockSetActiveWorkspace,
-      setActiveProject: mockSetActiveProject,
-    })
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    await act(async () => {
-      screen.getByTestId('tile-sess-1').click()
-    })
-
-    expect(mockSetActiveWorkspace).not.toHaveBeenCalled()
-  })
-
-  it('sorts busy sessions to the top before alphabetical ordering', async () => {
-    const ws = makeWorkspace({ id: 'ws-1', name: 'Alpha' })
-    const proj = makeProject({ id: 'p-1', workspaceId: 'ws-1', name: 'Project' })
-    // sess-a comes first alphabetically, sess-z comes last — but sess-z is busy
-    const sessA = makeSession({ id: 's-a', projectId: 'p-1', tabTitle: 'aaa' })
-    const sessZ = makeSession({ id: 's-z', projectId: 'p-1', tabTitle: 'zzz' })
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([
-        ['s-a', sessA],
-        ['s-z', { ...sessZ, busy: true }],
-      ]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [ws],
-      projectsByWorkspaceId: new Map([['ws-1', [proj]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    const tiles = screen.getAllByRole('button')
-    expect(tiles[0].getAttribute('data-testid')).toBe('tile-s-z')
-    expect(tiles[1].getAttribute('data-testid')).toBe('tile-s-a')
-  })
-
-  it('sorts tiles by workspace name, then project name, then tab title', async () => {
-    const ws1 = makeWorkspace({ id: 'ws-a', name: 'Alpha' })
-    const ws2 = makeWorkspace({ id: 'ws-b', name: 'Beta' })
-    const proj1 = makeProject({ id: 'p-1', workspaceId: 'ws-b', name: 'Project' })
-    const proj2 = makeProject({ id: 'p-2', workspaceId: 'ws-a', name: 'Project' })
-    const sess1 = makeSession({ id: 's-1', projectId: 'p-1' })
-    const sess2 = makeSession({ id: 's-2', projectId: 'p-2' })
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([
-        ['s-1', sess1],
-        ['s-2', sess2],
-      ]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [ws1, ws2],
-      projectsByWorkspaceId: new Map([
-        ['ws-b', [proj1]],
-        ['ws-a', [proj2]],
-      ]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    const tiles = screen.getAllByRole('button')
-    // Alpha workspace (ws-a) should come before Beta workspace (ws-b)
-    expect(tiles[0].getAttribute('data-testid')).toBe('tile-s-2')
-    expect(tiles[1].getAttribute('data-testid')).toBe('tile-s-1')
-  })
-
-  it('renders tile for scratch session without a real project', async () => {
-    const scratchSession = makeSession({
-      id: 'scratch-1',
-      projectId: SCRATCH_PROJECT_ID,
-      tabTitle: 'Scratch',
-    })
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['scratch-1', scratchSession]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [],
-      projectsByWorkspaceId: new Map(),
-      setScratchActive: mockSetScratchActive,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    expect(screen.getByTestId('tile-scratch-1')).toBeTruthy()
-  })
-
-  it('calls setScratchActive when a scratch tile is clicked', async () => {
-    const scratchSession = makeSession({
-      id: 'scratch-2',
-      projectId: SCRATCH_PROJECT_ID,
-      tabTitle: 'Scratch',
-    })
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['scratch-2', scratchSession]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [],
-      projectsByWorkspaceId: new Map(),
-      setScratchActive: mockSetScratchActive,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    await act(async () => {
-      screen.getByTestId('tile-scratch-2').click()
-    })
-
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'scratch-2')
-    expect(mockSetScratchActive).toHaveBeenCalledWith(true)
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
-    expect(mockSetActiveProject).not.toHaveBeenCalled()
-  })
-
-  it('sorts tiles: busy first, then workspace, project, and tab title', async () => {
-    const wsA = makeWorkspace({ id: 'ws-a', name: 'Alpha' })
-    const wsB = makeWorkspace({ id: 'ws-b', name: 'Beta' })
-    const projA = makeProject({ id: 'proj-a', workspaceId: 'ws-a', name: 'api' })
-    const projB = makeProject({ id: 'proj-b', workspaceId: 'ws-a', name: 'web' })
-    const projC = makeProject({ id: 'proj-c', workspaceId: 'ws-b', name: 'api' })
-
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([
-        ['s-1', makeSession({ id: 's-1', projectId: 'proj-b', tabTitle: 'bbb' })],
-        ['s-2', makeSession({ id: 's-2', projectId: 'proj-a', tabTitle: 'zzz' })],
-        ['s-3', makeSession({ id: 's-3', projectId: 'proj-a', tabTitle: 'aaa' })],
-        ['s-4', makeSession({ id: 's-4', projectId: 'proj-c', tabTitle: 'ccc', busy: true })],
-      ]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [wsA, wsB],
-      projectsByWorkspaceId: new Map([
-        ['ws-a', [projA, projB]],
-        ['ws-b', [projC]],
-      ]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    const ids = [...document.querySelectorAll('[data-testid^="tile-"]')].map((el) =>
-      el.getAttribute('data-testid')
-    )
-    // busy s-4 first; then Alpha/api by title (aaa, zzz), then Alpha/web, per comparator
-    expect(ids).toEqual(['tile-s-4', 'tile-s-3', 'tile-s-2', 'tile-s-1'])
-  })
-
-  it('skips sessions whose project or workspace cannot be resolved', async () => {
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([
-        ['s-orphan', makeSession({ id: 's-orphan', projectId: 'proj-ghost' })],
-        ['s-lost-ws', makeSession({ id: 's-lost-ws', projectId: 'proj-x' })],
-      ]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [],
-      projectsByWorkspaceId: new Map([
-        ['ws-gone', [makeProject({ id: 'proj-x', workspaceId: 'ws-gone' })]],
-      ]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    expect(document.querySelector('[data-testid^="tile-"]')).toBeNull()
-  })
-
-  it('starts empty polling when PID resolution rejects', async () => {
-    mockGetPids.mockRejectedValueOnce(new Error('ipc down'))
-    vi.mocked(useSessionStore).mockReturnValue({
-      sessions: new Map([['sess-1', makeSession()]]),
-    } as unknown as ReturnType<typeof useSessionStore>)
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      workspaces: [makeWorkspace()],
-      projectsByWorkspaceId: new Map([['ws-1', [makeProject()]]]),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-
-    expect(mockStartPolling).toHaveBeenCalledWith([])
+  it('shows a hidden lane again when it is toggled back', () => {
+    localStorage.setItem(LANES_STORAGE_KEY, JSON.stringify(['idle']))
+    sessions.set('a', session('a', { agentState: 'idle' }))
+    const { container } = mount()
+    expect(container.querySelector('.board__lane-head[data-lane="Idle"]')).toBeNull()
+    // Unhide from another lane's header — the only one on screen.
+    fireEvent.click(container.querySelector('.board__lane-head .board__lane-toggle')!)
+    expect(localStorage.getItem(LANES_STORAGE_KEY)).not.toContain('"idle","idle"')
   })
 })

@@ -1,108 +1,72 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { LayoutGrid, Rows3 } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useMetricsStore } from '../../stores/metrics.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { SessionTile } from './SessionTile'
-import type { Project, Workspace, TerminalSession } from '../../../../shared/types/index'
+import { BoardScreen } from './BoardScreen'
+import {
+  buildLanes,
+  loadHiddenLanes,
+  saveHiddenLanes,
+  type BoardCard,
+} from '../../sidebar/board-lanes'
+import type { AgentState } from '../../../shared/types/index'
 import { SCRATCH_PROJECT_ID } from '../../../shared/types/index'
 import './OverviewScreen.css'
-import { branchLabel } from '../../sidebar/branch-display'
 
-interface TileData {
-  session: TerminalSession
-  project: Project
-  workspace: Workspace
-  isScratch?: boolean
-}
+type Layout = 'board' | 'list'
 
-const SCRATCH_WORKSPACE: Workspace = {
-  id: SCRATCH_PROJECT_ID,
-  name: 'Scratch',
-  folderPath: '',
-  color: '#858585',
-  tags: [],
-  createdAt: '',
-  updatedAt: '',
-}
-
-const SCRATCH_PROJECT: Project = {
-  id: SCRATCH_PROJECT_ID,
-  workspaceId: SCRATCH_PROJECT_ID,
-  name: '',
-  isWorktree: false,
-  createdAt: '',
-  updatedAt: '',
-}
-
+/**
+ * Every terminal in the app, on one surface.
+ *
+ * Two layouts: a board that groups by state, and the flat list this screen used
+ * to be. Board is the default — "which terminal is in what state" is the
+ * question this surface exists to answer, and the flat grid never answered it.
+ *
+ * The layout choice is deliberately not persisted, matching the decision that
+ * the sidebar's active view is not restored either: opening to a narrowed
+ * surface reads as data loss.
+ */
 export function OverviewScreen(): JSX.Element {
   const { sessions } = useSessionStore()
   const { workspaces, projectsByWorkspaceId, setScratchActive } = useWorkspaceStore()
   const { processesBySessionId, startPolling, stopPolling } = useMetricsStore()
 
-  // Build fast lookup maps
-  const projectById = useMemo(() => {
-    const m = new Map<string, Project>()
-    for (const projects of projectsByWorkspaceId.values()) {
-      for (const p of projects) m.set(p.id, p)
-    }
-    return m
-  }, [projectsByWorkspaceId])
+  const [layout, setLayout] = useState<Layout>('board')
+  const [hiddenLanes, setHiddenLanes] = useState<AgentState[]>(() => loadHiddenLanes())
 
-  const workspaceById = useMemo(() => {
-    const m = new Map<string, Workspace>()
-    for (const w of workspaces) m.set(w.id, w)
-    return m
-  }, [workspaces])
+  const projects = useMemo(
+    () => [...projectsByWorkspaceId.values()].flat(),
+    [projectsByWorkspaceId]
+  )
 
-  // Build ordered tile list — busy first, then workspace → project → tab title
-  const tiles = useMemo((): TileData[] => {
-    const result: TileData[] = []
-    for (const session of sessions.values()) {
-      if (session.status === 'closed') continue
-      if (session.projectId === SCRATCH_PROJECT_ID) {
-        result.push({
-          session,
-          project: SCRATCH_PROJECT,
-          workspace: SCRATCH_WORKSPACE,
-          isScratch: true,
-        })
-        continue
-      }
-      const project = projectById.get(session.projectId)
-      if (!project) continue
-      const workspace = workspaceById.get(project.workspaceId)
-      if (!workspace) continue
-      result.push({ session, project, workspace })
-    }
-    result.sort((a, b) => {
-      const aBusy = a.session.busy ? 0 : 1
-      const bBusy = b.session.busy ? 0 : 1
-      if (aBusy !== bBusy) return aBusy - bBusy
-      const wCmp = a.workspace.name.localeCompare(b.workspace.name)
-      if (wCmp !== 0) return wCmp
-      const pCmp = branchLabel(a.project).localeCompare(branchLabel(b.project))
-      if (pCmp !== 0) return pCmp
-      return a.session.tabTitle.localeCompare(b.session.tabTitle)
-    })
-    return result
-  }, [sessions, projectById, workspaceById])
+  const open = useMemo(() => [...sessions.values()], [sessions])
 
-  // Resolve PIDs and start polling whenever the session list changes
-  const sessionIdsKey = tiles.map((t) => t.session.id).join(',')
+  const lanes = useMemo(
+    () => buildLanes(open, projects, workspaces, hiddenLanes),
+    [open, projects, workspaces, hiddenLanes]
+  )
+
+  const cards = useMemo(() => lanes.flatMap((lane) => lane.cards), [lanes])
+
+  // One clock read per render rather than one per card, so every age on screen
+  // is measured from the same instant.
+  const now = Date.now()
+
+  const sessionIdsKey = cards.map((c) => c.sessionId).join(',')
   useEffect(() => {
-    if (tiles.length === 0) {
+    if (sessionIdsKey === '') {
       startPolling([])
       return stopPolling
     }
     let cancelled = false
-    const sessionIds = tiles.map((t) => t.session.id)
     window.electronAPI.metrics
-      .getPids(sessionIds)
+      .getPids(sessionIdsKey.split(','))
       .then((result) => {
         if (cancelled) return
-        const resolved = 'data' in result ? result.data : []
-        startPolling(resolved)
+        startPolling('data' in result ? result.data : [])
       })
       .catch(() => {
         if (!cancelled) startPolling([])
@@ -114,37 +78,88 @@ export function OverviewScreen(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionIdsKey])
 
-  function navigate(tile: TileData): void {
-    useExtensionRegistry.getState().setActiveGlobalTab(null)
-    if (tile.isScratch) {
-      useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, tile.session.id)
-      setScratchActive(true)
-      return
-    }
-    const { activeWorkspaceId, setActiveWorkspace, setActiveProject } = useWorkspaceStore.getState()
-    if (tile.project.workspaceId !== activeWorkspaceId) {
-      setActiveWorkspace(tile.project.workspaceId)
-    }
-    setActiveProject(tile.project.id)
-    useSessionStore.getState().setActiveSessionForProject(tile.project.id, tile.session.id)
-  }
+  const navigate = useCallback(
+    (sessionId: string): void => {
+      const session = useSessionStore.getState().sessions.get(sessionId)
+      if (session === undefined) return
+      useExtensionRegistry.getState().setActiveGlobalTab(null)
+
+      if (session.projectId === SCRATCH_PROJECT_ID) {
+        useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
+        setScratchActive(true)
+        return
+      }
+      const project = projects.find((p) => p.id === session.projectId)
+      if (project === undefined) return
+      const { activeWorkspaceId, setActiveWorkspace, setActiveProject } =
+        useWorkspaceStore.getState()
+      if (project.workspaceId !== activeWorkspaceId) setActiveWorkspace(project.workspaceId)
+      setActiveProject(project.id)
+      useSessionStore.getState().setActiveSessionForProject(project.id, sessionId)
+    },
+    [projects, setScratchActive]
+  )
+
+  const toggleLane = useCallback((state: AgentState): void => {
+    setHiddenLanes((current) => {
+      const next = current.includes(state)
+        ? current.filter((s) => s !== state)
+        : [...current, state]
+      saveHiddenLanes(next)
+      return next
+    })
+  }, [])
+
+  const renderCard = useCallback(
+    (card: BoardCard) => (
+      <SessionTile
+        card={card}
+        processMetrics={processesBySessionId.get(card.sessionId) ?? null}
+        now={now}
+        onNavigate={() => navigate(card.sessionId)}
+      />
+    ),
+    [processesBySessionId, now, navigate]
+  )
 
   return (
     <div className="overview-screen">
-      {tiles.length === 0 ? (
+      <div className="overview-screen__bar">
+        <div className="overview-screen__layouts" role="group" aria-label="Layout">
+          <button
+            type="button"
+            className="overview-screen__layout"
+            aria-pressed={layout === 'board'}
+            aria-label="Board"
+            onClick={() => setLayout('board')}
+          >
+            <LayoutGrid aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="overview-screen__layout"
+            aria-pressed={layout === 'list'}
+            aria-label="List"
+            onClick={() => setLayout('list')}
+          >
+            <Rows3 aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      {layout === 'board' ? (
+        <BoardScreen
+          lanes={lanes}
+          renderCard={renderCard}
+          onToggleLane={toggleLane}
+          onEmpty={() => useExtensionRegistry.getState().setActiveGlobalTab(null)}
+        />
+      ) : cards.length === 0 ? (
         <div className="overview-screen__empty">No open terminals</div>
       ) : (
         <div className="overview-screen__grid">
-          {tiles.map((tile, index) => (
-            <SessionTile
-              key={tile.session.id}
-              session={tile.session}
-              project={tile.project}
-              workspace={tile.workspace}
-              processMetrics={processesBySessionId.get(tile.session.id) ?? null}
-              tileIndex={index}
-              onNavigate={() => navigate(tile)}
-            />
+          {cards.map((card) => (
+            <React.Fragment key={card.sessionId}>{renderCard(card)}</React.Fragment>
           ))}
         </div>
       )}
