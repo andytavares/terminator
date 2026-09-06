@@ -170,20 +170,20 @@ next step, shows no raw markup, repeats no column name, and the last column is f
 
 ### Tests for User Story 4 ⚠️ Write first, confirm they FAIL
 
-- [ ] T055 [P] [US4] Write failing unit specs in `tests/unit/extensions/speckit-pilot/phase-progress.spec.ts` for `nextPhaseName` derivation and the all-complete case (data-model §4)
-- [ ] T056 [P] [US4] Write a failing spec asserting no card renders the literal string `# Summary` or any leading markdown heading syntax
+- [x] T055 [P] [US4] Write failing unit specs in `tests/unit/extensions/speckit-pilot/phase-progress.spec.ts` for `nextPhaseName` derivation and the all-complete case (data-model §4)
+- [x] T056 [P] [US4] Write a failing spec asserting no card renders the literal string `# Summary` or any leading markdown heading syntax
 
 ### Implementation for User Story 4
 
-- [ ] T057 [US4] Extend the card phase model with phase **names** in `extensions/speckit-pilot/src/state/phases.ts` and derive `nextPhaseName` (FR-019)
-- [ ] T058 [US4] Redesign `extensions/speckit-pilot/src/components/CardTile.tsx` — progress bar plus next-step label replacing the ten numbered circles; drop the invariant type chip and the column-duplicating status chip (FR-021)
-- [ ] T059 [US4] Strip markdown heading syntax from card descriptions, rendering prose or the first prose line, in `extensions/speckit-pilot/src/components/CardTile.tsx` and the drawer's Scope field (FR-020)
-- [ ] T060 [US4] Apply one card naming rule across all columns — brief title, folder name only as fallback — in `extensions/speckit-pilot/src/components/BoardView.tsx` (FR-023)
-- [ ] T061 [US4] Add a horizontal scroller with a visible edge affordance and a minimum column width in `extensions/speckit-pilot/src/components/BoardView.tsx` (FR-022)
-- [ ] T062 [US4] Collapse the supervision strip to zero height when nothing is running, or replace it with the action that starts something, in `extensions/speckit-pilot/src/components/SupervisionPanel.tsx` (FR-024)
-- [ ] T063 [US4] Fold the toolbar's lone "New card" button into the app bar in `extensions/speckit-pilot/src/components/BoardView.tsx` to recover a full band of chrome
-- [ ] T064 [US4] Rebuild `extensions/speckit-pilot/src/components/CardDetail.tsx` on the shared Dialog with a dirty-state guard that warns before discarding edits (FR-025)
-- [ ] T065 [US4] Verify chrome above the first card is ≤ 100px at the default window size (SC-014)
+- [x] T057 [US4] Extend the card phase model with phase **names** in `extensions/speckit-pilot/src/state/phases.ts` and derive `nextPhaseName` (FR-019)
+- [x] T058 [US4] Redesign `extensions/speckit-pilot/src/components/CardTile.tsx` — progress bar plus next-step label replacing the ten numbered circles; drop the invariant type chip and the column-duplicating status chip (FR-021)
+- [x] T059 [US4] Strip markdown heading syntax from card descriptions, rendering prose or the first prose line, in `extensions/speckit-pilot/src/components/CardTile.tsx` and the drawer's Scope field (FR-020)
+- [x] T060 [US4] Apply one card naming rule across all columns — brief title, folder name only as fallback — in `extensions/speckit-pilot/src/components/BoardView.tsx` (FR-023)
+- [x] T061 [US4] Add a horizontal scroller with a visible edge affordance and a minimum column width in `extensions/speckit-pilot/src/components/BoardView.tsx` (FR-022)
+- [x] T062 [US4] Collapse the supervision strip to zero height when nothing is running, or replace it with the action that starts something, in `extensions/speckit-pilot/src/components/SupervisionPanel.tsx` (FR-024)
+- [x] T063 [US4] Fold the toolbar's lone "New card" button into the app bar in `extensions/speckit-pilot/src/components/BoardView.tsx` to recover a full band of chrome
+- [x] T064 [US4] Rebuild `extensions/speckit-pilot/src/components/CardDetail.tsx` on the shared Dialog with a dirty-state guard that warns before discarding edits (FR-025)
+- [x] T065 [US4] Verify chrome above the first card is ≤ 100px at the default window size (SC-014)
 
 **Checkpoint**: The board is readable without having memorised a phase numbering.
 

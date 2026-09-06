@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import type { CardBrief, CardType, ChecklistItem } from '../types/speckit.types.js'
 
@@ -6,6 +6,11 @@ const TYPES: CardType[] = ['feature', 'bug', 'chore', 'spike']
 
 interface CardBriefEditorProps {
   initial?: Partial<CardBrief>
+  /**
+   * Reports whether the form differs from what it was given, so a container can
+   * warn before discarding. Closing used to drop edits silently.
+   */
+  onDirtyChange?: (dirty: boolean) => void
   submitLabel?: string
   onSubmit: (brief: {
     title: string
@@ -18,6 +23,7 @@ interface CardBriefEditorProps {
 
 export function CardBriefEditor({
   initial,
+  onDirtyChange,
   submitLabel = 'Save',
   onSubmit,
   onCancel,
@@ -25,6 +31,15 @@ export function CardBriefEditor({
   const [title, setTitle] = useState(initial?.title ?? '')
   const [type, setType] = useState<CardType>(initial?.type ?? 'feature')
   const [scope, setScope] = useState(initial?.scope ?? '')
+
+  const dirty =
+    title !== (initial?.title ?? '') ||
+    type !== (initial?.type ?? 'feature') ||
+    scope !== (initial?.scope ?? '')
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
   const [checklist, setChecklist] = useState<ChecklistItem[]>(initial?.checklist ?? [])
   const [newItem, setNewItem] = useState('')
 

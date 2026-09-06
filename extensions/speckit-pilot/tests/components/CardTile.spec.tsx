@@ -29,12 +29,34 @@ describe('CardTile', () => {
     expect(screen.getByText('Do the thing')).toBeTruthy()
   })
 
-  it('shows the run-status chip label', () => {
-    render(<CardTile card={card({ runStatus: 'awaiting_review' })} onOpen={vi.fn()} />)
-    expect(screen.getByText('Needs review')).toBeTruthy()
+  // The run-status chip repeated the name of the column the card was already
+  // sitting in. What a card cannot say from its position is what happens next,
+  // so that is what it says now.
+  it('says what happens next rather than repeating its column', () => {
+    render(
+      <CardTile
+        card={card({
+          runStatus: 'awaiting_review',
+          phaseSummary: { done: 3, total: 10, awaitingReview: true },
+        })}
+        onOpen={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Review plan')).toBeTruthy()
+    expect(screen.queryByText('Needs review')).toBeNull()
   })
 
-  it('shows phase progress and comment count', () => {
+  it('names the phase, so reading the board needs no memorised numbering', () => {
+    render(
+      <CardTile
+        card={card({ phaseSummary: { done: 3, total: 10, awaitingReview: false } })}
+        onOpen={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Next: plan')).toBeTruthy()
+  })
+
+  it('shows how far it has got, and the comment count', () => {
     render(
       <CardTile
         card={card({ phaseSummary: { done: 3, total: 10, awaitingReview: false } })}
@@ -42,8 +64,32 @@ describe('CardTile', () => {
         onOpen={vi.fn()}
       />
     )
-    expect(screen.getByText('3/10')).toBeTruthy()
+    expect(screen.getByText('3 of 10')).toBeTruthy()
     expect(screen.getByLabelText('2 comments')).toBeTruthy()
+  })
+
+  it('exposes progress to assistive technology as a real progressbar', () => {
+    render(
+      <CardTile
+        card={card({ phaseSummary: { done: 3, total: 10, awaitingReview: false } })}
+        onOpen={vi.fn()}
+      />
+    )
+    const bar = screen.getByRole('progressbar')
+    expect(bar.getAttribute('aria-valuenow')).toBe('3')
+    expect(bar.getAttribute('aria-valuemax')).toBe('10')
+  })
+
+  // The literal string "# Summary" was the description on every card.
+  it("shows prose rather than the brief's raw markup", () => {
+    render(
+      <CardTile
+        card={card({ scopeLine: '# Summary\nEvery surface reads one token.' })}
+        onOpen={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Every surface reads one token.')).toBeTruthy()
+    expect(screen.queryByText('# Summary')).toBeNull()
   })
 
   it('links out to the origin ticket for imported cards', () => {

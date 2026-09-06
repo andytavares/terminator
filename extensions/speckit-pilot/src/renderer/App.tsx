@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Settings, Download } from 'lucide-react'
+import { Settings, Download, Plus } from 'lucide-react'
 import { BoardView } from '../components/BoardView.js'
 import { CardDetail } from '../components/CardDetail.js'
 import { CardBriefEditor } from '../components/CardBriefEditor.js'
@@ -112,16 +112,26 @@ export function App(): JSX.Element {
         <div className="sk-appbar__search">
           {repoRoot && <KnowledgeSearch repoRoot={repoRoot} />}
         </div>
+        {/* Moved up from the board's own toolbar, which held this one button and
+            cost a full band of chrome to do it. */}
+        <button
+          type="button"
+          className="sk-btn sk-btn--primary"
+          onClick={() => setOverlay('new-card')}
+        >
+          <Plus aria-hidden="true" /> New card
+        </button>
         <button
           className="sk-btn"
           onClick={() => void runReconcile()}
           disabled={importing}
           aria-busy={importing}
         >
-          <Download size={14} /> {importing ? 'Importing…' : 'Import ticket'}
+          {/* Principle XII: no size prop — CSS controls what is drawn. */}
+          <Download aria-hidden="true" /> {importing ? 'Importing…' : 'Import ticket'}
         </button>
         <button aria-label="Settings" className="sk-btn" onClick={() => setOverlay('settings')}>
-          <Settings size={14} />
+          <Settings aria-hidden="true" />
         </button>
       </header>
 
@@ -134,11 +144,7 @@ export function App(): JSX.Element {
             <SettingsView />
           </div>
         ) : (
-          <BoardView
-            repoRoot={workspacePath}
-            onOpenCard={(dir) => setOpenCardDir(dir)}
-            onNewCard={() => setOverlay('new-card')}
-          />
+          <BoardView repoRoot={workspacePath} onOpenCard={(dir) => setOpenCardDir(dir)} />
         )}
       </div>
 

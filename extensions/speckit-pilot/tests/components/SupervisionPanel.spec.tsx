@@ -129,7 +129,7 @@ describe('saying that everything is fine', () => {
     await waitFor(() => expect(api.supervisionSnapshot).toHaveBeenCalled())
     expect(api.feedList).not.toHaveBeenCalled()
 
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     await waitFor(() => expect(api.feedList).toHaveBeenCalled())
   })
 })
@@ -260,14 +260,14 @@ describe('what stopped making progress', () => {
     // A detector that cries wolf gets turned off, and then the real stalls go
     // unreported too. Saying which mode it is in is the whole point.
     panel()
-    fireEvent.click(await screen.findByText(/stalls/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Stuck/ }))
     expect(await screen.findByText(/Shadow mode/)).toBeDefined()
   })
 
   it('shows the numbers that justified the firing', async () => {
     api.stallsList.mockResolvedValue({ firings: [firing()], shadowMode: false })
     panel()
-    fireEvent.click(await screen.findByText(/stalls/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Stuck/ }))
     expect(await screen.findByText(/quiet for 10m/)).toBeDefined()
     expect(screen.getByText(/nothing was running/)).toBeDefined()
   })
@@ -275,7 +275,7 @@ describe('what stopped making progress', () => {
   it('offers the same actions, since a stall you cannot act on is a notification', async () => {
     api.stallsList.mockResolvedValue({ firings: [firing()], shadowMode: false })
     panel()
-    fireEvent.click(await screen.findByText(/stalls/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Stuck/ }))
     fireEvent.click(await screen.findByText('Interrupt'))
     await waitFor(() => expect(api.runInterrupt).toHaveBeenCalledWith({ sessionId: 'session-1' }))
   })
@@ -299,7 +299,7 @@ describe('what is waiting to be reviewed', () => {
       backpressure: { allowed: true, unreviewed: 1, limit: 3 },
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     expect(await screen.findByText(/touches auth/)).toBeDefined()
   })
 
@@ -310,7 +310,7 @@ describe('what is waiting to be reviewed', () => {
       backpressure: { allowed: false, unreviewed: 3, limit: 3, reason: '3 diffs are waiting' },
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     expect(await screen.findByText('3 diffs are waiting')).toBeDefined()
   })
 
@@ -331,7 +331,7 @@ describe('what is waiting to be reviewed', () => {
       fullReject: false,
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     expect(await screen.findByText('src/auth.ts')).toBeDefined()
     expect(screen.getByText(/\+new/)).toBeDefined()
@@ -359,7 +359,7 @@ describe('what is waiting to be reviewed', () => {
       fullReject: false,
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     await screen.findByText(/never asked for/)
     fireEvent.click(screen.getAllByText('Reject')[1])
@@ -389,7 +389,7 @@ describe('what is waiting to be reviewed', () => {
       fullReject: false,
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     const finish = await screen.findByText('Decide every hunk to finish')
     fireEvent.click(finish)
@@ -413,7 +413,7 @@ describe('what is waiting to be reviewed', () => {
       fullReject: true,
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     expect(await screen.findByText(/this branch keeps nothing/)).toBeDefined()
   })
@@ -440,7 +440,7 @@ describe('what is waiting to be reviewed', () => {
       fullReject: false,
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     expect(await screen.findByText('Finish review — revert 1 hunk')).toBeDefined()
   })
@@ -462,7 +462,7 @@ describe('what is waiting to be reviewed', () => {
       fullReject: false,
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     expect(await screen.findByText('Finish review — keep everything')).toBeDefined()
   })
@@ -491,7 +491,7 @@ describe('what is waiting to be reviewed', () => {
       error: 'error: patch does not apply',
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     fireEvent.click(await screen.findByText(/Finish review/))
     expect(await screen.findByText(/patch does not apply/)).toBeDefined()
@@ -515,7 +515,7 @@ describe('what is waiting to be reviewed', () => {
       fullReject: false,
     })
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     fireEvent.click(await screen.findByText(/Finish review/))
     // Applied first: a queue entry removed without the rejections landing is a
@@ -552,7 +552,7 @@ describe('the step every diff viewer skips', () => {
 
   async function openReview(): Promise<void> {
     panel()
-    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByRole('tab', { name: /To review/ }))
     fireEvent.click(await screen.findByText('Review'))
     await screen.findByText('src/a.ts')
   }
@@ -689,7 +689,7 @@ describe('what happened while you were away', () => {
       mutes: [],
     })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     expect(await screen.findByText('Pilot')).toBeDefined()
   })
 })
@@ -707,7 +707,7 @@ describe('since you last looked', () => {
   it('asks nothing of a first visit — there is no "last" yet', async () => {
     api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     await screen.findByText('ready to review')
     expect(api.feedDigest).not.toHaveBeenCalled()
   })
@@ -716,7 +716,7 @@ describe('since you last looked', () => {
     window.localStorage.setItem('speckit.feed.lastLookedAt', '1000')
     api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     await waitFor(() => expect(api.feedDigest).toHaveBeenCalledWith({ from: 1000 }))
   })
 
@@ -731,7 +731,7 @@ describe('since you last looked', () => {
       bySession: [],
     })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     expect(await screen.findByText(/7 things across 2 runs/)).toBeDefined()
   })
 
@@ -740,7 +740,7 @@ describe('since you last looked', () => {
     window.localStorage.setItem('speckit.feed.lastLookedAt', '1000')
     api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     await screen.findByText('ready to review')
     expect(screen.queryByText(/Since you last looked/)).toBeNull()
   })
@@ -759,7 +759,7 @@ describe('which runs may interrupt you', () => {
   it('mutes one run rather than turning notifications off wholesale', async () => {
     api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     fireEvent.click(await screen.findByText('Mute'))
     await waitFor(() => expect(api.feedMute).toHaveBeenCalledWith({ sessionId: 'session-1' }))
   })
@@ -767,7 +767,7 @@ describe('which runs may interrupt you', () => {
   it('offers to unmute one that is muted', async () => {
     api.feedList.mockResolvedValue({ entries: [entry], mutes: [{ sessionId: 'session-1' }] })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     fireEvent.click(await screen.findByText('Unmute'))
     await waitFor(() => expect(api.feedUnmute).toHaveBeenCalledWith({ sessionId: 'session-1' }))
   })
@@ -775,14 +775,14 @@ describe('which runs may interrupt you', () => {
   it('still shows what a muted run did — muting hides the toast, not the record', async () => {
     api.feedList.mockResolvedValue({ entries: [entry], mutes: [{ sessionId: 'session-1' }] })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     expect(await screen.findByText('ready to review')).toBeDefined()
   })
 
   it('drops one line, because a list you cannot clear is one you stop reading', async () => {
     api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     panel()
-    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByRole('tab', { name: /Activity/ }))
     fireEvent.click(await screen.findByLabelText('Dismiss ready to review'))
     await waitFor(() => expect(api.feedDismiss).toHaveBeenCalledWith({ id: 'e1' }))
   })
@@ -828,7 +828,7 @@ describe('what is over', () => {
       history: [past()],
     })
     render(<SupervisionPanel />)
-    fireEvent.click(await screen.findByText(/history/))
+    fireEvent.click(await screen.findByRole('tab', { name: /History/ }))
     expect(await screen.findByText('approved')).toBeTruthy()
   })
 
@@ -840,7 +840,7 @@ describe('what is over', () => {
       history: [past()],
     })
     render(<SupervisionPanel />)
-    fireEvent.click(await screen.findByText(/history/))
+    fireEvent.click(await screen.findByRole('tab', { name: /History/ }))
     const meta = await screen.findByText(/specify/)
     expect(meta.textContent).toContain('4 turns')
     expect(meta.textContent).toContain('2 files')
@@ -855,19 +855,19 @@ describe('what is over', () => {
       history: [past()],
     })
     render(<SupervisionPanel cardLabel={() => 'Make all text red'} />)
-    fireEvent.click(await screen.findByText(/history/))
+    fireEvent.click(await screen.findByRole('tab', { name: /History/ }))
     expect(await screen.findByText('Make all text red')).toBeTruthy()
   })
 
   it('says so plainly when nothing has finished yet', async () => {
     render(<SupervisionPanel />)
-    fireEvent.click(await screen.findByText(/history/))
+    fireEvent.click(await screen.findByRole('tab', { name: /History/ }))
     expect(await screen.findByText('Nothing has finished yet.')).toBeTruthy()
   })
 
   it('copes with a main process that does not report history at all', async () => {
     render(<SupervisionPanel />)
-    fireEvent.click(await screen.findByText(/history/))
+    fireEvent.click(await screen.findByRole('tab', { name: /History/ }))
     expect(await screen.findByText('Nothing has finished yet.')).toBeTruthy()
   })
 
@@ -879,8 +879,10 @@ describe('what is over', () => {
       history: [past(), past({ phase: 'plan' })],
     })
     render(<SupervisionPanel />)
-    const tab = await screen.findByText(/history/)
-    await waitFor(() => expect(tab.textContent?.trim()).toBe('history'))
+    const tab = await screen.findByRole('tab', { name: /History/ })
+    // The tab labels are words now, not raw ids. What this asserts is unchanged:
+    // no count rides on History.
+    await waitFor(() => expect(tab.textContent?.trim()).toBe('History'))
   })
 
   it('offers no actions, because there is nothing left to do to it', async () => {
@@ -891,7 +893,7 @@ describe('what is over', () => {
       history: [past()],
     })
     render(<SupervisionPanel workspacePath="/repo" />)
-    fireEvent.click(await screen.findByText(/history/))
+    fireEvent.click(await screen.findByRole('tab', { name: /History/ }))
     await screen.findByText('approved')
     expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Interrupt' })).toBeNull()

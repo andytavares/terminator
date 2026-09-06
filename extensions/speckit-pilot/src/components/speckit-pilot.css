@@ -2910,11 +2910,11 @@
 }
 .sk-sup__clear,
 .sk-sup__note {
-  padding: 8px 10px;
-  border: 1px solid var(--tm-border, #1f2937);
-  border-radius: 6px;
-  color: var(--tm-text-secondary);
-  font-size: 12px;
+  /* Was a bordered box the height of a card. An absence does not need a
+     container — it needs one line saying so. */
+  padding: 4px 2px;
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
 }
 .sk-sup__warn {
   padding: 8px 10px;
@@ -3035,4 +3035,116 @@
   border: 1px solid var(--tm-border, #1f2937);
   font-size: 11px;
   color: var(--tm-text-secondary);
+}
+
+/* ── Card progress (036) ─────────────────────────────────────────────────
+   Replaces ten identical numbered circles. The bar says how far, the label
+   says what happens next — the one thing on the card you can act on. */
+
+.sk-card-progress {
+  margin: 8px 0 2px;
+}
+
+.sk-card-progress__track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tm-bg-input);
+  overflow: hidden;
+}
+
+.sk-card-progress__fill {
+  display: block;
+  height: 100%;
+  background: var(--tm-accent);
+  transition: width 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-card-progress__fill {
+    transition: none;
+  }
+}
+
+.sk-card-progress__legend {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.sk-card-progress__next {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tm-text-secondary);
+}
+
+.sk-card-progress__count {
+  color: var(--tm-text-muted);
+  font-family: var(--tm-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Principle XII: icons sized here rather than by a size prop. */
+.sk-card-tile__meta svg,
+.sk-card-tile__comments svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* The board scrolls sideways when the columns outrun the window. It always did;
+   nothing said so, and the last column simply appeared cut off. */
+.sk-board__cols[data-scrollable] {
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+}
+
+/* Below this a column cannot hold a readable card title, so the board scrolls
+   rather than squeezing. */
+.sk-board-col {
+  min-width: 240px;
+}
+
+.sk-board__toolbar:empty {
+  display: none;
+}
+
+/* Principle XII: icons inherit currentColor and are sized here rather than by a
+   size prop on the component. */
+.sk-appbar .sk-btn svg,
+.sk-board__toolbar .sk-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* The card drawer covered more than half the window while the board behind it
+   stayed fully lit and looked interactive. A scrim says which layer is live. */
+.sk-drawer::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 55%);
+  z-index: var(--tm-layer-modal);
+}
+
+.sk-drawer > * {
+  position: relative;
+  z-index: var(--tm-layer-modal);
+}
+
+.sk-card-detail__dirty {
+  padding: 1px 6px;
+  border: 1px solid var(--tm-warning);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-warning);
+  font-size: 10px;
+}
+
+/* Principle XII: sized here, not by a size prop. */
+.sk-card-detail__head svg {
+  width: 15px;
+  height: 15px;
 }

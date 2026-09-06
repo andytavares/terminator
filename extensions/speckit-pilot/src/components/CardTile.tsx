@@ -1,34 +1,9 @@
 import React from 'react'
 import { MessageSquare, ExternalLink } from 'lucide-react'
-import type { CardRunStatus, CardSummary, PhaseId, PhaseState } from '../types/speckit.types.js'
-import { PHASE_ORDER } from '../types/speckit.types.js'
-import { PhaseRail } from './PhaseRail.js'
-
-const RUN_STATUS_LABEL: Record<CardRunStatus, string> = {
-  none: 'Backlog',
-  waiting: 'Waiting',
-  running: 'Running',
-  awaiting_review: 'Needs review',
-  failed: 'Failed',
-  completed: 'Done',
-}
-
-/**
- * Approximate phase states from a card summary so the compact PhaseRail can render
- * without the full per-phase detail (the board only carries a done/total summary).
- */
-function approxPhases(card: CardSummary): Record<PhaseId, PhaseState> {
-  return Object.fromEntries(
-    PHASE_ORDER.map((id, idx) => {
-      let status: PhaseState['status'] = 'locked'
-      if (idx < card.phaseSummary.done) status = 'approved'
-      else if (idx === card.phaseSummary.done && card.runStatus === 'running') status = 'running'
-      else if (idx === card.phaseSummary.done && card.phaseSummary.awaitingReview)
-        status = 'awaiting_review'
-      return [id, { id, status } as PhaseState]
-    })
-  ) as Record<PhaseId, PhaseState>
-}
+import type { CardSummary } from '../types/speckit.types.js'
+import { completedSummary, nextStepLabel, phaseProgress } from '../state/phase-progress.js'
+import { firstProseLine } from '../state/plain-text.js'
+import { displayTitle } from '../state/card-title.js'
 
 interface CardTileProps {
   card: CardSummary
@@ -36,8 +11,23 @@ interface CardTileProps {
   onOpen: (featureDir: string) => void
 }
 
+/**
+ * One card on the board.
+ *
+ * It used to carry ten identical circles numbered 1 to 10, a chip reading the
+ * card's type — which read the same on every card — a status chip repeating the
+ * name of the column it was sitting in, and the brief's raw markdown. None of
+ * that answered the only question you ask a board card: where has this got to?
+ *
+ * Now it carries the title, one line of plain prose, how far it is as a bar, and
+ * the name of what happens next. The column already says the status; the origin
+ * and the type stay, because they do vary between cards.
+ */
 export function CardTile({ card, commentCount, onOpen }: CardTileProps) {
   const originLabel = card.source === 'native' ? 'native' : (card.sourceKey ?? card.source)
+  const progress = phaseProgress(card)
+  const summary = firstProseLine(card.scopeLine)
+
   return (
     <div
       role="button"
@@ -52,17 +42,31 @@ export function CardTile({ card, commentCount, onOpen }: CardTileProps) {
         }
       }}
     >
-      <div className="sk-card-tile__head">
-        <span className={`sk-card-badge sk-card-badge--${card.type}`}>{card.type}</span>
-        <span className={`sk-card-chip sk-card-chip--${card.runStatus}`}>
-          {RUN_STATUS_LABEL[card.runStatus]}
-        </span>
+      <div className="sk-card-tile__title">{displayTitle(card.title, card.featureDir)}</div>
+      {summary && <div className="sk-card-tile__scope">{summary}</div>}
+
+      <div className="sk-card-progress" title={completedSummary(card)}>
+        <div
+          className="sk-card-progress__track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={progress.total}
+          aria-valuenow={progress.done}
+          aria-label={completedSummary(card)}
+        >
+          <span
+            className="sk-card-progress__fill"
+            style={{ width: `${(progress.done / progress.total) * 100}%` }}
+          />
+        </div>
+        <div className="sk-card-progress__legend">
+          <span className="sk-card-progress__next">{nextStepLabel(card)}</span>
+          <span className="sk-card-progress__count">
+            {progress.done} of {progress.total}
+          </span>
+        </div>
       </div>
-      <div className="sk-card-tile__title">{card.title}</div>
-      {card.scopeLine && <div className="sk-card-tile__scope">{card.scopeLine}</div>}
-      <div className="sk-card-tile__rail">
-        <PhaseRail phases={approxPhases(card)} />
-      </div>
+
       <div className="sk-card-tile__meta">
         {card.source !== 'native' && card.sourceUrl ? (
           <a
@@ -73,16 +77,16 @@ export function CardTile({ card, commentCount, onOpen }: CardTileProps) {
             title={`Open in ${card.source}`}
             onClick={(e) => e.stopPropagation()}
           >
-            {originLabel} <ExternalLink size={10} />
+            {originLabel} <ExternalLink />
           </a>
         ) : (
           <span className="sk-card-origin sk-card-origin--native">{originLabel}</span>
         )}
         <span className="sk-card-tile__metaright">
-          {card.phaseSummary.done}/{card.phaseSummary.total}
+          <span className={`sk-card-badge sk-card-badge--${card.type}`}>{card.type}</span>
           {commentCount ? (
             <span className="sk-card-tile__comments" aria-label={`${commentCount} comments`}>
-              <MessageSquare size={12} /> {commentCount}
+              <MessageSquare /> {commentCount}
             </span>
           ) : null}
         </span>
