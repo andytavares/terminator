@@ -1,0 +1,24 @@
+tests/e2e/tools/capture-foundry-screenshot.spec.ts
+  s_357c91d2b54b02::t_2ecd2dcc0df267 156
+  s_357c91d2b54b02::t_e888f815f1ec22 148-155,157-160
+extensions/foundry/src/renderer/App.tsx
+  s_357c91d2b54b02::t_7fd5e4c87c7979 53-64,73
+extensions/foundry/tests/components/App.spec.tsx
+  s_357c91d2b54b02::t_ee3bb83007a2d1 81-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "11ea9e2dba32714aedbc5475f6f059c6b9f363ab",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
