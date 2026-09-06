@@ -35,6 +35,8 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 let invoke: ReturnType<typeof vi.fn>
+/** What `foundry:run-terminal` answers. Reset before every test. */
+let terminalReply: unknown = { ok: true }
 
 function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
   const current = order(over)
@@ -52,6 +54,7 @@ function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
     if (channel === 'foundry:order.mapState') {
       return { ok: true, mapping: { started: null, in_review: 'st-progress', done: null } }
     }
+    if (channel === 'foundry:run-terminal') return terminalReply
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -615,5 +618,38 @@ describe('what this order writes back (FR-062)', () => {
         writeBack: ['status'],
       })
     )
+  })
+})
+
+// The way back into the conversation that wrote the plan. It was a prop, and
+// nothing ever passed it, so the control never appeared in the running
+// application — while `provenance.forgeSession`, the thing it needed, was
+// never written either.
+describe('attaching to the architect', () => {
+  beforeEach(() => {
+    terminalReply = { ok: true }
+  })
+
+  it('offers the way back into the conversation that wrote the plan', async () => {
+    mount({}, { provenance: { forgeSession: 'sess-architect', decisions: [], amendments: [] } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /Attach/ })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 'sess-architect' })
+    )
+  })
+
+  it('offers nothing for an order no architect has run on', async () => {
+    mount({})
+    await waitFor(() => screen.getByRole('button', { name: /Compile|Blocked by/ }))
+    expect(screen.queryByRole('button', { name: /Attach/ })).toBeNull()
+  })
+
+  it('says so when that conversation has no terminal left', async () => {
+    terminalReply = { ok: false }
+    mount({}, { provenance: { forgeSession: 'sess-gone', decisions: [], amendments: [] } })
+    await waitFor(() => screen.getByRole('button', { name: /Attach/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
+    await waitFor(() => expect(screen.getByText(/no longer has a terminal/)).toBeTruthy())
   })
 })

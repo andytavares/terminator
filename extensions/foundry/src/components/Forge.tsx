@@ -83,13 +83,22 @@ function invoke(channel: string, payload: unknown): Promise<unknown> {
 
 export interface ForgeProps {
   readonly orderId: string
-  /** Take me to the agent's live session. The backstop, from any surface. */
-  readonly onAttach?: (orderId: string) => void
   /** The run has begun; the caller swaps this surface for the Floor. */
   readonly onStarted?: (orderId: string) => void
 }
 
-export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element {
+/**
+ * Take me to the terminal the architect is in.
+ *
+ * The backstop the whole design rests on: the agent runs in a real terminal
+ * and you can go and type at it.
+ */
+async function attachToArchitect(sessionId: string): Promise<string | null> {
+  const r = (await invoke('foundry:run-terminal', { sessionId })) as { ok?: boolean }
+  return r.ok === true ? null : 'that conversation no longer has a terminal'
+}
+
+export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const [view, setView] = useState<OrderView | null>(null)
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
@@ -492,8 +501,17 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
             </span>
           ) : null}
           <span className="fdry-id">{order.id}</span>
-          {onAttach !== undefined ? (
-            <button type="button" className="fdry-attach" onClick={() => onAttach(order.id)}>
+          {/* The conversation that wrote this plan. Rendered from the order's
+              own record rather than a prop nobody passed — which is why this
+              control never appeared in the running application at all. */}
+          {order.provenance.forgeSession !== null ? (
+            <button
+              type="button"
+              className="fdry-attach"
+              onClick={() =>
+                void attachToArchitect(order.provenance.forgeSession ?? '').then(setProblem)
+              }
+            >
               <Terminal aria-hidden="true" /> Attach
             </button>
           ) : null}

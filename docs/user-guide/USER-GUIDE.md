@@ -574,6 +574,10 @@ into criteria, units, a risk grade and budgets. It runs in a terminal you can
 watch, and it can only _propose_ — it cannot mark its own work agreed. Type into
 the box at the bottom to tell it what is wrong, and it redrafts.
 
+**Attach**, in the order's header, takes you into the terminal the architect
+is working in — the same conversation, whether it is still running or you came
+back to it after a restart.
+
 **Red team** findings appear alongside; each is either **Fixed** or **Accepted**,
 and accepting one costs a written reason. Nothing hands off while one is open.
 

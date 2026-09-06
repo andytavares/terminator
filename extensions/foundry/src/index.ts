@@ -944,7 +944,35 @@ async function convergeOnce(
 
   // One conversation per order, so a follow-up does not make the architect
   // read the repository again to answer "why not the other approach".
-  const resuming = intakeSessions.get(order.id)
+  //
+  // The recorded one is the fallback: the in-memory map dies with the process,
+  // and an order reopened after a restart should still know which conversation
+  // produced it.
+  const resuming = intakeSessions.get(order.id) ?? order.provenance.forgeSession ?? undefined
+
+  /**
+   * Write the conversation onto the order.
+   *
+   * `provenance.forgeSession` existed and nothing ever set it, so the Forge's
+   * "Attach" — the way back into the conversation that wrote the plan — had
+   * nothing to attach to and was never rendered.
+   */
+  const rememberSession = (sessionId: string): void => {
+    intakeSessions.set(order.id, sessionId)
+    void createOrderStore(root)
+      .load(order.id)
+      .then(async (current) => {
+        if (current === null || current.provenance.forgeSession === sessionId) return
+        await createOrderStore(root).save({
+          ...current,
+          provenance: { ...current.provenance, forgeSession: sessionId },
+        })
+      })
+      .catch(() => {
+        // A record of which conversation this was is a courtesy. Losing it
+        // must not fail the intake it is describing.
+      })
+  }
 
   return new Promise<ConvergeStarted>((resolve) => {
     let answered = false
@@ -1004,7 +1032,7 @@ async function convergeOnce(
         onPending: (pending) => notePending(api, { ...pending, featureDir }),
         onResolved: (requestId) => noteResolved(requestId),
         onRegistered: (run) => {
-          intakeSessions.set(order.id, run.sessionId)
+          rememberSession(run.sessionId)
           answer({ ok: true, sessionId: run.sessionId })
         },
         onTurnEnd: () => collect(false, 0),
@@ -1015,7 +1043,7 @@ async function convergeOnce(
           collect(true, null)
           return
         }
-        intakeSessions.set(order.id, run.sessionId)
+        rememberSession(run.sessionId)
         answer({ ok: true, sessionId: run.sessionId })
       })
       .catch((error: unknown) => {
