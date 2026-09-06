@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { amendOrder, addRedTeamFinding } from '../../src/order/amend.js'
+import { amendOrder } from '../../src/order/amend.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
@@ -120,47 +120,5 @@ describe('amendOrder', () => {
     amendOrder(before, { reason: 'x', at: '2026-09-06T12:00:00.000Z' })
     expect(before.status).toBe('agreed')
     expect(before.provenance.amendments).toEqual([])
-  })
-})
-
-describe('addRedTeamFinding', () => {
-  it('sends an agreed order back to draft — a late finding gets no quieter path', () => {
-    const after = addRedTeamFinding(agreed(), {
-      id: 'RT-1',
-      severity: 'high',
-      text: 'AC-1 is ambiguous about resize',
-      at: '2026-09-06T12:00:00.000Z',
-    })
-    expect(after.status).toBe('draft')
-    expect(after.redTeam).toHaveLength(1)
-    expect(after.redTeam[0].status).toBe('open')
-  })
-
-  it('records the finding as an amendment, so the reason it reopened is legible', () => {
-    const after = addRedTeamFinding(agreed(), {
-      id: 'RT-1',
-      severity: 'low',
-      text: 'x',
-      at: '2026-09-06T12:00:00.000Z',
-    })
-    expect(after.provenance.amendments[0]).toMatch(/RT-1/)
-  })
-
-  it('leaves a draft as a draft, and still records the finding', () => {
-    const draft = draftOrder({
-      id: 'WO-1',
-      title: 'x',
-      source: { kind: 'typed', tracker: null, key: null, url: null },
-      repoPaths: ['/repos/a'],
-      now: '2026-09-06T10:00:00.000Z',
-    })
-    const after = addRedTeamFinding(draft, {
-      id: 'RT-1',
-      severity: 'low',
-      text: 'x',
-      at: '2026-09-06T12:00:00.000Z',
-    })
-    expect(after.status).toBe('draft')
-    expect(after.redTeam).toHaveLength(1)
   })
 })

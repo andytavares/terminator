@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { strikeAssumption, affectedBy, liveAssumptions } from '../../src/forge/assumptions.js'
+import { strikeAssumption, liveAssumptions } from '../../src/forge/assumptions.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
@@ -112,16 +112,6 @@ describe('strikeAssumption', () => {
     const after = strikeAssumption(order(), 'A-9')
     expect(after.redraw).toEqual([])
     expect(after.order.assumptions).toHaveLength(3)
-  })
-})
-
-describe('affectedBy', () => {
-  it('resolves the units and criteria an assumption held up', () => {
-    expect(affectedBy(order(), 'A-2')).toEqual(['U-1', 'U-2'])
-  })
-
-  it('returns nothing for an unknown assumption', () => {
-    expect(affectedBy(order(), 'A-9')).toEqual([])
   })
 })
 

@@ -323,6 +323,64 @@
   border-radius: var(--tm-radius-sm);
 }
 
+/* A finding, and the two ways to clear it. Showing them without a way to
+   clear them is what blocked the compile gate for ever. */
+.fdry-finding-actions {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.fdry-accept {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.fdry-accept input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
+/* Just redrawn. Striking an assumption redraws only what depended on it
+   (FR-007), and a redraw the operator cannot see is one they cannot check. */
+.fdry-field.is-redrawn {
+  border-left: 2px solid var(--tm-accent);
+  padding-left: 10px;
+}
+
+/* The action that has to happen before the six checks mean anything: until
+   the architect has run they are a list of everything missing. */
+.fdry-converge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tm-on-accent);
+  background: var(--tm-accent);
+  border: 1px solid var(--tm-accent);
+  border-radius: var(--tm-radius-sm);
+  cursor: pointer;
+}
+
+.fdry-converge:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* One shape of work per row. An unavailable one is shown, not hidden, with
    the requirement it does not meet — "why is that not on offer" should be
    answerable without reading a YAML file. */

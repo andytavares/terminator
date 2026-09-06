@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Check, X, CircleDot, Terminal, Play } from 'lucide-react'
+import { Check, X, CircleDot, Terminal, Play, Wand } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
@@ -20,7 +20,12 @@ export interface OrderView {
   compile: CompileResult
   changed?: string[]
   unavailableChecks?: string[]
+  /** The session the architect is drafting in, while it is drafting. */
+  converging?: string
 }
+
+/** How often the document is refetched while the architect is working. */
+const REDRAFT_POLL_MS = 3000
 
 interface StatesView {
   capability?: CapabilityReport
@@ -81,6 +86,10 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
   const [draft, setDraft] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
   const [states, setStates] = useState<StatesView | null>(null)
+  /** What the last turn moved, so the operator can see the redraw (FR-007). */
+  const [moved, setMoved] = useState<string[]>([])
+  const [accepting, setAccepting] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
   const [recipes, setRecipes] = useState<RecipesView | null>(null)
   const [chosen, setChosen] = useState<string | null>(null)
 
@@ -138,17 +147,52 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
   const turn = useCallback(
     async (payload: Record<string, unknown>) => {
       setBusy(true)
+      setProblem(null)
       try {
         const next = (await invoke('foundry:order.turn', { id: orderId, ...payload })) as
-          | OrderView
+          | (OrderView & { error?: string })
           | { error: string }
-        if (!('error' in next)) setView(next)
+        // A turn can both move the document and report a problem — intake that
+        // refused a proposal returns the order as it stands *and* why.
+        if ('order' in next) {
+          setView(next)
+          setMoved(next.changed ?? [])
+        }
+        if (next.error !== undefined) setProblem(next.error)
       } finally {
         setBusy(false)
       }
     },
     [orderId]
   )
+
+  /** Ask the architect for a draft, or a redraft. */
+  const converge = useCallback(
+    async (message?: string) => {
+      setBusy(true)
+      setProblem(null)
+      try {
+        const next = (await invoke('foundry:order.converge', {
+          id: orderId,
+          ...(message === undefined ? {} : { message }),
+        })) as (OrderView & { error?: string }) | { error: string }
+        if ('order' in next) setView(next)
+        if (next.error !== undefined) setProblem(next.error)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [orderId]
+  )
+
+  // The architect answers in minutes, not in the call that started it — so the
+  // document is refetched while it works, and the redraft appears when it
+  // lands rather than the surface spinning on a promise.
+  useEffect(() => {
+    if (view?.converging === undefined) return
+    const timer = setInterval(() => void refresh(), REDRAFT_POLL_MS)
+    return () => clearInterval(timer)
+  }, [view?.converging, refresh])
 
   /**
    * Compile, agree, and start the Line.
@@ -225,6 +269,24 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
               </div>
             )
           })}
+          {/* The plan does not write itself. Until the architect has run, the
+              six checks below are a list of everything that is missing — so
+              this is the action, and hand-off is the one after it. */}
+          {order.status === 'draft' ? (
+            <button
+              type="button"
+              className="fdry-converge"
+              disabled={busy || view.converging !== undefined}
+              onClick={() => void converge()}
+            >
+              <Wand aria-hidden="true" />
+              {view.converging !== undefined
+                ? 'The architect is working…'
+                : order.acceptance.length === 0
+                  ? 'Draft the plan'
+                  : 'Redraft'}
+            </button>
+          ) : null}
           <button
             type="button"
             className="fdry-compile"
@@ -376,7 +438,7 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
           {order.plan.units.length} units · {order.status}
         </p>
 
-        <section className="fdry-field">
+        <section className={`fdry-field ${moved.includes('intent') ? 'is-redrawn' : ''}`}>
           <h2 className="fdry-panel-h">Intent</h2>
           <p>
             <b>Problem.</b> {order.intent.problem || 'not stated yet'}
@@ -386,10 +448,13 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
           </p>
         </section>
 
-        <section className="fdry-field">
+        <section className={`fdry-field ${moved.includes('acceptance') ? 'is-redrawn' : ''}`}>
           <h2 className="fdry-panel-h">Acceptance &amp; how it is proven</h2>
           {order.acceptance.length === 0 ? (
-            <p className="fdry-note">No criteria yet.</p>
+            <p className="fdry-note">
+              No criteria yet. Nothing writes them but the architect — press &ldquo;Draft the
+              plan&rdquo;.
+            </p>
           ) : (
             order.acceptance.map((criterion) => {
               const uncovered = matrix.uncoveredCriteria.includes(criterion.id)
@@ -449,7 +514,7 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
         ) : null}
 
         {assumptions.length > 0 ? (
-          <section className="fdry-field">
+          <section className={`fdry-field ${moved.includes('assumptions') ? 'is-redrawn' : ''}`}>
             <h2 className="fdry-panel-h">Assumptions — strike any that are wrong</h2>
             <div className="fdry-assume">
               {assumptions.map((assumption) => (
@@ -466,15 +531,60 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
           </section>
         ) : null}
 
+        {/* Every one of these has to be cleared before the order can be handed
+            off. Showing them without a way to clear them is what blocked the
+            gate for ever. */}
         {openFindings.length > 0 ? (
-          <section className="fdry-field">
+          <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
             <h2 className="fdry-panel-h">Red team — {openFindings.length} open</h2>
             {openFindings.map((finding) => (
               <div key={finding.id} className="fdry-finding">
                 <CircleDot aria-hidden="true" />
                 <span>{finding.text}</span>
+                <span className="fdry-finding-actions">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    title="It is fixed"
+                    onClick={() => void turn({ finding: { id: finding.id, decision: 'resolved' } })}
+                  >
+                    Fixed
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    title="It stands, and here is why"
+                    onClick={() => setAccepting(finding.id)}
+                  >
+                    Accept
+                  </button>
+                </span>
               </div>
             ))}
+            {accepting !== null ? (
+              <form
+                className="fdry-accept"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  if (reason.trim() === '') return
+                  void turn({
+                    finding: { id: accepting, decision: 'accepted', reason: reason.trim() },
+                  })
+                  setAccepting(null)
+                  setReason('')
+                }}
+              >
+                <input
+                  aria-label="Why this finding is accepted"
+                  placeholder="Why it stands…"
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                />
+                <button type="submit" disabled={reason.trim() === ''}>
+                  Accept it
+                </button>
+              </form>
+            ) : null}
           </section>
         ) : null}
 
@@ -483,13 +593,15 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
           onSubmit={(event) => {
             event.preventDefault()
             if (draft.trim() === '') return
-            void turn({ message: draft })
+            // Straight to the architect. `turn` routes free text there too;
+            // going directly says what the button does.
+            void converge(draft)
             setDraft('')
           }}
         >
           <input
-            aria-label="Answer, strike an assumption, or say what is wrong"
-            placeholder="Answer, strike an assumption, or say what's wrong…"
+            aria-label="Tell the architect what is wrong, or what you want instead"
+            placeholder="Tell the architect what's wrong, or what you want instead…"
             value={draft}
             disabled={busy}
             onChange={(event) => setDraft(event.target.value)}

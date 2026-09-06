@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execute, readOnlyDecision } from '../../src/line/executor.js'
+import { execute } from '../../src/line/executor.js'
 import type { ExecutorEvent, StartedRun } from '../../src/line/executor.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
 import { retry } from '../../src/line/scheduler.js'
@@ -34,6 +34,28 @@ steps:
   - id: ship
     kind: gate
     rule: ready-for-review
+    defaultIfIgnored: hold
+    after: [build]
+`
+
+/**
+ * A shape with a genuine mid-run pause.
+ *
+ * The terminal `ready-for-review` gate in RECIPE is a marker rather than a
+ * stop — the real "mark it ready?" is raised once a draft exists — so anything
+ * asserting that a gate halts a run needs one that actually does.
+ */
+const PAUSING = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: checkpoint
+    kind: gate
+    rule: unit.boundary
     defaultIfIgnored: hold
     after: [build]
 `
@@ -217,7 +239,7 @@ describe('execute', () => {
   it('raises a gate rather than answering it, and stops', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    const outcome = await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), deps(run))
 
     // Never launched as work, and never silently stepped over: the run halts
     // and the operator is asked.
@@ -229,7 +251,7 @@ describe('execute', () => {
   it('does not stop at a checkpoint the autonomy setting silences', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
       ...deps(run),
       autonomy: 'lights-out',
       runStep: async () => 0,
@@ -287,22 +309,6 @@ describe('execute', () => {
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
     expect(run).not.toHaveBeenCalled()
     expect(outcome.verdicts).toEqual([])
-  })
-})
-
-describe('readOnlyDecision', () => {
-  it('lets a read-only role read', () => {
-    expect(readOnlyDecision('Read', {}).allow).toBe(true)
-  })
-
-  it('refuses a write', () => {
-    const decision = readOnlyDecision('Write', { file_path: '/x' })
-    expect(decision.allow).toBe(false)
-    expect(decision.reason).toMatch(/may only read/)
-  })
-
-  it('refuses a tool it has never been taught about, rather than vouching for it', () => {
-    expect(readOnlyDecision('SomeNewTool', {}).allow).toBe(false)
   })
 })
 
@@ -511,7 +517,7 @@ describe('a repeated failure becomes a decision', () => {
     expect(second.gates.find((g) => g.rule === 'verify.repeat-fail')?.why).toMatch(/not a retry/)
   })
 
-  it('does not ask on the first failure — once is bad luck', async () => {
+  it('does not ask about the node on its first failure — once is bad luck', async () => {
     const o = order([unit('U-1')])
     const first = await execute(
       o,
@@ -519,7 +525,11 @@ describe('a repeated failure becomes a decision', () => {
       buildRunGraph(o, recipe()),
       deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     )
-    expect(first.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
+    // Nothing asks about *the unit*: a second attempt is owed first. The run
+    // still stops and says it cannot proceed, which is a different row — that
+    // one names no node.
+    expect(first.gates.filter((g) => g.nodeId !== null)).toEqual([])
+    expect(first.gates.some((g) => g.nodeId === null && g.why.includes('blocked'))).toBe(true)
   })
 })
 
@@ -542,7 +552,7 @@ describe('the ladder', () => {
   it('is not climbed when the run halted at a gate — there is nothing to judge yet', async () => {
     const runStep = vi.fn(async () => 0)
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
       ...deps(vi.fn(ok)),
       runStep,
     })
@@ -616,7 +626,7 @@ describe('shippable', () => {
 
   it('is false for a complete graph with an open gate', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+    const outcome = await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
@@ -638,7 +648,12 @@ describe('shippable', () => {
 describe('raising a gate where nobody can see it', () => {
   it('still stops, rather than continuing past a decision nobody took', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(vi.fn(ok)))
+    const outcome = await execute(
+      o,
+      recipe(PAUSING),
+      buildRunGraph(o, recipe(PAUSING)),
+      deps(vi.fn(ok))
+    )
     // No `raise` seam at all — the gate is still on the outcome, and the run
     // is still not shippable.
     expect(outcome.gates.length).toBeGreaterThan(0)
@@ -648,7 +663,241 @@ describe('raising a gate where nobody can see it', () => {
   it('hands each gate to the seam when there is one', async () => {
     const raise = vi.fn(async () => undefined)
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), { ...deps(vi.fn(ok)), raise })
+    await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
+      ...deps(vi.fn(ok)),
+      raise,
+    })
     expect(raise).toHaveBeenCalledWith(expect.objectContaining({ rule: 'unit.boundary' }))
+  })
+})
+
+describe('one conversation per lane', () => {
+  it('carries a resumable role on in the session the lane already has', async () => {
+    const run = vi.fn(ok)
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(run),
+      sessionFor: () => 'sess-lane-1',
+    })
+    // The builder declares `allowResume: true`, so it is offered the lane's
+    // open conversation rather than a fresh agent that has read nothing.
+    expect(run.mock.calls[0][0].resumeSessionId).toBe('sess-lane-1')
+  })
+
+  it('never offers one to a role that may not resume', async () => {
+    const verifying = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: check
+    kind: agent
+    role: verifier
+`
+    const run = vi.fn(ok)
+    const o = order([])
+    await execute(o, recipe(verifying), buildRunGraph(o, recipe(verifying)), {
+      ...deps(run),
+      sessionFor: () => 'sess-lane-1',
+      runStep: async () => 0,
+    })
+    // The verifier's fresh context is the whole point of it; being offered the
+    // builder's conversation would hand it the builder's justification.
+    expect(run.mock.calls[0][0].resumeSessionId).toBeUndefined()
+  })
+
+  it('starts fresh when the lane has no conversation yet', async () => {
+    const run = vi.fn(ok)
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    expect(run.mock.calls[0][0].resumeSessionId).toBeUndefined()
+  })
+})
+
+describe("a recipe's own gate rule", () => {
+  const risky = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: check
+    kind: gate
+    rule: critical-path
+    defaultIfIgnored: hold
+    after: [build]
+`
+
+  it('is the one raised, not a hardcoded default', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(risky), buildRunGraph(o, recipe(risky)), {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+    })
+    expect(outcome.gates.map((g) => g.rule)).toContain('critical-path')
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('unit.boundary')
+  })
+
+  it('brings the options that rule offers with it', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(risky), buildRunGraph(o, recipe(risky)), {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+    })
+    const gate = outcome.gates.find((g) => g.rule === 'critical-path')
+    expect(gate?.options.map((o) => o.id)).toContain('send_back')
+    expect(gate?.defaultIfIgnored).toBe('hold')
+  })
+
+  it("passes a recipe's terminal ship marker rather than asking about it", async () => {
+    // "Mark it ready?" before a draft exists is a question with no answer. The
+    // real one is raised once shipping has opened something.
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+    })
+    expect(outcome.gates).toEqual([])
+    expect(outcome.complete).toBe(true)
+    expect(outcome.shippable).toBe(true)
+  })
+
+  it('falls back to a checkpoint when a recipe names a rule this build does not know', async () => {
+    const odd = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: pause
+    kind: gate
+    rule: something-invented
+    defaultIfIgnored: hold
+    after: [build]
+`
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(odd), buildRunGraph(o, recipe(odd)), deps(vi.fn(ok)))
+    expect(outcome.gates.map((g) => g.rule)).toContain('unit.boundary')
+  })
+})
+
+describe('a step that promised something about its own result', () => {
+  const bugfix = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: reproduce
+    kind: run
+    command: npm test
+    expect: { exit_code: '!= 0' }
+`
+
+  it('fails when the promise was not kept, however the command exited', async () => {
+    // The reproduction has to *fail* before the fix exists — the one place a
+    // passing command is the wrong answer.
+    const o = order([])
+    const record = vi.fn(async () => undefined)
+    const outcome = await execute(o, recipe(bugfix), buildRunGraph(o, recipe(bugfix)), {
+      ...deps(vi.fn(ok)),
+      record,
+      runStep: async () => 0,
+    })
+    expect(outcome.complete).toBe(false)
+    expect(record).toHaveBeenCalledWith(
+      'step.expectation_unmet',
+      'reproduce',
+      expect.stringContaining('exit_code')
+    )
+  })
+
+  it('passes when it was kept', async () => {
+    const o = order([])
+    const outcome = await execute(o, recipe(bugfix), buildRunGraph(o, recipe(bugfix)), {
+      ...deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 })),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.graph.nodes.find((n) => n.id === 'reproduce')?.state).toBe('passed')
+  })
+
+  it('leaves a step that promised nothing judged on its exit status alone', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.complete).toBe(true)
+  })
+})
+
+describe('the grade the change turned out to deserve', () => {
+  it('regrades from what was touched, not from what the plan predicted', async () => {
+    const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
+      risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    // Planned P3, touches authentication. Shipping reads the regraded value,
+    // so a change like this cannot slip past the decision its real grade calls
+    // for.
+    expect(o.risk.grade).toBe('P3')
+    expect(outcome.risk.grade).not.toBe('P3')
+    expect(outcome.risk.triggers).toContain('authentication')
+  })
+
+  it('says it was planned as something else, when it was', async () => {
+    const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
+      risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+    })
+    expect(outcome.gates.find((g) => g.rule === 'risk.p0')?.summary).toContain('planned as P3')
+  })
+
+  it('leaves an ordinary change where the plan put it', async () => {
+    const o = order([unit('U-1', { touches: ['src/readme.ts'] })], {
+      risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.inspection.required).toBe(false)
+  })
+})
+
+describe('a graph that cannot move on its own', () => {
+  it('says so, rather than reporting a run waiting on a gate that does not exist', async () => {
+    // U-2 depends on U-1; U-1 fails twice, so nothing is runnable and nothing
+    // is finished.
+    const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
+    const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
+    let graph = buildRunGraph(o, recipe())
+    graph = (await execute(o, recipe(), graph, failing)).graph
+    const stalled = await execute(o, recipe(), graph, failing)
+
+    expect(stalled.shippable).toBe(false)
+    expect(stalled.gates.some((g) => g.why.includes('blocked'))).toBe(true)
+  })
+
+  it('does not call a finished run stalled', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.gates).toEqual([])
+    expect(outcome.shippable).toBe(true)
   })
 })

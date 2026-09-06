@@ -51,6 +51,12 @@ export function orderDir(root: string, orderId: string): string {
   return path.join(root, 'orders', orderId)
 }
 
+/**
+ * Reserved by the data-root contract, and proved by `footprint.spec.ts` to sit
+ * under the root like everything else. Nothing writes per-unit records yet;
+ * when something does, this is where they go — and deleting it to satisfy a
+ * reachability grep would remove the proof along with the path.
+ */
 export function unitDir(root: string, orderId: string, unitId: string): string {
   return path.join(orderDir(root, orderId), 'units', unitId)
 }

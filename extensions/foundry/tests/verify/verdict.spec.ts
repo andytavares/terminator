@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   makeVerdict,
   verdictFromExit,
-  isPass,
   summarise,
   SelfVerificationError,
   UnevidencedVerdictError,
@@ -108,32 +107,6 @@ describe('makeVerdict', () => {
     expect(() =>
       makeVerdict({ ...base(), result: 'not_measured', reason: '', evidence: [] })
     ).toThrow(UnevidencedVerdictError)
-  })
-})
-
-describe('isPass', () => {
-  function verdict(result: Verdict['result']): Verdict {
-    return {
-      nodeId: 'n',
-      criterionId: 'AC-1',
-      result,
-      reason: 'r',
-      evidence: [],
-      producedBy: { role: 'verifier', sessionId: 's' },
-      at: 'now',
-    }
-  }
-
-  it('is true only for a pass', () => {
-    expect(isPass(verdict('pass'))).toBe(true)
-  })
-
-  it('is false for a failure', () => {
-    expect(isPass(verdict('fail'))).toBe(false)
-  })
-
-  it('is false for "not measured" — the whole point of the third value', () => {
-    expect(isPass(verdict('not_measured'))).toBe(false)
   })
 })
 

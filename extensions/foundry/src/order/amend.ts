@@ -34,30 +34,3 @@ export interface LateFinding {
   readonly text: string
   readonly at: string
 }
-
-/**
- * A red-team finding raised after the order was agreed.
- *
- * It reopens the order like any other amendment. It gets no quieter path for
- * having arrived late — the whole value of the adversarial pass is that its
- * findings are as binding as anything else in the six checks.
- */
-export function addRedTeamFinding(order: WorkOrder, finding: LateFinding): WorkOrder {
-  return amendOrder(order, {
-    reason: `red team raised ${finding.id}: ${finding.text}`,
-    at: finding.at,
-    change: (o) => ({
-      ...o,
-      redTeam: [
-        ...o.redTeam,
-        {
-          id: finding.id,
-          severity: finding.severity,
-          text: finding.text,
-          status: 'open' as const,
-          reason: '',
-        },
-      ],
-    }),
-  })
-}

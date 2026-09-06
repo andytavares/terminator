@@ -44,6 +44,8 @@ function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
     }
     if (channel === 'foundry:order.states') return statesReply
     if (channel === 'foundry:run.recipes') return { recipes: [], proposed: 'standard' }
+    if (channel === 'foundry:order.converge')
+      return { order: current, compile: compileOrder(current) }
     if (channel === 'foundry:order.mapState') {
       return { ok: true, mapping: { started: null, in_review: 'st-progress', done: null } }
     }
@@ -288,5 +290,225 @@ describe('choosing the shape of work', () => {
     mountForStart({ recipes: { recipes: [], proposed: '' } })
     await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
     expect(screen.queryByText('Shape of work')).toBeNull()
+  })
+})
+
+describe('drafting the plan', () => {
+  it('offers the action, because nothing else writes the criteria', async () => {
+    mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy())
+    expect(screen.getByText(/Nothing writes them but the architect/)).toBeTruthy()
+  })
+
+  it('asks the architect for one', async () => {
+    mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
+    await waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', { id: 'WO-1' })
+    )
+  })
+
+  it('sends what the operator typed to the architect', async () => {
+    mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
+    await waitFor(() => screen.getByLabelText(/Tell the architect/))
+
+    fireEvent.change(screen.getByLabelText(/Tell the architect/), {
+      target: { value: 'the second unit is not needed' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
+        id: 'WO-1',
+        message: 'the second unit is not needed',
+      })
+    )
+  })
+
+  it('says why intake refused, rather than looking as though nothing happened', async () => {
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: order(), compile: compileOrder(order()) }
+      }
+      if (channel === 'foundry:order.converge') {
+        return {
+          order: order(),
+          compile: compileOrder(order()),
+          error: 'the proposal reached for a status',
+        }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+
+    await waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
+    await waitFor(() => expect(screen.getByText('the proposal reached for a status')).toBeTruthy())
+  })
+
+  it('offers a redraft once there are criteria', async () => {
+    const withCriteria = {
+      ...order(),
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'a',
+          priority: 'P1' as const,
+          verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
+          unverifiable: null,
+        },
+      ],
+    }
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: withCriteria, compile: compileOrder(withCriteria) }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Redraft/ })).toBeTruthy())
+  })
+
+  it('offers neither once the order has been handed off', async () => {
+    const running = { ...order(), status: 'running' as const }
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: running, compile: compileOrder(running) }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+    await waitFor(() => screen.getByText(/Handed off/))
+    expect(screen.queryByRole('button', { name: /Draft the plan|Redraft/ })).toBeNull()
+  })
+})
+
+describe('only the parts affected are redrawn (FR-007)', () => {
+  function withChanged(changed: string[]) {
+    const current = {
+      ...order(),
+      assumptions: [
+        { id: 'A-1', text: 'sessions are stored in Redis', struck: false, affects: ['AC-1'] },
+      ],
+    }
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: current, compile: compileOrder(current) }
+      }
+      if (channel === 'foundry:order.turn') {
+        return { order: current, compile: compileOrder(current), changed }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+  }
+
+  it('marks what a struck assumption moved, and nothing else', async () => {
+    withChanged(['acceptance'])
+    await waitFor(() => screen.getByText(/sessions are stored in Redis/))
+
+    // Striking one goes through `turn`, which is what carries the redraw list.
+    fireEvent.click(
+      screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
+    )
+    await waitFor(() =>
+      expect(screen.getByText(/Acceptance/).closest('section')?.className).toContain('is-redrawn')
+    )
+    expect(screen.getByText('Intent').closest('section')?.className).not.toContain('is-redrawn')
+  })
+
+  it('marks nothing when nothing moved', async () => {
+    withChanged([])
+    await waitFor(() => screen.getByText(/sessions are stored in Redis/))
+    fireEvent.click(
+      screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
+    )
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.turn', expect.anything())
+    )
+    expect(screen.getByText('Intent').closest('section')?.className).not.toContain('is-redrawn')
+  })
+})
+
+describe('clearing an adversarial finding', () => {
+  function withFinding() {
+    const current = {
+      ...order(),
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'high' as const,
+          text: 'the outcome restates the problem',
+          status: 'open' as const,
+          reason: '',
+        },
+      ],
+    }
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: current, compile: compileOrder(current) }
+      }
+      if (channel === 'foundry:order.turn') {
+        return { order: current, compile: compileOrder(current) }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+  }
+
+  it('offers a way to clear it, not just a list of what is blocking', async () => {
+    withFinding()
+    await waitFor(() => expect(screen.getByText(/Red team — 1 open/)).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Fixed' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy()
+  })
+
+  it('marks one fixed', async () => {
+    withFinding()
+    await waitFor(() => screen.getByText(/Red team — 1 open/))
+    fireEvent.click(screen.getByRole('button', { name: 'Fixed' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.turn', {
+        id: 'WO-1',
+        finding: { id: 'RT-1', decision: 'resolved' },
+      })
+    )
+  })
+
+  it('asks for the reason before accepting one', async () => {
+    withFinding()
+    await waitFor(() => screen.getByText(/Red team — 1 open/))
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }))
+    await waitFor(() => expect(screen.getByLabelText(/Why this finding is accepted/)).toBeTruthy())
+
+    // Nothing is sent until there is one — a shrug is not a decision.
+    fireEvent.click(screen.getByRole('button', { name: 'Accept it' }))
+    expect(invoke).not.toHaveBeenCalledWith('foundry:order.turn', expect.anything())
+
+    fireEvent.change(screen.getByLabelText(/Why this finding is accepted/), {
+      target: { value: 'the risk is priced in' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Accept it' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.turn', {
+        id: 'WO-1',
+        finding: { id: 'RT-1', decision: 'accepted', reason: 'the risk is priced in' },
+      })
+    )
   })
 })

@@ -50,7 +50,17 @@ test.beforeAll(async () => {
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'Foundry', repo)
-  await handle.page.waitForTimeout(2000)
+
+  // Extensions activate lazily, so a channel called before the host has loaded
+  // this one is refused with "no handler registered". Opening the panel and
+  // then waiting for a channel to answer is what makes every test below
+  // independent of which ones ran first — and `-g` runs honest.
+  await openFoundry()
+  await expect
+    .poll(async () => (await foundry('foundry:order.list').catch(() => null)) !== null, {
+      timeout: 30_000,
+    })
+    .toBe(true)
 })
 
 test.afterAll(async () => {
@@ -108,9 +118,13 @@ function bodyText(): Promise<string> {
 async function openFoundry(): Promise<void> {
   const panel = handle.page.locator('[data-extension-panel="terminator.foundry"]')
   if ((await panel.count()) === 0) {
-    await handle.page.locator('button[aria-label="Foundry"]').click()
+    // The sidebar button appears once the host has enumerated extensions, so
+    // it is waited for rather than clicked at whatever moment this runs.
+    const button = handle.page.locator('button[aria-label="Foundry"]')
+    await expect(button).toBeVisible({ timeout: 30_000 })
+    await button.click()
   }
-  await expect(panel).toHaveCount(1, { timeout: 20000 })
+  await expect(panel).toHaveCount(1, { timeout: 30_000 })
   await handle.page.waitForTimeout(2500)
 }
 
@@ -218,6 +232,13 @@ test('a run cannot be started from an order nobody agreed', async () => {
 })
 
 test('the ledger records what happened, attributably', async () => {
+  // Seeds its own order rather than relying on an earlier test's, so running
+  // this one alone asserts the same thing as running it in the suite.
+  await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'something to record' },
+    repoPaths: [repo],
+  })
+
   const record = (await foundry('foundry:ledger.query', {})) as {
     entries: { actor: string; action: string; reason: string }[]
     actions: string[]
@@ -230,6 +251,10 @@ test('the ledger records what happened, attributably', async () => {
 })
 
 test('the curator proposes nothing from a record with no repetition in it', async () => {
+  await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'nothing repeated here' },
+    repoPaths: [repo],
+  })
   const proposals = (await foundry('foundry:rules.propose', {})) as { proposals: unknown[] }
   expect(proposals.proposals).toEqual([])
 })
@@ -284,6 +309,48 @@ test('every registered channel answers rather than rejecting', async () => {
  * settings path that killed the run while the graph still said "running".
  * They only appear when the application runs.
  */
+/**
+ * The half without which nothing else can happen.
+ *
+ * A seeded draft has a problem statement and no criteria and no plan, so the
+ * compile gate refuses it for ever. Something has to turn that into a plan,
+ * and that something is an agent. Until this ran, nothing did — and the only
+ * route to a runnable order was hand-writing its JSON.
+ */
+test('intake launches the architect against the draft, read-only, in the repository', async () => {
+  test.setTimeout(180_000)
+  const { page } = handle
+
+  const created = (await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'greet should take a name, in README.md' },
+    repoPaths: [repo],
+  })) as { order: { id: string; acceptance: unknown[] } }
+
+  // A seeded draft has nothing to hand off. That is the state intake exists
+  // to move, and asserting it here is what makes the next assertion mean
+  // something.
+  expect(created.order.acceptance).toEqual([])
+
+  const converged = (await foundry('foundry:order.converge', { id: created.order.id })) as {
+    error?: string
+  }
+  // It either ran or said why. Silence would be the bug.
+  expect(converged).not.toBeNull()
+
+  const project = page.locator('.branch-row__name').filter({ hasText: 'intake' })
+  await expect(project.first()).toBeVisible({ timeout: 60_000 })
+  await project.first().click()
+
+  const screen = page.locator('.xterm-screen')
+  await expect(screen).toContainText('claude --session-id', { timeout: 60_000 })
+  await expect(screen).not.toContainText('bypassPermissions')
+
+  // Intake runs in the repository itself — no worktree is cut for a plan that
+  // may never be agreed.
+  const worktrees = execFileSync('git', ['worktree', 'list'], { cwd: repo }).toString()
+  expect(worktrees).not.toContain('intake')
+})
+
 test('a run cuts a worktree and launches a supervised agent in a visible terminal', async () => {
   test.setTimeout(180_000)
   const { page } = handle

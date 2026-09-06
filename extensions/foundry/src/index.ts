@@ -1,25 +1,23 @@
 import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
 import { app } from 'electron'
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { modelCatalog } from './state/model-catalog.js'
 
-import {
-  setPermissionSink,
-  setReadOnlyStateDir,
-  setRunSupervision,
-  setSupervisedRunner,
-} from './runtime/run-seams.js'
 import { createForgeChannels } from './ipc/forge-channels.js'
 import { createRunChannels, writeRunGraph } from './ipc/run-channels.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
 import { createLedgerChannels } from './ipc/ledger-channels.js'
-import { rulesFor } from './verify/rules.js'
+import { rulesFor, rulesAtRung } from './verify/rules.js'
+import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore } from './gates/store.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { markReady, readPulls, shipOrder } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
 import { ensureCheckouts } from './line/worktree.js'
+import { convergeBrief, readProposal } from './forge/converge.js'
+import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute } from './line/executor.js'
 import type { StartedRun } from './line/executor.js'
 import type { RunGraph, RunNode } from './line/run-graph.js'
@@ -34,6 +32,7 @@ import { queryEntries } from './ledger/append.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
 import { createPendingPermissions } from './runtime/pending-permissions.js'
+import type { PendingAsk } from './runtime/pending-permissions.js'
 import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
 import { createSupervision, type Supervision } from './runtime/supervision.js'
 import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/digest.js'
@@ -139,6 +138,15 @@ function fallbackDataRoot(): string {
  * notice is decided from the same answer the writers use.
  */
 const dataRootMemo = new Map<string, string>()
+
+/**
+ * The architect's open conversation, per order.
+ *
+ * In memory: a session does not survive a restart, and resuming one the
+ * runtime has forgotten is refused rather than silently starting a fresh agent
+ * that believes it is continuing.
+ */
+const intakeSessions = new Map<string, string>()
 
 function resolveFoundryDataRoot(api: ExtensionAPI): string {
   // Every read here is optional. Activation is called synchronously by the
@@ -356,16 +364,6 @@ function stallShadowMode(api: ExtensionAPI): boolean {
  * unsupervised spawn, and every surface reads empty rather than throwing.
  */
 export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Supervision | null> {
-  // Self-review's read-only policy does not need the control server, so it is
-  // installed whether or not the rest of the runtime comes up. Guarded on its
-  // own: activation must not fail because a host could not say where worktrees
-  // live, and a review with no policy refuses rather than bypassing.
-  try {
-    setReadOnlyStateDir(runtimeStateDir())
-  } catch {
-    setReadOnlyStateDir(null)
-  }
-
   try {
     control = await createControlServer()
     supervisedRunner = createSupervisedRunner({
@@ -373,60 +371,12 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
       control,
       stateDir: runtimeStateDir(),
     })
-    setSupervisedRunner(supervisedRunner)
-    // Raised requests are held here so a surface can render them, and cleared
-    // when answered — by the operator, the autonomy ladder, or the bridge
-    // handing the decision back to the terminal.
-    setPermissionSink({
-      onPending: (ask) => {
-        pendingPermissions.add(ask)
-        // The one thing allowed to interrupt: the run is stopped dead until
-        // somebody answers, and a request nobody sees is a twelve-hour hang.
-        const notification = notify(
-          api,
-          { kind: 'permission_requested', sessionId: ask.sessionId },
-          `${path.basename(ask.featureDir)} is asking: ${ask.summary}`,
-          [
-            {
-              id: 'allow',
-              label: 'Allow',
-              handler: () =>
-                supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: true }),
-            },
-            {
-              id: 'deny',
-              label: 'Deny',
-              handler: () =>
-                supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: false }),
-            },
-          ],
-          // Was an "Open the board" button sitting beside Allow and Deny —
-          // which is the wrong shape: opening the thing is not a third answer
-          // to the question, it is what clicking the notification should do.
-          // It also went no further than focusing the window, leaving you to
-          // find the run yourself.
-          () => gotoRun(api, 'run', ask.sessionId)
-        )
-        if (notification !== null) raisedNotifications.set(ask.requestId, notification)
-      },
-      onResolved: (requestId) => {
-        pendingPermissions.remove(requestId)
-        // Taken away with the request: a notification left behind after the
-        // thing it was about is answered teaches you to dismiss without reading.
-        raisedNotifications.get(requestId)?.dispose()
-        raisedNotifications.delete(requestId)
-      },
-    })
-
     // A run that stops making progress without asking for anything is the
     // failure nobody instruments: it looks exactly like one that is working.
     supervision = createSupervision({
       api,
       stateDir: runtimeStateDir(),
     })
-    // Registered runs are what everything downstream reads. Without this the
-    // review queue, the gate and the stall detector are all correct and empty.
-    setRunSupervision(supervision)
     mutes = createMuteStore(path.join(runtimeStateDir(), 'mutes.json'))
 
     const runner = supervisedRunner
@@ -614,6 +564,25 @@ function integrateDepsFor(api: ExtensionAPI, root: string): IntegrateDeps {
   }
 }
 
+/** A node for one rung of the ladder. Not from the graph — the ladder is not in it. */
+function ladderNode(rung: string, name: string, lane: number): RunNode {
+  return {
+    id: `ladder-${rung}-${name.replace(/\W+/g, '-').toLowerCase()}`,
+    stepId: `ladder-${rung}`,
+    kind: 'run',
+    state: 'running',
+    unitId: null,
+    lane,
+    role: null,
+    dependsOn: [],
+    attempts: 0,
+    sessionId: null,
+    worktreePath: null,
+    startedAt: null,
+    endedAt: null,
+  }
+}
+
 /**
  * Actually run a graph.
  *
@@ -643,6 +612,11 @@ async function executeRun(
   const store = createOrderStore(root)
   const featureDir = orderDir(root, order.id)
 
+  // One conversation per lane. A fresh agent per node is a terminal per node
+  // and an agent that has read nothing — the failure `continueRun` exists to
+  // avoid.
+  const laneSessions = new Map<number, string>()
+
   /**
    * One node, from launch to the end of its turn.
    *
@@ -668,6 +642,7 @@ async function executeRun(
     }
 
     return new Promise<StartedRun>((resolve) => {
+      const lane = input.node.lane ?? 1
       let sessionId = `${input.node.id}-unstarted`
       let settled = false
       const finish = (exitCode: number | null): void => {
@@ -695,8 +670,8 @@ async function executeRun(
                 return decision.allow ? null : { allow: false, message: decision.reason }
               }
             : undefined,
-          onPending: (pending) => pendingPermissions.add({ ...pending, featureDir }),
-          onResolved: (requestId) => pendingPermissions.remove(requestId),
+          onPending: (pending) => notePending(api, { ...pending, featureDir }),
+          onResolved: (requestId) => noteResolved(requestId),
           onEnd: (exitCode) => {
             // Off the live list and into the record, so a finished unit stops
             // holding a review slot and the next wave can start.
@@ -714,6 +689,10 @@ async function executeRun(
             return
           }
           sessionId = run.sessionId
+          // The lane's open conversation, for the next node that may carry it
+          // on. A role that may not resume is never offered it — the registry
+          // refuses, structurally.
+          laneSessions.set(lane, run.sessionId)
           // On the register, which is what the stall detector, the review
           // queue and the backpressure gate all read from. Without this the
           // agent is running and every one of them sees an idle factory —
@@ -737,6 +716,10 @@ async function executeRun(
   }
 
   const sources = resolveSources(api, root)
+  const houseRules = rulesFor(sources, {
+    repoPaths: sources.repoPaths,
+    houseDocs: [...order.context.houseDocs],
+  }).rules
   const gates = createLiveGateStore(() => root)
   const issuesPort = issuesPortFor(api)
 
@@ -749,16 +732,24 @@ async function executeRun(
     now: () => new Date().toISOString(),
     sources,
     run: runNode,
+    sessionFor: (lane) => laneSessions.get(lane),
+    record: async (action, subject, reason) => {
+      await store.record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'rule:line',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      })
+    },
     autonomy:
       api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
       'standard',
-    // Loaded here rather than inside the executor, so what an agent is told
-    // the house rules are and what the ladder is judged against are the same
-    // list read once.
-    rules: rulesFor(sources, {
-      repoPaths: sources.repoPaths,
-      houseDocs: [...order.context.houseDocs],
-    }).rules,
+    // Loaded once, so what an agent is told the house rules are and what the
+    // change is judged against are the same list.
+    rules: houseRules,
     raise: async (gate) => {
       await gates.save(gate)
       await store.record({
@@ -778,17 +769,13 @@ async function executeRun(
       if (step.command === null) return null
       const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
       const started = await runNode({
-        node: {
-          ...(graph.nodes[0] ?? ({} as RunNode)),
-          id: `ladder-${step.rung}-${step.name.replace(/\W+/g, '-').toLowerCase()}`,
-          kind: 'run',
-          role: null,
-          unitId: null,
-          lane,
-        },
+        node: ladderNode(step.rung, step.name, lane),
         role: null,
         prompt: `Run this exactly, and report its exit status. Do not fix what it reports.\n\n\`\`\`\n${step.command}\n\`\`\``,
-        resumeSessionId: undefined,
+        // In the lane's own conversation. Eight rungs used to be eight fresh
+        // agents and eight terminals, each re-reading the repository to run
+        // one command.
+        resumeSessionId: laneSessions.get(lane),
         readOnly: false,
       })
       return started.exitCode
@@ -831,12 +818,19 @@ async function executeRun(
   // inbox has the question, and answering it resumes from here.
   if (!outcome.shippable) return
 
+  // Shipped against the grade the change turned out to deserve, not the one
+  // the plan predicted — which is the whole reason the executor regrades.
   const shipped = await shipOrder(
-    order,
+    { ...order, risk: outcome.risk },
     {
       verdicts: outcome.verdicts,
       findings: outcome.inspection.required ? [outcome.inspection.reason] : [],
       ladder: outcome.ladder,
+      // Grouped by rung, so the record says what was in force where rather
+      // than listing every rule as though they all applied at once.
+      rulesInForce: RUNGS.flatMap((rung) =>
+        rulesAtRung(houseRules, rung).map((rule) => `${rule.id} (${rung})`)
+      ),
     },
     {
       ...integrateDepsFor(api, root),
@@ -860,6 +854,163 @@ async function executeRun(
       pulls: shipped.pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
     })
   }
+}
+
+/**
+ * One turn of intake, in a session the operator can see and type into.
+ *
+ * The architect runs read-only in the repository itself: intake changes no
+ * code, and cutting a worktree for a plan that may never be agreed would be
+ * creating a branch for nothing. It writes one file, and that file is
+ * validated before any of it reaches the order — an agent that could write the
+ * order directly could set its status and agree its own work.
+ *
+ * Resolves as soon as the architect is *running*, not when it finishes: a turn
+ * takes minutes, and a channel that waited would hold the bridge for all of
+ * them while the surface spun on a promise.
+ */
+async function convergeOnce(
+  api: ExtensionAPI,
+  root: string,
+  order: WorkOrder,
+  message: string,
+  onFinished: (outcome: ConvergeOutcome) => Promise<void>
+): Promise<ConvergeStarted> {
+  const runner = supervisedRunner
+  if (runner === null) {
+    return { ok: false, reason: 'The supervision runtime is not running, so intake cannot start.' }
+  }
+
+  const sources = resolveSources(api, root)
+  let plan
+  try {
+    plan = convergeBrief({
+      order,
+      root,
+      sources,
+      rules: rulesFor(sources, {
+        repoPaths: sources.repoPaths,
+        houseDocs: [...order.context.houseDocs],
+      }).rules,
+      message,
+    })
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
+
+  const workspaceId = api.workspace?.list()[0]?.id ?? ''
+  const featureDir = orderDir(root, order.id)
+  await fs.promises.mkdir(featureDir, { recursive: true })
+
+  // One conversation per order, so a follow-up does not make the architect
+  // read the repository again to answer "why not the other approach".
+  const resuming = intakeSessions.get(order.id)
+
+  return new Promise<ConvergeStarted>((resolve) => {
+    let answered = false
+    const answer = (started: ConvergeStarted): void => {
+      if (answered) return
+      answered = true
+      resolve(started)
+    }
+    let turnOver = false
+    const finish = (code: number | null): void => {
+      if (turnOver) return
+      turnOver = true
+      // The proposal is read when the turn ends, whatever the exit status: an
+      // architect that wrote a plan and then errored still wrote a plan.
+      void onFinished(
+        code === null
+          ? { ok: false, reason: 'The architect could not be started.' }
+          : readProposal(order, plan.proposalPath, new Date().toISOString())
+      )
+      answer({ ok: false, reason: 'The architect ended before it started.' })
+    }
+
+    void runner
+      .start({
+        featureDir,
+        worktreePath: plan.cwd,
+        workspaceId,
+        branch: `foundry/intake-${order.id.toLowerCase()}`,
+        prompt: plan.prompt,
+        phase: 'architect' as never,
+        resumeSessionId: plan.role.allowResume ? resuming : undefined,
+        model: defaultModel(api),
+        // Read-only, enforced by the hook rather than by the prompt. The
+        // architect proposes; it does not edit the repository it is reading.
+        // Its one exception is the proposal itself, and only at that path.
+        autoDecide: (tool, toolInput) => {
+          const target = (toolInput as { file_path?: unknown } | null)?.file_path
+          if (typeof target === 'string' && target === plan.proposalPath) return { allow: true }
+          const decision = decideReadOnly(tool, toolInput)
+          return decision.allow ? null : { allow: false, message: decision.reason }
+        },
+        onPending: (pending) => notePending(api, { ...pending, featureDir }),
+        onResolved: (requestId) => noteResolved(requestId),
+        onRegistered: (run) => {
+          intakeSessions.set(order.id, run.sessionId)
+          answer({ ok: true, sessionId: run.sessionId })
+        },
+        onTurnEnd: () => finish(0),
+        onEnd: (exitCode) => finish(exitCode),
+      })
+      .then((run) => {
+        if (run === null) {
+          answer({ ok: false, reason: 'The architect could not be started.' })
+          return
+        }
+        intakeSessions.set(order.id, run.sessionId)
+        answer({ ok: true, sessionId: run.sessionId })
+      })
+      .catch((error: unknown) => {
+        answer({
+          ok: false,
+          reason: error instanceof Error ? error.message : 'The architect could not be started.',
+        })
+      })
+  })
+}
+
+/**
+ * A tool call is being held, and somebody has to see it.
+ *
+ * The one thing allowed to interrupt: the run is stopped dead until it is
+ * answered, and a request nobody sees is a twelve-hour hang. This used to live
+ * inside a sink that nothing called, so every held call was silent.
+ */
+function notePending(api: ExtensionAPI, ask: PendingAsk): void {
+  pendingPermissions.add(ask)
+  const notification = notify(
+    api,
+    { kind: 'permission_requested', sessionId: ask.sessionId },
+    `${path.basename(ask.featureDir)} is asking: ${ask.summary}`,
+    [
+      {
+        id: 'allow',
+        label: 'Allow',
+        handler: () => supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: true }),
+      },
+      {
+        id: 'deny',
+        label: 'Deny',
+        handler: () => supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: false }),
+      },
+    ],
+    // Opening the thing is not a third answer to the question; it is what
+    // clicking the notification should do.
+    () => gotoRun(api, 'run', ask.sessionId)
+  )
+  if (notification !== null) raisedNotifications.set(ask.requestId, notification)
+}
+
+/** Answered, by whoever. The notification goes with the request. */
+function noteResolved(requestId: string): void {
+  pendingPermissions.remove(requestId)
+  // A notification left behind after the thing it was about is answered
+  // teaches you to dismiss without reading.
+  raisedNotifications.get(requestId)?.dispose()
+  raisedNotifications.delete(requestId)
 }
 
 export function activate(api: ExtensionAPI): void {
@@ -892,6 +1043,34 @@ export function activate(api: ExtensionAPI): void {
     now: () => new Date().toISOString(),
     writeBackDefault: defaultWriteBack(api),
     priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
+    // The redraft lands here, when the architect's turn ends — minutes after
+    // the channel that started it answered.
+    converge: (order, message) =>
+      convergeOnce(api, dataRoot(), order, message, async (outcome) => {
+        const store = createOrderStore(dataRoot())
+        if (!outcome.ok) {
+          await store.record({
+            at: new Date().toISOString(),
+            orderId: order.id,
+            actor: 'role:architect',
+            action: 'converge.refused',
+            subject: order.id,
+            reason: outcome.reason,
+            evidence: [],
+          })
+          return
+        }
+        await store.save(outcome.order)
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'role:architect',
+          action: 'order.redrafted',
+          subject: order.id,
+          reason: outcome.note === '' ? 'redrafted the plan' : outcome.note,
+          evidence: [],
+        })
+      }),
     // FR-059a: asked when the order is agreed, so an issue that will never
     // move is known before the run rather than after it.
     capability:
@@ -925,6 +1104,7 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:order.list', () => forge.list())
   reg(api, 'foundry:order.states', (payload) => forge.states(payload))
   reg(api, 'foundry:order.mapState', (payload) => forge.mapState(payload))
+  reg(api, 'foundry:order.converge', (payload) => forge.converge(payload))
 
   // ── The Line ───────────────────────────────────────────────────────────
   //
@@ -1502,10 +1682,6 @@ function refreshPalette(api: ExtensionAPI): void {
 export function deactivate(): void {
   disposables.forEach((d) => d.dispose())
   disposables.length = 0
-  setSupervisedRunner(null)
-  setPermissionSink(null)
-  setReadOnlyStateDir(null)
-  setRunSupervision(null)
   supervision = null
   mutes = null
   for (const notification of raisedNotifications.values()) notification.dispose()

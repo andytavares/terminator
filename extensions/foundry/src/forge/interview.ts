@@ -54,14 +54,3 @@ export function answerQuestion(
     return { ...question, answer }
   })
 }
-
-/**
- * Rank by blast radius: a question that changes three units outranks one that
- * changes one, because answering it unblocks more of the draft.
- */
-export function rankQuestions(questions: readonly RankableQuestion[]): OpenQuestion[] {
-  return questions
-    .map((question) => ({ ...question, rank: question.affects.length }))
-    .sort((a, b) => b.rank - a.rank)
-    .map(({ affects: _affects, ...question }) => question)
-}

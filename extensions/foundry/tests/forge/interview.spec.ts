@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  QUESTION_BUDGET,
-  surfacedQuestions,
-  answerQuestion,
-  rankQuestions,
-} from '../../src/forge/interview.js'
+import { QUESTION_BUDGET, surfacedQuestions, answerQuestion } from '../../src/forge/interview.js'
 import type { OpenQuestion } from '../../src/order/schema.js'
 
 // The ergonomic core of the Forge: ten questions cost ten answers, ten stated
@@ -92,20 +87,5 @@ describe('answerQuestion', () => {
   it('ignores an option index that is out of range', () => {
     const after = answerQuestion([q({ id: 'Q-1', options: ['No'] })], 'Q-1', 7)
     expect(after[0].answer).toBeNull()
-  })
-})
-
-describe('rankQuestions', () => {
-  it('ranks a question that changes more of the plan above one that changes less', () => {
-    const ranked = rankQuestions([
-      { ...q({ id: 'Q-few' }), affects: ['U-1'] },
-      { ...q({ id: 'Q-many' }), affects: ['U-1', 'U-2', 'U-3'] },
-    ])
-    expect(ranked.map((x) => x.id)).toEqual(['Q-many', 'Q-few'])
-  })
-
-  it('gives every question a rank, so ordering never depends on input order', () => {
-    const ranked = rankQuestions([{ ...q({ id: 'Q-1' }), affects: [] }])
-    expect(typeof ranked[0].rank).toBe('number')
   })
 })

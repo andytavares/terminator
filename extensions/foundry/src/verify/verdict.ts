@@ -85,16 +85,6 @@ export function makeVerdict(input: VerdictInput): Verdict {
   }
 }
 
-/**
- * Only a pass is a pass.
- *
- * Written as an explicit comparison rather than a truthiness check so that no
- * future edit can quietly widen it.
- */
-export function isPass(verdict: Verdict): boolean {
-  return verdict.result === 'pass'
-}
-
 export interface VerdictSummary {
   readonly passed: number
   readonly failed: number

@@ -5,24 +5,27 @@ import {
   markFailed,
   isComplete,
   budgetBreach,
+  hasStalled,
+  blockedNodes,
 } from './scheduler.js'
 import { withNode, stepFor } from './run-graph.js'
+import { checkExpect } from '../recipe/step-kinds.js'
 import type { RunGraph, RunNode } from './run-graph.js'
 import { createRoleRegistry } from './roles.js'
 import type { RoleRegistry } from './roles.js'
 import { brief } from './brief.js'
-import { decideReadOnly } from '../runtime/read-only-policy.js'
 import type { ResolveSources } from '../recipe/resolve.js'
 import type { Recipe, Rule } from '../recipe/parse.js'
-import type { Budgets, WorkOrder } from '../order/schema.js'
+import type { Budgets, RiskAssessment, WorkOrder } from '../order/schema.js'
 import { verdictFromExit, summarise } from '../verify/verdict.js'
 import type { Verdict } from '../verify/verdict.js'
-import { inspectionFor } from '../verify/inspection-triggers.js'
+import { inspectionFor, regrade } from '../verify/inspection-triggers.js'
 import { ladderFor, climb } from '../verify/ladder.js'
 import type { LadderOutcome, LadderStep } from '../verify/ladder.js'
 import { raiseGate } from '../gates/rules.js'
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { isLive } from '../gates/autonomy.js'
+import { GATE_RULES } from '../gates/rules.js'
 import type { Autonomy } from '../gates/autonomy.js'
 
 // The thing that joins the pieces.
@@ -83,6 +86,19 @@ export interface ExecutorDeps {
 
   /** Minutes elapsed and files touched, for the budget rules. */
   readonly observe?: () => { elapsedMinutes: number; filesTouched: number }
+
+  /** Write a line to the order's record. */
+  readonly record?: (action: string, subject: string, reason: string) => Promise<void>
+
+  /**
+   * The session a role may carry on in, when it may.
+   *
+   * A recipe is one conversation per lane, not one agent per node: a fresh
+   * agent for every step is five terminals and five agents that have each read
+   * the repository from scratch, which is what `continueRun` exists to avoid.
+   * A role with `allowResume: false` is never offered one, structurally.
+   */
+  readonly sessionFor?: (lane: number) => string | undefined
 }
 
 export type ExecutorEvent =
@@ -107,6 +123,14 @@ export interface RunOutcome {
   /** What the accumulated change was graded, and whether it warrants a look. */
   readonly inspection: { required: boolean; triggers: readonly string[]; reason: string }
   /**
+   * The grade the change turned out to deserve.
+   *
+   * Not the one the plan predicted. Shipping reads this, because a change
+   * planned as P3 that turns out to touch authentication must still take the
+   * decision that its real grade calls for.
+   */
+  readonly risk: RiskAssessment
+  /**
    * True when the work is finished *and* nothing is waiting on a person, so
    * the caller may ship. Distinct from `complete`: a graph with every node
    * passed and an open gate is complete and must not ship.
@@ -121,6 +145,11 @@ export interface RunOutcome {
  * against this order and this unit. The bare prompt on its own describes a
  * job and names no work, which is every "it built the wrong thing" failure.
  */
+/** Whether a recipe named a rule this build knows. */
+function isGateRule(value: unknown): value is GateRuleId {
+  return typeof value === 'string' && (GATE_RULES as readonly string[]).includes(value)
+}
+
 function promptFor(
   order: WorkOrder,
   recipe: Recipe,
@@ -197,6 +226,7 @@ export async function execute(
   }
 
   let halted = false
+  let stalled = false
 
   while (!isComplete(current) && !halted) {
     // Budgets are part of the agreement, not advice. Checked before a wave
@@ -216,7 +246,19 @@ export async function execute(
     }
 
     const ready = readyNodes(current, budgets)
-    if (ready.length === 0) break
+    if (ready.length === 0) {
+      // Nothing running, nothing runnable, and not finished: the graph cannot
+      // move on its own. Said out loud, because reporting it as "waiting on a
+      // gate" when no gate exists is a run that looks answerable and is not.
+      if (hasStalled(current, budgets)) {
+        halted = await raise('verify.repeat-fail', {
+          summary: `${order.title} cannot go any further on its own`,
+          why: `${blockedNodes(current).length} units are blocked and nothing is runnable. Something they depend on failed, or the plan has a cycle.`,
+        })
+        stalled = true
+      }
+      break
+    }
 
     // A join is a synchronisation point, not work. Its dependencies are what
     // it was waiting for, and the scheduler only offered it because they are
@@ -230,9 +272,26 @@ export async function execute(
 
     // A gate node in the recipe is a stated pause. It is not the executor's to
     // answer: it is raised, and the run stops until the inbox comes back.
+    //
+    // The rule is the recipe's own — every shipped recipe declares one, and
+    // ignoring it in favour of a hardcoded rule would give the operator the
+    // wrong question, the wrong options and the wrong default.
     const blocking = ready.find((node) => node.kind === 'gate')
     if (blocking !== undefined) {
-      halted = await raise('unit.boundary', {
+      const declared = stepFor(recipe, blocking)?.rule
+
+      // A recipe's terminal `ready-for-review` gate is its way of saying
+      // "shipping happens here". It is not a pause: the real decision is
+      // raised once the drafts exist, by whatever opens them, because "mark it
+      // ready?" asked before there is anything to mark is a question with no
+      // answer. So it passes, and the tail takes it from here.
+      if (declared === 'ready-for-review') {
+        current = markPassed(current, blocking.id, deps.now())
+        continue
+      }
+
+      const rule: GateRuleId = isGateRule(declared) ? declared : 'unit.boundary'
+      halted = await raise(rule, {
         summary: `${order.title} reached the "${blocking.stepId}" checkpoint`,
         why: `The "${recipe.id}" shape of work stops here by design.`,
         nodeId: blocking.id,
@@ -253,16 +312,26 @@ export async function execute(
         .filter((n): n is RunNode => n !== undefined && n.kind !== 'gate')
         .map(async (node) => {
           const roleId = node.role
-          // Structural, not advisory. A role that may not resume is never
-          // handed a session to resume, whatever a prompt might ask for.
-          if (roleId !== null) roles.assertResumable(roleId, undefined)
+          // One conversation per lane, where the role allows it. A fresh agent
+          // per node is a terminal per node and an agent that has read nothing
+          // — which is what `continueRun` exists to avoid.
+          //
+          // `assertResumable` is what makes the permission structural: a role
+          // with `allowResume: false` is *handed* undefined, so the refusal
+          // cannot be forgotten by a caller.
+          const offered = deps.sessionFor?.(node.lane ?? 1)
+          const resumeSessionId =
+            roleId !== null && offered !== undefined && roles.mayResume(roleId)
+              ? offered
+              : undefined
+          if (roleId !== null) roles.assertResumable(roleId, resumeSessionId)
           const readOnly = roleId !== null && !roles.mayWrite(roleId)
 
           const result = await deps.run({
             node,
             role: roleId,
             prompt: promptFor(order, recipe, node, roles, rules),
-            resumeSessionId: undefined,
+            resumeSessionId,
             readOnly,
           })
           return { node, result }
@@ -293,10 +362,43 @@ export async function execute(
         }
       }
 
-      if (result.exitCode === 0) {
+      // A judge declares what it expects; checking it is what makes it a judge
+      // rather than another agent. Parsed, validated and then ignored was the
+      // state of this before.
+      // The keys a recipe may assert about a step's own result. `exit_code`
+      // is the one a `run` or `judge` step actually produces; anything else it
+      // names is reported unmet rather than silently ignored, which is how a
+      // typo in a recipe becomes a green.
+      const step = stepFor(recipe, node)
+      const promised = step?.expect !== undefined
+      const unmet = !promised
+        ? []
+        : checkExpect(step.expect, {
+            exit_code: result.exitCode,
+            exitCode: result.exitCode,
+          }).map(
+            (failure) =>
+              `${failure.key} expected ${failure.expected}, got ${String(failure.actual)}`
+          )
+
+      // A declared expectation *replaces* the exit-status judgement rather
+      // than adding to it. That is what lets the bugfix shape say a
+      // reproduction must fail before the fix exists — the one place a passing
+      // command is the wrong answer, and where reading exit 0 as success would
+      // pass a reproduction that reproduces nothing.
+      const passed = promised ? unmet.length === 0 : result.exitCode === 0
+
+      if (passed) {
         current = markPassed(current, node.id, deps.now())
         deps.onEvent?.({ type: 'passed', nodeId: node.id })
       } else {
+        if (unmet.length > 0) {
+          await deps.record?.(
+            'step.expectation_unmet',
+            node.id,
+            `${node.stepId} did not meet what it promised: ${unmet.join('; ')}`
+          )
+        }
         const failure = markFailed(current, node.id, deps.now())
         current = failure.graph
         deps.onEvent?.({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
@@ -320,11 +422,18 @@ export async function execute(
   // finishing early from skipping the inspection.
   const touched = [...new Set(order.plan.units.flatMap((u) => u.touches))]
   const summary = summarise(verdicts)
-  const inspection = inspectionFor(order, {
+  const observed = {
     changedFiles: touched,
     linesChanged: 0,
-    checkState: summary.ok ? 'passing' : 'failing',
-  })
+    checkState: (summary.ok ? 'passing' : 'failing') as 'passing' | 'failing',
+  }
+  const inspection = inspectionFor(order, observed)
+
+  // The grade the change turned out to deserve, not the one the plan predicted.
+  // Shipping reads this: a change planned as P3 that turns out to touch
+  // authentication must take the operator's decision before it reaches the
+  // remote, and reading the stale grade is how it would not have.
+  const risk = regrade(order, observed)
   deps.onEvent?.({
     type: 'inspection',
     required: inspection.required,
@@ -335,11 +444,11 @@ export async function execute(
   // work to climb over: a run that halted at a gate has not earned a verdict
   // on the whole change, and reporting one would be inventing it.
   let ladder: LadderOutcome | null = null
-  if (!halted && isComplete(current)) {
+  if (!halted && !stalled && isComplete(current)) {
     ladder = await climb(
       ladderFor({
         toolchain: order.context.toolchain,
-        risk: { ...order.risk, triggers: [...inspection.triggers] },
+        risk,
         touchesUi: touched.some((path) => /\.(tsx|css|html|svelte|vue)$/.test(path)),
       }),
       deps.runStep ?? (() => Promise.resolve(null))
@@ -353,7 +462,9 @@ export async function execute(
   if (!halted && ladder !== null) {
     if (inspection.required) {
       halted = await raise('risk.p0', {
-        summary: `${order.title} graded ${inspection.grade} once it was done`,
+        summary: `${order.title} graded ${risk.grade} once it was done${
+          risk.grade === order.risk.grade ? '' : ` — it was planned as ${order.risk.grade}`
+        }`,
         why: `${inspection.reason} Triggered by ${inspection.triggers.join(', ')}.`,
       })
     }
@@ -381,24 +492,10 @@ export async function execute(
       triggers: inspection.triggers,
       reason: inspection.reason,
     },
+    risk,
     // Everything done, nothing waiting on a person, and the climb either
     // passed or was never owed. A complete graph with an open gate is not
     // shippable, which is the distinction this field exists to make.
-    shippable: complete && !halted && gates.length === 0 && (ladder?.ok ?? false),
+    shippable: complete && !halted && !stalled && gates.length === 0 && (ladder?.ok ?? false),
   }
-}
-
-/**
- * Whether a tool call a read-only role made is allowed.
- *
- * Exposed so the caller can hand it to the `PreToolUse` hook: a verifier that
- * decided to fix what it found is refused by the hook, not by a reminder in
- * its prompt.
- */
-export function readOnlyDecision(
-  toolName: string,
-  input: unknown
-): { allow: boolean; reason: string } {
-  const decision = decideReadOnly(toolName, input)
-  return { allow: decision.allow, reason: decision.reason }
 }

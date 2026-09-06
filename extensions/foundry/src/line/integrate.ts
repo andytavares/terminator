@@ -67,6 +67,13 @@ export interface Shipment {
    * that implies it was linted.
    */
   readonly ladder?: LadderOutcome | null
+  /**
+   * The house rules this change was judged against (FR-042).
+   *
+   * Named on the decision and in the body, so "which rules were in force" is
+   * answerable at review time rather than inferred from a directory listing.
+   */
+  readonly rulesInForce?: readonly string[]
 }
 
 export interface LanePullRequest {
@@ -233,6 +240,13 @@ export function prBody(
         `**${ladder.unmeasured.length} ${ladder.unmeasured.length === 1 ? 'check was' : 'checks were'} not measured here**: ${ladder.unmeasured.join(', ')}. This repository has no command for them, so they are reported as unmeasured rather than as passing.`
       )
     }
+  }
+
+  if ((shipment.rulesInForce?.length ?? 0) > 0) {
+    lines.push(
+      '',
+      `Judged against ${shipment.rulesInForce?.length} house ${shipment.rulesInForce?.length === 1 ? 'rule' : 'rules'}: ${shipment.rulesInForce?.join(', ')}.`
+    )
   }
 
   lines.push('', '### Inspection', '')
@@ -483,6 +497,7 @@ export async function shipOrder(
   // exist until now — and it is one of the four rules that stay live at every
   // autonomy setting, so a lights-out run reaches exactly this point and stops.
   const unmeasured = shipment.ladder?.unmeasured ?? []
+  const rules = shipment.rulesInForce ?? []
   const gate = raiseGate({
     id: `${order.id}-ready`,
     rule: 'ready-for-review',
@@ -496,7 +511,10 @@ export async function shipOrder(
       shipment.findings.length === 0
         ? 'The inspection found nothing.'
         : `The inspection found ${shipment.findings.length}.`,
-    ].join(' '),
+      rules.length === 0 ? '' : `Judged against: ${rules.join(', ')}.`,
+    ]
+      .filter((line) => line !== '')
+      .join(' '),
     evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
     riskGrade: order.risk.grade,
     blockedUnits: 0,

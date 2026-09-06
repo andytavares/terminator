@@ -13,12 +13,6 @@ export interface StrikeResult {
   readonly redraw: readonly string[]
 }
 
-/** What an assumption is holding up. */
-export function affectedBy(order: WorkOrder, assumptionId: string): string[] {
-  const assumption = order.assumptions.find((a) => a.id === assumptionId)
-  return assumption === undefined ? [] : [...assumption.affects]
-}
-
 /** The assumptions the operator still has to scan. */
 export function liveAssumptions(order: WorkOrder): Assumption[] {
   return order.assumptions.filter((a) => !a.struck)

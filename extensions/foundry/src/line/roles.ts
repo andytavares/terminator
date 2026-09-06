@@ -37,6 +37,14 @@ export interface RoleRegistry {
   get(id: string): Role | null
   /** Throws when a role that may not resume is handed a session to resume. */
   assertResumable(id: string, resumeSessionId: string | undefined): void
+  /**
+   * Whether this role may carry on in an open conversation.
+   *
+   * Asked *before* offering one, so a caller does not have to construct a
+   * forbidden call to find out. `assertResumable` is still what enforces it —
+   * this is the polite half, and the refusal is the structural one.
+   */
+  mayResume(id: string): boolean
   mayUseTool(id: string, tool: string): boolean
   mayWrite(id: string): boolean
 }
@@ -63,6 +71,13 @@ export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
       // would mean a typo in a recipe silently produced a verifier that could
       // read the builder's reasoning.
       if (role === null || !role.allowResume) throw new ResumeForbiddenError(id)
+    },
+
+    mayResume(id) {
+      // Unknown is non-resumable, for the same reason `assertResumable`
+      // treats it that way: a typo in a recipe must not produce a verifier
+      // that can read the builder's reasoning.
+      return get(id)?.allowResume === true
     },
 
     mayUseTool(id, tool) {

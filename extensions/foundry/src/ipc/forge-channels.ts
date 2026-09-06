@@ -3,12 +3,20 @@ import { seedOrder, newOrderId } from '../forge/intake-source.js'
 import type { IssueLike } from '../forge/intake-source.js'
 import { answerQuestion } from '../forge/interview.js'
 import { strikeAssumption } from '../forge/assumptions.js'
-import { applyFindings } from '../forge/red-team.js'
+import { applyFindings, resolveFinding, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
 import { TransitionIntentSchema } from '../order/schema.js'
 import type { TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
+
+/** What one turn of intake produced, or why it produced nothing. */
+export type ConvergeOutcome =
+  | { ok: true; order: WorkOrder; note: string }
+  | { ok: false; reason: string }
+
+/** Whether the architect is now running, or why it is not. */
+export type ConvergeStarted = { ok: true; sessionId: string } | { ok: false; reason: string }
 
 // The Forge's three channels.
 //
@@ -33,6 +41,20 @@ const TurnPayload = z.object({
   answer: z
     .object({ questionId: z.string(), option: z.union([z.string(), z.number()]) })
     .optional(),
+  /**
+   * Clear an adversarial finding.
+   *
+   * `resolved` means it was fixed; `accepted` means it stands and the operator
+   * has said why. Without one of these the compile gate refuses the order for
+   * ever, which is what it did before this existed.
+   */
+  finding: z
+    .object({
+      id: z.string(),
+      decision: z.enum(['resolved', 'accepted']),
+      reason: z.string().default(''),
+    })
+    .optional(),
 })
 
 const CompilePayload = z.object({ id: z.string(), commit: z.boolean().default(false) })
@@ -55,6 +77,20 @@ export interface ForgeDeps {
   /** Past decisions about the files a new idea names (FR-077). */
   readonly priorArtFor?: (paths: readonly string[]) => Promise<string[]>
   /**
+   * Start one turn of intake, and resolve as soon as it is *running*.
+   *
+   * Not when it finishes. An architect takes minutes, and a channel that
+   * waited would hold the bridge for all of them — the surface would spin with
+   * no way to see what the agent was doing, which is the opposite of running
+   * it in a terminal you can watch.
+   *
+   * The redraft lands later, through the store, and the surface sees it on its
+   * next read. A seam, so this file starts no sessions and knows nothing about
+   * terminals; absent means intake cannot run, which is said out loud rather
+   * than leaving a draft that can never be agreed.
+   */
+  readonly converge?: (order: WorkOrder, message: string) => Promise<ConvergeStarted>
+  /**
    * What the source tracker can be asked to do, and the states it offers.
    *
    * Consulted when the order is agreed rather than when a write is due
@@ -67,6 +103,8 @@ export interface ForgeDeps {
 }
 
 export interface ForgeChannels {
+  /** Run one turn of intake: the architect drafts, or redrafts, the plan. */
+  converge(payload: unknown): Promise<unknown>
   create(payload: unknown): Promise<unknown>
   turn(payload: unknown): Promise<unknown>
   compile(payload: unknown): Promise<unknown>
@@ -163,6 +201,31 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       return view(result.order, [...result.redraw])
     }
 
+    if (parsed.data.finding !== undefined) {
+      const { id: findingId, decision, reason } = parsed.data.finding
+      if (decision === 'accepted' && reason.trim() === '') {
+        // An accepted finding with no reason is a shrug, and the compile check
+        // would refuse it anyway — said here rather than silently ignored.
+        return { ...view(order), error: 'Accepting a finding costs a written reason.' }
+      }
+      const next =
+        decision === 'resolved'
+          ? resolveFinding(order, findingId)
+          : acceptFinding(order, findingId, reason)
+
+      await deps.store.save(next)
+      await deps.store.record({
+        at: deps.now(),
+        orderId: id,
+        actor: 'operator',
+        action: `finding.${decision}`,
+        subject: findingId,
+        reason: reason.trim() === '' ? 'fixed' : reason.trim(),
+        evidence: [],
+      })
+      return view(next, ['redTeam'])
+    }
+
     if (answer !== undefined) {
       const next: WorkOrder = {
         ...order,
@@ -181,10 +244,68 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       return view(next, [answer.questionId])
     }
 
-    // Free text has no effect on the document by itself — it goes to the agent
-    // session, and the redraft arrives as a later save. Returning the order
-    // unchanged is honest about that rather than pretending something moved.
+    // Free text goes to the architect, which is the whole conversational half
+    // of the Forge. It used to return the order unchanged with a comment
+    // saying the text had gone to an agent session; there was no agent.
+    if (parsed.data.message !== undefined && parsed.data.message.trim() !== '') {
+      return converge({ id, message: parsed.data.message })
+    }
+
     return view(order)
+  }
+
+  /**
+   * One turn of intake.
+   *
+   * The architect reads the draft and the repository and proposes criteria, a
+   * plan, a risk grade and budgets. It runs read-only and writes one file,
+   * which is validated before any of it reaches the order — an agent that
+   * could write the order directly could set its status and agree its own work.
+   */
+  async function converge(raw: unknown): Promise<unknown> {
+    const parsed = TurnPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const id = parsed.data.id
+    const order = await deps.store.load(id)
+    if (order === null) return { error: `No order ${id}.` }
+    if (order.status !== 'draft') {
+      return { error: `Only a draft can be converged; this order is ${order.status}.` }
+    }
+    if (deps.converge === undefined) {
+      return {
+        ...view(order),
+        error:
+          'Intake cannot run: there is no supervision runtime, so no architect can draft the plan.',
+      }
+    }
+
+    const started = await deps.converge(order, parsed.data.message ?? '')
+    if (!started.ok) {
+      await deps.store.record({
+        at: deps.now(),
+        orderId: id,
+        actor: 'role:architect',
+        action: 'converge.refused',
+        subject: id,
+        reason: started.reason,
+        evidence: [],
+      })
+      return { ...view(order), error: started.reason }
+    }
+
+    await deps.store.record({
+      at: deps.now(),
+      orderId: id,
+      actor: 'role:architect',
+      action: 'converge.started',
+      subject: started.sessionId,
+      reason: parsed.data.message === undefined ? 'drafting the plan' : parsed.data.message,
+      evidence: [],
+    })
+    // The order as it stands, plus the session the architect is working in —
+    // so the surface can say it is running and take the operator to it.
+    return { ...view(order), converging: started.sessionId }
   }
 
   async function compile(raw: unknown): Promise<unknown> {
@@ -291,5 +412,5 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     }
   }
 
-  return { create, turn, compile, list, states, mapState }
+  return { create, turn, compile, list, states, mapState, converge }
 }

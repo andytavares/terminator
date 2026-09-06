@@ -558,3 +558,206 @@ describe('the intent-to-state mapping (FR-060)', () => {
     expect(await channels.states({ nope: true })).toEqual({ error: 'Malformed request.' })
   })
 })
+
+describe('foundry:order.converge — the half that was missing', () => {
+  function drafted() {
+    return channels().create({
+      source: { kind: 'typed', text: 'expired tokens are accepted' },
+      repoPaths: [repo],
+    }) as Promise<OrderView>
+  }
+  it('starts the architect and answers straight away, rather than holding the bridge', async () => {
+    const seed = await drafted()
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
+    const c = createForgeChannels({ store, now: () => NOW, converge })
+
+    const r = (await c.converge({ id: seed.order.id })) as OrderView & { converging: string }
+    expect(converge).toHaveBeenCalled()
+    // An architect takes minutes. A channel that waited for one would hold the
+    // bridge for all of them, and the surface would spin with no way to see
+    // what the agent was doing.
+    expect(r.converging).toBe('sess-arch')
+    expect(r.order.acceptance).toEqual([])
+  })
+
+  it('names the session, so the surface can take the operator to it', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
+    })
+    const r = (await c.converge({ id: seed.order.id })) as { converging: string }
+    expect(r.converging).toBe('sess-arch')
+  })
+
+  it('records that it started, and what it was asked', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
+    })
+    await c.converge({ id: seed.order.id, message: 'tighten AC-2' })
+    const ledger = fs.readFileSync(path.join(root, 'orders', seed.order.id, 'ledger.jsonl'), 'utf8')
+    expect(ledger).toContain('converge.started')
+    expect(ledger).toContain('tighten AC-2')
+  })
+
+  it('returns the order untouched, and why, when the proposal was refused', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: false, reason: 'the architect could not be started' }),
+    })
+    const r = (await c.converge({ id: seed.order.id })) as OrderView & { error: string }
+    expect(r.error).toBe('the architect could not be started')
+    expect(r.order.acceptance).toEqual([])
+  })
+
+  it('records a refusal, so a run of bad proposals is visible afterwards', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: false, reason: 'no runtime' }),
+    })
+    await c.converge({ id: seed.order.id })
+    const ledger = fs.readFileSync(path.join(root, 'orders', seed.order.id, 'ledger.jsonl'), 'utf8')
+    expect(ledger).toContain('converge.refused')
+  })
+
+  it('says so when there is no runtime to run an architect', async () => {
+    const seed = await drafted()
+    const r = (await channels().converge({ id: seed.order.id })) as { error: string }
+    expect(r.error).toMatch(/no architect can draft the plan/)
+  })
+
+  it('refuses to converge an order that is no longer a draft', async () => {
+    const done = await agreeable()
+    await store.save({ ...done, status: 'running' })
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: true, sessionId: 's' }),
+    })
+    expect(await c.converge({ id: 'WO-1' })).toEqual({
+      error: 'Only a draft can be converged; this order is running.',
+    })
+  })
+
+  it('reports an order it cannot find', async () => {
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: true, sessionId: 's' }),
+    })
+    expect(await c.converge({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
+  })
+})
+
+describe('free text reaches the architect', () => {
+  it('goes to intake rather than nowhere', async () => {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
+    const c = createForgeChannels({ store, now: () => NOW, converge })
+
+    await c.turn({ id: seed.order.id, message: 'the second unit is not needed' })
+    expect(converge).toHaveBeenCalledWith(expect.anything(), 'the second unit is not needed')
+  })
+
+  it('leaves striking an assumption and answering a question alone', async () => {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
+    const c = createForgeChannels({ store, now: () => NOW, converge })
+
+    await c.turn({ id: seed.order.id, strike: seed.order.assumptions[0]?.id ?? 'A-1' })
+    expect(converge).not.toHaveBeenCalled()
+  })
+
+  it('does nothing for empty text', async () => {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
+    const c = createForgeChannels({ store, now: () => NOW, converge })
+
+    await c.turn({ id: seed.order.id, message: '   ' })
+    expect(converge).not.toHaveBeenCalled()
+  })
+})
+
+describe('clearing an adversarial finding — the other thing that blocked the gate', () => {
+  async function withFinding() {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(seed.order.redTeam.length).toBeGreaterThan(0)
+    return seed.order
+  }
+
+  it('marks one fixed', async () => {
+    const o = await withFinding()
+    const r = (await channels().turn({
+      id: o.id,
+      finding: { id: o.redTeam[0].id, decision: 'resolved' },
+    })) as OrderView
+    expect(r.order.redTeam[0].status).toBe('resolved')
+    expect((await store.load(o.id))?.redTeam[0].status).toBe('resolved')
+  })
+
+  it('accepts one, with the reason it stands', async () => {
+    const o = await withFinding()
+    const r = (await channels().turn({
+      id: o.id,
+      finding: { id: o.redTeam[0].id, decision: 'accepted', reason: 'the risk is priced in' },
+    })) as OrderView
+    expect(r.order.redTeam[0]).toMatchObject({
+      status: 'accepted',
+      reason: 'the risk is priced in',
+    })
+  })
+
+  it('refuses to accept one without a reason — a shrug is not a decision', async () => {
+    const o = await withFinding()
+    const r = (await channels().turn({
+      id: o.id,
+      finding: { id: o.redTeam[0].id, decision: 'accepted', reason: '   ' },
+    })) as OrderView & { error: string }
+    expect(r.error).toMatch(/costs a written reason/)
+    expect(r.order.redTeam[0].status).toBe('open')
+  })
+
+  it('records who cleared it and why', async () => {
+    const o = await withFinding()
+    await channels().turn({
+      id: o.id,
+      finding: { id: o.redTeam[0].id, decision: 'accepted', reason: 'priced in' },
+    })
+    const ledger = fs.readFileSync(path.join(root, 'orders', o.id, 'ledger.jsonl'), 'utf8')
+    expect(ledger).toContain('finding.accepted')
+    expect(ledger).toContain('priced in')
+  })
+
+  it('unblocks the compile check once every finding is cleared', async () => {
+    const o = await withFinding()
+    for (const finding of o.redTeam) {
+      await channels().turn({ id: o.id, finding: { id: finding.id, decision: 'resolved' } })
+    }
+    // The one check this used to fail for ever, because nothing could clear a
+    // finding.
+    const compiled = (await channels().compile({ id: o.id, commit: false })) as {
+      compile: { failures: { check: string }[] }
+    }
+    expect(compiled.compile.failures.map((f) => f.check)).not.toContain('redTeam')
+  })
+})
