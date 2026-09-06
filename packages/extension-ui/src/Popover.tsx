@@ -54,6 +54,26 @@ export function Popover({ label, children, onDismiss, className }: PopoverProps)
       if (ref.current && !ref.current.contains(e.target as Node)) dismissRef.current()
     }
 
+    /**
+     * Keep it on screen.
+     *
+     * The surface is absolutely positioned against whatever the caller
+     * anchored it to, and a control near the right or bottom edge — the caret
+     * beside a commit button, say — puts the panel half outside the view with
+     * no way to scroll to it. Measured after mount and nudged back, because
+     * the overflow depends on the rendered width, which nothing knows in
+     * advance.
+     */
+    const el = ref.current
+    if (el) {
+      const margin = 8
+      const box = el.getBoundingClientRect()
+      const overflowRight = box.right - (window.innerWidth - margin)
+      if (overflowRight > 0) el.style.marginLeft = `${-overflowRight}px`
+      const overflowBottom = box.bottom - (window.innerHeight - margin)
+      if (overflowBottom > 0) el.style.marginTop = `${-overflowBottom}px`
+    }
+
     document.addEventListener('keydown', onKeyDown)
     // Deferred a tick: the click that opened this popover is still propagating,
     // and would otherwise close it immediately.

@@ -39,6 +39,7 @@ export function RemoteControlSettings(): React.JSX.Element {
         }
         if (s) {
           setPort(s.port ?? 7681)
+          setStatus((prev) => ({ ...prev, enabled: s.enabled }))
           setMaxSubscribers(s.maxSubscribers ?? 5)
           setPasswordInput(s.password ?? '')
           setNgrokTokenInput(s.ngrokAuthToken ?? '')
@@ -133,7 +134,7 @@ export function RemoteControlSettings(): React.JSX.Element {
         </span>
       </div>
 
-      {(enabled || status.enabled) && (
+      {status.enabled && (
         <>
           {status.publicUrl ? (
             <div className="settings-section__field">
@@ -209,7 +210,7 @@ export function RemoteControlSettings(): React.JSX.Element {
             </div>
           ) : null}
 
-          {(status.lanUrl || enabled) && (
+          {(status.lanUrl || status.enabled) && (
             <div className="settings-section__field">
               <label className="settings-section__label">Local address</label>
               <div

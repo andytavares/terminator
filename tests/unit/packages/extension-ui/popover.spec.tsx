@@ -103,3 +103,52 @@ describe('Popover', () => {
     expect(Number(el.style.zIndex)).toBeGreaterThan(0)
   })
 })
+
+/**
+ * Staying on screen.
+ *
+ * The surface is positioned against whatever anchored it, so a control near an
+ * edge — the caret beside the commit button — put half the menu outside the
+ * window with nothing to scroll. jsdom reports a zero rect, so the geometry is
+ * stubbed: what is under test is the arithmetic and which way it nudges.
+ */
+describe('Popover viewport clamping', () => {
+  function renderWithRect(rect: Partial<DOMRect>) {
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: 200,
+      height: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+      ...rect,
+    } as DOMRect)
+    const view = render(
+      <Popover label="Menu" onDismiss={vi.fn()}>
+        <button>Item</button>
+      </Popover>
+    )
+    spy.mockRestore()
+    return view.container.querySelector('[data-tmui-surface]') as HTMLElement
+  }
+
+  it('pulls back a surface overflowing the right edge', () => {
+    const el = renderWithRect({ right: window.innerWidth + 40 })
+    // 40 over, plus the 8px margin it keeps.
+    expect(el.style.marginLeft).toBe('-48px')
+  })
+
+  it('pulls up a surface overflowing the bottom edge', () => {
+    const el = renderWithRect({ bottom: window.innerHeight + 20 })
+    expect(el.style.marginTop).toBe('-28px')
+  })
+
+  it('leaves a surface that already fits alone', () => {
+    const el = renderWithRect({ right: 100, bottom: 100 })
+    expect(el.style.marginLeft).toBe('')
+    expect(el.style.marginTop).toBe('')
+  })
+})

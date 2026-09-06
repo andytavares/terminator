@@ -165,13 +165,13 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
               className={`tv-modal-tab${tab === 'data' ? ' tv-modal-tab--active' : ''}`}
               onClick={() => setTab('data')}
             >
-              Data Tools
+              Data tools
             </button>
             <button
               className={`tv-modal-tab${tab === 'admin' ? ' tv-modal-tab--active' : ''}`}
               onClick={() => setTab('admin')}
             >
-              DB Admin
+              Database
             </button>
           </div>
           <button className="capture-modal__close" onClick={onClose}>

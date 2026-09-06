@@ -348,12 +348,18 @@
   background: color-mix(in srgb, var(--tm-accent) 18%, transparent);
 }
 
+/* Was 14px — the width of the single porcelain letter this used to print.
+   The words that replaced it overflowed the box and ran under the path. Sized
+   for the longest of them ("Conflict") and left-aligned, so every path in the
+   list starts at the same place. */
 .staging-area__badge {
   font-size: 10px;
   font-weight: 700;
-  width: 14px;
-  text-align: center;
-  flex-shrink: 0;
+  flex: 0 0 56px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .staging-area__badge--modified {

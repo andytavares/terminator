@@ -115,6 +115,36 @@ export const EXTENSION_BASE_CSS = `
   height: 16px;
 }
 
+/* The default an icon gets when nothing else sizes it.
+
+   lucide renders width/height attributes of 24 when given no size, which is
+   never what a 12px label wants — an icon converted from a text glyph and left
+   without a rule comes out enormous. This makes the default "as tall as the
+   text beside it", which is what the glyph it replaced did. Anything wanting a
+   specific size says so with .tm-icon*, or its own rule; both are more
+   specific than this and win.
+
+   The :has() rule is the other half: a button that used to hold a character
+   laid it out as text, and an inline SVG in the same place sits on the
+   baseline instead of centred. */
+button > svg,
+a > svg,
+label > svg,
+summary > svg {
+  width: 1.08em;
+  height: 1.08em;
+  flex: 0 0 auto;
+}
+
+/* Vertical centring only. Forcing justify-content here re-centred every
+   left-aligned button that happens to contain an icon — a disclosure row,
+   a menu item — which is a layout decision that belongs to the caller. */
+button:has(> svg) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* The light palette, mirroring [data-theme='light'] in src/renderer/styles.css.
    Those values are WCAG AA verified against their surfaces (TAV-8) — including
    the text-muted darkening and the semantic colours, which were chosen so they

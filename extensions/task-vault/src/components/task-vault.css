@@ -6039,6 +6039,11 @@ h2.daily-log__date {
   padding: 14px 16px;
   max-height: 70vh;
   overflow-y: auto;
+  /* The rows below wrap, but a flex child defaults to min-width:auto and so
+     refuses to shrink below its content — which let the chip rows drive the
+     dialog wider than itself and scroll the header off sideways. */
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 .db-admin__section {
@@ -6047,6 +6052,7 @@ h2.daily-log__date {
   gap: 6px;
   padding: 10px 0;
   border-top: 1px solid var(--tm-border);
+  min-width: 0;
 }
 
 .db-admin__stats {
@@ -6054,6 +6060,7 @@ h2.daily-log__date {
   flex-direction: column;
   gap: 6px;
   padding-bottom: 10px;
+  min-width: 0;
 }
 
 .db-admin__stats-header {
@@ -6072,6 +6079,7 @@ h2.daily-log__date {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 
 .db-admin__stat-chip-wrap {
@@ -6147,6 +6155,7 @@ h2.daily-log__date {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+  min-width: 0;
 }
 
 .tv-btn--danger-ghost {
