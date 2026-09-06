@@ -22,11 +22,21 @@ const renderHeader = (patch: Partial<RepoGroup> = {}, props: Record<string, unkn
     <RepoHeader group={group(patch)} collapsed={false} onToggleCollapse={vi.fn()} {...props} />
   )
 
-/** Drawn at rest, excluding the colour swatch — identity, not a fact. */
+/**
+ * Drawn at rest, excluding the colour swatch (identity, not a fact) and the
+ * disclosure chevron (structure, not content).
+ *
+ * The chevron moved out of the hover group and to the head of the row so that
+ * a header says whether it is collapsed without being pointed at — which is
+ * the first question it has to answer. It is not one of the facts this budget
+ * is counting.
+ */
 const restingElements = (container: HTMLElement): number =>
   [...container.querySelector('.repo-header')!.children].filter(
     (c) =>
-      !c.classList.contains('repo-header__hover') && !c.classList.contains('repo-header__swatch')
+      !c.classList.contains('repo-header__hover') &&
+      !c.classList.contains('repo-header__swatch') &&
+      !c.classList.contains('repo-header__chevron')
   ).length
 
 describe('RepoHeader', () => {
@@ -203,10 +213,25 @@ describe('RepoHeader — hover reveals without moving anything (FR-031)', () => 
     expect(container.querySelectorAll('.repo-header__action')).toHaveLength(3)
   })
 
-  it('orders the count before the controls, so it never moves as they appear', () => {
+  it('puts the count last, so every count in the sidebar shares one column', () => {
+    // The controls used to sit to the right of the count, and a repo
+    // contributing three of them pushed its count further left than one
+    // contributing two — so no two counts lined up. The controls take the
+    // slack now and the count is flush against the row's right padding,
+    // matching the branch rows and the scratch row.
     const { container } = renderHeader({}, { workspaceTabs: tabs, onAddBranch: vi.fn() })
     const kids = [...container.querySelector('.repo-header')!.children].map((c) => c.className)
-    expect(kids.indexOf('repo-header__count')).toBeLessThan(kids.indexOf('repo-header__hover'))
+    expect(kids.indexOf('repo-header__count')).toBeGreaterThan(kids.indexOf('repo-header__hover'))
+    expect(kids[kids.length - 1]).toBe('repo-header__count')
+  })
+
+  it('draws the disclosure chevron at rest, at the head of the row', () => {
+    // It used to live inside the hover group, so at rest there was nothing on
+    // screen saying whether a repo was collapsed.
+    const { container } = renderHeader()
+    const kids = [...container.querySelector('.repo-header')!.children].map((c) => c.className)
+    expect(kids[0]).toBe('repo-header__chevron')
+    expect(container.querySelector('.repo-header__chevron')).toBeTruthy()
   })
 })
 

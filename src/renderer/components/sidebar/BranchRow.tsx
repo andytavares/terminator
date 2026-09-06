@@ -231,13 +231,6 @@ export function BranchRow({
               <b>+{changeStats!.added}</b> <i>−{changeStats!.removed}</i>
             </span>
           )}
-          {row.stateCount > 1 ? (
-            <span className="branch-row__count">{row.stateCount}</span>
-          ) : (
-            row.lastActivityAt !== null && (
-              <span className="branch-row__age">{formatRelativeTime(row.lastActivityAt, now)}</span>
-            )
-          )}
         </span>
 
         {onAddTerminal && (
@@ -254,6 +247,17 @@ export function BranchRow({
             >
               <Plus aria-hidden="true" />
             </button>
+          </span>
+        )}
+
+        {/* Last on the row, so it sits flush against the right edge and lands
+            in the same column as every other count in the sidebar. Anything
+            that can appear or disappear goes to its left. */}
+        {row.stateCount > 1 ? (
+          <span className="branch-row__count">{row.stateCount}</span>
+        ) : (
+          <span className="branch-row__age">
+            {row.lastActivityAt !== null ? formatRelativeTime(row.lastActivityAt, now) : ''}
           </span>
         )}
       </div>

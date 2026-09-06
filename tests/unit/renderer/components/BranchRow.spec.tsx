@@ -137,10 +137,13 @@ describe('BranchRow', () => {
     expect(container.querySelector('.branch-row__count')).toBeNull()
   })
 
-  it('shows neither for a branch with no terminals', () => {
+  it('states neither a count nor an age for a branch with no terminals', () => {
+    // The box stays — it is the column every count in the sidebar shares, and
+    // dropping it would let the row's hover control sit where the numbers are
+    // — but it says nothing.
     const { container } = renderRow({ stateCount: 0, sessionCount: 0, lastActivityAt: null })
-    expect(container.querySelector('.branch-row__age')).toBeNull()
     expect(container.querySelector('.branch-row__count')).toBeNull()
+    expect(container.querySelector('.branch-row__age')!.textContent).toBe('')
   })
 
   // FR-026.

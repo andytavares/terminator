@@ -689,7 +689,6 @@ export function UnifiedSidebar({
             <div className="unified-sidebar__scratch">
               <div className="unified-sidebar__scratch-head">
                 <span className="unified-sidebar__scratch-label">Scratch</span>
-                <span className="unified-sidebar__scratch-count">{scratch.length}</span>
                 <button
                   className="unified-sidebar__scratch-add"
                   title="New scratch terminal"
@@ -698,6 +697,8 @@ export function UnifiedSidebar({
                 >
                   +
                 </button>
+                {/* Last on the row, in the same column as every other count. */}
+                <span className="unified-sidebar__scratch-count">{scratch.length}</span>
               </div>
               {scratch.map((session) => (
                 <BranchRow
