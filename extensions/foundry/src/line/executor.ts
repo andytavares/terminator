@@ -110,6 +110,17 @@ export type ExecutorEvent =
   | { type: 'gate'; gate: Gate }
   | { type: 'ladder'; outcome: LadderOutcome }
 
+/**
+ * Whether this shape of work ends in a pull request at all.
+ *
+ * A spike is a question, not a change: it opens nothing, which is FR-019 and
+ * is stated in the recipe by having no ship step rather than by a flag. A
+ * caller that shipped regardless would turn every investigation into a branch.
+ */
+export function opensPullRequest(recipe: Recipe): boolean {
+  return recipe.steps.some((step) => step.kind === 'gate' && step.rule === 'ready-for-review')
+}
+
 export interface RunOutcome {
   readonly graph: RunGraph
   readonly verdicts: readonly Verdict[]
@@ -364,24 +375,40 @@ export async function execute(
 
       // A judge declares what it expects; checking it is what makes it a judge
       // rather than another agent. Parsed, validated and then ignored was the
-      // state of this before.
-      // The keys a recipe may assert about a step's own result. `exit_code`
-      // is the one a `run` or `judge` step actually produces; anything else it
-      // names is reported unmet rather than silently ignored, which is how a
-      // typo in a recipe becomes a green.
+      // state of this before.      // What a step's own result actually offers. `suite_exit_code` is an
+      // alias: for a `run` step the suite *is* the step, and the bugfix shape
+      // names it that way to say which exit status it means.
       const step = stepFor(recipe, node)
-      const promised = step?.expect !== undefined
-      const unmet = !promised
-        ? []
-        : checkExpect(step.expect, {
-            exit_code: result.exitCode,
-            exitCode: result.exitCode,
-          }).map(
-            (failure) =>
-              `${failure.key} expected ${failure.expected}, got ${String(failure.actual)}`
-          )
+      const observed: Record<string, unknown> = {
+        exit_code: result.exitCode,
+        exitCode: result.exitCode,
+        suite_exit_code: result.exitCode,
+      }
 
-      // A declared expectation *replaces* the exit-status judgement rather
+      // A key nothing can supply is *not measured* — never a silent pass and
+      // never a silent failure. `tests_added` needs diff metrics this path
+      // does not gather, so an expectation naming it is recorded and the step
+      // falls back to its exit status, rather than becoming a shape that can
+      // never pass.
+      const named = Object.keys(step?.expect ?? {})
+      const unmeasurable = named.filter((key) => !(key in observed))
+      const measurable = Object.fromEntries(
+        Object.entries(step?.expect ?? {}).filter(([key]) => key in observed)
+      )
+      const promised = named.length > unmeasurable.length
+
+      const unmet = checkExpect(measurable, observed).map(
+        (failure) => `${failure.key} expected ${failure.expected}, got ${String(failure.actual)}`
+      )
+      if (unmeasurable.length > 0) {
+        await deps.record?.(
+          'step.expectation_not_measured',
+          node.id,
+          `${node.stepId} promised ${unmeasurable.join(', ')}, which nothing here measures. Judged on its exit status instead.`
+        )
+      }
+
+      // A measurable expectation *replaces* the exit-status judgement rather
       // than adding to it. That is what lets the bugfix shape say a
       // reproduction must fail before the fix exists — the one place a passing
       // command is the wrong answer, and where reading exit 0 as success would
@@ -496,6 +523,13 @@ export async function execute(
     // Everything done, nothing waiting on a person, and the climb either
     // passed or was never owed. A complete graph with an open gate is not
     // shippable, which is the distinction this field exists to make.
-    shippable: complete && !halted && !stalled && gates.length === 0 && (ladder?.ok ?? false),
+    // A shape with no ship step never ships, however well it went.
+    shippable:
+      opensPullRequest(recipe) &&
+      complete &&
+      !halted &&
+      !stalled &&
+      gates.length === 0 &&
+      (ladder?.ok ?? false),
   }
 }

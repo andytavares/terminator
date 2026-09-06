@@ -670,7 +670,8 @@ async function executeRun(
                 return decision.allow ? null : { allow: false, reason: decision.reason }
               }
             : undefined,
-          onPending: (pending) => notePending(api, { ...pending, featureDir }),
+          onPending: (pending) =>
+            notePending(api, { ...pending, featureDir }, { id: order.id, root }),
           onResolved: (requestId) => noteResolved(requestId),
           onEnd: (exitCode) => {
             // Off the live list and into the record, so a finished unit stops
@@ -959,6 +960,8 @@ async function convergeOnce(
           const decision = decideReadOnly(tool, toolInput)
           return decision.allow ? null : { allow: false, reason: decision.reason }
         },
+        // Intake is where questions belong, so one asked here is not a defect
+        // — it is the Forge working.
         onPending: (pending) => notePending(api, { ...pending, featureDir }),
         onResolved: (requestId) => noteResolved(requestId),
         onRegistered: (run) => {
@@ -994,8 +997,27 @@ async function convergeOnce(
  * answered, and a request nobody sees is a twelve-hour hang. This used to live
  * inside a sink that nothing called, so every held call was silent.
  */
-function notePending(api: ExtensionAPI, ask: PendingAsk): void {
+function notePending(api: ExtensionAPI, ask: PendingAsk, order?: OrderRef): void {
   pendingPermissions.add(ask)
+
+  // A question asked *during execution* is a defect of intake (FR-083): the
+  // Forge is where questions are supposed to be settled, and one arriving now
+  // means the order was handed off with something unanswered in it. Recorded
+  // against the order as well as answered — answering it alone loses the fact
+  // that it should never have been asked here.
+  if (order !== undefined && (ask.questions?.length ?? 0) > 0) {
+    void createOrderStore(order.root).record({
+      at: new Date().toISOString(),
+      orderId: order.id,
+      actor: 'rule:forge-defect',
+      action: 'intake.defect',
+      subject: ask.sessionId,
+      reason: `asked during execution, which intake should have settled: ${ask.questions
+        ?.map((q) => q.question)
+        .join('; ')}`,
+      evidence: [{ kind: 'stdout', excerpt: ask.summary }],
+    })
+  }
   const notification = notify(
     api,
     { kind: 'permission_requested', sessionId: ask.sessionId },
@@ -1017,6 +1039,12 @@ function notePending(api: ExtensionAPI, ask: PendingAsk): void {
     () => gotoRun(api, 'run', ask.sessionId)
   )
   if (notification !== null) raisedNotifications.set(ask.requestId, notification)
+}
+
+/** Which order a held tool call belongs to, so a question can be recorded. */
+interface OrderRef {
+  readonly id: string
+  readonly root: string
 }
 
 /** Answered, by whoever. The notification goes with the request. */

@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execute } from '../../src/line/executor.js'
+import { execute, opensPullRequest } from '../../src/line/executor.js'
 import type { ExecutorEvent, StartedRun } from '../../src/line/executor.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
 import { retry } from '../../src/line/scheduler.js'
@@ -899,5 +899,120 @@ describe('a graph that cannot move on its own', () => {
     })
     expect(outcome.gates).toEqual([])
     expect(outcome.shippable).toBe(true)
+  })
+})
+
+describe('a shape that opens nothing (FR-019)', () => {
+  const spike = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: investigate
+    kind: agent
+    role: architect
+  - id: findings
+    kind: agent
+    role: scribe
+    after: [investigate]
+`
+
+  it('is never shippable, however well it went', async () => {
+    const o = order([])
+    const outcome = await execute(o, recipe(spike), buildRunGraph(o, recipe(spike)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    // A spike is a question, not a change. Shipping one would turn every
+    // investigation into a branch.
+    expect(outcome.complete).toBe(true)
+    expect(outcome.ladder?.ok).toBe(true)
+    expect(outcome.shippable).toBe(false)
+  })
+
+  it('is decided by the recipe having a ship step, not by a flag', () => {
+    expect(opensPullRequest(recipe(spike))).toBe(false)
+    expect(opensPullRequest(recipe())).toBe(true)
+  })
+
+  it('leaves a shape that does ship shipping', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.shippable).toBe(true)
+  })
+})
+
+describe('an expectation nothing here can measure', () => {
+  const refactorish = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: cover
+    kind: run
+    command: npm test
+    expect: { tests_added: '>= 1' }
+`
+
+  it('is recorded, and the step is judged on its exit status instead', async () => {
+    const record = vi.fn(async () => undefined)
+    const o = order([])
+    const outcome = await execute(o, recipe(refactorish), buildRunGraph(o, recipe(refactorish)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      record,
+      runStep: async () => 0,
+    })
+    // Never a silent pass and never a silent failure: a shape whose promise
+    // nothing measures must not become a shape that can never pass.
+    expect(record).toHaveBeenCalledWith(
+      'step.expectation_not_measured',
+      'cover',
+      expect.stringContaining('tests_added')
+    )
+    expect(outcome.complete).toBe(true)
+  })
+
+  it('still honours the keys it can measure', async () => {
+    const both = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: reproduce
+    kind: run
+    command: npm test
+    expect: { suite_exit_code: '!= 0', tests_added: '>= 1' }
+`
+    const o = order([])
+    // The suite passing is the wrong answer for a reproduction, and that half
+    // is measurable.
+    const outcome = await execute(o, recipe(both), buildRunGraph(o, recipe(both)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.complete).toBe(false)
+  })
+
+  it('passes the reproduction when the suite fails, as the bug shape means', async () => {
+    const repro = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: reproduce
+    kind: run
+    command: npm test
+    expect: { suite_exit_code: '!= 0' }
+`
+    const o = order([])
+    const outcome = await execute(o, recipe(repro), buildRunGraph(o, recipe(repro)), {
+      ...deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 })),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.graph.nodes.find((n) => n.id === 'reproduce')?.state).toBe('passed')
   })
 })
