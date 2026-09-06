@@ -145,5 +145,18 @@ test('capture the Foundry surfaces', async () => {
   await openSurface('Ledger')
   write(join(dir, '08c-foundry-ledger.png'), await capture())
 
+  // Settings is behind the gear rather than a named tab, so it is reached by
+  // its accessible name. Worth a picture of its own: every control here is one
+  // the extension actually reads, and the panel is where that shows.
+  await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    await view.executeJavaScript(`document.querySelector('button[aria-label="Settings"]')?.click()`)
+  })
+  await handle.page.waitForTimeout(1500)
+  write(join(dir, '08d-foundry-settings.png'), await capture())
+
   await closeApp(handle)
 })

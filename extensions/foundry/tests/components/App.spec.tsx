@@ -78,6 +78,41 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
   })
 
+  // Settings covers the surfaces rather than sitting beside them, so while it
+  // is open none of the tabs is the one showing — and a tab clicked from inside
+  // it has to bring you back out, or it changes a surface nobody can see.
+  it('marks no surface as showing while settings covers them', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await waitFor(() => screen.getByRole('button', { name: /back/i }))
+    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Ledger' }).getAttribute('aria-pressed')).toBe(
+      'false'
+    )
+  })
+
+  it('says the gear is the thing that is pressed', async () => {
+    render(<App />)
+    expect(screen.getByRole('button', { name: 'Settings' }).getAttribute('aria-pressed')).toBe(
+      'false'
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Settings' }).getAttribute('aria-pressed')).toBe(
+        'true'
+      )
+    )
+  })
+
+  it('leaves settings when a surface tab is clicked, rather than doing nothing visible', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await waitFor(() => screen.getByRole('button', { name: /back/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /back/i })).toBeNull())
+    expect(screen.getByRole('button', { name: 'Ledger' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
   it('asks the inbox what needs the operator, on load', async () => {
     render(<App />)
     await waitFor(() => expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:inbox.list', {}))

@@ -50,9 +50,18 @@ export function App(): JSX.Element {
             <button
               key={tab.id}
               type="button"
-              className={surface === tab.id ? 'is-on' : ''}
-              aria-pressed={surface === tab.id}
-              onClick={() => setSurface(tab.id)}
+              // Settings covers the surfaces, so while it is open none of them
+              // is the one showing. Reporting one as pressed told a screen
+              // reader "Ledger, pressed" over a settings panel.
+              className={!settingsOpen && surface === tab.id ? 'is-on' : ''}
+              aria-pressed={!settingsOpen && surface === tab.id}
+              onClick={() => {
+                // Closes settings as well as choosing: without this, clicking a
+                // tab from inside settings changed the surface underneath and
+                // did nothing anybody could see.
+                setSettingsOpen(false)
+                setSurface(tab.id)
+              }}
             >
               {tab.label}
             </button>
@@ -61,6 +70,7 @@ export function App(): JSX.Element {
         <button
           aria-label="Settings"
           className="sk-btn"
+          aria-pressed={settingsOpen}
           style={{ marginLeft: 'auto' }}
           onClick={() => setSettingsOpen(true)}
         >
