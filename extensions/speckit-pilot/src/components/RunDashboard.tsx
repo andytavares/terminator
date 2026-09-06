@@ -285,7 +285,7 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
               flexShrink: 0,
             }}
           >
-            <ArrowLeft size={12} />
+            <ArrowLeft className="tm-icon-sm" />
           </button>
         )}
         {state && (
@@ -316,7 +316,7 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
                 opacity: stopping ? 0.6 : 1,
               }}
             >
-              <Square size={12} />
+              <Square className="tm-icon-sm" />
               {stopping ? 'Stopping…' : 'Stop'}
             </button>
             <button

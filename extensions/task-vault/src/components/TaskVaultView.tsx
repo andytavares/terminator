@@ -175,7 +175,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
             </button>
           </div>
           <button className="capture-modal__close" onClick={onClose}>
-            <X size={14} />
+            <X className="tm-icon" />
           </button>
         </div>
 
@@ -195,7 +195,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
                 disabled={exporting}
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <Download size={14} />
+                <Download className="tm-icon" />
                 {exporting ? 'Exporting…' : 'Export JSON'}
               </button>
               <button
@@ -204,7 +204,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
                 disabled={importing}
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <Upload size={14} />
+                <Upload className="tm-icon" />
                 {importing ? 'Importing…' : 'Import JSON'}
               </button>
               <input
@@ -579,7 +579,7 @@ export function TaskVaultView(): React.JSX.Element {
                     : selectedContexts.length === 1
                       ? `+${selectedContexts[0]}`
                       : `${selectedContexts.length} contexts`}
-                  <ChevronDown size={11} />
+                  <ChevronDown className="tm-icon-sm" />
                 </button>
                 {contextMenuOpen && (
                   <div className="tv-context-filter__dropdown">
@@ -620,7 +620,7 @@ export function TaskVaultView(): React.JSX.Element {
                   onClick={() => setShowCalendar((v) => !v)}
                   title={showCalendar ? 'Hide calendar' : 'Show calendar'}
                 >
-                  <CalendarDays size={14} />
+                  <CalendarDays className="tm-icon" />
                 </button>
               )}
               <button
@@ -628,7 +628,7 @@ export function TaskVaultView(): React.JSX.Element {
                 onClick={() => setShowDataTools(true)}
                 title="Data tools (export / import)"
               >
-                <Settings size={14} />
+                <Settings className="tm-icon" />
               </button>
             </div>
           </div>

@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  X,
-  LayoutTemplate,
-  ChevronRight,
-  ChevronDown,
-  Folder,
-  Tag as TagIcon,
   Check,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Folder,
+  LayoutTemplate,
+  Tag as TagIcon,
+  X,
 } from 'lucide-react'
-import { ConfirmDialog } from '@terminator/extension-ui'
+import { ConfirmDialog, useDismissible } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
@@ -95,7 +96,7 @@ function TagChipInput({
             }}
             aria-label={`Remove tag ${tag}`}
           >
-            <X size={10} />
+            <X className="tm-icon-sm" />
           </button>
         </span>
       ))}
@@ -127,18 +128,24 @@ function ItemEditModal({
   const [tags, setTags] = useState(state.tags)
   const [saving, setSaving] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     titleRef.current?.focus()
   }, [])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  /**
+   * Escape, focus, and the open-surface count the extension-exit gesture reads
+   * — missing here, so two Escapes with focus on Save or Cancel closed Notepad
+   * and discarded the edit. `manageFocus` is off because the effect above puts
+   * focus on the title field, which is where it belongs.
+   */
+  useDismissible({
+    ref: surfaceRef,
+    onDismiss: onClose,
+    closeOnOutsideClick: false,
+    manageFocus: false,
+  })
 
   async function handleSave() {
     if (saving) return
@@ -179,6 +186,8 @@ function ItemEditModal({
       }}
     >
       <div
+        ref={surfaceRef}
+        data-tmui-surface=""
         className="notepad-dialog"
         role="dialog"
         aria-modal="true"
@@ -189,7 +198,7 @@ function ItemEditModal({
             Edit {state.itemType === 'diagram' ? 'Diagram' : 'Note'}
           </span>
           <button className="notepad-btn-icon" onClick={onClose} aria-label="Close">
-            <X size={14} />
+            <X className="tm-icon" />
           </button>
         </div>
         <div className="notepad-dialog__body">
@@ -345,7 +354,7 @@ function DiagramRow({
       aria-selected={isSelected}
     >
       <div className="notepad-note-row__title">
-        <LayoutTemplate size={12} className="notepad-note-row__diagram-icon" />
+        <LayoutTemplate className="notepad-note-row__diagram-icon tm-icon-sm" />
         {diagram.title}
       </div>
       <div className="notepad-note-row__meta-line">
@@ -855,7 +864,7 @@ export function NoteList(): React.JSX.Element {
             className={`notepad-tag-filter__btn${activeTagIds.length > 0 ? ' notepad-tag-filter__btn--active' : ''}`}
             onClick={() => setTagDropdownOpen((v) => !v)}
           >
-            <TagIcon size={11} />
+            <TagIcon className="tm-icon-sm" />
             {activeTagIds.length > 0
               ? `${activeTagIds.length} tag${activeTagIds.length > 1 ? 's' : ''}`
               : 'Tags'}
@@ -868,7 +877,7 @@ export function NoteList(): React.JSX.Element {
                   clearTags()
                 }}
               >
-                <X size={10} />
+                <X className="tm-icon-sm" />
               </span>
             )}
           </button>
@@ -889,7 +898,7 @@ export function NoteList(): React.JSX.Element {
                       onClick={() => toggleTag(tag.id)}
                     >
                       <span className="notepad-tag-filter__check">
-                        {isActive && <Check size={10} />}
+                        {isActive && <Check className="tm-icon-sm" />}
                       </span>
                       <span className="notepad-tag-filter__hash">#</span>
                       {tag.name}
@@ -986,8 +995,12 @@ export function NoteList(): React.JSX.Element {
                           isCollapsed ? `Expand ${folder.name}` : `Collapse ${folder.name}`
                         }
                       >
-                        {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                        <Folder size={12} className="notepad-folder-header__icon" />
+                        {isCollapsed ? (
+                          <ChevronRight className="tm-icon-sm" />
+                        ) : (
+                          <ChevronDown className="tm-icon-sm" />
+                        )}
+                        <Folder className="notepad-folder-header__icon tm-icon-sm" />
                         {isRenaming ? (
                           <input
                             className="notepad-folder-header__rename-input"
@@ -1062,7 +1075,7 @@ export function NoteList(): React.JSX.Element {
           className="notepad-btn-export"
           onClick={() => window.dispatchEvent(new CustomEvent('notepad:openExport'))}
         >
-          ↓ Export
+          <Download aria-hidden="true" /> Export
         </button>
         <button
           className="notepad-btn-primary notepad-btn-new"

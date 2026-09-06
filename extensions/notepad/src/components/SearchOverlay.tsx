@@ -1,5 +1,6 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useDismissible } from '@terminator/extension-ui'
 import { Search, X } from 'lucide-react'
 import type { SearchResult } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
@@ -42,6 +43,7 @@ interface SearchOverlayProps {
 }
 
 export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Element {
+  const surfaceRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
@@ -101,12 +103,16 @@ export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Elemen
     onClose()
   }
 
+  /**
+   * Escape, focus, and a place in the open-surface count the double-Escape
+   * "leave the extension" gesture reads — which this palette was missing, so
+   * two Escapes with focus off the input closed Notepad instead of the search.
+   * The backdrop below owns the outside click.
+   */
+  useDismissible({ ref: surfaceRef, onDismiss: onClose, closeOnOutsideClick: false })
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        onClose()
-        return
-      }
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         setSelectedIdx((i) => Math.min(i + 1, results.length - 1))
@@ -141,13 +147,15 @@ export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Elemen
       }}
     >
       <div
+        ref={surfaceRef}
+        data-tmui-surface=""
         className="notepad-search-overlay"
         role="dialog"
         aria-label="Search notes"
         aria-modal="true"
       >
         <div className="notepad-search-overlay__input-row">
-          <Search size={15} className="notepad-search-overlay__icon" />
+          <Search className="notepad-search-overlay__icon tm-icon-lg" />
           <input
             ref={inputRef}
             className="notepad-search-overlay__input"
@@ -166,7 +174,7 @@ export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Elemen
                 className="notepad-search-overlay__filter-chip notepad-search-overlay__filter-chip--active"
                 onClick={() => setActiveTagFilter(null)}
               >
-                {activeTagFilter} <X size={9} />
+                {activeTagFilter} <X className="tm-icon-sm" />
               </button>
             )}
             {tagCounts

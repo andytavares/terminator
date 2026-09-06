@@ -367,7 +367,7 @@ export function DateTimePicker({
         className={`dtp__trigger${value ? ' dtp__trigger--has-value' : ''}${open ? ' dtp__trigger--open' : ''}`}
         onClick={() => (open ? setOpen(false) : openPicker())}
       >
-        {mode === 'time' ? <Clock size={13} /> : <Calendar size={13} />}
+        {mode === 'time' ? <Clock className="tm-icon" /> : <Calendar className="tm-icon" />}
         <span className="dtp__trigger-label">{getTriggerLabel()}</span>
       </button>
 
@@ -420,13 +420,13 @@ export function DateTimePicker({
                 <div className="dtp__calendar">
                   <div className="dtp__cal-header">
                     <button type="button" className="dtp__cal-nav" onClick={prevMonth}>
-                      <ChevronLeft size={14} />
+                      <ChevronLeft className="tm-icon" />
                     </button>
                     <span className="dtp__cal-month-label">
                       {MONTH_NAMES[displayMonth]} {displayYear}
                     </span>
                     <button type="button" className="dtp__cal-nav" onClick={nextMonth}>
-                      <ChevronRight size={14} />
+                      <ChevronRight className="tm-icon" />
                     </button>
                   </div>
 

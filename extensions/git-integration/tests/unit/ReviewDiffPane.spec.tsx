@@ -173,7 +173,7 @@ describe('ReviewDiffPane', () => {
       patchFileComplexity: mockPatchFileComplexity,
     } as unknown as ReturnType<typeof usePrReviewStore>)
     await renderPane()
-    expect(screen.getByText('✓ Viewed')).toBeTruthy()
+    expect(screen.getByText(/Viewed/)).toBeTruthy()
   })
 
   it('shows Finish chapter button when on last file of a non-final chapter', async () => {
@@ -212,10 +212,10 @@ describe('ReviewDiffPane', () => {
     expect(onShowRisk).toHaveBeenCalled()
   })
 
-  it('calls onPrevFile when ← Prev is clicked', async () => {
+  it('calls onPrevFile when the Prev control is clicked', async () => {
     const onPrevFile = vi.fn()
     await renderPane({ onPrevFile })
-    fireEvent.click(screen.getByText('← Prev'))
+    fireEvent.click(screen.getByText(/Prev/))
     expect(onPrevFile).toHaveBeenCalled()
   })
 

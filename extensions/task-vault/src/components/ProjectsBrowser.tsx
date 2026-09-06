@@ -182,7 +182,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
   if (linked)
     return (
       <span className="projects-browser__linked-badge" title="Linked">
-        <Zap size={14} />
+        <Zap className="tm-icon" />
       </span>
     )
   if (!linking)
@@ -201,7 +201,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
       <span className="projects-browser__link-picker">
         <span className="tv-text-muted-sm">No active sessions</span>
         <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
-          <X size={14} />
+          <X className="tm-icon" />
         </button>
       </span>
     )
@@ -219,7 +219,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
         ))}
       </select>
       <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
-        <X size={14} />
+        <X className="tm-icon" />
       </button>
     </span>
   )
@@ -437,34 +437,22 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
     switch (task.status) {
       case 'done':
         return (
-          <CheckCircle2
-            size={15}
-            className="daily-log__task-status-icon daily-log__task-status-icon--done"
-          />
+          <CheckCircle2 className="daily-log__task-status-icon daily-log__task-status-icon--done tm-icon-lg" />
         )
       case 'cancelled':
         return (
-          <MinusCircle
-            size={15}
-            className="daily-log__task-status-icon daily-log__task-status-icon--cancelled"
-          />
+          <MinusCircle className="daily-log__task-status-icon daily-log__task-status-icon--cancelled tm-icon-lg" />
         )
       case 'migrated':
         return (
-          <ArrowRightCircle
-            size={15}
-            className="daily-log__task-status-icon daily-log__task-status-icon--migrated"
-          />
+          <ArrowRightCircle className="daily-log__task-status-icon daily-log__task-status-icon--migrated tm-icon-lg" />
         )
       case 'in-progress':
         return (
-          <Timer
-            size={15}
-            className="daily-log__task-status-icon daily-log__task-status-icon--in-progress"
-          />
+          <Timer className="daily-log__task-status-icon daily-log__task-status-icon--in-progress tm-icon-lg" />
         )
       default:
-        return <Circle size={15} className="daily-log__task-status-icon" />
+        return <Circle className="daily-log__task-status-icon tm-icon-lg" />
     }
   }
 
@@ -521,10 +509,10 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
                 className="tv-btn tv-btn--primary tv-btn--icon"
                 onClick={() => void handleSaveEdit(t.id)}
               >
-                <Check size={13} />
+                <Check className="tm-icon" />
               </button>
               <button className="tv-btn tv-btn--icon" onClick={() => setEditingId(null)}>
-                <X size={13} />
+                <X className="tm-icon" />
               </button>
             </span>
           ) : (
@@ -615,10 +603,10 @@ function ProjectAreaBadge({
           onClick={() => void save()}
           title="Save area"
         >
-          <Check size={13} />
+          <Check className="tm-icon" />
         </button>
         <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)} title="Cancel">
-          <X size={13} />
+          <X className="tm-icon" />
         </button>
       </span>
     )
@@ -640,7 +628,7 @@ function ProjectAreaBadge({
           onClick={() => void openEdit()}
           title="Change area"
         >
-          <Pencil size={14} />
+          <Pencil className="tm-icon" />
         </button>
       </span>
     )
@@ -812,7 +800,7 @@ export function ProjectsBrowser(): React.JSX.Element {
                     setRenameError(null)
                   }}
                 >
-                  <X size={13} />
+                  <X className="tm-icon" />
                 </button>
                 {renameError && <span className="area-detail__rename-error">{renameError}</span>}
               </div>
@@ -828,7 +816,7 @@ export function ProjectsBrowser(): React.JSX.Element {
                   }}
                   title="Rename project"
                 >
-                  <Pencil size={12} />
+                  <Pencil className="tm-icon-sm" />
                 </button>
               </span>
             )}
@@ -860,7 +848,7 @@ export function ProjectsBrowser(): React.JSX.Element {
                   className="tv-btn tv-btn--ghost tv-btn--xs"
                   onClick={() => setEditingDeadlineProject(null)}
                 >
-                  <X size={12} />
+                  <X className="tm-icon-sm" />
                 </button>
               </span>
             ) : project.deadline ? (
@@ -917,14 +905,14 @@ export function ProjectsBrowser(): React.JSX.Element {
                 className="projects-browser__action-btn projects-browser__action-btn--danger"
                 onClick={() => void handleUpdateStatus(project.filePath, 'archived')}
               >
-                <Archive size={12} /> Archive project
+                <Archive className="tm-icon-sm" /> Archive project
               </button>
             ) : (
               <button
                 className="projects-browser__action-btn projects-browser__action-btn--danger"
                 onClick={() => void handleDelete(project.filePath, project.name)}
               >
-                <Trash2 size={12} /> Delete project
+                <Trash2 className="tm-icon-sm" /> Delete project
               </button>
             )}
           </div>

@@ -24,7 +24,7 @@ export function KnowledgeSearch({ repoRoot, onAttach }: KnowledgeSearchProps) {
   return (
     <div className="sk-knowledge">
       <div className="sk-knowledge__bar">
-        <Search size={14} />
+        <Search className="tm-icon" />
         <input
           aria-label="Search workspace knowledge"
           value={query}

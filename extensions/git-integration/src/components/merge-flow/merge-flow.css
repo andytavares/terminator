@@ -1703,14 +1703,20 @@
 }
 
 /* ── Git Sidebar resolve button ─────────────────────────────────────────── */
+/* A conflict is a danger state, so it is toned like one — this was warning
+   text and border over an accent-tinted fill, three colours telling three
+   stories, and it measured 3.8:1 in the light theme. Matches
+   `.git-full-view__conflict-banner-btn`, which says the same thing elsewhere. */
 .git-sidebar__resolve-conflicts-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: calc(100% - 24px);
   margin: 8px 12px;
   padding: 7px 12px;
-  background: var(--tm-accent-dim);
-  border: 1px solid var(--tm-warning);
-  color: var(--tm-warning);
+  background: transparent;
+  border: 1px solid var(--tm-danger);
+  color: var(--tm-danger);
   border-radius: var(--tm-radius-xs);
   cursor: pointer;
   font-size: 0.8125rem;
@@ -1718,8 +1724,16 @@
   transition: background 0.1s;
 }
 
+/* Dimming the button dims its label with it. */
 .git-sidebar__resolve-conflicts-btn:hover {
-  opacity: 0.85;
+  background: color-mix(in srgb, var(--tm-danger) 12%, transparent);
+}
+
+.git-sidebar__resolve-conflicts-btn svg,
+.git-full-view__conflict-banner-btn svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
 }
 
 /* Principle XII: the glyphs these buttons used to print are icons now, and an
@@ -1739,4 +1753,16 @@
   width: 14px;
   height: 14px;
   display: block;
+}
+
+/* Principle XII sizing for the header controls and hub hint. */
+.conflict-header__back svg,
+.conflict-header__nav-btn svg,
+.conflict-header__reset svg,
+.conflict-header__close svg,
+.conflict-hub__hint-icon,
+.keep-both-modal__preview-label svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
 }

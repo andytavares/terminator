@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Settings, Download, Plus } from 'lucide-react'
+import { ArrowLeft, Download, Plus, Settings } from 'lucide-react'
 import { BoardView } from '../components/BoardView.js'
 import { CardDetail } from '../components/CardDetail.js'
 import { CardBriefEditor } from '../components/CardBriefEditor.js'
@@ -139,7 +139,7 @@ export function App(): JSX.Element {
         {overlay === 'settings' ? (
           <div className="sk-settings-wrap">
             <button className="sk-btn" onClick={() => setOverlay('none')}>
-              ← Back to board
+              <ArrowLeft aria-hidden="true" /> Back to board
             </button>
             <SettingsView />
           </div>

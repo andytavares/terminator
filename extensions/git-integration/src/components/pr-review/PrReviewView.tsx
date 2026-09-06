@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { RefreshCw, TriangleAlert } from 'lucide-react'
 import { Dialog } from '@terminator/extension-ui'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ChapterNav } from './ChapterNav'
@@ -214,7 +215,7 @@ export function PrReviewView({
               title="Refresh PR"
               aria-label="Refresh pull request"
             >
-              ↻
+              <RefreshCw aria-hidden="true" />
             </button>
             {showMultipleChapters && (
               <button
@@ -252,7 +253,7 @@ export function PrReviewView({
                 title="Refresh PR"
                 aria-label="Refresh pull request"
               >
-                ↻
+                <RefreshCw aria-hidden="true" />
               </button>
               <button
                 className="pr-view-mode-btn"
@@ -329,7 +330,7 @@ export function PrReviewView({
       {/* Large-PR cognitive load warning */}
       {showLargePrBanner && (
         <div className="pr-large-pr-banner" role="alert">
-          <span className="pr-large-pr-banner__icon">⚠</span>
+          <TriangleAlert aria-hidden="true" className="pr-large-pr-banner__icon" />
           <span className="pr-large-pr-banner__text">
             Large PR — {totalLoc.toLocaleString()} LOC, estimated {estimatedReviewMinutes} min to
             review. Consider requesting it be split.

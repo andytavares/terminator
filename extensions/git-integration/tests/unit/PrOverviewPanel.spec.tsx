@@ -483,7 +483,7 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('⚠ Conflicts')).toBeTruthy()
+    expect(screen.getByText(/Conflicts/)).toBeTruthy()
   })
 
   it('shows resolve conflicts button when mergeStateStatus is dirty', () => {

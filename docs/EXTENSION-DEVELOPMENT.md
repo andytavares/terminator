@@ -453,7 +453,9 @@ you next touch a surface —
 2. Replace raw `z-index` numbers with `layerValue()` or `var(--tm-layer-*)`.
 3. Replace hardcoded colours with `--tm-*` tokens, and check your surface in both
    themes.
-4. Replace `size={n}` on lucide icons with CSS sizing (Constitution XII).
+4. Replace `size={n}` on lucide icons with the injected scale —
+   `className="tm-icon-sm"` (12px), `"tm-icon"` (14px), `"tm-icon-lg"` (16px).
+   The `size` prop is a lint error in `extensions/*/src/**/*.tsx`.
 
 ---
 

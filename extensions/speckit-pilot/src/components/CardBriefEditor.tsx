@@ -123,7 +123,7 @@ export function CardBriefEditor({
                 aria-label={`Remove ${item.text}`}
                 onClick={() => setChecklist((prev) => prev.filter((i) => i.id !== item.id))}
               >
-                <X size={12} />
+                <X className="tm-icon-sm" />
               </button>
             </li>
           ))}
@@ -142,7 +142,7 @@ export function CardBriefEditor({
             placeholder="Add an item"
           />
           <button type="button" aria-label="Add checklist item" onClick={addItem}>
-            <Plus size={14} />
+            <Plus className="tm-icon" />
           </button>
         </div>
       </div>

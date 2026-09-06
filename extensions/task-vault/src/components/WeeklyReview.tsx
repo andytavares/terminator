@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { IndexedTask, IndexedProject } from '../vault/types'
 import { WeeklyReviewStep1GetClear } from './WeeklyReviewStep1GetClear'
 import { WeeklyReviewStep2Inbox } from './WeeklyReviewStep2Inbox'
@@ -149,7 +149,7 @@ export function WeeklyReview(): React.JSX.Element {
     return (
       <div className="weekly-review weekly-review--done">
         <div className="weekly-review__complete">
-          <span className="weekly-review__complete-icon">✦</span>
+          <Check aria-hidden="true" className="weekly-review__complete-icon" />
           <p className="weekly-review__complete-title">Review complete</p>
           <p className="weekly-review__complete-sub">
             Your mind is clear. You're ready for the week.
@@ -190,7 +190,7 @@ export function WeeklyReview(): React.JSX.Element {
             disabled={step === 1}
             aria-label="Previous step"
           >
-            <ChevronLeft size={14} />
+            <ChevronLeft className="tm-icon" />
           </button>
           <button
             className="tv-btn tv-btn--primary"
@@ -198,7 +198,7 @@ export function WeeklyReview(): React.JSX.Element {
             disabled={step === TOTAL_STEPS}
             aria-label="Next step"
           >
-            <ChevronRight size={14} />
+            <ChevronRight className="tm-icon" />
           </button>
         </div>
       </div>

@@ -18,6 +18,16 @@ export interface DismissibleOptions {
    */
   alsoInside?: ReadonlyArray<RefObject<HTMLElement | null>>
   /**
+   * Listen for Escape in the capture phase.
+   *
+   * A surface hosting an editor — CodeMirror, xterm — may have its keydown
+   * stopped before it reaches the document, so the surface never learns the
+   * key was pressed and cannot close. Capture phase sees it first. Off by
+   * default: capturing is the wrong default for a surface with nothing that
+   * swallows keys, because it reaches Escape ahead of anything nested.
+   */
+  captureEscape?: boolean
+  /**
    * False while the surface is closed.
    *
    * A conditionally-rendered popover cannot call a hook conditionally, so the
@@ -43,6 +53,7 @@ export function useDismissible({
   manageFocus = true,
   closeOnOutsideClick = true,
   alsoInside,
+  captureEscape = false,
   enabled = true,
 }: DismissibleOptions): void {
   const alsoInsideRef = { current: alsoInside }
@@ -76,7 +87,7 @@ export function useDismissible({
       dismissRef.current()
     }
 
-    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keydown', onKeyDown, captureEscape)
     // Deferred a tick: the click that opened this surface is still propagating.
     const timer = closeOnOutsideClick
       ? setTimeout(() => document.addEventListener('mousedown', onPointerDown), 0)
@@ -84,13 +95,13 @@ export function useDismissible({
 
     return () => {
       if (timer !== undefined) clearTimeout(timer)
-      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keydown', onKeyDown, captureEscape)
       document.removeEventListener('mousedown', onPointerDown)
       restoreFocus()
       release()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled])
+  }, [enabled, captureEscape])
 }
 
 function isInnermost(el: HTMLElement | null): boolean {

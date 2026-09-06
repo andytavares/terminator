@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowRight, Check, RotateCcw, X } from 'lucide-react'
+import { ArrowRight, Check, Info, RotateCcw, X } from 'lucide-react'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import type { ConflictFile } from '../../schemas/merge-flow.schema'
 
@@ -225,7 +225,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
       {/* Hint */}
       {unresolvedFiles.length > 0 && (
         <div className="conflict-hub__hint">
-          <span className="conflict-hub__hint-icon">ℹ</span>
+          <Info aria-hidden="true" className="conflict-hub__hint-icon" />
           <span>
             <strong>Start with the highlighted file.</strong> MergeFlow orders by complexity —
             hardest first while you&apos;re fresh. You can jump to any file at any time.

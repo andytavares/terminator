@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { ArrowDown, TriangleAlert } from 'lucide-react'
 import { Dialog } from '@terminator/extension-ui'
 import type { ConflictBlock, GitAuthor } from '../../schemas/merge-flow.schema'
 import { highlightBlock, langFromBlockId } from '../../utils/syntax'
@@ -264,7 +264,9 @@ export function KeepBothModal({
 
       {/* Merged preview */}
       <div className="keep-both-modal__preview-section">
-        <div className="keep-both-modal__preview-label">↓ MERGED RESULT PREVIEW</div>
+        <div className="keep-both-modal__preview-label">
+          <ArrowDown aria-hidden="true" /> Merged result preview
+        </div>
         <pre className="keep-both-modal__preview hljs">
           <div className="keep-both-modal__code-inner">
             <div className="keep-both-modal__line-nums" aria-hidden="true">

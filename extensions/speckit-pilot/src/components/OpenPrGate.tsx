@@ -113,7 +113,7 @@ export function OpenPrGate({ featureDir, workspacePath }: OpenPrGateProps) {
           color: 'var(--tm-text-secondary)',
         }}
       >
-        <Link size={12} />
+        <Link className="tm-icon-sm" />
         <span>Spec: {specPath}</span>
       </div>
 
@@ -144,7 +144,7 @@ export function OpenPrGate({ featureDir, workspacePath }: OpenPrGateProps) {
         aria-label="Open PR"
         style={{ display: 'flex', alignItems: 'center', gap: 6 }}
       >
-        <GitMerge size={14} />
+        <GitMerge className="tm-icon" />
         {opening ? 'Opening…' : 'Open PR'}
       </button>
     </div>

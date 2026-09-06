@@ -101,13 +101,13 @@ export function CalendarView(): React.JSX.Element {
     <div className="cal-view">
       <div className="cal-view__header">
         <button className="tv-btn tv-btn--icon" onClick={prevMonth} title="Previous month">
-          <ChevronRight size={15} style={{ transform: 'rotate(180deg)' }} />
+          <ChevronRight className="tm-icon-lg" style={{ transform: 'rotate(180deg)' }} />
         </button>
         <span className="cal-view__month-label">
           {MONTH_NAMES[month - 1]} {year}
         </span>
         <button className="tv-btn tv-btn--icon" onClick={nextMonth} title="Next month">
-          <ChevronRight size={15} />
+          <ChevronRight className="tm-icon-lg" />
         </button>
       </div>
 

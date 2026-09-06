@@ -136,7 +136,7 @@ export function FileToPicker({
           onKeyDown={onKeyDown}
         />
         <button className="file-to-picker__close" onClick={onClose}>
-          <X size={14} />
+          <X className="tm-icon" />
         </button>
       </div>
       {loading ? (

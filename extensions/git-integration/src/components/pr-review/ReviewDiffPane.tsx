@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { Check, ChevronLeft, TriangleAlert } from 'lucide-react'
 import { HealthChips } from './HealthChips'
 import { InlineCommentThread } from './InlineCommentThread'
 import { CommentComposer } from './CommentComposer'
@@ -316,7 +317,11 @@ export function ReviewDiffPane({
           <span className="review-diff-changes">
             +{file.additions}/−{file.deletions}
           </span>
-          {isViewed && <span className="review-diff-viewed-badge">✓ Viewed</span>}
+          {isViewed && (
+            <span className="review-diff-viewed-badge">
+              <Check aria-hidden="true" /> Viewed
+            </span>
+          )}
         </div>
       </div>
 
@@ -714,7 +719,7 @@ export function ReviewDiffPane({
                     const hotspot = hotspots.find((h) => h.hunkIndex === hi)!
                     return (
                       <div className="complexity-hotspot-annotation" role="alert">
-                        ⚠ {hotspot.message}
+                        <TriangleAlert aria-hidden="true" /> {hotspot.message}
                       </div>
                     )
                   })()}
@@ -741,7 +746,7 @@ export function ReviewDiffPane({
         </div>
         <div className="review-diff-nav-right">
           <button className="review-diff-nav-btn" onClick={onPrevFile} aria-label="Previous file">
-            ← Prev
+            <ChevronLeft aria-hidden="true" /> Prev
           </button>
           {isLastFile ? (
             <button

@@ -95,6 +95,31 @@ const EXTENSION_BASE_CSS = `
   --tm-font-ui: 'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
 
+/* Icon sizes (Constitution Principle XII).
+   Icons are sized here, never with a size prop on the component. The
+   extensions had 139 such props across seven ad-hoc values in a 6px band —
+   10, 11, 12, 13, 14, 15, 16 — which is not seven decisions, it is one
+   decision made seven times. Three steps carry all of it. Injected rather
+   than exported so an extension gets them without importing anything, the
+   same way it gets the colour tokens. */
+.tm-icon-sm,
+.tm-icon,
+.tm-icon-lg {
+  flex: 0 0 auto;
+}
+.tm-icon-sm {
+  width: 12px;
+  height: 12px;
+}
+.tm-icon {
+  width: 14px;
+  height: 14px;
+}
+.tm-icon-lg {
+  width: 16px;
+  height: 16px;
+}
+
 /* The light palette, mirroring [data-theme='light'] in src/renderer/styles.css.
    Those values are WCAG AA verified against their surfaces (TAV-8) — including
    the text-muted darkening and the semantic colours, which were chosen so they

@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { useNotesStore } from '../stores/notes.store'
 import { NoteEditor } from '../editor/NoteEditor'
 import type { DiagramListItem } from '../db/types'
+import { useDismissible } from '@terminator/extension-ui'
 
 function toFilenameSlug(title: string): string {
   return (
@@ -54,7 +55,7 @@ function TagChipBar({
             onClick={() => onRemoveTag(tag)}
             aria-label={`Remove tag ${tag}`}
           >
-            <X size={10} />
+            <X className="tm-icon-sm" />
           </button>
         </span>
       ))}
@@ -202,15 +203,28 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
     return handleSaveNote()
   }, [type, handleSaveNote, handleSaveDiagram, handleSaveFolder])
 
-  useEffect(() => {
-    if (!showQuickCreate) return
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') close()
-    }
-    // Capture phase so CodeMirror's internal stopPropagation can't block Escape.
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => document.removeEventListener('keydown', onKeyDown, true)
-  }, [showQuickCreate, close])
+  /**
+   * Escape, focus, and — the part this was missing — a place in the open-surface
+   * count that the double-Escape "leave the extension" gesture reads.
+   *
+   * Without it, the host saw no open modal here. Focus in the composer was
+   * saved by the text-field guard, but focus on any button in this overlay was
+   * not: two Escapes closed Notepad and took the draft with it. That is the
+   * defect this feature exists to fix, and this surface had been missed.
+   *
+   * `captureEscape` keeps the original reason for the capture-phase listener
+   * this replaces: CodeMirror stops propagation before the document sees it.
+   * The backdrop below owns the outside click.
+   */
+  const surfaceRef = useRef<HTMLDivElement>(null)
+
+  useDismissible({
+    ref: surfaceRef,
+    onDismiss: close,
+    closeOnOutsideClick: false,
+    captureEscape: true,
+    enabled: showQuickCreate,
+  })
 
   function addTag(raw: string) {
     const trimmed = raw.trim().toLowerCase().replace(/\s+/g, '-')
@@ -243,6 +257,8 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
       }}
     >
       <div
+        ref={surfaceRef}
+        data-tmui-surface=""
         className="notepad-quick-create"
         role="dialog"
         aria-modal="true"

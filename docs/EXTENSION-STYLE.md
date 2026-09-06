@@ -111,11 +111,47 @@ only one of those is fine — so the frame stays and the frame says which.
 
 ## 7. Icons
 
-Constitution Principle XII, restated because it is the rule most often broken
-here: lucide-react only, flat, inheriting `currentColor`. Size in CSS, never
-with the `size` prop. No emoji, and no unicode character used as a visual
-element — `⚠`, `✓`, `×`, `↻` and `▸` are `TriangleAlert`, `Check`, `X`,
-`RefreshCw` and `ChevronRight`.
+Constitution Principle XII: lucide-react only, flat, inheriting `currentColor`.
+
+**Size comes from the scale, never from a `size` prop.** Three steps, injected
+into every extension document alongside the colour tokens, so nothing needs
+importing:
+
+| Class        | Size | For                                        |
+| ------------ | ---- | ------------------------------------------ |
+| `tm-icon-sm` | 12px | Inline with small text, chips, status dots |
+| `tm-icon`    | 14px | The default — buttons, rows, list items    |
+| `tm-icon-lg` | 16px | Section headers, primary controls          |
+
+```tsx
+✅ <Check aria-hidden="true" className="tm-icon" />
+❌ <Check size={14} />
+```
+
+Anything outside those three sizes gets a rule on its own selector — an empty
+state's 36px glyph, a status dot's 7px tick — not a fourth scale step. The
+`size` prop is an ESLint error, with two named exemptions: `<select size={n}>`
+is the HTML rows attribute, and a generator that computes a raster from a pixel
+count (`QRCodeSVG`) is not CSS-sizable.
+
+**No unicode as a visual element.** `⚠ ✓ ✕ ← → ↑ ↓ ↺ ↻ ▸ ▾ ℹ ✦` standing for a
+state or an action are `TriangleAlert`, `Check`, `X`, `ArrowLeft`,
+`ChevronRight`, `ChevronUp`, `ArrowDown`, `RotateCcw`, `RefreshCw`,
+`ChevronRight`, `ChevronDown` and `Info`.
+
+Typography is not iconography, and stays:
+
+| Keep                        | Because                                                     |
+| --------------------------- | ----------------------------------------------------------- |
+| `3× Ours`                   | a multiplication sign                                       |
+| `−12`                       | a minus                                                     |
+| `Modified by X · Y`         | punctuation                                                 |
+| `Committing…`               | an ellipsis                                                 |
+| `⌘↵ Save · Esc Cancel`      | the glyphs printed on the keys                              |
+| `old/path.ts → new/path.ts` | a relational mark between two named things, like an en dash |
+
+The line is whether the character stands **alone as a control** (an icon) or
+sits **between two named things in a sentence** (typography).
 
 ## 8. Colour
 

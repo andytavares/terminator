@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Pencil,
-  X,
   Archive,
+  ArrowLeft,
+  ArrowRightCircle,
   CheckCircle2,
   Circle,
-  ArrowRightCircle,
   MinusCircle,
+  Pencil,
   Timer,
+  X,
 } from 'lucide-react'
 import type { IndexedTask } from '../vault/types'
 import { SmartTaskInput, invalidateSmartInputCache } from './SmartTaskInput'
@@ -279,7 +280,7 @@ export function AreasView(): React.JSX.Element {
                   }}
                   title="Archive area"
                 >
-                  <Archive size={14} />
+                  <Archive className="tm-icon" />
                 </button>
               ) : (
                 <button
@@ -290,7 +291,7 @@ export function AreasView(): React.JSX.Element {
                   }}
                   title="Delete area permanently"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 className="tm-icon" />
                 </button>
               )}
             </div>
@@ -411,15 +412,15 @@ function AreaDetail({
   function TaskStatusIcon({ status }: { status: string }): React.JSX.Element {
     switch (status) {
       case 'done':
-        return <CheckCircle2 size={15} className="task-status task-status--done" />
+        return <CheckCircle2 className="task-status task-status--done tm-icon-lg" />
       case 'migrated':
-        return <ArrowRightCircle size={15} className="task-status task-status--migrated" />
+        return <ArrowRightCircle className="task-status task-status--migrated tm-icon-lg" />
       case 'cancelled':
-        return <MinusCircle size={15} className="task-status task-status--cancelled" />
+        return <MinusCircle className="task-status task-status--cancelled tm-icon-lg" />
       case 'in-progress':
-        return <Timer size={15} className="task-status task-status--in-progress" />
+        return <Timer className="task-status task-status--in-progress tm-icon-lg" />
       default:
-        return <Circle size={15} className="task-status task-status--open" />
+        return <Circle className="task-status task-status--open tm-icon-lg" />
     }
   }
 
@@ -430,7 +431,7 @@ function AreaDetail({
     <div className="area-detail">
       <div className="area-detail__header">
         <button className="tv-btn tv-btn--ghost tv-btn--xs" onClick={onBack}>
-          ← Areas
+          <ArrowLeft aria-hidden="true" /> Areas
         </button>
         {renamingArea ? (
           <div className="area-detail__rename-row">
@@ -460,7 +461,7 @@ function AreaDetail({
                 setRenameText(area.name)
               }}
             >
-              <X size={13} />
+              <X className="tm-icon" />
             </button>
             {renameError && <span className="area-detail__rename-error">{renameError}</span>}
           </div>
@@ -478,7 +479,7 @@ function AreaDetail({
               }}
               title="Rename area"
             >
-              <Pencil size={12} />
+              <Pencil className="tm-icon-sm" />
             </button>
           </h2>
         )}
@@ -553,7 +554,7 @@ function AreaDetail({
                     className="tv-btn tv-btn--ghost tv-btn--xs"
                     onClick={() => setEditingId(null)}
                   >
-                    <X size={13} />
+                    <X className="tm-icon" />
                   </button>
                 </span>
               ) : (

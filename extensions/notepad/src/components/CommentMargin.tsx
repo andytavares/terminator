@@ -147,7 +147,7 @@ function CommentCard({
           aria-label="Delete comment"
           title="Delete comment"
         >
-          <Trash2 size={11} />
+          <Trash2 className="tm-icon-sm" />
         </button>
       </div>
 
@@ -287,7 +287,7 @@ export function CommentMargin({
               {orphanedComments.length > 0 && (
                 <div className="notepad-comment-orphaned-section">
                   <div className="notepad-comment-orphaned-header">
-                    <AlertTriangle size={13} />
+                    <AlertTriangle className="tm-icon" />
                     <span>Orphaned ({orphanedComments.length})</span>
                   </div>
                   {orphanedComments.map((comment) => (

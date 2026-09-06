@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Check } from 'lucide-react'
 import { logReviewAction } from '../utils/review-log'
 
 interface Props {
@@ -68,7 +69,7 @@ export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): Reac
         <ul className="wr-step__captured-list">
           {captured.map((item, i) => (
             <li key={i} className="wr-step__captured-item">
-              ✓ {item}
+              <Check aria-hidden="true" /> {item}
             </li>
           ))}
         </ul>

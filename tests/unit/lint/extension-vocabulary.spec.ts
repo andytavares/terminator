@@ -92,3 +92,37 @@ describe('extension vocabulary rule', () => {
     expect(msgs).toHaveLength(0)
   })
 })
+
+/**
+ * Constitution XII. Landed with the last conversion rather than before it: a
+ * rule that fires 139 times on the day it ships gets switched off.
+ */
+describe('icon sizing rule', () => {
+  it('rejects a size prop on a lucide icon', async () => {
+    const msgs = await messagesFor('const A = () => <Check size={14} />')
+    expect(msgs.join(' ')).toMatch(/Constitution XII/)
+  })
+
+  it('accepts the published scale classes', async () => {
+    expect(await messagesFor('const A = () => <Check className="tm-icon" />')).toHaveLength(0)
+    expect(await messagesFor('const A = () => <Check className="x tm-icon-sm" />')).toHaveLength(0)
+  })
+
+  it('leaves the HTML rows attribute alone', async () => {
+    // <select size={6}> is how many rows a list box shows. Lowercase tag.
+    expect(await messagesFor('const A = () => <select size={6} />')).toHaveLength(0)
+  })
+
+  it('leaves a generator that genuinely takes a pixel count alone', async () => {
+    // QRCodeSVG computes its module grid from this; it is not CSS-sizable.
+    expect(await messagesFor('const A = () => <QRCodeSVG value="x" size={112} />')).toHaveLength(0)
+  })
+
+  it('does not police core source', async () => {
+    const msgs = await messagesFor(
+      'const A = () => <Check size={14} />',
+      'src/renderer/components/X.tsx'
+    )
+    expect(msgs.join(' ')).not.toMatch(/Constitution XII/)
+  })
+})

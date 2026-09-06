@@ -421,7 +421,7 @@ export function SettingsView() {
                   aria-label={`${PHASE_LABEL[phaseId]} gate row`}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {locked && <Lock size={11} />}
+                    {locked && <Lock className="tm-icon-sm" />}
                     {PHASE_LABEL[phaseId]}
                     {locked && (
                       <span style={{ fontSize: 10, color: 'var(--tm-text-secondary)' }}>
@@ -625,11 +625,11 @@ export function SettingsView() {
           onClick={handleSaveSettings}
           aria-label="Save agent runner settings"
         >
-          <Save size={13} /> Save settings
+          <Save className="tm-icon" /> Save settings
         </button>
         {settingsSaved && (
           <div style={s.saved}>
-            <CheckCircle size={12} /> Settings saved
+            <CheckCircle className="tm-icon-sm" /> Settings saved
           </div>
         )}
       </div>

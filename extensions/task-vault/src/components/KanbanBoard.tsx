@@ -353,7 +353,7 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
           onClick={() => setShowLaneEditor(true)}
           title="Edit lanes"
         >
-          <Settings size={13} />
+          <Settings className="tm-icon" />
           Lanes
         </button>
       </div>

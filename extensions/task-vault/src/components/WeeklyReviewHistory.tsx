@@ -139,7 +139,11 @@ export function WeeklyReviewHistory(): React.JSX.Element {
                 onClick={() => void toggle(review.id)}
                 aria-expanded={expandedId === review.id}
               >
-                {expandedId === review.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                {expandedId === review.id ? (
+                  <ChevronDown className="tm-icon" />
+                ) : (
+                  <ChevronRight className="tm-icon" />
+                )}
                 <span className="wr-history__date">{formatReviewDate(review.startedAt)}</span>
                 {review.status === 'in_progress' && (
                   <span className="wr-history__badge">in progress</span>
@@ -154,7 +158,7 @@ export function WeeklyReviewHistory(): React.JSX.Element {
                 title="Export this review as Markdown"
                 aria-label={`Export review from ${formatReviewDate(review.startedAt)}`}
               >
-                <Download size={14} />
+                <Download className="tm-icon" />
               </button>
             </div>
 

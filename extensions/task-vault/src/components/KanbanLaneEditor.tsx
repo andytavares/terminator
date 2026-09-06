@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Dialog } from '@terminator/extension-ui'
 import { createPortal } from 'react-dom'
-import { Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import type { KanbanLane, TaskStatus } from '../vault/types'
 
 const ALL_STATUSES: TaskStatus[] = [
@@ -110,7 +110,7 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
                     disabled={i === 0}
                     title="Move up"
                   >
-                    ↑
+                    <ChevronUp aria-hidden="true" />
                   </button>
                   <button
                     className="tv-btn tv-btn--ghost tv-btn--xs"
@@ -118,7 +118,7 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
                     disabled={i === draft.length - 1}
                     title="Move down"
                   >
-                    ↓
+                    <ChevronDown aria-hidden="true" />
                   </button>
                 </div>
                 <input
@@ -132,7 +132,7 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
                   onClick={() => removeLane(i)}
                   title="Remove lane"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 className="tm-icon" />
                 </button>
               </div>
               <div className="tv-lane-editor__statuses">
@@ -197,7 +197,7 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
             onClick={addLane}
             disabled={!newLabel.trim()}
           >
-            <Plus size={13} />
+            <Plus className="tm-icon" />
             Add
           </button>
         </div>

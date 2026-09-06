@@ -61,7 +61,7 @@ export function BatchCheckIn({ featureDir, batchIndex, diffSummary }: BatchCheck
           aria-label="Continue"
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <Play size={13} />
+          <Play className="tm-icon" />
           Continue
         </button>
         <button
@@ -72,7 +72,7 @@ export function BatchCheckIn({ featureDir, batchIndex, diffSummary }: BatchCheck
           aria-label="Pause"
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <Pause size={13} />
+          <Pause className="tm-icon" />
           Pause
         </button>
         <button
@@ -83,7 +83,7 @@ export function BatchCheckIn({ featureDir, batchIndex, diffSummary }: BatchCheck
           aria-label="Split to follow-up"
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <SplitSquareVertical size={13} />
+          <SplitSquareVertical className="tm-icon" />
           Split to follow-up
         </button>
         <button
@@ -91,7 +91,7 @@ export function BatchCheckIn({ featureDir, batchIndex, diffSummary }: BatchCheck
           aria-label="Redirect"
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <ArrowRight size={13} />
+          <ArrowRight className="tm-icon" />
           Redirect
         </button>
       </div>

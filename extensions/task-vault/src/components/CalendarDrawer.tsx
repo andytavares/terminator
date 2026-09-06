@@ -186,13 +186,13 @@ export function CalendarDrawer(): React.JSX.Element {
       <div className="cal-drawer__panel">
         <div className="cal-drawer__month-nav">
           <button className="tv-btn tv-btn--icon" onClick={prevMonth} title="Previous month">
-            <ChevronLeft size={13} />
+            <ChevronLeft className="tm-icon" />
           </button>
           <span className="cal-drawer__month-label">
             {MONTH_NAMES[month - 1]} {year}
           </span>
           <button className="tv-btn tv-btn--icon" onClick={nextMonth} title="Next month">
-            <ChevronRight size={13} />
+            <ChevronRight className="tm-icon" />
           </button>
         </div>
 
@@ -269,7 +269,7 @@ export function CalendarDrawer(): React.JSX.Element {
               onClick={handleGoToDay}
               title="Open in Task Vault"
             >
-              <ExternalLink size={12} />
+              <ExternalLink className="tm-icon-sm" />
             </button>
           </div>
           {loadingDay && <div className="cal-drawer__day-loading">…</div>}

@@ -677,7 +677,7 @@ export function NotepadView(): React.JSX.Element {
                   setPendingAnchor(null)
                 }}
               >
-                <MessageSquarePlus size={14} />
+                <MessageSquarePlus className="tm-icon" />
               </button>
             )}
             {commentHover && (

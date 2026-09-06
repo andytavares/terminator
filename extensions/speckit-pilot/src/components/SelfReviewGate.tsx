@@ -151,11 +151,11 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
             {/* A check that did not run gets neither mark: a tick would claim
                 it passed, a cross would blame it for failing. */}
             {row.passed === null ? (
-              <MinusCircle size={14} style={{ color: 'var(--tm-text-secondary)' }} />
+              <MinusCircle className="tm-icon" style={{ color: 'var(--tm-text-secondary)' }} />
             ) : row.passed ? (
-              <CheckCircle size={14} style={{ color: 'var(--tm-success, #22c55e)' }} />
+              <CheckCircle className="tm-icon" style={{ color: 'var(--tm-success, #22c55e)' }} />
             ) : (
-              <XCircle size={14} style={{ color: 'var(--tm-danger)' }} />
+              <XCircle className="tm-icon" style={{ color: 'var(--tm-danger)' }} />
             )}
             <span style={{ flex: 1, fontSize: 13, color: 'var(--tm-text-primary)' }}>
               {row.label}
@@ -206,7 +206,7 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
             fontSize: 12,
           }}
         >
-          <AlertCircle size={12} />
+          <AlertCircle className="tm-icon-sm" />
           Some quality checks did not pass. Review before approving.
         </div>
       )}
@@ -226,7 +226,7 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
           aria-label="Back to Implement"
           style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <ArrowLeft size={14} />
+          <ArrowLeft className="tm-icon" />
           Back to Implement
         </button>
         <button
@@ -235,7 +235,7 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
           aria-label="Approve → Open PR"
           style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <GitMerge size={14} />
+          <GitMerge className="tm-icon" />
           Approve → Open PR
         </button>
       </div>

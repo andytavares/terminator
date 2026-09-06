@@ -176,7 +176,7 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
         <div className="db-admin__stats-header">
           <span className="db-admin__section-title">Tables</span>
           <button className="tv-btn tv-btn--ghost tv-btn--xs" onClick={() => void loadStats()}>
-            <RefreshCw size={11} />
+            <RefreshCw className="tm-icon-sm" />
           </button>
         </div>
         {stats ? (
@@ -200,7 +200,7 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
                   onClick={() => handleClearTable(table)}
                   title={`Clear all rows from ${table}`}
                 >
-                  <Trash2 size={10} />
+                  <Trash2 className="tm-icon-sm" />
                 </button>
               </div>
             ))}
@@ -251,7 +251,7 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
             disabled={running || !sql.trim()}
             title="Run (⌘↵)"
           >
-            <Play size={12} />
+            <Play className="tm-icon-sm" />
             {running ? 'Running…' : 'Run'}
           </button>
         </div>
@@ -270,7 +270,10 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
                 {canDeleteRows && (
                   <span className="db-admin__result-hint">
                     {' · click '}
-                    <Trash2 size={10} style={{ display: 'inline', verticalAlign: 'middle' }} />
+                    <Trash2
+                      className="tm-icon-sm"
+                      style={{ display: 'inline', verticalAlign: 'middle' }}
+                    />
                     {' to delete a row'}
                   </span>
                 )}
@@ -295,7 +298,7 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
                               onClick={() => handleDeleteRow(row, sourceTable!)}
                               title="Delete this row"
                             >
-                              <Trash2 size={10} />
+                              <Trash2 className="tm-icon-sm" />
                             </button>
                           </td>
                         )}

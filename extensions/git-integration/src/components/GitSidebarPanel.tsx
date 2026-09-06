@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { ChevronDown, GitBranch } from 'lucide-react'
+import { ArrowRight, ChevronDown, GitBranch } from 'lucide-react'
 import { Popover } from '@terminator/extension-ui'
 import { useGitStore } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
@@ -175,7 +175,7 @@ export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Ele
           }
           data-testid="resolve-conflicts-btn"
         >
-          Resolve conflicts →
+          <ArrowRight aria-hidden="true" /> Resolve conflicts
         </button>
       )}
 

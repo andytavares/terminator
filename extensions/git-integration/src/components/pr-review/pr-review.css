@@ -2849,7 +2849,17 @@
   cursor: not-allowed;
 }
 
+/* Principle XII: the → is an icon now, sized here. */
+.pr-overview-resolve-conflicts-btn svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
 .pr-overview-resolve-conflicts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 16px;
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--tm-danger) 50%, transparent);
@@ -2996,4 +3006,33 @@
 .pr-issue-composer-hint {
   font-size: 11px;
   color: var(--tm-text-muted);
+}
+
+/* Principle XII: the glyphs these carried were text and took a font size; an
+   icon takes real dimensions. One block for every check-state and control icon
+   converted in this pass. */
+.pr-checks-icon svg,
+.pr-checks-summary-icon svg,
+.review-diff-viewed-badge svg,
+.pr-merge-state-badge svg,
+.pr-overview-section-toggle svg,
+.chapter-nav__done svg,
+.chapter-file-list__done svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.pr-large-pr-banner__icon,
+.review-diff-hotspot svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.pr-overview-refresh-btn svg,
+.pr-review-view__refresh svg {
+  width: 13px;
+  height: 13px;
+  display: block;
 }
