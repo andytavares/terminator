@@ -207,6 +207,7 @@ function mountForStart(over: Record<string, unknown> = {}) {
             },
           ],
           proposed: 'standard',
+          proposedWhy: '2 units of work',
         }
       )
     }
@@ -257,6 +258,23 @@ describe('choosing the shape of work', () => {
     await waitFor(() => expect(screen.getByText('Shape of work')).toBeTruthy())
     expect(screen.getByText('direct')).toBeTruthy()
     expect(screen.getByText('proposed')).toBeTruthy()
+  })
+
+  it('says why that shape was proposed, not only that it was (FR-014)', async () => {
+    mountForStart()
+    await waitFor(() => screen.getByText('Shape of work'))
+    expect(screen.getByText(/standard proposed — 2 units of work/)).toBeTruthy()
+  })
+
+  it('says nothing about grounds it was not given', async () => {
+    mountForStart({
+      recipes: {
+        recipes: [{ name: 'direct', available: true, unmet: [], rung: 'built-in' }],
+        proposed: 'direct',
+      },
+    })
+    await waitFor(() => screen.getByText('Shape of work'))
+    expect(screen.queryByText(/proposed —/)).toBeNull()
   })
 
   it('shows one it cannot run, with the requirement it does not meet', async () => {

@@ -4,7 +4,9 @@
 
 All channels use the `foundry:` namespace, registered by the extension's main-process handler via `api.ipc.registerHandler`. Payloads are validated with zod before processing. Nothing in `src/` names any of these channels (Constitution II).
 
-Ten channels replace roughly forty in the extension being retired. Every one is renderer → main (invoke) unless stated.
+**Forty-three channels**, of which the thirteen below carry the Forge, the Line and the record and are documented in full; the remaining thirty drive the supervision surface and are listed, with their payloads and responses, in [Supervision and settings channels](#supervision-and-settings-channels) at the end. Every one is renderer → main (invoke) unless stated.
+
+The count is worth stating plainly: an earlier draft of this contract said ten, which was the design's ambition rather than what shipped. Supervising a live agent — its permissions, its transcript, its review queue, its stalls — is where the other thirty went.
 
 Entity shapes referenced below are defined in [data-model.md](../data-model.md) and are not repeated here.
 
@@ -70,6 +72,34 @@ Run the six checks and, when they all pass, move the order to `agreed`. Idempote
 **Response**: `{ compile: CompileResult; order: WorkOrder }`
 
 When `commit` is true and `compile.ok` is false the order is unchanged and `failures` names the specific offending criterion or unit (FR-011).
+
+---
+
+## `foundry:run.recipes`
+
+The shapes of work this repository can support for one order, which one the system proposes, and **why** it proposes it (FR-014).
+
+`available: false` carries the requirement the repository does not meet, so a shape that cannot run says so rather than disappearing.
+
+**Payload**: `{ id: string }`
+
+**Response**:
+
+```typescript
+{
+  recipes: Array<{
+    name: string
+    available: boolean
+    unmet: string[]
+    rung: 'data-root' | 'repository' | 'built-in' | null
+    description?: string
+  }>
+  proposed: string
+  // The grounds, not just the answer: a shape decides how many agents run,
+  // what is verified, and whether a pull request opens at the end.
+  proposedWhy: string
+}
+```
 
 ---
 
@@ -159,7 +189,7 @@ Writes a ledger entry before acting. A gate already decided returns an error rat
 
 Run the curator over the ledger and return proposals. On request only — never scheduled, never unprompted (FR-080).
 
-**Payload**: `{ since?: string }`
+**Payload**: `{ orderId?: string }` — omitted reads every order.
 
 **Response**:
 
@@ -167,16 +197,58 @@ Run the curator over the ledger and return proposals. On request only — never 
 {
   proposals: Array<{
     id: string
-    ruleId: string
     rung: 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6'
     asserts: string
-    derivedFrom: string[] // ledger entry ids — FR-079 requires citation
-    wouldHaveCaught: number
+    origin: string
+    occurrences: number
+    // FR-079 requires citation: the specific past rejections it derives from.
+    citations: Array<{
+      ref: string
+      at: string
+      actor: string
+      action: string
+      subject: string
+      reason: string
+    }>
   }>
 }
 ```
 
-Accepting or rejecting a proposal is `foundry:inbox.decide` against the gate the proposal raises, so there is one decision path and one ledger shape for every decision in the system.
+---
+
+## `foundry:rules.decide`
+
+Accept or turn down one proposal (FR-081). Accepting writes a rule into the records location, where it applies to subsequent work in every repository. Turning one down is permanent: it is never offered again.
+
+The proposal is re-derived from the ledger inside the handler rather than trusted from the surface — a rule accepted on evidence the ledger no longer supports is one nobody can justify.
+
+**Payload**: `{ proposalId: string; accept: boolean; reason?: string }`
+
+**Response**: `{ ok: true; accepted: boolean; file?: string; rule?: string }`, or `{ error }` when the ledger no longer supports the proposal.
+
+---
+
+## `foundry:rules.inForce`
+
+The checks the operator accepted, and the ones they turned down — the readable-back half of FR-081.
+
+Only rules that resolved from the **records location** rung are listed. A built-in is not the operator's to remove, and a rule carried by a repository belongs to that repository.
+
+**Payload**: `{}`
+
+**Response**: `{ rules: Array<{ id: string; asserts: string; rung: string; origin: string }>; declined: Array<{ id: string; reason: string }> }`
+
+---
+
+## `foundry:rules.remove`
+
+Take an accepted check back out (FR-081). The rule file is deleted **and** the id is recorded as declined, so the curator does not propose it again next week — a factory that argues with the operator is worse than one that never learned.
+
+Refused for any id not in `foundry:rules.inForce`.
+
+**Payload**: `{ ruleId: string; reason?: string }`
+
+**Response**: `{ ok: true; removed: boolean; reason: string; at: string }`, or `{ error }`.
 
 ---
 
@@ -194,3 +266,68 @@ Registered via `api.settings.register`; not channels, but part of the surface.
 | `terminator.foundry.budgets.filesTouched`     | number                                   | `25`                                              |
 | `terminator.foundry.writeBack`                | string[]                                 | all three (FR-062)                                |
 | `terminator.foundry.criticalPaths`            | Record&lt;repo, string[]&gt;             | `{}` — operator-declared, never inferred          |
+
+---
+
+## Supervision and settings channels
+
+Thirty channels serve the Floor: the live runs, their permissions, their transcripts, the review queue and the model box. They take the same `foundry:` namespace and the same invoke shape. Grouped by what they are for.
+
+### The run graph and the session
+
+| Channel                        | Payload                                   | Response                                                                                                        |
+| ------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `foundry:run.resume`           | `{ id: string }`                          | Restarts a run's scheduler after a gate was decided. Main-process seam: raised from the inbox, not from a view. |
+| `foundry:run-interrupt`        | `{ sessionId: string }`                   | `{ ok: boolean }`                                                                                               |
+| `foundry:run-redirect`         | `{ sessionId: string; message?: string }` | `{ ok: boolean }` — interrupts, then sends. Refuses an empty message rather than throwing.                      |
+| `foundry:run-stop`             | `{ sessionId: string; reason?: string }`  | `{ ok: boolean }` — archives the run before it leaves the live list                                             |
+| `foundry:run-terminal`         | `{ sessionId: string }`                   | `{ ok: boolean }` — focuses the window and navigates to the agent's terminal (FR-027)                           |
+| `foundry:run-transcript`       | `{ sessionId: string; limit?: number }`   | `{ lines: string[] }` — the tail, default 40                                                                    |
+| `foundry:supervision-snapshot` | `{}`                                      | `{ runs, review, backpressure: { allowed, unreviewed, limit } }`                                                |
+| `foundry:stalls-list`          | `{}`                                      | `{ firings, shadowMode: boolean }`                                                                              |
+
+### Review
+
+| Channel                      | Payload                                                                 | Response                                                                                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `foundry:review-hunks`       | `{ sessionId: string }`                                                 | `{ files, complete, fullReject }`; `files: null` means the runtime never started, which is not the same as a change that touched nothing |
+| `foundry:review-decide-hunk` | `{ sessionId: string; hunkId: string; decision: 'accept' \| 'reject' }` | `{ ok: boolean }`                                                                                                                        |
+| `foundry:review-apply`       | `{ sessionId: string }`                                                 | `{ ok, reverted, error? }` — reverts the rejected hunks                                                                                  |
+| `foundry:review-advance`     | `{ sessionId: string }`                                                 | `{ step }`                                                                                                                               |
+| `foundry:review-done`        | `{ sessionId: string }`                                                 | `{ ok: true }` — reopens the backpressure gate                                                                                           |
+| `foundry:review-intent`      | `{ sessionId: string; request: string; agentAccount: string }`          | `{ intent }` — what the change does against what was asked for                                                                           |
+
+### Permissions
+
+| Channel                        | Payload                                                               | Response                                                                        |
+| ------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `foundry:permissions-list`     | `{}`                                                                  | `{ pending }`                                                                   |
+| `foundry:permission-resolve`   | `{ requestId: string; decision: 'allow' \| 'deny'; answer?: string }` | `{ ok, reason? }` — refuses with a reason when the request is no longer waiting |
+| `foundry:permission-hand-back` | `{ requestId: string }`                                               | `{ ok: boolean }` — returns the decision to the terminal                        |
+
+### The activity feed
+
+| Channel                | Payload                                                 | Response                                                 |
+| ---------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| `foundry:feed-list`    | `{}`                                                    | `{ entries, mutes }`                                     |
+| `foundry:feed-dismiss` | `{ id: string }`                                        | `{ ok: true }`                                           |
+| `foundry:feed-mute`    | `{ sessionId?: string; author?: 'agent' \| 'console' }` | `{ mutes }`                                              |
+| `foundry:feed-unmute`  | `{ sessionId?: string; author?: 'agent' \| 'console' }` | `{ mutes }`                                              |
+| `foundry:feed-digest`  | `{ from: number; to?: number }`                         | The roll-up of what happened while the operator was away |
+
+### The order, beyond compiling it
+
+| Channel                   | Payload                            | Response                                                           |
+| ------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
+| `foundry:order.list`      | `{}`                               | Every order, for the board                                         |
+| `foundry:order.converge`  | `{ id: string }`                   | Runs the architect read-only and reads back its proposal (ADR-043) |
+| `foundry:order.states`    | `{ id: string }`                   | The tracker's workflow positions, for the intent mapping (FR-060)  |
+| `foundry:order.mapState`  | `{ id: string; intent; optionId }` | `{ ok, mapping }`                                                  |
+| `foundry:order.writeBack` | `{ id: string; events: string[] }` | Which write-backs this order will make (FR-062)                    |
+
+### The model
+
+| Channel               | Payload             | Response                          |
+| --------------------- | ------------------- | --------------------------------- |
+| `foundry:models-list` | `{}`                | `{ models, selected }`            |
+| `foundry:model-set`   | `{ model: string }` | `{ ok, selected }` or `{ error }` |

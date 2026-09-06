@@ -9,6 +9,7 @@ import { createRunChannels, writeRunGraph } from './ipc/run-channels.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
 import { createLedgerChannels } from './ipc/ledger-channels.js'
 import { rulesFor, rulesAtRung } from './verify/rules.js'
+import { availableNames, resolveRule } from './recipe/resolve.js'
 import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore } from './gates/store.js'
@@ -1244,11 +1245,31 @@ export function activate(api: ExtensionAPI): void {
         (rule) => rule.id
       )
     },
+    // Read by rung rather than by applicability: a check the operator accepted
+    // is theirs to remove whether or not it applies to the repository they
+    // happen to have open.
+    acceptedRules: () => {
+      const sources = resolveSources(api, dataRoot())
+      return availableNames('rules', sources).flatMap((name) => {
+        const resolved = resolveRule(name, sources)
+        if (!resolved.ok || resolved.resolved.rung !== 'data-root') return []
+        return [
+          {
+            id: resolved.resolved.value.id,
+            asserts: resolved.resolved.value.asserts,
+            rung: resolved.resolved.rung,
+            origin: resolved.resolved.value.origin,
+          },
+        ]
+      })
+    },
     now: () => new Date().toISOString(),
   })
   reg(api, 'foundry:ledger.query', (payload) => ledger.query(payload))
   reg(api, 'foundry:rules.propose', (payload) => ledger.proposeRules(payload))
   reg(api, 'foundry:rules.decide', (payload) => ledger.decideProposal(payload))
+  reg(api, 'foundry:rules.inForce', (payload) => ledger.rulesInForce(payload))
+  reg(api, 'foundry:rules.remove', (payload) => ledger.removeAcceptedRule(payload))
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands

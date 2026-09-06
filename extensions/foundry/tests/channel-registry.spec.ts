@@ -14,8 +14,20 @@ import { fileURLToPath } from 'node:url'
 // A duplicate `reg()` did exactly that, and the only thing that noticed was a
 // screenshot with no Foundry button in it.
 
-const src = fs.readFileSync(
-  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'index.ts'),
+const here = path.dirname(fileURLToPath(import.meta.url))
+const src = fs.readFileSync(path.join(here, '..', 'src', 'index.ts'), 'utf8')
+
+const contract = fs.readFileSync(
+  path.join(
+    here,
+    '..',
+    '..',
+    '..',
+    'specs',
+    '037-foundry-software-factory',
+    'contracts',
+    'ipc-channels.md'
+  ),
   'utf8'
 )
 
@@ -35,6 +47,15 @@ describe('the channel registry', () => {
 
   it('registers something at all, so this test cannot pass by finding nothing', () => {
     expect(registered().length).toBeGreaterThan(20)
+  })
+
+  // Constitution VIII: the contract ships with the code. It said "ten
+  // channels" while forty-three were registered, and thirty of them were
+  // documented nowhere — a contract nobody could use to answer "what does this
+  // extension expose".
+  it('documents every channel it registers', () => {
+    const undocumented = registered().filter((name) => !contract.includes(name))
+    expect(undocumented, `not in the IPC contract: ${undocumented.join(', ')}`).toEqual([])
   })
 
   it('names every channel under this extension prefix', () => {

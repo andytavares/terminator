@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { ScrollText, Sparkles, Check, X } from 'lucide-react'
+import { ScrollText, Sparkles, Check, X, Trash2 } from 'lucide-react'
 import type { LedgerEntry } from '../ledger/append.js'
 import type { Proposal } from '../ledger/curator.js'
 
@@ -16,6 +16,18 @@ interface LedgerView {
   actors: string[]
   actions: string[]
   orders: string[]
+}
+
+interface AcceptedRule {
+  id: string
+  asserts: string
+  rung: string
+  origin: string
+}
+
+interface RulesView {
+  rules: AcceptedRule[]
+  declined: { id: string; reason: string }[]
 }
 
 const PAGE = 200
@@ -37,7 +49,18 @@ export function Ledger(): JSX.Element {
   const [actor, setActor] = useState('')
   const [action, setAction] = useState('')
   const [proposals, setProposals] = useState<Proposal[] | null>(null)
+  const [rules, setRules] = useState<RulesView | null>(null)
   const [note, setNote] = useState<string | null>(null)
+
+  const refreshRules = useCallback(async () => {
+    const next = (await invoke('foundry:rules.inForce', {})) as Partial<RulesView> & {
+      error?: string
+    }
+    if (next.error !== undefined) return
+    // Normalised on arrival rather than guarded at every read: a reply missing
+    // an array is the same thing to this panel as an empty one.
+    setRules({ rules: next.rules ?? [], declined: next.declined ?? [] })
+  }, [])
 
   const refresh = useCallback(async () => {
     const next = (await invoke('foundry:ledger.query', {
@@ -54,28 +77,58 @@ export function Ledger(): JSX.Element {
     void refresh()
   }, [refresh])
 
+  useEffect(() => {
+    void refreshRules()
+  }, [refreshRules])
+
   const ask = useCallback(async () => {
     const next = (await invoke('foundry:rules.propose', {})) as { proposals?: Proposal[] }
     setProposals(next.proposals ?? [])
     setNote(null)
   }, [])
 
-  const decide = useCallback(async (proposal: Proposal, accept: boolean) => {
-    const result = (await invoke('foundry:rules.decide', {
-      proposalId: proposal.id,
-      accept,
-    })) as { error?: string; rule?: string }
-    if (result.error !== undefined) {
-      setNote(result.error)
-      return
-    }
-    setNote(
-      accept
-        ? `${proposal.id} is in force from the next run.`
-        : `${proposal.id} will not be offered again.`
-    )
-    setProposals((current) => current?.filter((p) => p.id !== proposal.id) ?? null)
-  }, [])
+  const decide = useCallback(
+    async (proposal: Proposal, accept: boolean) => {
+      const result = (await invoke('foundry:rules.decide', {
+        proposalId: proposal.id,
+        accept,
+      })) as { error?: string; rule?: string }
+      if (result.error !== undefined) {
+        setNote(result.error)
+        return
+      }
+      setNote(
+        accept
+          ? `${proposal.id} is in force from the next run.`
+          : `${proposal.id} will not be offered again.`
+      )
+      setProposals((current) => current?.filter((p) => p.id !== proposal.id) ?? null)
+      void refreshRules()
+    },
+    [refreshRules]
+  )
+
+  /**
+   * Take an accepted check back out.
+   *
+   * The counterpart to accepting one. A rule the operator can add but never
+   * remove is one they stop accepting at all, and the removal is recorded so
+   * the same proposal is not offered back next week.
+   */
+  const remove = useCallback(
+    async (rule: AcceptedRule) => {
+      const result = (await invoke('foundry:rules.remove', { ruleId: rule.id })) as {
+        error?: string
+      }
+      if (result.error !== undefined) {
+        setNote(result.error)
+        return
+      }
+      setNote(`${rule.id} is no longer in force, and will not be proposed again.`)
+      await refreshRules()
+    },
+    [refreshRules]
+  )
 
   if (view === null) return <div className="fdry-empty">Loading the record…</div>
 
@@ -159,6 +212,38 @@ export function Ledger(): JSX.Element {
               </article>
             ))
           )}
+        </section>
+      ) : null}
+
+      {(rules?.rules?.length ?? 0) > 0 || (rules?.declined?.length ?? 0) > 0 ? (
+        <section className="fdry-panel">
+          <h3 className="fdry-panel-h">Checks you accepted</h3>
+          {rules?.rules?.length === 0 ? (
+            <p className="fdry-note">None in force.</p>
+          ) : (
+            rules?.rules?.map((rule) => (
+              <article key={rule.id} className="fdry-proposal">
+                <b>{rule.asserts}</b>
+                <p className="fdry-note">
+                  {rule.id} · rung {rule.rung} · from {rule.origin}
+                </p>
+                <div className="fdry-proposal-actions">
+                  <button type="button" onClick={() => void remove(rule)}>
+                    <Trash2 aria-hidden="true" /> Remove this check
+                  </button>
+                </div>
+              </article>
+            ))
+          )}
+          {(rules?.declined?.length ?? 0) > 0 ? (
+            <ul className="fdry-citations">
+              {rules?.declined?.map((entry) => (
+                <li key={entry.id}>
+                  <code>{entry.id}</code> — {entry.reason}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </section>
       ) : null}
 

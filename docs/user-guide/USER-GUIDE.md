@@ -577,6 +577,13 @@ the box at the bottom to tell it what is wrong, and it redrafts.
 **Red team** findings appear alongside; each is either **Fixed** or **Accepted**,
 and accepting one costs a written reason. Nothing hands off while one is open.
 
+**Shape of work** offers the shapes this repository can actually support — one
+that cannot run here says which requirement it does not meet rather than
+quietly disappearing. Foundry proposes one and says why it chose it ("2 units
+of work", "graded P1, which is above the direct shape's ceiling"). Pick a
+different one in a click; the override is recorded alongside the proposal it
+replaced.
+
 **Compile & hand off** agrees the order and starts the work. If the order is
 seeded from a tracker issue, a **Tracker write-back** panel lets you say which
 of _your_ workflow states each moment means — when work starts, when the draft
@@ -605,9 +612,15 @@ actually occur.
 
 One button: **What do I keep rejecting?** Foundry reads the record and, when
 the same reason has turned work away three times, proposes a rule — citing the
-specific entries it derived from. Accept it and it applies to later work;
-decline it and it is never offered again. It proposes nothing until you press
-the button.
+specific entries it derived from. Accept it and it applies to later work in
+every repository; decline it and it is never offered again. It proposes nothing
+until you press the button.
+
+Below that, **Checks you accepted** lists the rules you put there — never the
+ones that ship with Foundry, and never a rule a repository carries, because
+neither is yours to delete. **Remove this check** takes one back out, and the
+removal is kept with its reason so the same proposal is not offered back to you
+next week.
 
 ### Shipping
 

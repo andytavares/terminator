@@ -61,6 +61,10 @@ function mount(over: Record<string, unknown> = {}) {
     }
     if (channel === 'foundry:rules.propose') return { proposals: over.proposals ?? [] }
     if (channel === 'foundry:rules.decide') return over.decide ?? { ok: true, accepted: true }
+    if (channel === 'foundry:rules.inForce') {
+      return over.inForce ?? { rules: [], declined: [] }
+    }
+    if (channel === 'foundry:rules.remove') return over.remove ?? { ok: true, removed: true }
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -226,5 +230,68 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     await waitFor(() => expect(screen.getByText(/no longer supports/)).toBeTruthy())
     // Still listed, because it was not decided.
     expect(screen.getByText(PROPOSAL.asserts)).toBeTruthy()
+  })
+})
+
+describe('removing an accepted check (FR-081)', () => {
+  const IN_FORCE = {
+    rules: [
+      {
+        id: 'curator-hardcodes-the-timeout',
+        asserts: 'no unit hardcodes a timeout',
+        rung: 'data-root',
+        origin: 'curator:2026-09-01T10:00:00.000Z/U-1',
+      },
+    ],
+    declined: [],
+  }
+
+  it('shows the checks the operator accepted, with what each asserts', async () => {
+    mount({ inForce: IN_FORCE })
+    await waitFor(() => expect(screen.getByText('Checks you accepted')).toBeTruthy())
+    expect(screen.getByText('no unit hardcodes a timeout')).toBeTruthy()
+  })
+
+  it('offers a way to take one back out', async () => {
+    mount({ inForce: IN_FORCE })
+    await waitFor(() => screen.getByText('Checks you accepted'))
+    fireEvent.click(screen.getByRole('button', { name: /Remove this check/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:rules.remove', {
+        ruleId: 'curator-hardcodes-the-timeout',
+      })
+    )
+  })
+
+  it('says it is gone and will not come back', async () => {
+    mount({ inForce: IN_FORCE })
+    await waitFor(() => screen.getByText('Checks you accepted'))
+    fireEvent.click(screen.getByRole('button', { name: /Remove this check/ }))
+    await waitFor(() => expect(screen.getByText(/no longer in force/)).toBeTruthy())
+  })
+
+  it('reports a refusal rather than claiming the check was removed', async () => {
+    mount({ inForce: IN_FORCE, remove: { error: 'docs-in-pr is not yours to remove.' } })
+    await waitFor(() => screen.getByText('Checks you accepted'))
+    fireEvent.click(screen.getByRole('button', { name: /Remove this check/ }))
+    await waitFor(() => expect(screen.getByText(/not yours to remove/)).toBeTruthy())
+    expect(screen.queryByText(/no longer in force/)).toBeNull()
+  })
+
+  it('shows what was turned down, and why, so the removal is readable back', async () => {
+    mount({
+      inForce: {
+        rules: [],
+        declined: [{ id: 'curator-hardcodes-the-timeout', reason: 'it fired on everything' }],
+      },
+    })
+    await waitFor(() => expect(screen.getByText('Checks you accepted')).toBeTruthy())
+    expect(screen.getByText(/it fired on everything/)).toBeTruthy()
+  })
+
+  it('shows the panel not at all when there is nothing in force and nothing declined', async () => {
+    mount()
+    await waitFor(() => screen.getByText('G-1'))
+    expect(screen.queryByText('Checks you accepted')).toBeNull()
   })
 })

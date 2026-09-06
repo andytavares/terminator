@@ -198,15 +198,18 @@ describe('foundry:run.recipes', () => {
 
 describe('proposeRecipe', () => {
   it('keeps a shape the order already carries', () => {
-    expect(proposeRecipe(order({ recipe: 'bugfix' }))).toBe('bugfix')
+    expect(proposeRecipe(order({ recipe: 'bugfix' }))).toEqual({
+      name: 'bugfix',
+      why: 'the order already names this shape',
+    })
   })
 
   it('proposes the direct shape for one low-risk unit', () => {
-    expect(
-      proposeRecipe(
-        order({ risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] } })
-      )
-    ).toBe('direct')
+    const proposal = proposeRecipe(
+      order({ risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] } })
+    )
+    expect(proposal.name).toBe('direct')
+    expect(proposal.why).toBe('one unit of work, graded P3')
   })
 
   it('proposes the standard shape once there is more than one unit', () => {
@@ -221,15 +224,48 @@ describe('proposeRecipe', () => {
       touches: [],
       verify: [],
     })
-    expect(proposeRecipe(o)).toBe('standard')
+    const proposal = proposeRecipe(o)
+    expect(proposal.name).toBe('standard')
+    expect(proposal.why).toBe('2 units of work')
   })
 
   it('proposes the standard shape for anything above the lowest risk', () => {
-    expect(
-      proposeRecipe(
-        order({ risk: { grade: 'P1', triggers: [], blastRadius: [], criticalPaths: [] } })
-      )
-    ).toBe('standard')
+    const proposal = proposeRecipe(
+      order({ risk: { grade: 'P1', triggers: [], blastRadius: [], criticalPaths: [] } })
+    )
+    expect(proposal.name).toBe('standard')
+    expect(proposal.why).toContain("above the direct shape's ceiling")
+  })
+})
+
+describe('the reason a shape was chosen (FR-014)', () => {
+  function ledgerText(): string {
+    return fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
+  }
+
+  it('records why the system picked the shape, not only where it came from', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const text = ledgerText()
+    expect(text).toContain('role:architect')
+    expect(text).toContain('one unit of work, graded P3')
+    expect(text).toContain('resolved from built-in')
+  })
+
+  it('says the operator chose it when the operator chose it', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1', recipe: 'standard' })
+    expect(ledgerText()).toContain('chosen by the operator')
+  })
+
+  it('offers the reason alongside the proposal', async () => {
+    await store.save(order())
+    const view = (await channels().recipes({ id: 'WO-1' })) as {
+      proposed: string
+      proposedWhy: string
+    }
+    expect(view.proposed).toBe('direct')
+    expect(view.proposedWhy).toBe('one unit of work, graded P3')
   })
 })
 

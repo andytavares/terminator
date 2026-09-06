@@ -159,6 +159,19 @@ export async function declinedProposals(root: string): Promise<string[]> {
 }
 
 /**
+ * The same list with the reasons, for the surface that shows it back.
+ *
+ * A removal the operator cannot see afterwards is not a record (FR-081); the
+ * ids alone say what was turned down but never why.
+ */
+export async function declinedWithReasons(root: string): Promise<{ id: string; reason: string }[]> {
+  const declined = await readDeclined(root)
+  return Object.keys(declined)
+    .sort()
+    .map((id) => ({ id, reason: declined[id] }))
+}
+
+/**
  * Remove an accepted rule.
  *
  * Deleted *and* declined: a rule the operator removed is one they decided

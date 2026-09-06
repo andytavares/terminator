@@ -7,6 +7,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/schema.js'
 import { resolveRule } from '../../src/recipe/resolve.js'
 import { declinedProposals } from '../../src/verify/rules.js'
+import { availableNames } from '../../src/recipe/resolve.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
 // Reading the record, and asking it what it thinks.
@@ -16,11 +17,33 @@ import type { LedgerEntry } from '../../src/ledger/append.js'
 
 let root: string
 
+/**
+ * The host reads accepted checks by rung — those that resolved from the
+ * records location rather than shipping with the tool. Read here the same way,
+ * so the test cannot pass on a list the application never produces.
+ */
+function acceptedRules() {
+  const sources = { dataRoot: root, repoPaths: [], builtInDir: path.resolve(root, 'nowhere') }
+  return availableNames('rules', sources).flatMap((name) => {
+    const resolved = resolveRule(name, sources)
+    if (!resolved.ok || resolved.resolved.rung !== 'data-root') return []
+    return [
+      {
+        id: resolved.resolved.value.id,
+        asserts: resolved.resolved.value.asserts,
+        rung: resolved.resolved.rung,
+        origin: resolved.resolved.value.origin,
+      },
+    ]
+  })
+}
+
 function channels(existingRuleIds: string[] = []) {
   return createLedgerChannels({
     store: createOrderStore(root),
     dataRoot: () => root,
     existingRuleIds: () => existingRuleIds,
+    acceptedRules,
     now: () => '2026-09-06T12:00:00.000Z',
   })
 }
@@ -270,5 +293,62 @@ describe('nothing is proposed unprompted (FR-076)', () => {
     // asked for.
     const asked = (await channels().proposeRules({})) as { proposals: unknown[] }
     expect(asked.proposals).toHaveLength(1)
+  })
+})
+
+describe('removing an accepted check (FR-081)', () => {
+  async function accept(): Promise<string> {
+    await repeatedRejections()
+    const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
+    const id = r.proposals[0].id
+    await channels().decideProposal({ proposalId: id, accept: true })
+    return id
+  }
+
+  it('lists what the operator accepted, and nothing that shipped with the tool', async () => {
+    const id = await accept()
+    const view = (await channels().rulesInForce({})) as {
+      rules: { id: string; rung: string }[]
+    }
+    expect(view.rules.map((rule) => rule.id)).toEqual([id])
+    expect(view.rules.every((rule) => rule.rung === 'data-root')).toBe(true)
+  })
+
+  it('removes it, so later work no longer loads it', async () => {
+    const id = await accept()
+    const result = (await channels().removeAcceptedRule({ ruleId: id })) as { removed: boolean }
+    expect(result.removed).toBe(true)
+    expect(
+      resolveRule(id, { dataRoot: root, repoPaths: [], builtInDir: path.resolve(root, 'nowhere') })
+        .ok
+    ).toBe(false)
+  })
+
+  it('records the removal, with the reason, where it can be read back', async () => {
+    const id = await accept()
+    await channels().removeAcceptedRule({ ruleId: id, reason: 'it fired on everything' })
+    const view = (await channels().rulesInForce({})) as {
+      declined: { id: string; reason: string }[]
+    }
+    expect(view.declined).toEqual([{ id, reason: 'it fired on everything' }])
+  })
+
+  it('never proposes a removed check again', async () => {
+    const id = await accept()
+    await channels().removeAcceptedRule({ ruleId: id })
+    const again = (await channels().proposeRules({})) as { proposals: unknown[] }
+    expect(again.proposals).toEqual([])
+  })
+
+  it('refuses to remove something the operator did not accept', async () => {
+    await accept()
+    const result = (await channels().removeAcceptedRule({ ruleId: 'docs-in-pr' })) as {
+      error: string
+    }
+    expect(result.error).toMatch(/not yours to remove/)
+  })
+
+  it('rejects a malformed request', async () => {
+    expect(await channels().removeAcceptedRule({})).toEqual({ error: 'Malformed request.' })
   })
 })

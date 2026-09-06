@@ -3,7 +3,13 @@ import { queryEntries } from '../ledger/append.js'
 import type { LedgerEntry } from '../ledger/append.js'
 import { propose } from '../ledger/curator.js'
 import { ledgerPath } from '../data-root.js'
-import { acceptProposal, declineProposal, declinedProposals } from '../verify/rules.js'
+import {
+  acceptProposal,
+  declineProposal,
+  declinedProposals,
+  declinedWithReasons,
+  removeRule,
+} from '../verify/rules.js'
 import type { OrderStore } from '../order/store.js'
 
 // The record, and what the operator can ask it for.
@@ -28,12 +34,29 @@ const DecidePayload = z.object({
   reason: z.string().optional(),
 })
 
+const RemovePayload = z.object({ ruleId: z.string(), reason: z.string().optional() })
+
+/** A check the operator accepted, as the surface that can remove it needs it. */
+export interface AcceptedRule {
+  readonly id: string
+  readonly asserts: string
+  readonly rung: string
+  readonly origin: string
+}
+
 export interface LedgerDeps {
   readonly store: OrderStore
   /** Resolved on every call: the records location follows the open workspace. */
   readonly dataRoot: () => string
   /** Rule ids already in force, so nothing already covered is proposed. */
   readonly existingRuleIds: () => readonly string[]
+  /**
+   * The checks the operator accepted — those read from the records location
+   * rather than shipped with the tool. Only these can be removed: a built-in
+   * is not the operator's to delete, and a repository's own rule belongs to
+   * that repository.
+   */
+  readonly acceptedRules: () => readonly AcceptedRule[]
   readonly now: () => string
 }
 
@@ -41,6 +64,8 @@ export interface LedgerChannels {
   query(payload: unknown): Promise<unknown>
   proposeRules(payload: unknown): Promise<unknown>
   decideProposal(payload: unknown): Promise<unknown>
+  rulesInForce(payload: unknown): Promise<unknown>
+  removeAcceptedRule(payload: unknown): Promise<unknown>
 }
 
 export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
@@ -125,5 +150,40 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     return { ok: true, accepted: true, file, rule: found.id }
   }
 
-  return { query, proposeRules, decideProposal }
+  /**
+   * The checks in force that the operator put there, and the ones they turned
+   * down — the two halves of the record FR-081 asks for.
+   */
+  async function rulesInForce(): Promise<unknown> {
+    return {
+      rules: deps.acceptedRules(),
+      declined: await declinedWithReasons(deps.dataRoot()),
+    }
+  }
+
+  /**
+   * Remove an accepted check.
+   *
+   * Refused for anything the operator did not accept: deleting a built-in
+   * would leave the tool quietly weaker than the one it ships as, and a
+   * removal that silently did nothing is worse than a refusal that says why.
+   */
+  async function removeAcceptedRule(raw: unknown): Promise<unknown> {
+    const parsed = RemovePayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    const { ruleId } = parsed.data
+
+    const accepted = deps.acceptedRules().find((rule) => rule.id === ruleId)
+    if (accepted === undefined) {
+      return {
+        error: `${ruleId} is not one of the checks you accepted, so it is not yours to remove.`,
+      }
+    }
+
+    const reason = parsed.data.reason ?? 'removed by the operator'
+    const removed = await removeRule(deps.dataRoot(), ruleId, reason)
+    return { ok: true, removed, reason, at: deps.now() }
+  }
+
+  return { query, proposeRules, decideProposal, rulesInForce, removeAcceptedRule }
 }

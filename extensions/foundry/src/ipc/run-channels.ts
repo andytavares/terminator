@@ -78,18 +78,43 @@ export async function writeRunGraph(dataRoot: string, graph: RunGraph): Promise<
   )
 }
 
+/** A proposed shape and the reason it fits this order (FR-014). */
+export interface ProposedRecipe {
+  readonly name: string
+  readonly why: string
+}
+
 /**
- * Choose a shape when the operator has not.
+ * Choose a shape when the operator has not, and say why.
  *
  * Deliberately simple and stated out loud rather than clever: one unit is a
  * direct change, several is the standard shape, and anything already carrying
  * a recipe keeps it. The operator overrides in one click and that override is
  * recorded — a proposal nobody can predict is worse than a plain one.
+ *
+ * The reason travels with the name because a shape decides how many agents
+ * run, what gets verified and whether a pull request opens at the end. An
+ * operator asked to accept or override that needs the grounds, not just the
+ * answer.
  */
-export function proposeRecipe(order: WorkOrder): string {
-  if (order.recipe !== null) return order.recipe
-  if (order.plan.units.length <= 1 && order.risk.grade === 'P3') return 'direct'
-  return 'standard'
+export function proposeRecipe(order: WorkOrder): ProposedRecipe {
+  if (order.recipe !== null) {
+    return { name: order.recipe, why: 'the order already names this shape' }
+  }
+  const units = order.plan.units.length
+  if (units <= 1 && order.risk.grade === 'P3') {
+    return {
+      name: 'direct',
+      why: `${units === 1 ? 'one unit' : 'no units'} of work, graded ${order.risk.grade}`,
+    }
+  }
+  return {
+    name: 'standard',
+    why:
+      units > 1
+        ? `${units} units of work`
+        : `graded ${order.risk.grade}, which is above the direct shape's ceiling`,
+  }
 }
 
 export function createRunChannels(deps: RunDeps): RunChannels {
@@ -122,7 +147,9 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const writable = await ensureWritable(deps.dataRoot())
     if (!writable.ok) return { error: writable.reason }
 
-    const name = parsed.data.recipe ?? proposeRecipe(order)
+    const chosenByOperator = parsed.data.recipe !== undefined
+    const proposal = proposeRecipe(order)
+    const name = parsed.data.recipe ?? proposal.name
     const resolved = resolveRecipe(name, deps.sources())
     if (!resolved.ok) return { error: resolved.reason }
 
@@ -138,18 +165,22 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       ...order,
       status: 'running',
       recipe: name,
-      recipeOverriddenBy: parsed.data.recipe === undefined ? null : 'operator',
+      recipeOverriddenBy: chosenByOperator ? 'operator' : null,
     }
     await deps.store.save(running)
     await deps.store.record({
       at: deps.now(),
       orderId: order.id,
-      actor: parsed.data.recipe === undefined ? 'role:architect' : 'operator',
+      actor: chosenByOperator ? 'operator' : 'role:architect',
       action: 'run.started',
       subject: name,
-      // Which rung the recipe came from is part of the answer: "which recipe
-      // ran" alone does not explain a surprising run.
-      reason: `recipe resolved from ${resolved.resolved.rung}`,
+      // Both halves of "why this shape": the grounds for choosing it, and
+      // which rung it was read from. Either alone leaves a surprising run
+      // unexplained — the first says why this shape, the second says why this
+      // version of it.
+      reason: `${
+        chosenByOperator ? 'chosen by the operator' : proposal.why
+      }; recipe resolved from ${resolved.resolved.rung}`,
       evidence: [],
     })
 
@@ -294,7 +325,8 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       }
     })
 
-    return { recipes: offered, proposed: proposeRecipe(order) }
+    const proposal = proposeRecipe(order)
+    return { recipes: offered, proposed: proposal.name, proposedWhy: proposal.why }
   }
 
   /**

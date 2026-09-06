@@ -45,6 +45,8 @@ interface RecipeOption {
 interface RecipesView {
   recipes?: RecipeOption[]
   proposed?: string
+  /** Why that shape was proposed (FR-014) — the grounds, not just the answer. */
+  proposedWhy?: string
   error?: string
 }
 
@@ -345,6 +347,11 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
         {(recipes?.recipes?.length ?? 0) > 0 && order.status === 'draft' ? (
           <section className="fdry-panel">
             <h2 className="fdry-panel-h">Shape of work</h2>
+            {recipes?.proposedWhy !== undefined && recipes.proposedWhy !== '' ? (
+              <p className="fdry-note">
+                {recipes.proposed} proposed — {recipes.proposedWhy}.
+              </p>
+            ) : null}
             {recipes?.recipes?.map((option) => {
               const isChosen = (chosen ?? recipes.proposed) === option.name
               return (
