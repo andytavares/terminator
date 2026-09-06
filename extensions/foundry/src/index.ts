@@ -667,7 +667,7 @@ async function executeRun(
           autoDecide: input.readOnly
             ? (tool, toolInput) => {
                 const decision = decideReadOnly(tool, toolInput)
-                return decision.allow ? null : { allow: false, message: decision.reason }
+                return decision.allow ? null : { allow: false, reason: decision.reason }
               }
             : undefined,
           onPending: (pending) => notePending(api, { ...pending, featureDir }),
@@ -913,16 +913,29 @@ async function convergeOnce(
       answered = true
       resolve(started)
     }
-    let turnOver = false
-    const finish = (code: number | null): void => {
-      if (turnOver) return
-      turnOver = true
-      // The proposal is read when the turn ends, whatever the exit status: an
-      // architect that wrote a plan and then errored still wrote a plan.
+    let done = false
+    /**
+     * Take the proposal, if there is one to take.
+     *
+     * A turn ending is not the architect finishing: it thinks, replies, asks
+     * something, and may write on a later turn. Reading at the first turn end
+     * reported "the architect wrote no proposal" while it was still working,
+     * so a turn only counts when the file is actually there. The session
+     * ending is the deadline — then the answer is whatever it left, including
+     * nothing.
+     */
+    const collect = (deadline: boolean, code: number | null): void => {
+      if (done) return
+      if (!deadline && !fs.existsSync(plan.proposalPath)) return
+      done = true
+      // The session is over either way, so it must not be resumed: `--resume`
+      // on one the runtime has forgotten silently starts a fresh agent that
+      // believes it is continuing.
+      if (deadline) intakeSessions.delete(order.id)
       void onFinished(
-        code === null
-          ? { ok: false, reason: 'The architect could not be started.' }
-          : readProposal(order, plan.proposalPath, new Date().toISOString())
+        !deadline || code !== null
+          ? readProposal(order, plan.proposalPath, new Date().toISOString())
+          : { ok: false, reason: 'The architect could not be started.' }
       )
       answer({ ok: false, reason: 'The architect ended before it started.' })
     }
@@ -944,7 +957,7 @@ async function convergeOnce(
           const target = (toolInput as { file_path?: unknown } | null)?.file_path
           if (typeof target === 'string' && target === plan.proposalPath) return { allow: true }
           const decision = decideReadOnly(tool, toolInput)
-          return decision.allow ? null : { allow: false, message: decision.reason }
+          return decision.allow ? null : { allow: false, reason: decision.reason }
         },
         onPending: (pending) => notePending(api, { ...pending, featureDir }),
         onResolved: (requestId) => noteResolved(requestId),
@@ -952,18 +965,20 @@ async function convergeOnce(
           intakeSessions.set(order.id, run.sessionId)
           answer({ ok: true, sessionId: run.sessionId })
         },
-        onTurnEnd: () => finish(0),
-        onEnd: (exitCode) => finish(exitCode),
+        onTurnEnd: () => collect(false, 0),
+        onEnd: (exitCode) => collect(true, exitCode),
       })
       .then((run) => {
         if (run === null) {
-          answer({ ok: false, reason: 'The architect could not be started.' })
+          collect(true, null)
           return
         }
         intakeSessions.set(order.id, run.sessionId)
         answer({ ok: true, sessionId: run.sessionId })
       })
       .catch((error: unknown) => {
+        done = true
+        intakeSessions.delete(order.id)
         answer({
           ok: false,
           reason: error instanceof Error ? error.message : 'The architect could not be started.',

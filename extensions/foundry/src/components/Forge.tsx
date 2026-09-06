@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, X, CircleDot, Terminal, Play, Wand } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
@@ -90,6 +90,15 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
   const [moved, setMoved] = useState<string[]>([])
   const [accepting, setAccepting] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  /**
+   * The architect is working, until the document says otherwise.
+   *
+   * Its own state rather than a field on the view: the view is replaced on
+   * every poll by `order.compile`, which knows nothing about a session, so
+   * deriving it from there cleared the flag after one tick and stopped the
+   * poll — and a redraft landing a minute later never appeared.
+   */
+  const [drafting, setDrafting] = useState(false)
   const [recipes, setRecipes] = useState<RecipesView | null>(null)
   const [chosen, setChosen] = useState<string | null>(null)
 
@@ -172,27 +181,37 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
       setBusy(true)
       setProblem(null)
       try {
+        decisionsAtStart.current = view?.order.provenance.decisions.length ?? 0
         const next = (await invoke('foundry:order.converge', {
           id: orderId,
           ...(message === undefined ? {} : { message }),
-        })) as (OrderView & { error?: string }) | { error: string }
+        })) as (OrderView & { error?: string; converging?: string }) | { error: string }
         if ('order' in next) setView(next)
         if (next.error !== undefined) setProblem(next.error)
+        setDrafting('converging' in next && next.converging !== undefined)
       } finally {
         setBusy(false)
       }
     },
-    [orderId]
+    [orderId, view]
   )
 
-  // The architect answers in minutes, not in the call that started it — so the
-  // document is refetched while it works, and the redraft appears when it
-  // lands rather than the surface spinning on a promise.
+  // The architect answers in minutes, not in the call that started it, so the
+  // document is refetched while it works and the redraft appears when it
+  // lands. What stops the poll is the record growing — the architect writes a
+  // line whether it redrafted, refused or found nothing to change — rather
+  // than a timeout, which would either give up early or poll for ever.
+  const decisionsAtStart = useRef(0)
   useEffect(() => {
-    if (view?.converging === undefined) return
+    if (!drafting) return
     const timer = setInterval(() => void refresh(), REDRAFT_POLL_MS)
     return () => clearInterval(timer)
-  }, [view?.converging, refresh])
+  }, [drafting, refresh])
+
+  useEffect(() => {
+    if (!drafting || view === null) return
+    if (view.order.provenance.decisions.length > decisionsAtStart.current) setDrafting(false)
+  }, [drafting, view])
 
   /**
    * Compile, agree, and start the Line.
@@ -276,11 +295,11 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
             <button
               type="button"
               className="fdry-converge"
-              disabled={busy || view.converging !== undefined}
+              disabled={busy || drafting}
               onClick={() => void converge()}
             >
               <Wand aria-hidden="true" />
-              {view.converging !== undefined
+              {drafting
                 ? 'The architect is working…'
                 : order.acceptance.length === 0
                   ? 'Draft the plan'

@@ -30,6 +30,8 @@ function mount(over: Record<string, unknown> = {}) {
     if (channel === 'foundry:inbox.list') {
       return {
         gates: over.gates ?? [],
+        autonomy: over.autonomy ?? 'standard',
+        silenced: over.silenced ?? [],
         summary: {
           waiting: 0,
           orders: 0,
@@ -162,5 +164,20 @@ describe('nothing needs you', () => {
     await waitFor(() => screen.getByText('Nothing needs you.'))
     expect(screen.getByText('2')).toBeTruthy()
     expect(screen.getByText('4')).toBeTruthy()
+  })
+})
+
+describe('quiet has to be explicable', () => {
+  it('says which rules this setting is not asking about', async () => {
+    mount({ autonomy: 'lights-out', silenced: ['unit.boundary', 'new-dependency'] })
+    await waitFor(() => expect(screen.getByText(/not asking about/)).toBeTruthy())
+    expect(screen.getByText(/unit.boundary, new-dependency/)).toBeTruthy()
+    expect(screen.getByText('lights-out')).toBeTruthy()
+  })
+
+  it('says nothing when every rule is live', async () => {
+    mount({ autonomy: 'escorted', silenced: [] })
+    await waitFor(() => screen.getByText('Nothing needs you.'))
+    expect(screen.queryByText(/not asking about/)).toBeNull()
   })
 })

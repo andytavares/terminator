@@ -513,6 +513,13 @@
   padding: 6px;
 }
 
+/* Quiet has to be explicable: which rules this setting is not asking about. */
+.fdry-silenced {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
 /* A mute you cannot find is a mute you never undo, so each one is a control. */
 .fdry-unmute {
   appearance: none;

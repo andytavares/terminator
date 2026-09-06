@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { decide, applyDefault, isOverdue } from '../gates/rules.js'
 import { rankInbox, summariseInbox } from '../gates/rank.js'
-import { isLive } from '../gates/autonomy.js'
+import { isLive, silencedRules } from '../gates/autonomy.js'
 import type { Autonomy } from '../gates/autonomy.js'
 import type { Gate } from '../gates/rules.js'
 import type { GateStore } from '../gates/store.js'
@@ -76,6 +76,12 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
     const orders = await deps.orders.list()
     return {
       gates: rankInbox(settled),
+      // What this setting is *not* asking about. "Nothing needs you" means
+      // something different at each rung of the dial, and an operator who
+      // cannot see which rules are silenced cannot tell a quiet factory from
+      // a deaf one.
+      autonomy,
+      silenced: silencedRules(autonomy),
       summary: {
         ...summariseInbox(settled),
         building: orders.filter((o) => o.status === 'running').length,

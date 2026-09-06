@@ -56,13 +56,24 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
   invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:run.observe') return view
     if (channel === 'foundry:permissions-list') return { pending: live.pending ?? [] }
-    if (channel === 'foundry:supervision-snapshot') return { review: live.review ?? [] }
-    if (channel === 'foundry:review-hunks') return { files: live.hunks ?? [] }
+    if (channel === 'foundry:supervision-snapshot') {
+      return { review: live.review ?? [], backpressure: live.backpressure }
+    }
+    if (channel === 'foundry:stalls-list') {
+      return { firings: live.stalls ?? [], shadowMode: live.shadowMode ?? true }
+    }
+    if (channel === 'foundry:review-hunks') {
+      return {
+        files: live.hunks ?? [],
+        complete: live.complete ?? true,
+        fullReject: live.fullReject ?? false,
+      }
+    }
     if (channel === 'foundry:review-decide-hunk') return { ok: true }
     if (channel === 'foundry:review-apply') return live.apply ?? { ok: true, reverted: 0 }
     if (channel === 'foundry:review-done') return { ok: true }
     if (channel === 'foundry:review-intent') return { intent: live.intent ?? null }
-    if (channel === 'foundry:review-advance') return { step: null }
+    if (channel === 'foundry:review-advance') return { step: live.step ?? null }
     if (channel === 'foundry:feed-list') {
       return { entries: live.feed ?? [], mutes: live.mutes ?? [] }
     }
@@ -358,6 +369,7 @@ const REVIEW = {
   grade: 'P0',
   gradeTrigger: 'touches authentication',
   diffSummary: { files: 2, added: 40, removed: 3 },
+  step: 'intent',
 }
 
 const HUNKS = [
@@ -573,5 +585,127 @@ describe('a mute you can find again', () => {
   it('shows the panel for a mute even when the feed is empty', async () => {
     mount(reply(), { mutes: [{ author: 'agent' }] })
     await waitFor(() => expect(screen.getByText('Activity')).toBeTruthy())
+  })
+})
+
+describe('why a new run would be refused', () => {
+  it('says so, with the queue depth', async () => {
+    mount(reply(), {
+      backpressure: { allowed: false, unreviewed: 3, limit: 3, reason: '3 diffs are unreviewed' },
+    })
+    await waitFor(() => expect(screen.getByText(/3 diffs are unreviewed/)).toBeTruthy())
+    expect(screen.getByText(/A new run is refused/)).toBeTruthy()
+  })
+
+  it('says nothing while runs are allowed', async () => {
+    mount(reply(), { backpressure: { allowed: true, unreviewed: 0, limit: 3, reason: null } })
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText(/A new run is refused/)).toBeNull()
+  })
+})
+
+describe('work that stopped making progress', () => {
+  const FIRING = {
+    firing: { sessionId: 's-1', signal: 'no tool call for 8 minutes', firedAt: 1 },
+    featureDir: '/d',
+    shadow: true,
+  }
+
+  it('shows it — the failure nobody instruments looks exactly like work', async () => {
+    mount(reply(), { stalls: [FIRING] })
+    await waitFor(() => expect(screen.getByText(/Stopped making progress/)).toBeTruthy())
+    expect(screen.getByText(/no tool call for 8 minutes/)).toBeTruthy()
+  })
+
+  it('says when it is only recording, so a quiet list is not read as a clean run', async () => {
+    mount(reply(), { stalls: [FIRING], shadowMode: true })
+    await waitFor(() => screen.getByText(/Stopped making progress/))
+    expect(screen.getByText(/recorded, not acted on/)).toBeTruthy()
+  })
+
+  it('drops the caveat once shadow mode is off', async () => {
+    mount(reply(), { stalls: [FIRING], shadowMode: false })
+    await waitFor(() => screen.getByText(/Stopped making progress/))
+    expect(screen.queryByText(/recorded, not acted on/)).toBeNull()
+  })
+
+  it('shows nothing when nothing stalled', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText(/Stopped making progress/)).toBeNull()
+  })
+})
+
+describe('half a review is not a review', () => {
+  it('refuses to apply until every hunk is decided', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS, complete: false })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByText('src/auth/session.ts'))
+
+    const apply = screen.getByRole('button', { name: /Decide every hunk first/ })
+    expect(apply.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('allows it once they are', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS, complete: true })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /Apply what I decided/ }).hasAttribute('disabled')
+      ).toBe(false)
+    )
+  })
+
+  it('warns before applying a full rejection', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS, complete: true, fullReject: true })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => expect(screen.getByText(/takes the whole change back out/)).toBeTruthy())
+  })
+
+  it('says how much came back out, so "applied" is not read as "nothing happened"', async () => {
+    mount(reply(), {
+      review: [REVIEW],
+      hunks: HUNKS,
+      complete: true,
+      apply: { ok: true, reverted: 2 },
+    })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByRole('button', { name: /Apply what I decided/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Apply what I decided/ }))
+    await waitFor(() => expect(screen.getByText(/2 hunks reverted/)).toBeTruthy())
+  })
+
+  it('says so when nothing was reverted', async () => {
+    mount(reply(), {
+      review: [REVIEW],
+      hunks: HUNKS,
+      complete: true,
+      apply: { ok: true, reverted: 0 },
+    })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByRole('button', { name: /Apply what I decided/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Apply what I decided/ }))
+    await waitFor(() => expect(screen.getByText(/Nothing was reverted/)).toBeTruthy())
+  })
+})
+
+describe('which of the four questions the reviewer is on', () => {
+  it('says it, rather than leaving a queue with steps invisible', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS, step: 'risk' })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => expect(screen.getByText(/What does it put at risk/)).toBeTruthy())
+  })
+
+  it("falls back to the item's own step when the queue has no next one", async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS, step: null })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => expect(screen.getByText(/Is this what was asked for/)).toBeTruthy())
   })
 })

@@ -18,6 +18,9 @@ import type { Gate, GateRuleId } from '../gates/rules.js'
 
 interface InboxView {
   gates: Gate[]
+  autonomy?: 'escorted' | 'standard' | 'lights-out'
+  /** Rules this setting is not asking about. Shown, so quiet is explicable. */
+  silenced?: GateRuleId[]
   summary: {
     waiting: number
     orders: number
@@ -119,6 +122,11 @@ export function Inbox(): JSX.Element {
         <div className="fdry-nothing">
           <CheckCircle2 aria-hidden="true" />
           <p>Nothing needs you.</p>
+          {(view.silenced?.length ?? 0) > 0 ? (
+            <small className="fdry-silenced">
+              On <b>{view.autonomy}</b>, not asking about: {view.silenced?.join(', ')}
+            </small>
+          ) : null}
           {digest !== null && digest.entryCount > 0 ? (
             <small>
               {digest.entryCount} things happened across {digest.sessionCount}{' '}

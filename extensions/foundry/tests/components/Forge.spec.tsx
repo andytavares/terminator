@@ -512,3 +512,65 @@ describe('clearing an adversarial finding', () => {
     )
   })
 })
+
+describe('while the architect is working', () => {
+  /** A document that grows a provenance line on the third read, as a redraft does. */
+  function landsAfter(polls: number) {
+    let reads = 0
+    const before = order()
+    const after = {
+      ...before,
+      provenance: { ...before.provenance, decisions: ['2026-09-06 architect: redrafted'] },
+    }
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        reads += 1
+        const shown = reads > polls ? after : before
+        return { order: shown, compile: compileOrder(shown) }
+      }
+      if (channel === 'foundry:order.converge') {
+        return { order: before, compile: compileOrder(before), converging: 'sess-arch' }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+  }
+
+  it('keeps asking until the redraft lands, rather than giving up after one tick', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    landsAfter(3)
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy()
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
+    await vi.waitFor(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
+
+    // Three polls before the record grows. A poll that stopped after one would
+    // never see it.
+    await vi.advanceTimersByTimeAsync(12_000)
+    await vi.waitFor(() =>
+      expect(
+        invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length
+      ).toBeGreaterThan(3)
+    )
+    vi.useRealTimers()
+  })
+
+  it('stops once the architect has written its line', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    landsAfter(1)
+    await vi.waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
+    await vi.advanceTimersByTimeAsync(9_000)
+
+    await vi.waitFor(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
+    const settled = invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length
+    await vi.advanceTimersByTimeAsync(9_000)
+    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length).toBe(settled)
+    vi.useRealTimers()
+  })
+})

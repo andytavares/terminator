@@ -59,6 +59,16 @@ interface ReviewItem {
   grade: 'P0' | 'P1' | 'P2' | 'P3'
   gradeTrigger: string
   diffSummary: { files: number; added: number; removed: number }
+  /** Where this review has got to: intent, risk, structure, tests. */
+  step: 'intent' | 'risk' | 'structure' | 'tests'
+}
+
+/** What each review step is asking, in the reviewer's terms. */
+const STEP_ASKS: Record<ReviewItem['step'], string> = {
+  intent: 'Is this what was asked for?',
+  risk: 'What does it put at risk?',
+  structure: 'Does it fit the code around it?',
+  tests: 'Is it proven?',
 }
 
 interface Hunk {
@@ -93,6 +103,21 @@ interface FeedEntry {
 interface MuteRule {
   sessionId?: string
   author?: string
+}
+
+/** Why a new run would be refused, and how deep the queue is. */
+interface Backpressure {
+  allowed: boolean
+  unreviewed: number
+  limit: number
+  reason: string | null
+}
+
+/** A run that stopped making progress without asking for anything. */
+interface StallFiring {
+  firing: { sessionId: string; signal: string; firedAt: number }
+  featureDir: string
+  shadow: boolean
 }
 
 /** How often the live half is refetched. Slow enough to be cheap, fast
@@ -141,8 +166,14 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [hunks, setHunks] = useState<HunkFile[] | null>(null)
   const [intent, setIntent] = useState<IntentReview | null>(null)
+  const [decided, setDecided] = useState(false)
+  const [fullReject, setFullReject] = useState(false)
+  const [step, setStep] = useState<ReviewItem['step'] | null>(null)
   const [feed, setFeed] = useState<FeedEntry[]>([])
   const [mutes, setMutes] = useState<MuteRule[]>([])
+  const [backpressure, setBackpressure] = useState<Backpressure | null>(null)
+  const [stalls, setStalls] = useState<StallFiring[]>([])
+  const [shadowMode, setShadowMode] = useState(true)
 
   const refresh = useCallback(async () => {
     const next = (await invoke('foundry:run.observe', { id: orderId })) as
@@ -171,8 +202,16 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     setPending(asks.pending ?? [])
     const snapshot = (await invoke('foundry:supervision-snapshot')) as {
       review?: ReviewItem[]
+      backpressure?: Backpressure
     }
     setReview(snapshot.review ?? [])
+    setBackpressure(snapshot.backpressure ?? null)
+    const stalled = (await invoke('foundry:stalls-list')) as {
+      firings?: StallFiring[]
+      shadowMode?: boolean
+    }
+    setStalls(stalled.firings ?? [])
+    setShadowMode(stalled.shadowMode ?? true)
     const activity = (await invoke('foundry:feed-list')) as {
       entries?: FeedEntry[]
       mutes?: MuteRule[]
@@ -230,7 +269,11 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       setReviewing(item.sessionId)
       const next = (await invoke('foundry:review-hunks', { sessionId: item.sessionId })) as {
         files: HunkFile[] | null
+        complete?: boolean
+        fullReject?: boolean
       }
+      setDecided(next.complete === true)
+      setFullReject(next.fullReject === true)
       // Null is "the runtime never started", which is not the same as "this
       // change was empty" — a panel that cannot tell them apart shows an empty
       // review for a run that never happened.
@@ -246,8 +289,12 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       })) as { intent: IntentReview | null }
       setIntent(checked.intent)
 
-      // Move the queue on, so the next review step is the one it offers.
-      await invoke('foundry:review-advance', { sessionId: item.sessionId })
+      // Move the queue on, and keep what it moved to: a reviewer working
+      // through four questions should be told which one they are on.
+      const advanced = (await invoke('foundry:review-advance', {
+        sessionId: item.sessionId,
+      })) as { step: ReviewItem['step'] | null }
+      setStep(advanced.step ?? item.step)
     },
     [view]
   )
@@ -269,8 +316,12 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       await invoke('foundry:review-decide-hunk', { sessionId: reviewing, hunkId, decision })
       const next = (await invoke('foundry:review-hunks', { sessionId: reviewing })) as {
         files: HunkFile[] | null
+        complete?: boolean
+        fullReject?: boolean
       }
       setHunks(next.files)
+      setDecided(next.complete === true)
+      setFullReject(next.fullReject === true)
     },
     [reviewing]
   )
@@ -286,9 +337,20 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       setProblem(result.error ?? 'the decisions could not be applied')
       return
     }
+    // Said out loud: rejecting a hunk takes lines back out of the working
+    // copy, and "applied" without a count reads as though nothing happened.
+    setProblem(
+      (result.reverted ?? 0) === 0
+        ? 'Applied. Nothing was reverted.'
+        : `Applied. ${result.reverted} ${result.reverted === 1 ? 'hunk' : 'hunks'} reverted.`
+    )
     await invoke('foundry:review-done', { sessionId: reviewing })
     setReviewing(null)
     setHunks(null)
+    setIntent(null)
+    setDecided(false)
+    setFullReject(false)
+    setStep(null)
     await pollLive()
   }, [reviewing, pollLive])
 
@@ -502,7 +564,10 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
 
       {reviewing !== null ? (
         <section className="fdry-panel" style={{ marginTop: 12 }}>
-          <h3 className="fdry-panel-h">Reviewing {reviewing}</h3>
+          <h3 className="fdry-panel-h">
+            Reviewing {reviewing}
+            {step === null ? '' : ` — ${STEP_ASKS[step]}`}
+          </h3>
           {intent?.hasScopeConcern === true ? (
             <p className="fdry-note fdry-scope">
               {intent.unexpectedFiles.length > 0
@@ -550,9 +615,22 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               </div>
             ))
           )}
+          {fullReject ? (
+            <p className="fdry-note fdry-scope">
+              Every hunk is rejected. Applying this takes the whole change back out.
+            </p>
+          ) : null}
           <div className="fdry-hunk-actions" style={{ marginTop: 10 }}>
-            <button type="button" className="is-primary" onClick={() => void applyReview()}>
-              Apply what I decided
+            <button
+              type="button"
+              className="is-primary"
+              // Half a review is not a review: applying it would accept by
+              // default every hunk nobody looked at.
+              disabled={!decided}
+              title={decided ? '' : 'Decide every hunk first'}
+              onClick={() => void applyReview()}
+            >
+              {decided ? 'Apply what I decided' : 'Decide every hunk first'}
             </button>
             <button
               type="button"
@@ -560,6 +638,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                 setReviewing(null)
                 setHunks(null)
                 setIntent(null)
+                setStep(null)
               }}
             >
               Close
@@ -611,6 +690,39 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               </button>
             </div>
           ))}
+        </section>
+      ) : null}
+
+      {/* Why a new run would be refused. Overriding is one click and is
+          recorded with how deep the queue was at the time. */}
+      {backpressure !== null && !backpressure.allowed ? (
+        <p className="fdry-note fdry-scope">
+          {backpressure.reason ??
+            `${backpressure.unreviewed} diffs are unreviewed, and the limit is ${backpressure.limit}.`}{' '}
+          A new run is refused until one is reviewed.
+        </p>
+      ) : null}
+
+      {/* Work that stopped making progress without asking for anything — the
+          failure nobody instruments, because it looks exactly like work. */}
+      {stalls.length > 0 ? (
+        <section className="fdry-panel" style={{ marginTop: 12 }}>
+          <h3 className="fdry-panel-h">
+            Stopped making progress — {stalls.length}
+            {shadowMode ? ' (recorded, not acted on)' : ''}
+          </h3>
+          {stalls.slice(-5).map((entry) => (
+            <p key={`${entry.firing.sessionId}-${entry.firing.firedAt}`} className="fdry-note">
+              <b>{entry.firing.sessionId}</b> — {entry.firing.signal}
+              {entry.shadow ? ' · shadow' : ''}
+            </p>
+          ))}
+          {shadowMode ? (
+            <p className="fdry-note">
+              Shadow mode: these are recorded and never notified, until the thresholds have earned
+              it. Turn it off in settings once they have.
+            </p>
+          ) : null}
         </section>
       ) : null}
 

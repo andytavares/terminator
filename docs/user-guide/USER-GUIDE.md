@@ -568,6 +568,15 @@ The document is the subject; the conversation sits behind it. On the left rail:
   Those report **"not measured"** rather than passing. A green you did not earn
   is worse than a gap you can see.
 
+**Draft the plan** is the first thing to press. Foundry seeds a draft with your
+problem statement and what it read in the repository; the architect turns that
+into criteria, units, a risk grade and budgets. It runs in a terminal you can
+watch, and it can only _propose_ — it cannot mark its own work agreed. Type into
+the box at the bottom to tell it what is wrong, and it redrafts.
+
+**Red team** findings appear alongside; each is either **Fixed** or **Accepted**,
+and accepting one costs a written reason. Nothing hands off while one is open.
+
 **Compile & hand off** agrees the order and starts the work. If the order is
 seeded from a tracker issue, a **Tracker write-back** panel lets you say which
 of _your_ workflow states each moment means — when work starts, when the draft

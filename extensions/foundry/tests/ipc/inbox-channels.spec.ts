@@ -360,3 +360,26 @@ describe('a decision that leaves the run stopped is a decision that did nothing'
     expect((act.mock.calls[0][0] as { nodeId: string | null }).nodeId).toBe('build:U-1')
   })
 })
+
+describe('what this setting is not asking about', () => {
+  it('names the silenced rules alongside the queue', async () => {
+    const r = (await channels('lights-out').list()) as {
+      autonomy: string
+      silenced: string[]
+    }
+    expect(r.autonomy).toBe('lights-out')
+    expect(r.silenced).toContain('unit.boundary')
+  })
+
+  it('silences nothing when escorted', async () => {
+    const r = (await channels('escorted').list()) as { silenced: string[] }
+    expect(r.silenced).toEqual([])
+  })
+
+  it('never silences the four that stay live at every setting', async () => {
+    const r = (await channels('lights-out').list()) as { silenced: string[] }
+    for (const rule of ['risk.p0', 'budget.exceeded', 'destructive', 'ready-for-review']) {
+      expect(r.silenced).not.toContain(rule)
+    }
+  })
+})

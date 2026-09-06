@@ -199,3 +199,26 @@ describe('reading back what it wrote', () => {
     expect(result.ok && result.order.status).toBe('draft')
   })
 })
+
+describe('when the proposal is read', () => {
+  function write(value: unknown): string {
+    const file = path.join(orderDir(root, 'WO-1'), 'proposal.json')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value))
+    return file
+  }
+
+  it('is not read while the file is not there — a turn ending is not the architect finishing', () => {
+    // It thinks, replies, asks something, and may write on a later turn.
+    // Reading at the first turn end reported "wrote no proposal" while it was
+    // still working.
+    const missing = path.join(orderDir(root, 'WO-1'), 'proposal.json')
+    expect(fs.existsSync(missing)).toBe(false)
+  })
+
+  it('is read once it is there, whatever turn wrote it', () => {
+    const file = write({ note: 'on the third turn' })
+    const result = readProposal(order(), file, 'now')
+    expect(result.ok && result.note).toBe('on the third turn')
+  })
+})
