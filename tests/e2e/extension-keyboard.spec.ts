@@ -123,3 +123,109 @@ test('every focusable control in an extension view shows a focus ring', async ()
   )
   expect(missing, `controls with no visible focus indicator: ${missing.join(', ')}`).toHaveLength(0)
 })
+
+/**
+ * SC-001, across all five extensions rather than the one the original spec
+ * drove.
+ *
+ * Two guards stand between Escape and lost work, and they cover different
+ * cases: the text-field guard (focus in an input) and the modal-depth guard
+ * (a surface open, focus anywhere in it). A surface can pass the first and
+ * fail the second — which is exactly how three Notepad modals shipped broken.
+ * So each extension is checked on whichever it actually has.
+ */
+const SURFACES: { id: string; label: string; part: string; open: string }[] = [
+  { id: 'terminator.notepad', label: 'Notes', part: 'notepad', open: 'new note' },
+  { id: 'terminator.speckit-pilot', label: 'SpecKit', part: 'speckit', open: 'new card' },
+  // Each extension opens on an empty state, so the field to type into has to
+  // be brought up first — which is also the path a person takes.
+  { id: 'terminator.task-vault', label: 'Task Vault', part: 'task-vault', open: 'add task' },
+]
+
+for (const { id, label, part, open } of SURFACES) {
+  test(`${label}: two Escapes with a draft in a text field keep the extension open`, async () => {
+    // Idempotent: the sidebar button toggles, so clicking it when the panel is
+    // already up puts the extension away instead of bringing it forward.
+    const panel = handle.page.locator(`[data-extension-panel="${id}"]`)
+    if ((await panel.count()) === 0) {
+      await handle.page.locator(`button[aria-label="${label}"]`).click()
+    }
+    await expect(panel).toHaveCount(1, { timeout: 20000 })
+    await handle.page.waitForTimeout(2000)
+
+    await inView(
+      part,
+      `(() => {
+        const b = [...document.querySelectorAll('button')].find((x) =>
+          (x.textContent || '').toLowerCase().includes(${JSON.stringify(open)})
+        )
+        if (b) b.click()
+        return !!b
+      })()`
+    )
+    await handle.page.waitForTimeout(1500)
+
+    // Type into the first field this extension offers, wherever it is.
+    const typed = await inView<boolean>(
+      part,
+      `(() => {
+        const el = document.querySelector('input:not([type=hidden]),textarea')
+        if (!el) return false
+        el.focus()
+        el.value = 'UNSAVED DRAFT'
+        el.dispatchEvent(new Event('input', { bubbles: true }))
+        return document.activeElement === el
+      })()`
+    )
+    expect(typed, `${label} offered no text field to type into`).toBe(true)
+
+    await key(part, 'Escape')
+    await key(part, 'Escape')
+    await handle.page.waitForTimeout(1000)
+
+    const still = await handle.page.evaluate(
+      () =>
+        document.querySelector('[data-extension-panel]')?.getAttribute('data-extension-panel') ??
+        null
+    )
+    expect(still, `${label} was closed by Escape while a draft was unsaved`).toBe(id)
+  })
+}
+
+/**
+ * The other half of FR-001, and the reason the guards are three conditions
+ * rather than one: Remote Control's screen has no text field and no modal, so
+ * there is nothing to protect and the gesture must still work. A guard that
+ * only ever suppresses is not a guard, it is a broken feature — and this is
+ * the case that would catch that.
+ */
+test('Remote Control: two Escapes still leave the extension, because nothing is at risk', async () => {
+  const id = 'terminator.remote-control'
+  const panel = handle.page.locator(`[data-extension-panel="${id}"]`)
+  if ((await panel.count()) === 0) {
+    await handle.page.locator('button[aria-label="Remote Control"]').click()
+  }
+  await expect(panel).toHaveCount(1, { timeout: 20000 })
+  await handle.page.waitForTimeout(2000)
+
+  // Nothing typed into, nothing open: the two conditions that would suppress.
+  const state = await inView<{ fields: number; surfaces: number }>(
+    'remote-control',
+    `(() => ({
+      fields: document.querySelectorAll('input:not([type=hidden]),textarea').length,
+      surfaces: document.querySelectorAll('[data-tmui-surface],[data-tmui-panel]').length,
+    }))()`
+  )
+  expect(state.fields, 'this test only means anything with no field on screen').toBe(0)
+  expect(state.surfaces, 'and no open surface').toBe(0)
+
+  await key('remote-control', 'Escape')
+  await key('remote-control', 'Escape')
+  await handle.page.waitForTimeout(1200)
+
+  const still = await handle.page.evaluate(
+    () =>
+      document.querySelector('[data-extension-panel]')?.getAttribute('data-extension-panel') ?? null
+  )
+  expect(still, 'with nothing at risk the exit gesture must still fire').not.toBe(id)
+})
