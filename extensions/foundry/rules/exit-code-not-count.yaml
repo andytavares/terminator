@@ -1,0 +1,10 @@
+schemaVersion: 1
+id: exit-code-not-count
+scope: universal
+rung: L2
+asserts: >
+  A command's verdict comes from its exit status, never from a printed pass
+  count. A suite that reports failures and exits zero, or prints "7139 passed"
+  and exits one, is exactly the case that makes reading the summary wrong.
+appliesWhen: always
+origin: built-in

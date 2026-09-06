@@ -1,0 +1,11 @@
+schemaVersion: 1
+id: screenshot-the-app
+scope: project
+rung: L5
+asserts: >
+  A change to the interface attaches a picture of the running application as
+  evidence. Structural assertions pass while the interface renders broken, and
+  every interface failure in this project's history passed its assertions
+  first.
+appliesWhen: 'path_exists: playwright.config.ts'
+origin: built-in

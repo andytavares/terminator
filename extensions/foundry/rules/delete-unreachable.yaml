@@ -1,0 +1,10 @@
+schemaVersion: 1
+id: delete-unreachable
+scope: project
+rung: L3
+asserts: >
+  A feature whose inputs the system cannot produce is deleted along with its
+  tests, and the deletion is said out loud. Wired-but-inert reads as shipped,
+  which is worse than absent.
+appliesWhen: 'house_doc: .specify/memory/constitution.md'
+origin: built-in

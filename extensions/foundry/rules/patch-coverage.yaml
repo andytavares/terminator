@@ -1,0 +1,11 @@
+schemaVersion: 1
+id: patch-coverage
+scope: universal
+rung: L2
+asserts: >
+  Coverage is measured per changed file, using whatever coverage command the
+  probe found. A project-wide total hides a new file at zero, which is the
+  thing this is for. Where the repository has no coverage command the result
+  is "not measured", said out loud, never a pass.
+appliesWhen: always
+origin: built-in

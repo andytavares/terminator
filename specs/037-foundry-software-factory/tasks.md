@@ -156,23 +156,23 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests for User Story 3 (write first, must fail)
 
-- [ ] T063 [P] [US3] Spec for the three-valued verdict, asserting `not_measured` is never coerced to a pass and requires a reason, in `extensions/foundry/tests/verify/verdict.spec.ts`
-- [ ] T064 [P] [US3] Spec rejecting a verdict whose `producedBy.sessionId` equals its node's `sessionId` — the model's most important invariant — in `extensions/foundry/tests/verify/verdict.spec.ts`
-- [ ] T065 [P] [US3] Spec for ladder placement L0–L6 and stopping at the first failing rung rather than continuing, in `extensions/foundry/tests/verify/ladder.spec.ts`
-- [ ] T066 [P] [US3] Spec for verdicts derived from exit status rather than printed summary, including a command that prints passes and exits non-zero, in `extensions/foundry/tests/verify/ladder.spec.ts`
-- [ ] T067 [P] [US3] Spec for rule scoping — universal rules always load, project rules load only where the repository carries what they depend on — in `extensions/foundry/tests/verify/rules.spec.ts`
-- [ ] T068 [P] [US3] Spec for the second verification failure raising a gate on the third attempt instead of retrying, in `extensions/foundry/tests/line/scheduler.spec.ts`
-- [ ] T069 [P] [US3] Spec for security inspection firing on a risk trigger, not firing without one, and recording that it did not, in `extensions/foundry/tests/verify/ladder.spec.ts`
+- [x] T063 [P] [US3] Spec for the three-valued verdict, asserting `not_measured` is never coerced to a pass and requires a reason, in `extensions/foundry/tests/verify/verdict.spec.ts`
+- [x] T064 [P] [US3] Spec rejecting a verdict whose `producedBy.sessionId` equals its node's `sessionId` — the model's most important invariant — in `extensions/foundry/tests/verify/verdict.spec.ts`
+- [x] T065 [P] [US3] Spec for ladder placement L0–L6 and stopping at the first failing rung rather than continuing, in `extensions/foundry/tests/verify/ladder.spec.ts`
+- [x] T066 [P] [US3] Spec for verdicts derived from exit status rather than printed summary, including a command that prints passes and exits non-zero, in `extensions/foundry/tests/verify/ladder.spec.ts`
+- [x] T067 [P] [US3] Spec for rule scoping — universal rules always load, project rules load only where the repository carries what they depend on — in `extensions/foundry/tests/verify/rules.spec.ts`
+- [x] T068 [P] [US3] Spec for the second verification failure raising a gate on the third attempt instead of retrying, in `extensions/foundry/tests/line/scheduler.spec.ts`
+- [x] T069 [P] [US3] Spec for security inspection firing on a risk trigger, not firing without one, and recording that it did not, in `extensions/foundry/tests/verify/ladder.spec.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T070 [P] [US3] Implement the three-valued verdict with evidence and the different-producer invariant in `extensions/foundry/src/verify/verdict.ts`
-- [ ] T071 [US3] Implement the ladder — rung placement, first-failure stop, per-step exit codes written beside the unit — in `extensions/foundry/src/verify/ladder.ts`
-- [ ] T072 [P] [US3] Implement rule loading and scope resolution in `extensions/foundry/src/verify/rules.ts`
-- [ ] T073 [P] [US3] Author the universal rule pack — `exit-code-not-count`, `patch-coverage`, `render-not-call`, `reachability`, `every-consumer`, `no-stubs` — in `extensions/foundry/rules/`
-- [ ] T074 [P] [US3] Author the project-scoped rule pack — `screenshot-the-app`, `docs-in-pr`, `flat-icons`, `delete-unreachable` — in `extensions/foundry/rules/`
-- [ ] T075 [US3] Wire inspection triggers to the existing `runtime/review/risk-grader.ts` output so inspection reads the accumulated change rather than a single unit, in `extensions/foundry/src/verify/ladder.ts`
-- [ ] T076 [US3] Enforce `allowResume: false` in the runner so a verifier cannot be started with a `resumeSessionId`, in `extensions/foundry/src/line/roles.ts`
+- [x] T070 [P] [US3] Implement the three-valued verdict with evidence and the different-producer invariant in `extensions/foundry/src/verify/verdict.ts`
+- [x] T071 [US3] Implement the ladder — rung placement, first-failure stop, per-step exit codes written beside the unit — in `extensions/foundry/src/verify/ladder.ts`
+- [x] T072 [P] [US3] Implement rule loading and scope resolution in `extensions/foundry/src/verify/rules.ts`
+- [x] T073 [P] [US3] Author the universal rule pack — `exit-code-not-count`, `patch-coverage`, `render-not-call`, `reachability`, `every-consumer`, `no-stubs` — in `extensions/foundry/rules/`
+- [x] T074 [P] [US3] Author the project-scoped rule pack — `screenshot-the-app`, `docs-in-pr`, `flat-icons`, `delete-unreachable` — in `extensions/foundry/rules/`
+- [x] T075 [US3] Wire inspection triggers to the existing `runtime/review/risk-grader.ts` output so inspection reads the accumulated change rather than a single unit, in `extensions/foundry/src/verify/ladder.ts`
+- [x] T076 [US3] Enforce `allowResume: false` in the runner so a verifier cannot be started with a `resumeSessionId`, in `extensions/foundry/src/line/roles.ts`
 
 **Checkpoint**: No agent marks its own homework, and an unrunnable check never reports success.
 

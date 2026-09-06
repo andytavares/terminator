@@ -1,0 +1,10 @@
+schemaVersion: 1
+id: every-consumer
+scope: universal
+rung: L3
+asserts: >
+  A shared fix is applied at every place that hand-rolls the behaviour, and the
+  verifier enumerates them rather than spot-checking one. Verifying a single
+  call site is how a fix ships alongside three un-migrated copies of the bug.
+appliesWhen: always
+origin: built-in

@@ -1,0 +1,10 @@
+schemaVersion: 1
+id: reachability
+scope: universal
+rung: L3
+asserts: >
+  Every new component is reachable from a mounted parent, and every new module
+  is imported by production code rather than only by its own test. A component
+  nothing renders is dead code that passes its tests.
+appliesWhen: always
+origin: built-in

@@ -1,0 +1,10 @@
+schemaVersion: 1
+id: render-not-call
+scope: universal
+rung: L3
+asserts: >
+  Interface behaviour is proven by reading the rendered output after a real
+  render, never by asserting that a mocked store was called. A mocked-store
+  assertion proves the write happened; it never proves anything was drawn.
+appliesWhen: always
+origin: built-in
