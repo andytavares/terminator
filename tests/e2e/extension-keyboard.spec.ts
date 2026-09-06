@@ -136,7 +136,7 @@ test('every focusable control in an extension view shows a focus ring', async ()
  */
 const SURFACES: { id: string; label: string; part: string; open: string }[] = [
   { id: 'terminator.notepad', label: 'Notes', part: 'notepad', open: 'new note' },
-  { id: 'terminator.speckit-pilot', label: 'SpecKit', part: 'speckit', open: 'new card' },
+  { id: 'terminator.foundry', label: 'Foundry', part: 'foundry', open: 'new card' },
   // Each extension opens on an empty state, so the field to type into has to
   // be brought up first — which is also the path a person takes.
   { id: 'terminator.task-vault', label: 'Task Vault', part: 'task-vault', open: 'add task' },

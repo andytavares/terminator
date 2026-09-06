@@ -91,40 +91,40 @@ async function openExtension(id: string, urlPart: string): Promise<void> {
  */
 
 const LABELS: Record<string, string> = {
-  'terminator.speckit-pilot': 'SpecKit',
+  'terminator.foundry': 'Foundry',
   'terminator.task-vault': 'Task Vault',
   'terminator.notepad': 'Notes',
   'terminator.remote-control': 'Remote Control',
 }
 
 const SURFACES: { id: string; label: string; urlPart: string }[] = [
-  { id: 'terminator.speckit-pilot', label: 'SpecKit', urlPart: 'speckit' },
+  { id: 'terminator.foundry', label: 'Foundry', urlPart: 'foundry' },
   { id: 'terminator.task-vault', label: 'Task Vault', urlPart: 'task-vault' },
   { id: 'terminator.notepad', label: 'Notepad', urlPart: 'notepad' },
   { id: 'terminator.remote-control', label: 'Remote Control', urlPart: 'remote-control' },
 ]
 
 test('an extension view follows the app into the light theme', async () => {
-  await openExtension('terminator.speckit-pilot', 'speckit')
+  await openExtension('terminator.foundry', 'foundry')
 
   await setTheme('light')
   const light = await inView<string | null>(
-    'speckit',
+    'foundry',
     "document.documentElement.getAttribute('data-theme')"
   )
   expect(light).toBe('light')
 
   // The attribute is only useful if it actually repaints. Dark's base is
   // #0c0c0f and light's is #f0f0f5, so the body's own ground has to change.
-  const lightBg = await inView<string>('speckit', 'getComputedStyle(document.body).backgroundColor')
+  const lightBg = await inView<string>('foundry', 'getComputedStyle(document.body).backgroundColor')
 
   await setTheme('dark')
   const dark = await inView<string | null>(
-    'speckit',
+    'foundry',
     "document.documentElement.getAttribute('data-theme')"
   )
   expect(dark).not.toBe('light')
-  const darkBg = await inView<string>('speckit', 'getComputedStyle(document.body).backgroundColor')
+  const darkBg = await inView<string>('foundry', 'getComputedStyle(document.body).backgroundColor')
 
   expect(lightBg).not.toBe(darkBg)
 })

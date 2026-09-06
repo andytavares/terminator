@@ -1,0 +1,16 @@
+{
+  "id": "terminator.foundry",
+  "name": "Foundry",
+  "version": "0.1.0",
+  "description": "A software factory: converge an idea into a work order, then build, verify and ship it.",
+  "main": "src/index.js",
+  "renderer": "dist/index.html",
+  "minAppVersion": "0.1.0",
+  "contributes": {
+    "workspaceTab": {
+      "label": "Foundry",
+      "icon": "brain",
+      "view": "main"
+    }
+  }
+}

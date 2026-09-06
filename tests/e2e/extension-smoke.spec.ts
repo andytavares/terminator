@@ -30,7 +30,7 @@ const SURFACES: { id: string; label: string; part: string; expand?: string }[] =
   },
   { id: 'terminator.notepad', label: 'Notes', part: 'notepad' },
   { id: 'terminator.task-vault', label: 'Task Vault', part: 'task-vault' },
-  { id: 'terminator.speckit-pilot', label: 'SpecKit', part: 'speckit' },
+  { id: 'terminator.foundry', label: 'Foundry', part: 'foundry' },
 ]
 
 test.beforeAll(async () => {

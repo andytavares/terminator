@@ -28,16 +28,16 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 **Purpose**: Rename the extension and get a green build before any behaviour changes. Nothing here changes what the extension does.
 
-- [ ] T001 Rename the extension directory with `git mv extensions/speckit-pilot extensions/foundry` so the move is recorded as a rename rather than a delete plus an add
-- [ ] T002 Set `id` to `terminator.foundry`, `name` to `Foundry` and the workspace tab label to `Foundry` in `extensions/foundry/manifest.json`
-- [ ] T003 Rename the package to `@terminator/extension-foundry` and add the extension-owned dependencies `zod@3.23.8` and `js-yaml@4.3.1` in `extensions/foundry/package.json` (per research.md R2 and R8; `zod` corrects an existing Principle II gap where it was hoisted from the root manifest)
-- [ ] T004 [P] Point the `typecheck:extensions` script at `extensions/foundry/tsconfig.json` in `package.json`
-- [ ] T005 [P] Update the renderer entry paths in `extensions/foundry/vite.renderer.config.ts` and `extensions/foundry/index.html`
-- [ ] T006 [P] Rewrite `extensions/foundry/CLAUDE.md` for this extension: the `foundry:*` IPC prefix, the extension-owned dependency rule, and the constraint that nothing may be written into a target repository
-- [ ] T007 Delete the checked-in coverage report directory `extensions/foundry/coverage/` and confirm it is ignored, so a build artefact is not carried through the rename
-- [ ] T008 Rename every registered IPC channel prefix from `speckit-pilot:` to `foundry:` and every settings key prefix from `terminator.speckit-pilot.` to `terminator.foundry.` in `extensions/foundry/src/index.ts`
-- [ ] T009 Run `npm run build:extensions` and confirm `extensions/foundry/src/index.js` is produced and remains gitignored
-- [ ] T010 Run `npx vitest run` and confirm the existing 62 extension specs still pass unchanged after the rename, so the baseline is green before any behaviour changes
+- [x] T001 Rename the extension directory with `git mv extensions/speckit-pilot extensions/foundry` so the move is recorded as a rename rather than a delete plus an add
+- [x] T002 Set `id` to `terminator.foundry`, `name` to `Foundry` and the workspace tab label to `Foundry` in `extensions/foundry/manifest.json`
+- [x] T003 Rename the package to `@terminator/extension-foundry` and add the extension-owned dependencies `zod@3.23.8` and `js-yaml@4.3.1` in `extensions/foundry/package.json` (per research.md R2 and R8; `zod` corrects an existing Principle II gap where it was hoisted from the root manifest)
+- [x] T004 [P] Point the `typecheck:extensions` script at `extensions/foundry/tsconfig.json` in `package.json`
+- [x] T005 [P] Update the renderer entry paths in `extensions/foundry/vite.renderer.config.ts` and `extensions/foundry/index.html`
+- [x] T006 [P] Rewrite `extensions/foundry/CLAUDE.md` for this extension: the `foundry:*` IPC prefix, the extension-owned dependency rule, and the constraint that nothing may be written into a target repository
+- [x] T007 Delete the checked-in coverage report directory `extensions/foundry/coverage/` and confirm it is ignored, so a build artefact is not carried through the rename
+- [x] T008 Rename every registered IPC channel prefix to `foundry:` and every settings key prefix to `terminator.foundry.` across `extensions/foundry/src/` and `extensions/foundry/tests/` (the live prefix was `speckit:`, not `speckit-pilot:` as this task originally recorded; 54 channels, 441 quoted occurrences, replaced only where quoted so prose was untouched)
+- [x] T009 Run `npm run build:extensions` and confirm `extensions/foundry/src/index.js` is produced and remains gitignored
+- [x] T010 Run `npx vitest run` and confirm the existing extension specs still pass unchanged after the rename — 83 spec files, 1426 tests, not the 62 this task originally recorded (that count missed `.spec.tsx`) — so the baseline is green before any behaviour changes
 
 **Checkpoint**: The extension is renamed, builds, and behaves exactly as before.
 
