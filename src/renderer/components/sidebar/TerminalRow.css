@@ -1,0 +1,118 @@
+/* A terminal under a branch, and a pane under a terminal.
+
+   Deliberately the branch row's anatomy at one step in: the same status gutter
+   in the same column, so scanning for what needs you stays a single column top
+   to bottom rather than a search across three kinds of row. */
+
+.terminal-row {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  /* One step in from the branch's status gutter. The gutter is what carries
+     depth here — every row in the sidebar leads with one, so stepping that
+     column is what makes the tree readable at a glance. */
+  padding: 0 10px 0 47px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+}
+
+/* A pane sits one step further in than the terminal it was split from. */
+.terminal-row--nested {
+  padding-left: 61px;
+}
+
+.terminal-row:hover {
+  background: var(--bg-card-hover);
+}
+
+.terminal-row--selected {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.terminal-row:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
+}
+
+.terminal-row__gutter {
+  flex: 0 0 12px;
+  display: grid;
+  place-items: center;
+}
+
+.terminal-row__gutter svg {
+  width: 9px;
+  height: 9px;
+  display: block;
+}
+
+/* Opacity carries the state, never colour — the same rule the branch rows
+   follow, so the two columns read as one. */
+.terminal-row__state--awaiting-input {
+  opacity: var(--state-op-awaiting);
+}
+.terminal-row__state--working {
+  opacity: var(--state-op-working);
+}
+.terminal-row__state--idle {
+  opacity: var(--state-op-idle);
+}
+.terminal-row__state--exited {
+  opacity: var(--state-op-exited);
+}
+
+.terminal-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-row__bell {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Held at low opacity rather than hidden: a terminal you cannot see how to
+   close is one you have to learn a shortcut to escape. */
+.terminal-row__close {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.terminal-row__close svg {
+  width: 10px;
+  height: 10px;
+  display: block;
+}
+
+.terminal-row:hover .terminal-row__close,
+.terminal-row__close:focus-visible {
+  opacity: 0.8;
+}
+
+.terminal-row__close:hover {
+  opacity: 1;
+  color: var(--text-primary);
+}

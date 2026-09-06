@@ -9,12 +9,45 @@
   height: 28px;
   display: flex;
   align-items: center;
-  padding: 0 10px 0 0;
+  /* Indented past the repo header's chevron, so a branch reads as sitting
+     under its repo rather than beside it — its disclosure used to start at 0,
+     left of the repo's own. */
+  padding: 0 10px 0 14px;
   box-shadow: inset 2px 0 0 var(--ws-color, transparent);
   color: var(--text-secondary);
   user-select: none;
   cursor: pointer;
   outline: none;
+}
+
+/* The disclosure column. Always reserved, drawn only when there is something
+   under the row, so branch names stay in one column whether or not a branch
+   has terminals. */
+.branch-row__disclosure {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.branch-row__disclosure svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
+.branch-row__disclosure:hover {
+  color: var(--text-primary);
+}
+
+.branch-row__disclosure--empty {
+  cursor: default;
 }
 
 .branch-row:hover {

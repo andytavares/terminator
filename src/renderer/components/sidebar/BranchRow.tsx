@@ -1,28 +1,13 @@
 import React, { useState } from 'react'
-import { Circle, CircleX, GitBranch, Pause, Play, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, GitBranch, Plus } from 'lucide-react'
 import type { BranchRow as BranchRowData } from '../../sidebar/branch-rows'
 import type { DragItemProps } from '../../hooks/useDragReorder'
 import type { ChangeStats } from '../../../shared/schemas/git.schema'
-import type { StatusIcon } from '../../sidebar/session-status'
+import { ICON_FOR_STATE, STATUS_ICON } from '../../sidebar/state-icons'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import { ContextMenu, closeAllContextMenus, type ContextMenuItem } from '../ContextMenu'
 import { issueMenuItems, type IssueMenuActions } from './issue-menu-items'
 import './BranchRow.css'
-
-/** The same four shapes the terminal tabs and the board lanes use. */
-const STATUS_ICON: Record<StatusIcon, typeof Circle> = {
-  play: Play,
-  circle: Circle,
-  pause: Pause,
-  'circle-x': CircleX,
-}
-
-const ICON_FOR_STATE: Record<BranchRowData['state'], StatusIcon> = {
-  'awaiting-input': 'pause',
-  working: 'play',
-  idle: 'circle',
-  exited: 'circle-x',
-}
 
 const STATE_LABEL: Record<BranchRowData['state'], string> = {
   'awaiting-input': 'Waiting on you',
@@ -47,6 +32,15 @@ export interface BranchRowProps {
    */
   changeStats?: ChangeStats | null
   onSelect: () => void
+  /**
+   * Whether the terminals under this branch are listed.
+   *
+   * Absent when the row has none — the chevron is drawn only where there is
+   * something behind it, so an empty branch does not offer a disclosure that
+   * reveals nothing.
+   */
+  expanded?: boolean
+  onToggleExpanded?: () => void
   onAddTerminal?: () => void
   onRename?: (name: string) => void
   onRemove?: () => void
@@ -97,6 +91,8 @@ export function BranchRow({
   onIssueClick,
   changeStats,
   onSelect,
+  expanded,
+  onToggleExpanded,
   onAddTerminal,
   onRename,
   onRemove,
@@ -176,6 +172,32 @@ export function BranchRow({
           }
         }}
       >
+        {/* The disclosure for this branch's terminals. Drawn only when there
+            is something under it, and it takes the click without selecting the
+            branch — expanding to see what is there is not the same act as
+            switching to it. */}
+        {onToggleExpanded && row.terminals.length > 0 ? (
+          <button
+            type="button"
+            className="branch-row__disclosure"
+            aria-label={
+              expanded ? `Hide terminals in ${row.label}` : `Show terminals in ${row.label}`
+            }
+            aria-expanded={expanded}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleExpanded()
+            }}
+          >
+            {expanded ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
+          </button>
+        ) : (
+          <span
+            className="branch-row__disclosure branch-row__disclosure--empty"
+            aria-hidden="true"
+          />
+        )}
+
         {/* The status gutter: one fixed column, one glyph, never anything else,
             so finding what needs you is a scan down a single column rather than
             a search across full-width rows. */}

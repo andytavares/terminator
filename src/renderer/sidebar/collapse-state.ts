@@ -11,7 +11,18 @@ import type { GroupKey } from './view-model'
  * Supersedes terminator.workspace.expanded and terminator.project.collapsed,
  * which carried opposite polarities and could not be merged safely.
  */
-export type CollapseState = Partial<Record<GroupKey, string[]>>
+/**
+ * The namespace branch rows use for their terminal lists.
+ *
+ * Not a grouping mode — a branch's terminals are the same set however the
+ * sidebar is grouped, so they share one namespace rather than being
+ * partitioned like group keys are.
+ */
+export const TERMINALS_NAMESPACE = 'branch-terminals'
+
+export type CollapseNamespace = GroupKey | typeof TERMINALS_NAMESPACE
+
+export type CollapseState = Partial<Record<CollapseNamespace, string[]>>
 
 export const COLLAPSE_STORAGE_KEY = 'terminator.sidebar.collapsed'
 
@@ -27,7 +38,7 @@ export function loadCollapseState(): CollapseState {
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
     const state: CollapseState = {}
     for (const [mode, keys] of Object.entries(parsed)) {
-      if (isStringArray(keys)) state[mode as GroupKey] = keys
+      if (isStringArray(keys)) state[mode as CollapseNamespace] = keys
     }
     return state
   } catch {
@@ -43,13 +54,17 @@ export function saveCollapseState(state: CollapseState): void {
   }
 }
 
-export function isCollapsed(state: CollapseState, mode: GroupKey, groupKey: string): boolean {
+export function isCollapsed(
+  state: CollapseState,
+  mode: CollapseNamespace,
+  groupKey: string
+): boolean {
   return state[mode]?.includes(groupKey) ?? false
 }
 
 export function toggleCollapsed(
   state: CollapseState,
-  mode: GroupKey,
+  mode: CollapseNamespace,
   groupKey: string
 ): CollapseState {
   const current = state[mode] ?? []
