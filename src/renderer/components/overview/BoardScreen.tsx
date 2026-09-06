@@ -42,7 +42,7 @@ export function BoardScreen({ lanes, renderCard, onToggleLane, onEmpty }: Props)
   const lastRects = useRef(new Map<string, { left: number; top: number }>())
 
   const visible = lanes.filter((lane) => lane.visible)
-  const hidden = lanes.filter((lane) => !lane.visible)
+  const hidden = lanes.filter((lane) => lane.hiddenByUser)
   const columnOf = new Map<AgentState, number>(visible.map((lane, i) => [lane.state, i + 1]))
   const totalCards = lanes.reduce((n, lane) => n + lane.cards.length, 0)
 

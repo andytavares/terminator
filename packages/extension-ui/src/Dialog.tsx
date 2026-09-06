@@ -33,6 +33,14 @@ export interface DialogProps {
    * would be a trap.
    */
   dismissible?: boolean
+  /**
+   * How wide the panel is.
+   *
+   * A caller that needs more room asks for it here rather than sizing its own
+   * content wider than the panel — which produced a dialog whose title and
+   * close button scrolled off sideways.
+   */
+  size?: 'default' | 'wide'
   /** Called for Escape, outside click and the close control alike. */
   onDismiss: () => void
 }
@@ -66,6 +74,7 @@ export function Dialog({
   children,
   actions,
   dismissible = true,
+  size = 'default',
   onDismiss,
 }: DialogProps): JSX.Element {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -116,6 +125,7 @@ export function Dialog({
           ref={panelRef}
           data-tmui-panel=""
           className="tmui-dialog__panel"
+          data-size={size}
           style={{ zIndex }}
           role="dialog"
           aria-modal="true"

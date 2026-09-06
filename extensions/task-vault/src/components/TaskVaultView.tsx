@@ -1,14 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  X,
-  Settings,
-  Download,
-  Upload,
-  Kanban,
-  List,
-  ChevronDown,
-  CalendarDays,
-} from 'lucide-react'
+import { CalendarDays, ChevronDown, Download, Kanban, List, Settings, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { Dialog, IconButton } from '@terminator/extension-ui'
 import './task-vault.css'
@@ -157,7 +148,12 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
   }
 
   return createPortal(
-    <Dialog title="Data tools" onDismiss={onClose} actions={[]}>
+    <Dialog
+      title="Data tools"
+      onDismiss={onClose}
+      actions={[]}
+      size={tab === 'admin' ? 'wide' : 'default'}
+    >
       <div className="tv-data-tools" data-wide={tab === 'admin' ? '' : undefined}>
         <div className="capture-modal__header">
           <div className="tv-modal-tabs">
@@ -165,7 +161,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
               className={`tv-modal-tab${tab === 'data' ? ' tv-modal-tab--active' : ''}`}
               onClick={() => setTab('data')}
             >
-              Data tools
+              Export &amp; import
             </button>
             <button
               className={`tv-modal-tab${tab === 'admin' ? ' tv-modal-tab--active' : ''}`}
@@ -174,9 +170,6 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
               Database
             </button>
           </div>
-          <button className="capture-modal__close" onClick={onClose}>
-            <X className="tm-icon" />
-          </button>
         </div>
 
         {tab === 'data' && (

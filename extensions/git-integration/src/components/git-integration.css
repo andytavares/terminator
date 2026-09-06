@@ -917,8 +917,17 @@
   position: relative;
 }
 
+/* Had only padding, so it inherited the browser's button and rendered as a
+   white pill. Matches the secondary button it sits beside. */
 .git-view__btn--caret {
   padding: 0 8px;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  color: var(--tm-text-primary);
+}
+
+.git-view__btn--caret:hover {
+  background: var(--tm-bg-card-hover);
 }
 
 .git-view__menu-item {

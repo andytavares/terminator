@@ -102,6 +102,8 @@ for (const { id, label, part, expand } of SURFACES) {
       bodyLength: number
       unstyledInputs: string[]
       oversizedIcons: string[]
+      bareButtons: string[]
+      sideScrollers: string[]
     }>(
       part,
       `(() => {
@@ -122,6 +124,27 @@ for (const { id, label, part, expand } of SURFACES) {
             )
           }
         }
+        // No button renders the browser's native control. A modifier that
+        // forgets a background used to produce a white pill on a dark panel.
+        const bareButtons = []
+        for (const el of document.querySelectorAll('button')) {
+          const r = el.getBoundingClientRect()
+          if (r.width < 1 || r.height < 1) continue
+          const cs = getComputedStyle(el)
+          if (cs.appearance === 'auto' || cs.borderTopStyle === 'outset') {
+            bareButtons.push((el.className || el.getAttribute('aria-label') || 'button').toString().split(' ')[0])
+          }
+        }
+        // A dialog scrolls down, never sideways — its own title and close
+        // control are the first things to leave when it does.
+        const sideScrollers = []
+        for (const el of document.querySelectorAll('.tmui-dialog__panel, [role=dialog]')) {
+          if (el.scrollWidth - el.clientWidth > 1) {
+            sideScrollers.push(
+              (el.className || 'dialog') + ' overflows by ' + (el.scrollWidth - el.clientWidth) + 'px'
+            )
+          }
+        }
         const oversized = []
         for (const svg of document.querySelectorAll('svg')) {
           const r = svg.getBoundingClientRect()
@@ -133,6 +156,8 @@ for (const { id, label, part, expand } of SURFACES) {
           }
         }
         return {
+          bareButtons,
+          sideScrollers,
           thrown: window.__thrown || [],
           bodyLength: document.body.innerText.length,
           unstyledInputs: unstyled,
@@ -146,6 +171,14 @@ for (const { id, label, part, expand } of SURFACES) {
     expect(
       report.unstyledInputs,
       `${label} has controls with browser-default styling: ${report.unstyledInputs.join(', ')}`
+    ).toHaveLength(0)
+    expect(
+      report.bareButtons,
+      `${label} has buttons rendering the browser's native control: ${report.bareButtons.join(', ')}`
+    ).toHaveLength(0)
+    expect(
+      report.sideScrollers,
+      `${label} has a dialog that scrolls sideways: ${report.sideScrollers.join(', ')}`
     ).toHaveLength(0)
     expect(
       report.oversizedIcons,

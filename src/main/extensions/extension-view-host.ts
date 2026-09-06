@@ -115,6 +115,23 @@ export const EXTENSION_BASE_CSS = `
   height: 16px;
 }
 
+/* No button renders the browser's native control.
+
+   Nothing in this product wants the UA button look, and relying on every
+   modifier to remember a background is how a caret beside "Commit & push"
+   shipped as a white pill on a dark panel. border:0 rather than a
+   transparent border, so a button that wants an edge states the full
+   shorthand — which every one of them already does. */
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 /* The default an icon gets when nothing else sizes it.
 
    lucide renders width/height attributes of 24 when given no size, which is
