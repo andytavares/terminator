@@ -1,0 +1,22 @@
+tests/e2e/extension-keyboard.spec.ts
+  s_8aa585ff1f786f::t_475980f5a95c00 126-136,143-146,154-155,167-193
+  s_8aa585ff1f786f::t_24ab41786643da 194-231
+  s_8aa585ff1f786f::t_fea6519b5ac1a7 137-142,156-165
+  s_8aa585ff1f786f::t_b86104deaae826 147-153,166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "f0e0dd59ec94a04c05c718701259ce0f6550b816",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
