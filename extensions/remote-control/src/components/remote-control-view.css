@@ -132,7 +132,7 @@
   white-space: nowrap;
   font-family: var(--tm-font-mono);
   font-size: 13px;
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 
 .rc-credential {

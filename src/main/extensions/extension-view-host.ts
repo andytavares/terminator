@@ -7,7 +7,12 @@ import { sendToView } from '../safe-send.js'
 const logger = makeLogger('extension-view-host')
 
 // Injected into every extension WebContentsView so --tm-* CSS variables are defined.
-// Extensions use these to match the app's dark theme without sharing the main renderer context.
+// Extensions use these to match the app's theme without sharing the main
+// renderer context. Both palettes have to be here: an extension view is a
+// separate document that does not load the core stylesheet, and until this
+// block gained a `[data-theme='light']` counterpart every extension panel
+// stayed dark while the rest of the app went light. The host stamps
+// `data-theme` on the view's <html> and restamps it when the theme changes.
 export const EXTENSION_BASE_CSS = `
 :root {
   --tm-bg-base: #0c0c0f;
@@ -23,6 +28,14 @@ export const EXTENSION_BASE_CSS = `
   --tm-border-strong: rgba(255,255,255,0.12);
   --tm-accent: #5c6bc0;
   --tm-on-accent: #ffffff;
+  /* The accent as text or an icon, rather than as a fill. --tm-accent is dark
+     enough to carry white (4.86:1) and therefore too dark to read on the dark
+     surfaces (3.48:1 on --tm-bg-card); this is the same hue lifted until it
+     passes as text (6.24:1). In the light theme one value does both jobs. */
+  --tm-accent-text: #8b98e8;
+  /* Hover for a filled accent control. It darkens in both themes: lightening
+     the dark theme's accent drops white below AA (#6b79ce gives 4.00:1). */
+  --tm-accent-hover: #5361b5;
   --tm-accent-dim: rgba(92,107,192,0.18);
   --tm-accent-glow: rgba(92,107,192,0.35);
   --tm-danger: #e05c5c;
@@ -38,6 +51,22 @@ export const EXTENSION_BASE_CSS = `
   --tm-syntax-number: #e0a361;
   --tm-syntax-title: #7fb8f0;
   --tm-syntax-attribute: #e2c07e;
+  /* Translucent layers over whatever surface is beneath.
+     Extension stylesheets reached for rgba(255,255,255,alpha) ~350 times for
+     these — a hairline border, a faint hover fill, a raised strip. Every one
+     of them is invisible on a light ground, so the alpha itself has to flip
+     with the theme rather than the colour under it. */
+  --tm-overlay-subtle: rgba(255,255,255,0.04);
+  --tm-overlay-soft: rgba(255,255,255,0.06);
+  --tm-overlay: rgba(255,255,255,0.09);
+  --tm-overlay-strong: rgba(255,255,255,0.14);
+  --tm-scrim: rgba(0,0,0,0.55);
+  /* Text on a filled semantic control. The fills are bright in this theme, so
+     the text on them is dark; in the light theme the fills are deep and it
+     flips. */
+  --tm-on-success: #06210f;
+  --tm-on-warning: #241a00;
+  --tm-on-danger: #2a0b0b;
   --tm-radius-xs: 4px;
   --tm-radius-sm: 6px;
   --tm-radius-md: 10px;
@@ -59,6 +88,51 @@ export const EXTENSION_BASE_CSS = `
   --tm-layer-toast: 400;
   --tm-font-mono: 'IBM Plex Mono','JetBrains Mono','Fira Code','Courier New',monospace;
   --tm-font-ui: 'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+
+/* The light palette, mirroring [data-theme='light'] in src/renderer/styles.css.
+   Those values are WCAG AA verified against their surfaces (TAV-8) — including
+   the text-muted darkening and the semantic colours, which were chosen so they
+   hold up composited under the diff tints. Keep the two blocks in step. */
+:root[data-theme='light'] {
+  --tm-bg-base: #f0f0f5;
+  --tm-bg-surface: #e8e8f0;
+  --tm-bg-elevated: #ffffff;
+  --tm-bg-card: #f5f5fa;
+  --tm-bg-card-hover: #eaeaf5;
+  --tm-bg-input: #ffffff;
+  --tm-text-primary: #1a1a2e;
+  --tm-text-secondary: #555580;
+  --tm-text-muted: #5c5c94;
+  --tm-border: rgba(0,0,0,0.08);
+  --tm-border-strong: rgba(0,0,0,0.15);
+  --tm-accent: #4a57a8;
+  --tm-on-accent: #ffffff;
+  --tm-accent-text: #4a57a8;
+  --tm-accent-hover: #3d4890;
+  --tm-accent-dim: rgba(74,87,168,0.12);
+  --tm-accent-glow: rgba(74,87,168,0.28);
+  --tm-danger: #962d20;
+  --tm-success: #0f5c2a;
+  --tm-warning: #a85a00;
+  --tm-diff-added-bg: rgba(15,92,42,0.10);
+  --tm-diff-removed-bg: rgba(150,45,32,0.10);
+  --tm-syntax-comment: #5c5c94;
+  --tm-syntax-keyword: #8a3fa8;
+  --tm-syntax-string: #0f5c2a;
+  --tm-syntax-tag: #962d20;
+  --tm-syntax-literal: #0e6e7a;
+  --tm-syntax-number: #8a5417;
+  --tm-syntax-title: #1d5fa8;
+  --tm-syntax-attribute: #7a5c12;
+  --tm-overlay-subtle: rgba(0,0,0,0.03);
+  --tm-overlay-soft: rgba(0,0,0,0.05);
+  --tm-overlay: rgba(0,0,0,0.07);
+  --tm-overlay-strong: rgba(0,0,0,0.12);
+  --tm-scrim: rgba(0,0,0,0.35);
+  --tm-on-success: #ffffff;
+  --tm-on-warning: #ffffff;
+  --tm-on-danger: #ffffff;
 }
 *, *::before, *::after { box-sizing: border-box; }
 html, body {
@@ -128,8 +202,37 @@ interface ViewEntry {
   lastVisible: boolean
 }
 
+/**
+ * Stamps `data-theme` on an extension document's root element.
+ *
+ * Dark is the `:root` default in EXTENSION_BASE_CSS, so the attribute is
+ * removed rather than set to "dark" — one way to express each theme, and no
+ * chance of the two disagreeing.
+ */
+async function applyTheme(contents: Electron.WebContents, theme: 'dark' | 'light'): Promise<void> {
+  const js =
+    theme === 'light'
+      ? "document.documentElement.setAttribute('data-theme','light')"
+      : "document.documentElement.removeAttribute('data-theme')"
+  try {
+    await contents.executeJavaScript(js)
+  } catch {
+    // A view can be destroyed between the theme change and this running.
+  }
+}
+
 export class ExtensionViewHost {
   private views = new Map<string, ViewEntry[]>()
+  /**
+   * The app's theme, mirrored onto every extension document.
+   *
+   * An extension view is a separate document and never reads the renderer's
+   * `data-theme`, so without this the light palette in EXTENSION_BASE_CSS
+   * would be dead CSS: the tokens exist but the selector never matches.
+   * Held here so a view created after a theme change starts in the right one
+   * rather than flashing dark.
+   */
+  private theme: 'dark' | 'light' = 'dark'
   private mainWindow: BrowserWindow
   private preloadPath: string
   private bottomInset = 0
@@ -264,6 +367,7 @@ export class ExtensionViewHost {
 
     view.webContents.on('did-finish-load', () => {
       view.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
+      void applyTheme(view.webContents, this.theme)
       this.mainWindow.webContents.send('extension:panel-loaded', { id: ext.id, viewParam })
       // Send current workspace context so extension doesn't need to wait for a change event.
       if (repoRoot != null) {
@@ -376,6 +480,20 @@ export class ExtensionViewHost {
   setLeftInset(inset: number): void {
     this.leftInset = Math.max(0, inset)
     this.reapply()
+  }
+
+  /**
+   * Switch every open extension view to the app's theme, and remember it for
+   * views created later.
+   */
+  setTheme(theme: 'dark' | 'light'): void {
+    if (this.theme === theme) return
+    this.theme = theme
+    for (const entries of this.views.values()) {
+      for (const { view } of entries) {
+        void applyTheme(view.webContents, theme)
+      }
+    }
   }
 
   broadcastToAll(channel: string, data: unknown): void {

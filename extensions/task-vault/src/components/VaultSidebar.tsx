@@ -8,7 +8,7 @@ const NAV_ITEMS: Array<{ view: VaultView; label: string; icon: React.ReactNode }
   { view: 'projects', label: 'Projects', icon: <FolderOpen size={15} /> },
   { view: 'areas', label: 'Areas', icon: <Layers size={15} /> },
   { view: 'archive', label: 'History', icon: <Archive size={15} /> },
-  { view: 'review', label: 'Weekly Review', icon: <ClipboardList size={15} /> },
+  { view: 'review', label: 'Weekly review', icon: <ClipboardList size={15} /> },
 ]
 
 export function VaultSidebar(): React.JSX.Element {

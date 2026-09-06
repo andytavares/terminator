@@ -178,6 +178,7 @@ interface ElectronAPI {
     }): Promise<void>
     setBottomInset(inset: number): void
     setLeftInset(inset: number): void
+    setTheme(theme: 'dark' | 'light'): void
   }
   keyboard: {
     isReserved(accelerator: string): boolean

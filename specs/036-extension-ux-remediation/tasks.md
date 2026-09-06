@@ -277,15 +277,15 @@ measured from computed colours rather than parsed stylesheet text.
 
 ### Tests for User Story 8 ⚠️ Write first, confirm they FAIL
 
-- [ ] T092 [US8] Build the rendering contrast harness at `tests/e2e/extension-themes.spec.ts` — mount each extension surface in both themes, read computed text and composited background colour, assert AA (research R5; parsing the stylesheet cannot resolve `color-mix` or layered alpha)
+- [x] T092 [US8] Build the rendering contrast harness at `tests/e2e/extension-themes.spec.ts` — mount each extension surface in both themes, read computed text and composited background colour, assert AA (research R5; parsing the stylesheet cannot resolve `color-mix` or layered alpha)
 
 ### Implementation for User Story 8
 
-- [ ] T093 [P] [US8] Replace hardcoded hex and raw `rgba()` with tokens in `extensions/task-vault/src/components/task-vault.css` (132 hex, 144 rgba — the largest file)
-- [ ] T094 [P] [US8] Replace hardcoded hex and raw `rgba()` with tokens in `extensions/notepad/src/components/notepad.css` (63 hex, 309 rgba — the highest rgba count)
-- [ ] T095 [P] [US8] Replace hardcoded hex and raw `rgba()` with tokens in `extensions/git-integration/src/components/pr-review/pr-review.css` and `merge-flow/merge-flow.css`
-- [ ] T096 [P] [US8] Replace hardcoded hex and raw `rgba()` with tokens in `extensions/speckit-pilot/src/components/speckit-pilot.css` (76 hex)
-- [ ] T097 [US8] Fix every contrast failure the harness reports, and record any literal that legitimately has no token equivalent with a justification in review (FR-040, FR-041)
+- [x] T093 [P] [US8] Replace hardcoded hex and raw `rgba()` with tokens in `extensions/task-vault/src/components/task-vault.css` (132 hex, 144 rgba — the largest file)
+- [x] T094 [P] [US8] Replace hardcoded hex and raw `rgba()` with tokens in `extensions/notepad/src/components/notepad.css` (63 hex, 309 rgba — the highest rgba count)
+- [x] T095 [P] [US8] Replace hardcoded hex and raw `rgba()` with tokens in `extensions/git-integration/src/components/pr-review/pr-review.css` and `merge-flow/merge-flow.css`
+- [x] T096 [P] [US8] Replace hardcoded hex and raw `rgba()` with tokens in `extensions/speckit-pilot/src/components/speckit-pilot.css` (76 hex)
+- [x] T097 [US8] Fix every contrast failure the harness reports, and record any literal that legitimately has no token equivalent with a justification in review (FR-040, FR-041)
 
 **Checkpoint**: Light mode is proven rather than assumed.
 

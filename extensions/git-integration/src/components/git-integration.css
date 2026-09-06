@@ -148,7 +148,7 @@
 }
 
 .git-view__hook-output {
-  background: var(--tm-bg-sidebar);
+  background: var(--tm-bg-surface);
   border: 1px solid var(--tm-danger);
   border-radius: var(--tm-radius-xs);
   overflow: hidden;
@@ -187,7 +187,7 @@
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--tm-text-primary);
-  background: var(--tm-bg-secondary, rgba(0, 0, 0, 0.2));
+  background: var(--tm-bg-surface, rgba(0, 0, 0, 0.2));
   border-radius: 4px;
   max-height: 160px;
   overflow-y: auto;
@@ -229,7 +229,7 @@
 
 .git-view__btn--primary {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
   border-color: var(--tm-accent);
 }
 
@@ -366,7 +366,7 @@
   color: var(--tm-danger);
 }
 .staging-area__badge--renamed {
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 .staging-area__badge--untracked {
   color: var(--tm-text-muted);
@@ -465,7 +465,7 @@
 
 .file-diff-view__toggle-btn--active {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
 .file-diff-view__toggle-btn:not(.file-diff-view__toggle-btn--active):hover {
@@ -500,14 +500,14 @@
   background: rgba(97, 175, 239, 0.1);
   border-bottom: 1px solid rgba(97, 175, 239, 0.3);
   font-size: 11px;
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 
 .file-diff-view__refresh-btn {
   background: none;
   border: 1px solid rgba(97, 175, 239, 0.5);
   border-radius: var(--tm-radius-xs);
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
   cursor: pointer;
   font-size: 10px;
   padding: 1px 6px;
@@ -527,7 +527,7 @@
 
 .diff-hunk-header {
   background: rgba(97, 175, 239, 0.08);
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
   font-size: 11px;
   padding: 2px 8px;
   display: block;
@@ -595,7 +595,7 @@
 .diff-table__split-divider {
   width: 6px;
   min-width: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tm-overlay);
   padding: 0;
   cursor: col-resize;
   transition: background 0.15s;
@@ -624,7 +624,7 @@
 .pr-dialog {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--tm-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -774,13 +774,13 @@
 .pr-dialog__existing-pr {
   font-size: 12px;
   color: var(--tm-success);
-  background: rgba(152, 195, 121, 0.1);
+  background: color-mix(in srgb, var(--tm-success) 10%, transparent);
   padding: 8px 10px;
   border-radius: var(--tm-radius-xs);
 }
 
 .pr-dialog__existing-pr a {
-  color: #58a6ff;
+  color: var(--tm-accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -788,7 +788,7 @@
 .pr-dialog__error {
   font-size: 12px;
   color: var(--tm-danger);
-  background: rgba(224, 108, 117, 0.1);
+  background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
   padding: 6px 10px;
   border-radius: var(--tm-radius-xs);
 }
@@ -836,8 +836,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: rgba(224, 92, 92, 0.12);
-  border-bottom: 1px solid rgba(224, 92, 92, 0.3);
+  background: color-mix(in srgb, var(--tm-danger) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--tm-danger) 30%, transparent);
   flex-shrink: 0;
   gap: 8px;
 }
@@ -861,7 +861,7 @@
 }
 
 .git-full-view__conflict-banner-btn:hover {
-  background: rgba(224, 92, 92, 0.15);
+  background: color-mix(in srgb, var(--tm-danger) 15%, transparent);
 }
 
 .git-full-view__staging {
@@ -880,7 +880,7 @@
   width: 5px;
   flex-shrink: 0;
   cursor: col-resize;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--tm-overlay);
   transition: background 0.15s;
   position: relative;
   z-index: var(--tm-layer-panel);

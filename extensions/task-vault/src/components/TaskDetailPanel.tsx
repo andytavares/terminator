@@ -22,12 +22,12 @@ const SECTIONS: Section[] = [
   },
   {
     key: 'acceptanceCriteria',
-    label: 'Acceptance Criteria',
+    label: 'Acceptance criteria',
     placeholder: '- [ ] Criterion one\n- [ ] Criterion two',
   },
   {
     key: 'devHints',
-    label: 'Dev Hints',
+    label: 'Dev hints',
     placeholder: 'Implementation notes, links, gotchas… Markdown supported.',
   },
 ]
