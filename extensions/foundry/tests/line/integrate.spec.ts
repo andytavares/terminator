@@ -482,3 +482,163 @@ describe('the branches a happy path never reaches', () => {
     expect(result.pulls[0].url).toBe('')
   })
 })
+
+describe('one order across several repositories (FR-067, FR-068)', () => {
+  function twoLanes(over: Partial<WorkOrder> = {}): WorkOrder {
+    const base = order()
+    return {
+      ...base,
+      context: {
+        ...base.context,
+        repos: [
+          {
+            name: 'proto',
+            path: '/repos/proto',
+            lane: 1,
+            baseBranch: 'main',
+            headBranch: 'f/wo-1',
+          },
+          { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: 'f/wo-1' },
+        ],
+      },
+      plan: {
+        ...base.plan,
+        sharedFiles: ['proto/session.proto'],
+        lanes: [
+          { ord: 1, repo: 'proto', branch: '', role: 'producer', blocks: [2], blockedBy: [] },
+          { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
+        ],
+        units: [
+          {
+            id: 'U-1',
+            title: 'the contract',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: ['proto/session.proto'],
+            verify: [],
+          },
+          {
+            id: 'U-2',
+            title: 'adopt it',
+            role: 'builder',
+            lane: 2,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: ['proto/session.proto'],
+            verify: [],
+          },
+        ],
+      },
+      ...over,
+    }
+  }
+
+  /** A client that hands each `gh pr create` its own URL. */
+  function multiDeps() {
+    let created = 0
+    const exec = vi.fn(async (options: { command: string; args: string[] }) => {
+      if (options.command === 'gh' && options.args[1] === 'create') {
+        created += 1
+        return {
+          exitCode: 0,
+          stdout: `https://github.com/tav/r/pull/${created}\n`,
+          stderr: '',
+          timedOut: false,
+        }
+      }
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+    return deps({ exec: exec as never })
+  }
+
+  it('opens one draft per repository', async () => {
+    const d = multiDeps()
+    const result = await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
+    expect(result.pulls.map((p) => p.repo)).toEqual(['proto', 'cli'])
+  })
+
+  it('opens them in merge order, producer first', async () => {
+    const d = multiDeps()
+    await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
+    expect(callsTo(d.exec, 'gh', 'create').map((c) => c.cwd)).toEqual([
+      '/repos/proto',
+      '/repos/cli',
+    ])
+  })
+
+  it('tells the consumer which lane it must not merge before', async () => {
+    const d = multiDeps()
+    const result = await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
+    const consumer = fs.readFileSync(result.pulls[1].bodyPath, 'utf8')
+    expect(consumer).toContain('Do not merge this before lane 1')
+    expect(consumer).toContain('https://github.com/tav/r/pull/1')
+  })
+
+  it('names the shared file on both, not only on the producer', async () => {
+    const d = multiDeps()
+    const result = await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
+    for (const pull of result.pulls) {
+      expect(fs.readFileSync(pull.bodyPath, 'utf8')).toContain('proto/session.proto')
+    }
+  })
+
+  it('goes back to GitHub to cross-link the earlier lane, not just the local file', async () => {
+    const d = multiDeps()
+    await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
+    const edits = callsTo(d.exec, 'gh', 'edit')
+    expect(edits).toHaveLength(1)
+    expect(edits[0].args).toContain('https://github.com/tav/r/pull/1')
+  })
+
+  it('records a failed cross-link rather than losing the drafts over a description', async () => {
+    let created = 0
+    const exec = vi.fn(async (options: { command: string; args: string[] }) => {
+      if (options.command === 'gh' && options.args[1] === 'create') {
+        created += 1
+        return {
+          exitCode: 0,
+          stdout: `https://github.com/tav/r/pull/${created}\n`,
+          stderr: '',
+          timedOut: false,
+        }
+      }
+      if (options.command === 'gh' && options.args[1] === 'edit') {
+        return { exitCode: 1, stdout: '', stderr: 'could not edit', timedOut: false }
+      }
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+    const d = deps({ exec: exec as never })
+    const result = await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
+    expect(result.pulls).toHaveLength(2)
+    expect(d.record).toHaveBeenCalledWith(
+      'ship.crosslink_failed',
+      expect.any(String),
+      expect.stringContaining('could not edit')
+    )
+  })
+
+  it('says nothing about lanes on a single-repository order', async () => {
+    const d = deps()
+    const result = await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    expect(fs.readFileSync(result.pulls[0].bodyPath, 'utf8')).not.toMatch(/repository change/)
+  })
+
+  it('edits nothing for a single-repository order', async () => {
+    const d = deps()
+    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    expect(callsTo(d.exec, 'gh', 'edit')).toHaveLength(0)
+  })
+
+  it('takes one shipping decision for the whole order, not one per lane', async () => {
+    const decide = vi.fn(async () => 'approve')
+    const d = multiDeps()
+    await shipOrder(
+      twoLanes({ risk: { grade: 'P0', triggers: [], blastRadius: [], criticalPaths: [] } }),
+      { verdicts: [verdict()], findings: [] },
+      { ...d, decide }
+    )
+    expect(decide).toHaveBeenCalledTimes(1)
+  })
+})

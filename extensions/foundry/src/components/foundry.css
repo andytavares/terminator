@@ -3288,6 +3288,41 @@
   color: var(--tm-text-secondary);
 }
 
+/* Merge order: one repository per row, in the order they land. */
+.fdry-merge {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-merge li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fdry-merge small {
+  color: var(--tm-text-secondary);
+}
+
+/* Held is the state worth spotting, so it is the only one that takes colour. */
+.fdry-merge li.is-held .fdry-hold {
+  color: var(--tm-warning);
+}
+
+.fdry-role {
+  padding: 1px 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
 /* One intent per row: what it means, and which state it maps to. */
 .fdry-map {
   display: flex;

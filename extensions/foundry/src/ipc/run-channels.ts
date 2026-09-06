@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { z } from 'zod'
 import { orderDir, ensureWritable } from '../data-root.js'
+import { laneViews, mayMergeLane } from '../order/lanes.js'
 import { buildRunGraph } from '../line/run-graph.js'
 import type { RunGraph } from '../line/run-graph.js'
 import { readyNodes, blockedReason } from '../line/scheduler.js'
@@ -147,6 +148,22 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       blocked: graph.nodes
         .map((n) => ({ id: n.id, reason: blockedReason(graph, n.id) }))
         .filter((b) => b.reason !== null),
+      // What each lane is, what it shares, and what it is waiting for. Empty
+      // for an order with nothing agreed yet, and one unremarkable row for a
+      // single-repository order — the surface decides not to draw it.
+      lanes:
+        order === null
+          ? []
+          : laneViews(order).map((view) => ({
+              ord: view.lane.ord,
+              repo: view.lane.repo,
+              role: view.lane.role,
+              collisions: view.collisions,
+              blockedBy: view.blockedBy,
+              // Said as a sentence here rather than reassembled in the view,
+              // so the reason the operator reads is the reason the rule gave.
+              hold: mayMergeLane(order, view.lane.ord, []).reason,
+            })),
     }
   }
 

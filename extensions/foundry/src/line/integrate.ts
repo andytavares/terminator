@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import { raiseGate } from '../gates/rules.js'
+import { laneViews, mayMergeLane } from '../order/lanes.js'
 import type { Gate } from '../gates/rules.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
@@ -122,12 +123,52 @@ function verdictLine(order: WorkOrder, criterionId: string, verdicts: readonly V
 }
 
 /**
+ * The lane section of a body: what else this change is part of.
+ *
+ * Only for an order that spans repositories. One lane produces no section at
+ * all, because "1 of 1" on a pull request is noise (FR-068).
+ */
+function laneSection(order: WorkOrder, lane: number, opened: readonly LanePullRequest[]): string[] {
+  if (order.plan.lanes.length < 2) return []
+
+  const views = laneViews(order)
+  const mine = views.find((view) => view.lane.ord === lane)
+  const lines = ['', `### Part of a ${views.length}-repository change`, '']
+
+  for (const view of views) {
+    const url = opened.find((pull) => pull.lane === view.lane.ord)?.url
+    const position =
+      view.lane.ord === lane
+        ? '**this one**'
+        : (url ?? (view.lane.ord < lane ? 'merges before this' : 'merges after this'))
+    lines.push(`${view.lane.ord}. \`${view.lane.repo}\` — ${position}`)
+  }
+
+  if (mine !== undefined && mine.collisions.length > 0) {
+    lines.push(
+      '',
+      `Shared with the other lanes: ${mine.collisions.map((path) => `\`${path}\``).join(', ')}.`
+    )
+  }
+  if (mine !== undefined && mine.blockedBy.length > 0) {
+    const first = mine.blockedBy.join(', ')
+    lines.push(`Do not merge this before lane ${first}.`)
+  }
+  return lines
+}
+
+/**
  * What a reviewer reads.
  *
  * A verdict per criterion, in a table, including the ones nothing checked —
  * FR-056 asks for every criterion, and "every" is the load-bearing word.
  */
-export function prBody(order: WorkOrder, shipment: Shipment): string {
+export function prBody(
+  order: WorkOrder,
+  shipment: Shipment,
+  lane = 1,
+  opened: readonly LanePullRequest[] = []
+): string {
   const lines: string[] = [
     `## ${order.title}`,
     '',
@@ -162,6 +203,8 @@ export function prBody(order: WorkOrder, shipment: Shipment): string {
   } else {
     for (const finding of shipment.findings) lines.push(`- ${finding}`)
   }
+
+  lines.push(...laneSection(order, lane, opened))
 
   lines.push(
     '',
@@ -282,23 +325,30 @@ export async function markReady(
 }
 
 /**
- * Ship the order: push, and open a draft per repository.
+ * Ship the order: push, and open a draft per repository, in merge order.
  *
  * The body is written whatever happens, including when the operator has turned
  * pushing off — what would have shipped is worth reading even when it did not.
+ *
+ * Merge order matters here and only here: a consumer's draft is opened after
+ * its producer's, so the consumer can carry the producer's URL and the
+ * reviewer opens them in the order they land. Lanes that share nothing are
+ * unordered and this loop costs them one comparison.
  */
 export async function shipOrder(
   order: WorkOrder,
   shipment: Shipment,
   deps: IntegrateDeps
 ): Promise<ShipOutcome> {
-  const body = prBody(order, shipment)
   const repos = [...order.context.repos].sort((a, b) => a.lane - b.lane)
   const bodyPaths: string[] = []
 
   for (const repo of repos) {
     const file = bodyPathFor(deps.root, order, repo.lane)
-    await writeBody(file, body)
+    // Written before anything is pushed, so the operator can read what would
+    // have shipped even when nothing does. Rewritten per lane afterwards once
+    // the sibling URLs exist.
+    await writeBody(file, prBody(order, shipment, repo.lane, []))
     bodyPaths.push(file)
   }
 
@@ -333,10 +383,55 @@ export async function shipOrder(
 
   const pulls: LanePullRequest[] = []
   for (const repo of repos) {
+    // The lanes this one waits on are open by now — this loop runs in merge
+    // order — so the cross-links in its body are real URLs rather than
+    // "merges before this".
+    const held = mayMergeLane(
+      order,
+      repo.lane,
+      pulls.map((pull) => pull.lane)
+    )
+    const file = bodyPathFor(deps.root, order, repo.lane)
+    await writeBody(file, prBody(order, shipment, repo.lane, pulls))
+
     await pushLane(repo, deps)
-    const pull = await openDraft(order, repo, bodyPathFor(deps.root, order, repo.lane), deps)
+    const pull = await openDraft(order, repo, file, deps)
     pulls.push(pull)
-    await deps.record('ship.draft_opened', pull.url, `Draft pull request for lane ${repo.lane}.`)
+    await deps.record(
+      'ship.draft_opened',
+      pull.url,
+      held.allowed
+        ? `Draft pull request for lane ${repo.lane}.`
+        : `Draft pull request for lane ${repo.lane}, held from merging: ${held.reason ?? ''}`
+    )
+  }
+
+  // Now every sibling URL exists, so the earlier lanes can name the later
+  // ones. This has to go back to GitHub — `gh pr create` read the file once
+  // and rewriting it afterwards changes a local file and nothing else, which
+  // would leave lane 1 permanently saying "merges after this".
+  //
+  // Only where there is a sibling to link to, and never for the last lane,
+  // whose body already had every URL when it was created.
+  if (pulls.length > 1) {
+    for (const pull of pulls.slice(0, -1)) {
+      await writeBody(pull.bodyPath, prBody(order, shipment, pull.lane, pulls))
+      const edited = await deps.exec({
+        command: 'gh',
+        args: ['pr', 'edit', pull.url, '--body-file', pull.bodyPath],
+        cwd: pull.cwd,
+        timeoutMs: 60_000,
+      })
+      // A failed cross-link is cosmetic. The drafts are open and the work is
+      // pushed; losing that over a description would be the worse failure.
+      if (edited.exitCode !== 0) {
+        await deps.record(
+          'ship.crosslink_failed',
+          pull.url,
+          `The cross-links could not be written back: ${edited.stderr.trim()}`
+        )
+      }
+    }
   }
 
   await fs.promises.writeFile(

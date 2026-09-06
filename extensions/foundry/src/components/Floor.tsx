@@ -15,10 +15,22 @@ interface Blocked {
   reason: string
 }
 
+/** One repository this order spans, and what it is waiting for. */
+interface LaneRow {
+  ord: number
+  repo: string
+  role: 'producer' | 'consumer' | null
+  collisions: string[]
+  blockedBy: number[]
+  /** Why this lane cannot merge yet, in the rule's own words. Null when it can. */
+  hold: string | null
+}
+
 interface FloorView {
   graph: RunGraph
   ready: string[]
   blocked: Blocked[]
+  lanes?: LaneRow[]
 }
 
 const STATE_LABEL: Record<RunNode['state'], string> = {
@@ -34,6 +46,18 @@ const STATE_LABEL: Record<RunNode['state'], string> = {
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
+}
+
+/**
+ * The repository, where the order names one.
+ *
+ * "lane 2" is a number the operator did not choose and cannot map to
+ * anything; `cli-flow` is where the work is happening.
+ */
+function laneName(view: FloorView, lane: number): string {
+  if (lane === 0) return 'steps'
+  const named = view.lanes?.find((row) => row.ord === lane)
+  return named === undefined ? `lane ${lane}` : named.repo
 }
 
 export interface FloorProps {
@@ -81,10 +105,35 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
         {view.graph.orderId} · {view.graph.recipe}
       </h2>
 
+      {/* Only where there is more than one repository. A single-lane order
+          gets no merge-order section at all, because "1 of 1, merges first"
+          is ceremony over nothing (FR-068). */}
+      {(view.lanes?.length ?? 0) > 1 ? (
+        <section className="fdry-panel" style={{ marginBottom: 12 }}>
+          <h3 className="fdry-panel-h">Merge order</h3>
+          <ol className="fdry-merge">
+            {view.lanes?.map((row) => (
+              <li key={row.ord} className={row.hold === null ? '' : 'is-held'}>
+                <b>{row.repo}</b>
+                {row.role === null ? null : <span className="fdry-role">{row.role}</span>}
+                {row.collisions.length > 0 ? (
+                  <small>shares {row.collisions.join(', ')}</small>
+                ) : null}
+                {row.hold === null ? (
+                  <small>free to merge</small>
+                ) : (
+                  <small className="fdry-hold">{row.hold}</small>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
       {lanes.map((lane) => (
         <div key={lane} className="fdry-lane">
           <div className="fdry-lane-name">
-            <b>{lane === 0 ? 'steps' : `lane ${lane}`}</b>
+            <b>{laneName(view, lane)}</b>
           </div>
           <div className="fdry-units">
             {view.graph.nodes

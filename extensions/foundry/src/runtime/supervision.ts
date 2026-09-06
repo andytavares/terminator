@@ -21,7 +21,8 @@ import { parseHunks } from './review/parse-hunks.js'
 import { createDecisionSet, type DecisionSet, type HunkDecision } from './review/hunk-decisions.js'
 import { reviewIntent, type IntentReview } from './review/intent-diff.js'
 import { revertRejected, type ApplyResult } from './review/apply-decisions.js'
-import { laneViews, mayMergeLane, type CardLanes } from './lane-coordination.js'
+import { laneViews, mayMergeLane } from '../order/lanes.js'
+import type { WorkOrder } from '../order/schema.js'
 
 // The supervision layer: what is running, what it changed, what needs looking
 // at, and what must not start yet.
@@ -80,11 +81,19 @@ export interface Supervision {
   /**
    * Whether a lane may merge yet, and what it would collide with.
    *
-   * A card with one lane costs nothing here: every rule collapses to a no-op,
-   * so single-repository work never sees any of this.
+   * Read from the agreed order rather than from a file an agent wrote: the
+   * lanes and the collisions are part of what was agreed, and a second source
+   * for them is a second thing that can be wrong.
+   *
+   * An order with one lane costs nothing here: every rule collapses to a
+   * no-op, so single-repository work never sees any of this.
    */
-  lanes(card: CardLanes): ReturnType<typeof laneViews>
-  mayMerge(card: CardLanes, ord: number, merged: readonly number[]): ReturnType<typeof mayMergeLane>
+  lanes(order: WorkOrder): ReturnType<typeof laneViews>
+  mayMerge(
+    order: WorkOrder,
+    ord: number,
+    merged: readonly number[]
+  ): ReturnType<typeof mayMergeLane>
   /** Everything a surface needs in one read. */
   snapshot(): {
     runs: Run[]
@@ -345,12 +354,12 @@ export function createSupervision(options: SupervisionOptions): Supervision {
       })
     },
 
-    lanes(card) {
-      return laneViews(card)
+    lanes(order) {
+      return laneViews(order)
     },
 
-    mayMerge(card, ord, merged) {
-      return mayMergeLane(card, ord, merged)
+    mayMerge(order, ord, merged) {
+      return mayMergeLane(order, ord, merged)
     },
 
     snapshot() {

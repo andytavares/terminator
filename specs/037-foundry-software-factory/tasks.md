@@ -280,17 +280,17 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests for User Story 7 (write first, must fail)
 
-- [ ] T118 [P] [US7] Spec for lanes sourced from the validated order rather than from an agent-written file, in `extensions/foundry/tests/runtime/workitem.spec.ts`
-- [ ] T119 [P] [US7] Spec for shared-file detection at compile time, promoting the producing work ahead of the consuming work, in `extensions/foundry/tests/order/compile.spec.ts`
-- [ ] T120 [P] [US7] Spec asserting a consuming lane never merges before its producing lane, in `extensions/foundry/tests/line/integrate.spec.ts`
-- [ ] T121 [P] [US7] Spec asserting a single-lane order behaves as one stream with no lane machinery visible, in `extensions/foundry/tests/line/run-graph.spec.ts`
+- [x] T118 [P] [US7] Spec for lanes sourced from the validated order rather than from an agent-written file, in `extensions/foundry/tests/order/lanes.spec.ts` and `tests/runtime/supervision.spec.ts` — `runtime/workitem.ts` was already deleted in the Phase 4 retirement, so there was no spec of that name to write; the module that actually held the card-shaped lane rules was `runtime/lane-coordination.ts`, now replaced by `order/lanes.ts` over the `WorkOrder`
+- [x] T119 [P] [US7] Spec for shared-file detection at compile time, promoting the producing work ahead of the consuming work, in `extensions/foundry/tests/order/compile.spec.ts`
+- [x] T120 [P] [US7] Spec asserting a consuming lane never merges before its producing lane, in `extensions/foundry/tests/line/integrate.spec.ts`
+- [x] T121 [P] [US7] Spec asserting a single-lane order behaves as one stream with no lane machinery visible, in `extensions/foundry/tests/line/run-graph.spec.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T122 [US7] Source lanes from `order.plan.lanes` and delete the `workitem.json` read path in `extensions/foundry/src/runtime/workitem.ts`
-- [ ] T123 [US7] Derive `sharedFiles` from unit `touches` across lanes and fail compile when a collision has no producing unit, in `extensions/foundry/src/order/compile.ts`
-- [ ] T124 [US7] Open one draft pull request per lane, cross-linked to the others and to the order, holding lane N until lane N−1 is open and green, in `extensions/foundry/src/line/integrate.ts`
-- [ ] T125 [US7] Render lanes, their merge order and their blocked reasons on the Floor in `extensions/foundry/src/components/Floor.tsx`
+- [x] T122 [US7] Source lanes from `order.plan.lanes`; `runtime/lane-coordination.ts` and its `CardLanes` shape are deleted and `runtime/supervision.ts` reads the order. The last `workitem.json` reference in the extension was a stale comment in `index.ts`, also removed
+- [x] T123 [US7] Derive `sharedFiles` from unit `touches` across lanes and fail compile when a collision has no producing unit — derivation in `extensions/foundry/src/order/lanes.ts`, the failure folded into the existing `coverage` check in `order/compile.ts` rather than added as a seventh check id
+- [x] T124 [US7] Open one draft pull request per lane, cross-linked to the others and to the order, holding lane N until lane N−1 is open and green, in `extensions/foundry/src/line/integrate.ts`
+- [x] T125 [US7] Render lanes, their merge order and their blocked reasons on the Floor in `extensions/foundry/src/components/Floor.tsx`
 
 **Checkpoint**: A multi-repository order merges in the right order and a single-repository order is unaffected.
 

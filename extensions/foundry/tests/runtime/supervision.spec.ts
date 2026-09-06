@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSupervision, type Supervision } from '../../src/runtime/supervision.js'
+import { draftOrder } from '../../src/order/schema.js'
+import type { WorkOrder } from '../../src/order/schema.js'
 
 // What is running, what it changed, what needs looking at, and what must not
 // start yet. Assembled as one thing here because the closed branch's worst bugs
@@ -448,56 +450,96 @@ describe('the intent step', () => {
 })
 
 describe('lanes across repositories', () => {
-  const card = {
-    id: 'FLU-220',
-    lanes: [
-      {
-        ord: 1,
-        repo: 'fluent',
-        branch: 'feat/x',
-        role: 'producer' as const,
-        blocks: [2],
-        blocked_by: [],
+  // Read from the agreed order rather than from a file an agent wrote: the
+  // lanes and the collisions are part of what was agreed, and a second source
+  // for them is a second thing that can be wrong.
+
+  function order(over: Partial<WorkOrder> = {}): WorkOrder {
+    const base = draftOrder({
+      id: 'WO-1',
+      title: 'ULID session identity',
+      source: { kind: 'typed', tracker: null, key: null, url: null },
+      repoPaths: ['/repos/fluent', '/repos/cli'],
+      now: '2026-09-06T10:00:00.000Z',
+    })
+    return {
+      ...base,
+      plan: {
+        ...base.plan,
+        sharedFiles: ['proto/session.proto'],
+        lanes: [
+          {
+            ord: 1,
+            repo: 'fluent',
+            branch: 'feat/x',
+            role: 'producer',
+            blocks: [2],
+            blockedBy: [],
+          },
+          { ord: 2, repo: 'cli', branch: 'feat/x', role: 'consumer', blocks: [], blockedBy: [1] },
+        ],
+        units: [
+          {
+            id: 'U-1',
+            title: 'the contract',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: [],
+            touches: ['proto/session.proto'],
+            verify: [],
+          },
+          {
+            id: 'U-2',
+            title: 'adopt it',
+            role: 'builder',
+            lane: 2,
+            dependsOn: [],
+            satisfies: [],
+            touches: ['proto/session.proto'],
+            verify: [],
+          },
+        ],
       },
-      {
-        ord: 2,
-        repo: 'cli',
-        branch: 'feat/x',
-        role: 'consumer' as const,
-        blocks: [],
-        blocked_by: [1],
-      },
-    ],
-    contract: { shared_files: ['proto/session.proto'] },
+      ...over,
+    }
   }
 
   it('orders them, so a consumer is never merged before its producer', () => {
-    const s = build()
-    expect(s.lanes(card).map((v) => v.lane.ord)).toEqual([1, 2])
+    expect(
+      build()
+        .lanes(order())
+        .map((v) => v.lane.ord)
+    ).toEqual([1, 2])
   })
 
   it('flags the file both lanes touch, before either starts', () => {
-    const s = build()
-    expect(s.lanes(card)[0].collisions).toContain('proto/session.proto')
+    expect(build().lanes(order())[0].collisions).toContain('proto/session.proto')
   })
 
   it('refuses a consumer while its producer is unmerged', () => {
-    expect(build().mayMerge(card, 2, []).allowed).toBe(false)
+    expect(build().mayMerge(order(), 2, []).allowed).toBe(false)
   })
 
   it('allows it once the producer has merged', () => {
-    expect(build().mayMerge(card, 2, [1]).allowed).toBe(true)
+    expect(build().mayMerge(order(), 2, [1]).allowed).toBe(true)
   })
 
   it('allows the producer straight away', () => {
-    expect(build().mayMerge(card, 1, []).allowed).toBe(true)
+    expect(build().mayMerge(order(), 1, []).allowed).toBe(true)
   })
 
-  it('costs a single-lane card nothing', () => {
+  it('costs a single-lane order nothing', () => {
     // Every rule collapses to a no-op, so ordinary work never sees any of this.
-    const single = {
-      id: 'X',
-      lanes: [{ ord: 1, repo: 'r', branch: 'b', blocks: [], blocked_by: [] }],
+    const base = order()
+    const single: WorkOrder = {
+      ...base,
+      plan: {
+        ...base.plan,
+        sharedFiles: [],
+        lanes: [{ ord: 1, repo: 'r', branch: 'b', role: null, blocks: [], blockedBy: [] }],
+        units: [{ ...base.plan.units[0], lane: 1 }],
+      },
     }
     const s = build()
     expect(s.lanes(single)[0].collisions).toEqual([])

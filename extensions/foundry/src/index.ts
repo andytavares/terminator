@@ -789,11 +789,6 @@ export function activate(api: ExtensionAPI): void {
     return { intent: intent ?? null }
   })
 
-  // Merge ordering across the repositories a card touches. A card with one lane
-  // costs nothing: every rule collapses to a no-op.
-  // Read from the card's own `workitem.json` rather than taken as a payload:
-  // the contract between the pipeline and the console is a file, and a surface
-  // that had to carry the lanes in would need a producer of its own.
   // Applying the decisions is what makes a rejection mean anything: the
   // rejected hunks come back out of the working copy, the accepted ones stay.
   reg(api, 'foundry:review-apply', async (payload: unknown) => {

@@ -1,4 +1,5 @@
 import { coverageMatrix } from './coverage-matrix.js'
+import { collidingLanes, planLanes, sharedFilesFor } from './lanes.js'
 import type { WorkOrder } from './schema.js'
 
 // The six checks that decide whether an order may be handed off.
@@ -112,6 +113,44 @@ function checkCoverage(order: WorkOrder): CompileFailure | null {
 }
 
 /**
+ * Two lanes touching one file, and nobody said which of them owns it.
+ *
+ * Folded into `coverage` rather than given a seventh check, because it is the
+ * same question that check already asks: does the plan account for everything
+ * it has to. A collision with no producer is a plan that has not decided the
+ * merge order, and discovering that at merge time means discovering it as a
+ * conflict.
+ *
+ * Runs only when there is a collision, so a single-repository order — and a
+ * multi-repository one whose lanes touch nothing in common — never sees it.
+ */
+function checkLaneOwnership(order: WorkOrder): CompileFailure | null {
+  const shared = sharedFilesFor(order)
+  if (shared.length === 0) return null
+
+  const involved = collidingLanes(order, shared)
+  const producers = order.plan.lanes.filter(
+    (lane) => lane.role === 'producer' && involved.includes(lane.ord)
+  )
+  if (producers.length === 1) return null
+
+  const names = involved
+    .map((ord) => order.plan.lanes.find((lane) => lane.ord === ord)?.repo ?? `lane ${ord}`)
+    .join(', ')
+
+  return {
+    check: 'coverage',
+    detail:
+      producers.length === 0
+        ? `${names} all change ${shared.join(', ')}, and no lane is declared the producer. Say which repository owns the shared change so the rest can be held until it merges.`
+        : `${producers.length} lanes are declared the producer of ${shared.join(', ')}. Exactly one owns a shared change.`,
+    subjectIds: order.plan.units
+      .filter((unit) => unit.touches.some((path) => shared.includes(path)))
+      .map((unit) => unit.id),
+  }
+}
+
+/**
  * The grade has to have been taken against *this* plan.
  *
  * Expressed as: everything the plan says it will touch is inside the blast
@@ -177,7 +216,7 @@ export function compileOrder(order: WorkOrder): CompileResult {
   const failures = [
     checkQuestions(order),
     checkVerifiable(order),
-    checkCoverage(order),
+    checkCoverage(order) ?? checkLaneOwnership(order),
     checkRisk(order),
     checkRedTeam(order),
     checkBudgets(order),
@@ -214,5 +253,9 @@ export function agreeOrder(order: WorkOrder, now: string): AgreeResult {
 
   const result = compileOrder(order)
   if (!result.ok) return { ok: false, result }
-  return { ok: true, order: { ...order, status: 'agreed', agreedAt: now } }
+  // The collisions and the merge order they imply are written down at the
+  // moment of agreement, so what the Line reads is the plan that was agreed
+  // rather than a derivation it has to repeat and could get differently.
+  const planned = planLanes(order)
+  return { ok: true, order: { ...planned, status: 'agreed', agreedAt: now } }
 }

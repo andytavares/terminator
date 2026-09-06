@@ -327,3 +327,84 @@ describe('offering shapes of work', () => {
     expect(r.ready.length).toBeLessThanOrEqual(2)
   })
 })
+
+describe('what run.observe says about lanes (FR-067, FR-068)', () => {
+  function twoLanes(): WorkOrder {
+    const base = order()
+    return {
+      ...base,
+      plan: {
+        ...base.plan,
+        sharedFiles: ['proto/session.proto'],
+        lanes: [
+          { ord: 1, repo: 'proto', branch: '', role: 'producer', blocks: [2], blockedBy: [] },
+          { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
+        ],
+        units: [
+          {
+            id: 'U-1',
+            title: 'the contract',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: ['proto/session.proto'],
+            verify: [],
+          },
+          {
+            id: 'U-2',
+            title: 'adopt it',
+            role: 'builder',
+            lane: 2,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: ['proto/session.proto'],
+            verify: [],
+          },
+        ],
+      },
+    }
+  }
+
+  interface Observed {
+    lanes: {
+      ord: number
+      repo: string
+      role: string | null
+      collisions: string[]
+      blockedBy: number[]
+      hold: string | null
+    }[]
+  }
+
+  it('reports each lane in merge order, by repository', async () => {
+    await store.save(twoLanes())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    expect(r.lanes.map((l) => l.repo)).toEqual(['proto', 'cli'])
+  })
+
+  it('names the shared file on both lanes, not only on the producer', async () => {
+    await store.save(twoLanes())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    for (const lane of r.lanes) expect(lane.collisions).toEqual(['proto/session.proto'])
+  })
+
+  it('gives the hold as a sentence, so the surface does not reassemble it', async () => {
+    await store.save(twoLanes())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    expect(r.lanes[0].hold).toBeNull()
+    expect(r.lanes[1].hold).toContain('must merge first')
+    expect(r.lanes[1].hold).toContain('proto/session.proto')
+  })
+
+  it('reports one unremarkable lane for a single-repository order', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    expect(r.lanes).toHaveLength(1)
+    expect(r.lanes[0]).toMatchObject({ collisions: [], blockedBy: [], hold: null })
+  })
+})
