@@ -15,5 +15,8 @@
     "js-yaml": "4.3.1",
     "marked": "^15.0.12",
     "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "4.0.9"
   }
 }

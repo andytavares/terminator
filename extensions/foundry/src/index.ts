@@ -2794,11 +2794,94 @@ export function activate(api: ExtensionAPI): void {
 
   disposables.push(
     api.settings.register({
-      label: 'SpecKit Pilot',
+      label: 'Foundry',
+      description:
+        'A software factory. Foundry writes nothing into the repositories it works on — its own records go wherever you point them below.',
       properties: {
+        // Where the records go (FR-074). Empty means <workdir>/.foundry, which
+        // leaves an untracked directory behind in every repository you run an
+        // order in; Foundry says so once and never edits your .gitignore.
+        // Setting one location avoids it, and is the only workable answer once
+        // an order spans repositories.
+        'terminator.foundry.dataDir': {
+          type: 'folder',
+          label: 'Where Foundry keeps its records',
+          description:
+            'Leave empty to write beside each repository, in an untracked .foundry directory. Set one folder and every order writes there instead — recommended, and required in practice for orders that span repositories.',
+          default: '',
+        },
+        // Draft-first shipping (FR-053). Off puts a gate back before the push,
+        // which is the old behaviour and is there for repositories where a
+        // stray branch is expensive.
+        'terminator.foundry.autoOpenDraftPr': {
+          type: 'boolean',
+          label: 'Open a draft pull request when work finishes',
+          description:
+            'On: the Line pushes and opens a draft without asking, and your decision becomes "mark it ready" on a real diff. Off: nothing is pushed until you say so.',
+          default: true,
+        },
+        // Which gate rules are live (FR-049). Not a chattiness level: four
+        // rules stay live at every setting, so lights-out still cannot merge.
+        'terminator.foundry.autonomy': {
+          type: 'enum',
+          label: 'Autonomy',
+          description:
+            'Which rules are allowed to stop for you. Risk, budget, destructive actions and the merge decision are live at every setting.',
+          options: ['escorted', 'standard', 'lights-out'],
+          default: 'standard',
+        },
+        'terminator.foundry.budgets.agents': {
+          type: 'number',
+          label: 'Agents running at once',
+          default: 3,
+          min: 1,
+        },
+        'terminator.foundry.budgets.wallClockMinutes': {
+          type: 'number',
+          label: 'Minutes before an order pauses and asks',
+          description:
+            'Exceeding a budget pauses the work and raises a decision. It never continues silently, and it never dies silently.',
+          default: 45,
+          min: 1,
+        },
+        'terminator.foundry.budgets.filesTouched': {
+          type: 'number',
+          label: 'Files an order may touch before it pauses and asks',
+          default: 25,
+          min: 1,
+        },
+        // Three booleans rather than a list: the settings surface has no array
+        // type, and each write-back is independently worth turning off.
+        'terminator.foundry.writeBack.summaryComment': {
+          type: 'boolean',
+          label: 'Comment the agreed work order on its source issue',
+          default: true,
+        },
+        'terminator.foundry.writeBack.status': {
+          type: 'boolean',
+          label: 'Move the source issue as work starts, opens and merges',
+          description:
+            'Built for Linear. A tracker that cannot be asked to move an issue reports it as unsupported when the order is agreed, and nothing is faked.',
+          default: true,
+        },
+        'terminator.foundry.writeBack.prLink': {
+          type: 'boolean',
+          label: 'Attach every pull request to the source issue',
+          default: true,
+        },
+        // Operator-declared, never inferred. Per-repository lists live in
+        // config.yaml under the data root; this is the workspace-wide list.
+        'terminator.foundry.criticalPaths': {
+          type: 'string',
+          label: 'Critical paths, one glob per line',
+          description:
+            'Touching one of these raises a decision before anything is pushed. Foundry never infers this list.',
+          default: '',
+          workspaceScoped: true,
+        },
         'terminator.foundry.enabled': {
           type: 'boolean',
-          label: 'Enable SpecKit Pilot',
+          label: 'Enable Foundry',
           default: true,
           workspaceScoped: true,
         },

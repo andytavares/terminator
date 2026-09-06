@@ -53,21 +53,21 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests (write first, must fail)
 
-- [ ] T011 [P] Spec for data-root resolution — empty setting resolves to `<workdir>/.foundry/`, an absolute setting wins for every repository, a relative setting is rejected — in `extensions/foundry/tests/data-root.spec.ts`
-- [ ] T012 [P] Spec for the toolchain probe — `package.json` scripts, then tool config, then CI workflow; an undiscoverable command resolves to `null` with a reason — in `extensions/foundry/tests/verify/toolchain-probe.spec.ts`
-- [ ] T013 [P] Spec for the work-order schema, including that an unknown higher `schemaVersion` is refused outright rather than partially read, in `extensions/foundry/tests/order/schema.spec.ts`
-- [ ] T014 [P] Spec for recipe, role and rule schema parsing, including a malformed file being reported by path and excluded rather than throwing, in `extensions/foundry/tests/recipe/parse.spec.ts`
-- [ ] T015 [P] Spec for append-only ledger writes — single-line whole-line appends, no read-modify-write, concurrent writers safe — in `extensions/foundry/tests/ledger/append.spec.ts`
+- [x] T011 [P] Spec for data-root resolution — empty setting resolves to `<workdir>/.foundry/`, an absolute setting wins for every repository, a relative setting is rejected — in `extensions/foundry/tests/data-root.spec.ts`
+- [x] T012 [P] Spec for the toolchain probe — `package.json` scripts, then tool config, then CI workflow; an undiscoverable command resolves to `null` with a reason — in `extensions/foundry/tests/verify/toolchain-probe.spec.ts`
+- [x] T013 [P] Spec for the work-order schema, including that an unknown higher `schemaVersion` is refused outright rather than partially read, in `extensions/foundry/tests/order/schema.spec.ts`
+- [x] T014 [P] Spec for recipe, role and rule schema parsing, including a malformed file being reported by path and excluded rather than throwing, in `extensions/foundry/tests/recipe/parse.spec.ts`
+- [x] T015 [P] Spec for append-only ledger writes — single-line whole-line appends, no read-modify-write, concurrent writers safe — in `extensions/foundry/tests/ledger/append.spec.ts`
 
 ### Implementation
 
-- [ ] T016 [P] Implement data-root resolution, resolved once and handed to every writer as an absolute path, in `extensions/foundry/src/data-root.ts`
-- [ ] T017 [P] Implement the toolchain probe as manifest reads only, never executing the target project's code, generalising `scriptsOf()` and `runs()` from the retiring `runner/self-review-plan.ts`, in `extensions/foundry/src/verify/toolchain-probe.ts`
-- [ ] T018 Implement the zod work-order schema for every entity in data-model.md §1–§8 in `extensions/foundry/src/order/schema.ts`
-- [ ] T019 [P] Implement recipe, role and rule schemas and the YAML loader using `js-yaml`'s default safe `load` in `extensions/foundry/src/recipe/parse.ts`
-- [ ] T020 [P] Implement append-only JSONL ledger writes in `extensions/foundry/src/ledger/append.ts`
-- [ ] T021 Register the settings from contracts/ipc-channels.md — `dataDir`, `autoOpenDraftPr`, `autonomy`, the three budgets, `writeBack`, `criticalPaths` — in `extensions/foundry/src/index.ts`
-- [ ] T022 Delete `extensions/foundry/src/schemas/speckit.schemas.ts` and confirm nothing imports it, so the old phase schema does not survive alongside the new order schema
+- [x] T016 [P] Implement data-root resolution, resolved once and handed to every writer as an absolute path, in `extensions/foundry/src/data-root.ts`
+- [x] T017 [P] Implement the toolchain probe as manifest reads only, never executing the target project's code, generalising `scriptsOf()` and `runs()` from the retiring `runner/self-review-plan.ts`, in `extensions/foundry/src/verify/toolchain-probe.ts`
+- [x] T018 Implement the zod work-order schema for every entity in data-model.md §1–§8 in `extensions/foundry/src/order/schema.ts`
+- [x] T019 [P] Implement recipe, role and rule schemas and the YAML loader using `js-yaml`'s default safe `load` in `extensions/foundry/src/recipe/parse.ts`
+- [x] T020 [P] Implement append-only JSONL ledger writes in `extensions/foundry/src/ledger/append.ts`
+- [x] T021 Register the settings from contracts/ipc-channels.md — `dataDir`, `autoOpenDraftPr`, `autonomy`, the three budgets, `writeBack`, `criticalPaths` — in `extensions/foundry/src/index.ts`. Two shapes changed against the contract because `SettingDefinition` has no array or record type: `writeBack` became three booleans (each is independently worth turning off anyway), and `criticalPaths` became a newline-separated workspace-scoped string, with the per-repository map deferred to `config.yaml` under the data root where the contract already puts it
+- [ ] T022 **Moved to Phase 4 (with T057–T061).** Deleting `extensions/foundry/src/schemas/speckit.schemas.ts` cannot happen here: `src/state/state-persistence.ts` imports it and is still the live phase state until the pipeline is retired. Deleting it now would break the build for the whole of Phase 3, so it is done alongside the rest of the removal, after the `speckit` recipe has proved the engine
 
 **Checkpoint**: The contract, its storage and the project probe exist and are tested. User stories can begin.
 
