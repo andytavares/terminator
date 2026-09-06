@@ -1,0 +1,67 @@
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_357c91d2b54b02::t_28cf8ffdf81392 75-82,86-90,96,175-177
+  s_357c91d2b54b02::t_b8eeea1344e12d 1-74,83-85,91-95,97-174,178-230
+extensions/foundry/src/components/foundry.css
+  s_357c91d2b54b02::t_a9cbd061c0ae10 3342,3356
+  s_357c91d2b54b02::t_66cefce2812ffb 3291-3341,3343-3355,3357-3376
+extensions/foundry/src/renderer/App.tsx
+  s_357c91d2b54b02::t_66cefce2812ffb 5,8,13-14,20-26,49-59,81-82
+extensions/foundry/tests/ledger/curator.spec.ts
+  s_357c91d2b54b02::t_671b0f066c3261 219-220,225-226
+  s_357c91d2b54b02::t_496195f8b30593 1-34,50-60,64-218,221-224,227-252
+  s_357c91d2b54b02::t_9c7e6ac87b1a8b 35-49,61-63
+extensions/foundry/tests/ledger/append.spec.ts
+  s_357c91d2b54b02::t_4118615db0c0ed 135-167,174-192
+  s_357c91d2b54b02::t_9c7e6ac87b1a8b 168-173
+extensions/foundry/tests/forge/intake-source.spec.ts
+  s_357c91d2b54b02::t_9018258f5537b4 206-263
+  s_357c91d2b54b02::t_9c7e6ac87b1a8b 5
+  s_357c91d2b54b02::t_860b5aaf1e2b72 204-205
+extensions/foundry/src/forge/intake-source.ts
+  s_357c91d2b54b02::t_b29ab012941fcb 44-52,64-75,145-157,161
+extensions/foundry/src/ledger/curator.ts
+  s_357c91d2b54b02::t_09d0649b2a71fa 1-84,89-162,164
+  s_357c91d2b54b02::t_9c7e6ac87b1a8b 85-88,163
+extensions/foundry/src/verify/rules.ts
+  s_357c91d2b54b02::t_82bd9ab4d716e2 6,84-180
+extensions/foundry/src/ipc/forge-channels.ts
+  s_357c91d2b54b02::t_48b8ce48687cc2 55-56,105
+extensions/foundry/src/components/Ledger.tsx
+  s_357c91d2b54b02::t_9c7e6ac87b1a8b 63-78,130-131
+  s_357c91d2b54b02::t_2b0d13876186bb 1-62,79-129,132-208
+extensions/foundry/tests/components/App.spec.tsx
+  s_357c91d2b54b02::t_a261a4c621368b 6,17-19,94-114
+  s_357c91d2b54b02::t_28e7aee64a21ba 115
+extensions/foundry/tests/verify/rules.spec.ts
+  s_357c91d2b54b02::t_0a1c281a8e7f43 1-160,164-180,184-185
+  s_357c91d2b54b02::t_9c7e6ac87b1a8b 161-163,181-183
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_9f96fedf90e7e7 16-17,683-708
+  s_357c91d2b54b02::t_48b8ce48687cc2 25-26,473-491,583
+  s_357c91d2b54b02::t_cb350ae8b27864 709
+extensions/foundry/src/ipc/ledger-channels.ts
+  s_357c91d2b54b02::t_9c7e6ac87b1a8b 57
+  s_357c91d2b54b02::t_c29fa9454e006e 1-56,58-126
+extensions/foundry/tests/ipc/ledger-channels.spec.ts
+  s_357c91d2b54b02::t_d09fefd1fea39b 2-240,254,273-274
+  s_357c91d2b54b02::t_0c1f2282024b2e 241-253,255-272
+  s_357c91d2b54b02::t_62b6cb6dcac4a7 1
+specs/037-foundry-software-factory/tasks.md
+  s_357c91d2b54b02::t_642440c78dadfc 307-310,314-318
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "1a68ef51a7982605d014ae652627e4620c307d4b",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
