@@ -72,6 +72,7 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
 export function Inbox(): JSX.Element {
   const [view, setView] = useState<InboxView | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [problem, setProblem] = useState<string | null>(null)
   const [digest, setDigest] = useState<Digest | null>(null)
 
   const refresh = useCallback(async () => {
@@ -104,8 +105,16 @@ export function Inbox(): JSX.Element {
   const answer = useCallback(
     async (gateId: string, option: string) => {
       setBusy(gateId)
+      setProblem(null)
       try {
-        await invoke('foundry:inbox.decide', { gateId, option })
+        // Said out loud. This is the control the whole autonomy dial exists to
+        // reach: a decision the handler refused — already answered, gate gone,
+        // a rule that threw — used to look exactly like one it took, because
+        // the reply was thrown away and the list simply redrew.
+        const result = (await invoke('foundry:inbox.decide', { gateId, option })) as {
+          error?: string
+        }
+        if (result.error !== undefined) setProblem(result.error)
         await refresh()
       } finally {
         setBusy(null)
@@ -118,6 +127,7 @@ export function Inbox(): JSX.Element {
 
   return (
     <div className="fdry-shell">
+      {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
       {view.gates.length === 0 ? (
         <div className="fdry-nothing">
           <CheckCircle2 aria-hidden="true" />

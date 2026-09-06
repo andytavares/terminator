@@ -69,7 +69,9 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
         fullReject: live.fullReject ?? false,
       }
     }
-    if (channel === 'foundry:review-decide-hunk') return { ok: true }
+    if (channel === 'foundry:review-decide-hunk') return live.decideHunk ?? { ok: true }
+    if (channel === 'foundry:permission-hand-back') return live.handBack ?? { ok: true }
+    if (channel === 'foundry:run-terminal') return live.terminal ?? { ok: true }
     if (channel === 'foundry:review-apply') return live.apply ?? { ok: true, reverted: 0 }
     if (channel === 'foundry:review-done') return { ok: true }
     if (channel === 'foundry:review-intent') return { intent: live.intent ?? null }
@@ -788,5 +790,42 @@ describe('the group that is not a lane', () => {
       })
     )
     await waitFor(() => expect(screen.getByText('the whole order')).toBeTruthy())
+  })
+})
+
+// Two clicks that used to fail in silence. Both reply `{ ok: false }`, and
+// both replies were thrown away.
+describe('the refusals a click used to swallow', () => {
+  const ASK = {
+    requestId: 'r-1',
+    sessionId: 's-1',
+    toolName: 'Bash',
+    summary: 'rm -rf build',
+    at: Date.now(),
+  }
+
+  it('says so when the request is no longer waiting to be handed back', async () => {
+    mount(reply(), { pending: [ASK], handBack: { ok: false } })
+    await waitFor(() => screen.getByRole('button', { name: /In the terminal/i }))
+    fireEvent.click(screen.getByRole('button', { name: /In the terminal/i }))
+    await waitFor(() => expect(screen.getByText(/no longer waiting/)).toBeTruthy())
+  })
+
+  it('says so when it handed back but there is no terminal to open', async () => {
+    mount(reply(), { pending: [ASK], handBack: { ok: true }, terminal: { ok: false } })
+    await waitFor(() => screen.getByRole('button', { name: /In the terminal/i }))
+    fireEvent.click(screen.getByRole('button', { name: /In the terminal/i }))
+    await waitFor(() => expect(screen.getByText(/no longer has a terminal/)).toBeTruthy())
+  })
+})
+
+describe('a hunk decision the review refused', () => {
+  it('says the review is gone rather than looking like it stuck', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS, complete: false, decideHunk: { ok: false } })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByText('src/auth/session.ts'))
+    fireEvent.click(screen.getByRole('button', { name: 'Reject h-1' }))
+    await waitFor(() => expect(screen.getByText(/no longer open/)).toBeTruthy())
   })
 })

@@ -45,6 +45,7 @@ function mount(over: Record<string, unknown> = {}) {
     if (channel === 'foundry:feed-digest') {
       return over.digest ?? { entryCount: 0, sessionCount: 0, bySession: [] }
     }
+    if (channel === 'foundry:inbox.decide') return over.decide ?? { ok: true }
     return { ok: true }
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -179,5 +180,27 @@ describe('quiet has to be explicable', () => {
     mount({ autonomy: 'escorted', silenced: [] })
     await waitFor(() => screen.getByText('Nothing needs you.'))
     expect(screen.queryByText(/not asking about/)).toBeNull()
+  })
+})
+
+// The decision is the whole point of the surface. A refusal that showed
+// nothing looked exactly like a decision that was taken: the reply was thrown
+// away and the list simply redrew with the gate still on it.
+describe('a decision the handler refused', () => {
+  it('says why, rather than redrawing as though nothing happened', async () => {
+    mount({ gates: [gate()], decide: { error: 'Gate G-1 was already decided (approve).' } })
+    await waitFor(() => screen.getByRole('button', { name: /Approve/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Approve/ }))
+    await waitFor(() => expect(screen.getByText(/already decided/)).toBeTruthy())
+  })
+
+  it('says nothing when the decision was taken', async () => {
+    mount({ gates: [gate()] })
+    await waitFor(() => screen.getByRole('button', { name: /Approve/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Approve/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
+    )
+    expect(screen.queryByText(/already decided/)).toBeNull()
   })
 })

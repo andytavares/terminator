@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
@@ -286,17 +286,23 @@ test('every registered channel answers rather than rejecting', async () => {
   // A channel registered and unreachable is dead wiring; a channel that
   // rejects on its own name is worse, because a surface calling it fails at
   // the moment the operator presses the button.
-  const channels = [
-    'foundry:order.list',
-    'foundry:inbox.list',
-    'foundry:ledger.query',
-    'foundry:permissions-list',
-    'foundry:models-list',
-    'foundry:supervision-snapshot',
-    'foundry:stalls-list',
-  ]
+  //
+  // Read from the source rather than listed here. The list was seven of
+  // forty-three while the test's own name said "every", which is the shape of
+  // a green nobody should have trusted.
+  const source = readFileSync(
+    join(process.cwd(), 'extensions', 'foundry', 'src', 'index.ts'),
+    'utf8'
+  )
+  const channels = [...source.matchAll(/reg\(api,\s*'(foundry:[^']+)'/g)].map((m) => m[1])
+  expect(channels.length).toBeGreaterThan(30)
+
+  // Every one is called with an empty payload. A channel that needs arguments
+  // answers `{ error: 'Malformed request.' }`, which is answering — the thing
+  // being asserted is that none of them throws, and that none of them is
+  // absent from the registry the host actually built.
   for (const channel of channels) {
-    await expect(foundry(channel, {}), `${channel} rejected`).resolves.toBeTruthy()
+    await expect(foundry(channel, {}), `${channel} rejected`).resolves.toBeDefined()
   }
 })
 

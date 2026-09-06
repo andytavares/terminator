@@ -253,8 +253,23 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
 
   const handBack = useCallback(
     async (ask: PendingAsk) => {
-      await invoke('foundry:permission-hand-back', { requestId: ask.requestId })
-      await invoke('foundry:run-terminal', { sessionId: ask.sessionId })
+      const given = (await invoke('foundry:permission-hand-back', {
+        requestId: ask.requestId,
+      })) as { ok?: boolean }
+      if (given.ok !== true) {
+        setProblem('that request is no longer waiting')
+        await pollLive()
+        return
+      }
+      // Handing back and going there are two things, and the second can fail on
+      // its own: a run whose terminal has been closed accepts the hand-back and
+      // has nowhere to send you. Silently, until this said so.
+      const gone = (await invoke('foundry:run-terminal', { sessionId: ask.sessionId })) as {
+        ok?: boolean
+      }
+      if (gone.ok !== true) {
+        setProblem('handed back, but that run no longer has a terminal to open')
+      }
       await pollLive()
     },
     [pollLive]
@@ -318,7 +333,12 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const decideHunk = useCallback(
     async (hunkId: string, decision: 'accept' | 'reject') => {
       if (reviewing === null) return
-      await invoke('foundry:review-decide-hunk', { sessionId: reviewing, hunkId, decision })
+      const took = (await invoke('foundry:review-decide-hunk', {
+        sessionId: reviewing,
+        hunkId,
+        decision,
+      })) as { ok?: boolean }
+      if (took.ok !== true) setProblem('that review is no longer open')
       const next = (await invoke('foundry:review-hunks', { sessionId: reviewing })) as {
         files: HunkFile[] | null
         complete?: boolean
