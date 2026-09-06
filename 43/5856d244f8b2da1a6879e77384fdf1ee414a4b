@@ -1,0 +1,62 @@
+src/renderer/sidebar/branch-rows.ts
+  s_8aa585ff1f786f::t_935f42e6a90c72 7-22,34-41,233,291-316
+src/renderer/sidebar/state-icons.tsx
+  s_8aa585ff1f786f::t_7c396e5aa2c48e 1-24
+src/renderer/App.tsx
+  s_8aa585ff1f786f::t_9c9cb74ae1851b 226-230,235,239,244,248
+tests/unit/renderer/components/TerminalRow.spec.tsx
+  s_8aa585ff1f786f::t_09a65bdbf9fb7f 1-88
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_8aa585ff1f786f::t_57293da2490d35 232-243,255-266
+  s_8aa585ff1f786f::t_bcecb3ccbccfee 223-226,229,249,252
+tests/unit/renderer/components/BranchRow.spec.tsx
+  s_8aa585ff1f786f::t_acb1714ad78e9c 38-42,44
+  s_8aa585ff1f786f::t_57293da2490d35 43
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_8aa585ff1f786f::t_92e81c82980a70 21,25,436-452,458-461
+  s_8aa585ff1f786f::t_5801f72945c5c2 453-457,462
+  s_8aa585ff1f786f::t_57293da2490d35 604-633
+  s_8aa585ff1f786f::t_c24d86822e9115 776-787
+  s_8aa585ff1f786f::t_693c53fb8f7452 599-600,602-603,634-660
+  s_8aa585ff1f786f::t_0ac4b609258151 463
+src/renderer/components/terminal/LeafPane.tsx
+  s_8aa585ff1f786f::t_79f34868b140c8 2,13-21,47-64,90-98
+src/renderer/components/sidebar/BranchRow.css
+  s_8aa585ff1f786f::t_33e37f71b681a0 12-15
+  s_8aa585ff1f786f::t_94a8e92ad64bef 23-52
+src/renderer/components/terminal/LeafPane.css
+  s_8aa585ff1f786f::t_d9cf67ca94f127 15-16,21-53
+  s_8aa585ff1f786f::t_298855e2264530 54
+src/renderer/sidebar/collapse-state.ts
+  s_8aa585ff1f786f::t_20ecd272a5bf03 14-25,41,57-61,67
+tests/e2e/split-panes.spec.ts
+  s_8aa585ff1f786f::t_f2e223721d7049 1-86
+src/renderer/components/sidebar/BranchRow.tsx
+  s_8aa585ff1f786f::t_94a8e92ad64bef 35-43,94-95,175-182,186-194,199-200
+  s_8aa585ff1f786f::t_7c396e5aa2c48e 2,6
+  s_8aa585ff1f786f::t_57293da2490d35 183-185,195-198
+src/renderer/components/sidebar/TerminalRow.tsx
+  s_8aa585ff1f786f::t_7c396e5aa2c48e 3
+  s_8aa585ff1f786f::t_f8f953ac89a2b2 1-2,4-80
+src/renderer/components/sidebar/TerminalRow.css
+  s_8aa585ff1f786f::t_33e37f71b681a0 12-15,26
+  s_8aa585ff1f786f::t_d4ad1607cb04ee 1-11,16-25,27-118
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_8aa585ff1f786f::t_7b43deccc62de7 462-467,472-490
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "435856d244f8b2da1a6879e77384fdf1ee414a4b",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
