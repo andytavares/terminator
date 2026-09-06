@@ -129,3 +129,30 @@ export function withNode(graph: RunGraph, id: string, change: Partial<RunNode>):
     nodes: graph.nodes.map((n) => (n.id === id ? { ...n, ...change } : n)),
   }
 }
+
+/**
+ * What to call a node, to somebody watching the run.
+ *
+ * `n2` is the handle the graph and the ledger use, and it is the wrong thing
+ * to put in front of an operator: watching a run means knowing what is being
+ * built, not which array slot it came from. The unit's own title is the best
+ * answer, the role is the next best, and the step it came from after that —
+ * the id is the last resort rather than the default.
+ */
+export function nodeLabel(order: WorkOrder | null, node: RunNode): string {
+  const unit =
+    node.unitId === null ? undefined : order?.plan.units.find((u) => u.id === node.unitId)
+  if (unit !== undefined) {
+    return node.role === null
+      ? `${unit.id} ${unit.title}`
+      : `${node.role} · ${unit.id} ${unit.title}`
+  }
+  if (node.role !== null) return node.role
+  if (node.stepId.trim() !== '') return node.stepId
+  return node.id
+}
+
+/** Every node's label, keyed by id, for a surface that renders many at once. */
+export function nodeLabels(order: WorkOrder | null, graph: RunGraph): Record<string, string> {
+  return Object.fromEntries(graph.nodes.map((node) => [node.id, nodeLabel(order, node)]))
+}

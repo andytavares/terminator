@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { buildRunGraph, nodeById, withNode, stepFor } from '../../src/line/run-graph.js'
+import {
+  buildRunGraph,
+  nodeById,
+  withNode,
+  stepFor,
+  nodeLabel,
+  nodeLabels,
+} from '../../src/line/run-graph.js'
+import type { RunNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/schema.js'
@@ -260,5 +268,90 @@ steps:
     const graph = buildRunGraph(order(), r.value)
     const alien = { ...graph.nodes[0], stepId: 'elsewhere' }
     expect(stepFor(r.value, alien)).toBeUndefined()
+  })
+})
+
+// `n2` is the handle the graph and the ledger use. Putting it in front of an
+// operator watching a run tells them which array slot the work came from and
+// nothing about what is being built — which is the whole point of the surface.
+describe('what to call a node', () => {
+  const node = (over: Partial<RunNode> & Pick<RunNode, 'id'>): RunNode => ({
+    stepId: 'build',
+    kind: 'agent',
+    state: 'waiting',
+    unitId: null,
+    lane: null,
+    role: null,
+    dependsOn: [],
+    attempts: 0,
+    sessionId: null,
+    worktreePath: null,
+    startedAt: null,
+    endedAt: null,
+    ...over,
+  })
+
+  const withUnit = (): WorkOrder => {
+    const base = order()
+    return {
+      ...base,
+      plan: {
+        ...base.plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'refresh the token on a 401',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: [],
+            touches: [],
+            verify: [],
+          },
+        ],
+      },
+    }
+  }
+
+  it("uses the unit's own title, which is what the operator asked for", () => {
+    expect(nodeLabel(withUnit(), node({ id: 'n2', unitId: 'U-1', role: 'builder' }))).toBe(
+      'builder · U-1 refresh the token on a 401'
+    )
+  })
+
+  it('names the unit without a role when the node has none', () => {
+    expect(nodeLabel(withUnit(), node({ id: 'n2', unitId: 'U-1' }))).toBe(
+      'U-1 refresh the token on a 401'
+    )
+  })
+
+  it('falls back to the role for a node that is not about one unit', () => {
+    expect(nodeLabel(withUnit(), node({ id: 'n1', role: 'architect' }))).toBe('architect')
+  })
+
+  it('falls back to the step for a gate, which has neither', () => {
+    expect(nodeLabel(withUnit(), node({ id: 'n4', stepId: 'ship', kind: 'gate' }))).toBe('ship')
+  })
+
+  it('falls back to the id only when there is nothing else at all', () => {
+    expect(nodeLabel(null, node({ id: 'n9', stepId: '' }))).toBe('n9')
+  })
+
+  it('names a unit the order no longer has by its role rather than inventing one', () => {
+    expect(nodeLabel(order(), node({ id: 'n2', unitId: 'U-gone', role: 'builder' }))).toBe(
+      'builder'
+    )
+  })
+
+  it('labels every node in the graph, keyed by the id the ledger uses', () => {
+    const graph = {
+      orderId: 'WO-1',
+      recipe: 'direct',
+      nodes: [node({ id: 'n1', role: 'architect' }), node({ id: 'n2', unitId: 'U-1' })],
+    }
+    expect(nodeLabels(withUnit(), graph)).toEqual({
+      n1: 'architect',
+      n2: 'U-1 refresh the token on a 401',
+    })
   })
 })

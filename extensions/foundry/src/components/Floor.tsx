@@ -37,6 +37,8 @@ interface LaneRow {
 
 interface FloorView {
   graph: RunGraph
+  /** What to call each node, keyed by id — worked out where the order is. */
+  labels?: Record<string, string>
   ready: string[]
   blocked: Blocked[]
   lanes?: LaneRow[]
@@ -146,7 +148,10 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
  * anything; `cli-flow` is where the work is happening.
  */
 function laneName(view: FloorView, lane: number): string {
-  if (lane === 0) return 'steps'
+  // Lane 0 is not a lane: it is where the nodes that belong to the order as a
+  // whole sit — the shipping gate, the joins. "steps" said nothing about which
+  // ones those were.
+  if (lane === 0) return 'the whole order'
   const named = view.lanes?.find((row) => row.ord === lane)
   return named === undefined ? `lane ${lane}` : named.repo
 }
@@ -417,15 +422,22 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             {view.graph.nodes
               .filter((n) => (n.lane ?? 0) === lane)
               .map((node) => (
-                <span key={node.id} className={`fdry-unit is-${node.state}`}>
-                  {node.id}
+                <span
+                  key={node.id}
+                  className={`fdry-unit is-${node.state}`}
+                  // The id stays reachable because it is what the ledger and
+                  // the graph call this node, but it is not what a person
+                  // watching the run needs to read.
+                  title={node.id}
+                >
+                  {view.labels?.[node.id] ?? node.id}
                   <u>{STATE_LABEL[node.state]}</u>
                   {node.sessionId !== null ? (
                     <>
                       <button
                         type="button"
                         className="fdry-unit-attach"
-                        aria-label={`Watch ${node.id}`}
+                        aria-label={`Watch ${view.labels?.[node.id] ?? node.id}`}
                         onClick={() => setWatching(node.sessionId)}
                       >
                         <ShieldQuestion aria-hidden="true" />
@@ -433,7 +445,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                       <button
                         type="button"
                         className="fdry-unit-attach"
-                        aria-label={`Attach to ${node.id}`}
+                        aria-label={`Attach to ${view.labels?.[node.id] ?? node.id}`}
                         onClick={() => void attach(node.id)}
                       >
                         <Terminal aria-hidden="true" />
@@ -730,8 +742,8 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
         <section className="fdry-panel" style={{ marginTop: 12 }}>
           <h3 className="fdry-panel-h">Blocked</h3>
           {view.blocked.map((entry) => (
-            <p key={entry.id} className="fdry-note">
-              <b>{entry.id}</b> — {entry.reason}
+            <p key={entry.id} className="fdry-note" title={entry.id}>
+              <b>{view.labels?.[entry.id] ?? entry.id}</b> — {entry.reason}
             </p>
           ))}
         </section>

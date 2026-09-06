@@ -629,3 +629,30 @@ describe('foundry:run.resume', () => {
     expect(await bare.resume({ id: 'WO-1' })).toMatchObject({ started: false })
   })
 })
+
+describe('what the Floor is told to call each node', () => {
+  it('supplies a label per node, so a chip does not read "n2"', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const view = (await channels().observe({ id: 'WO-1' })) as {
+      labels: Record<string, string>
+    }
+    expect(Object.keys(view.labels).length).toBeGreaterThan(0)
+    expect(Object.values(view.labels).some((label) => label.includes('U-1'))).toBe(true)
+    expect(Object.values(view.labels).every((label) => /^n\d+$/.test(label))).toBe(false)
+  })
+
+  it('says what a blocked node is waiting on in the same words the chips use', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const view = (await channels().observe({ id: 'WO-1' })) as {
+      labels: Record<string, string>
+      blocked: { id: string; reason: string }[]
+    }
+    const waiting = view.blocked.find((b) => b.reason.startsWith('waiting on '))
+    expect(waiting).toBeDefined()
+    const named = waiting?.reason.replace('waiting on ', '').split(', ') ?? []
+    expect(named.length).toBeGreaterThan(0)
+    for (const name of named) expect(Object.values(view.labels)).toContain(name)
+  })
+})

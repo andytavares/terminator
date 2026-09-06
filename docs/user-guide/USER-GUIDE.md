@@ -602,6 +602,9 @@ Two things you can do without leaving:
 - **Waiting on you** lists every tool call an agent is holding — allow it, deny
   it, or hand it back to the terminal to answer where the agent is. Nothing in
   that run moves until you do.
+- Every piece of work is named by what it is — the role and the unit it is
+  building, not the identifier the run graph uses internally — and **Blocked**
+  says what each one is waiting on in the same words.
 - **Watch** a unit to read its transcript, and **Redirect**, **Interrupt** or
   **Stop** it. The terminal is always there as the backstop: the agent runs in
   a real terminal in its own worktree project, and you can go and type at it.

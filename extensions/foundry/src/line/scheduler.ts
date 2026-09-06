@@ -62,8 +62,19 @@ export function blockedNodes(graph: RunGraph): RunNode[] {
   )
 }
 
-/** Why this node is not running, in words. Null when it is running or done. */
-export function blockedReason(graph: RunGraph, id: string): string | null {
+/**
+ * Why this node is not running, in words. Null when it is running or done.
+ *
+ * `name` decides what the sentence calls the nodes it mentions. The reason the
+ * operator reads is composed here rather than reassembled by a surface, so it
+ * has to be able to use the surface's own names — otherwise the panel says
+ * "waiting on n2" beside a chip labelled "builder · U-1".
+ */
+export function blockedReason(
+  graph: RunGraph,
+  id: string,
+  name: (nodeId: string) => string = (nodeId) => nodeId
+): string | null {
   const node = nodeById(graph, id)
   if (node === undefined) return null
   if (node.state !== 'waiting' && node.state !== 'ready' && node.state !== 'blocked') return null
@@ -74,7 +85,7 @@ export function blockedReason(graph: RunGraph, id: string): string | null {
       dependency !== undefined && (dependency.state === 'failed' || dependency.state === 'blocked')
     )
   })
-  if (failed.length > 0) return `${failed.join(', ')} failed`
+  if (failed.length > 0) return `${failed.map(name).join(', ')} failed`
 
   const waiting = node.dependsOn.filter((dep) => {
     const dependency = nodeById(graph, dep)
@@ -82,7 +93,7 @@ export function blockedReason(graph: RunGraph, id: string): string | null {
       dependency !== undefined && dependency.state !== 'passed' && dependency.state !== 'skipped'
     )
   })
-  if (waiting.length > 0) return `waiting on ${waiting.join(', ')}`
+  if (waiting.length > 0) return `waiting on ${waiting.map(name).join(', ')}`
   return null
 }
 

@@ -709,3 +709,84 @@ describe('which of the four questions the reviewer is on', () => {
     await waitFor(() => expect(screen.getByText(/Is this what was asked for/)).toBeTruthy())
   })
 })
+
+// Watching a run means knowing what is being built. `N-1` is the handle the
+// graph and the ledger use, and on its own it says nothing.
+describe('what a node is called on the Floor', () => {
+  const LABELS = { 'N-1': 'builder · U-1 refresh the token on a 401', 'N-2': 'verifier · U-2' }
+
+  it('shows what the node is, not the id the graph uses', async () => {
+    mount(reply({ labels: LABELS }))
+    await waitFor(() =>
+      expect(screen.getByText(/builder · U-1 refresh the token on a 401/)).toBeTruthy()
+    )
+    expect(screen.queryByText('N-1')).toBeNull()
+  })
+
+  it('keeps the id reachable, because it is what the record calls this node', async () => {
+    mount(reply({ labels: LABELS }))
+    const chip = await waitFor(() =>
+      screen.getByText(/builder · U-1 refresh/).closest('.fdry-unit')
+    )
+    expect(chip?.getAttribute('title')).toBe('N-1')
+  })
+
+  it('names the node in the controls that act on it', async () => {
+    mount(reply({ labels: LABELS }))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /Watch builder · U-1 refresh the token on a 401/ })
+      ).toBeTruthy()
+    )
+  })
+
+  it('falls back to the id when nothing supplied a label', async () => {
+    mount(reply())
+    await waitFor(() => expect(screen.getByText('N-1')).toBeTruthy())
+  })
+
+  it('names a blocked node the same way the chips do', async () => {
+    mount(
+      reply({
+        labels: LABELS,
+        blocked: [{ id: 'N-2', reason: 'waiting on builder · U-1 refresh the token on a 401' }],
+      })
+    )
+    await waitFor(() => expect(screen.getByText('Blocked')).toBeTruthy())
+    // Once as a chip, once in the Blocked panel — the same name in both, which
+    // is the point.
+    expect(screen.getAllByText('verifier · U-2')).toHaveLength(2)
+    expect(screen.getByText(/waiting on builder · U-1 refresh the token on a 401/)).toBeTruthy()
+  })
+})
+
+describe('the group that is not a lane', () => {
+  it('says the nodes with no lane belong to the whole order', async () => {
+    mount(
+      reply({
+        graph: {
+          orderId: 'WO-1',
+          recipe: 'direct',
+          nodes: [
+            {
+              id: 'N-9',
+              unitId: null,
+              lane: null,
+              role: null,
+              kind: 'gate',
+              state: 'waiting',
+              sessionId: null,
+              attempts: 0,
+              startedAt: null,
+              endedAt: null,
+              dependsOn: [],
+              stepId: 'ship',
+            },
+          ],
+        },
+        labels: { 'N-9': 'ship' },
+      })
+    )
+    await waitFor(() => expect(screen.getByText('the whole order')).toBeTruthy())
+  })
+})

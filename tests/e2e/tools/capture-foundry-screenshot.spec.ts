@@ -1,6 +1,6 @@
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { writeFileSync as write } from 'node:fs'
@@ -141,6 +141,102 @@ test('capture the Foundry surfaces', async () => {
   })
   await handle.page.waitForTimeout(4000)
   write(join(dir, '08b-foundry-forge.png'), await capture())
+
+  // The Floor only renders for an order that is running, and starting one for
+  // real launches an agent. The order the Forge just made is moved to running
+  // with a graph beside it instead: the same files a real run writes, so the
+  // surface reads them the same way, without an agent being launched.
+  const ordersDir = join(repo, '.foundry', 'orders')
+  const orderId = readdirSync(ordersDir)[0]
+  const orderFile = join(ordersDir, orderId, 'order.json')
+  const order = JSON.parse(readFileSync(orderFile, 'utf8')) as Record<string, unknown>
+  writeFileSync(orderFile, JSON.stringify({ ...order, status: 'running' }, null, 2))
+  writeFileSync(
+    join(ordersDir, orderId, 'run-graph.json'),
+    JSON.stringify(
+      {
+        orderId,
+        recipe: 'direct',
+        nodes: [
+          {
+            id: 'n1',
+            stepId: 'plan',
+            kind: 'agent',
+            state: 'passed',
+            unitId: null,
+            lane: 1,
+            role: 'architect',
+            dependsOn: [],
+            attempts: 1,
+            sessionId: null,
+            worktreePath: null,
+            startedAt: '2026-09-06T10:00:00.000Z',
+            endedAt: '2026-09-06T10:04:00.000Z',
+          },
+          {
+            id: 'n2',
+            stepId: 'build',
+            kind: 'agent',
+            state: 'running',
+            unitId: 'U-1',
+            lane: 1,
+            role: 'builder',
+            dependsOn: ['n1'],
+            attempts: 1,
+            sessionId: null,
+            worktreePath: null,
+            startedAt: '2026-09-06T10:04:00.000Z',
+            endedAt: null,
+          },
+          {
+            id: 'n3',
+            stepId: 'verify',
+            kind: 'agent',
+            state: 'waiting',
+            unitId: 'U-1',
+            lane: 1,
+            role: 'verifier',
+            dependsOn: ['n2'],
+            attempts: 0,
+            sessionId: null,
+            worktreePath: null,
+            startedAt: null,
+            endedAt: null,
+          },
+          {
+            id: 'n4',
+            stepId: 'ship',
+            kind: 'gate',
+            state: 'waiting',
+            unitId: null,
+            lane: null,
+            role: null,
+            dependsOn: ['n3'],
+            attempts: 0,
+            sessionId: null,
+            worktreePath: null,
+            startedAt: null,
+            endedAt: null,
+          },
+        ],
+      },
+      null,
+      2
+    )
+  )
+
+  // Back out to the list and in again, so the surface re-reads the order.
+  await openSurface('Inbox')
+  await openSurface('Forge')
+  await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    await view.executeJavaScript(`document.querySelector('.fdry-orders button')?.click()`)
+  })
+  await handle.page.waitForTimeout(2500)
+  write(join(dir, '08e-foundry-floor.png'), await capture())
 
   await openSurface('Ledger')
   write(join(dir, '08c-foundry-ledger.png'), await capture())
