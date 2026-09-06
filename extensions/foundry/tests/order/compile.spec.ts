@@ -28,6 +28,16 @@ function complete(over: Partial<WorkOrder> = {}): WorkOrder {
         verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
         unverifiable: null,
       },
+      // The unit touches a stylesheet, and a command cannot say whether the
+      // glyph renders — which is the whole of FR-040, and the reason this
+      // fixture used to be refused by the check that enforces it.
+      {
+        id: 'AC-2',
+        statement: 'the last column is not clipped, in the running application',
+        priority: 'P1',
+        verify: { kind: 'screenshot', target: 'a full-width terminal row' },
+        unverifiable: null,
+      },
     ],
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
     plan: {
@@ -39,7 +49,7 @@ function complete(over: Partial<WorkOrder> = {}): WorkOrder {
           role: 'builder',
           lane: 1,
           dependsOn: [],
-          satisfies: ['AC-1'],
+          satisfies: ['AC-1', 'AC-2'],
           touches: ['src/styles.css'],
           verify: [],
         },
@@ -163,8 +173,10 @@ describe('compileOrder', () => {
 
     it('names both the uncovered criterion and the orphan unit in one failure', () => {
       const order = complete()
+      // AC-3, because the fixture already carries the screenshot criterion
+      // FR-040 requires of a change to a stylesheet.
       order.acceptance.push({
-        id: 'AC-2',
+        id: 'AC-3',
         statement: 'x',
         priority: 'P1',
         verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
@@ -181,7 +193,7 @@ describe('compileOrder', () => {
         verify: [],
       })
       const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
-      expect(f?.subjectIds).toEqual(expect.arrayContaining(['AC-2', 'U-2']))
+      expect(f?.subjectIds).toEqual(expect.arrayContaining(['AC-3', 'U-2']))
     })
   })
 

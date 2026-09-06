@@ -32,6 +32,13 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
         verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
         unverifiable: null,
       },
+      {
+        id: 'AC-2',
+        statement: 'the last column is not clipped, in the running application',
+        priority: 'P1',
+        verify: { kind: 'screenshot' as const, target: 'a full-width row' },
+        unverifiable: null,
+      },
     ],
     plan: {
       ...base.plan,
@@ -42,7 +49,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
           role: 'builder',
           lane: 1,
           dependsOn: [],
-          satisfies: ['AC-1'],
+          satisfies: ['AC-1', 'AC-2'],
           touches: ['src/a.css'],
           verify: [],
         },

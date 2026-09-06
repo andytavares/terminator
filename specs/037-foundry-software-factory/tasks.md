@@ -321,6 +321,30 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ---
 
+## Phase 12: What three audits found after the tasks were finished
+
+Every task above was done as written, and the feature still did not work. The
+tasks build mechanisms; nothing in the list builds the seams between them, and
+module-level reachability ("is this file imported?") passes while call-level
+reachability ("does anything call this?") fails. Recorded here because the next
+plan will have the same shape.
+
+- [x] T144 Join the Line's tail: the executor raises gates, climbs the ladder, applies house rules, acts on the inspection, and ships — twelve mechanisms that were built, tested and called by nothing (`4c5e93cd`)
+- [x] T145 Give the Forge an agent. Nothing wrote acceptance criteria, units, risk or budgets, so no order could ever pass the compile gate and the Line could never start from the interface. `forge/converge.ts` and `order/proposal.ts`, ADR-043 (`ee824fbb`)
+- [x] T146 Let the operator clear an adversarial finding — `resolveFinding` and `acceptFinding` existed and nothing called them, so the `redTeam` check refused every order for ever (`ee824fbb`)
+- [x] T147 Regrade from the change rather than the plan: shipping read the _planned_ risk grade, so a change that turned out to touch authentication could ship without the decision its real grade requires (`ee824fbb`)
+- [x] T148 One conversation per lane. Every node started a fresh agent that had read nothing — the failure `continueRun` exists to prevent (`ee824fbb`)
+- [x] T149 Honour a recipe's own declared gate rule, and check a judge's `expect` — both were parsed, validated and ignored (`ee824fbb`)
+- [x] T150 Surface six things a channel returned and no surface read: review completeness, the revert count, backpressure, stalls, the review step, and which rules the autonomy dial silences (`0315c711`)
+- [x] T151 Fix the intake path's four bugs: the redraft poll died after one tick, a denial carried no reason, the proposal was read at the first turn end, and a dead session was resumed (`0315c711`)
+- [x] T152 Enforce FR-040 — a change to a file a person looks at needs a picture of the running application, or the same written escape every criterion has. The existing fixture was exactly the case the requirement exists to catch
+- [x] T153 Guard the class of failure that hid all of this: `tests/channel-registry.spec.ts` fails on a duplicate `reg()`, which threw inside `activate` and stopped the whole extension loading while the build stayed green and 7,837 tests passed
+
+**Checkpoint**: every exported mechanism has a production caller, every
+registered channel is reachable, and every field a channel returns is read.
+
+---
+
 ## Phase 11: Polish & Cross-Cutting Concerns
 
 - [x] T135 [P] Write ADR-040 recording the work order as the only contract between intake and execution, superseding ADR-010 and ADR-012, in `docs/adr/040-the-work-order-is-the-contract.md`

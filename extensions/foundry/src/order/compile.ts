@@ -60,6 +60,36 @@ function checkQuestions(order: WorkOrder): CompileFailure | null {
  * criterion as unverifiable, but only in writing, and the reason travels with
  * the order.
  */
+/** Files a person looks at. A change to one is a change somebody can see. */
+const UI_FILE = /\.(tsx|jsx|vue|svelte|css|scss|html)$/
+
+/**
+ * A change somebody can see needs a picture of it (FR-040).
+ *
+ * Not a rule about screenshots for their own sake: every UI failure in this
+ * project's history passed its structural assertions first, and a criterion
+ * proved by a command cannot say whether the thing renders. The escape is the
+ * same one every criterion has — accept it as unverifiable, in writing.
+ */
+function checkPicture(order: WorkOrder): CompileFailure | null {
+  const seen = order.plan.units.filter((unit) => unit.touches.some((p) => UI_FILE.test(p)))
+  if (seen.length === 0) return null
+
+  const pictured = order.acceptance.some(
+    (criterion) =>
+      criterion.unverifiable?.accepted === true ||
+      criterion.verify.kind === 'screenshot' ||
+      (criterion.verify.kind === 'judge' && criterion.verify.evidence.includes('screenshot'))
+  )
+  if (pictured) return null
+
+  return {
+    check: 'verifiable',
+    detail: `${seen.map((u) => u.id).join(', ')} change what a person sees, and no criterion asks for a picture of the running application. A command cannot say whether it renders.`,
+    subjectIds: seen.map((unit) => unit.id),
+  }
+}
+
 function checkVerifiable(order: WorkOrder): CompileFailure | null {
   const unprovable = order.acceptance.filter((criterion) => {
     if (criterion.unverifiable?.accepted === true) return false
@@ -215,7 +245,7 @@ function checkBudgets(order: WorkOrder): CompileFailure | null {
 export function compileOrder(order: WorkOrder): CompileResult {
   const failures = [
     checkQuestions(order),
-    checkVerifiable(order),
+    checkVerifiable(order) ?? checkPicture(order),
     checkCoverage(order) ?? checkLaneOwnership(order),
     checkRisk(order),
     checkRedTeam(order),

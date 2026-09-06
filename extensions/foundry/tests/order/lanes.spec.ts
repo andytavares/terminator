@@ -282,3 +282,88 @@ describe('holding a merge (FR-067)', () => {
     expect(mayMergeLane(planLanes(single()), 1, [])).toMatchObject({ allowed: true })
   })
 })
+
+describe('a change somebody can see needs a picture of it (FR-040)', () => {
+  function uiOrder(over: Partial<WorkOrder> = {}): WorkOrder {
+    const base = order()
+    return {
+      ...base,
+      plan: {
+        ...base.plan,
+        lanes: [{ ord: 1, repo: 'proto', branch: '', role: null, blocks: [], blockedBy: [] }],
+        units: [unit({ id: 'U-1', lane: 1, touches: ['src/components/Inbox.tsx'] })],
+        sharedFiles: [],
+      },
+      risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+      ...over,
+    }
+  }
+
+  it('refuses one whose criteria are all commands', () => {
+    const result = compileOrder(uiOrder())
+    expect(result.ok).toBe(false)
+    expect(result.failures.find((f) => f.check === 'verifiable')?.detail).toMatch(
+      /picture of the running application/
+    )
+  })
+
+  it('accepts a screenshot criterion', () => {
+    const withPicture = uiOrder({
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'the row renders',
+          priority: 'P1',
+          verify: { kind: 'screenshot', target: 'the inbox' },
+          unverifiable: null,
+        },
+      ],
+    })
+    expect(compileOrder(withPicture).ok).toBe(true)
+  })
+
+  it('accepts a judge that names a screenshot as its evidence', () => {
+    const judged = uiOrder({
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'the row reads at a glance',
+          priority: 'P1',
+          verify: { kind: 'judge', rubric: 'is it legible', evidence: ['screenshot'] },
+          unverifiable: null,
+        },
+      ],
+    })
+    expect(compileOrder(judged).ok).toBe(true)
+  })
+
+  it('takes the same escape every criterion has, in writing', () => {
+    const accepted = uiOrder({
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'it looks right',
+          priority: 'P1',
+          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+          unverifiable: { accepted: true, reason: 'no display in this environment' },
+        },
+      ],
+    })
+    expect(compileOrder(accepted).ok).toBe(true)
+  })
+
+  it('asks nothing of a change nobody looks at', () => {
+    const backend = uiOrder({
+      plan: {
+        ...uiOrder().plan,
+        units: [unit({ id: 'U-1', lane: 1, touches: ['src/main/auth.ts'] })],
+      },
+    })
+    expect(compileOrder(backend).ok).toBe(true)
+  })
+
+  it('names the units that change what is seen', () => {
+    const failure = compileOrder(uiOrder()).failures.find((f) => f.check === 'verifiable')
+    expect(failure?.subjectIds).toEqual(['U-1'])
+  })
+})
