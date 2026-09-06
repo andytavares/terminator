@@ -1,0 +1,78 @@
+extensions/foundry/tests/line/executor.spec.ts
+  s_357c91d2b54b02::t_7b52aaf1ff22d3 9,501-502,505-507,512-522,553,558-559,561-564,566-575,580,584,588-599
+  s_357c91d2b54b02::t_b750081821cc82 415-500,503-504,508-511,523-552,554-557,560,565,576-579,581-583,585-587,600-654
+  s_357c91d2b54b02::t_10cef544399614 119-120,122-123,217,221-223,225-238,329-332,335,346-351
+extensions/foundry/tests/line/integrate.spec.ts
+  s_357c91d2b54b02::t_c78d2bace020f5 645-647,657-757
+  s_357c91d2b54b02::t_569d4a97441cb9 648-656
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_7d910da9e40c8b 971-976,978-991,993-1002
+  s_357c91d2b54b02::t_aaa7988da66f85 700-709,712-726,729-733
+  s_357c91d2b54b02::t_9fe3f666698d2b 943
+  s_357c91d2b54b02::t_5e6b8850883003 727-728
+  s_357c91d2b54b02::t_520554f6cbc07b 740,763,846,850
+  s_357c91d2b54b02::t_6e0bebf04cce88 20,637,739,741-747,750,752-762,764-799,826-845,847-849,851-862
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_357c91d2b54b02::t_30024eb8e46073 495-536,540-546,549,551-595
+  s_357c91d2b54b02::t_569d4a97441cb9 537-539
+  s_357c91d2b54b02::t_8e95b403e5aebb 547-548,550
+extensions/foundry/tests/line/brief.spec.ts
+  s_357c91d2b54b02::t_569d4a97441cb9 194-196
+  s_357c91d2b54b02::t_1b05a9f3a19062 1-193,197-278
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_357c91d2b54b02::t_4e02ad55370c76 312-315,331-335,340-349,351-362
+  s_357c91d2b54b02::t_569d4a97441cb9 316-330,336-339,350
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_357c91d2b54b02::t_73e23e78d13682 1-139,145-166
+  s_357c91d2b54b02::t_1d980c5c07a4e4 140-144
+extensions/foundry/src/ipc/run-channels.ts
+  s_357c91d2b54b02::t_9c00b48e9c7c0f 9,25,51-52,226-276,322
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_357c91d2b54b02::t_6745154ba77a1f 66-69,554-577
+  s_357c91d2b54b02::t_b0c8d38f07e0fa 64-65,70,463-479,483-489,495-516,524-553
+  s_357c91d2b54b02::t_9a225a071daae9 59-63,354-454,456-462
+  s_357c91d2b54b02::t_1d980c5c07a4e4 455,480-482,490-494,517-523
+extensions/foundry/src/components/foundry.css
+  s_357c91d2b54b02::t_cee1c6aeed2520 367-457
+  s_357c91d2b54b02::t_b0c8d38f07e0fa 472-498
+  s_357c91d2b54b02::t_6745154ba77a1f 458-471
+extensions/foundry/src/line/executor.ts
+  s_357c91d2b54b02::t_569d4a97441cb9 136-137
+  s_357c91d2b54b02::t_10cef544399614 221-230
+  s_357c91d2b54b02::t_50ea628d6324f2 1-8,13,16,21-26,59-85,94-95,103-114,117-130,133-135,138-140
+  s_357c91d2b54b02::t_0fe50e27f7bf65 237
+  s_357c91d2b54b02::t_c8f80d128e4d7a 159-160,163,166-216,231-236,238-245,264,284,303-314,319-320,322,326,334-371,375,377-387
+extensions/foundry/src/line/brief.ts
+  s_357c91d2b54b02::t_a0a69e86fae2b3 1-70,75-79,86-124,133-158,160-179,184
+  s_357c91d2b54b02::t_569d4a97441cb9 71-74,80-85,125-132,159,180-183
+extensions/foundry/src/line/integrate.ts
+  s_357c91d2b54b02::t_9f658dcaa03eff 9,54-55,62-69,87-91,93-98,223-236
+  s_357c91d2b54b02::t_1a7a138410da3b 92,480-508
+  s_357c91d2b54b02::t_e72132998735c8 237
+tests/e2e/foundry.spec.ts
+  s_357c91d2b54b02::t_1046b3f6c508ae 3,277-401
+  s_357c91d2b54b02::t_48b94fa98d3e3b 402
+extensions/foundry/src/components/Floor.tsx
+  s_357c91d2b54b02::t_c4d14e2818616f 55-75,140-142,172-175,253-254,265-293,479-494,496-505,516-561,563-567
+  s_357c91d2b54b02::t_cebc7814622518 2-11,76-90,143-144,180,228-252,255-264,495,506-515,562,568-573,575-576,593-615
+  s_357c91d2b54b02::t_71b662430b096e 91-97,145,176-179,181,294-301,574,577-592
+  s_357c91d2b54b02::t_cee27870153d59 302,616
+extensions/foundry/src/components/Inbox.tsx
+  s_357c91d2b54b02::t_71b662430b096e 30-39,72,77-94,122-130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "4c5e93cd7b29c07a0be3cb8dae5a93927cc4ce80",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
