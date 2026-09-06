@@ -226,7 +226,7 @@ export function PrOverviewPanel({
               className="pr-overview-your-review-badge"
               title="You have been requested to review this PR"
             >
-              <Eye size={11} strokeWidth={2} />
+              <Eye aria-hidden="true" />
               Your review requested
             </span>
           )}

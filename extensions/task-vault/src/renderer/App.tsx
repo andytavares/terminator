@@ -1,9 +1,13 @@
 import React, { useEffect } from 'react'
 import { TaskVaultView, CaptureModal } from '../components/TaskVaultView'
 import { CalendarDrawer } from '../components/CalendarDrawer'
-import { ExtensionToastContainer } from '../components/ExtensionToastContainer'
+import { ToastRegion } from '@terminator/extension-ui'
 import { useVaultNavStore } from '../stores/vault-nav.store'
-import { addExtensionToast, type ToastType } from '../stores/extension-toast.store'
+import {
+  addExtensionToast,
+  useExtensionToastStore,
+  type ToastType,
+} from '../stores/extension-toast.store'
 
 interface SerializedNotification {
   id: string
@@ -51,7 +55,7 @@ export function App(): JSX.Element {
     return (
       <div className="vault-cal-panel" style={{ width: '100%', borderLeft: 'none' }}>
         <CalendarDrawer />
-        <ExtensionToastContainer />
+        <VaultToasts />
       </div>
     )
   }
@@ -60,7 +64,31 @@ export function App(): JSX.Element {
     <>
       <TaskVaultView />
       <CaptureModal />
-      <ExtensionToastContainer />
+      <VaultToasts />
     </>
+  )
+}
+
+/**
+ * The vault's toasts, drawn by the shared component.
+ *
+ * The store keeps its own dismissal timer, so `duration: 0` tells the toast
+ * not to run a second one — one owner for when a message disappears. The old
+ * container this replaces printed ℹ ✓ ⚠ ✕ as text (Principle XII) and made
+ * the whole toast a click target with nothing to say so.
+ */
+function VaultToasts(): React.JSX.Element {
+  const { toasts, removeToast } = useExtensionToastStore()
+  return (
+    <ToastRegion
+      toasts={toasts.map((t) => ({
+        id: t.id,
+        message: t.message,
+        tone: t.type,
+        duration: 0,
+        action: t.onClick ? { label: 'View', onSelect: t.onClick } : undefined,
+      }))}
+      onDismiss={removeToast}
+    />
   )
 }

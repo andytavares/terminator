@@ -10,8 +10,17 @@ export interface ToastItem {
   id: string
   message: string
   tone?: ToastTone
-  /** Milliseconds. An error is sticky by default — it is the one you must read. */
+  /** Milliseconds. An error is sticky by default — it is the one you must read.
+   *  Zero means the caller owns dismissal. */
   duration?: number
+  /**
+   * Somewhere to go from here.
+   *
+   * A named button, not a click target on the whole toast: an affordance the
+   * reader cannot see is one they will not use, and one they will trigger by
+   * accident reaching for the dismiss.
+   */
+  action?: { label: string; onSelect: () => void }
 }
 
 const DEFAULT_DURATION_MS = 5000
@@ -26,7 +35,13 @@ export interface ToastProps extends Omit<ToastItem, 'id'> {
  * `role="status"` announces politely and never takes focus, which is what lets
  * a toast appear over an open dialog without interrupting it.
  */
-export function Toast({ message, tone = 'info', duration, onDismiss }: ToastProps): JSX.Element {
+export function Toast({
+  message,
+  tone = 'info',
+  duration,
+  action,
+  onDismiss,
+}: ToastProps): JSX.Element {
   const dismissRef = useRef(onDismiss)
   dismissRef.current = onDismiss
 
@@ -40,6 +55,11 @@ export function Toast({ message, tone = 'info', duration, onDismiss }: ToastProp
   return (
     <div className="tmui-toast" data-tone={tone} role="status">
       <span className="tmui-toast__message">{message}</span>
+      {action && (
+        <button type="button" className="tmui-toast__action" onClick={action.onSelect}>
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
         className="tmui-icon-button tmui-toast__dismiss"
@@ -69,6 +89,7 @@ export function ToastRegion({ toasts, onDismiss }: ToastRegionProps): JSX.Elemen
           message={toast.message}
           tone={toast.tone}
           duration={toast.duration}
+          action={toast.action}
           onDismiss={() => onDismiss(toast.id)}
         />
       ))}

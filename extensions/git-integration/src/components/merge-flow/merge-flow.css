@@ -108,7 +108,9 @@
 }
 
 .conflict-hub__branch-arrow {
-  font-size: 0.75rem;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
   color: var(--tm-text-muted);
 }
 
@@ -284,9 +286,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.5rem;
-  color: var(--tm-on-accent);
+  color: var(--tm-on-success);
   font-weight: 700;
+}
+
+.conflict-hub__file-dot svg {
+  width: 7px;
+  height: 7px;
 }
 
 .conflict-hub__lang-badge {
@@ -1417,7 +1423,9 @@
 }
 
 .completion-screen__branch-arrow {
-  font-size: 0.75rem;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
   color: var(--tm-text-muted);
 }
 
@@ -1441,12 +1449,18 @@
   height: 64px;
   border-radius: 50%;
   background: var(--tm-success);
-  color: var(--tm-on-accent);
+  color: var(--tm-on-success);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.75rem;
   font-weight: 700;
+}
+
+/* Principle XII: these were text glyphs sized with font-size, which does
+   nothing to an SVG — lucide would fall back to 24px inside a 10px dot. */
+.completion-screen__check svg {
+  width: 30px;
+  height: 30px;
 }
 
 .completion-screen__title {
@@ -1706,4 +1720,23 @@
 
 .git-sidebar__resolve-conflicts-btn:hover {
   opacity: 0.85;
+}
+
+/* Principle XII: the glyphs these buttons used to print are icons now, and an
+   icon takes its size from here. */
+.conflict-hub__start-over {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.conflict-hub__start-over svg {
+  width: 12px;
+  height: 12px;
+}
+
+.conflict-hub__exit svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }

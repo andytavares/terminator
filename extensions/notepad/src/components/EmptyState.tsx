@@ -10,7 +10,7 @@ export function EmptyState({ onNewNote, onImport }: EmptyStateProps): React.JSX.
   return (
     <div className="notepad-empty-state">
       <span className="notepad-empty-state__icon">
-        <Pencil size={36} />
+        <Pencil aria-hidden="true" />
       </span>
       <h2 className="notepad-empty-state__heading">No notes yet</h2>
       <p className="notepad-empty-state__desc">

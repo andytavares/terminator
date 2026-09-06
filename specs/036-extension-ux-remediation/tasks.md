@@ -299,10 +299,10 @@ measured from computed colours rather than parsed stylesheet text.
 - [ ] T101 [P] Update `docs/EXTENSION-DEVELOPMENT.md` and `packages/extension-sdk/README.md` with the v1.3.0 surface and a migration note for third-party extensions
 - [ ] T102 [P] Update `README.md` and `docs/user-guide/USER-GUIDE.md` for the four redesigned views
 - [ ] T103 [P] Add the CHANGELOG entry under `### Fixed` describing the behaviour matrix, the Escape defect and the four redesigns
-- [ ] T104 Convert `size={n}` icon props to CSS-controlled sizing in every component this feature rewrote, per the Complexity Tracking position (Principle XII)
-- [ ] T105 Replace unicode characters used as visual elements with lucide icons in `extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx`, `merge-flow/ConflictHub.tsx` and `pr-review/FullFileList.tsx` (Principle XII)
+- [x] T104 Convert `size={n}` icon props to CSS-controlled sizing in every component this feature rewrote, per the Complexity Tracking position (Principle XII)
+- [x] T105 Replace unicode characters used as visual elements with lucide icons in `extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx`, `merge-flow/ConflictHub.tsx` and `pr-review/FullFileList.tsx` (Principle XII)
 - [ ] T106 Record the remaining Principle XII debt in the untouched components as a follow-up issue rather than sweeping it silently into this PR
-- [ ] T107 Delete every superseded implementation left dormant, verifying nothing references it (Constitution X)
+- [x] T107 Delete every superseded implementation left dormant, verifying nothing references it (Constitution X)
 - [ ] T108 Run the full `quickstart.md` validation end to end
 - [ ] T109 Run the done gate from the worktree: `npm run format`, `npm run lint` (0 errors), `npm run test` — check the **exit code**, not the printed pass count — then `npx playwright test`
 

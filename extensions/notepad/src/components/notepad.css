@@ -713,6 +713,12 @@
   max-width: 520px;
 }
 
+/* Principle XII: sized here, not with a `size` prop. */
+.notepad-empty-state__icon svg {
+  width: 36px;
+  height: 36px;
+}
+
 .notepad-empty-state__icon {
   opacity: 0.4;
   display: flex;

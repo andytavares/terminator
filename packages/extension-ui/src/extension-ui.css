@@ -287,3 +287,24 @@
   font-family: var(--tm-font-ui);
   font-size: 13px;
 }
+
+.tmui-toast__action {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-xs);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tmui-toast__action:hover {
+  background: var(--tm-overlay);
+}
+
+.tmui-toast__action:focus-visible {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: 2px;
+}

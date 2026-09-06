@@ -1,4 +1,5 @@
 import React from 'react'
+import { ArrowRight, Check, RotateCcw, X } from 'lucide-react'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import type { ConflictFile } from '../../schemas/merge-flow.schema'
 
@@ -96,7 +97,7 @@ function FileCard({
         className="conflict-hub__file-dot"
         style={{ background: isResolved ? 'var(--tm-success)' : dotColor }}
       >
-        {isResolved ? '✓' : ''}
+        {isResolved && <Check aria-hidden="true" />}
       </span>
 
       <span
@@ -161,7 +162,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
         </div>
         <div className="conflict-hub__branch-crumb">
           <span className="conflict-hub__branch">{oursBranchDisplay}</span>
-          <span className="conflict-hub__branch-arrow">→</span>
+          <ArrowRight aria-hidden="true" className="conflict-hub__branch-arrow" />
           <span className="conflict-hub__branch">{theirsBranchDisplay}</span>
         </div>
         {session.isRebase && <span className="conflict-hub__rebase-badge">rebase</span>}
@@ -171,7 +172,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
             onClick={onStartOver}
             title="Reset all resolutions and start over"
           >
-            ↺ Start over
+            <RotateCcw aria-hidden="true" /> Start over
           </button>
         )}
         {onExit && (
@@ -181,7 +182,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
             aria-label="Exit merge flow"
             title="Exit merge flow"
           >
-            ✕
+            <X aria-hidden="true" />
           </button>
         )}
       </div>
