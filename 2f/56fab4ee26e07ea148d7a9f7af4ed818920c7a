@@ -1,0 +1,58 @@
+extensions/foundry/tests/data-root.spec.ts
+  s_357c91d2b54b02::t_668a1fad950aa4 1-115
+extensions/foundry/tests/verify/toolchain-probe.spec.ts
+  s_357c91d2b54b02::t_2c1ddab223d173 1-131
+extensions/foundry/tests/recipe/parse.spec.ts
+  s_357c91d2b54b02::t_0a08c4a659a090 1-96,167-199,227-259,291
+  s_357c91d2b54b02::t_0b7d21995e2816 260-290
+  s_357c91d2b54b02::t_62f7acd2c8f6b7 200-226
+  s_357c91d2b54b02::t_4226b7992b978d 97-166
+  s_357c91d2b54b02::t_a682ff98362c0c 292-309
+extensions/foundry/tests/ledger/append.spec.ts
+  s_357c91d2b54b02::t_abb868a632b242 1-129
+  s_357c91d2b54b02::t_49054aa5573cbd 130-134
+extensions/foundry/package.json
+  s_357c91d2b54b02::t_5e6d902d345e62 18-19
+  s_357c91d2b54b02::t_f5a8c92e4ca8d9 20
+extensions/foundry/src/verify/toolchain-probe.ts
+  s_357c91d2b54b02::t_bdf6f669a420d9 1-210
+  s_357c91d2b54b02::t_3439b096dab55e 211-216
+extensions/foundry/src/order/schema.ts
+  s_357c91d2b54b02::t_f7bda69edfade3 1-311
+  s_357c91d2b54b02::t_d269f319994eb2 312-321
+extensions/foundry/src/recipe/parse.ts
+  s_357c91d2b54b02::t_4bdeccb5e18c72 1-32,39-248
+  s_357c91d2b54b02::t_63267d0562f299 33-38
+extensions/foundry/src/data-root.ts
+  s_357c91d2b54b02::t_8cfe44f3e2349d 1-88
+extensions/foundry/src/ledger/append.ts
+  s_357c91d2b54b02::t_3f6bfe3d17af51 1-106
+extensions/foundry/tests/order/schema.spec.ts
+  s_357c91d2b54b02::t_3ca0fd14aa346b 88-95,98,101,104,107,111
+  s_357c91d2b54b02::t_f470ade90d4953 150-260
+  s_357c91d2b54b02::t_26e8c27272c5d9 288-325
+  s_357c91d2b54b02::t_696c1aedcfbcd3 1-87,96-97,99-100,102-103,105-106,108-110,112-149,261-287,326
+  s_357c91d2b54b02::t_55811af59b622c 327-337
+specs/037-foundry-software-factory/tasks.md
+  s_357c91d2b54b02::t_0b79663f3dafc6 56-60,64-70
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_eb86e81309d313 2797-2799,2801-2881,2884
+package-lock.json
+  s_357c91d2b54b02::t_1969836e079886 86-88,3715-3721
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "2f56fab4ee26e07ea148d7a9f7af4ed818920c7a",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
