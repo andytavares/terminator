@@ -234,6 +234,7 @@ describe('what a surface shows', () => {
   })
 
   it('flags the shared file on every lane that touches it, not just the producer', () => {
+    expect(laneViews(planned).length).toBeGreaterThan(1)
     for (const view of laneViews(planned)) {
       expect(view.collisions).toEqual(['proto/session.proto'])
     }

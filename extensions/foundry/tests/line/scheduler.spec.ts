@@ -219,6 +219,7 @@ describe('isComplete and hasStalled', () => {
 
   it('is complete when every node has passed or been skipped', () => {
     let g = graph([unit('U-1')])
+    expect(g.nodes.length).toBeGreaterThan(0)
     for (const node of g.nodes) g = markPassed(g, node.id, 'at')
     expect(isComplete(g)).toBe(true)
   })

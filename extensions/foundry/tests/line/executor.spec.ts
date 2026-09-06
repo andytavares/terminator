@@ -179,6 +179,7 @@ describe('execute', () => {
     const run = vi.fn(ok)
     const o = order()
     await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    expect(run.mock.calls.length).toBeGreaterThan(0)
     for (const call of run.mock.calls) {
       expect(call[0].resumeSessionId).toBeUndefined()
     }
@@ -220,6 +221,7 @@ describe('execute', () => {
   it('never lets the working session produce its own verdict', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok))
+    expect(outcome.verdicts.length).toBeGreaterThan(0)
     for (const verdict of outcome.verdicts) {
       expect(verdict.producedBy.sessionId).not.toBe('sess-build:U-1')
     }

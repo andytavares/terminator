@@ -426,6 +426,7 @@ describe('what run.observe says about lanes (FR-067, FR-068)', () => {
     await store.save(twoLanes())
     await channels().start({ id: 'WO-1' })
     const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    expect(r.lanes.length).toBeGreaterThan(1)
     for (const lane of r.lanes) expect(lane.collisions).toEqual(['proto/session.proto'])
   })
 

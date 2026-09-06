@@ -579,6 +579,7 @@ describe('one order across several repositories (FR-067, FR-068)', () => {
   it('names the shared file on both, not only on the producer', async () => {
     const d = multiDeps()
     const result = await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
+    expect(result.pulls).toHaveLength(2)
     for (const pull of result.pulls) {
       expect(fs.readFileSync(pull.bodyPath, 'utf8')).toContain('proto/session.proto')
     }

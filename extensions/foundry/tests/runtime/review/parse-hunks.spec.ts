@@ -41,6 +41,7 @@ describe('splitting a diff into reviewable hunks (FR-052)', () => {
   })
 
   it('drops diff metadata, which is not reviewable content', () => {
+    expect(parseHunks(PATCH).length).toBeGreaterThan(0)
     for (const hunk of parseHunks(PATCH)) {
       expect(hunk.lines.some((line) => line.startsWith('diff --git'))).toBe(false)
       expect(hunk.lines.some((line) => line.startsWith('index '))).toBe(false)
