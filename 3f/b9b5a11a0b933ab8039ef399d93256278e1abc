@@ -1,0 +1,46 @@
+specs/036-extension-ux-remediation/tasks.md
+  s_8aa585ff1f786f::t_4cc014445d7aeb 307
+  s_8aa585ff1f786f::t_ed05bc1c195538 306
+extensions/task-vault/src/components/task-vault.css
+  s_8aa585ff1f786f::t_7d53d440fa3354 46,51-52,5911,5919,7465
+  s_8aa585ff1f786f::t_aee26f1213b867 38-39,7350,7379,7425,7454
+tests/e2e/workspace.spec.ts
+  s_8aa585ff1f786f::t_28909423913710 67-73
+extensions/speckit-pilot/src/components/speckit-pilot.css
+  s_8aa585ff1f786f::t_7d53d440fa3354 1230,3101
+extensions/git-integration/src/components/git-integration.css
+  s_8aa585ff1f786f::t_aee26f1213b867 166,268,344,348,403,406,500-501,508,518,529,769
+  s_8aa585ff1f786f::t_7d53d440fa3354 190
+extensions/remote-control/src/components/RemoteControlView.tsx
+  s_8aa585ff1f786f::t_a40b2203b51594 3-12,336-340
+extensions/remote-control/src/components/remote-control-view.css
+  s_8aa585ff1f786f::t_a40b2203b51594 279-284
+extensions/git-integration/src/components/merge-flow/merge-flow.css
+  s_8aa585ff1f786f::t_aee26f1213b867 349,1624
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_8aa585ff1f786f::t_7d53d440fa3354 598
+  s_8aa585ff1f786f::t_b5f66c3dfd7371 819-820,827,834,840-841,843,856-857,861-863,869,879,1388-1390
+  s_8aa585ff1f786f::t_aee26f1213b867 406,1521-1522,2054,2790,2792,2811
+tests/e2e/speckit-supervised-run.spec.ts
+  s_8aa585ff1f786f::t_28909423913710 295-297
+extensions/notepad/src/components/notepad.css
+  s_8aa585ff1f786f::t_aee26f1213b867 637,1453,2265,2270,2274,2468,2471,2521-2522
+  s_8aa585ff1f786f::t_b5f66c3dfd7371 110,927,950,1221,1228-1229,1508,1980,2081,2132,2142-2143
+  s_8aa585ff1f786f::t_7d53d440fa3354 2315
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "3fb9b5a11a0b933ab8039ef399d93256278e1abc",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
