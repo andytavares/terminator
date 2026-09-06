@@ -95,7 +95,7 @@ export function registerGithubHandlers(
       if (search && /^\d+$/.test(search.trim())) {
         const raw = await gh(repoRoot, ['pr', 'view', search.trim(), '--json', PR_JSON_FIELDS])
         const pr = parseReviewQueuePR(JSON.parse(raw))
-        return { prs: [pr], hasMore: false }
+        return { prs: [pr], totalCount: 1, hasMore: false }
       }
 
       // Text search — always searches all states so nothing is missed
@@ -113,13 +113,13 @@ export function registerGithubHandlers(
           PR_JSON_FIELDS,
         ])
         const prs: ReviewQueuePR[] = (JSON.parse(raw) as unknown[]).map(parseReviewQueuePR)
-        return { prs, hasMore: false }
+        return { prs, totalCount: prs.length, hasMore: false }
       }
 
       // Paginated load via GraphQL
       const { owner, repo } = await ownerAndName(repoRoot)
       const gqlStates = includeClosedPrs ? '[OPEN,CLOSED,MERGED]' : 'OPEN'
-      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles mergeStateStatus author{login avatarUrl}assignees(first:10){nodes{login}}latestReviews(first:20){nodes{author{login avatarUrl}state submittedAt}}reviewRequests(first:10){nodes{requestedReviewer{...on User{login avatarUrl}...on Team{name}}}}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
+      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){totalCount pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles mergeStateStatus author{login avatarUrl}assignees(first:10){nodes{login}}latestReviews(first:20){nodes{author{login avatarUrl}state submittedAt}}reviewRequests(first:10){nodes{requestedReviewer{...on User{login avatarUrl}...on Team{name}}}}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
       const args = [
         'api',
         'graphql',
@@ -137,6 +137,7 @@ export function registerGithubHandlers(
         data: {
           repository: {
             pullRequests: {
+              totalCount: number
               pageInfo: { endCursor: string; hasNextPage: boolean }
               nodes: unknown[]
             }
@@ -144,10 +145,14 @@ export function registerGithubHandlers(
         }
       }
       const data = JSON.parse(raw) as GQLResponse
-      const { nodes, pageInfo } = data.data.repository.pullRequests
+      const { nodes, pageInfo, totalCount } = data.data.repository.pullRequests
       const prs: ReviewQueuePR[] = nodes.map((n) => parseReviewQueuePR(normalizeGraphQLNode(n)))
       return {
         prs,
+        // The count the summary line reports. Without it the view can only
+        // count the rows it happens to hold, which is the page size — so a
+        // repository with 47 open PRs said "20 waiting on you".
+        totalCount,
         hasMore: pageInfo.hasNextPage,
         nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : undefined,
       }

@@ -226,20 +226,20 @@ overflow menu.
 
 ### Tests for User Story 6 ⚠️ Write first, confirm they FAIL
 
-- [ ] T075 [P] [US6] Write a failing spec in `tests/unit/extensions/git-integration/review-queue.spec.tsx` asserting no row exposes approval as its primary action and that approval styling is identical across risk levels (FR-034a)
-- [ ] T076 [P] [US6] Write a failing spec asserting file status renders as a word, never a porcelain code (FR-036)
+- [x] T075 [P] [US6] Write a failing spec in `tests/unit/extensions/git-integration/review-queue.spec.tsx` asserting no row exposes approval as its primary action and that approval styling is identical across risk levels (FR-034a)
+- [x] T076 [P] [US6] Write a failing spec asserting file status renders as a word, never a porcelain code (FR-036)
 
 ### Implementation for User Story 6
 
-- [ ] T077 [US6] Replace the four stat tiles with a single summary line stating a true count and total reading time in `extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx` (FR-032)
-- [ ] T078 [US6] Fetch the true count so the summary never reads `20+`, and remove the manual "Load more" pagination in `extensions/git-integration/src/components/pr-review/ReviewQueue.tsx`
-- [ ] T079 [US6] State risk once in words per row and remove the unlabelled six-dot indicator, keeping the coloured edge, in `extensions/git-integration/src/components/pr-review/ReviewQueue.tsx` (FR-033)
-- [ ] T080 [US6] Make the row's primary action open the diff, and move approval into the row's overflow menu with risk-independent styling (FR-034, FR-034a)
-- [ ] T081 [US6] Remove the filter chips that duplicate the list's own section groupings in `extensions/git-integration/src/components/pr-review/PrReviewView.tsx` (FR-035)
-- [ ] T082 [US6] Render file status as words in `extensions/git-integration/src/components/StagingArea.tsx` and `GitSidebarPanel.tsx` (FR-036)
-- [ ] T083 [US6] Reduce the git panel's commit controls to one primary with alternates behind a caret, and state what would enable it when disabled, in `extensions/git-integration/src/components/GitSidebarPanel.tsx` (FR-037)
-- [ ] T084 [US6] Add ahead/behind branch context to the panel header in `extensions/git-integration/src/components/GitSidebarPanel.tsx`
-- [ ] T085 [US6] Verify chrome above the first queue row is ≤ 100px at the default window size (SC-014)
+- [x] T077 [US6] Replace the four stat tiles with a single summary line stating a true count and total reading time in `extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx` (FR-032)
+- [x] T078 [US6] Fetch the true count so the summary never reads `20+`, and remove the manual "Load more" pagination in `extensions/git-integration/src/components/pr-review/ReviewQueue.tsx`
+- [x] T079 [US6] State risk once in words per row and remove the unlabelled six-dot indicator, keeping the coloured edge, in `extensions/git-integration/src/components/pr-review/ReviewQueue.tsx` (FR-033)
+- [x] T080 [US6] Make the row's primary action open the diff, and move approval into the row's overflow menu with risk-independent styling (FR-034, FR-034a)
+- [x] T081 [US6] Remove the filter chips that duplicate the list's own section groupings in `extensions/git-integration/src/components/pr-review/PrReviewView.tsx` (FR-035)
+- [x] T082 [US6] Render file status as words in `extensions/git-integration/src/components/StagingArea.tsx` and `GitSidebarPanel.tsx` (FR-036)
+- [x] T083 [US6] Reduce the git panel's commit controls to one primary with alternates behind a caret, and state what would enable it when disabled, in `extensions/git-integration/src/components/GitSidebarPanel.tsx` (FR-037)
+- [x] T084 [US6] Add ahead/behind branch context to the panel header in `extensions/git-integration/src/components/GitSidebarPanel.tsx`
+- [x] T085 [US6] Verify chrome above the first queue row is ≤ 100px at the default window size (SC-014)
 
 **Checkpoint**: Approving a pull request now starts by reading it.
 

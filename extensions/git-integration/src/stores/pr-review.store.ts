@@ -21,6 +21,8 @@ interface PrReviewStore {
   loadingMorePrs: boolean
   queueError: string | null
   hasMorePrs: boolean
+  /** Open PRs in the repository, not rows loaded. Null until the first load. */
+  totalPrCount: number | null
   nextPrCursor: string | undefined
   includeClosedPrs: boolean
 
@@ -53,6 +55,7 @@ interface PrReviewStore {
   setLoadingMorePrs(loading: boolean): void
   setQueueError(error: string | null): void
   setHasMorePrs(hasMore: boolean): void
+  setTotalPrCount(total: number | null): void
   setNextPrCursor(cursor: string | undefined): void
   setIncludeClosedPrs(include: boolean): void
 
@@ -134,6 +137,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   loadingMorePrs: false,
   queueError: null,
   hasMorePrs: false,
+  totalPrCount: null,
   nextPrCursor: undefined,
   includeClosedPrs: false,
   activePr: null,
@@ -154,6 +158,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   setLoadingMorePrs: (loading) => set({ loadingMorePrs: loading }),
   setQueueError: (error) => set({ queueError: error }),
   setHasMorePrs: (hasMore) => set({ hasMorePrs: hasMore }),
+  setTotalPrCount: (total) => set({ totalPrCount: total }),
   setNextPrCursor: (cursor) => set({ nextPrCursor: cursor }),
   setIncludeClosedPrs: (include) => set({ includeClosedPrs: include }),
 

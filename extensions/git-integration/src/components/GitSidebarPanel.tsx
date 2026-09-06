@@ -1,4 +1,6 @@
 import React, { useCallback, useState } from 'react'
+import { ChevronDown, GitBranch } from 'lucide-react'
+import { Popover } from '@terminator/extension-ui'
 import { useGitStore } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
 import { StagingArea } from './StagingArea'
@@ -6,6 +8,38 @@ import { PrDialog } from './PrDialog'
 import './git-integration.css'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
 import { gitAPI } from '../api/git'
+
+/**
+ * "3 ahead of main · nothing to pull" — the two facts you most want before
+ * committing, which the header carried neither of.
+ */
+export function trackingLine(status: {
+  ahead?: number
+  behind?: number
+  upstream?: string | null
+}): string {
+  const ahead = status.ahead ?? 0
+  const behind = status.behind ?? 0
+  if (!status.upstream) return 'No upstream branch yet'
+  const parts: string[] = []
+  parts.push(ahead === 0 ? 'nothing to push' : `${ahead} ahead`)
+  parts.push(behind === 0 ? 'nothing to pull' : `${behind} behind`)
+  return parts.join(' · ')
+}
+
+/**
+ * Why the commit button is unavailable.
+ *
+ * A disabled control that does not say what would enable it leaves the reader
+ * guessing, which is exactly what three greyed-out buttons did.
+ */
+export function whyCannotCommit(stagedCount: number, message: string): string {
+  if (stagedCount === 0 && message.trim() === '') {
+    return 'Stage a file and describe the change to commit.'
+  }
+  if (stagedCount === 0) return 'Stage at least one file to commit.'
+  return 'Describe the change to commit.'
+}
 
 interface Props {
   repoRoot: string | null
@@ -21,6 +55,7 @@ export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Ele
   const [isPushing, setIsPushing] = useState(false)
   const [commitError, setCommitError] = useState<string | null>(null)
   const [showPrDialog, setShowPrDialog] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [existingPr, setExistingPr] = useState<PullRequest | null>(null)
 
   const stagedFiles = status?.files.filter((f) => f.staged) ?? []
@@ -119,7 +154,14 @@ export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Ele
     <div className="git-sidebar">
       <div className="git-sidebar__header">
         {status ? (
-          <span className="git-sidebar__branch">⎇ {status.branch}</span>
+          <>
+            <span className="git-sidebar__branch">
+              <GitBranch aria-hidden="true" /> {status.branch}
+            </span>
+            {/* Ahead/behind: the two facts you most want before committing, and
+                the header carried neither. */}
+            <span className="git-sidebar__tracking">{trackingLine(status)}</span>
+          </>
         ) : (
           <span className="git-sidebar__branch">Git</span>
         )}
@@ -160,28 +202,61 @@ export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Ele
             <span className="git-view__commit-error-msg">{commitError}</span>
           </div>
         )}
+        {/* Was three buttons of near-equal weight, two of them disabled and
+            hard to tell apart from the one that was not. One primary now, with
+            the alternates behind its caret. */}
         <div className="git-view__buttons">
           <button
-            className="git-view__btn git-view__btn--secondary"
-            onClick={() => void handleOpenPr()}
-          >
-            Open PR
-          </button>
-          <button
-            className="git-view__btn git-view__btn--secondary"
-            onClick={() => void handleCommit()}
-            disabled={!canCommit || isCommitting || isPushing}
-          >
-            {isCommitting ? '⟳ Committing…' : 'Commit'}
-          </button>
-          <button
-            className="git-view__btn git-view__btn--primary"
+            className="git-view__btn git-view__btn--primary git-view__btn--grow"
             onClick={() => void handleCommitAndPush()}
             disabled={!canCommit || isCommitting || isPushing}
           >
-            {isPushing ? '⟳ Pushing…' : 'Commit & Push'}
+            {isPushing ? 'Pushing…' : isCommitting ? 'Committing…' : 'Commit & push'}
           </button>
+          <div className="git-view__more">
+            <button
+              type="button"
+              className="git-view__btn git-view__btn--caret"
+              aria-label="Other commit actions"
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((v) => !v)}
+            >
+              <ChevronDown aria-hidden="true" />
+            </button>
+            {moreOpen && (
+              <Popover label="Other commit actions" onDismiss={() => setMoreOpen(false)}>
+                <button
+                  type="button"
+                  className="git-view__menu-item"
+                  disabled={!canCommit || isCommitting || isPushing}
+                  onClick={() => {
+                    setMoreOpen(false)
+                    void handleCommit()
+                  }}
+                >
+                  Commit without pushing
+                </button>
+                <button
+                  type="button"
+                  className="git-view__menu-item"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    void handleOpenPr()
+                  }}
+                >
+                  Open a pull request
+                </button>
+              </Popover>
+            )}
+          </div>
         </div>
+        {/* A disabled control that does not say what would enable it leaves the
+            reader guessing, which is what the three greyed buttons did. */}
+        {!canCommit && !isCommitting && !isPushing && (
+          <p className="git-view__commit-hint">
+            {whyCannotCommit(stagedFiles.length, commitMessage)}
+          </p>
+        )}
       </div>
 
       {showPrDialog && status && (

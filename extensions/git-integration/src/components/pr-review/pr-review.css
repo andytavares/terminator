@@ -65,19 +65,37 @@
 
 /* Stat cards */
 
-.pr-stat-cards-row {
+/* One line of triage. Padding was sized for the four tiles this replaced. */
+.pr-summary-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  padding: 14px 16px 10px;
+  padding: 8px 16px 6px;
   flex-shrink: 0;
 }
 
-.pr-stat-cards {
-  display: flex;
-  flex: 1;
-  gap: 10px;
-  flex-wrap: wrap;
+.pr-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.pr-summary__count {
+  color: var(--tm-text-primary);
+}
+
+.pr-summary__risk {
+  color: var(--tm-danger);
+}
+
+.pr-loading-rest {
+  margin: 0;
+  padding: 8px 16px;
+  color: var(--tm-text-muted);
+  font-size: 12px;
 }
 
 .pr-refresh-btn {
@@ -96,6 +114,12 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
+.pr-refresh-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
 .pr-refresh-btn:hover:not(:disabled) {
   color: var(--tm-text-primary);
   border-color: rgba(255, 255, 255, 0.3);
@@ -113,46 +137,17 @@
   animation: pr-spin 0.7s linear infinite;
 }
 
-.pr-stat-card {
-  flex: 1;
-  min-width: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-}
-
-.pr-stat-card--high {
-  border-color: rgba(248, 81, 73, 0.3);
-}
-
-.pr-stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--tm-text-primary);
-}
-
-.pr-stat-label {
-  font-size: 10px;
-  color: var(--tm-text-muted);
-  margin-top: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.3;
-}
-
 /* Filter pills */
 
+/* Search, open/closed and age: the three controls that scope the list, on the
+   one row, with the rule that used to sit under the pills. */
 .pr-search-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px 12px;
+  padding: 0 16px 8px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--tm-border);
 }
 
 .pr-search-input {
@@ -230,16 +225,9 @@
   cursor: default;
 }
 
-.pr-filter-pills {
-  display: flex;
-  gap: 6px;
-  padding: 0 16px 12px;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 .pr-filter-pill {
+  flex: 0 0 auto;
+  white-space: nowrap;
   padding: 4px 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 20px;

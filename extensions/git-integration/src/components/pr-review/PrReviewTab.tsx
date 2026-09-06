@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { githubAPI } from '../../api/github'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ReviewQueue } from './ReviewQueue'
@@ -19,6 +19,9 @@ interface Props {
   repoRoot: string | null
 }
 
+/** Pages fetched automatically after the first, per queue load. */
+const MAX_AUTO_PAGES = 10
+
 export function PrReviewTab({ repoRoot }: Props) {
   const {
     activePr,
@@ -28,6 +31,9 @@ export function PrReviewTab({ repoRoot }: Props) {
     markPrInProgress,
     dismissPr,
     nextPrCursor,
+    hasMorePrs,
+    queueLoading,
+    loadingMorePrs,
     includeClosedPrs,
     setIncludeClosedPrs,
     viewedFiles,
@@ -77,10 +83,24 @@ export function PrReviewTab({ repoRoot }: Props) {
     await loadQueue({ includeClosedPrs: include })
   }
 
-  const handleLoadMore = async () => {
-    if (!nextPrCursor) return
-    await loadQueue({ cursor: nextPrCursor, append: true })
-  }
+  // The queue is meant to be worked top to bottom, and "Load more pull
+  // requests" made finishing it a manual chore — while the summary above it
+  // could only count the rows already held, so it reported the page size as
+  // the total. Pages follow on their own now, bounded so a repository with
+  // thousands of open PRs cannot turn one screen into hundreds of API calls;
+  // past the bound the summary still states the real total from `totalCount`,
+  // and search reaches anything the list has not got to.
+  const autoPagesRef = useRef(0)
+  useEffect(() => {
+    autoPagesRef.current = 0
+  }, [repoRoot, includeClosedPrs])
+  useEffect(() => {
+    if (!hasMorePrs || !nextPrCursor) return
+    if (queueLoading || loadingMorePrs) return
+    if (autoPagesRef.current >= MAX_AUTO_PAGES) return
+    autoPagesRef.current += 1
+    void loadQueue({ cursor: nextPrCursor, append: true })
+  }, [hasMorePrs, nextPrCursor, queueLoading, loadingMorePrs, loadQueue])
 
   const handleOpenPr = async (pr: ReviewQueuePR) => {
     if (!repoRoot) return
@@ -254,7 +274,6 @@ export function PrReviewTab({ repoRoot }: Props) {
         repoRoot={repoRoot}
         onOpenPr={handleOpenPr}
         onRefresh={handleRefreshQueue}
-        onLoadMore={handleLoadMore}
         onDismissPr={handleDismissPr}
         includeClosedPrs={includeClosedPrs}
         onToggleClosedPrs={handleToggleClosed}

@@ -3,22 +3,30 @@ import { useGitStore } from '../stores/git.store'
 import type { GitFileStatus, GitStatus } from '../schemas/git.schema'
 import { gitAPI } from '../api/git'
 
+/**
+ * File status, in words.
+ *
+ * These were git's porcelain letters — M, A, D, R, U and a bare `?` for an
+ * untracked file. That is the plumbing's notation surfacing into the interface:
+ * the panel knows the file is new and was showing a punctuation mark instead of
+ * saying so.
+ */
 const STATUS_BADGE: Record<string, string> = {
-  modified: 'M',
-  added: 'A',
-  deleted: 'D',
-  renamed: 'R',
-  untracked: '?',
-  conflicted: 'U',
+  modified: 'Changed',
+  added: 'Added',
+  deleted: 'Deleted',
+  renamed: 'Renamed',
+  untracked: 'New',
+  conflicted: 'Conflict',
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  modified: 'modified',
-  added: 'added',
-  deleted: 'deleted',
-  renamed: 'renamed',
-  untracked: 'untracked',
-  conflicted: 'conflicted',
+  modified: 'Changed since the last commit',
+  added: 'Staged as a new file',
+  deleted: 'Deleted',
+  renamed: 'Renamed',
+  untracked: 'New — not tracked by git yet',
+  conflicted: 'Conflicted — needs resolving before it can be committed',
 }
 
 interface StagingAreaProps {
@@ -39,7 +47,7 @@ function FileItem({
   onSelect: (path: string, staged: boolean) => void
 }): JSX.Element {
   const isConflicted = file.status === 'conflicted'
-  const badge = STATUS_BADGE[file.status] ?? '~'
+  const badge = STATUS_BADGE[file.status] ?? 'Changed'
 
   return (
     <div

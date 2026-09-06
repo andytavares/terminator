@@ -23,13 +23,25 @@ const makeFile = (status: string, staged: boolean, path?: string) => ({
   isBinary: false,
 })
 
+// The badge used to carry git's porcelain letters — M, A, D, R, U, and a bare
+// "?" for an untracked file — with the raw status word as its tooltip. Both say
+// it in the reader's language now.
 const STATUS_TOOLTIP: Record<string, string> = {
-  modified: 'modified',
-  added: 'added',
-  deleted: 'deleted',
-  renamed: 'renamed',
-  untracked: 'untracked',
-  conflicted: 'conflicted',
+  modified: 'Changed since the last commit',
+  added: 'Staged as a new file',
+  deleted: 'Deleted',
+  renamed: 'Renamed',
+  untracked: 'New — not tracked by git yet',
+  conflicted: 'Conflicted — needs resolving before it can be committed',
+}
+
+const STATUS_BADGE_TEXT: Record<string, string> = {
+  modified: 'Changed',
+  added: 'Added',
+  deleted: 'Deleted',
+  renamed: 'Renamed',
+  untracked: 'New',
+  conflicted: 'Conflict',
 }
 
 function setupStore(
@@ -84,6 +96,9 @@ describe('StagingArea — file status badge tooltips', () => {
       const badge = document.querySelector(`.staging-area__badge--${status}`)
       expect(badge).not.toBeNull()
       expect(badge?.getAttribute('title')).toBe(label)
+      // Never a porcelain letter: the panel knows the file is new and should
+      // say so rather than printing a punctuation mark.
+      expect(badge?.textContent).toBe(STATUS_BADGE_TEXT[status])
     })
   })
 })

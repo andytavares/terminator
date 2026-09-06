@@ -46,6 +46,7 @@ const defaultStoreState = {
   queueError: null,
   rateLimitState: null,
   hasMorePrs: false,
+  totalPrCount: null,
   currentUserLogin: null,
 }
 
@@ -60,7 +61,6 @@ const defaultProps = {
   repoRoot: '/repo',
   onOpenPr: vi.fn(),
   onRefresh: vi.fn().mockResolvedValue(undefined),
-  onLoadMore: vi.fn().mockResolvedValue(undefined),
   onDismissPr: vi.fn().mockResolvedValue(undefined),
   includeClosedPrs: false,
   onToggleClosedPrs: vi.fn().mockResolvedValue(undefined),
@@ -81,11 +81,18 @@ describe('ReviewQueue', () => {
     expect(screen.getByText('No open pull requests.')).toBeTruthy()
   })
 
-  it('shows stat cards', () => {
+  it('summarises the queue in one line instead of four tiles', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      prQueue: [makePr({ number: 1, riskLevel: 'high' })],
+      totalPrCount: 1,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('Awaiting review')).toBeTruthy()
-    expect(screen.getByText('High risk — read these first')).toBeTruthy()
-    expect(screen.getByText('Total review time')).toBeTruthy()
+    expect(screen.getByText(/waiting on you/)).toBeTruthy()
+    expect(screen.getByText(/of reading/)).toBeTruthy()
+    // Two of the old tile labels told the reader what to do rather than naming
+    // a metric; the grouping below already does that.
+    expect(screen.queryByText('High risk — read these first')).toBeNull()
   })
 
   it('renders PR rows when queue has PRs', () => {
@@ -127,17 +134,18 @@ describe('ReviewQueue', () => {
     expect(screen.getByRole('searchbox')).toBeTruthy()
   })
 
-  it('shows filter pills when not searching', () => {
+  it('keeps only the filter the section headings cannot express', () => {
     render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('All')).toBeTruthy()
-    expect(screen.getByText('High risk')).toBeTruthy()
-    expect(screen.getByText('Quick wins')).toBeTruthy()
+    expect(screen.getByText('Open more than 3 days')).toBeTruthy()
+    // "High risk", "Quick wins" and "In progress" were each a heading in the
+    // list below, so the pill only hid the rest of the page to reach them.
+    expect(screen.queryByText('Quick wins')).toBeNull()
   })
 
   it('hides filter pills when searching', () => {
     render(<ReviewQueue {...defaultProps} />)
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'feature' } })
-    expect(screen.queryByText('All')).toBeNull()
+    expect(screen.queryByText('Open more than 3 days')).toBeNull()
   })
 
   it('shows "Open only" button by default', () => {
@@ -175,23 +183,25 @@ describe('ReviewQueue', () => {
     expect(screen.getByText(/GitHub API rate limit reached/)).toBeTruthy()
   })
 
-  it('shows load more button when hasMorePrs is true', () => {
+  it('says a page is on its way rather than asking for a click', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       hasMorePrs: true,
+      loadingMorePrs: true,
       prQueue: [makePr()],
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('Load more pull requests')).toBeTruthy()
+    expect(screen.getByText('Loading the rest…')).toBeTruthy()
+    expect(screen.queryByText('Load more pull requests')).toBeNull()
   })
 
-  it('renders HIGH label for high-risk PRs', () => {
+  it('renders the risk in words for high-risk PRs', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [makePr({ riskLevel: 'high', number: 10, title: 'Risky PR' })],
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('HIGH')).toBeTruthy()
+    expect(screen.getByText('High risk')).toBeTruthy()
     expect(screen.getByText('Read these first')).toBeTruthy()
   })
 
@@ -223,9 +233,13 @@ describe('ReviewQueue', () => {
 
   it('applies active filter pill when clicked', () => {
     render(<ReviewQueue {...defaultProps} />)
-    fireEvent.click(screen.getByText('High risk'))
-    const highRiskBtn = screen.getByText('High risk')
-    expect(highRiskBtn.className).toContain('pr-filter-pill--active')
+    const staleBtn = screen.getByText('Open more than 3 days')
+    fireEvent.click(staleBtn)
+    expect(staleBtn.className).toContain('pr-filter-pill--active')
+    // Pressing it again returns to the whole queue, so there is no state the
+    // control cannot leave.
+    fireEvent.click(staleBtn)
+    expect(staleBtn.className).not.toContain('pr-filter-pill--active')
   })
 
   it('shows approval chip when PR has approvals', () => {
@@ -241,7 +255,7 @@ describe('ReviewQueue', () => {
       ],
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('✓ 2 approved')).toBeTruthy()
+    expect(screen.getByText(/2 approved/)).toBeTruthy()
   })
 
   it('does not show approval chip when PR has no approvals', () => {
@@ -252,7 +266,7 @@ describe('ReviewQueue', () => {
       ],
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
-    expect(screen.queryByText(/✓.*approved/)).toBeNull()
+    expect(screen.queryByText(/approved/)).toBeNull()
   })
 
   it('shows Needs your review section when current user is a requested reviewer', () => {

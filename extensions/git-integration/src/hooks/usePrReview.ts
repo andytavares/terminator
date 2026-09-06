@@ -115,6 +115,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
     setRateLimitState,
     setHasMorePrs,
     setNextPrCursor,
+    setTotalPrCount,
     includeClosedPrs,
     setCurrentUserLogin,
   } = usePrReviewStore()
@@ -177,7 +178,12 @@ export function useLoadPrQueue(repoRoot: string | null) {
           }
           return
         }
-        const res = result as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
+        const res = result as {
+          prs: unknown[]
+          hasMore: boolean
+          nextCursor?: string
+          totalCount?: number
+        }
         const prs = parsePrList(res.prs)
         const prsWithStatus = await mergeSessionStatuses(repoRoot, prs, isAppend)
         if (isStale()) return
@@ -188,6 +194,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
         }
         setHasMorePrs(res.hasMore)
         setNextPrCursor(res.nextCursor)
+        setTotalPrCount(res.totalCount ?? null)
       } catch (e) {
         if (!isStale()) setQueueError(String(e))
       } finally {
@@ -211,6 +218,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
       setRateLimitState,
       setHasMorePrs,
       setNextPrCursor,
+      setTotalPrCount,
       setCurrentUserLogin,
     ]
   )

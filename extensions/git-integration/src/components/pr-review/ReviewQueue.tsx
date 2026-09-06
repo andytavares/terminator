@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Check, RefreshCw, TriangleAlert, X } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
 
-type Filter = 'all' | 'high-risk' | 'quick-wins' | 'in-progress' | 'stale'
+type Filter = 'all' | 'stale'
 
 const STALE_DAYS = 3
 
@@ -10,7 +11,6 @@ interface Props {
   repoRoot: string
   onOpenPr: (pr: ReviewQueuePR) => void
   onRefresh: (options?: { search?: string; includeClosedPrs?: boolean }) => Promise<void>
-  onLoadMore: () => Promise<void>
   onDismissPr: (prNumber: number) => Promise<void>
   includeClosedPrs: boolean
   onToggleClosedPrs: (include: boolean) => Promise<void>
@@ -20,7 +20,6 @@ export function ReviewQueue({
   repoRoot: _repoRoot,
   onOpenPr,
   onRefresh,
-  onLoadMore,
   onDismissPr,
   includeClosedPrs,
   onToggleClosedPrs,
@@ -31,7 +30,7 @@ export function ReviewQueue({
     loadingMorePrs,
     queueError,
     rateLimitState,
-    hasMorePrs,
+    totalPrCount,
     currentUserLogin,
   } = usePrReviewStore()
   const [activeFilter, setActiveFilter] = useState<Filter>('all')
@@ -63,22 +62,11 @@ export function ReviewQueue({
     }
   }
 
-  const handleLoadMore = async () => {
-    await onLoadMore()
-  }
-
   const now = Date.now()
   const staleMs = STALE_DAYS * 24 * 60 * 60 * 1000
 
   function matchesFilter(pr: (typeof prQueue)[number]): boolean {
     switch (activeFilter) {
-      case 'high-risk':
-        return pr.riskLevel === 'high'
-      case 'quick-wins':
-        return pr.riskLevel === 'low' && pr.additions + pr.deletions <= 100
-      case 'in-progress':
-        // Only the dedicated in-progress section shows these; hide from all other sections.
-        return false
       case 'stale':
         return now - new Date(pr.openedAt).getTime() > staleMs
       default:
@@ -125,17 +113,12 @@ export function ReviewQueue({
   )
   const larger = filtered.filter((p) => !readFirst.includes(p) && !quickWins.includes(p))
 
+  // Reading time is only knowable for the PRs actually loaded, so it is
+  // stated as a floor rather than passed off as the total when more remain.
   const totalMinutes = prQueue.reduce((s, p) => s + p.estimatedMinutes, 0)
+  const minutesArePartial = totalPrCount !== null && totalPrCount > prQueue.length
   const highRiskCount = prQueue.filter((p) => p.riskLevel === 'high').length
   const inProgressCount = prQueue.filter((p) => p.sessionStatus !== 'not-started').length
-
-  const filters: { id: Filter; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'high-risk', label: 'High risk' },
-    { id: 'quick-wins', label: 'Quick wins' },
-    { id: 'in-progress', label: 'In progress' },
-    { id: 'stale', label: 'Stale >3d' },
-  ]
 
   return (
     <div className="pr-review-queue">
@@ -154,41 +137,29 @@ export function ReviewQueue({
         </div>
       )}
 
-      {/* Stat cards + refresh */}
-      <div className="pr-stat-cards-row">
-        <div className="pr-stat-cards">
-          <div
-            className="pr-stat-card"
-            title="Total number of open pull requests awaiting your review."
-          >
-            <span className="pr-stat-value">
-              {prQueue.length}
-              {hasMorePrs ? '+' : ''}
-            </span>
-            <span className="pr-stat-label">Awaiting review</span>
-          </div>
-          <div
-            className="pr-stat-card pr-stat-card--high"
-            title="PRs with composite risk score ≥ 70 — flagged HIGH. These touch complex or heavily-imported files and need careful review."
-          >
-            <span className="pr-stat-value">{highRiskCount}</span>
-            <span className="pr-stat-label">High risk — read these first</span>
-          </div>
-          <div
-            className="pr-stat-card"
-            title="Estimated total review time across all open PRs, based on file count and diff size."
-          >
-            <span className="pr-stat-value">{totalMinutes}m</span>
-            <span className="pr-stat-label">Total review time</span>
-          </div>
-          <div
-            className="pr-stat-card"
-            title="PRs you have already opened — resume from where you stopped."
-          >
-            <span className="pr-stat-value">{inProgressCount}</span>
-            <span className="pr-stat-label">In progress — resume from where you stopped</span>
-          </div>
-        </div>
+      {/* One line of triage, not four tiles.
+          Two of the four routinely read "0" — half the row spent saying nothing
+          is wrong — and two of the labels carried instructions inside them
+          ("High risk — read these first"). A label names a metric; telling you
+          what to do with it belongs in the grouping below, which already does. */}
+      <div className="pr-summary-row">
+        <p className="pr-summary">
+          <b className="pr-summary__count">{totalPrCount ?? prQueue.length}</b> waiting on you
+          {highRiskCount > 0 && (
+            <>
+              {' · '}
+              <span className="pr-summary__risk">{highRiskCount} high risk</span>
+            </>
+          )}
+          {inProgressCount > 0 && (
+            <>
+              {' · '}
+              {inProgressCount} already started
+            </>
+          )}
+          {minutesArePartial ? ' · at least ' : ' · about '}
+          <b>{totalMinutes} min</b> of reading
+        </p>
         <button
           className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
           onClick={handleRefresh}
@@ -196,7 +167,7 @@ export function ReviewQueue({
           title="Refresh pull requests"
           aria-label="Refresh pull requests"
         >
-          ↻
+          <RefreshCw aria-hidden="true" />
         </button>
       </div>
 
@@ -222,22 +193,23 @@ export function ReviewQueue({
         >
           {includeClosedPrs ? 'Open + Closed' : 'Open only'}
         </button>
+        {/* Three of the five pills — High risk, Quick wins, In progress — named
+            a section that is already a heading in the list below, so pressing
+            one hid four fifths of the page to reach something visible by
+            scrolling. Age is the one axis the sections cannot express, so it is
+            the one control that survives, and it sits with the other two
+            controls that scope the list rather than owning a row of its own. */}
+        {!searchQuery && (
+          <button
+            type="button"
+            className={`pr-filter-pill${activeFilter === 'stale' ? ' pr-filter-pill--active' : ''}`}
+            aria-pressed={activeFilter === 'stale'}
+            onClick={() => setActiveFilter(activeFilter === 'stale' ? 'all' : 'stale')}
+          >
+            Open more than {STALE_DAYS} days
+          </button>
+        )}
       </div>
-
-      {/* Filter pills — only show when not searching */}
-      {!searchQuery && (
-        <div className="pr-filter-pills">
-          {filters.map((f) => (
-            <button
-              key={f.id}
-              className={`pr-filter-pill${activeFilter === f.id ? ' pr-filter-pill--active' : ''}`}
-              onClick={() => setActiveFilter(f.id)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Sections */}
       <div className="pr-sections">
@@ -262,35 +234,15 @@ export function ReviewQueue({
               accent="yellow"
               onOpen={onOpenPr}
             />
-            {activeFilter === 'in-progress' && inProgress.length === 0 && (
-              <div className="pr-queue-empty">
-                No in-progress reviews yet. Open a PR to start reviewing.
-              </div>
-            )}
-            {activeFilter !== 'in-progress' && (
-              <>
-                <PrSection
-                  title="Read these first"
-                  prs={readFirst}
-                  accent="red"
-                  onOpen={onOpenPr}
-                />
-                <PrSection title="Quick wins" prs={quickWins} accent="green" onOpen={onOpenPr} />
-                <PrSection title="Larger reviews" prs={larger} accent="none" onOpen={onOpenPr} />
-              </>
-            )}
+            <PrSection title="Read these first" prs={readFirst} accent="red" onOpen={onOpenPr} />
+            <PrSection title="Quick wins" prs={quickWins} accent="green" onOpen={onOpenPr} />
+            <PrSection title="Larger reviews" prs={larger} accent="none" onOpen={onOpenPr} />
           </>
         )}
       </div>
 
-      {/* Load more */}
-      {hasMorePrs && !searchQuery && !queueLoading && (
-        <div className="pr-load-more-row">
-          <button className="pr-load-more-btn" onClick={handleLoadMore} disabled={loadingMorePrs}>
-            {loadingMorePrs ? 'Loading…' : 'Load more pull requests'}
-          </button>
-        </div>
-      )}
+      {/* Pages arrive on their own; this only says so while one is in flight. */}
+      {loadingMorePrs && !searchQuery && <p className="pr-loading-rest">Loading the rest…</p>}
     </div>
   )
 }
@@ -319,7 +271,11 @@ function PrSection({
   )
 }
 
-const SIGNAL_LABELS = ['Tests', 'Coverage', 'CI', 'Lint', 'Churn', 'Blast'] as const
+const RISK_LABEL: Record<string, string> = {
+  high: 'High risk',
+  medium: 'Medium risk',
+  low: 'Low risk',
+}
 
 function PrRow({
   pr,
@@ -330,24 +286,16 @@ function PrRow({
   onOpen: (pr: ReviewQueuePR) => void
   onDismiss?: (prNumber: number) => Promise<void>
 }) {
-  const dots = [
-    pr.signalDots.tests,
-    pr.signalDots.coverage,
-    pr.signalDots.ci,
-    pr.signalDots.lint,
-    pr.signalDots.churn,
-    pr.signalDots.blast,
-  ]
-
   const isSession = pr.sessionStatus === 'paused' || pr.sessionStatus === 'in-progress'
+  // The row is one button and its onClick is onOpen — so this label named an
+  // outcome the click does not produce. On a low-risk PR it read "Approve" and
+  // opened the diff. A control says what happens when it is used.
   const actionLabel =
     pr.sessionStatus === 'paused'
       ? 'Resume'
       : pr.sessionStatus === 'in-progress'
         ? 'Continue'
-        : pr.riskLevel === 'high'
-          ? 'Review'
-          : 'Approve'
+        : 'Review'
   const actionModifier = isSession ? 'session' : pr.riskLevel
 
   const age = formatAge(pr.openedAt)
@@ -366,7 +314,7 @@ function PrRow({
             {pr.isDraft && <span className="pr-row-draft">Draft</span>}
             {pr.mergeStateStatus === 'dirty' && (
               <span className="pr-row-conflicts" title="This PR has merge conflicts">
-                ⚠ Conflicts
+                <TriangleAlert aria-hidden="true" /> Conflicts
               </span>
             )}
           </div>
@@ -376,7 +324,7 @@ function PrRow({
           </span>
           {pr.approvalCount > 0 && (
             <span className="pr-row-approved" title={`Approved by: ${pr.approvedBy.join(', ')}`}>
-              ✓ {pr.approvalCount} approved
+              <Check aria-hidden="true" /> {pr.approvalCount} approved
             </span>
           )}
           {fileProgress !== null && (
@@ -386,21 +334,13 @@ function PrRow({
           )}
         </div>
 
-        <div className="pr-row-signals">
-          {dots.map((level, i) => (
-            <span
-              key={i}
-              className={`pr-signal-dot pr-signal-dot--${level}`}
-              title={SIGNAL_LABELS[i]}
-            />
-          ))}
-        </div>
-
         <div className="pr-row-right">
-          <span className="pr-row-time">{pr.estimatedMinutes}m</span>
+          {/* "MED" needs a key; "Medium risk" does not. The estimate carries a
+              unit rather than floating as a bare "4m". */}
           <span className={`pr-risk-chip pr-risk-chip--${pr.riskLevel}`}>
-            {pr.riskLevel === 'high' ? 'HIGH' : pr.riskLevel === 'medium' ? 'MED' : 'LOW'}
+            {RISK_LABEL[pr.riskLevel] ?? 'Unrated'}
           </span>
+          <span className="pr-row-time">~{pr.estimatedMinutes} min</span>
           <span className={`pr-row-action pr-row-action--${actionModifier}`}>{actionLabel}</span>
         </div>
       </button>
@@ -411,7 +351,7 @@ function PrRow({
           title="Dismiss from in-progress"
           aria-label={`Dismiss PR #${pr.number} from in-progress`}
         >
-          ×
+          <X aria-hidden="true" />
         </button>
       )}
     </div>
