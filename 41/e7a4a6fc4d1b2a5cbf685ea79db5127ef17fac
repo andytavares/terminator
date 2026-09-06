@@ -1,0 +1,53 @@
+packages/extension-ui/src/Popover.tsx
+  s_8aa585ff1f786f::t_c98214ffcd4196 57-76
+src/main/extensions/extension-view-host.ts
+  s_8aa585ff1f786f::t_94eda8d38f4fc1 118-138,142-147
+  s_8aa585ff1f786f::t_9e2023187accf9 139-141
+extensions/remote-control/src/server/remote-server.ts
+  s_8aa585ff1f786f::t_9e2023187accf9 144-146
+  s_8aa585ff1f786f::t_94eda8d38f4fc1 123-143,147-152
+extensions/speckit-pilot/src/components/SettingsView.tsx
+  s_8aa585ff1f786f::t_07e4b5dca6a57c 301,331
+tests/unit/packages/extension-ui/popover.spec.tsx
+  s_8aa585ff1f786f::t_1b5d5087158741 106-145
+  s_8aa585ff1f786f::t_603c8a1160b3d1 146-148
+  s_8aa585ff1f786f::t_2fb1610c5920e9 149-154
+extensions/git-integration/src/components/git-integration.css
+  s_8aa585ff1f786f::t_753d0fbfa5f08f 351-354,358-362
+src/renderer/components/overview/BoardScreen.css
+  s_8aa585ff1f786f::t_27b3ff62d45eab 5-42
+src/renderer/components/overview/BoardScreen.tsx
+  s_8aa585ff1f786f::t_c98214ffcd4196 45
+  s_8aa585ff1f786f::t_010450be59dd69 116-123,125,127,130-131,133,135-140
+  s_8aa585ff1f786f::t_924d7d0634c309 141-168
+  s_8aa585ff1f786f::t_27b3ff62d45eab 2,169-180
+extensions/remote-control/src/components/RemoteControlSettings.tsx
+  s_8aa585ff1f786f::t_96937bcb1fb7b6 42,137,213
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_8aa585ff1f786f::t_7fd1de3257d8ba 168,174
+tests/e2e/extension-smoke.spec.ts
+  s_8aa585ff1f786f::t_aef944acd659fc 1-24,31-48,52-78,81-84,87-90,98-111,123-127,134-151,153-155
+  s_8aa585ff1f786f::t_778a6e44626332 112-122
+  s_8aa585ff1f786f::t_ceeecf30107cb3 79-80,91-94,96-97
+  s_8aa585ff1f786f::t_753d0fbfa5f08f 128-133,152
+  s_8aa585ff1f786f::t_0555fa0a0ff79e 85-86,95
+  s_8aa585ff1f786f::t_924d7d0634c309 25-30,49-51
+extensions/task-vault/src/components/task-vault.css
+  s_8aa585ff1f786f::t_7fd1de3257d8ba 6042-6046,6055,6063,6082,6158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "41e7a4a6fc4d1b2a5cbf685ea79db5127ef17fac",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
