@@ -73,7 +73,7 @@ describe('ladderFor', () => {
     const inspection = ladderFor({ toolchain: full, risk: risky, touchesUi: false }).find(
       (s) => s.rung === 'L4'
     )
-    expect(inspection?.status).toBe('runnable')
+    expect(inspection?.status).toBe('elsewhere')
     expect(inspection?.reason).toContain('secrets')
   })
 
@@ -84,11 +84,26 @@ describe('ladderFor', () => {
     expect(integration?.name).toMatch(/picture of the running application/)
   })
 
-  it('always keeps independent verification runnable — it needs no command', () => {
-    const l3 = ladderFor({ toolchain: toolchain(), risk: noRisk, touchesUi: false }).find(
-      (s) => s.rung === 'L3'
-    )
-    expect(l3?.status).toBe('runnable')
+  // Three rungs are not commands and never were: independent verification is
+  // the verifier's own node, the inspection is the inspector's, and the human
+  // decision is a gate. They used to be `runnable` with nothing to run, so
+  // every climb reported them "not measured" — three phantom gaps in every
+  // pull request body, on the one signal the design cannot afford to have
+  // people skim.
+  it('reports the rungs decided elsewhere as decided, never as a gap', () => {
+    const steps = ladderFor({ toolchain: toolchain(), risk: risky, touchesUi: false })
+    for (const rung of ['L3', 'L4', 'L6'] as const) {
+      const step = steps.find((s) => s.rung === rung)
+      expect(step?.status, rung).toBe('elsewhere')
+      expect(step?.reason, rung).not.toBe('')
+    }
+  })
+
+  it('says where each of them was decided, rather than only that it was', () => {
+    const steps = ladderFor({ toolchain: toolchain(), risk: risky, touchesUi: false })
+    expect(steps.find((s) => s.rung === 'L3')?.reason).toMatch(/verifier/)
+    expect(steps.find((s) => s.rung === 'L4')?.reason).toMatch(/findings/)
+    expect(steps.find((s) => s.rung === 'L6')?.reason).toMatch(/decision/)
   })
 
   it('reports every rung unavailable in a repository with nothing in it, and none as passing', () => {

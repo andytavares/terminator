@@ -91,6 +91,18 @@ function order(units = [unit('U-1'), unit('U-2')], over: Partial<WorkOrder> = {}
   return {
     ...base,
     status: 'agreed',
+    // A real toolchain, so the climb has real rungs. With an empty one the
+    // only steps the ladder offers are the three that are not commands at
+    // all, and every "a rung failed" test below would be passing on those.
+    context: {
+      ...base.context,
+      toolchain: {
+        ...base.context.toolchain,
+        test: { command: 'npm test', source: 'package.json' },
+        lint: { command: 'npm run lint', source: 'package.json' },
+        format: { command: 'npm run format', source: 'package.json' },
+      },
+    },
     acceptance: [
       {
         id: 'AC-1',

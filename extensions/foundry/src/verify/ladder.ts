@@ -16,7 +16,7 @@ import type { RiskAssessment } from '../order/schema.js'
 export const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
 export type Rung = (typeof RUNGS)[number]
 
-export type RungStatus = 'runnable' | 'unavailable' | 'not_triggered'
+export type RungStatus = 'runnable' | 'unavailable' | 'not_triggered' | 'elsewhere'
 
 export interface LadderStep {
   readonly rung: Rung
@@ -71,8 +71,8 @@ export function ladderFor(input: LadderInput): LadderStep[] {
           rung: 'L4',
           name: 'Security inspection',
           command: null,
-          status: 'runnable',
-          reason: `triggered by ${risk.triggers.join(', ')}`,
+          status: 'elsewhere',
+          reason: `triggered by ${risk.triggers.join(', ')} — see the findings`,
           check: null,
         }
       : {
@@ -97,8 +97,12 @@ export function ladderFor(input: LadderInput): LadderStep[] {
       rung: 'L3',
       name: 'Independent verification',
       command: null,
-      status: 'runnable',
-      reason: '',
+      // Not a command, and not a gap: the verifier runs as its own node on
+      // every unit, and its exit status is in the criteria table. Calling this
+      // "not measured" put three phantom gaps in every pull request body and
+      // taught the operator to skim the one signal that matters.
+      status: 'elsewhere',
+      reason: 'by the verifier on each unit — see the criteria table',
       check: null,
     },
     inspection,
@@ -107,8 +111,8 @@ export function ladderFor(input: LadderInput): LadderStep[] {
       rung: 'L6',
       name: 'Human decision',
       command: null,
-      status: 'runnable',
-      reason: 'only what a rule raised',
+      status: 'elsewhere',
+      reason: 'only what a rule raised — see the decision below',
       check: null,
     },
   ]
@@ -117,7 +121,7 @@ export function ladderFor(input: LadderInput): LadderStep[] {
 export interface StepOutcome {
   readonly rung: Rung
   readonly name: string
-  readonly result: 'pass' | 'fail' | 'not_measured' | 'not_triggered'
+  readonly result: 'pass' | 'fail' | 'not_measured' | 'not_triggered' | 'elsewhere'
   readonly reason: string
   readonly exitCode: number | null
 }
@@ -153,6 +157,19 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
         rung: step.rung,
         name: step.name,
         result: 'not_triggered',
+        reason: step.reason,
+        exitCode: null,
+      })
+      continue
+    }
+
+    if (step.status === 'elsewhere') {
+      // Decided, but not here. Neither a pass this climb can claim nor a gap
+      // it should report.
+      outcomes.push({
+        rung: step.rung,
+        name: step.name,
+        result: 'elsewhere',
         reason: step.reason,
         exitCode: null,
       })

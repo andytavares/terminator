@@ -755,3 +755,37 @@ describe('the body reports the climb (FR-056)', () => {
     expect(body).not.toContain('### Verification')
   })
 })
+
+// Three rungs are not commands: independent verification is the verifier's own
+// node, the inspection is the inspector's, and the human decision is a gate.
+// They used to climb as "runnable" with nothing to run, so every body reported
+// them "not measured" — three phantom gaps in every pull request, on the one
+// signal the design cannot afford to have people skim.
+describe('the rungs decided somewhere else', () => {
+  const CLIMB = {
+    steps: [
+      { rung: 'L0' as const, name: 'Lint', result: 'pass' as const, reason: '', exitCode: 0 },
+      {
+        rung: 'L3' as const,
+        name: 'Independent verification',
+        result: 'elsewhere' as const,
+        reason: 'by the verifier on each unit — see the criteria table',
+        exitCode: null,
+      },
+    ],
+    stoppedAt: null,
+    unmeasured: [],
+    ok: true,
+  }
+
+  it('says they were decided, and where', () => {
+    const body = prBody(order(), { verdicts: [verdict()], findings: [], ladder: CLIMB })
+    expect(body).toContain('decided — by the verifier on each unit')
+  })
+
+  it('never calls them a gap', () => {
+    const body = prBody(order(), { verdicts: [verdict()], findings: [], ladder: CLIMB })
+    expect(body).not.toMatch(/not measured here/)
+    expect(body).not.toContain('not measured — by the verifier')
+  })
+})

@@ -566,7 +566,9 @@ The document is the subject; the conversation sits behind it. On the left rail:
   document that depended on it are redrawn.
 - **"Not measurable here"**, when the repository has no command for a check.
   Those report **"not measured"** rather than passing. A green you did not earn
-  is worse than a gap you can see.
+  is worse than a gap you can see — and the three rungs that were never
+  commands (independent verification, the security inspection, your own
+  decision) say where they were decided instead of counting as gaps.
 
 **Draft the plan** is the first thing to press. Foundry seeds a draft with your
 problem statement and what it read in the repository; the architect turns that

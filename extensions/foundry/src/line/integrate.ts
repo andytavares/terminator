@@ -231,7 +231,10 @@ export function prBody(
   if (ladder !== null) {
     lines.push('', '### Verification', '', '| Rung | Step | Result |', '| --- | --- | --- |')
     for (const step of ladder.steps) {
-      const result = step.result === 'not_measured' ? `not measured — ${step.reason}` : step.result
+      const result =
+        step.result === 'not_measured' || step.result === 'elsewhere'
+          ? `${step.result === 'elsewhere' ? 'decided' : 'not measured'} — ${step.reason}`
+          : step.result
       lines.push(`| ${step.rung} | ${step.name} | ${result} |`)
     }
     if (ladder.unmeasured.length > 0) {
