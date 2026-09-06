@@ -584,6 +584,8 @@ of work", "graded P1, which is above the direct shape's ceiling"). Pick a
 different one in a click; the override is recorded alongside the proposal it
 replaced.
 
+![A work order in the Forge, with its convergence checks and the shape of work](screenshots/08b-foundry-forge.png)
+
 **Compile & hand off** agrees the order and starts the work. If the order is
 seeded from a tracker issue, a **Tracker write-back** panel lets you say which
 of _your_ workflow states each moment means — when work starts, when the draft
@@ -621,6 +623,8 @@ ones that ship with Foundry, and never a rule a repository carries, because
 neither is yours to delete. **Remove this check** takes one back out, and the
 removal is kept with its reason so the same proposal is not offered back to you
 next week.
+
+![The Ledger, with a check the operator accepted](screenshots/08c-foundry-ledger.png)
 
 ### Shipping
 

@@ -634,6 +634,12 @@
   border-bottom: 1px solid var(--tm-border);
 }
 
+/* The rule separates one proposal from the next; under the last one it read as
+   a stray line with nothing below it. */
+.fdry-proposal:last-of-type {
+  border-bottom: none;
+}
+
 .fdry-citations {
   margin: 6px 0;
   padding-left: 18px;
@@ -643,8 +649,44 @@
 
 .fdry-proposal-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* These had no rule at all, so Accept, Never-propose and Remove rendered as
+   bare text with an icon beside it — no border, no ground, nothing that reads
+   as pressable. Same treatment as the gate's actions, which is the other place
+   a decision is taken. */
+.fdry-proposal-actions button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fdry-proposal-actions button:hover {
+  color: var(--tm-text-primary);
+}
+
+.fdry-proposal-actions button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-proposal-actions button svg {
+  width: 13px;
+  height: 13px;
 }
 
 /* Merge order: one repository per row, in the order they land. */
