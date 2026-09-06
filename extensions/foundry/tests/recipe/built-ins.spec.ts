@@ -4,6 +4,9 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseRecipe, parseRole, STEP_KINDS } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
+import { createRoleRegistry } from '../../src/line/roles.js'
+import { brief } from '../../src/line/brief.js'
+import { draftOrder } from '../../src/order/schema.js'
 
 // The built-ins ship inside the extension, so they are available in a
 // repository that contains nothing of Foundry's. They are data, which means
@@ -214,4 +217,45 @@ describe('built-in roles', () => {
     const parsed = parseRole(read(rolesDir, file), file)
     expect(parsed.ok && parsed.value.prompt.trim().length).toBeGreaterThan(40)
   })
+})
+
+// Two roles ship that no built-in recipe names: the foreman and the
+// integrator. Scheduling and integration are code here, not agents. They are
+// not dead weight — an operator's own recipe may name any role (FR-021), and
+// the executor resolves a role by id with no list of which ones are "real".
+//
+// That is a claim, so it is proved rather than asserted: every shipped role
+// resolves through the same registry the executor uses, and briefs into a
+// message an agent could actually be launched with.
+describe('every shipped role is one an operator recipe could name', () => {
+  const registry = createRoleRegistry({
+    dataRoot: path.join(root, 'nowhere-data'),
+    repoPaths: [],
+    builtInDir: root,
+  })
+
+  const order = draftOrder({
+    id: 'WO-1',
+    title: 'rewrite the session refresh',
+    source: { kind: 'typed', tracker: null, key: null, url: null },
+    repoPaths: ['/tmp/repo'],
+    now: '2026-09-06T10:00:00.000Z',
+  })
+
+  it.each(roleFiles.map((f) => f.replace('.yaml', '')))(
+    '%s resolves through the registry',
+    (id) => {
+      expect(registry.get(id)?.id).toBe(id)
+    }
+  )
+
+  it.each(roleFiles.map((f) => f.replace('.yaml', '')))(
+    '%s briefs into something an agent can be launched with',
+    (id) => {
+      const text = brief({ order, role: registry.get(id) ?? null, unit: null, rules: [] })
+      expect(text.trim().length).toBeGreaterThan(50)
+      // The role's own prompt leads, because it is the instruction.
+      expect(text.startsWith((registry.get(id)?.prompt ?? '').trim())).toBe(true)
+    }
+  )
 })
