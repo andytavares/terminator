@@ -1,0 +1,60 @@
+extensions/task-vault/src/components/WeeklyReviewStep3Projects.tsx
+  s_8aa585ff1f786f::t_9d9c9bd5fc0cd7 79-80
+extensions/task-vault/src/components/DailyLog.tsx
+  s_8aa585ff1f786f::t_6a2c07afd806f4 2,44-45,1358,1532
+  s_8aa585ff1f786f::t_d6cf365a320345 75-81,86-87,91,1736-1745,1751-1753,1766
+  s_8aa585ff1f786f::t_301c50cd0c6ed3 1349-1355
+  s_8aa585ff1f786f::t_55841fdc89ccb2 1570-1575
+  s_8aa585ff1f786f::t_623fad5d9d1cea 1767-1768
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_8aa585ff1f786f::t_20bdb455b8063a 189-193
+  s_8aa585ff1f786f::t_0259678dd39687 109-112,114-123,128,133,135,143,147,149,187,196,221,229,240,251
+extensions/task-vault/src/components/CalendarDrawer.tsx
+  s_8aa585ff1f786f::t_8124ff99bbdc73 221,226-229
+  s_8aa585ff1f786f::t_611f0aba33c13a 4,62-65,140,246-263
+extensions/task-vault/src/components/WeeklyReviewStep5Someday.tsx
+  s_8aa585ff1f786f::t_9d9c9bd5fc0cd7 125-126
+extensions/task-vault/tests/components/calendar-load.spec.ts
+  s_8aa585ff1f786f::t_a83ae351710b38 2,51-79
+  s_8aa585ff1f786f::t_51607733d87949 1,3-50,80-81
+extensions/task-vault/tests/components/CalendarDrawer.spec.tsx
+  s_8aa585ff1f786f::t_07a2cdbc7ec000 219-220
+  s_8aa585ff1f786f::t_2464800b7dc26a 113-117
+extensions/task-vault/src/components/WeeklyReviewStep2Inbox.tsx
+  s_8aa585ff1f786f::t_9d9c9bd5fc0cd7 24-25
+extensions/task-vault/src/components/WeeklyReview.tsx
+  s_8aa585ff1f786f::t_2d2b5087896a3a 26-35,169-170,172-177,179-182
+extensions/task-vault/src/components/WeeklyReviewStepStaleTasks.tsx
+  s_8aa585ff1f786f::t_9d9c9bd5fc0cd7 124-125
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_8aa585ff1f786f::t_d433aeefcbf92d 13,554-561,563-567,569,574
+  s_8aa585ff1f786f::t_9043a9458a4f05 575,578
+extensions/task-vault/src/state/calendar-load.ts
+  s_8aa585ff1f786f::t_777c5c293bf136 47-52
+  s_8aa585ff1f786f::t_237fb577dafadb 1-32
+  s_8aa585ff1f786f::t_611f0aba33c13a 33-46,53
+extensions/task-vault/src/components/task-vault.css
+  s_8aa585ff1f786f::t_8124ff99bbdc73 7883-7888
+  s_8aa585ff1f786f::t_611f0aba33c13a 7889-7922
+  s_8aa585ff1f786f::t_2d2b5087896a3a 7822-7882
+extensions/task-vault/src/components/WeeklyReviewStep1GetClear.tsx
+  s_8aa585ff1f786f::t_925312413c03ff 77-90
+specs/036-extension-ux-remediation/tasks.md
+  s_8aa585ff1f786f::t_1894b509169aac 202-203,207-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "9d808810958f355e8996ae1c4be9b9e0c76762a9",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
