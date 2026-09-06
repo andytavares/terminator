@@ -5,7 +5,6 @@ allowResume: true
 reads: [graph, budgets, rules, ledger]
 writes: [schedule]
 tools: [read]
-outputSchema: schedule
 prompt: |
   Decide what runs next, inside the budget the order agreed to.
 

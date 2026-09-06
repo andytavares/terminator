@@ -45,8 +45,38 @@ export interface RoleRegistry {
    * this is the polite half, and the refusal is the structural one.
    */
   mayResume(id: string): boolean
+  /**
+   * Whether this role declared the class of work a tool belongs to.
+   *
+   * Takes the tool's own name — `Edit`, `Bash`, `Read` — and maps it to the
+   * vocabulary a role file uses. A tool in no class is allowed: the point is
+   * to hold a role to what it said it does, not to enumerate every tool an
+   * agent might reach for.
+   */
   mayUseTool(id: string, tool: string): boolean
   mayWrite(id: string): boolean
+}
+
+/**
+ * The `writes:` destinations that mean "this role edits files in the working
+ * copy". Everything else a role writes — findings, a plan, a schedule — is an
+ * artefact it returns, not a change to the repository.
+ */
+const CHECKOUT_WRITES: ReadonlySet<string> = new Set(['worktree', 'integration_branch', 'docs'])
+
+/**
+ * Which word in a role's `tools:` list a given tool needs.
+ *
+ * Only the writing tools are mapped. `Bash` is deliberately absent: a role's
+ * `run_tests` and `git` both arrive as Bash, and telling them apart is the
+ * read-only policy's job, which already reads the command rather than the
+ * tool name.
+ */
+const TOOL_CLASS: Record<string, string | undefined> = {
+  Edit: 'edit',
+  MultiEdit: 'edit',
+  Write: 'edit',
+  NotebookEdit: 'edit',
 }
 
 export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
@@ -82,16 +112,29 @@ export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
 
     mayUseTool(id, tool) {
       const role = get(id)
-      return role !== null && role.tools.includes(tool)
+      if (role === null) return false
+      const needed = TOOL_CLASS[tool]
+      // A tool this vocabulary says nothing about. Allowed — refusing every
+      // unlisted tool would refuse the ones every agent uses to think.
+      if (needed === undefined) return true
+      return role.tools.includes(needed)
     },
 
     /**
-     * A verifier's empty write list is not documentation — it is the reason a
-     * verifier that decided to fix what it found could not.
+     * Whether this role may write to the checkout.
+     *
+     * Not "does it write anything": the red team writes findings, the foreman
+     * writes a schedule and the architect writes a plan, and none of them
+     * touches the repository. This asked `writes.length > 0`, so all three
+     * came back true, and the executor installs its read-only policy on the
+     * answer — the adversarial pass could edit the code it was reviewing.
+     *
+     * Three destinations are the checkout, and they are the same three the
+     * built-in role tests already name.
      */
     mayWrite(id) {
       const role = get(id)
-      return role !== null && role.writes.length > 0
+      return role !== null && role.writes.some((target) => CHECKOUT_WRITES.has(target))
     },
   }
 }

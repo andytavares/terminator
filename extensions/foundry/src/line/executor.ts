@@ -55,6 +55,13 @@ export interface ExecutorDeps {
     resumeSessionId: string | undefined
     /** True when this role may not write; the caller installs the policy. */
     readOnly: boolean
+    /**
+     * The tier this role asked for, resolved here where the registry is.
+     * 'deep' for a node with no role, so the operator's choice stands.
+     */
+    modelTier: 'fast' | 'deep'
+    /** Whether this role declared the class of work a tool belongs to. */
+    mayUseTool: (tool: string) => boolean
   }) => Promise<StartedRun>
   readonly now: () => string
   readonly sources: ResolveSources
@@ -344,6 +351,8 @@ export async function execute(
             prompt: promptFor(order, recipe, node, roles, rules),
             resumeSessionId,
             readOnly,
+            modelTier: (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep',
+            mayUseTool: (tool) => roleId === null || roles.mayUseTool(roleId, tool),
           })
           return { node, result }
         })

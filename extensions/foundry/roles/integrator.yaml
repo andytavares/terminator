@@ -5,7 +5,6 @@ allowResume: true
 reads: [lanes, verdicts]
 writes: [integration_branch]
 tools: [read, edit, git]
-outputSchema: integration
 prompt: |
   Merge the lanes in their declared order and keep the result green.
 

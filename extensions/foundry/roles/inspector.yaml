@@ -5,7 +5,6 @@ allowResume: false
 reads: [diff, risk_triggers, rules]
 writes: []
 tools: [read, search]
-outputSchema: findings
 prompt: |
   Inspect this change for security risk. You were run because it touches
   something that warrants it — authentication, payments, secrets, a migration,

@@ -5,7 +5,6 @@ allowResume: false
 reads: [repo, issue, house_docs, prior_art]
 writes: [context]
 tools: [read, search]
-outputSchema: context
 prompt: |
   Read this repository and report what a plan would need to know. You change
   nothing and you ask nothing — anything you can find out yourself is not a

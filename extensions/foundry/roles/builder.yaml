@@ -5,7 +5,6 @@ allowResume: true
 reads: [unit, context, rules]
 writes: [worktree]
 tools: [read, search, edit, run_tests]
-outputSchema: unit_result
 prompt: |
   Build one unit, in its own worktree, and nothing else.
 

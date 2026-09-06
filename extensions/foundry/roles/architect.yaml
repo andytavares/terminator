@@ -5,7 +5,6 @@ allowResume: true
 reads: [intent, context]
 writes: [plan, acceptance]
 tools: [read, search]
-outputSchema: plan
 prompt: |
   Turn intent and context into criteria and a plan.
 

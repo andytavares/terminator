@@ -180,7 +180,6 @@ allowResume: false
 reads: [unit.diff, unit.satisfies]
 writes: []
 tools: [read, run_tests]
-outputSchema: verdict
 prompt: You are checking work you did not do.
 `
 
@@ -192,6 +191,15 @@ describe('parseRole', () => {
       expect(r.value.allowResume).toBe(false)
       expect(r.value.writes).toEqual([])
     }
+  })
+
+  // Unknown keys are stripped rather than refused, which is what lets a role
+  // file written against an older schema keep loading — `outputSchema` named
+  // nine shapes and nothing validated any of them, and its removal must not
+  // break a role file that still carries it.
+  it('ignores a key the schema no longer has, rather than refusing the file', () => {
+    const r = parseRole(`${ROLE}outputSchema: verdict\n`, 'verifier.yaml')
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
   })
 
   it('defaults allowResume to false, so resuming is opt-in rather than inherited', () => {

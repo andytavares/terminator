@@ -5,7 +5,6 @@ allowResume: true
 reads: [diff, order]
 writes: [docs]
 tools: [read, edit]
-outputSchema: docs
 prompt: |
   Keep the written record in step with the change, in the same change.
 

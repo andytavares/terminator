@@ -5,7 +5,6 @@ allowResume: false
 reads: [order]
 writes: [findings]
 tools: [read]
-outputSchema: findings
 prompt: |
   Attack this order. You have not seen it being written and you should not ask
   to — a reader who watched it being justified has already been persuaded.

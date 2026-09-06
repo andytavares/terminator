@@ -1016,3 +1016,66 @@ steps:
     expect(outcome.graph.nodes.find((n) => n.id === 'reproduce')?.state).toBe('passed')
   })
 })
+
+// The settings panel has always said the operator's model applies "unless a
+// role asks for something else". Nothing read `modelTier`, so it applied to
+// everything — the scribe, which four recipes use and which every role file
+// marks `fast`, ran on the deep model like the architect.
+describe('the tier a role asked for', () => {
+  const TIERED = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: document
+    kind: agent
+    role: scribe
+    after: [build]
+`
+
+  async function tiers(): Promise<{ role: string | null; modelTier: string }[]> {
+    const seen: { role: string | null; modelTier: string }[] = []
+    const run = vi.fn(
+      async (input: { node: { id: string }; role: string | null; modelTier: string }) => {
+        seen.push({ role: input.role, modelTier: input.modelTier })
+        return ok(input)
+      }
+    )
+    const o = order([unit('U-1')])
+    const r = recipe(TIERED)
+    await execute(o, r, buildRunGraph(o, r), deps(run as never))
+    return seen
+  }
+
+  it('runs the scribe on the fast model, which is what its role file asks for', async () => {
+    const seen = await tiers()
+    const scribe = seen.filter((s) => s.role === 'scribe')
+    // Said out loud: without this the test passes on a run that never reached
+    // the scribe at all.
+    expect(scribe.length).toBeGreaterThan(0)
+    expect(scribe.every((s) => s.modelTier === 'fast')).toBe(true)
+  })
+
+  it('leaves the builder on the deep model', async () => {
+    const seen = await tiers()
+    const builder = seen.filter((s) => s.role === 'builder')
+    expect(builder.length).toBeGreaterThan(0)
+    expect(builder.every((s) => s.modelTier === 'deep')).toBe(true)
+  })
+
+  it('asks for the deep tier for a node with no role, so the operator choice stands', async () => {
+    const seen: string[] = []
+    const run = vi.fn(
+      async (input: { node: { id: string }; role: string | null; modelTier: string }) => {
+        if (input.role === null) seen.push(input.modelTier)
+        return ok(input)
+      }
+    )
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run as never))
+    for (const tier of seen) expect(tier).toBe('deep')
+  })
+})

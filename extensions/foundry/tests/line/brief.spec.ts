@@ -20,7 +20,7 @@ function role(over: Partial<Role> = {}): Role {
     reads: ['unit', 'context', 'rules'],
     writes: ['worktree'],
     tools: ['read', 'edit'],
-    outputSchema: '',
+
     prompt: 'Build one unit, in its own worktree, and nothing else.',
     ...over,
   }

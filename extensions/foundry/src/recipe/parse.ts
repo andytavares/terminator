@@ -192,7 +192,6 @@ const RoleSchema = z.object({
   reads: z.array(z.string()).default([]),
   writes: z.array(z.string()).default([]),
   tools: z.array(z.string()).default([]),
-  outputSchema: z.string().default(''),
   prompt: z.string().min(1),
 })
 

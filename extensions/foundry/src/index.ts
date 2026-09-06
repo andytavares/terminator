@@ -196,6 +196,26 @@ function defaultModel(api: ExtensionAPI): string {
   return typeof value === 'string' ? value : 'opus'
 }
 
+/**
+ * The model this role runs on.
+ *
+ * A role declares `modelTier: fast | deep`, and the settings panel has always
+ * said the operator's choice applies "unless a role asks for something else" —
+ * which was not true of anything, because nothing read the field. A `fast`
+ * role now runs on the small model; `deep`, and a node with no role at all,
+ * take the operator's choice.
+ *
+ * An alias again rather than a pinned id, for the same reason: `haiku`
+ * follows the latest of that family.
+ */
+export function modelForTier(api: ExtensionAPI, tier: 'fast' | 'deep'): string {
+  const chosen = defaultModel(api)
+  // An empty choice means "pass no --model", and a role asking for the fast
+  // tier must not override the operator's decision to configure it themselves.
+  if (chosen === '') return ''
+  return tier === 'fast' ? 'haiku' : chosen
+}
+
 // The loopback endpoint the agents' hooks answer on, and the runner that owns
 // their terminals. Started once for the extension rather than per run: a port
 // per agent would be a port per card.
@@ -630,6 +650,9 @@ async function executeRun(
     prompt: string
     resumeSessionId: string | undefined
     readOnly: boolean
+    modelTier: 'fast' | 'deep'
+    /** Whether this role declared the class of work a tool belongs to. */
+    mayUseTool: (tool: string) => boolean
   }): Promise<StartedRun> {
     const checkout = checkouts.get(input.node.lane ?? 1)
     // No checkout and no runner mean nothing ran. Reported with a null exit
@@ -659,16 +682,28 @@ async function executeRun(
           prompt: input.prompt,
           phase: (input.role ?? input.node.id) as never,
           resumeSessionId: input.resumeSessionId,
-          model: defaultModel(api),
+          model: modelForTier(api, input.modelTier),
           // The read-only decision is taken by the same policy the hook
           // applies, so a verifier that decides to fix what it found is
           // refused rather than reminded.
-          autoDecide: input.readOnly
-            ? (tool, toolInput) => {
-                const decision = decideReadOnly(tool, toolInput)
-                return decision.allow ? null : { allow: false, reason: decision.reason }
+          // Two gates, not one. Read-only is the whole-role decision; the
+          // second holds a role that may write to what it said it writes with
+          // — a scribe that decided to edit source rather than documentation
+          // is refused by the first if it has no checkout, and by neither if
+          // the only check were "may this role write at all".
+          autoDecide: (tool, toolInput) => {
+            if (input.readOnly) {
+              const decision = decideReadOnly(tool, toolInput)
+              return decision.allow ? null : { allow: false, reason: decision.reason }
+            }
+            if (input.role !== null && !input.mayUseTool(tool)) {
+              return {
+                allow: false,
+                reason: `the ${input.role} role does not use ${tool}; its role file lists what it does`,
               }
-            : undefined,
+            }
+            return null
+          },
           onPending: (pending) =>
             notePending(api, { ...pending, featureDir }, { id: order.id, root }),
           onResolved: (requestId) => noteResolved(requestId),
@@ -771,6 +806,11 @@ async function executeRun(
       const started = await runNode({
         node: ladderNode(step.rung, step.name, lane),
         role: null,
+        // A rung is a command, not a conversation. It runs on whatever the
+        // operator chose, like any node with no role of its own, and answers
+        // to no role's tool list.
+        modelTier: 'deep',
+        mayUseTool: () => true,
         prompt: `Run this exactly, and report its exit status. Do not fix what it reports.\n\n\`\`\`\n${step.command}\n\`\`\``,
         // In the lane's own conversation. Eight rungs used to be eight fresh
         // agents and eight terminals, each re-reading the repository to run
@@ -949,7 +989,7 @@ async function convergeOnce(
         prompt: plan.prompt,
         phase: 'architect' as never,
         resumeSessionId: plan.role.allowResume ? resuming : undefined,
-        model: defaultModel(api),
+        model: modelForTier(api, plan.role.modelTier),
         // Read-only, enforced by the hook rather than by the prompt. The
         // architect proposes; it does not edit the repository it is reading.
         // Its one exception is the proposal itself, and only at that path.

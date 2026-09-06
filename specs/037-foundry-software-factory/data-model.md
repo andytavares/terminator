@@ -228,7 +228,23 @@ Six kinds, no more (Complexity Tracking).
 
 ### Role
 
-`id`, `prompt`, `reads[]`, `writes[]`, `tools[]`, `modelTier`, `outputSchema`, `allowResume` (bool). The verifier role sets `allowResume: false` structurally — that is how FR-032's fresh context is enforced rather than by convention (R12).
+`id`, `prompt`, `reads[]`, `writes[]`, `tools[]`, `modelTier`, `allowResume` (bool). The verifier role sets `allowResume: false` structurally — that is how FR-032's fresh context is enforced rather than by convention (R12).
+
+**Every field is enforced, and each by something.** `reads[]` decides what goes
+into the brief (`line/brief.ts`); `writes[]` decides whether the read-only
+policy is installed, and means **writes to the checkout** — the three
+destinations `worktree`, `integration_branch` and `docs`, not "produces an
+artefact", because the red team produces findings and the architect a plan
+without touching a file; `tools[]` refuses a writing tool to a role that did
+not declare `edit`; `modelTier` picks the model the agent launches with, so a
+`fast` role runs on the small one; `allowResume` is refused structurally rather
+than asked for in a prompt.
+
+`outputSchema` was removed during implementation. It named nine shapes —
+`plan`, `verdict`, `findings`, `schedule`, `integration`, `context`, `docs`,
+`unit_result` — of which one is a real artefact (the architect's proposal,
+validated by `ProposalSchema`) and the rest are a diff and an exit status. A
+field nothing could enforce reads as a contract that holds.
 
 ### Rule
 

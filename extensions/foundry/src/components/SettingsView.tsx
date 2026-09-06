@@ -51,8 +51,8 @@ export function SettingsView(): JSX.Element {
     <div className="fdry-settings">
       <h2 className="fdry-panel-h">Model</h2>
       <p className="fdry-note">
-        What every agent runs on unless a role asks for something else. An alias never goes stale
-        the way a pinned identifier does.
+        What every agent runs on, unless its role asks for the fast tier — the scribe and the scout
+        do. An alias never goes stale the way a pinned identifier does.
       </p>
 
       <ul className="fdry-models">
