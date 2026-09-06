@@ -6,6 +6,7 @@ import { laneViews, mayMergeLane } from '../order/lanes.js'
 import type { Gate } from '../gates/rules.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
+import type { LadderOutcome } from '../verify/ladder.js'
 
 // The end of the line: a draft pull request, opened without being asked for.
 //
@@ -50,12 +51,22 @@ export interface IntegrateDeps {
   /** Put a gate in front of the operator and resolve with the option chosen. */
   readonly decide: (gate: Gate) => Promise<string>
   readonly record: (action: string, subject: string, reason: string) => Promise<void>
+  /** Put the "mark it ready?" decision where the operator will see it. */
+  readonly raiseGate?: (gate: Gate) => Promise<void>
 }
 
 export interface Shipment {
   readonly verdicts: readonly Verdict[]
   /** What the inspection found. Empty means it found nothing, not that it did not run. */
   readonly findings: readonly string[]
+  /**
+   * The verification climb, where there was one.
+   *
+   * Carried so the body can say which rungs never ran. A repository with no
+   * lint command is allowed to ship a draft; it is not allowed to ship one
+   * that implies it was linted.
+   */
+  readonly ladder?: LadderOutcome | null
 }
 
 export interface LanePullRequest {
@@ -73,6 +84,18 @@ export interface ShipOutcome {
   /** True when nothing was pushed, and `reason` says why. */
   readonly held: boolean
   readonly reason: string
+  /** The "mark it ready?" decision, once there is a draft to mark. */
+  readonly gate?: Gate
+}
+
+/** One line on how the criteria came out, for the gate's own reason. */
+function criteriaSummary(shipment: Shipment): string {
+  const results = shipment.verdicts.map((v) => v.result)
+  const failed = results.filter((r) => r === 'fail').length
+  const unmeasured = results.filter((r) => r === 'not_measured').length
+  if (failed > 0) return `${failed} criteria failed`
+  if (unmeasured > 0) return `${unmeasured} criteria not measured`
+  return 'every criterion passed'
 }
 
 export class PushRefusedError extends Error {
@@ -196,6 +219,21 @@ export function prBody(
     lines.push(verdictLine(order, criterion.id, shipment.verdicts))
   }
   if (order.acceptance.length === 0) lines.push('| — | _No criteria._ | not measured | |')
+
+  const ladder = shipment.ladder ?? null
+  if (ladder !== null) {
+    lines.push('', '### Verification', '', '| Rung | Step | Result |', '| --- | --- | --- |')
+    for (const step of ladder.steps) {
+      const result = step.result === 'not_measured' ? `not measured — ${step.reason}` : step.result
+      lines.push(`| ${step.rung} | ${step.name} | ${result} |`)
+    }
+    if (ladder.unmeasured.length > 0) {
+      lines.push(
+        '',
+        `**${ladder.unmeasured.length} ${ladder.unmeasured.length === 1 ? 'check was' : 'checks were'} not measured here**: ${ladder.unmeasured.join(', ')}. This repository has no command for them, so they are reported as unmeasured rather than as passing.`
+      )
+    }
+  }
 
   lines.push('', '### Inspection', '')
   if (shipment.findings.length === 0) {
@@ -439,5 +477,33 @@ export async function shipOrder(
     JSON.stringify(pulls, null, 2),
     'utf8'
   )
-  return { pulls, bodyPaths, held: false, reason: '' }
+
+  // The decision the operator is finally offered (FR-057). Raised here rather
+  // than by the executor because it is about the pull request, which does not
+  // exist until now — and it is one of the four rules that stay live at every
+  // autonomy setting, so a lights-out run reaches exactly this point and stops.
+  const unmeasured = shipment.ladder?.unmeasured ?? []
+  const gate = raiseGate({
+    id: `${order.id}-ready`,
+    rule: 'ready-for-review',
+    orderId: order.id,
+    summary: `Mark ${pulls.length === 1 ? 'the draft' : `${pulls.length} drafts`} for ${order.title} ready?`,
+    why: [
+      `${order.plan.units.length} units, ${criteriaSummary(shipment)}.`,
+      unmeasured.length === 0
+        ? 'Everything this repository can check was checked.'
+        : `Not measured here: ${unmeasured.join(', ')}.`,
+      shipment.findings.length === 0
+        ? 'The inspection found nothing.'
+        : `The inspection found ${shipment.findings.length}.`,
+    ].join(' '),
+    evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
+    riskGrade: order.risk.grade,
+    blockedUnits: 0,
+    at: deps.now(),
+  })
+  await deps.raiseGate?.(gate)
+  await deps.record('ship.ready_asked', order.id, gate.why)
+
+  return { pulls, bodyPaths, held: false, reason: '', gate }
 }

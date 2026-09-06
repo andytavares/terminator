@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Terminal, ShieldQuestion, Square, CornerDownLeft } from 'lucide-react'
+import {
+  Terminal,
+  ShieldQuestion,
+  Square,
+  CornerDownLeft,
+  Check,
+  X,
+  ScanEye,
+  BellOff,
+} from 'lucide-react'
 import type { RunGraph, RunNode } from '../line/run-graph.js'
 
 // Where you watch, not where you act.
@@ -41,6 +50,49 @@ interface PendingAsk {
   summary: string
   detail: string | null
   at: number
+}
+
+/** A finished run whose change nobody has looked at yet. */
+interface ReviewItem {
+  sessionId: string
+  branch: string
+  grade: 'P0' | 'P1' | 'P2' | 'P3'
+  gradeTrigger: string
+  diffSummary: { files: number; added: number; removed: number }
+}
+
+interface Hunk {
+  id: string
+  newStart: number
+  lines: string[]
+  decision: 'accept' | 'reject' | null
+}
+
+interface HunkFile {
+  file: string
+  hunks: Hunk[]
+}
+
+/** The request set against what the agent says it did. */
+interface IntentReview {
+  unexpectedFiles: string[]
+  untouchedFiles: string[]
+  hasScopeConcern: boolean
+}
+
+interface FeedEntry {
+  id: string
+  at: number
+  sessionId: string
+  author: string
+  summary: string
+}
+
+/** A run whose posts are silenced. Shown, because a mute you cannot find is
+ *  a mute you never undo. */
+interface MuteRule {
+  sessionId?: string
+  author?: string
 }
 
 /** How often the live half is refetched. Slow enough to be cheap, fast
@@ -85,6 +137,12 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const [transcript, setTranscript] = useState<string[]>([])
   const [watching, setWatching] = useState<string | null>(null)
   const [redirect, setRedirect] = useState('')
+  const [review, setReview] = useState<ReviewItem[]>([])
+  const [reviewing, setReviewing] = useState<string | null>(null)
+  const [hunks, setHunks] = useState<HunkFile[] | null>(null)
+  const [intent, setIntent] = useState<IntentReview | null>(null)
+  const [feed, setFeed] = useState<FeedEntry[]>([])
+  const [mutes, setMutes] = useState<MuteRule[]>([])
 
   const refresh = useCallback(async () => {
     const next = (await invoke('foundry:run.observe', { id: orderId })) as
@@ -111,6 +169,16 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const pollLive = useCallback(async () => {
     const asks = (await invoke('foundry:permissions-list')) as { pending?: PendingAsk[] }
     setPending(asks.pending ?? [])
+    const snapshot = (await invoke('foundry:supervision-snapshot')) as {
+      review?: ReviewItem[]
+    }
+    setReview(snapshot.review ?? [])
+    const activity = (await invoke('foundry:feed-list')) as {
+      entries?: FeedEntry[]
+      mutes?: MuteRule[]
+    }
+    setFeed((activity.entries ?? []).slice(-12).reverse())
+    setMutes(activity.mutes ?? [])
     if (watching !== null) {
       const tail = (await invoke('foundry:run-transcript', {
         sessionId: watching,
@@ -152,6 +220,81 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     async (channel: string, payload: Record<string, unknown>) => {
       const result = (await invoke(channel, payload)) as { ok?: boolean }
       if (result.ok !== true) setProblem('that run is no longer live')
+      await pollLive()
+    },
+    [pollLive]
+  )
+
+  const openReview = useCallback(
+    async (item: ReviewItem) => {
+      setReviewing(item.sessionId)
+      const next = (await invoke('foundry:review-hunks', { sessionId: item.sessionId })) as {
+        files: HunkFile[] | null
+      }
+      // Null is "the runtime never started", which is not the same as "this
+      // change was empty" — a panel that cannot tell them apart shows an empty
+      // review for a run that never happened.
+      setHunks(next.files)
+
+      // The request against the agent's own account of it. The step every diff
+      // viewer skips, and the one that catches work that is defensible in
+      // isolation and was never asked for.
+      const checked = (await invoke('foundry:review-intent', {
+        sessionId: item.sessionId,
+        request: view?.graph.orderId ?? '',
+        agentAccount: item.branch,
+      })) as { intent: IntentReview | null }
+      setIntent(checked.intent)
+
+      // Move the queue on, so the next review step is the one it offers.
+      await invoke('foundry:review-advance', { sessionId: item.sessionId })
+    },
+    [view]
+  )
+
+  const dismiss = useCallback(
+    async (entry: FeedEntry, mute: boolean) => {
+      await invoke(mute ? 'foundry:feed-mute' : 'foundry:feed-dismiss', {
+        id: entry.id,
+        sessionId: entry.sessionId,
+      })
+      await pollLive()
+    },
+    [pollLive]
+  )
+
+  const decideHunk = useCallback(
+    async (hunkId: string, decision: 'accept' | 'reject') => {
+      if (reviewing === null) return
+      await invoke('foundry:review-decide-hunk', { sessionId: reviewing, hunkId, decision })
+      const next = (await invoke('foundry:review-hunks', { sessionId: reviewing })) as {
+        files: HunkFile[] | null
+      }
+      setHunks(next.files)
+    },
+    [reviewing]
+  )
+
+  const applyReview = useCallback(async () => {
+    if (reviewing === null) return
+    const result = (await invoke('foundry:review-apply', { sessionId: reviewing })) as {
+      ok: boolean
+      reverted?: number
+      error?: string
+    }
+    if (!result.ok) {
+      setProblem(result.error ?? 'the decisions could not be applied')
+      return
+    }
+    await invoke('foundry:review-done', { sessionId: reviewing })
+    setReviewing(null)
+    setHunks(null)
+    await pollLive()
+  }, [reviewing, pollLive])
+
+  const unmute = useCallback(
+    async (rule: MuteRule) => {
+      await invoke('foundry:feed-unmute', rule)
       await pollLive()
     },
     [pollLive]
@@ -330,6 +473,144 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               <Square aria-hidden="true" /> Stop
             </button>
           </form>
+        </section>
+      ) : null}
+
+      {/* Finished work nobody has looked at, worst risk first. Rejecting is
+          hunk by hunk, because one file routinely holds both the change you
+          asked for and the one you did not. */}
+      {review.length > 0 ? (
+        <section className="fdry-panel" style={{ marginTop: 12 }}>
+          <h3 className="fdry-panel-h">To review — {review.length}</h3>
+          {review.map((item) => (
+            <div key={item.sessionId} className="fdry-review-row">
+              <span className={`fdry-grade is-${item.grade.toLowerCase()}`}>{item.grade}</span>
+              <div className="fdry-review-main">
+                <b>{item.branch}</b>
+                <small>
+                  {item.gradeTrigger} · {item.diffSummary.files} files, +{item.diffSummary.added}/−
+                  {item.diffSummary.removed}
+                </small>
+              </div>
+              <button type="button" onClick={() => void openReview(item)}>
+                <ScanEye aria-hidden="true" /> Review
+              </button>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {reviewing !== null ? (
+        <section className="fdry-panel" style={{ marginTop: 12 }}>
+          <h3 className="fdry-panel-h">Reviewing {reviewing}</h3>
+          {intent?.hasScopeConcern === true ? (
+            <p className="fdry-note fdry-scope">
+              {intent.unexpectedFiles.length > 0
+                ? `Touched without being asked: ${intent.unexpectedFiles.join(', ')}.`
+                : ''}
+              {intent.untouchedFiles.length > 0
+                ? ` Asked for and never touched: ${intent.untouchedFiles.join(', ')}.`
+                : ''}
+            </p>
+          ) : null}
+          {hunks === null ? (
+            <p className="fdry-note">
+              The supervision runtime is not running, so there is no diff to show. That is not the
+              same as a change that touched nothing.
+            </p>
+          ) : hunks.length === 0 ? (
+            <p className="fdry-note">This run changed nothing.</p>
+          ) : (
+            hunks.map((file) => (
+              <div key={file.file} className="fdry-hunk-file">
+                <code>{file.file}</code>
+                {file.hunks.map((hunk) => (
+                  <div key={hunk.id} className={`fdry-hunk is-${hunk.decision ?? 'undecided'}`}>
+                    <pre>{hunk.lines.join('\n')}</pre>
+                    <div className="fdry-hunk-actions">
+                      <button
+                        type="button"
+                        aria-label={`Accept ${hunk.id}`}
+                        className={hunk.decision === 'accept' ? 'is-primary' : ''}
+                        onClick={() => void decideHunk(hunk.id, 'accept')}
+                      >
+                        <Check aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Reject ${hunk.id}`}
+                        className={hunk.decision === 'reject' ? 'is-primary' : ''}
+                        onClick={() => void decideHunk(hunk.id, 'reject')}
+                      >
+                        <X aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+          <div className="fdry-hunk-actions" style={{ marginTop: 10 }}>
+            <button type="button" className="is-primary" onClick={() => void applyReview()}>
+              Apply what I decided
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setReviewing(null)
+                setHunks(null)
+                setIntent(null)
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {/* What happened while you were away. Every row can be cleared, and a
+          run that keeps interrupting can be muted without hiding what it
+          does — a feed you cannot clear a line from is one you stop reading. */}
+      {feed.length > 0 || mutes.length > 0 ? (
+        <section className="fdry-panel" style={{ marginTop: 12 }}>
+          <h3 className="fdry-panel-h">Activity</h3>
+          {mutes.length > 0 ? (
+            <p className="fdry-note">
+              Silenced:{' '}
+              {mutes.map((rule) => (
+                <button
+                  key={`${rule.sessionId ?? ''}-${rule.author ?? ''}`}
+                  type="button"
+                  className="fdry-unmute"
+                  aria-label={`Unmute ${rule.sessionId ?? rule.author ?? 'everything'}`}
+                  onClick={() => void unmute(rule)}
+                >
+                  {rule.sessionId ?? rule.author ?? 'everything'} ✕
+                </button>
+              ))}
+            </p>
+          ) : null}
+          {feed.map((entry) => (
+            <div key={entry.id} className="fdry-feed-row">
+              <span className="fdry-feed-author">{entry.author}</span>
+              <span className="fdry-feed-summary">{entry.summary}</span>
+              <button
+                type="button"
+                aria-label={`Dismiss ${entry.id}`}
+                onClick={() => void dismiss(entry, false)}
+              >
+                <X aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Mute ${entry.sessionId}`}
+                title="Stop this run interrupting, without hiding what it does"
+                onClick={() => void dismiss(entry, true)}
+              >
+                <BellOff aria-hidden="true" />
+              </button>
+            </div>
+          ))}
         </section>
       ) : null}
 

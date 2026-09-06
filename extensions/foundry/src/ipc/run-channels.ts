@@ -6,7 +6,7 @@ import { laneViews, mayMergeLane } from '../order/lanes.js'
 import { buildRunGraph } from '../line/run-graph.js'
 import type { RunGraph } from '../line/run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
-import { readyNodes, blockedReason } from '../line/scheduler.js'
+import { readyNodes, blockedReason, retry as retryNode } from '../line/scheduler.js'
 import { resolveRecipe, availableNames } from '../recipe/resolve.js'
 import type { ResolveSources } from '../recipe/resolve.js'
 import { checkRequirements } from '../recipe/requirements.js'
@@ -22,7 +22,7 @@ import type { WorkOrder } from '../order/schema.js'
 // time, and the message arrives attached to the wrong thing.
 
 const StartPayload = z.object({ id: z.string(), recipe: z.string().optional() })
-const ObservePayload = z.object({ id: z.string() })
+const ObservePayload = z.object({ id: z.string(), retry: z.array(z.string()).optional() })
 const AttachPayload = z.object({ orderId: z.string(), nodeId: z.string() })
 
 export interface RunDeps {
@@ -48,6 +48,8 @@ export interface RunDeps {
 }
 
 export interface RunChannels {
+  /** Continue a run that halted at a gate the operator has now answered. */
+  resume(payload: unknown): Promise<unknown>
   start(payload: unknown): Promise<unknown>
   observe(payload: unknown): Promise<unknown>
   /** Which shapes of work this order could actually take, and why not. */
@@ -221,6 +223,57 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     }
   }
 
+  /**
+   * Pick a halted run back up.
+   *
+   * The graph on disk is the run's state, so resuming is re-entering the
+   * executor over it — there is no second notion of "where it got to" that
+   * could disagree. A node the operator sent back is retried; everything else
+   * carries on from where the wave stopped.
+   *
+   * Idempotent against a run that is already going: `execute` starts only what
+   * the scheduler offers, and a running node is not offered.
+   */
+  async function resume(raw: unknown): Promise<unknown> {
+    const parsed = ObservePayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const order = await deps.store.load(parsed.data.id)
+    if (order === null) return { error: `No order ${parsed.data.id}.` }
+    if (order.status !== 'running') {
+      return { error: `Only a running order can be resumed; this one is ${order.status}.` }
+    }
+
+    const graph = await loadGraph(parsed.data.id)
+    if (graph === null) return { error: `No run for ${parsed.data.id}.` }
+    if (order.recipe === null) return { error: `${order.id} has no recipe to resume.` }
+
+    const resolved = resolveRecipe(order.recipe, deps.sources())
+    if (!resolved.ok) return { error: resolved.reason }
+
+    // Anything the operator sent back is offered again. Without this a failed
+    // node stays failed and the resumed run has nothing to do — which reads
+    // as "it finished" rather than "it never restarted".
+    const retried = (parsed.data.retry ?? []).reduce((g, id) => retryNode(g, id), graph)
+    await saveGraph(retried)
+
+    if (deps.execute === undefined) {
+      return { graph: retried, started: false, reason: 'The supervision runtime is not available.' }
+    }
+    void deps.execute(order, resolved.resolved.value, retried).catch(async (error: unknown) => {
+      await deps.store.record({
+        at: deps.now(),
+        orderId: order.id,
+        actor: 'rule:line',
+        action: 'run.failed',
+        subject: order.id,
+        reason: error instanceof Error ? error.message : String(error),
+        evidence: [],
+      })
+    })
+    return { graph: retried, started: true }
+  }
+
   async function recipes(raw: unknown): Promise<unknown> {
     const parsed = ObservePayload.safeParse(raw)
     if (!parsed.success) return { error: 'Malformed request.' }
@@ -266,5 +319,5 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return { terminalSessionId: node.sessionId, nodeId: node.id }
   }
 
-  return { start, observe, recipes, attach }
+  return { start, resume, observe, recipes, attach }
 }

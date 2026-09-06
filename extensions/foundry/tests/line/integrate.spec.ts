@@ -642,3 +642,116 @@ describe('one order across several repositories (FR-067, FR-068)', () => {
     expect(decide).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('the decision the operator is finally offered (FR-057)', () => {
+  const ladderOk = {
+    steps: [
+      {
+        rung: 'L1' as const,
+        name: "The unit's own tests",
+        result: 'pass' as const,
+        reason: '',
+        exitCode: 0,
+      },
+    ],
+    stoppedAt: null,
+    unmeasured: [],
+    ok: true,
+  }
+
+  it('is whether to mark it ready, not whether to create it', async () => {
+    const raiseGate = vi.fn(async () => undefined)
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [], ladder: ladderOk },
+      deps({ raiseGate })
+    )
+    expect(result.gate?.rule).toBe('ready-for-review')
+    expect(result.gate?.options.map((o) => o.id)).toContain('mark_ready')
+    expect(result.gate?.options.map((o) => o.id)).not.toContain('create')
+    expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ready-for-review' }))
+  })
+
+  it('never defaults to shipping when nobody answers', async () => {
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [], ladder: ladderOk },
+      deps()
+    )
+    expect(result.gate?.defaultIfIgnored).toBe('hold')
+  })
+
+  it('says what was never measured, so a bare repository cannot look checked', async () => {
+    const result = await shipOrder(
+      order(),
+      {
+        verdicts: [verdict()],
+        findings: [],
+        ladder: { ...ladderOk, unmeasured: ['Lint', 'Repository gate'], ok: true },
+      },
+      deps()
+    )
+    expect(result.gate?.why).toContain('Not measured here: Lint, Repository gate')
+  })
+
+  it('says the inspection found nothing, rather than staying silent about it', async () => {
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [], ladder: ladderOk },
+      deps()
+    )
+    expect(result.gate?.why).toContain('inspection found nothing')
+  })
+
+  it('points at the body, so the decision is taken on the evidence', async () => {
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [], ladder: ladderOk },
+      deps()
+    )
+    expect(result.gate?.evidence[0]).toMatchObject({ kind: 'report_file' })
+  })
+
+  it('raises nothing when nothing was pushed', async () => {
+    const raiseGate = vi.fn(async () => undefined)
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ autoOpen: false, raiseGate })
+    )
+    expect(result.gate).toBeUndefined()
+    expect(raiseGate).not.toHaveBeenCalled()
+  })
+})
+
+describe('the body reports the climb (FR-056)', () => {
+  it('names every rung and its result', () => {
+    const body = prBody(order(), {
+      verdicts: [verdict()],
+      findings: [],
+      ladder: {
+        steps: [
+          { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0 },
+          {
+            rung: 'L2',
+            name: 'Repository gate',
+            result: 'not_measured',
+            reason: 'this repository has no coverage command',
+            exitCode: null,
+          },
+        ],
+        stoppedAt: null,
+        unmeasured: ['Repository gate'],
+        ok: true,
+      },
+    })
+    expect(body).toContain('Lint')
+    expect(body).toContain('not measured — this repository has no coverage command')
+    expect(body).toMatch(/1 check was not measured here/)
+  })
+
+  it('has no verification section when there was no climb', () => {
+    const body = prBody(order(), { verdicts: [verdict()], findings: [] })
+    expect(body).not.toContain('### Verification')
+  })
+})

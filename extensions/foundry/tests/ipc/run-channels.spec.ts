@@ -492,3 +492,104 @@ describe('the graph is actually run (FR-020)', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 })
+
+describe('foundry:run.resume', () => {
+  function live(execute?: ReturnType<typeof vi.fn>) {
+    return createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      execute: (execute ?? vi.fn(async () => undefined)) as never,
+    })
+  }
+
+  async function started(execute?: ReturnType<typeof vi.fn>) {
+    await store.save(order())
+    const channels = live(execute)
+    await channels.start({ id: 'WO-1' })
+    return channels
+  }
+
+  it('picks the run back up from the graph on disk', async () => {
+    const execute = vi.fn(async () => undefined)
+    const channels = await started(execute)
+    execute.mockClear()
+
+    const r = (await channels.resume({ id: 'WO-1' })) as { started: boolean }
+    expect(r.started).toBe(true)
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'WO-1' }),
+      expect.anything(),
+      expect.objectContaining({ nodes: expect.anything() })
+    )
+  })
+
+  it('retries the node the operator sent back', async () => {
+    const execute = vi.fn(async () => undefined)
+    const channels = await started(execute)
+
+    // Fail a node, as a run would.
+    const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+    const graph = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
+    const failed = {
+      ...graph,
+      nodes: graph.nodes.map((n) =>
+        n.unitId === 'U-1' ? { ...n, state: 'failed', attempts: 1 } : n
+      ),
+    }
+    fs.writeFileSync(file, JSON.stringify(failed))
+    execute.mockClear()
+
+    const nodeId = failed.nodes.find((n) => n.unitId === 'U-1')?.id ?? ''
+    await channels.resume({ id: 'WO-1', retry: [nodeId] })
+
+    // Back in the queue — `waiting`, which is where the scheduler picks it
+    // up. `ready` is a state the scheduler assigns, not the resume.
+    const handed = execute.mock.calls[0][2] as RunGraph
+    expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('waiting')
+  })
+
+  it('leaves everything else where it was', async () => {
+    const execute = vi.fn(async () => undefined)
+    const channels = await started(execute)
+    execute.mockClear()
+
+    await channels.resume({ id: 'WO-1', retry: [] })
+    const handed = execute.mock.calls[0][2] as RunGraph
+    expect(handed.nodes.every((n) => n.state !== 'failed')).toBe(true)
+  })
+
+  it('refuses an order that is not running', async () => {
+    await store.save(order({ status: 'agreed' }))
+    expect(await live().resume({ id: 'WO-1' })).toEqual({
+      error: 'Only a running order can be resumed; this one is agreed.',
+    })
+  })
+
+  it('refuses an order with no run on disk', async () => {
+    await store.save(order({ status: 'running', recipe: 'direct' }))
+    expect(await live().resume({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
+  })
+
+  it('reports an order it cannot find', async () => {
+    expect(await live().resume({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
+  })
+
+  it('rejects a malformed request', async () => {
+    expect(await live().resume({ retry: 'U-1' })).toEqual({ error: 'Malformed request.' })
+  })
+
+  it('says so when there is nothing to run it', async () => {
+    await store.save(order())
+    const channels = live()
+    await channels.start({ id: 'WO-1' })
+    const bare = createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+    })
+    expect(await bare.resume({ id: 'WO-1' })).toMatchObject({ started: false })
+  })
+})

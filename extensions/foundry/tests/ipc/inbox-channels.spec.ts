@@ -309,3 +309,54 @@ describe('a gate store whose root follows the workspace', () => {
     for (const dir of [a, b]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })
 })
+
+describe('a decision that leaves the run stopped is a decision that did nothing', () => {
+  function decided(rule: Parameters<typeof gate>[0]['rule'], option: string) {
+    const act = vi.fn(async () => undefined)
+    return {
+      act,
+      run: async () => {
+        await createGateStore(root).save(gate({ rule }))
+        const c = createInboxChannels({
+          gates: createGateStore(root),
+          orders: createOrderStore(root),
+          autonomy: () => 'escorted',
+          now: () => '2026-09-06T12:00:00.000Z',
+          record: vi.fn(async () => undefined) as never,
+          act,
+        })
+        await c.decide({ gateId: 'G-1', option })
+      },
+    }
+  }
+
+  it('carries the chosen option through, so the caller can act on which one it was', async () => {
+    const { act, run } = decided('verify.repeat-fail', 'send_back')
+    await run()
+    expect(act).toHaveBeenCalledWith(
+      expect.objectContaining({ rule: 'verify.repeat-fail' }),
+      'send_back'
+    )
+  })
+
+  it('carries a hold through too — the caller decides that it means "stay stopped"', async () => {
+    const { act, run } = decided('risk.p0', 'hold')
+    await run()
+    expect(act).toHaveBeenCalledWith(expect.anything(), 'hold')
+  })
+
+  it('names the node, so a send-back knows what to retry', async () => {
+    const act = vi.fn(async () => undefined)
+    await createGateStore(root).save(gate({ rule: 'verify.repeat-fail', nodeId: 'build:U-1' }))
+    const c = createInboxChannels({
+      gates: createGateStore(root),
+      orders: createOrderStore(root),
+      autonomy: () => 'escorted',
+      now: () => '2026-09-06T12:00:00.000Z',
+      record: vi.fn(async () => undefined) as never,
+      act,
+    })
+    await c.decide({ gateId: 'G-1', option: 'send_back' })
+    expect((act.mock.calls[0][0] as { nodeId: string | null }).nodeId).toBe('build:U-1')
+  })
+})

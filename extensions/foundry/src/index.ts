@@ -17,7 +17,7 @@ import { rulesFor } from './verify/rules.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore } from './gates/store.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
-import { markReady, readPulls } from './line/integrate.js'
+import { markReady, readPulls, shipOrder } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
 import { ensureCheckouts } from './line/worktree.js'
 import { execute } from './line/executor.js'
@@ -634,6 +634,7 @@ async function executeRun(
   graph: RunGraph
 ): Promise<void> {
   const exec: ShellExec = (options) => api.shell.exec(options)
+  const startedAt = Date.now()
   // Every checkout before any agent starts: a run that provisions lane 2 half
   // way through and fails has already spent lane 1's agent budget.
   const checkouts = await ensureCheckouts(order, { exec, root })
@@ -696,20 +697,106 @@ async function executeRun(
             : undefined,
           onPending: (pending) => pendingPermissions.add({ ...pending, featureDir }),
           onResolved: (requestId) => pendingPermissions.remove(requestId),
-          onEnd: (exitCode) => finish(exitCode),
+          onEnd: (exitCode) => {
+            // Off the live list and into the record, so a finished unit stops
+            // holding a review slot and the next wave can start.
+            supervision?.finish(sessionId, Date.now())
+            supervision?.runs.archive(sessionId, exitCode === 0 ? 'ended' : 'stopped', Date.now())
+            finish(exitCode)
+          },
+          onTurnEnd: (turns) => {
+            void supervision?.finishTurn(sessionId, turns, Date.now())
+          },
         })
         .then((run) => {
-          if (run === null) finish(null)
-          else sessionId = run.sessionId
+          if (run === null) {
+            finish(null)
+            return
+          }
+          sessionId = run.sessionId
+          // On the register, which is what the stall detector, the review
+          // queue and the backpressure gate all read from. Without this the
+          // agent is running and every one of them sees an idle factory —
+          // the register was the seam the old phase dispatcher filled.
+          supervision?.runs.add({
+            sessionId: run.sessionId,
+            featureDir,
+            phase: input.role ?? input.node.stepId,
+            worktreePath: checkout.path,
+            branch: checkout.branch,
+            baseBranch:
+              checkout.origin === '' ? null : (order.context.repos[0]?.baseBranch ?? null),
+            terminalSessionId: run.terminalSessionId,
+            transcriptPath: run.transcriptPath,
+            startedAt: Date.now(),
+          })
+          void supervision?.measure(run.sessionId)
         })
         .catch(() => finish(null))
     })
   }
 
+  const sources = resolveSources(api, root)
+  const gates = createLiveGateStore(() => root)
+  const issuesPort = issuesPortFor(api)
+
+  // The issue moves the moment work starts, not when somebody remembers.
+  if (issuesPort !== null) {
+    await writeBack(order, 'started', writeBackDepsFor(api, root, order, issuesPort))
+  }
+
   const outcome = await execute(order, recipe, graph, {
     now: () => new Date().toISOString(),
-    sources: resolveSources(api, root),
+    sources,
     run: runNode,
+    autonomy:
+      api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
+      'standard',
+    // Loaded here rather than inside the executor, so what an agent is told
+    // the house rules are and what the ladder is judged against are the same
+    // list read once.
+    rules: rulesFor(sources, {
+      repoPaths: sources.repoPaths,
+      houseDocs: [...order.context.houseDocs],
+    }).rules,
+    raise: async (gate) => {
+      await gates.save(gate)
+      await store.record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: `rule:${gate.rule}`,
+        action: 'gate.raised',
+        subject: gate.id,
+        reason: gate.why,
+        evidence: [...gate.evidence],
+      })
+    },
+    // A rung runs as a step inside the supervised session, in the lane's own
+    // checkout — not as a hidden child process, which is what makes its output
+    // visible and its tool calls hook-gated.
+    runStep: async (step) => {
+      if (step.command === null) return null
+      const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
+      const started = await runNode({
+        node: {
+          ...(graph.nodes[0] ?? ({} as RunNode)),
+          id: `ladder-${step.rung}-${step.name.replace(/\W+/g, '-').toLowerCase()}`,
+          kind: 'run',
+          role: null,
+          unitId: null,
+          lane,
+        },
+        role: null,
+        prompt: `Run this exactly, and report its exit status. Do not fix what it reports.\n\n\`\`\`\n${step.command}\n\`\`\``,
+        resumeSessionId: undefined,
+        readOnly: false,
+      })
+      return started.exitCode
+    },
+    observe: () => ({
+      elapsedMinutes: Math.round((Date.now() - startedAt) / 60_000),
+      filesTouched: new Set(order.plan.units.flatMap((u) => u.touches)).size,
+    }),
     onEvent: (event) => {
       if (event.type !== 'verdict') return
       void store.record({
@@ -736,6 +823,43 @@ async function executeRun(
       : `waiting on ${outcome.awaitingDecision.join(', ') || 'a gate'}`,
     evidence: [],
   })
+
+  // ── The tail ───────────────────────────────────────────────────────────
+  //
+  // Work that is finished and waiting on nobody ships, without being asked
+  // (FR-053). Work that is waiting on somebody does not — the run halts, the
+  // inbox has the question, and answering it resumes from here.
+  if (!outcome.shippable) return
+
+  const shipped = await shipOrder(
+    order,
+    {
+      verdicts: outcome.verdicts,
+      findings: outcome.inspection.required ? [outcome.inspection.reason] : [],
+      ladder: outcome.ladder,
+    },
+    {
+      ...integrateDepsFor(api, root),
+      // The shipping decision, where the grade calls for one, is the operator's
+      // and reaches them through the inbox like every other.
+      decide: async (gate) => {
+        await gates.save(gate)
+        return 'hold'
+      },
+      raiseGate: async (gate) => {
+        await gates.save(gate)
+      },
+    }
+  )
+
+  if (shipped.held || shipped.pulls.length === 0) return
+
+  await store.save({ ...order, status: 'shipped' })
+  if (issuesPort !== null) {
+    await writeBack(order, 'draft_opened', writeBackDepsFor(api, root, order, issuesPort), {
+      pulls: shipped.pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
+    })
+  }
 }
 
 export function activate(api: ExtensionAPI): void {
@@ -816,6 +940,7 @@ export function activate(api: ExtensionAPI): void {
     execute: (order, recipe, graph) => executeRun(api, dataRoot(), order, recipe, graph),
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
+  reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))
   reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
   reg(api, 'foundry:run.recipes', (payload) => runs.recipes(payload))
   reg(api, 'foundry:session.attach', (payload) => runs.attach(payload))
@@ -843,15 +968,38 @@ export function activate(api: ExtensionAPI): void {
         evidence: [],
       })
     },
-    // "Mark ready" is the decision the operator is offered on a finished
-    // order (FR-057), and this is what makes it mean something. Creating the
-    // pull request was never their decision to take.
+    // What a decision actually does.
+    //
+    // Two things, and the second is the one that was missing: "mark ready"
+    // turns the drafts into review requests, and every other answer that
+    // unblocks work puts the run back on. A decision the operator takes that
+    // leaves the run stopped is a decision that did nothing.
     act: async (gate, option) => {
-      if (gate.rule !== 'ready-for-review' || option !== 'mark_ready') return
-      const deps = integrateDepsFor(api, dataRoot())
-      for (const pull of await readPulls(dataRoot(), gate.orderId)) {
-        await markReady(pull, deps)
+      if (gate.rule === 'ready-for-review') {
+        if (option !== 'mark_ready') return
+        const deps = integrateDepsFor(api, dataRoot())
+        for (const pull of await readPulls(dataRoot(), gate.orderId)) {
+          await markReady(pull, deps)
+        }
+        // The issue's last move. Marking ready is as close to merged as
+        // Foundry gets — it never merges anything itself.
+        const order = await createOrderStore(dataRoot()).load(gate.orderId)
+        const port = issuesPortFor(api)
+        if (order !== null && port !== null) {
+          await writeBack(order, 'merged', writeBackDepsFor(api, dataRoot(), order, port))
+        }
+        return
       }
+
+      // `hold` means what it says: the run stays stopped until the operator
+      // comes back to it. Everything else is a decision to carry on.
+      if (option === 'hold' || option === 'stop') return
+      await runs.resume({
+        id: gate.orderId,
+        // "Send back" is a retry of the node that failed; the others resume
+        // whatever the wave was doing.
+        retry: option === 'send_back' && gate.nodeId !== null ? [gate.nodeId] : [],
+      })
     },
   })
   reg(api, 'foundry:inbox.list', () => inbox.list())

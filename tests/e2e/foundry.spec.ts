@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
@@ -273,4 +273,130 @@ test('every registered channel answers rather than rejecting', async () => {
   for (const channel of channels) {
     await expect(foundry(channel, {}), `${channel} rejected`).resolves.toBeTruthy()
   }
+})
+
+/**
+ * The claim the whole Line rests on: a unit runs as a real agent, in a real
+ * terminal, in its own worktree, and you can see it.
+ *
+ * Every unit below this passes in isolation and so did every one of the worst
+ * bugs on this line of work — no terminal, the wrong workspace, a relative
+ * settings path that killed the run while the graph still said "running".
+ * They only appear when the application runs.
+ */
+test('a run cuts a worktree and launches a supervised agent in a visible terminal', async () => {
+  test.setTimeout(180_000)
+  const { page } = handle
+
+  // A complete order, written where the extension keeps its records. The Forge
+  // is what fills one in normally and has its own cover; what is under test
+  // here is everything after it.
+  const id = 'WO-E2E-1'
+  const dir = join(repo, '.foundry', 'orders', id)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(
+    join(dir, 'order.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      id,
+      title: 'Greet by name',
+      status: 'agreed',
+      source: { kind: 'typed', tracker: null, key: null, url: null },
+      writeBack: [],
+      stateMapping: { started: null, in_review: null, done: null },
+      recipe: null,
+      recipeOverriddenBy: null,
+      intent: { problem: 'greet says hello', outcome: 'it says hello by name', nonGoals: [] },
+      context: {
+        repos: [{ name: 'fixture', path: repo, lane: 1, baseBranch: 'main', headBranch: '' }],
+        toolchain: {
+          test: { command: 'echo ok', source: 'package.json' },
+          lint: null,
+          format: null,
+          coverage: null,
+          e2e: null,
+          build: null,
+        },
+        entryPoints: [],
+        priorArt: [],
+        conventions: [],
+        houseDocs: [],
+      },
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'greet takes a name',
+          priority: 'P1',
+          verify: { kind: 'test', command: 'echo ok', assert: 'exit_code == 0' },
+          unverifiable: null,
+        },
+      ],
+      risk: { grade: 'P3', triggers: [], blastRadius: ['README.md'], criticalPaths: [] },
+      budgets: { agents: 1, wallClockMinutes: 60, filesTouched: 5, tokens: null },
+      plan: {
+        units: [
+          {
+            id: 'U-1',
+            title: 'greet by name',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: ['README.md'],
+            verify: [],
+          },
+        ],
+        lanes: [{ ord: 1, repo: 'fixture', branch: '', role: null, blocks: [], blockedBy: [] }],
+        sharedFiles: [],
+      },
+      assumptions: [],
+      openQuestions: [],
+      redTeam: [],
+      provenance: { forgeSession: null, decisions: [], amendments: [] },
+      createdAt: '2026-09-06T10:00:00.000Z',
+      agreedAt: '2026-09-06T10:00:00.000Z',
+    })
+  )
+
+  const started = (await foundry('foundry:run.start', { id })) as {
+    error?: string
+    started?: boolean
+    graph?: { nodes: { id: string }[] }
+  }
+  expect(started.error, 'the run was refused').toBeUndefined()
+  expect(started.started, 'nothing was there to run it').toBe(true)
+  expect(started.graph?.nodes.length).toBeGreaterThan(0)
+
+  // The worktree became a project in the sidebar, named for the branch the
+  // run cut — which is what makes it findable at all.
+  const project = page.locator('.branch-row__name').filter({ hasText: 'wo-e2e-1' })
+  await expect(project.first()).toBeVisible({ timeout: 60_000 })
+
+  // And it is running in a terminal, with the command visible in it — held
+  // until the tab mounted rather than printed before anything was listening.
+  await project.first().click()
+  const screen = page.locator('.xterm-screen')
+  await expect(screen).toContainText('claude --session-id', { timeout: 60_000 })
+
+  // Never the thing this replaced: an invisible agent approving its own tool
+  // calls.
+  await expect(screen).not.toContainText('bypassPermissions')
+
+  // A relative settings path resolves against the worktree, where it does not
+  // exist, and the run dies on "Settings file not found" while the graph still
+  // says running.
+  await expect(screen).toContainText("--settings '/")
+  await expect(screen).not.toContainText('Settings file not found')
+
+  // The agent was told what to build, not merely who it is.
+  const snapshot = (await foundry('foundry:supervision-snapshot')) as {
+    runs: { sessionId: string; branch: string }[]
+  }
+  expect(snapshot.runs.length).toBeGreaterThan(0)
+  expect(snapshot.runs[0].branch).toContain('wo-e2e-1')
+
+  // The worktree is a real checkout of the fixture repository, cut under the
+  // data root rather than inside the repository being worked on.
+  const worktrees = execFileSync('git', ['worktree', 'list'], { cwd: repo }).toString()
+  expect(worktrees).toContain(join('.foundry', 'orders', id, 'worktrees', 'fixture'))
 })

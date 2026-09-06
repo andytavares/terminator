@@ -27,6 +27,16 @@ interface InboxView {
   }
 }
 
+/** What happened since the operator last looked, rolled up. */
+interface Digest {
+  entryCount: number
+  sessionCount: number
+  bySession: { sessionId: string; entries: { summary: string }[] }[]
+}
+
+/** Where "since you last looked" is remembered. Per viewer, not per run. */
+const LAST_READ_KEY = 'foundry.inbox.lastRead'
+
 const RULE_ICON: Record<GateRuleId, React.ComponentType> = {
   'risk.p0': ShieldAlert,
   'budget.exceeded': Gauge,
@@ -59,10 +69,29 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
 export function Inbox(): JSX.Element {
   const [view, setView] = useState<InboxView | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [digest, setDigest] = useState<Digest | null>(null)
 
   const refresh = useCallback(async () => {
     const next = (await invoke('foundry:inbox.list')) as InboxView
     setView(next)
+
+    // "Nothing needs you" is only reassuring if it also says what happened
+    // while you were not looking. When it was is a property of the person
+    // reading, not of the runs, so it lives in their own browser.
+    let since = Date.now() - 24 * 60 * 60 * 1000
+    try {
+      const stored = window.localStorage.getItem(LAST_READ_KEY)
+      if (stored !== null) since = Number(stored)
+    } catch {
+      // A private window, or storage turned off. A day is a fine default.
+    }
+    const rolled = (await invoke('foundry:feed-digest', { from: since })) as Digest
+    setDigest(rolled)
+    try {
+      window.localStorage.setItem(LAST_READ_KEY, String(Date.now()))
+    } catch {
+      // Nothing here is worth failing the surface for.
+    }
   }, [])
 
   useEffect(() => {
@@ -90,6 +119,15 @@ export function Inbox(): JSX.Element {
         <div className="fdry-nothing">
           <CheckCircle2 aria-hidden="true" />
           <p>Nothing needs you.</p>
+          {digest !== null && digest.entryCount > 0 ? (
+            <small>
+              {digest.entryCount} things happened across {digest.sessionCount}{' '}
+              {digest.sessionCount === 1 ? 'run' : 'runs'} since you last looked
+              {digest.bySession[0]?.entries[0] !== undefined
+                ? ` — most recently: ${digest.bySession[0].entries[0].summary}`
+                : ''}
+            </small>
+          ) : null}
         </div>
       ) : (
         <ul className="fdry-queue">

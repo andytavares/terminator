@@ -364,6 +364,138 @@
   color: var(--tm-accent-text);
 }
 
+/* Finished work nobody has looked at. Worst risk first, so the queue's order
+   and the eye's order are the same. */
+.fdry-review-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+}
+
+.fdry-review-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fdry-review-main small {
+  color: var(--tm-text-secondary);
+}
+
+.fdry-grade {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Only the two that warrant stopping take colour. A list where every row is
+   coloured is a list where none of them stand out. */
+.fdry-grade.is-p0 {
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
+}
+
+.fdry-grade.is-p1 {
+  border-color: var(--tm-warning);
+  color: var(--tm-warning);
+}
+
+.fdry-hunk-file {
+  margin-top: 10px;
+}
+
+.fdry-hunk-file > code {
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-hunk {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  overflow: hidden;
+}
+
+/* The border says which way it was decided, rather than a wash of colour over
+   the diff itself — which is the thing being read. */
+.fdry-hunk.is-accept {
+  border-color: var(--tm-success);
+}
+
+.fdry-hunk.is-reject {
+  border-color: var(--tm-danger);
+}
+
+.fdry-hunk pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  font-size: 11px;
+  line-height: 1.45;
+  background: var(--tm-bg-input);
+  white-space: pre;
+}
+
+.fdry-hunk-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  padding: 6px;
+}
+
+/* A mute you cannot find is a mute you never undo, so each one is a control. */
+.fdry-unmute {
+  appearance: none;
+  margin: 0 4px;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  cursor: pointer;
+}
+
+/* What happened while you were away. */
+.fdry-feed-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+}
+
+/* The author is a margin note, not a status: the pill treatment belongs to
+   run state and review grade, which are the things worth spotting. */
+.fdry-feed-author {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-feed-summary {
+  flex: 1;
+  min-width: 0;
+}
+
+.fdry-scope {
+  color: var(--tm-warning);
+}
+
 /* The record. Read-only apart from one button. */
 .fdry-ledger-bar {
   display: flex;

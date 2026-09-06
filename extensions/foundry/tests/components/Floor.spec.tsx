@@ -56,6 +56,18 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
   invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:run.observe') return view
     if (channel === 'foundry:permissions-list') return { pending: live.pending ?? [] }
+    if (channel === 'foundry:supervision-snapshot') return { review: live.review ?? [] }
+    if (channel === 'foundry:review-hunks') return { files: live.hunks ?? [] }
+    if (channel === 'foundry:review-decide-hunk') return { ok: true }
+    if (channel === 'foundry:review-apply') return live.apply ?? { ok: true, reverted: 0 }
+    if (channel === 'foundry:review-done') return { ok: true }
+    if (channel === 'foundry:review-intent') return { intent: live.intent ?? null }
+    if (channel === 'foundry:review-advance') return { step: null }
+    if (channel === 'foundry:feed-list') {
+      return { entries: live.feed ?? [], mutes: live.mutes ?? [] }
+    }
+    if (channel === 'foundry:feed-unmute') return { mutes: [] }
+    if (channel === 'foundry:feed-dismiss' || channel === 'foundry:feed-mute') return { ok: true }
     if (channel === 'foundry:run-transcript') return { lines: live.lines ?? [] }
     if (channel === 'foundry:permission-resolve') return live.resolve ?? { ok: true }
     if (
@@ -337,5 +349,229 @@ describe('watching a run', () => {
     await waitFor(() => screen.getByText(/WO-1/))
     expect(screen.queryByRole('button', { name: 'Watch N-2' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Attach to N-2' })).toBeNull()
+  })
+})
+
+const REVIEW = {
+  sessionId: 's-1',
+  branch: 'foundry/wo-1',
+  grade: 'P0',
+  gradeTrigger: 'touches authentication',
+  diffSummary: { files: 2, added: 40, removed: 3 },
+}
+
+const HUNKS = [
+  {
+    file: 'src/auth/session.ts',
+    hunks: [
+      { id: 'h-1', newStart: 10, lines: ['+  if (expired) return null'], decision: null },
+      { id: 'h-2', newStart: 40, lines: ['+  console.log(token)'], decision: null },
+    ],
+  },
+]
+
+describe('finished work nobody has looked at', () => {
+  it('lists it worst risk first, with the reason for the grade', async () => {
+    mount(reply(), { review: [REVIEW] })
+    await waitFor(() => expect(screen.getByText('To review — 1')).toBeTruthy())
+    expect(screen.getByText('P0')).toBeTruthy()
+    expect(screen.getByText(/touches authentication/)).toBeTruthy()
+    expect(screen.getByText(/2 files/)).toBeTruthy()
+  })
+
+  it('shows nothing when nothing is waiting', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText(/To review/)).toBeNull()
+  })
+
+  it('opens the diff hunk by hunk, because one file holds both changes', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+
+    await waitFor(() => expect(screen.getByText('src/auth/session.ts')).toBeTruthy())
+    expect(screen.getByText(/if \(expired\) return null/)).toBeTruthy()
+    expect(screen.getByText(/console\.log\(token\)/)).toBeTruthy()
+  })
+
+  it('accepts and rejects one at a time', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByText('src/auth/session.ts'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accept h-1' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:review-decide-hunk', {
+        sessionId: 's-1',
+        hunkId: 'h-1',
+        decision: 'accept',
+      })
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reject h-2' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:review-decide-hunk', {
+        sessionId: 's-1',
+        hunkId: 'h-2',
+        decision: 'reject',
+      })
+    )
+  })
+
+  it('applies what was decided, which is what makes a rejection mean anything', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByText('src/auth/session.ts'))
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply what I decided/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:review-apply', { sessionId: 's-1' })
+    )
+    expect(invoke).toHaveBeenCalledWith('foundry:review-done', { sessionId: 's-1' })
+  })
+
+  it('says why it could not apply them, rather than closing as though it had', async () => {
+    mount(reply(), {
+      review: [REVIEW],
+      hunks: HUNKS,
+      apply: { ok: false, error: 'the worktree moved under it' },
+    })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByText('src/auth/session.ts'))
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply what I decided/ }))
+    await waitFor(() => expect(screen.getByText(/worktree moved under it/)).toBeTruthy())
+    expect(screen.getByText('src/auth/session.ts')).toBeTruthy()
+  })
+
+  it('tells a runtime that never started apart from a change that touched nothing', async () => {
+    mount(reply(), { review: [REVIEW], hunks: null })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => expect(screen.getByText(/supervision runtime is not running/)).toBeTruthy())
+  })
+
+  it('says a run that changed nothing changed nothing', async () => {
+    mount(reply(), { review: [REVIEW], hunks: [] })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => expect(screen.getByText('This run changed nothing.')).toBeTruthy())
+  })
+})
+
+describe('the request against what the agent says it did', () => {
+  it('names what was touched without being asked', async () => {
+    mount(reply(), {
+      review: [REVIEW],
+      hunks: HUNKS,
+      intent: {
+        unexpectedFiles: ['src/config/timeouts.ts'],
+        untouchedFiles: [],
+        hasScopeConcern: true,
+      },
+    })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Touched without being asked: src\/config\/timeouts\.ts/)
+      ).toBeTruthy()
+    )
+  })
+
+  it('names what was asked for and never touched, which often means it was not done', async () => {
+    mount(reply(), {
+      review: [REVIEW],
+      hunks: HUNKS,
+      intent: {
+        unexpectedFiles: [],
+        untouchedFiles: ['src/auth/refresh.ts'],
+        hasScopeConcern: true,
+      },
+    })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() =>
+      expect(screen.getByText(/never touched: src\/auth\/refresh\.ts/)).toBeTruthy()
+    )
+  })
+
+  it('says nothing when the change was what was asked for', async () => {
+    mount(reply(), {
+      review: [REVIEW],
+      hunks: HUNKS,
+      intent: { unexpectedFiles: [], untouchedFiles: [], hasScopeConcern: false },
+    })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByText('src/auth/session.ts'))
+    expect(screen.queryByText(/Touched without being asked/)).toBeNull()
+  })
+})
+
+describe('what happened while you were away', () => {
+  const ENTRY = {
+    id: 'f-1',
+    at: 1,
+    sessionId: 's-1',
+    author: 'agent',
+    summary: 'edited session.ts',
+  }
+
+  it('lists it, newest first', async () => {
+    mount(reply(), { feed: [ENTRY, { ...ENTRY, id: 'f-2', summary: 'ran the tests' }] })
+    await waitFor(() => expect(screen.getByText('Activity')).toBeTruthy())
+    const rows = screen.getAllByText(/edited session|ran the tests/).map((e) => e.textContent)
+    expect(rows[0]).toBe('ran the tests')
+  })
+
+  it('clears one line without hiding the rest', async () => {
+    mount(reply(), { feed: [ENTRY] })
+    await waitFor(() => screen.getByText('Activity'))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss f-1' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:feed-dismiss', { id: 'f-1', sessionId: 's-1' })
+    )
+  })
+
+  it('mutes a run that keeps interrupting, without hiding what it does', async () => {
+    mount(reply(), { feed: [ENTRY] })
+    await waitFor(() => screen.getByText('Activity'))
+    fireEvent.click(screen.getByRole('button', { name: 'Mute s-1' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:feed-mute', { id: 'f-1', sessionId: 's-1' })
+    )
+  })
+
+  it('shows no section when nothing has happened', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText('Activity')).toBeNull()
+  })
+})
+
+describe('a mute you can find again', () => {
+  it('shows what is silenced', async () => {
+    mount(reply(), { mutes: [{ sessionId: 's-1' }] })
+    await waitFor(() => expect(screen.getByText(/Silenced/)).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Unmute s-1' })).toBeTruthy()
+  })
+
+  it('puts it back', async () => {
+    mount(reply(), { mutes: [{ sessionId: 's-1' }] })
+    await waitFor(() => screen.getByText(/Silenced/))
+    fireEvent.click(screen.getByRole('button', { name: 'Unmute s-1' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:feed-unmute', { sessionId: 's-1' })
+    )
+  })
+
+  it('shows the panel for a mute even when the feed is empty', async () => {
+    mount(reply(), { mutes: [{ author: 'agent' }] })
+    await waitFor(() => expect(screen.getByText('Activity')).toBeTruthy())
   })
 })
