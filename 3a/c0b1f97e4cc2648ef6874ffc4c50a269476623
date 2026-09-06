@@ -1,0 +1,47 @@
+extensions/foundry/src/line/run-graph.ts
+  s_357c91d2b54b02::t_10c9275e45083f 132-145,149-158
+  s_357c91d2b54b02::t_0c921e9e664172 146-148
+extensions/foundry/src/ipc/run-channels.ts
+  s_357c91d2b54b02::t_ba5dc9cf282b7c 6
+  s_357c91d2b54b02::t_0efd285d735ce6 232-236,239,242
+extensions/foundry/tests/line/run-graph.spec.ts
+  s_357c91d2b54b02::t_2ae3545648d89d 2-10
+  s_357c91d2b54b02::t_8d0707a64a3fa3 273-340,344-357
+  s_357c91d2b54b02::t_0c921e9e664172 341-343
+docs/user-guide/USER-GUIDE.md
+  s_357c91d2b54b02::t_f922bc28912c43 605-607
+extensions/foundry/src/components/Floor.tsx
+  s_357c91d2b54b02::t_732270821c1cf4 745-746
+  s_357c91d2b54b02::t_ef0ac815c1cffa 40-41
+  s_357c91d2b54b02::t_b61c0976f62c15 151-154
+  s_357c91d2b54b02::t_ba5dc9cf282b7c 425-433,440,448
+extensions/foundry/src/line/scheduler.ts
+  s_357c91d2b54b02::t_0efd285d735ce6 65-77,88,96
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_357c91d2b54b02::t_40f76c3a95d328 632-658
+tests/e2e/tools/capture-foundry-screenshot.spec.ts
+  s_357c91d2b54b02::t_abba437ccc8569 3,145-235,237-239
+  s_357c91d2b54b02::t_0c921e9e664172 236
+  s_357c91d2b54b02::t_518bbc97e62617 240
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_357c91d2b54b02::t_98f08c650d2df3 712-755,760-761
+  s_357c91d2b54b02::t_0c921e9e664172 759
+  s_357c91d2b54b02::t_4b0e8f56cd4466 756-758
+  s_357c91d2b54b02::t_7de44f24c13539 762-792
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "3ac0b1f97e4cc2648ef6874ffc4c50a269476623",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
