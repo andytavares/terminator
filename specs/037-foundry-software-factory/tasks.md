@@ -81,22 +81,22 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests for User Story 1 (write first, must fail)
 
-- [ ] T023 [P] [US1] Spec for the six compile checks, each failing in isolation and naming the specific offending id, plus a complete order returning `ok: true` with zero failures, in `extensions/foundry/tests/order/compile.spec.ts`
-- [ ] T024 [P] [US1] Spec for the bidirectional coverage matrix — an uncovered criterion and an orphan unit each fail, and an order failing both reports both — in `extensions/foundry/tests/order/coverage-matrix.spec.ts`
-- [ ] T025 [P] [US1] Spec for the question budget: at most three unanswered questions surfaced, ranked by how much of the plan each changes, in `extensions/foundry/tests/forge/interview.spec.ts`
-- [ ] T026 [P] [US1] Spec for striking an assumption redrawing exactly its `affects` set and nothing else, in `extensions/foundry/tests/forge/assumptions.spec.ts`
-- [ ] T027 [P] [US1] Spec for amendment returning an agreed order to draft, re-running all six checks and preserving every identifier, in `extensions/foundry/tests/order/amend.spec.ts`
-- [ ] T028 [P] [US1] Spec for intake sources — typed, tracker issue, failing run — including a second seed of the same issue key offering the existing order, in `extensions/foundry/tests/forge/intake-source.spec.ts`
+- [x] T023 [P] [US1] Spec for the six compile checks, each failing in isolation and naming the specific offending id, plus a complete order returning `ok: true` with zero failures, in `extensions/foundry/tests/order/compile.spec.ts`
+- [x] T024 [P] [US1] Spec for the bidirectional coverage matrix — an uncovered criterion and an orphan unit each fail, and an order failing both reports both — in `extensions/foundry/tests/order/coverage-matrix.spec.ts`
+- [x] T025 [P] [US1] Spec for the question budget: at most three unanswered questions surfaced, ranked by how much of the plan each changes, in `extensions/foundry/tests/forge/interview.spec.ts`
+- [x] T026 [P] [US1] Spec for striking an assumption redrawing exactly its `affects` set and nothing else, in `extensions/foundry/tests/forge/assumptions.spec.ts`
+- [x] T027 [P] [US1] Spec for amendment returning an agreed order to draft, re-running all six checks and preserving every identifier, in `extensions/foundry/tests/order/amend.spec.ts`
+- [x] T028 [P] [US1] Spec for intake sources — typed, tracker issue, failing run — including a second seed of the same issue key offering the existing order, in `extensions/foundry/tests/forge/intake-source.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T029 [P] [US1] Implement the six compile checks as a pure function returning `{ ok, failures[] }` with subject ids in `extensions/foundry/src/order/compile.ts`
-- [ ] T030 [P] [US1] Implement the criteria-by-units coverage matrix in both directions in `extensions/foundry/src/order/coverage-matrix.ts`
-- [ ] T031 [P] [US1] Implement intake source resolution, including reuse of the existing tracker connection for issue seeding, in `extensions/foundry/src/forge/intake-source.ts`
-- [ ] T032 [US1] Implement the interview protocol — Scout before any question, question budget of three, ranked with a recommended answer — in `extensions/foundry/src/forge/interview.ts`
-- [ ] T033 [US1] Implement assumptions and targeted redraft on strike in `extensions/foundry/src/forge/assumptions.ts`
+- [x] T029 [P] [US1] Implement the six compile checks as a pure function returning `{ ok, failures[] }` with subject ids in `extensions/foundry/src/order/compile.ts`
+- [x] T030 [P] [US1] Implement the criteria-by-units coverage matrix in both directions in `extensions/foundry/src/order/coverage-matrix.ts`
+- [x] T031 [P] [US1] Implement intake source resolution, including reuse of the existing tracker connection for issue seeding, in `extensions/foundry/src/forge/intake-source.ts`
+- [x] T032 [US1] Implement the interview protocol — Scout before any question, question budget of three, ranked with a recommended answer — in `extensions/foundry/src/forge/interview.ts`
+- [x] T033 [US1] Implement assumptions and targeted redraft on strike in `extensions/foundry/src/forge/assumptions.ts`
 - [ ] T034 [US1] Implement the adversarial pass, started without the intake transcript and without a resumed session, in `extensions/foundry/src/forge/red-team.ts`
-- [ ] T035 [US1] Implement amendment returning the order to draft and recording what changed in `extensions/foundry/src/order/amend.ts`
+- [x] T035 [US1] Implement amendment returning the order to draft and recording what changed in `extensions/foundry/src/order/amend.ts`
 - [ ] T036 [P] [US1] Implement the human rendering of an order, regenerated on every change and never hand-edited, in `extensions/foundry/src/order/render.ts`
 - [ ] T037 [US1] Register `foundry:order.create`, `foundry:order.turn` and `foundry:order.compile` per contracts/ipc-channels.md in `extensions/foundry/src/index.ts`
 - [ ] T038 [US1] Build the Forge surface — live order document, convergence checklist, at most three questions, strikeable assumptions, coverage matrix — in `extensions/foundry/src/components/Forge.tsx`
