@@ -459,12 +459,35 @@ describe('useKeyboardShortcuts', () => {
       )
     })
 
-    it('Cmd+D does nothing when scratchProjectId is set but activeProjectId is null', async () => {
+    it('Cmd+D splits the scratch terminal when that is what is on screen', async () => {
+      // This used to be gated on `activeProjectId` alone and do nothing at
+      // all here — silently, with the palette entries absent too, which reads
+      // as the feature having been removed rather than as not applying. Cmd+T
+      // and Cmd+W already treat scratch as an ordinary project; this now does
+      // the same.
       setupMocks({ activeProjectId: null })
       const useKeyboardShortcuts = await importHook()
       renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
       pressKey('d', { metaKey: true })
-      expect(mockSplitSession).not.toHaveBeenCalled()
+      expect(mockSplitSession).toHaveBeenCalledWith(
+        SCRATCH_ID,
+        'vertical',
+        expect.any(String),
+        5000
+      )
+    })
+
+    it('Cmd+Shift+D splits the scratch terminal horizontally', async () => {
+      setupMocks({ activeProjectId: null })
+      const useKeyboardShortcuts = await importHook()
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+      pressKey('d', { metaKey: true, shiftKey: true })
+      expect(mockSplitSession).toHaveBeenCalledWith(
+        SCRATCH_ID,
+        'horizontal',
+        expect.any(String),
+        5000
+      )
     })
 
     it('Cmd+W closes scratch tab when scratchProjectId is set', async () => {

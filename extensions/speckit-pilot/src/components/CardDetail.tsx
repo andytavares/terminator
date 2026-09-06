@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { ConfirmDialog, useDismissible } from '@terminator/extension-ui'
 import { X } from 'lucide-react'
 import { getSpeckitAPI } from '../types/electron.js'
 import type { PilotState } from '../types/speckit.types.js'
@@ -13,7 +14,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'brief', label: 'Brief' },
   { id: 'phases', label: 'Phases' },
   { id: 'activity', label: 'Activity' },
-  { id: 'artifacts', label: 'Artifacts' },
+  { id: 'artifacts', label: 'Files' },
 ]
 
 interface CardDetailProps {
@@ -115,16 +116,50 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
   // "Actively running" means a phase is genuinely in progress — not just a stale
   // run flag (e.g. after a reload the in-memory runner is gone). Base the handoff
   // affordance on that so a dead/stuck run can always be (re)started.
+  const [dirty, setDirty] = useState(false)
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Escape closes the drawer, the same as everywhere else in the product. It
+  // used to do nothing here, so the reflex second press exited the extension.
+  useDismissible({
+    ref: panelRef,
+    onDismiss: () => requestClose(),
+    manageFocus: false,
+    closeOnOutsideClick: false,
+    enabled: !confirmingDiscard,
+  })
+
   const isRunning = state ? Object.values(state.phases).some((p) => p.status === 'running') : false
   const hasRun = state !== null && state.run !== null
   const canHandoff = state !== null && !isRunning && state.run?.status !== 'completed'
 
+  /**
+   * Closing with unsaved edits used to discard them without a word. The drawer
+   * asks first — and only when there is something to lose.
+   */
+  function requestClose(): void {
+    if (!dirty) {
+      onClose()
+      return
+    }
+    setConfirmingDiscard(true)
+  }
+
   return (
-    <div className="sk-card-detail" role="dialog" aria-label="Card detail">
+    <div
+      ref={panelRef}
+      data-tmui-surface=""
+      className="sk-card-detail"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Card detail"
+    >
       <header className="sk-card-detail__head">
         <h2>{state?.card.title ?? 'Card'}</h2>
-        <button type="button" aria-label="Close" onClick={onClose}>
-          <X size={16} />
+        {dirty && <span className="sk-card-detail__dirty">Unsaved</span>}
+        <button type="button" aria-label="Close" onClick={requestClose}>
+          <X aria-hidden="true" />
         </button>
       </header>
       <nav className="sk-card-detail__tabs">
@@ -143,7 +178,12 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
       <div className="sk-card-detail__body">
         {tab === 'brief' &&
           (state ? (
-            <CardBriefEditor initial={state.card} submitLabel="Save brief" onSubmit={saveBrief} />
+            <CardBriefEditor
+              initial={state.card}
+              submitLabel="Save brief"
+              onSubmit={saveBrief}
+              onDirtyChange={setDirty}
+            />
           ) : (
             <p>Loading…</p>
           ))}
@@ -247,6 +287,19 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
         {tab === 'activity' && <ActivityFeed featureDir={featureDir} />}
         {tab === 'artifacts' && <ArtifactsPanel featureDir={featureDir} />}
       </div>
+      {confirmingDiscard && (
+        <ConfirmDialog
+          title="Discard your changes?"
+          description="This card's brief has edits that have not been saved."
+          confirmLabel="Discard"
+          danger
+          onConfirm={() => {
+            setConfirmingDiscard(false)
+            onClose()
+          }}
+          onClose={() => setConfirmingDiscard(false)}
+        />
+      )}
     </div>
   )
 }

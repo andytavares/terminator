@@ -5,7 +5,8 @@
   "main": "out/main/index.js",
   "type": "module",
   "workspaces": [
-    "extensions/*"
+    "extensions/*",
+    "packages/*"
   ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
@@ -45,6 +46,7 @@
     "*.{json,md,css,html,yml,yaml}": "prettier --write"
   },
   "dependencies": {
+    "@terminator/extension-ui": "*",
     "@electric-sql/pglite": "^0.2.17",
     "@fastify/static": "10.1.2",
     "@fastify/websocket": "11.2.0",

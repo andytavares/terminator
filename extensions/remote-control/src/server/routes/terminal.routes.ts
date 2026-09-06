@@ -7,6 +7,7 @@ import { MISSING_CWD_ERROR } from '../../types.js'
 import type { PtyManagerAPI } from '../../types.js'
 import type { WsTicketStore } from '../ws-ticket-store.js'
 import type { WsSubscriberManager } from '../ws-subscriber-manager.js'
+import type { ConnectedDeviceRegistry } from '../connected-devices'
 
 const CreateTerminalSchema = z.object({
   cwd: z.string().min(1),
@@ -28,6 +29,11 @@ interface TerminalRouteOptions {
   ptyManager: PtyManagerAPI
   ticketStore: WsTicketStore
   subscriberManager: WsSubscriberManager
+  /**
+   * Who is watching, for the Remote Control view. Optional so existing callers
+   * are unaffected; without it the view simply shows nothing connected.
+   */
+  deviceRegistry?: ConnectedDeviceRegistry
   getMaxSubscribers: () => number
 }
 
@@ -41,7 +47,7 @@ export async function registerTerminalRoutes(
   app: FastifyInstance,
   opts: TerminalRouteOptions
 ): Promise<{ cleanup: () => void }> {
-  const { ptyManager, ticketStore, subscriberManager, getMaxSubscribers } = opts
+  const { ptyManager, ticketStore, subscriberManager, getMaxSubscribers, deviceRegistry } = opts
 
   // One output-broadcast listener per session this surface is streaming.
   const broadcastDisposers = new Map<string, () => void>()
@@ -208,6 +214,13 @@ export async function registerTerminalRoutes(
       const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())
       if (!accepted) return
 
+      // The socket is the device's identity for as long as it is open, which is
+      // exactly as long as the view should list it.
+      const deviceId = `${sessionId}:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+      deviceRegistry?.add(deviceId, request.headers['user-agent'], sessionId, () =>
+        ws.close(4004, 'disconnected from the app')
+      )
+
       // First remote viewer of an app-owned session starts the broadcast; the
       // listener stays attached across reconnects and dies with the session.
       // Attached only after acceptance so a rejected connection leaves no
@@ -228,6 +241,7 @@ export async function registerTerminalRoutes(
       })
 
       ws.on('close', () => {
+        deviceRegistry?.remove(deviceId)
         subscriberManager.removeSubscriber(sessionId, ws)
         if (subscriberManager.getCount(sessionId) === 0 && ptyManager.getSession(sessionId)) {
           // Grace period: mobile clients navigate away (unmounting the view) without

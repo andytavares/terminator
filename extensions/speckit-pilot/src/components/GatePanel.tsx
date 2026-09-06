@@ -139,7 +139,7 @@ export function GatePanel({
           }}
         >
           {artifactContent ?? (
-            <span style={{ color: 'var(--tm-text-secondary)' }}>No artifact to preview.</span>
+            <span style={{ color: 'var(--tm-text-secondary)' }}>Nothing to preview.</span>
           )}
         </div>
       )}
@@ -322,7 +322,7 @@ export function GatePanel({
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
               aria-label="Approve"
             >
-              <CheckCircle size={14} />
+              <CheckCircle className="tm-icon" />
               {approving ? 'Approving…' : 'Approve'}
             </button>
             <button
@@ -331,7 +331,7 @@ export function GatePanel({
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
               aria-label={isQuestionPhase ? 'Answer questions' : 'Request changes'}
             >
-              <RotateCcw size={14} />
+              <RotateCcw className="tm-icon" />
               {isQuestionPhase ? 'Answer questions' : 'Request changes'}
             </button>
           </div>
@@ -345,7 +345,7 @@ export function GatePanel({
                 style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 aria-label="Revoke"
               >
-                <Undo2 size={14} />
+                <Undo2 className="tm-icon" />
                 Revoke
               </button>
             )}
@@ -358,7 +358,7 @@ export function GatePanel({
                 style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 aria-label="Skip phase"
               >
-                <SkipForward size={14} />
+                <SkipForward className="tm-icon" />
                 Skip
               </button>
             )}
@@ -369,7 +369,7 @@ export function GatePanel({
                 style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 aria-label="Comment"
               >
-                <MessageSquare size={14} />
+                <MessageSquare className="tm-icon" />
                 Comment
               </button>
             )}
@@ -380,7 +380,7 @@ export function GatePanel({
                 style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 aria-label="Edit"
               >
-                <Edit2 size={14} />
+                <Edit2 className="tm-icon" />
                 Edit
               </button>
             )}

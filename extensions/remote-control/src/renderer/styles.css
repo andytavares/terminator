@@ -24,8 +24,6 @@
   font-weight: 600;
   margin-bottom: 16px;
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 .settings-section__field {
@@ -35,8 +33,6 @@
 .settings-section__label {
   display: block;
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--text-muted);
   margin-bottom: 6px;
 }
@@ -99,7 +95,7 @@
 
 .settings-section__hint code {
   font-family: var(--font-mono);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--tm-overlay-soft);
   padding: 1px 4px;
   border-radius: 3px;
 }

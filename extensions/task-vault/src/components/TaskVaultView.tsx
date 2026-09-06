@@ -1,21 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  X,
-  Settings,
-  Download,
-  Upload,
-  Kanban,
-  List,
-  ChevronDown,
-  CalendarDays,
-} from 'lucide-react'
+import { CalendarDays, ChevronDown, Download, Kanban, List, Settings, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { Dialog, IconButton } from '@terminator/extension-ui'
 import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
 import { useVaultNavStore } from '../stores/vault-nav.store'
-import { useVaultDataStore } from '../stores/vault-data.store'
-import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { VaultSidebar } from './VaultSidebar'
 import { DailyLog } from './DailyLog'
 import { ProjectsBrowser } from './ProjectsBrowser'
@@ -66,37 +56,29 @@ export function CaptureModal(): React.JSX.Element | null {
   }
 
   return createPortal(
-    <div className="capture-modal__backdrop" onClick={close}>
-      <div className="capture-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="capture-modal__header">
-          <span className="capture-modal__title">Capture to Inbox</span>
-          <button className="capture-modal__close" onClick={close}>
-            <X size={14} />
-          </button>
-        </div>
-        <div className="capture-modal__body">
-          <SmartTaskInput
-            value={text}
-            onChange={setText}
-            onSubmit={handleCapture}
-            onCancel={close}
-            disabled={capturing}
-            autoFocus
-            placeholder="Task text… @project #area +context due:YYYY-MM-DD"
-          />
-        </div>
-        <div className="capture-modal__footer">
-          <button
-            className="capture-modal__capture-btn"
-            onClick={handleCapture}
-            disabled={capturing || !text.trim()}
-          >
-            {capturing ? '…' : 'Capture'}
-          </button>
-          <span className="capture-modal__hint">Esc to dismiss · Enter to capture</span>
-        </div>
-      </div>
-    </div>,
+    <Dialog
+      title="Capture to Inbox"
+      onDismiss={close}
+      actions={[
+        {
+          label: capturing ? '…' : 'Capture',
+          tone: 'primary',
+          disabled: capturing || !text.trim(),
+          shortcut: '↵',
+          onSelect: () => void handleCapture(),
+        },
+      ]}
+    >
+      <SmartTaskInput
+        value={text}
+        onChange={setText}
+        onSubmit={handleCapture}
+        onCancel={close}
+        disabled={capturing}
+        autoFocus
+        placeholder="Task text… @project #area +context due:YYYY-MM-DD"
+      />
+    </Dialog>,
     document.body
   )
 }
@@ -166,30 +148,28 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
   }
 
   return createPortal(
-    <div className="capture-modal__backdrop" onClick={onClose}>
-      <div
-        className="capture-modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: tab === 'admin' ? 780 : 420, width: '90vw' }}
-      >
+    <Dialog
+      title="Data tools"
+      onDismiss={onClose}
+      actions={[]}
+      size={tab === 'admin' ? 'wide' : 'default'}
+    >
+      <div className="tv-data-tools" data-wide={tab === 'admin' ? '' : undefined}>
         <div className="capture-modal__header">
           <div className="tv-modal-tabs">
             <button
               className={`tv-modal-tab${tab === 'data' ? ' tv-modal-tab--active' : ''}`}
               onClick={() => setTab('data')}
             >
-              Data Tools
+              Export &amp; import
             </button>
             <button
               className={`tv-modal-tab${tab === 'admin' ? ' tv-modal-tab--active' : ''}`}
               onClick={() => setTab('admin')}
             >
-              DB Admin
+              Database
             </button>
           </div>
-          <button className="capture-modal__close" onClick={onClose}>
-            <X size={14} />
-          </button>
         </div>
 
         {tab === 'data' && (
@@ -198,7 +178,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
             style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
           >
             <p style={{ fontSize: 12, color: 'var(--tm-text-muted)', margin: 0 }}>
-              Export your vault to JSON for backup or migration. Import merges records by ID —
+              Export everything to JSON for backup or migration. Import merges records by ID —
               existing data is not overwritten.
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -208,7 +188,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
                 disabled={exporting}
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <Download size={14} />
+                <Download className="tm-icon" />
                 {exporting ? 'Exporting…' : 'Export JSON'}
               </button>
               <button
@@ -217,7 +197,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
                 disabled={importing}
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <Upload size={14} />
+                <Upload className="tm-icon" />
                 {importing ? 'Importing…' : 'Import JSON'}
               </button>
               <input
@@ -253,7 +233,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
           </div>
         )}
       </div>
-    </div>,
+    </Dialog>,
     document.body
   )
 }
@@ -327,19 +307,10 @@ export function TaskVaultView(): React.JSX.Element {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Consume navigation intent dispatched from App.tsx (works even when this tab was unmounted)
-  const pendingNavigation = useExtensionRegistry((s) => s.pendingNavigations.get('task-vault'))
-  const clearPendingNavigation = useExtensionRegistry((s) => s.clearPendingNavigation)
-
-  useEffect(() => {
-    if (!pendingNavigation) return
-    clearPendingNavigation('task-vault')
-    const payload = pendingNavigation as { taskId: string; date?: string } | string
-    const taskId = typeof payload === 'string' ? payload : payload.taskId
-    const date = typeof payload === 'object' && payload.date ? payload.date : undefined
-    useVaultNavStore.getState().navigateToTask(taskId, date)
-    if (date) void useVaultDataStore.getState().loadDate(date)
-  }, [pendingNavigation, clearPendingNavigation])
+  // Navigation intent arrives on the `task-vault:navigate` bridge channel, which
+  // the effect further down listens to. A second path used to read the core
+  // registry's pendingNavigations map — but this view bundles its own copy of
+  // that store, so nothing was ever put in the map it was reading.
 
   useEffect(() => {
     if (!pendingTaskId || !todayLog) return
@@ -468,10 +439,9 @@ export function TaskVaultView(): React.JSX.Element {
   }, [])
 
   function makeTaskNavHandler(taskId: string): () => void {
-    return () => {
-      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-      useVaultNavStore.getState().navigateToTask(taskId)
-    }
+    // Already inside the vault view; the tab activation this used to do reached
+    // a copy of the core registry bundled into this view and moved nothing.
+    return () => useVaultNavStore.getState().navigateToTask(taskId)
   }
 
   async function handleComplete(taskId: string) {
@@ -574,32 +544,35 @@ export function TaskVaultView(): React.JSX.Element {
         <div className="task-vault-view__toolbar-row">
           <div className="task-vault-view__toolbar">
             <div className="task-vault-view__toolbar-right">
-              <button
-                className={`tv-btn tv-btn--xs${viewMode === 'list' ? ' tv-btn--secondary' : ' tv-btn--ghost'}`}
+              {/* These carried `title` alone, so enumerating every button in the
+                  running view returned neither of them: a tooltip is not a
+                  label, and never appears for keyboard or touch. IconButton
+                  takes the label as a required prop. */}
+              <IconButton
+                icon={List}
+                label="List view"
+                pressed={viewMode === 'list'}
                 onClick={() => setViewMode('list')}
-                title="List view"
-              >
-                <List size={13} />
-              </button>
-              <button
-                className={`tv-btn tv-btn--xs${viewMode === 'kanban' ? ' tv-btn--secondary' : ' tv-btn--ghost'}`}
+              />
+              <IconButton
+                icon={Kanban}
+                label="Board view"
+                pressed={viewMode === 'kanban'}
                 onClick={() => setViewMode('kanban')}
-                title="Kanban view"
-              >
-                <Kanban size={13} />
-              </button>
+              />
               <div className="tv-context-filter" ref={contextMenuRef}>
                 <button
                   className={`tv-btn tv-btn--xs tv-context-filter__btn${selectedContexts.length > 0 ? ' tv-btn--secondary' : ' tv-btn--ghost'}`}
                   onClick={() => setContextMenuOpen((v) => !v)}
-                  title="Filter by context"
+                  title="Filter"
+                  aria-label="Filter by context"
                 >
                   {selectedContexts.length === 0
-                    ? 'Context'
+                    ? 'Filter'
                     : selectedContexts.length === 1
                       ? `+${selectedContexts[0]}`
                       : `${selectedContexts.length} contexts`}
-                  <ChevronDown size={11} />
+                  <ChevronDown className="tm-icon-sm" />
                 </button>
                 {contextMenuOpen && (
                   <div className="tv-context-filter__dropdown">
@@ -640,7 +613,7 @@ export function TaskVaultView(): React.JSX.Element {
                   onClick={() => setShowCalendar((v) => !v)}
                   title={showCalendar ? 'Hide calendar' : 'Show calendar'}
                 >
-                  <CalendarDays size={14} />
+                  <CalendarDays className="tm-icon" />
                 </button>
               )}
               <button
@@ -648,7 +621,7 @@ export function TaskVaultView(): React.JSX.Element {
                 onClick={() => setShowDataTools(true)}
                 title="Data tools (export / import)"
               >
-                <Settings size={14} />
+                <Settings className="tm-icon" />
               </button>
             </div>
           </div>

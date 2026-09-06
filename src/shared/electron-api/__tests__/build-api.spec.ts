@@ -113,6 +113,25 @@ describe('buildElectronApi — native mode', () => {
     expect(typeof api.db.health).toBe('function')
     expect(typeof api.getFilePath).toBe('function')
     expect(typeof api.extension.setBottomInset).toBe('function')
+    expect(typeof api.extension.setTheme).toBe('function')
+  })
+
+  // An extension view is its own document and never sees the renderer's
+  // `data-theme`, so the theme has to travel over this channel. It is
+  // native-only: the remote client renders its own chrome.
+  it('sends the theme to the extension host', () => {
+    const t = makeTransport()
+    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    api.extension.setTheme('light')
+    expect(t.send).toHaveBeenCalledWith('extension:set-theme', { theme: 'light' })
+    api.extension.setTheme('dark')
+    expect(t.send).toHaveBeenCalledWith('extension:set-theme', { theme: 'dark' })
+  })
+
+  it('omits the theme channel from the remote client', () => {
+    const t = makeTransport()
+    const api = buildElectronApi(t, { mode: 'remote', locals: REMOTE_LOCALS }) as any
+    expect(api.extension.setTheme).toBeUndefined()
   })
 
   it('throws at build time when a local implementation is missing', () => {

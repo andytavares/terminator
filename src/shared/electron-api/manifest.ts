@@ -332,6 +332,15 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toPayload: (inset: number) => ({ inset }),
     remote: 'omit',
   },
+  {
+    // An extension view is its own document and never sees the renderer's
+    // `data-theme`, so the renderer has to tell it.
+    path: 'extension.setTheme',
+    kind: 'send',
+    channel: 'extension:set-theme',
+    toPayload: (theme: 'dark' | 'light') => ({ theme }),
+    remote: 'omit',
+  },
 
   // ── keyboard ──────────────────────────────────────────────────────────────
   // Local on both transports: native checks the reserved-shortcut set, remote

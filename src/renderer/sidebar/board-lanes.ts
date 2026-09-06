@@ -23,6 +23,14 @@ export interface BoardLane {
   count: number
   /** False when the user has hidden it, or when it is history and empty. */
   visible: boolean
+  /**
+   * The user's own choice, separate from `visible`.
+   *
+   * An empty history lane is invisible whether or not it was hidden, so
+   * `visible` cannot answer "is there something to restore here" — unhiding an
+   * empty Exited lane left it invisible and the restore control stuck.
+   */
+  hiddenByUser: boolean
   /** True for `exited` alone — a record rather than a queue. */
   isHistory: boolean
 }
@@ -98,6 +106,7 @@ export function buildLanes(
       cards,
       count: cards.length,
       visible: !hidden.has(state) && !(isHistory && cards.length === 0),
+      hiddenByUser: hidden.has(state),
       isHistory,
     }
   })

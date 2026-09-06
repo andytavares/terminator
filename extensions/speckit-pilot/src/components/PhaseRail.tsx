@@ -90,11 +90,11 @@ export function PhaseRail({ phases, activePhase, selectedPhase, onSelectPhase }:
               }}
             >
               {cls === 'done' ? (
-                <Check size={12} />
+                <Check className="tm-icon-sm" />
               ) : cls === 'active' ? (
-                <Loader2 size={12} />
+                <Loader2 className="tm-icon-sm" />
               ) : cls === 'review' ? (
-                <Eye size={12} />
+                <Eye className="tm-icon-sm" />
               ) : (
                 idx + 1
               )}

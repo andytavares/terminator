@@ -94,6 +94,9 @@ export function RepoHeader({
           }
         }}
       >
+        <span className="repo-header__chevron" aria-hidden="true">
+          {collapsed ? <ChevronRight /> : <ChevronDown />}
+        </span>
         {group.color && <span className="repo-header__swatch" aria-hidden="true" />}
         <span className="repo-header__name" title={pathLabel || group.folderPath || undefined}>
           {group.label}
@@ -106,8 +109,6 @@ export function RepoHeader({
             <Pause aria-hidden="true" />
           </span>
         )}
-
-        <span className="repo-header__count">{group.branchCount}</span>
 
         <span className="repo-header__hover">
           {workspaceTabs.map((tab) => (
@@ -139,10 +140,11 @@ export function RepoHeader({
               <Plus aria-hidden="true" />
             </button>
           )}
-          <span className="repo-header__chevron" aria-hidden="true">
-            {collapsed ? <ChevronRight /> : <ChevronDown />}
-          </span>
         </span>
+
+        {/* Last on the row: every count in the sidebar lands in one column,
+            and revealing the actions to its left cannot move it. */}
+        <span className="repo-header__count">{group.branchCount}</span>
       </div>
 
       {menu && (

@@ -9,12 +9,45 @@
   height: 28px;
   display: flex;
   align-items: center;
-  padding: 0 10px 0 0;
+  /* Indented past the repo header's chevron, so a branch reads as sitting
+     under its repo rather than beside it — its disclosure used to start at 0,
+     left of the repo's own. */
+  padding: 0 10px 0 14px;
   box-shadow: inset 2px 0 0 var(--ws-color, transparent);
   color: var(--text-secondary);
   user-select: none;
   cursor: pointer;
   outline: none;
+}
+
+/* The disclosure column. Always reserved, drawn only when there is something
+   under the row, so branch names stay in one column whether or not a branch
+   has terminals. */
+.branch-row__disclosure {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.branch-row__disclosure svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
+.branch-row__disclosure:hover {
+  color: var(--text-primary);
+}
+
+.branch-row__disclosure--empty {
+  cursor: default;
 }
 
 .branch-row:hover {
@@ -147,17 +180,46 @@
   font-style: normal;
 }
 
-.branch-row__count {
-  color: var(--text-primary);
+/* The same column the repo header's count occupies — last on the row, fixed
+   width, flush against the same right padding. The age takes the identical box
+   when there is no count, so a row with one terminal and a row with three line
+   up with each other and with the repo above them.
+
+   The type is restated here because it used to be inherited from
+   `.branch-row__meta`, which these two no longer sit inside: without it the
+   count rendered at the row's own size and read as a different, louder kind of
+   number than the repo count directly above it. */
+.branch-row__count,
+.branch-row__age {
+  flex: 0 0 var(--sidebar-count-w);
+  width: var(--sidebar-count-w);
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
+.branch-row__age {
+  color: var(--text-muted);
+}
+
+.branch-row__count {
+  color: var(--text-secondary);
+}
+
+/* Sits to the left of the count and takes the slack, so revealing it cannot
+   move the count out of its column. */
 .branch-row__hover {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  width: 16px;
   justify-content: flex-end;
-  margin-left: 6px;
+  margin-left: auto;
+  /* Matches the 7px the repo header gets from its row gap, so the two + are
+     in one column. This row has no gap of its own. */
+  margin-right: 7px;
   opacity: 0;
   transition: opacity 0.12s;
 }
@@ -167,10 +229,15 @@
   opacity: 0.85;
 }
 
+/* The same box as `.repo-header__action`. Sized by its glyph, it was 12px
+   against the header's 14px, so even with the two groups aligned the two +
+   sat 2px apart. */
 .branch-row__action {
   display: grid;
   place-items: center;
   padding: 0;
+  width: 14px;
+  height: 14px;
   background: transparent;
   border: 0;
   color: var(--text-muted);

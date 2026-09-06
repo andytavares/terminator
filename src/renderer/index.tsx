@@ -18,6 +18,10 @@ function Root(): JSX.Element {
   const theme = useSettingsStore((s) => s.resolvedTheme)
   React.useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
+    // Extension views are separate documents that never see this attribute,
+    // so they are told. Without it the light palette in EXTENSION_BASE_CSS is
+    // dead CSS and every extension panel stays dark in the light theme.
+    window.electronAPI?.extension?.setTheme?.(theme)
   }, [theme])
 
   React.useEffect(() => {

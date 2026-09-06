@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   createDoubleEscapeDetector,
   DOUBLE_ESCAPE_WINDOW_MS,
+  shouldSuppressExitGesture,
+  type EscapeContext,
 } from '../../../src/shared/double-escape'
 
 describe('createDoubleEscapeDetector', () => {
@@ -50,5 +52,55 @@ describe('createDoubleEscapeDetector', () => {
     detector.register(1000)
     detector.reset()
     expect(detector.register(1100)).toBe(false)
+  })
+})
+
+// ── The guards (036) ────────────────────────────────────────────────────────
+//
+// The host window's detector stood down inside a terminal, inside a text field,
+// and while a modal was open. The copy running inside every extension had none
+// of those guards, so Escape twice in a text field closed the extension and
+// discarded the draft. One decision function now serves both, because two
+// implementations of one rule is exactly how they came to disagree.
+
+describe('shouldSuppressExitGesture', () => {
+  const ctx = (over: Partial<EscapeContext> = {}): EscapeContext => ({
+    inTerminal: false,
+    inTextField: false,
+    modalDepth: 0,
+    ...over,
+  })
+
+  it('does not suppress when nothing has claimed the key', () => {
+    expect(shouldSuppressExitGesture(ctx())).toBe(false)
+  })
+
+  it('suppresses inside a terminal, where Escape belongs to the shell', () => {
+    expect(shouldSuppressExitGesture(ctx({ inTerminal: true }))).toBe(true)
+  })
+
+  // This is the case that lost people's work.
+  it('suppresses inside a text field, where Escape belongs to the field', () => {
+    expect(shouldSuppressExitGesture(ctx({ inTextField: true }))).toBe(true)
+  })
+
+  it('suppresses while a modal surface is open', () => {
+    expect(shouldSuppressExitGesture(ctx({ modalDepth: 1 }))).toBe(true)
+  })
+
+  it('suppresses while nested modal surfaces are open', () => {
+    expect(shouldSuppressExitGesture(ctx({ modalDepth: 3 }))).toBe(true)
+  })
+
+  it('stops suppressing once the last surface closes', () => {
+    expect(shouldSuppressExitGesture(ctx({ modalDepth: 0 }))).toBe(false)
+  })
+
+  it('suppresses when several conditions hold at once', () => {
+    expect(shouldSuppressExitGesture(ctx({ inTerminal: true, inTextField: true }))).toBe(true)
+  })
+
+  it('treats a negative depth as nothing open rather than as a suppressor', () => {
+    expect(shouldSuppressExitGesture(ctx({ modalDepth: -1 }))).toBe(false)
   })
 })

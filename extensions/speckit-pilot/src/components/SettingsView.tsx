@@ -123,8 +123,6 @@ export function SettingsView() {
     label: {
       fontSize: 11,
       fontWeight: 600,
-      textTransform: 'uppercase' as const,
-      letterSpacing: '0.08em',
       color: 'var(--tm-text-secondary)',
       marginBottom: 12,
     } as React.CSSProperties,
@@ -300,7 +298,7 @@ export function SettingsView() {
                 // core settings bridge unavailable — localStorage value still persists
               }
             }}
-            style={{ width: 80 }}
+            style={{ ...s.input, width: 80 }}
           />
           <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginTop: 5 }}>
             How many cards agents may work at once; extra hand-offs wait for a free slot.
@@ -330,7 +328,7 @@ export function SettingsView() {
                 // core settings bridge unavailable — localStorage value still persists
               }
             }}
-            style={{ width: 80 }}
+            style={{ ...s.input, width: 80 }}
           />
           <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginTop: 5 }}>
             Persisted step output older than this is deleted automatically.
@@ -392,7 +390,6 @@ export function SettingsView() {
                 fontSize: 11,
                 color: 'var(--tm-text-secondary)',
                 fontWeight: 600,
-                textTransform: 'uppercase',
                 letterSpacing: '0.06em',
               }}
             >
@@ -421,7 +418,7 @@ export function SettingsView() {
                   aria-label={`${PHASE_LABEL[phaseId]} gate row`}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {locked && <Lock size={11} />}
+                    {locked && <Lock className="tm-icon-sm" />}
                     {PHASE_LABEL[phaseId]}
                     {locked && (
                       <span style={{ fontSize: 10, color: 'var(--tm-text-secondary)' }}>
@@ -625,11 +622,11 @@ export function SettingsView() {
           onClick={handleSaveSettings}
           aria-label="Save agent runner settings"
         >
-          <Save size={13} /> Save settings
+          <Save className="tm-icon" /> Save settings
         </button>
         {settingsSaved && (
           <div style={s.saved}>
-            <CheckCircle size={12} /> Settings saved
+            <CheckCircle className="tm-icon-sm" /> Settings saved
           </div>
         )}
       </div>

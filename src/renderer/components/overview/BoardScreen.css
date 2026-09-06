@@ -2,6 +2,44 @@
    Cards are direct children positioned by grid-column/grid-row — see the note
    in BoardScreen.tsx for why that is load-bearing rather than tidy. */
 
+/* The way back from a hidden lane. Only present when there is one to make. */
+.board__hidden-lanes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px 0;
+  background: var(--bg-base);
+}
+
+.board__hidden-lanes-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.board__hidden-lane {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.board__hidden-lane:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.board__hidden-lane svg {
+  width: 11px;
+  height: 11px;
+}
+
 .board {
   flex: 1;
   display: grid;

@@ -123,6 +123,17 @@
   --tm-radius-lg: var(--radius-lg);
   --tm-font-mono: var(--font-mono);
   --tm-font-ui: var(--font-ui);
+
+  /* ── Layer scale (036) ───────────────────────────────────────
+     Ordering is the contract; these numbers are the implementation.
+     Replaces 14 ad-hoc z-index values across the extension stylesheets,
+     where stacking was decided by whoever picked the larger number.
+     Toast sits above modal on purpose: a confirmation raised from inside
+     a dialog must be readable without dismissing the dialog first. */
+  --tm-layer-panel: 100;
+  --tm-layer-overlay: 200;
+  --tm-layer-modal: 300;
+  --tm-layer-toast: 400;
 }
 
 /* ── Light Mode Token Overrides ──────────────────────────────── */

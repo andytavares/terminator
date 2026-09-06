@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Eye } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  RefreshCw,
+  TriangleAlert,
+} from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useLoadIssueComments } from '../../hooks/usePrReview'
 import { githubAPI } from '../../api/github'
@@ -194,7 +202,7 @@ export function PrOverviewPanel({
             title="Reload PR"
             aria-label="Reload pull request"
           >
-            ↻
+            <RefreshCw aria-hidden="true" />
           </button>
           {onPopOut && (
             <button
@@ -226,17 +234,19 @@ export function PrOverviewPanel({
               className="pr-overview-your-review-badge"
               title="You have been requested to review this PR"
             >
-              <Eye size={11} strokeWidth={2} />
+              <Eye aria-hidden="true" />
               Your review requested
             </span>
           )}
         {pr.mergeStateStatus === 'behind' && (
           <span className="pr-merge-state-badge pr-merge-state-badge--behind">
-            ↓ Behind {pr.baseRefName}
+            <ArrowDown aria-hidden="true" /> Behind {pr.baseRefName}
           </span>
         )}
         {pr.mergeStateStatus === 'dirty' && (
-          <span className="pr-merge-state-badge pr-merge-state-badge--dirty">⚠ Conflicts</span>
+          <span className="pr-merge-state-badge pr-merge-state-badge--dirty">
+            <TriangleAlert aria-hidden="true" /> Conflicts
+          </span>
         )}
       </div>
 
@@ -346,7 +356,7 @@ export function PrOverviewPanel({
                   className={`pr-overview-hotspot-item pr-overview-hotspot-item--${f.riskScore.level}`}
                 >
                   <span className={`pr-risk-chip pr-risk-chip--${f.riskScore.level}`}>
-                    {f.riskScore.level === 'high' ? 'HIGH' : 'MED'}
+                    {f.riskScore.level === 'high' ? 'High' : 'Medium'}
                   </span>
                   <span className="pr-overview-hotspot-path" title={f.path}>
                     {formatShortPath(f.path)}
@@ -373,7 +383,13 @@ export function PrOverviewPanel({
               aria-expanded={issueRefsExpanded}
             >
               Context
-              <span className="pr-overview-section-toggle">{issueRefsExpanded ? '▾' : '▸'}</span>
+              <span className="pr-overview-section-toggle">
+                {issueRefsExpanded ? (
+                  <ChevronDown aria-hidden="true" />
+                ) : (
+                  <ChevronRight aria-hidden="true" />
+                )}
+              </span>
             </h3>
             {issueRefsExpanded && (
               <ul className="pr-overview-issue-refs">
@@ -501,7 +517,13 @@ export function PrOverviewPanel({
             onClick={handleUpdateBranch}
             disabled={updatingBranch}
           >
-            {updatingBranch ? 'Updating…' : `↓ Update from ${pr.baseRefName}`}
+            {updatingBranch ? (
+              'Updating…'
+            ) : (
+              <>
+                <ArrowDown aria-hidden="true" /> Update from {pr.baseRefName}
+              </>
+            )}
           </button>
         )}
         {pr.mergeStateStatus === 'dirty' && (
@@ -510,7 +532,13 @@ export function PrOverviewPanel({
             onClick={handleResolveConflicts}
             disabled={preparingMerge}
           >
-            {preparingMerge ? 'Preparing merge…' : 'Resolve conflicts →'}
+            {preparingMerge ? (
+              'Preparing merge…'
+            ) : (
+              <>
+                <ArrowRight aria-hidden="true" /> Resolve conflicts
+              </>
+            )}
           </button>
         )}
         {pr.isDraft && (

@@ -22,12 +22,12 @@ const SECTIONS: Section[] = [
   },
   {
     key: 'acceptanceCriteria',
-    label: 'Acceptance Criteria',
+    label: 'Acceptance criteria',
     placeholder: '- [ ] Criterion one\n- [ ] Criterion two',
   },
   {
     key: 'devHints',
-    label: 'Dev Hints',
+    label: 'Dev hints',
     placeholder: 'Implementation notes, links, gotchas… Markdown supported.',
   },
 ]
@@ -93,7 +93,7 @@ function SectionEditor({ label, value, placeholder, onSave }: SectionEditorProps
           title={editing ? 'Preview' : 'Edit'}
           disabled={saving}
         >
-          {editing ? <Eye size={13} /> : <Pencil size={13} />}
+          {editing ? <Eye className="tm-icon" /> : <Pencil className="tm-icon" />}
         </button>
       </div>
 
@@ -219,7 +219,7 @@ export function TaskDetailPanel({ taskId, taskText, onClose }: TaskDetailPanelPr
           {taskText}
         </span>
         <button className="tv-btn tv-btn--icon" onClick={onClose} title="Close detail panel">
-          <X size={14} />
+          <X className="tm-icon" />
         </button>
       </div>
 

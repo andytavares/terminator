@@ -223,25 +223,29 @@ export function App(): JSX.Element {
       })
     }
 
-    if (activeProjectId) {
+    // Scratch terminals split too. Gated on `activeProjectId` alone, these
+    // were simply absent from the palette on a scratch terminal — the same
+    // silence the shortcut had.
+    const splitProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
+    if (splitProjectId) {
       const settings = resolveSettings(activeWorkspaceId)
       const cwd = resolveActiveCwd()
       cmds.push({
         id: 'core.split-vertical',
-        label: 'Split Pane Vertically',
+        label: 'Split pane vertically',
         shortcut: '⌘D',
         category: 'Terminal',
         action: () => {
-          void splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit)
+          void splitSession(splitProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit)
         },
       })
       cmds.push({
         id: 'core.split-horizontal',
-        label: 'Split Pane Horizontally',
+        label: 'Split pane horizontally',
         shortcut: '⌘⇧D',
         category: 'Terminal',
         action: () => {
-          void splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit)
+          void splitSession(splitProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit)
         },
       })
     }

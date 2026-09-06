@@ -107,6 +107,7 @@
 /* Scratch is a group like any other, but it belongs to no repo, so it carries
    no scope actions — only a way to start another one. */
 .unified-sidebar__scratch-add {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -152,9 +153,13 @@
   user-select: none;
 }
 
+/* The same column as every other count in the sidebar. The add control takes
+   the slack ahead of it, so it lands in the same column as the other rows' +
+   rather than sitting against the label. */
 .unified-sidebar__scratch-count {
-  margin-left: auto;
-  margin-right: 4px;
+  flex: 0 0 var(--sidebar-count-w, 20px);
+  width: var(--sidebar-count-w, 20px);
+  text-align: right;
   font-size: 10px;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;

@@ -1,4 +1,5 @@
 import React from 'react'
+import { ArrowRight, Check, Info, RotateCcw, X } from 'lucide-react'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import type { ConflictFile } from '../../schemas/merge-flow.schema'
 
@@ -96,7 +97,7 @@ function FileCard({
         className="conflict-hub__file-dot"
         style={{ background: isResolved ? 'var(--tm-success)' : dotColor }}
       >
-        {isResolved ? '✓' : ''}
+        {isResolved && <Check aria-hidden="true" />}
       </span>
 
       <span
@@ -161,7 +162,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
         </div>
         <div className="conflict-hub__branch-crumb">
           <span className="conflict-hub__branch">{oursBranchDisplay}</span>
-          <span className="conflict-hub__branch-arrow">→</span>
+          <ArrowRight aria-hidden="true" className="conflict-hub__branch-arrow" />
           <span className="conflict-hub__branch">{theirsBranchDisplay}</span>
         </div>
         {session.isRebase && <span className="conflict-hub__rebase-badge">rebase</span>}
@@ -171,7 +172,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
             onClick={onStartOver}
             title="Reset all resolutions and start over"
           >
-            ↺ Start over
+            <RotateCcw aria-hidden="true" /> Start over
           </button>
         )}
         {onExit && (
@@ -181,7 +182,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
             aria-label="Exit merge flow"
             title="Exit merge flow"
           >
-            ✕
+            <X aria-hidden="true" />
           </button>
         )}
       </div>
@@ -195,19 +196,19 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
         <div className="conflict-hub__stats">
           <div className="conflict-hub__stat">
             <span className="conflict-hub__stat-value">{session.files.length}</span>
-            <span className="conflict-hub__stat-label">FILES CONFLICTED</span>
+            <span className="conflict-hub__stat-label">Files conflicted</span>
           </div>
           <div className="conflict-hub__stat">
             <span className="conflict-hub__stat-value conflict-hub__stat-value--accent">
               {session.totalConflicts}
             </span>
-            <span className="conflict-hub__stat-label">TOTAL CONFLICTS</span>
+            <span className="conflict-hub__stat-label">Total conflicts</span>
           </div>
           <div className="conflict-hub__stat">
             <span className="conflict-hub__stat-value conflict-hub__stat-value--muted">
               ~{estimatedMin} min
             </span>
-            <span className="conflict-hub__stat-label">ESTIMATED TIME</span>
+            <span className="conflict-hub__stat-label">Estimated time</span>
           </div>
         </div>
         <div className="conflict-hub__progress">
@@ -224,7 +225,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
       {/* Hint */}
       {unresolvedFiles.length > 0 && (
         <div className="conflict-hub__hint">
-          <span className="conflict-hub__hint-icon">ℹ</span>
+          <Info aria-hidden="true" className="conflict-hub__hint-icon" />
           <span>
             <strong>Start with the highlighted file.</strong> MergeFlow orders by complexity —
             hardest first while you&apos;re fresh. You can jump to any file at any time.
@@ -235,7 +236,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
       {/* Unresolved files */}
       {unresolvedFiles.length > 0 && (
         <div className="conflict-hub__section">
-          <div className="conflict-hub__section-label">NEEDS YOUR ATTENTION</div>
+          <div className="conflict-hub__section-label">Needs your attention</div>
           {unresolvedFiles.map((file) => {
             const idx = session.files.indexOf(file)
             return (
@@ -257,7 +258,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
       {/* Resolved files */}
       {resolvedFiles.length > 0 && (
         <div className="conflict-hub__section">
-          <div className="conflict-hub__section-label">RESOLVED</div>
+          <div className="conflict-hub__section-label">Resolved</div>
           {resolvedFiles.map((file) => {
             const idx = session.files.indexOf(file)
             return (

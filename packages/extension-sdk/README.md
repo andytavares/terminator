@@ -75,6 +75,50 @@ const off = window.electronAPI.extensionBridge.on('my-ext:update', (data) => {
 // Call off() to unsubscribe
 ```
 
+## Shared UI — `@terminator/extension-ui` _(v1.3.0)_
+
+This package is **types only**. The runtime components live next door:
+
+```bash
+npm install @terminator/extension-ui
+```
+
+Your extension renders in its own `WebContentsView`, which loads neither the host
+stylesheet nor the host's components — so without this package every extension
+ends up writing its own dialog, and they end up disagreeing about what Escape
+does. It ships `Dialog`, `ConfirmDialog`, `Popover`, `ToastRegion`, `EmptyState`,
+`IconButton`, `useDismissible` and the layer scale, source-only, with `react`,
+`react-dom` and `lucide-react` as peer dependencies.
+
+```tsx
+import { ConfirmDialog } from '@terminator/extension-ui'
+;<ConfirmDialog
+  title="Delete this note?"
+  body="It is removed from this machine and cannot be recovered."
+  confirmLabel="Delete"
+  tone="danger"
+  onConfirm={remove}
+  onDismiss={close}
+/>
+```
+
+Two behaviours you would otherwise have to implement yourself, and one you
+cannot discover from the DOM:
+
+- Escape closes only the **innermost** open surface.
+- Stacking comes from `LAYERS` / `var(--tm-layer-*)`, not from raw numbers.
+- The host's double-Escape "exit extension" gesture must stand down while a
+  modal is open. `Dialog` reports depth over `electronAPI.ui.setModalDepth`; a
+  hand-rolled modal that does not will let a user's second Escape close your
+  extension and discard whatever they were typing.
+
+Colours, spacing and radii come from the `--tm-*` tokens the host injects into
+your document. They carry both light and dark, and the host sets `data-theme` on
+your `<html>` — so a hardcoded hex is a colour that cannot follow the theme.
+
+See `docs/EXTENSION-STYLE.md` for the house rules and
+`docs/EXTENSION-DEVELOPMENT.md` for the full API.
+
 ## Manifest `contributes`
 
 | Surface       | Key            | Fields                                     |

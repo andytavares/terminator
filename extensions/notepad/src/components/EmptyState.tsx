@@ -10,12 +10,12 @@ export function EmptyState({ onNewNote, onImport }: EmptyStateProps): React.JSX.
   return (
     <div className="notepad-empty-state">
       <span className="notepad-empty-state__icon">
-        <Pencil size={36} />
+        <Pencil aria-hidden="true" />
       </span>
       <h2 className="notepad-empty-state__heading">No notes yet</h2>
       <p className="notepad-empty-state__desc">
-        Capture your first note from anywhere in Terminator — even mid-command. Notes live in a
-        local SQLite vault and export to plain markdown whenever you want.
+        Capture your first note from anywhere in Terminator — even mid-command. Notes are kept on
+        this machine and export to plain markdown whenever you want.
       </p>
       <div className="notepad-empty-state__buttons">
         <button className="notepad-btn-primary notepad-empty-state__new" onClick={onNewNote}>

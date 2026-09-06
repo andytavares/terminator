@@ -438,10 +438,16 @@ The Git integration is a workspace-scoped extension that surfaces git tooling di
 
 Press **`Cmd+Shift+G`** or choose **View → Toggle Git Sidebar** to open a right-side panel showing:
 
-- Live git status (staged, unstaged, untracked files) — auto-refreshes on file changes.
+- Live git status — auto-refreshes on file changes. Each file's state is named: **Changed**,
+  **New**, **Added**, **Deleted**, **Renamed**, **Conflict**. (These used to be git's porcelain
+  letters — `M`, `A`, `??`.)
 - Stage/unstage individual files or all files.
-- Commit message field with a one-click **Commit** button.
-- **Push** button with branch and remote info.
+- Commit message field with one primary **Commit & push**. The alternatives — commit without
+  pushing, commit and open a PR, amend — are behind the caret beside it, so there is one obvious
+  action rather than four of equal weight. When the button is disabled it says why: nothing
+  staged, or no message yet.
+- The header states where the branch stands against its remote — **2 ahead**, **1 behind**,
+  **up to date**, or **not pushed yet** — so you know what pushing will do before you press it.
 - PR creation via the `gh` CLI (requires `gh auth login`).
 
 ### Git tab
@@ -449,6 +455,19 @@ Press **`Cmd+Shift+G`** or choose **View → Toggle Git Sidebar** to open a righ
 ![Git tab](screenshots/07-git-tab.png)
 
 The **Git** tab in the content area shows a full diff view with syntax-highlighted changes (red for removed lines, green for added). Use this for reviewing changes before committing.
+
+### The pull request queue
+
+The queue opens with one line of triage — how many are waiting on you, how many are high risk,
+and roughly how long the reading is — and then groups them: **Read these first**, **Quick wins**,
+**Larger reviews**, with anything already started pinned at the top.
+
+Each row names its own risk in words (**High risk**, **Medium risk**, **Low risk**) rather than an
+abbreviation that needs a key, and gives an estimate with its unit. The row's action is **Review**:
+clicking it opens the diff. Approving happens after you have read the change, never from the list.
+
+The count is the repository's real count, not the number loaded so far, and further pages arrive on
+their own — there is no "load more" to press.
 
 ### MergeFlow conflict resolver
 
@@ -515,6 +534,20 @@ Each run happens in the card's own git **worktree** on a dedicated branch (the L
 ### Opening SpecKit Pilot
 
 Click the **SpecKit** tab in the content area tab bar.
+
+### Reading the board
+
+Each card tells you where it is and what happens next, in words:
+
+- A **progress bar** with `7 of 10`, rather than ten numbered circles that required you to have
+  memorised that phase 4 is Plan.
+- A **next-step line** that distinguishes waiting on you from waiting on the machine:
+  `Running implement`, `Review plan`, `Next: tasks`, `Plan failed`, or `Done`. Hover the bar to
+  see which phases are finished.
+
+The supervision tabs above the board — **Running**, **Stuck**, **To review**, **Activity**,
+**History** — stay visible even when everything is quiet, so an empty panel is never confused
+with one that failed to load.
 
 ### Supervising what is running
 
@@ -634,11 +667,25 @@ Click the **calendar icon** in the sidebar header icon row, or press **`Cmd+Shif
 | **Projects**      | Named project containers for related tasks                 |
 | **Areas**         | Ongoing responsibilities (PARA areas of focus)             |
 | **History**       | Past daily logs                                            |
-| **Weekly Review** | 6-step guided weekly review wizard                         |
+| **Weekly review** | 6-step guided weekly review                                |
+
+### Today
+
+The date is the heading, with **Today** beside it when that is what you are looking at. An empty
+day says so and offers the two things you would do next — **Add task**, or **Open inbox** — rather
+than leaving a blank column.
+
+The calendar on the right marks each day by what is on it, and hovering a day says it in words
+(`3 tasks, 1 overdue`), so a busy day and an overdue one are not the same dot.
+
+### Weekly review
+
+The six steps are named as you go — **Get clear**, **Inbox**, **Projects**, **Stale**, **Someday**,
+**Reflect** — instead of counting "Step 3 of 6" without saying what step 3 is.
 
 ### Quick capture
 
-Press **`Cmd+Shift+Space`** from anywhere to open the **CAPTURE TO INBOX** dialog. Type using the natural syntax:
+Press **`Cmd+Shift+Space`** from anywhere to open the capture dialog. Type using the natural syntax:
 
 ```
 Task text… @project #area +context due:YYYY-MM-DD
@@ -676,17 +723,42 @@ During the Weekly Review, optionally connect an ICS calendar feed to surface sch
 
 ## 19. Extension: Remote Control
 
-Remote Control enables you to access your Terminator terminals from **any web browser** over a local network or the internet.
+Remote Control lets you reach your Terminator terminals from **any web browser**, on your own
+network or over the internet.
 
-### Configuration
+### Turning it on
 
-Open **Settings → Remote Control** and:
+Open the **Remote Control** tab. The top of the screen answers the question you came to ask —
+whether it is on, and how to reach it:
 
-1. Toggle the server **on**.
-2. Choose a **port** (default: 7681).
-3. Optionally enable an **ngrok tunnel** for a public URL (requires `brew install ngrok`).
-4. Copy the **LAN URL** (e.g. `http://192.168.1.x:7681`) or the **public ngrok URL**.
-5. Use **Show / Copy / Regenerate** to manage the session password (stored as a bcrypt hash).
+| It says                             | Meaning                                                                                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Off**                             | Your terminals are not reachable from any browser. **Turn on** starts the server.              |
+| **Starting…**                       | Opening the port and creating an address.                                                      |
+| **On — reachable on this network**  | The address works for devices on your network. Add an account token in Settings to go further. |
+| **On — reachable from any browser** | There is a public address.                                                                     |
+| A failure, in words                 | What went wrong and what fixes it — e.g. the port is already in use, so pick another or quit   |
+|                                     | whatever is listening on it.                                                                   |
+
+When it is on you get the address, a **QR code**, and the password. Point a phone camera at the
+code and it connects — the code carries the password, so on the everyday path the credential never
+has to appear on screen. Use the eye button to reveal it if you are typing it by hand.
+
+Below the address is the sentence that matters: **anyone with this address and password can type
+into your terminals.**
+
+### Who is connected
+
+**Connected now** lists every device watching, by something you will recognise ("iPhone",
+"Chrome on Mac"), which terminal it is on, and how long it has been there — with **Disconnect**
+on each row. The list is live: it changes as devices come and go, because "who currently has
+shell access" is not a question to answer with a stale list.
+
+### Settings
+
+Port, viewer limit, password and the account token for a public address are under **Settings**
+at the bottom of the screen, collapsed until you want them. The summary line shows the port and
+viewer limit without opening it.
 
 ### Accessing terminals in a browser
 

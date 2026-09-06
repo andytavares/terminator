@@ -127,9 +127,9 @@ export function ManualEditor({ block, onSave, onCancel, suggestedText }: Props) 
         <span className="manual-editor__lang-badge">
           {isJsLike(block.blockId)
             ? block.blockId.includes('.ts') || block.blockId.includes('.tsx')
-              ? 'TYPESCRIPT'
-              : 'JAVASCRIPT'
-            : 'TEXT'}
+              ? 'TypeScript'
+              : 'JavaScript'
+            : 'Plain text'}
         </span>
         <span className="manual-editor__line-count">{lineCount} lines</span>
         <button className="manual-editor__cancel" onClick={onCancel}>

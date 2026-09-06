@@ -73,7 +73,6 @@ export function RunConsole({ featureDir, lines = [], phase, inTerminal = false }
             fontWeight: 600,
             color: 'var(--tm-text-secondary)',
             letterSpacing: '0.05em',
-            textTransform: 'uppercase',
           }}
         >
           {phaseLabel}

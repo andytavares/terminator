@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
+import { dayLoadLabel, isOverdue, shortDay, weekOf } from '../state/calendar-load'
 import type { KanbanLane, Task } from '../vault/types'
 
 type DayData = { date: string; status: string; count: number }
@@ -58,6 +59,10 @@ export function CalendarDrawer(): React.JSX.Element {
   const [month, setMonth] = useState(today.getMonth() + 1)
   const [dayMap, setDayMap] = useState<DayMap>(new Map())
   const [selectedDate, setSelectedDate] = useState<string>(todayStr)
+  // Until a day is picked, the panel below the grid showed today's tasks — the
+  // same list the main column is already showing. It leads with the week
+  // instead, which is something the main column cannot say.
+  const [pickedADay, setPickedADay] = useState(false)
   const [selectedDayTasks, setSelectedDayTasks] = useState<Task[]>([])
   const [loadingDay, setLoadingDay] = useState(true)
   const selectedDateRef = useRef(selectedDate)
@@ -132,6 +137,7 @@ export function CalendarDrawer(): React.JSX.Element {
   }
 
   async function handleDayClick(dateStr: string) {
+    setPickedADay(true)
     setSelectedDate(dateStr)
     if (dateStr === todayStr) void loadToday()
     else void loadDate(dateStr)
@@ -180,13 +186,13 @@ export function CalendarDrawer(): React.JSX.Element {
       <div className="cal-drawer__panel">
         <div className="cal-drawer__month-nav">
           <button className="tv-btn tv-btn--icon" onClick={prevMonth} title="Previous month">
-            <ChevronLeft size={13} />
+            <ChevronLeft className="tm-icon" />
           </button>
           <span className="cal-drawer__month-label">
             {MONTH_NAMES[month - 1]} {year}
           </span>
           <button className="tv-btn tv-btn--icon" onClick={nextMonth} title="Next month">
-            <ChevronRight size={13} />
+            <ChevronRight className="tm-icon" />
           </button>
         </div>
 
@@ -212,11 +218,15 @@ export function CalendarDrawer(): React.JSX.Element {
                   isToday ? 'cal-drawer__cell--today' : '',
                   isSelected ? 'cal-drawer__cell--selected' : '',
                   hasTasks ? 'cal-drawer__cell--has-tasks' : '',
+                  isOverdue(dateStr, rows, todayStr) ? 'cal-drawer__cell--overdue' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
                 onClick={() => handleDayClick(dateStr)}
-                title={dateStr}
+                // The cell said only its own date, so a month of dots could not
+                // be read without clicking every day. It now says the load.
+                title={dayLoadLabel(dateStr, rows)}
+                aria-label={dayLoadLabel(dateStr, rows)}
               >
                 <span className="cal-drawer__day-num">{parseInt(dateStr.slice(8))}</span>
                 {hasTasks && (
@@ -233,7 +243,24 @@ export function CalendarDrawer(): React.JSX.Element {
         </div>
 
         <div className="cal-drawer__day-panel">
-          <div className="cal-drawer__day-header">
+          {!pickedADay && (
+            <div className="cal-drawer__week">
+              <span className="cal-drawer__week-title">This week</span>
+              <ul className="cal-drawer__week-list">
+                {weekOf(todayStr).map((day) => {
+                  const rows = dayMap.get(day) ?? []
+                  const open = rows.filter((r) => r.status === 'open').length
+                  return (
+                    <li key={day} className="cal-drawer__week-row">
+                      <span className="cal-drawer__week-day">{shortDay(day)}</span>
+                      <span className="cal-drawer__week-count">{open || '—'}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+          <div className="cal-drawer__day-header" hidden={!pickedADay}>
             <span className="cal-drawer__day-title">
               {selectedDate === todayStr ? 'Today' : selectedDate}
             </span>
@@ -242,7 +269,7 @@ export function CalendarDrawer(): React.JSX.Element {
               onClick={handleGoToDay}
               title="Open in Task Vault"
             >
-              <ExternalLink size={12} />
+              <ExternalLink className="tm-icon-sm" />
             </button>
           </div>
           {loadingDay && <div className="cal-drawer__day-loading">…</div>}

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Settings, Download, X } from 'lucide-react'
+import { ArrowLeft, Download, Plus, Settings } from 'lucide-react'
 import { BoardView } from '../components/BoardView.js'
 import { CardDetail } from '../components/CardDetail.js'
 import { CardBriefEditor } from '../components/CardBriefEditor.js'
 import { KnowledgeSearch } from '../components/KnowledgeSearch.js'
 import { SettingsView } from '../components/SettingsView.js'
+import { Dialog } from '@terminator/extension-ui'
 import { getSpeckitAPI } from '../types/electron.js'
 import { reconcileAssignedTickets } from '../state/reconcile-tickets.js'
 
@@ -111,16 +112,26 @@ export function App(): JSX.Element {
         <div className="sk-appbar__search">
           {repoRoot && <KnowledgeSearch repoRoot={repoRoot} />}
         </div>
+        {/* Moved up from the board's own toolbar, which held this one button and
+            cost a full band of chrome to do it. */}
+        <button
+          type="button"
+          className="sk-btn sk-btn--primary"
+          onClick={() => setOverlay('new-card')}
+        >
+          <Plus aria-hidden="true" /> New card
+        </button>
         <button
           className="sk-btn"
           onClick={() => void runReconcile()}
           disabled={importing}
           aria-busy={importing}
         >
-          <Download size={14} /> {importing ? 'Importing…' : 'Import ticket'}
+          {/* Principle XII: no size prop — CSS controls what is drawn. */}
+          <Download aria-hidden="true" /> {importing ? 'Importing…' : 'Import ticket'}
         </button>
         <button aria-label="Settings" className="sk-btn" onClick={() => setOverlay('settings')}>
-          <Settings size={14} />
+          <Settings aria-hidden="true" />
         </button>
       </header>
 
@@ -128,16 +139,12 @@ export function App(): JSX.Element {
         {overlay === 'settings' ? (
           <div className="sk-settings-wrap">
             <button className="sk-btn" onClick={() => setOverlay('none')}>
-              ← Back to board
+              <ArrowLeft aria-hidden="true" /> Back to board
             </button>
             <SettingsView />
           </div>
         ) : (
-          <BoardView
-            repoRoot={workspacePath}
-            onOpenCard={(dir) => setOpenCardDir(dir)}
-            onNewCard={() => setOverlay('new-card')}
-          />
+          <BoardView repoRoot={workspacePath} onOpenCard={(dir) => setOpenCardDir(dir)} />
         )}
       </div>
 
@@ -152,21 +159,15 @@ export function App(): JSX.Element {
       )}
 
       {overlay === 'new-card' && (
-        <div className="sk-modal" role="dialog" aria-label="New card">
-          <div className="sk-modal__panel">
-            <header className="sk-modal__head">
-              <h2>New card</h2>
-              <button type="button" aria-label="Close" onClick={() => setOverlay('none')}>
-                <X size={16} />
-              </button>
-            </header>
-            <CardBriefEditor
-              submitLabel="Create card"
-              onSubmit={createCard}
-              onCancel={() => setOverlay('none')}
-            />
-          </div>
-        </div>
+        <Dialog title="New card" actions={[]} onDismiss={() => setOverlay('none')}>
+          {/* CardBriefEditor carries its own submit and cancel, so the dialog
+              takes no actions of its own rather than showing a second set. */}
+          <CardBriefEditor
+            submitLabel="Create card"
+            onSubmit={createCard}
+            onCancel={() => setOverlay('none')}
+          />
+        </Dialog>
       )}
     </div>
   )

@@ -4,6 +4,22 @@ import { branchLabel } from './branch-display'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 import type { AgentState, Project, TerminalSession, Workspace } from '../../shared/types/index'
 
+/**
+ * One terminal under a branch, and the panes split off it.
+ *
+ * `splitSession` pins every split pane to its root session via
+ * `parentSessionId` — one level, deliberately — so this mirrors what the data
+ * already says rather than inventing a hierarchy for the sidebar.
+ */
+export interface BranchTerminal {
+  sessionId: string
+  title: string
+  state: AgentState
+  bellCount: number
+  /** Panes split off this terminal. Empty for an unsplit one. */
+  panes: BranchTerminal[]
+}
+
 /** One branch, as the sidebar draws it. */
 export interface BranchRow {
   projectId: string
@@ -15,6 +31,14 @@ export interface BranchRow {
   /** How many terminals share `state` — the count that agrees with the glyph. */
   stateCount: number
   sessionCount: number
+  /**
+   * Its terminals, roots first with their panes beneath.
+   *
+   * The row drew a count and nothing else, so a split pane existed on screen
+   * and nowhere else — no name, no state, and no way to reach or close it
+   * except a shortcut.
+   */
+  terminals: BranchTerminal[]
   /** Newest across its terminals; null when it has none. */
   lastActivityAt: number | null
   workspaceId: string
@@ -206,6 +230,7 @@ export function buildBranchRows(
       state,
       stateCount: countInState(own, state),
       sessionCount: own.length,
+      terminals: buildTerminals(own),
       lastActivityAt: own.length === 0 ? null : Math.max(...own.map((s) => s.lastActivityAt)),
       workspaceId: project.workspaceId,
     }
@@ -262,4 +287,30 @@ export function buildBranchRows(
     .sort((a, b) => compareGroups(a, b, view.sortBy, workspaceOrder))
 
   return { groups, scratch, shown: kept.length, total }
+}
+
+/** Roots first, each carrying the panes pinned to it. */
+function buildTerminals(sessions: TerminalSession[]): BranchTerminal[] {
+  const panesByParent = new Map<string, TerminalSession[]>()
+  for (const s of sessions) {
+    if (s.parentSessionId === undefined) continue
+    const bucket = panesByParent.get(s.parentSessionId)
+    if (bucket) bucket.push(s)
+    else panesByParent.set(s.parentSessionId, [s])
+  }
+  const describe = (s: TerminalSession, panes: BranchTerminal[]): BranchTerminal => ({
+    sessionId: s.id,
+    title: s.tabTitle,
+    state: s.agentState,
+    bellCount: s.bellCount ?? 0,
+    panes,
+  })
+  return sessions
+    .filter((s) => s.parentSessionId === undefined)
+    .map((root) =>
+      describe(
+        root,
+        (panesByParent.get(root.id) ?? []).map((pane) => describe(pane, []))
+      )
+    )
 }

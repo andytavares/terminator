@@ -1,4 +1,5 @@
 import React from 'react'
+import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 
 interface Props {
@@ -54,7 +55,7 @@ export function ConflictHeader({
       {/* Breadcrumb */}
       <div className="conflict-header__breadcrumb">
         <button className="conflict-header__back" onClick={onBack} aria-label="Back to file list">
-          ← All files
+          <ArrowLeft aria-hidden="true" /> All files
         </button>
         <span className="conflict-header__sep">/</span>
         <span className="conflict-header__filepath">
@@ -85,7 +86,7 @@ export function ConflictHeader({
           disabled={!canPrev}
           aria-label="Previous conflict"
         >
-          ← Prev
+          <ChevronLeft aria-hidden="true" /> Prev
         </button>
         <button
           className="conflict-header__nav-btn"
@@ -93,7 +94,7 @@ export function ConflictHeader({
           disabled={!canNext}
           aria-label="Next conflict"
         >
-          Next →
+          Next <ChevronRight aria-hidden="true" />
         </button>
       </div>
 
@@ -113,7 +114,7 @@ export function ConflictHeader({
           aria-label="Start over"
           title="Reset all resolutions and start from scratch"
         >
-          ↺ Start over
+          <RotateCcw aria-hidden="true" /> Start over
         </button>
       )}
 
@@ -124,7 +125,7 @@ export function ConflictHeader({
           aria-label="Exit merge flow"
           title="Exit merge flow"
         >
-          ✕
+          <X aria-hidden="true" />
         </button>
       )}
     </div>

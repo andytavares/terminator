@@ -41,8 +41,6 @@
 .sk-left__title {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--tm-text-secondary);
 }
 
@@ -114,12 +112,12 @@
 }
 
 .sk-phase-row--selected {
-  background: rgba(92, 107, 192, 0.12);
+  background: color-mix(in srgb, var(--tm-accent) 12%, transparent);
   border-left-color: var(--tm-accent);
 }
 
 .sk-phase-row--selected:hover {
-  background: rgba(92, 107, 192, 0.18);
+  background: color-mix(in srgb, var(--tm-accent) 18%, transparent);
 }
 
 .sk-phase-icon {
@@ -136,17 +134,17 @@
 
 .sk-phase-icon--approved {
   background: var(--tm-success);
-  color: #000;
+  color: var(--tm-on-success);
 }
 
 .sk-phase-icon--awaiting_review {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
 .sk-phase-icon--running {
   background: var(--tm-warning);
-  color: #000;
+  color: var(--tm-on-success);
   animation: sk-pulse 1.4s ease-in-out infinite;
 }
 
@@ -166,12 +164,12 @@
 .sk-phase-icon--stale,
 .sk-phase-icon--modified {
   background: var(--tm-warning);
-  color: #000;
+  color: var(--tm-on-success);
 }
 
 .sk-phase-icon--failed {
   background: var(--tm-danger);
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
 .sk-phase-icon--skipped {
@@ -227,7 +225,7 @@
   color: var(--tm-success);
 }
 .sk-phase-row__status--awaiting_review {
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 .sk-phase-row__status--running {
   color: var(--tm-warning);
@@ -278,20 +276,18 @@
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .sk-status-badge--approved {
-  background: rgba(74, 222, 128, 0.15);
+  background: color-mix(in srgb, var(--tm-success) 15%, transparent);
   color: var(--tm-success);
 }
 .sk-status-badge--awaiting_review {
-  background: rgba(92, 107, 192, 0.2);
-  color: var(--tm-accent);
+  background: color-mix(in srgb, var(--tm-accent) 20%, transparent);
+  color: var(--tm-accent-text);
 }
 .sk-status-badge--running {
-  background: rgba(250, 204, 21, 0.15);
+  background: color-mix(in srgb, var(--tm-warning) 15%, transparent);
   color: var(--tm-warning);
 }
 .sk-status-badge--ready {
@@ -305,11 +301,11 @@
 }
 .sk-status-badge--stale,
 .sk-status-badge--modified {
-  background: rgba(250, 204, 21, 0.15);
+  background: color-mix(in srgb, var(--tm-warning) 15%, transparent);
   color: var(--tm-warning);
 }
 .sk-status-badge--failed {
-  background: rgba(224, 92, 92, 0.15);
+  background: color-mix(in srgb, var(--tm-danger) 15%, transparent);
   color: var(--tm-danger);
 }
 .sk-status-badge--skipped {
@@ -353,8 +349,8 @@
   gap: 10px;
   margin-top: 10px;
   padding: 10px 12px;
-  background: rgba(224, 92, 92, 0.06);
-  border: 1px solid rgba(224, 92, 92, 0.2);
+  background: color-mix(in srgb, var(--tm-danger) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tm-danger) 20%, transparent);
   border-radius: var(--tm-radius-xs);
 }
 
@@ -383,7 +379,7 @@
   border-radius: 3px;
   font-family: var(--tm-font-mono);
   font-size: 11px;
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 
 /* ── Action buttons ──────────────────────────────────────────── */
@@ -410,7 +406,7 @@
 
 .sk-btn--primary {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
   border-color: var(--tm-accent);
 }
 
@@ -432,11 +428,11 @@
 .sk-btn--danger {
   background: transparent;
   color: var(--tm-danger);
-  border-color: rgba(224, 92, 92, 0.4);
+  border-color: color-mix(in srgb, var(--tm-danger) 40%, transparent);
 }
 
 .sk-btn--danger:hover:not(:disabled) {
-  background: rgba(224, 92, 92, 0.1);
+  background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
 }
 
 .sk-btn:disabled {
@@ -499,7 +495,7 @@
 
 .sk-editor__mode-btn--active {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
 .sk-editor__mode-btn:not(.sk-editor__mode-btn--active):hover {
@@ -595,7 +591,7 @@
   padding: 1px 5px;
   font-family: var(--tm-font-mono);
   font-size: 12px;
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 .sk-md pre {
   background: var(--tm-bg-elevated);
@@ -616,7 +612,7 @@
   color: var(--tm-text-secondary);
 }
 .sk-md a {
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
   text-decoration: none;
 }
 .sk-md a:hover {
@@ -785,32 +781,30 @@
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
 .sk-badge--review {
-  background: rgba(250, 180, 80, 0.15);
-  color: #d4933b;
-  border: 1px solid rgba(250, 180, 80, 0.3);
+  background: color-mix(in srgb, var(--tm-warning) 15%, transparent);
+  color: var(--tm-warning);
+  border: 1px solid color-mix(in srgb, var(--tm-warning) 30%, transparent);
 }
 
 .sk-badge--approved {
-  background: rgba(74, 222, 128, 0.12);
+  background: color-mix(in srgb, var(--tm-success) 12%, transparent);
   color: var(--tm-success);
-  border: 1px solid rgba(74, 222, 128, 0.25);
+  border: 1px solid color-mix(in srgb, var(--tm-success) 25%, transparent);
 }
 
 .sk-badge--running {
-  background: rgba(92, 107, 192, 0.15);
-  color: var(--tm-accent);
-  border: 1px solid rgba(92, 107, 192, 0.3);
+  background: color-mix(in srgb, var(--tm-accent) 15%, transparent);
+  color: var(--tm-accent-text);
+  border: 1px solid color-mix(in srgb, var(--tm-accent) 30%, transparent);
 }
 
 .sk-badge--accent {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
 /* ── Source badges (Linear / Jira brand colors) ──────────────── */
@@ -820,9 +814,11 @@
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 4px;
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
+/* The two literals in this file that are deliberately not tokens: a brand
+   colour identifies its product and must not shift with the app's theme. */
 .sk-source-badge--linear {
   background: #5e6ad2;
 }
@@ -846,7 +842,7 @@
 
 .sk-pill--active {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
   border-color: transparent;
   font-weight: 600;
 }
@@ -871,7 +867,7 @@
 }
 
 .sk-approval__card--approved {
-  border-color: rgba(74, 222, 128, 0.2);
+  border-color: color-mix(in srgb, var(--tm-success) 20%, transparent);
 }
 
 .sk-approval__card-header {
@@ -928,12 +924,12 @@
 }
 
 .sk-btn--danger-outline:hover:not(:disabled) {
-  background: rgba(224, 92, 92, 0.08);
+  background: color-mix(in srgb, var(--tm-danger) 8%, transparent);
 }
 
 .sk-btn--danger {
   background: var(--tm-danger);
-  color: #fff;
+  color: var(--tm-on-accent);
   border-color: var(--tm-danger);
 }
 
@@ -963,8 +959,6 @@
 .sk-gate__title {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--tm-text-secondary);
   margin-bottom: 6px;
 }
@@ -984,8 +978,6 @@
 .sk-form-label {
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--tm-text-secondary);
   margin-bottom: 4px;
   display: block;
@@ -1208,11 +1200,11 @@
 }
 
 .sk-diff__row--add {
-  background: rgba(74, 222, 128, 0.06);
+  background: color-mix(in srgb, var(--tm-success) 6%, transparent);
 }
 
 .sk-diff__row--remove {
-  background: rgba(224, 92, 92, 0.07);
+  background: color-mix(in srgb, var(--tm-danger) 7%, transparent);
 }
 
 .sk-diff__row--context {
@@ -1235,7 +1227,7 @@
 }
 
 .sk-diff__ln--old {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--tm-overlay-subtle);
 }
 
 .sk-diff__prefix {
@@ -1307,79 +1299,6 @@
 
 /* ── Stale propagation modal ─────────────────────────────────── */
 
-.sk-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.sk-modal {
-  background: var(--tm-bg-surface);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  width: 680px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 64px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-.sk-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--tm-border);
-  flex-shrink: 0;
-}
-
-.sk-modal__title {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.sk-modal__body {
-  padding: 16px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.sk-modal__desc {
-  font-size: 12px;
-  color: var(--tm-text-secondary);
-  margin: 0 0 14px;
-  line-height: 1.6;
-}
-
-.sk-modal__desc code {
-  background: var(--tm-bg-elevated);
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-family: var(--tm-font-mono);
-  font-size: 11px;
-  color: var(--tm-text-primary);
-}
-
-.sk-modal__footer {
-  padding: 12px 16px;
-  border-top: 1px solid var(--tm-border);
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.sk-modal__queue-preview {
-  padding: 14px 16px;
-  border-top: 1px solid var(--tm-border);
-  background: var(--tm-bg-elevated);
-}
-
 .sk-stale-table {
   width: 100%;
   border-collapse: collapse;
@@ -1390,8 +1309,6 @@
   text-align: left;
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--tm-text-secondary);
   padding: 6px 10px;
   border-bottom: 1px solid var(--tm-border);
@@ -1430,7 +1347,7 @@
   border-radius: 3px;
   font-family: var(--tm-font-mono);
   font-size: 11px;
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 
 /* ── Implement dashboard ─────────────────────────────────────── */
@@ -1526,8 +1443,6 @@
   text-align: left;
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--tm-text-secondary);
   padding: 8px 12px;
   border-bottom: 1px solid var(--tm-border);
@@ -1567,22 +1482,22 @@
 }
 
 .sk-task-badge--done {
-  background: rgba(74, 222, 128, 0.15);
+  background: color-mix(in srgb, var(--tm-success) 15%, transparent);
   color: var(--tm-success);
 }
 
 .sk-task-badge--writing {
-  background: rgba(168, 85, 247, 0.15);
-  color: #a855f7;
+  background: color-mix(in srgb, var(--tm-accent) 15%, transparent);
+  color: var(--tm-accent-text);
 }
 
 .sk-task-badge--queued {
-  background: rgba(34, 211, 238, 0.12);
-  color: #22d3ee;
+  background: color-mix(in srgb, var(--tm-syntax-literal) 12%, transparent);
+  color: var(--tm-syntax-literal);
 }
 
 .sk-task-badge--failed {
-  background: rgba(224, 92, 92, 0.15);
+  background: color-mix(in srgb, var(--tm-danger) 15%, transparent);
   color: var(--tm-danger);
 }
 
@@ -1630,7 +1545,7 @@
 .sk-settings__nav-item--active {
   color: var(--tm-text-primary);
   border-left-color: var(--tm-accent);
-  background: rgba(92, 107, 192, 0.08);
+  background: color-mix(in srgb, var(--tm-accent) 8%, transparent);
 }
 
 .sk-settings__content {
@@ -1709,8 +1624,6 @@
   text-align: left;
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--tm-text-secondary);
   padding: 8px 12px;
   border-bottom: 1px solid var(--tm-border);
@@ -1750,7 +1663,7 @@
     color 0.1s;
 }
 .sk-tab__close:hover {
-  background: var(--tm-bg-hover);
+  background: var(--tm-bg-card-hover);
   color: var(--tm-text-primary);
 }
 
@@ -1772,8 +1685,6 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--tm-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 .sk-artifact-preview__filename {
   font-family: var(--tm-font-mono);
@@ -1810,7 +1721,7 @@
 }
 .sk-run-dialog__command code {
   font-family: var(--tm-font-mono);
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
   background: var(--tm-bg-elevated);
   padding: 2px 6px;
   border-radius: 3px;
@@ -1819,8 +1730,6 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--tm-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 .sk-run-dialog__hint {
   margin: 0;
@@ -1865,7 +1774,7 @@
 }
 
 .sk-kanban__lane {
-  background: color-mix(in srgb, var(--tm-bg) 60%, var(--tm-surface));
+  background: color-mix(in srgb, var(--tm-bg-base) 60%, var(--tm-bg-surface));
   border: 1px solid var(--tm-border);
   border-radius: 6px;
   min-height: 120px;
@@ -1884,8 +1793,6 @@
 .sk-kanban__lane-title {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--tm-text-muted);
 }
 
@@ -1914,7 +1821,7 @@
 }
 
 .sk-kanban__card {
-  background: var(--tm-surface);
+  background: var(--tm-bg-surface);
   border: 1px solid var(--tm-border);
   border-radius: 4px;
   padding: 8px 10px;
@@ -1933,13 +1840,13 @@
 .sk-kanban__card-text {
   font-size: 12px;
   line-height: 1.4;
-  color: var(--tm-text);
+  color: var(--tm-text-primary);
 }
 
 /* Active state for the kanban toggle button */
 .sk-icon-btn--active {
   background: color-mix(in srgb, var(--tm-accent) 15%, transparent);
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
   border-radius: 4px;
 }
 
@@ -2023,7 +1930,7 @@
 }
 
 .sk-ticket-body a {
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
   text-decoration: underline;
 }
 
@@ -2084,16 +1991,16 @@
   cursor: pointer;
 }
 .sk-btn:hover {
-  background: var(--tm-bg-hover, var(--tm-bg-elevated));
+  background: var(--tm-bg-card-hover);
 }
 .sk-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 .sk-btn--primary {
-  background: var(--tm-accent, #3b82f6);
+  background: var(--tm-accent);
   border-color: transparent;
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 .sk-btn--small {
   padding: 2px 6px;
@@ -2112,7 +2019,7 @@
   padding: 8px 10px;
 }
 .sk-board__error {
-  color: var(--tm-error, #ef4444);
+  color: var(--tm-danger);
   font-size: 12px;
 }
 .sk-board__empty {
@@ -2139,7 +2046,7 @@
   height: 100%;
 }
 .sk-board-col--over {
-  border-color: var(--tm-accent, #3b82f6);
+  border-color: var(--tm-accent);
 }
 .sk-board-col__head {
   padding: 8px 10px;
@@ -2182,7 +2089,7 @@
   color: var(--tm-text-primary);
 }
 .sk-card-tile:hover {
-  border-color: var(--tm-accent, #3b82f6);
+  border-color: var(--tm-accent);
 }
 .sk-card-tile__head {
   display: flex;
@@ -2214,12 +2121,10 @@
 }
 .sk-card-badge {
   font-size: 10px;
-  text-transform: uppercase;
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--tm-bg-surface);
   border: 1px solid var(--tm-border);
-  letter-spacing: 0.03em;
 }
 .sk-card-chip {
   font-size: 10px;
@@ -2229,13 +2134,13 @@
   border: 1px solid var(--tm-border);
 }
 .sk-card-chip--running {
-  border-color: var(--tm-accent, #3b82f6);
+  border-color: var(--tm-accent);
 }
 .sk-card-chip--awaiting_review {
-  border-color: var(--tm-warning, #f59e0b);
+  border-color: var(--tm-warning);
 }
 .sk-card-chip--failed {
-  border-color: var(--tm-error, #ef4444);
+  border-color: var(--tm-danger);
 }
 .sk-card-chip--waiting {
   border-color: var(--tm-text-secondary);
@@ -2247,10 +2152,10 @@
   right: 0;
   bottom: 0;
   width: min(560px, 90%);
-  background: var(--tm-bg-base, var(--tm-bg-surface));
+  background: var(--tm-bg-base);
   border-left: 1px solid var(--tm-border);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.3);
-  z-index: 20;
+  z-index: var(--tm-layer-overlay);
   overflow: hidden;
 }
 .sk-card-detail {
@@ -2280,34 +2185,6 @@
   overflow: auto;
   padding: 12px;
 }
-.sk-modal {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 30;
-}
-.sk-modal__panel {
-  width: min(520px, 92%);
-  max-height: 88%;
-  overflow: auto;
-  background: var(--tm-bg-surface);
-  border: 1px solid var(--tm-border);
-  border-radius: 10px;
-  padding: 14px;
-}
-.sk-modal__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.sk-modal__head h2 {
-  font-size: 14px;
-  margin: 0;
-}
 /* Brief editor */
 .sk-field {
   display: flex;
@@ -2317,7 +2194,7 @@
   font-size: 12px;
 }
 .sk-field__hint {
-  color: var(--tm-warning, #f59e0b);
+  color: var(--tm-warning);
   font-size: 11px;
 }
 .sk-segmented {
@@ -2328,15 +2205,14 @@
   flex: 1;
   padding: 4px;
   font-size: 11px;
-  text-transform: capitalize;
   border: 1px solid var(--tm-border);
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
   cursor: pointer;
 }
 .sk-segmented__opt--on {
-  background: var(--tm-accent, #3b82f6);
-  color: #fff;
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
   border-color: transparent;
 }
 .sk-checklist {
@@ -2425,7 +2301,7 @@
   cursor: pointer;
 }
 .sk-artifacts__item--on {
-  border-color: var(--tm-accent, #3b82f6);
+  border-color: var(--tm-accent);
 }
 .sk-artifacts__revs {
   margin-left: auto;
@@ -2472,7 +2348,7 @@
   background: var(--tm-bg-surface);
   border: 1px solid var(--tm-border);
   border-radius: 6px;
-  z-index: 40;
+  z-index: var(--tm-layer-overlay);
   width: 360px;
 }
 .sk-knowledge__result {
@@ -2484,7 +2360,7 @@
   border-bottom: 1px solid var(--tm-border);
 }
 .sk-knowledge__loc {
-  color: var(--tm-accent, #3b82f6);
+  color: var(--tm-accent-text);
 }
 .sk-import__list {
   list-style: none;
@@ -2601,8 +2477,8 @@
   display: flex;
   gap: 8px;
   padding: 8px 12px;
-  background: var(--tm-surface, #111827);
-  border-top: 1px solid var(--tm-border, #374151);
+  background: var(--tm-bg-surface);
+  border-top: 1px solid var(--tm-border);
 }
 
 .sk-console-reply input {
@@ -2647,7 +2523,7 @@
 .sk-brief-editor input:not([type='checkbox']):not([type='radio']):focus,
 .sk-brief-editor textarea:focus,
 .sk-activity textarea:focus {
-  border-color: var(--tm-accent, #3b82f6);
+  border-color: var(--tm-accent);
 }
 .sk-card-detail textarea,
 .sk-modal textarea,
@@ -2675,7 +2551,7 @@
 .sk-modal__head button:hover,
 .sk-checklist__add button:hover,
 .sk-checklist li > button:hover {
-  background: var(--tm-bg-hover, var(--tm-bg-surface));
+  background: var(--tm-bg-card-hover);
 }
 /* Checklist rows */
 .sk-checklist li {
@@ -2721,7 +2597,7 @@
 }
 .sk-card-origin--linear,
 .sk-card-origin--jira {
-  color: var(--tm-accent, #3b82f6);
+  color: var(--tm-accent-text);
 }
 .sk-card-origin--linear:hover,
 .sk-card-origin--jira:hover {
@@ -2740,15 +2616,13 @@
 }
 .sk-asks--clear {
   padding: 10px 12px;
-  border: 1px solid var(--tm-border, #1f2937);
+  border: 1px solid var(--tm-border);
   border-radius: 6px;
   color: var(--tm-text-secondary);
   font-size: 12px;
 }
 .sk-asks__header {
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--tm-text-secondary);
 }
 .sk-ask {
@@ -2756,9 +2630,9 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid var(--tm-warning, #b45309);
+  border: 1px solid var(--tm-warning);
   border-radius: 6px;
-  background: var(--tm-surface, #111827);
+  background: var(--tm-bg-surface);
 }
 .sk-ask__head {
   display: flex;
@@ -2775,8 +2649,8 @@
 .sk-ask__host {
   padding: 1px 6px;
   border-radius: 999px;
-  border: 1px solid var(--tm-warning, #b45309);
-  color: var(--tm-warning, #b45309);
+  border: 1px solid var(--tm-warning);
+  color: var(--tm-warning);
 }
 /* The ask itself. Wraps rather than truncates — the half you cannot see is
    the half that might delete something. */
@@ -2805,7 +2679,7 @@
 .sk-ask__answer button {
   padding: 4px 10px;
   border-radius: 4px;
-  border: 1px solid var(--tm-border, #1f2937);
+  border: 1px solid var(--tm-border);
   background: transparent;
   color: var(--tm-text-primary);
   font-size: 12px;
@@ -2823,7 +2697,7 @@
   padding: 8px;
   max-height: 260px;
   overflow: auto;
-  background: var(--tm-bg, #0b1220);
+  background: var(--tm-bg-base);
   border-radius: 4px;
   font-size: 11px;
   white-space: pre-wrap;
@@ -2835,8 +2709,8 @@
   flex-wrap: wrap;
 }
 .sk-ask__allow {
-  border-color: var(--tm-accent, #3b82f6);
-  color: var(--tm-accent, #3b82f6);
+  border-color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 .sk-ask__answer {
   display: flex;
@@ -2849,8 +2723,8 @@
   min-width: 0;
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid var(--tm-border, #1f2937);
-  background: var(--tm-bg, #0b1220);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-bg-base);
   color: var(--tm-text-primary);
   font-size: 12px;
 }
@@ -2880,15 +2754,15 @@
 .sk-sup__tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--tm-border, #1f2937);
+  border-bottom: 1px solid var(--tm-border);
   padding-bottom: 6px;
   /* Stays put while the list under it scrolls: with five sections, losing the
      tabs on the way down means scrolling back up to change what you are
      looking at. */
   position: sticky;
   top: 0;
-  z-index: 1;
-  background: var(--tm-bg, #0b1220);
+  z-index: var(--tm-layer-panel);
+  background: var(--tm-bg-base);
 }
 .sk-sup__tab {
   padding: 4px 10px;
@@ -2896,19 +2770,18 @@
   background: transparent;
   color: var(--tm-text-secondary);
   font-size: 12px;
-  text-transform: capitalize;
   cursor: pointer;
   border-radius: 4px;
 }
 .sk-sup__tab--on {
-  background: var(--tm-surface, #111827);
+  background: var(--tm-bg-surface);
   color: var(--tm-text-primary);
 }
 .sk-sup__count {
   margin-left: 4px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--tm-border, #1f2937);
+  background: var(--tm-border);
   font-size: 10px;
 }
 .sk-sup__list {
@@ -2922,9 +2795,9 @@
   gap: 10px;
   flex-wrap: wrap;
   padding: 8px 10px;
-  border: 1px solid var(--tm-border, #1f2937);
+  border: 1px solid var(--tm-border);
   border-radius: 6px;
-  background: var(--tm-surface, #111827);
+  background: var(--tm-bg-surface);
 }
 /* Takes the space, so a long branch name wraps instead of squeezing the
    actions off the row. */
@@ -2948,40 +2821,38 @@
   flex: 0 0 auto;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--tm-border, #1f2937);
+  border: 1px solid var(--tm-border);
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   color: var(--tm-text-secondary);
   white-space: nowrap;
 }
 .sk-sup__state--waiting,
 .sk-sup__state--stalled {
-  border-color: var(--tm-warning, #b45309);
-  color: var(--tm-warning, #b45309);
+  border-color: var(--tm-warning);
+  color: var(--tm-warning);
 }
 .sk-sup__state--ready {
-  border-color: var(--tm-accent, #3b82f6);
-  color: var(--tm-accent, #3b82f6);
+  border-color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 /* History outcomes. Only the two that went wrong are coloured — a list where
    every row is coloured is a list where none of them stand out. */
 .sk-sup__state--approved {
-  border-color: var(--tm-success, #15803d);
-  color: var(--tm-success, #15803d);
+  border-color: var(--tm-success);
+  color: var(--tm-success);
 }
 .sk-sup__state--discarded {
-  border-color: var(--tm-danger, #dc2626);
-  color: var(--tm-danger, #dc2626);
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
 }
 /* Worst first is the queue's order; the grade should read that way too. */
 .sk-sup__grade--P0 {
-  border-color: var(--tm-danger, #dc2626);
-  color: var(--tm-danger, #dc2626);
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
 }
 .sk-sup__grade--P1 {
-  border-color: var(--tm-warning, #b45309);
-  color: var(--tm-warning, #b45309);
+  border-color: var(--tm-warning);
+  color: var(--tm-warning);
 }
 .sk-sup__actions {
   display: flex;
@@ -2991,7 +2862,7 @@
 .sk-sup__btn {
   padding: 3px 9px;
   border-radius: 4px;
-  border: 1px solid var(--tm-border, #1f2937);
+  border: 1px solid var(--tm-border);
   background: transparent;
   color: var(--tm-text-primary);
   font-size: 11px;
@@ -3004,24 +2875,24 @@
   width: 100%;
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid var(--tm-border, #1f2937);
-  background: var(--tm-bg, #0b1220);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-bg-base);
   color: var(--tm-text-primary);
   font-size: 12px;
 }
 .sk-sup__clear,
 .sk-sup__note {
-  padding: 8px 10px;
-  border: 1px solid var(--tm-border, #1f2937);
-  border-radius: 6px;
-  color: var(--tm-text-secondary);
-  font-size: 12px;
+  /* Was a bordered box the height of a card. An absence does not need a
+     container — it needs one line saying so. */
+  padding: 4px 2px;
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
 }
 .sk-sup__warn {
   padding: 8px 10px;
-  border: 1px solid var(--tm-warning, #b45309);
+  border: 1px solid var(--tm-warning);
   border-radius: 6px;
-  color: var(--tm-warning, #b45309);
+  color: var(--tm-warning);
   font-size: 12px;
 }
 
@@ -3041,7 +2912,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-top: 6px;
-  border-top: 1px solid var(--tm-border, #1f2937);
+  border-top: 1px solid var(--tm-border);
   margin-top: 6px;
 }
 /* A row per thing said, sized to the sentence rather than to the pill beside
@@ -3080,7 +2951,7 @@
   word-break: break-all;
 }
 .sk-sup__hunk {
-  border: 1px solid var(--tm-border, #1f2937);
+  border: 1px solid var(--tm-border);
   border-radius: 4px;
   padding: 6px;
   margin-bottom: 6px;
@@ -3088,10 +2959,10 @@
 /* Decided hunks stay readable — the border says which way, not a wash of
    colour over the diff itself. */
 .sk-sup__hunk--accept {
-  border-color: var(--tm-success, #15803d);
+  border-color: var(--tm-success);
 }
 .sk-sup__hunk--reject {
-  border-color: var(--tm-danger, #dc2626);
+  border-color: var(--tm-danger);
 }
 .sk-sup__diff {
   margin: 0 0 6px;
@@ -3113,8 +2984,6 @@
 }
 .sk-lanes__head {
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   color: var(--tm-text-secondary);
 }
 .sk-lanes__row {
@@ -3122,9 +2991,9 @@
   gap: 10px;
   align-items: flex-start;
   padding: 8px 10px;
-  border: 1px solid var(--tm-border, #1f2937);
+  border: 1px solid var(--tm-border);
   border-radius: 6px;
-  background: var(--tm-surface, #111827);
+  background: var(--tm-bg-surface);
 }
 .sk-lanes__ord {
   flex: 0 0 auto;
@@ -3133,7 +3002,121 @@
   display: grid;
   place-items: center;
   border-radius: 999px;
-  border: 1px solid var(--tm-border, #1f2937);
+  border: 1px solid var(--tm-border);
   font-size: 11px;
   color: var(--tm-text-secondary);
+}
+
+/* ── Card progress (036) ─────────────────────────────────────────────────
+   Replaces ten identical numbered circles. The bar says how far, the label
+   says what happens next — the one thing on the card you can act on. */
+
+.sk-card-progress {
+  margin: 8px 0 2px;
+}
+
+.sk-card-progress__track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tm-bg-input);
+  overflow: hidden;
+}
+
+.sk-card-progress__fill {
+  display: block;
+  height: 100%;
+  background: var(--tm-accent);
+  transition: width 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-card-progress__fill {
+    transition: none;
+  }
+}
+
+.sk-card-progress__legend {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.sk-card-progress__next {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tm-text-secondary);
+}
+
+.sk-card-progress__count {
+  color: var(--tm-text-muted);
+  font-family: var(--tm-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Principle XII: icons sized here rather than by a size prop. */
+.sk-card-tile__meta svg,
+.sk-card-tile__comments svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* The board scrolls sideways when the columns outrun the window. It always did;
+   nothing said so, and the last column simply appeared cut off. */
+.sk-board__cols[data-scrollable] {
+  /* A mask reads the alpha channel; #000 here is "fully opaque", not a colour
+     anyone sees. */
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+}
+
+/* Below this a column cannot hold a readable card title, so the board scrolls
+   rather than squeezing. */
+.sk-board-col {
+  min-width: 240px;
+}
+
+.sk-board__toolbar:empty {
+  display: none;
+}
+
+/* Principle XII: icons inherit currentColor and are sized here rather than by a
+   size prop on the component. */
+.sk-appbar .sk-btn svg,
+.sk-board__toolbar .sk-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* The card drawer covered more than half the window while the board behind it
+   stayed fully lit and looked interactive. A scrim says which layer is live. */
+.sk-drawer::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--tm-scrim);
+  z-index: var(--tm-layer-modal);
+}
+
+.sk-drawer > * {
+  position: relative;
+  z-index: var(--tm-layer-modal);
+}
+
+.sk-card-detail__dirty {
+  padding: 1px 6px;
+  border: 1px solid var(--tm-warning);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-warning);
+  font-size: 10px;
+}
+
+/* Principle XII: sized here, not by a size prop. */
+.sk-card-detail__head svg {
+  width: 15px;
+  height: 15px;
 }

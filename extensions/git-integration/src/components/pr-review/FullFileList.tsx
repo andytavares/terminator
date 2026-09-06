@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { PrReviewDetail, Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 import { chapterRiskLevel } from '../../github/pr-review-service'
@@ -91,8 +92,14 @@ export function FullFileList({
                 <span className="full-file-chapter-progress">
                   {viewedInChapter}/{files.length}
                 </span>
-                {status === 'complete' && <span className="full-file-chapter-done">✓</span>}
-                <span className="full-file-chapter-chevron">{isOpen ? '▾' : '▸'}</span>
+                {status === 'complete' && (
+                  <Check aria-hidden="true" className="full-file-chapter-done" />
+                )}
+                {isOpen ? (
+                  <ChevronDown aria-hidden="true" className="full-file-chapter-chevron" />
+                ) : (
+                  <ChevronRight aria-hidden="true" className="full-file-chapter-chevron" />
+                )}
               </button>
             )}
 
@@ -123,7 +130,7 @@ export function FullFileList({
                       <span className="full-file-row-add">+{file.additions}</span>
                       <span className="full-file-row-del">−{file.deletions}</span>
                     </span>
-                    {isViewed && <span className="full-file-row-check">✓</span>}
+                    {isViewed && <Check aria-hidden="true" className="full-file-row-check" />}
                   </button>
                 )
               })}

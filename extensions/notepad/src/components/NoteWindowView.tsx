@@ -417,7 +417,7 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
                 setPendingAnchor(null)
               }}
             >
-              <MessageSquarePlus size={14} />
+              <MessageSquarePlus className="tm-icon" />
             </button>
           )}
           {commentHover && (

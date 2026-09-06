@@ -104,6 +104,14 @@ export function activate(api: ExtensionAPI): void {
         },
       })
       await remoteServer.start()
+
+      // Push the connected-device list whenever it changes. The server owns the
+      // sockets, so it is the authority; polling would add latency and a second
+      // source of truth for state it already holds.
+      remoteServer.devices.onChange((devices) => {
+        api.window.broadcast('remote:devices', { devices })
+      })
+      api.window.broadcast('remote:devices', { devices: remoteServer.devices.list() })
       api.window.broadcast('remote:status', {
         enabled: true,
         port,
@@ -253,6 +261,18 @@ export function activate(api: ExtensionAPI): void {
     'remote:caddyfile',
     (_payload) => {
       return generateCaddyfile(getPort())
+    },
+    LOCAL_ONLY
+  )
+
+  // "Disconnect" in the view. The socket closing is what removes the row, so a
+  // failure here leaves it visible rather than lying about what happened.
+  api.ipc.registerHandler(
+    'remote:disconnect-device',
+    (payload) => {
+      const { id } = (payload ?? {}) as { id?: string }
+      if (!id || !remoteServer) return { ok: false }
+      return { ok: remoteServer.devices.disconnect(id) }
     },
     LOCAL_ONLY
   )

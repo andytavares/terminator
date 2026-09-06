@@ -220,39 +220,50 @@ export function useKeyboardShortcuts({
         return
       }
 
-      // Cmd+D: split vertically (side by side) — always in the active project, never scratch
+      // Cmd+D: split vertically (side by side). `effectiveProjectId` rather
+      // than `activeProjectId`, so a scratch terminal splits too — it used to
+      // do nothing at all there, and say nothing, which reads as the feature
+      // having been removed rather than as not applying.
       if (isMeta && !e.shiftKey && e.key === 'd') {
         e.preventDefault()
-        if (activeProjectId) {
+        if (effectiveProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
-          splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit).catch(
-            (error: unknown) =>
-              dispatchNotification({
-                type: 'error',
-                title: 'Split pane failed',
-                message: error instanceof Error ? error.message : 'Could not create split pane',
-                key: 'splitPaneFailed',
-              })
+          splitSession(
+            effectiveProjectId,
+            'vertical',
+            cwd,
+            settings.terminal.scrollbackLimit
+          ).catch((error: unknown) =>
+            dispatchNotification({
+              type: 'error',
+              title: 'Split pane failed',
+              message: error instanceof Error ? error.message : 'Could not create split pane',
+              key: 'splitPaneFailed',
+            })
           )
         }
         return
       }
 
-      // Cmd+Shift+D: split horizontally (top / bottom) — always in the active project, never scratch
+      // Cmd+Shift+D: split horizontally (top / bottom).
       if (isMeta && e.shiftKey && e.key === 'd') {
         e.preventDefault()
-        if (activeProjectId) {
+        if (effectiveProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
-          splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit).catch(
-            (error: unknown) =>
-              dispatchNotification({
-                type: 'error',
-                title: 'Split pane failed',
-                message: error instanceof Error ? error.message : 'Could not create split pane',
-                key: 'splitPaneFailed',
-              })
+          splitSession(
+            effectiveProjectId,
+            'horizontal',
+            cwd,
+            settings.terminal.scrollbackLimit
+          ).catch((error: unknown) =>
+            dispatchNotification({
+              type: 'error',
+              title: 'Split pane failed',
+              message: error instanceof Error ? error.message : 'Could not create split pane',
+              key: 'splitPaneFailed',
+            })
           )
         }
         return

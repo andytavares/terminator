@@ -6,6 +6,7 @@ import { resolve } from 'path'
 // node/jsdom split is expressed as two projects instead.
 const JSDOM_INCLUDE = [
   'tests/unit/**/*.spec.tsx',
+  'packages/*/tests/**/*.spec.tsx',
   'tests/unit/renderer-remote/**/*.spec.ts',
   'extensions/*/tests/**/*.spec.tsx',
 ]
@@ -13,6 +14,7 @@ const JSDOM_INCLUDE = [
 const NODE_INCLUDE = [
   'tests/unit/**/*.spec.ts',
   'tests/unit/**/*.spec.js',
+  'packages/*/tests/**/*.spec.ts',
   'tests/integration/**/*.spec.ts',
   'tests/integration/**/*.spec.js',
   'extensions/*/tests/**/*.spec.ts',
@@ -54,11 +56,14 @@ export default defineConfig({
         'src/**/*.tsx',
         'extensions/*/src/**/*.ts',
         'extensions/*/src/**/*.tsx',
+        'packages/extension-ui/src/**/*.ts',
+        'packages/extension-ui/src/**/*.tsx',
         'vite.config.remote.ts',
       ],
       exclude: [
         'vitest.config.ts',
         'playwright.config.ts',
+        'packages/*/vite.config.ts',
         'src/renderer/index.tsx',
         'src/renderer-remote/mobile.main.tsx',
         'src/main/index.ts',

@@ -18,9 +18,11 @@ import {
   loadCollapseState,
   saveCollapseState,
   toggleCollapsed,
+  TERMINALS_NAMESPACE,
 } from '../../sidebar/collapse-state'
 import { useDragReorder, type DragItemProps } from '../../hooks/useDragReorder'
 import { mergeReorder } from '../../sidebar/manual-order'
+import { TerminalRow } from './TerminalRow'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
@@ -432,6 +434,34 @@ export function UnifiedSidebar({
   }
 
   /**
+   * Whether a branch's terminals are listed.
+   *
+   * The polarity is *collapsed*, like every other group here — but a branch's
+   * terminals start hidden, because the sidebar's job is still to stop at the
+   * branch by default (ADR-035) and expanding is how you go further.
+   */
+  function terminalsExpanded(projectId: string): boolean {
+    return isGroupCollapsed(collapseState, TERMINALS_NAMESPACE, projectId)
+  }
+
+  function toggleTerminals(projectId: string): void {
+    const next = toggleCollapsed(collapseState, TERMINALS_NAMESPACE, projectId)
+    setCollapseState(next)
+    saveCollapseState(next)
+  }
+
+  /** Which terminal a project is currently showing. */
+  function activeSessionIdFor(projectId: string): string | null {
+    return projectViews.get(projectId)?.activeSessionId ?? null
+  }
+
+  /** Leaves the split layout first, then ends the session — as Cmd+W does. */
+  function closeTerminal(projectId: string, sessionId: string): void {
+    sessionStore.closeSplitLeaf(projectId, sessionId)
+    void sessionStore.closeSession(sessionId)
+  }
+
+  /**
    * Selecting a session sets activeProjectId as well as the project's active
    * session. Leaving activeProjectId undefined under a non-project grouping
    * would break per-project auto-open and the project tab bar (invariant I4).
@@ -566,38 +596,68 @@ export function UnifiedSidebar({
     const branchCwd = project ? (project.worktreePath ?? workspace?.folderPath) : undefined
     if (project && branchCwd) ensureChangeStats(row.projectId, branchCwd, clock)
 
+    const expanded = terminalsExpanded(row.projectId)
+
     return (
-      <BranchRow
-        key={row.projectId}
-        row={row}
-        dragProps={dragProps}
-        dragOver={dragOver}
-        selected={row.projectId === activeProjectId}
-        colour={workspace?.color}
-        now={clock}
-        issueKey={issueLinkFor(row.projectId)?.key ?? null}
-        onIssueClick={() => openDrawer(row.projectId)}
-        changeStats={statsFor(row.projectId)?.stats}
-        onSelect={() => selectBranch(row.projectId)}
-        onAddTerminal={() => addSessionToProject(row.projectId)}
-        // A branch is named by its branch (ADR-034), so there is nothing to
-        // rename. A branch in a folder that is not a repo has no branch, and
-        // its stored name is the only name it has.
-        onRename={
-          project && project.gitBranch === undefined
-            ? (name) => void renameProject(row.projectId, name)
-            : undefined
-        }
-        onRemove={() => setConfirmDeleteProject({ id: row.projectId, name: row.label })}
-        onOpenInEditor={() => openInEditor(folderForBranch(row.projectId))}
-        editorName={editorName}
-        issueActions={issueActionsFor(row.projectId)}
-        repoActions={workspaceTabList.map((tab) => ({
-          id: tab.id,
-          label: tab.label,
-          onSelect: () => onSelectWorkspaceTab(row.workspaceId, tab.id),
-        }))}
-      />
+      <React.Fragment key={row.projectId}>
+        <BranchRow
+          row={row}
+          dragProps={dragProps}
+          dragOver={dragOver}
+          expanded={expanded}
+          onToggleExpanded={() => toggleTerminals(row.projectId)}
+          selected={row.projectId === activeProjectId}
+          colour={workspace?.color}
+          now={clock}
+          issueKey={issueLinkFor(row.projectId)?.key ?? null}
+          onIssueClick={() => openDrawer(row.projectId)}
+          changeStats={statsFor(row.projectId)?.stats}
+          onSelect={() => selectBranch(row.projectId)}
+          onAddTerminal={() => addSessionToProject(row.projectId)}
+          // A branch is named by its branch (ADR-034), so there is nothing to
+          // rename. A branch in a folder that is not a repo has no branch, and
+          // its stored name is the only name it has.
+          onRename={
+            project && project.gitBranch === undefined
+              ? (name) => void renameProject(row.projectId, name)
+              : undefined
+          }
+          onRemove={() => setConfirmDeleteProject({ id: row.projectId, name: row.label })}
+          onOpenInEditor={() => openInEditor(folderForBranch(row.projectId))}
+          editorName={editorName}
+          issueActions={issueActionsFor(row.projectId)}
+          repoActions={workspaceTabList.map((tab) => ({
+            id: tab.id,
+            label: tab.label,
+            onSelect: () => onSelectWorkspaceTab(row.workspaceId, tab.id),
+          }))}
+        />
+
+        {/* The terminals under this branch, and the panes under each of them.
+            Rendered here rather than inside BranchRow so a row stays one row —
+            the same shape the repo header and its branches already use. */}
+        {expanded &&
+          row.terminals.map((terminal) => (
+            <React.Fragment key={terminal.sessionId}>
+              <TerminalRow
+                terminal={terminal}
+                selected={activeSessionIdFor(row.projectId) === terminal.sessionId}
+                onSelect={() => selectSession(row.projectId, terminal.sessionId)}
+                onClose={() => closeTerminal(row.projectId, terminal.sessionId)}
+              />
+              {terminal.panes.map((pane) => (
+                <TerminalRow
+                  key={pane.sessionId}
+                  terminal={pane}
+                  nested
+                  selected={activeSessionIdFor(row.projectId) === pane.sessionId}
+                  onSelect={() => selectSession(row.projectId, pane.sessionId)}
+                  onClose={() => closeTerminal(row.projectId, pane.sessionId)}
+                />
+              ))}
+            </React.Fragment>
+          ))}
+      </React.Fragment>
     )
   }
 
@@ -689,7 +749,6 @@ export function UnifiedSidebar({
             <div className="unified-sidebar__scratch">
               <div className="unified-sidebar__scratch-head">
                 <span className="unified-sidebar__scratch-label">Scratch</span>
-                <span className="unified-sidebar__scratch-count">{scratch.length}</span>
                 <button
                   className="unified-sidebar__scratch-add"
                   title="New scratch terminal"
@@ -698,6 +757,8 @@ export function UnifiedSidebar({
                 >
                   +
                 </button>
+                {/* Last on the row, in the same column as every other count. */}
+                <span className="unified-sidebar__scratch-count">{scratch.length}</span>
               </div>
               {scratch.map((session) => (
                 <BranchRow
@@ -712,6 +773,18 @@ export function UnifiedSidebar({
                     state: session.agentState,
                     stateCount: 1,
                     sessionCount: 1,
+                    // A scratch row *is* its terminal, so what nests under it
+                    // is the panes split off it — the same one level the
+                    // session controller pins.
+                    terminals: [...sessions.values()]
+                      .filter((s) => s.parentSessionId === session.id)
+                      .map((pane) => ({
+                        sessionId: pane.id,
+                        title: pane.tabTitle,
+                        state: pane.agentState,
+                        bellCount: pane.bellCount ?? 0,
+                        panes: [],
+                      })),
                     lastActivityAt: session.lastActivityAt,
                     workspaceId: '',
                   }}

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { ArrowRight } from 'lucide-react'
 import './git-integration.css'
 import { useGitStore } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
@@ -228,7 +229,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
               className="git-full-view__conflict-banner-btn"
               onClick={() => setView('merge-flow')}
             >
-              Resolve conflicts →
+              <ArrowRight aria-hidden="true" /> Resolve conflicts
             </button>
           </div>
         )}

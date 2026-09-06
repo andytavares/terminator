@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Dialog } from '@terminator/extension-ui'
 import { marked } from 'marked'
 import type { PullRequest } from '../schemas/git.schema'
 
@@ -188,155 +189,136 @@ export function PrDialog({
 
   const previewHtml = marked.parse(body || '*No description*') as string
 
+  const submitLabel = isCreating ? '…' : isDraft ? 'Create Draft PR' : 'Create PR'
+
   return (
-    <div className="pr-dialog" onClick={onClose}>
-      <div
-        className="pr-dialog__panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Create Pull Request"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="pr-dialog__header">
-          <h2 className="pr-dialog__title">Open Pull Request</h2>
-          <button className="pr-dialog__close" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
+    <Dialog
+      title="Open Pull Request"
+      onDismiss={onClose}
+      actions={[
+        { label: 'Cancel', disabled: isCreating, onSelect: onClose },
+        {
+          label: submitLabel,
+          tone: 'primary',
+          disabled: isCreating || !title.trim() || !!existingPr,
+          onSelect: () => void handleCreate(),
+        },
+      ]}
+    >
+      {existingPr && (
+        <div className="pr-dialog__existing-pr">
+          A PR already exists:{' '}
+          <a
+            href={existingPr.url}
+            onClick={(e) => {
+              e.preventDefault()
+              window.electronAPI.shell.openExternal(existingPr.url).catch(() => {})
+            }}
+          >
+            #{existingPr.number}: {existingPr.title}
+          </a>
         </div>
+      )}
 
-        {existingPr && (
-          <div className="pr-dialog__existing-pr">
-            A PR already exists:{' '}
-            <a
-              href={existingPr.url}
-              onClick={(e) => {
-                e.preventDefault()
-                window.electronAPI.shell.openExternal(existingPr.url).catch(() => {})
-              }}
+      {isDefaultBranch && (
+        <div className="pr-dialog__warning">
+          Warning: creating a PR from the default branch ({branch}).
+        </div>
+      )}
+
+      <div className="pr-dialog__field">
+        <label className="pr-dialog__label">Title</label>
+        <input
+          className="pr-dialog__input"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Pull request title"
+        />
+      </div>
+
+      <div className="pr-dialog__field">
+        <div className="pr-dialog__inline pr-dialog__desc-header">
+          <label className="pr-dialog__label">Description</label>
+          <div className="pr-dialog__mode-toggle">
+            <button
+              className={`pr-dialog__mode-btn${descMode === 'write' ? ' pr-dialog__mode-btn--active' : ''}`}
+              onClick={() => setDescMode('write')}
             >
-              #{existingPr.number}: {existingPr.title}
-            </a>
+              Write
+            </button>
+            <button
+              className={`pr-dialog__mode-btn${descMode === 'preview' ? ' pr-dialog__mode-btn--active' : ''}`}
+              onClick={() => setDescMode('preview')}
+            >
+              Preview
+            </button>
           </div>
+        </div>
+        {descMode === 'write' ? (
+          <textarea
+            className="pr-dialog__textarea"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Describe your changes… (Markdown supported)"
+            rows={8}
+          />
+        ) : (
+          <div className="pr-dialog__preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
         )}
+      </div>
 
-        {isDefaultBranch && (
-          <div className="pr-dialog__warning">
-            Warning: creating a PR from the default branch ({branch}).
-          </div>
-        )}
-
-        <div className="pr-dialog__field">
-          <label className="pr-dialog__label">Title</label>
+      <div className="pr-dialog__inline">
+        <div className="pr-dialog__field pr-dialog__field--flex">
+          <label className="pr-dialog__label">Base branch</label>
           <input
             className="pr-dialog__input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Pull request title"
+            placeholder="Filter branches…"
+            value={baseFilter}
+            onChange={(e) => setBaseFilter(e.target.value)}
+            style={{ marginBottom: 4 }}
           />
-        </div>
-
-        <div className="pr-dialog__field">
-          <div className="pr-dialog__inline pr-dialog__desc-header">
-            <label className="pr-dialog__label">Description</label>
-            <div className="pr-dialog__mode-toggle">
-              <button
-                className={`pr-dialog__mode-btn${descMode === 'write' ? ' pr-dialog__mode-btn--active' : ''}`}
-                onClick={() => setDescMode('write')}
-              >
-                Write
-              </button>
-              <button
-                className={`pr-dialog__mode-btn${descMode === 'preview' ? ' pr-dialog__mode-btn--active' : ''}`}
-                onClick={() => setDescMode('preview')}
-              >
-                Preview
-              </button>
-            </div>
-          </div>
-          {descMode === 'write' ? (
-            <textarea
-              className="pr-dialog__textarea"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Describe your changes… (Markdown supported)"
-              rows={8}
-            />
-          ) : (
-            <div className="pr-dialog__preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
-          )}
-        </div>
-
-        <div className="pr-dialog__inline">
-          <div className="pr-dialog__field pr-dialog__field--flex">
-            <label className="pr-dialog__label">Base branch</label>
-            <input
-              className="pr-dialog__input"
-              placeholder="Filter branches…"
-              value={baseFilter}
-              onChange={(e) => setBaseFilter(e.target.value)}
-              style={{ marginBottom: 4 }}
-            />
-            <select
-              className="pr-dialog__input pr-dialog__select"
-              value={base}
-              onChange={(e) => setBase(e.target.value)}
-              size={6}
-            >
-              {localBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-                .length > 0 && (
-                <optgroup label="Local">
-                  {localBranches
-                    .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-                    .map((b) => (
-                      <option key={b.name} value={b.name}>
-                        {b.name}
-                      </option>
-                    ))}
-                </optgroup>
-              )}
-              {remoteBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-                .length > 0 && (
-                <optgroup label="Remote">
-                  {remoteBranches
-                    .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-                    .map((b) => (
-                      <option key={b.name} value={b.name}>
-                        {b.name}
-                      </option>
-                    ))}
-                </optgroup>
-              )}
-            </select>
-          </div>
-
-          <label className="pr-dialog__draft-toggle">
-            <input
-              type="checkbox"
-              checked={isDraft}
-              onChange={(e) => setIsDraft(e.target.checked)}
-            />
-            Draft
-          </label>
-        </div>
-
-        {error && <div className="pr-dialog__error">{error}</div>}
-
-        <div className="pr-dialog__actions">
-          {isCreating && creatingStatus && (
-            <span className="pr-dialog__status">{creatingStatus}</span>
-          )}
-          <button className="pr-dialog__cancel-btn" onClick={onClose} disabled={isCreating}>
-            Cancel
-          </button>
-          <button
-            className="pr-dialog__submit-btn"
-            onClick={handleCreate}
-            disabled={isCreating || !title.trim() || !!existingPr}
+          <select
+            className="pr-dialog__input pr-dialog__select"
+            value={base}
+            onChange={(e) => setBase(e.target.value)}
+            size={6}
           >
-            {isCreating ? '…' : isDraft ? 'Create Draft PR' : 'Create PR'}
-          </button>
+            {localBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
+              .length > 0 && (
+              <optgroup label="Local">
+                {localBranches
+                  .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
+                  .map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+            {remoteBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
+              .length > 0 && (
+              <optgroup label="Remote">
+                {remoteBranches
+                  .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
+                  .map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+          </select>
         </div>
+
+        <label className="pr-dialog__draft-toggle">
+          <input type="checkbox" checked={isDraft} onChange={(e) => setIsDraft(e.target.checked)} />
+          Draft
+        </label>
       </div>
-    </div>
+
+      {error && <div className="pr-dialog__error">{error}</div>}
+
+      {isCreating && creatingStatus && <p className="pr-dialog__status">{creatingStatus}</p>}
+    </Dialog>
   )
 }

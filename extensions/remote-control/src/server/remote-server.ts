@@ -13,6 +13,7 @@ import { registerBridgeRoute } from './routes/bridge.route.js'
 import { WsTicketStore } from './ws-ticket-store.js'
 import { SessionStore } from './session-store.js'
 import { WsSubscriberManager } from './ws-subscriber-manager.js'
+import { ConnectedDeviceRegistry } from './connected-devices.js'
 
 // CSS injected into every extension iframe so --tm-* variables and layout are defined.
 // Mirrors the EXTENSION_BASE_CSS in src/main/extensions/extension-view-host.ts —
@@ -32,6 +33,14 @@ const EXTENSION_BASE_CSS = `
   --tm-border-strong: rgba(255,255,255,0.12);
   --tm-accent: #5c6bc0;
   --tm-on-accent: #ffffff;
+  /* The accent as text or an icon, rather than as a fill. --tm-accent is dark
+     enough to carry white (4.86:1) and therefore too dark to read on the dark
+     surfaces (3.48:1 on --tm-bg-card); this is the same hue lifted until it
+     passes as text (6.24:1). In the light theme one value does both jobs. */
+  --tm-accent-text: #8b98e8;
+  /* Hover for a filled accent control. It darkens in both themes: lightening
+     the dark theme's accent drops white below AA (#6b79ce gives 4.00:1). */
+  --tm-accent-hover: #5361b5;
   --tm-accent-dim: rgba(92,107,192,0.18);
   --tm-accent-glow: rgba(92,107,192,0.35);
   --tm-danger: #e05c5c;
@@ -47,12 +56,160 @@ const EXTENSION_BASE_CSS = `
   --tm-syntax-number: #e0a361;
   --tm-syntax-title: #7fb8f0;
   --tm-syntax-attribute: #e2c07e;
+  /* Translucent layers over whatever surface is beneath.
+     Extension stylesheets reached for rgba(255,255,255,alpha) ~350 times for
+     these — a hairline border, a faint hover fill, a raised strip. Every one
+     of them is invisible on a light ground, so the alpha itself has to flip
+     with the theme rather than the colour under it. */
+  --tm-overlay-subtle: rgba(255,255,255,0.04);
+  --tm-overlay-soft: rgba(255,255,255,0.06);
+  --tm-overlay: rgba(255,255,255,0.09);
+  --tm-overlay-strong: rgba(255,255,255,0.14);
+  --tm-scrim: rgba(0,0,0,0.55);
+  /* Text on a filled semantic control. The fills are bright in this theme, so
+     the text on them is dark; in the light theme the fills are deep and it
+     flips. */
+  --tm-on-success: #06210f;
+  --tm-on-warning: #241a00;
+  --tm-on-danger: #2a0b0b;
   --tm-radius-xs: 4px;
   --tm-radius-sm: 6px;
   --tm-radius-md: 10px;
   --tm-radius-lg: 16px;
+  --tm-space-1: 4px;
+  --tm-space-2: 8px;
+  --tm-space-3: 12px;
+  --tm-space-4: 16px;
+  --tm-space-5: 20px;
+  --tm-space-6: 24px;
+  --tm-space-8: 32px;
+  /* The stacking scale. Extension stylesheets reference these instead of raw
+     numbers; without them here every z-index in an extension view resolves to
+     nothing and the stacking order collapses. Must stay in step with
+     packages/extension-ui/src/layers.ts and the :root block in styles.css. */
+  --tm-layer-panel: 100;
+  --tm-layer-overlay: 200;
+  --tm-layer-modal: 300;
+  --tm-layer-toast: 400;
   --tm-font-mono: 'IBM Plex Mono','JetBrains Mono','Fira Code','Courier New',monospace;
   --tm-font-ui: 'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+
+/* Icon sizes (Constitution Principle XII).
+   Icons are sized here, never with a size prop on the component. The
+   extensions had 139 such props across seven ad-hoc values in a 6px band —
+   10, 11, 12, 13, 14, 15, 16 — which is not seven decisions, it is one
+   decision made seven times. Three steps carry all of it. Injected rather
+   than exported so an extension gets them without importing anything, the
+   same way it gets the colour tokens. */
+.tm-icon-sm,
+.tm-icon,
+.tm-icon-lg {
+  flex: 0 0 auto;
+}
+.tm-icon-sm {
+  width: 12px;
+  height: 12px;
+}
+.tm-icon {
+  width: 14px;
+  height: 14px;
+}
+.tm-icon-lg {
+  width: 16px;
+  height: 16px;
+}
+
+/* No button renders the browser's native control.
+
+   Nothing in this product wants the UA button look, and relying on every
+   modifier to remember a background is how a caret beside "Commit & push"
+   shipped as a white pill on a dark panel. border:0 rather than a
+   transparent border, so a button that wants an edge states the full
+   shorthand — which every one of them already does. */
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The default an icon gets when nothing else sizes it.
+
+   lucide renders width/height attributes of 24 when given no size, which is
+   never what a 12px label wants — an icon converted from a text glyph and left
+   without a rule comes out enormous. This makes the default "as tall as the
+   text beside it", which is what the glyph it replaced did. Anything wanting a
+   specific size says so with .tm-icon*, or its own rule; both are more
+   specific than this and win.
+
+   The :has() rule is the other half: a button that used to hold a character
+   laid it out as text, and an inline SVG in the same place sits on the
+   baseline instead of centred. */
+button > svg,
+a > svg,
+label > svg,
+summary > svg {
+  width: 1.08em;
+  height: 1.08em;
+  flex: 0 0 auto;
+}
+
+/* Vertical centring only. Forcing justify-content here re-centred every
+   left-aligned button that happens to contain an icon — a disclosure row,
+   a menu item — which is a layout decision that belongs to the caller. */
+button:has(> svg) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The light palette, mirroring [data-theme='light'] in src/renderer/styles.css.
+   Those values are WCAG AA verified against their surfaces (TAV-8) — including
+   the text-muted darkening and the semantic colours, which were chosen so they
+   hold up composited under the diff tints. Keep the two blocks in step. */
+:root[data-theme='light'] {
+  --tm-bg-base: #f0f0f5;
+  --tm-bg-surface: #e8e8f0;
+  --tm-bg-elevated: #ffffff;
+  --tm-bg-card: #f5f5fa;
+  --tm-bg-card-hover: #eaeaf5;
+  --tm-bg-input: #ffffff;
+  --tm-text-primary: #1a1a2e;
+  --tm-text-secondary: #555580;
+  --tm-text-muted: #5c5c94;
+  --tm-border: rgba(0,0,0,0.08);
+  --tm-border-strong: rgba(0,0,0,0.15);
+  --tm-accent: #4a57a8;
+  --tm-on-accent: #ffffff;
+  --tm-accent-text: #4a57a8;
+  --tm-accent-hover: #3d4890;
+  --tm-accent-dim: rgba(74,87,168,0.12);
+  --tm-accent-glow: rgba(74,87,168,0.28);
+  --tm-danger: #962d20;
+  --tm-success: #0f5c2a;
+  --tm-warning: #a85a00;
+  --tm-diff-added-bg: rgba(15,92,42,0.10);
+  --tm-diff-removed-bg: rgba(150,45,32,0.10);
+  --tm-syntax-comment: #5c5c94;
+  --tm-syntax-keyword: #8a3fa8;
+  --tm-syntax-string: #0f5c2a;
+  --tm-syntax-tag: #962d20;
+  --tm-syntax-literal: #0e6e7a;
+  --tm-syntax-number: #8a5417;
+  --tm-syntax-title: #1d5fa8;
+  --tm-syntax-attribute: #7a5c12;
+  --tm-overlay-subtle: rgba(0,0,0,0.03);
+  --tm-overlay-soft: rgba(0,0,0,0.05);
+  --tm-overlay: rgba(0,0,0,0.07);
+  --tm-overlay-strong: rgba(0,0,0,0.12);
+  --tm-scrim: rgba(0,0,0,0.35);
+  --tm-on-success: #ffffff;
+  --tm-on-warning: #ffffff;
+  --tm-on-danger: #ffffff;
 }
 *, *::before, *::after { box-sizing: border-box; }
 html, body {
@@ -129,6 +286,8 @@ export interface RemoteServerHandle {
   stop(): Promise<void>
   isListening(): boolean
   disconnectAllClients(): void
+  /** Who is connected, and a subscription to changes, for the view. */
+  devices: ConnectedDeviceRegistry
   inject: FastifyInstance['inject']
 }
 
@@ -198,6 +357,8 @@ export async function createRemoteServer(
 
   const ticketStore = new WsTicketStore()
   const subscriberManager = new WsSubscriberManager()
+  // Who is watching, so the Remote Control view can say so and disconnect one.
+  const deviceRegistry = new ConnectedDeviceRegistry()
   // One session store per browser surface; 8-hour cookie lifetime.
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000
   const appSessionStore = new SessionStore({
@@ -340,6 +501,7 @@ export async function createRemoteServer(
     ptyManager,
     ticketStore,
     subscriberManager,
+    deviceRegistry,
     getMaxSubscribers: deps.getMaxSubscribers,
   })
   const bridgeCleanup = await registerBridgeRoute(fastify, {
@@ -405,6 +567,9 @@ export async function createRemoteServer(
     isListening() {
       return listening
     },
+
+    /** The live device list, and a subscription to changes. */
+    devices: deviceRegistry,
 
     inject: fastify.inject.bind(fastify),
   }

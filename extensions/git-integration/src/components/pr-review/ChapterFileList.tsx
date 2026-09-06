@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react'
+import { Check } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 
@@ -101,7 +102,7 @@ export function ChapterFileList({
             </span>
             {isViewed && (
               <span className="chapter-file-viewed-check" aria-label="Viewed">
-                ✓
+                <Check aria-hidden="true" />
               </span>
             )}
             <span className="chapter-file-why" title={file.whyHere}>

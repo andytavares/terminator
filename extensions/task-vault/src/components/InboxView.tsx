@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Trash2, X, CalendarDays, Sunset } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Sunset, Trash2, X } from 'lucide-react'
 import type { IndexedTask } from '../vault/types'
 import { InboxProcessor } from './InboxProcessor'
 import { SmartTaskInput } from './SmartTaskInput'
@@ -117,7 +117,7 @@ export function InboxView(): React.JSX.Element {
                 void load()
               }}
             >
-              ← Back to list
+              <ArrowLeft aria-hidden="true" /> Back to list
             </button>
           </div>
           <InboxProcessor items={items} onDone={handleDone} />
@@ -223,7 +223,7 @@ function InboxItem({
             Save
           </button>
           <button className="tv-btn tv-btn--outline" onClick={() => setEditing(false)}>
-            <X size={13} />
+            <X className="tm-icon" />
           </button>
         </div>
       ) : (
@@ -254,21 +254,21 @@ function InboxItem({
               onClick={handleMoveToToday}
               title="Move to Today's log"
             >
-              <CalendarDays size={13} />
+              <CalendarDays className="tm-icon" />
             </button>
             <button
               className="tv-btn tv-btn--outline tv-btn--action-icon"
               onClick={handleSomeday}
               title="Move to backlog"
             >
-              <Sunset size={13} />
+              <Sunset className="tm-icon" />
             </button>
             <button
               className="tv-btn tv-btn--outline tv-btn--action-icon inbox-item__btn--delete"
               onClick={handleDelete}
               title="Delete"
             >
-              <Trash2 size={13} />
+              <Trash2 className="tm-icon" />
             </button>
           </div>
         </div>

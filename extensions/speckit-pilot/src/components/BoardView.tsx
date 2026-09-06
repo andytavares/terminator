@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -69,10 +68,9 @@ function Column({
 interface BoardViewProps {
   repoRoot: string
   onOpenCard: (featureDir: string) => void
-  onNewCard: () => void
 }
 
-export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
+export function BoardView({ repoRoot, onOpenCard }: BoardViewProps) {
   const [cards, setCards] = useState<CardSummary[]>([])
   // What supervised runs are holding. Above the board rather than inside a
   // card: a held tool call is the one state where nothing moves until a person
@@ -172,16 +170,15 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
 
   return (
     <div className="sk-board">
-      <div className="sk-board__toolbar">
-        <button type="button" className="sk-btn sk-btn--primary" onClick={onNewCard}>
-          <Plus size={14} /> New card
-        </button>
-        {error && (
+      {/* "New card" moved to the app bar: a whole band of chrome for one button
+          is a band the board does not get to use. Errors keep their place. */}
+      {error && (
+        <div className="sk-board__toolbar">
           <span role="alert" className="sk-board__error">
             {error}
           </span>
-        )}
-      </div>
+        </div>
+      )}
       {pending.length > 0 && (
         <PermissionQueue
           pending={pending}
@@ -226,7 +223,7 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="sk-board__cols">
+          <div className="sk-board__cols" data-scrollable="">
             {STAGE_ORDER.map((stage) => (
               <Column key={stage} stage={stage} cards={buckets[stage]} onOpen={onOpenCard} />
             ))}

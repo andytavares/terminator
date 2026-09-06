@@ -30,7 +30,7 @@ function CommentPin({ comment, screenX, screenY, isActive, onClick }: CommentPin
       aria-label={`Comment: ${comment.body}`}
     >
       <span className="diagram-comment-pin__icon">
-        <MessageSquarePlus size={13} />
+        <MessageSquarePlus className="tm-icon" />
       </span>
       {openCount > 1 && <span className="diagram-comment-pin__count">{openCount}</span>}
     </button>
@@ -82,17 +82,17 @@ function CommentPopover({
             onClick={onResolve}
             title="Resolve thread"
           >
-            <Check size={12} />
+            <Check className="tm-icon-sm" />
           </button>
           <button
             className="notepad-btn-ghost diagram-comment-popover__delete"
             onClick={onDelete}
             title="Delete thread"
           >
-            <Trash2 size={12} />
+            <Trash2 className="tm-icon-sm" />
           </button>
           <button className="notepad-btn-icon" onClick={onClose} aria-label="Close">
-            <X size={12} />
+            <X className="tm-icon-sm" />
           </button>
         </div>
       </div>
@@ -157,7 +157,7 @@ function NewCommentComposer({ screenX, screenY, onSubmit, onCancel }: NewComment
       <div className="diagram-comment-popover__header">
         <span className="diagram-comment-popover__title">New comment</span>
         <button className="notepad-btn-icon" onClick={onCancel} aria-label="Cancel">
-          <X size={12} />
+          <X className="tm-icon-sm" />
         </button>
       </div>
       <div className="diagram-comment-popover__reply">
@@ -556,7 +556,7 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
               title="Click to rename"
             >
               {title}
-              <Pencil size={11} className="diagram-view__title-edit-icon" />
+              <Pencil className="diagram-view__title-edit-icon tm-icon-sm" />
             </button>
           )}
           {tags.length > 0 && (
@@ -576,7 +576,7 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
             commentMode ? 'Cancel comment placement' : 'Add comment (click anywhere on canvas)'
           }
         >
-          <MessageSquarePlus size={14} />
+          <MessageSquarePlus className="tm-icon" />
           {commentMode ? ' Placing…' : ' Comment'}
         </button>
       </div>

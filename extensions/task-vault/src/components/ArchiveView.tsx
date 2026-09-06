@@ -26,35 +26,23 @@ function ArchiveStatusIcon({ status }: { status: string }): React.JSX.Element {
   switch (status) {
     case 'done':
       return (
-        <CheckCircle2
-          size={14}
-          className="archive-task__status-icon archive-task__status-icon--done"
-        />
+        <CheckCircle2 className="archive-task__status-icon archive-task__status-icon--done tm-icon" />
       )
     case 'cancelled':
       return (
-        <MinusCircle
-          size={14}
-          className="archive-task__status-icon archive-task__status-icon--cancelled"
-        />
+        <MinusCircle className="archive-task__status-icon archive-task__status-icon--cancelled tm-icon" />
       )
     case 'migrated':
       return (
-        <ArrowRightCircle
-          size={14}
-          className="archive-task__status-icon archive-task__status-icon--migrated"
-        />
+        <ArrowRightCircle className="archive-task__status-icon archive-task__status-icon--migrated tm-icon" />
       )
     case 'in-progress':
       return (
-        <Timer
-          size={14}
-          className="archive-task__status-icon archive-task__status-icon--in-progress"
-        />
+        <Timer className="archive-task__status-icon archive-task__status-icon--in-progress tm-icon" />
       )
     default:
       return (
-        <Circle size={14} className="archive-task__status-icon archive-task__status-icon--open" />
+        <Circle className="archive-task__status-icon archive-task__status-icon--open tm-icon" />
       )
   }
 }
@@ -344,14 +332,14 @@ function ArchiveTaskRow({
           onClick={() => onRestore(task.id)}
           title="Restore to open"
         >
-          <Undo2 size={13} />
+          <Undo2 className="tm-icon" />
         </button>
         <button
           className="archive-task__delete-btn"
           onClick={() => onDelete(task.id, task.text)}
           title="Delete permanently"
         >
-          <Trash2 size={14} />
+          <Trash2 className="tm-icon" />
         </button>
       </span>
     </div>

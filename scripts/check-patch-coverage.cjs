@@ -42,6 +42,7 @@ const COVERAGE_EXCLUDED_PATTERNS = [
   /vitest\.config\.ts$/, // test runner config, not application code
   /playwright\.config\.ts$/, // e2e runner config, not application code
   /electron\.vite\.config\.ts$/, // build config, not application code
+  /packages\/[^/]+\/vite\.config\.ts$/, // shared-package build config, not application code
 ]
 
 function isCoverageExcluded(filePath) {

@@ -68,7 +68,7 @@ export function ArtifactsPanel({ featureDir }: ArtifactsPanelProps) {
               disabled={!a.exists}
               onClick={() => open(a)}
             >
-              <FileText size={14} />
+              <FileText className="tm-icon" />
               <span className="sk-artifacts__label">{a.label}</span>
               {a.revisions.length > 0 && (
                 <span className="sk-artifacts__revs">{a.revisions.length} rev</span>
@@ -81,7 +81,7 @@ export function ArtifactsPanel({ featureDir }: ArtifactsPanelProps) {
       <div className="sk-artifacts__view">
         {selected?.kind === 'pr' && selected.prUrl ? (
           <a href={selected.prUrl} target="_blank" rel="noreferrer" className="sk-btn">
-            Open pull request <ExternalLink size={12} />
+            Open pull request <ExternalLink className="tm-icon-sm" />
           </a>
         ) : selected ? (
           <>
@@ -113,7 +113,7 @@ export function ArtifactsPanel({ featureDir }: ArtifactsPanelProps) {
             )}
           </>
         ) : (
-          <p className="sk-artifacts__hint">Select an artifact to view it.</p>
+          <p className="sk-artifacts__hint">Select a file to view it.</p>
         )}
       </div>
     </div>

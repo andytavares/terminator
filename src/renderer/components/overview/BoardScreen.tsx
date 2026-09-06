@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react'
-import { Pause, Play, Circle, CircleX, EyeOff } from 'lucide-react'
+import { Circle, CircleX, Eye, EyeOff, Pause, Play } from 'lucide-react'
 import type { BoardCard, BoardLane } from '../../sidebar/board-lanes'
 import type { AgentState } from '../../../shared/types/index'
 import './BoardScreen.css'
@@ -42,6 +42,7 @@ export function BoardScreen({ lanes, renderCard, onToggleLane, onEmpty }: Props)
   const lastRects = useRef(new Map<string, { left: number; top: number }>())
 
   const visible = lanes.filter((lane) => lane.visible)
+  const hidden = lanes.filter((lane) => lane.hiddenByUser)
   const columnOf = new Map<AgentState, number>(visible.map((lane, i) => [lane.state, i + 1]))
   const totalCards = lanes.reduce((n, lane) => n + lane.cards.length, 0)
 
@@ -112,46 +113,70 @@ export function BoardScreen({ lanes, renderCard, onToggleLane, onEmpty }: Props)
   }
 
   return (
-    <div
-      className="board"
-      ref={gridRef}
-      style={{ ['--board-lanes' as string]: String(visible.length) }}
-    >
-      {visible.map((lane, i) => {
-        const Icon = LANE_ICON[lane.state]
-        return (
-          <div
-            key={lane.state}
-            className={`board__lane-head${lane.isHistory ? ' board__lane-head--history' : ''}`}
-            data-lane={lane.label}
-            style={{ gridColumn: String(i + 1), gridRow: '1' }}
-          >
-            <Icon className={`board__lane-glyph board__state--${lane.state}`} aria-hidden="true" />
-            <span className="board__lane-label">{lane.label}</span>
-            <span className="board__lane-count">{lane.count}</span>
+    <>
+      {hidden.length > 0 && (
+        /* The hide control lives in the lane header, and a hidden lane is not
+           rendered — so hiding one took its own way back off the screen with
+           it. This is that way back. */
+        <div className="board__hidden-lanes">
+          <span className="board__hidden-lanes-label">Hidden:</span>
+          {hidden.map((lane) => (
             <button
+              key={lane.state}
               type="button"
-              className="board__lane-toggle"
+              className="board__hidden-lane"
               onClick={() => onToggleLane(lane.state)}
-              aria-label={`Hide the ${lane.label} lane`}
             >
-              <EyeOff aria-hidden="true" />
+              <Eye aria-hidden="true" />
+              {lane.label}
             </button>
-          </div>
-        )
-      })}
-
-      {placed.map(({ card, lane, column, row }) => (
-        <div
-          key={card.sessionId}
-          className="board__slot"
-          data-session-id={card.sessionId}
-          data-lane={lane.label}
-          style={{ gridColumn: String(column), gridRow: String(row) }}
-        >
-          {renderCard(card)}
+          ))}
         </div>
-      ))}
-    </div>
+      )}
+      <div
+        className="board"
+        ref={gridRef}
+        style={{ ['--board-lanes' as string]: String(visible.length) }}
+      >
+        {visible.map((lane, i) => {
+          const Icon = LANE_ICON[lane.state]
+          return (
+            <div
+              key={lane.state}
+              className={`board__lane-head${lane.isHistory ? ' board__lane-head--history' : ''}`}
+              data-lane={lane.label}
+              style={{ gridColumn: String(i + 1), gridRow: '1' }}
+            >
+              <Icon
+                className={`board__lane-glyph board__state--${lane.state}`}
+                aria-hidden="true"
+              />
+              <span className="board__lane-label">{lane.label}</span>
+              <span className="board__lane-count">{lane.count}</span>
+              <button
+                type="button"
+                className="board__lane-toggle"
+                onClick={() => onToggleLane(lane.state)}
+                aria-label={`Hide the ${lane.label} lane`}
+              >
+                <EyeOff aria-hidden="true" />
+              </button>
+            </div>
+          )
+        })}
+
+        {placed.map(({ card, lane, column, row }) => (
+          <div
+            key={card.sessionId}
+            className="board__slot"
+            data-session-id={card.sessionId}
+            data-lane={lane.label}
+            style={{ gridColumn: String(column), gridRow: String(row) }}
+          >
+            {renderCard(card)}
+          </div>
+        ))}
+      </div>
+    </>
   )
 }

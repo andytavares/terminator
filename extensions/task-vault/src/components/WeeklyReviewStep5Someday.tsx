@@ -122,8 +122,8 @@ export function WeeklyReviewStep5Someday({
         </>
       )}
 
-      <button className="wr-step__next" onClick={onComplete}>
-        Next
+      <button className="tv-btn tv-btn--primary" onClick={onComplete}>
+        Next: reflect
       </button>
     </div>
   )

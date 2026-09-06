@@ -12,9 +12,44 @@
   height: 22px;
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  gap: 6px;
+  padding: 0 4px 0 8px;
   background: rgba(255, 255, 255, 0.04);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* The way out of a pane. Held at low opacity rather than hidden, so it is
+   discoverable without being pointed at — a pane you cannot see how to close
+   is a pane you have to learn a shortcut to escape. */
+.leaf-pane__close {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0.55;
+  transition:
+    opacity 0.12s,
+    background 0.12s;
+}
+
+.leaf-pane__close svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
+.leaf-pane__close:hover,
+.leaf-pane__close:focus-visible {
+  opacity: 1;
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
 .leaf-pane--focused .leaf-pane__titlebar {

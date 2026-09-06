@@ -347,6 +347,10 @@ app.whenReady().then(async () => {
     viewHost?.setLeftInset(inset)
   })
 
+  onChannel('extension:set-theme', (_event, { theme }: { theme: 'dark' | 'light' }) => {
+    viewHost?.setTheme(theme)
+  })
+
   // Sent by the double-Escape gesture in the extension webview preload. The
   // extension view is its own webContents, so the host renderer never sees the
   // keystroke — main attributes it to a surface and relays the exit.

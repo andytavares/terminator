@@ -1,58 +1,27 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
-vi.mock('../../../src/components/RemoteControlSettings', () => ({
-  RemoteControlSettings: () => <div data-testid="remote-control-settings" />,
+vi.mock('../../../src/components/RemoteControlView', () => ({
+  RemoteControlView: () => <div data-testid="remote-control-view" />,
 }))
-
-const mockBridgeOn = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  const unsubscribe = vi.fn()
-  mockBridgeOn.mockReturnValue(unsubscribe)
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { on: mockBridgeOn } },
-    configurable: true,
-    writable: true,
-  })
 })
 
 afterEach(() => {
   vi.resetModules()
 })
 
+// App is now a one-line wrapper; the behaviour it used to hold moved into
+// RemoteControlView, which is covered by its own spec. What the old tests
+// asserted here — "subscribes to remote:status", "verify no crash" — is asserted
+// there against real states rather than against an internal flag.
 describe('remote-control renderer App', () => {
-  it('renders RemoteControlSettings', async () => {
+  it('renders the Remote Control view', async () => {
     const { App } = await import('../../../src/renderer/App')
     render(<App />)
-    expect(screen.getByTestId('remote-control-settings')).toBeDefined()
-  })
-
-  it('subscribes to remote:status on mount', async () => {
-    const { App } = await import('../../../src/renderer/App')
-    render(<App />)
-    expect(mockBridgeOn).toHaveBeenCalledWith('remote:status', expect.any(Function))
-  })
-
-  it('tracks enabled state from remote:status events', async () => {
-    const { App } = await import('../../../src/renderer/App')
-    render(<App />)
-    const handler = mockBridgeOn.mock.calls.find(([ch]) => ch === 'remote:status')?.[1]
-    expect(handler).toBeDefined()
-    act(() => {
-      handler?.({ enabled: true })
-    })
-    // enabled state is internal — just verify no crash
-  })
-
-  it('unsubscribes on unmount', async () => {
-    const unsubscribe = vi.fn()
-    mockBridgeOn.mockReturnValue(unsubscribe)
-    const { App } = await import('../../../src/renderer/App')
-    const { unmount } = render(<App />)
-    unmount()
-    expect(unsubscribe).toHaveBeenCalled()
+    expect(screen.getByTestId('remote-control-view')).toBeDefined()
   })
 })

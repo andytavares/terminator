@@ -148,7 +148,7 @@
 }
 
 .git-view__hook-output {
-  background: var(--tm-bg-sidebar);
+  background: var(--tm-bg-surface);
   border: 1px solid var(--tm-danger);
   border-radius: var(--tm-radius-xs);
   overflow: hidden;
@@ -163,7 +163,7 @@
 }
 
 .git-view__hook-output-summary:hover {
-  background: rgba(255, 80, 80, 0.08);
+  background: color-mix(in srgb, var(--tm-danger) 8%, transparent);
 }
 
 .git-view__hook-output-pre {
@@ -187,7 +187,7 @@
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--tm-text-primary);
-  background: var(--tm-bg-secondary, rgba(0, 0, 0, 0.2));
+  background: var(--tm-bg-surface);
   border-radius: 4px;
   max-height: 160px;
   overflow-y: auto;
@@ -229,7 +229,7 @@
 
 .git-view__btn--primary {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
   border-color: var(--tm-accent);
 }
 
@@ -265,7 +265,7 @@
 }
 
 .git-view__btn--danger:hover:not(:disabled) {
-  background: rgba(255, 80, 80, 0.1);
+  background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
 }
 
 .git-view__btn--danger:disabled {
@@ -305,8 +305,6 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--tm-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .staging-area__section-actions {
@@ -343,19 +341,25 @@
 }
 
 .staging-area__file-row--selected {
-  background: rgba(97, 175, 239, 0.12);
+  background: color-mix(in srgb, var(--tm-accent) 12%, transparent);
 }
 
 .staging-area__file-row--selected:hover {
-  background: rgba(97, 175, 239, 0.18);
+  background: color-mix(in srgb, var(--tm-accent) 18%, transparent);
 }
 
+/* Was 14px — the width of the single porcelain letter this used to print.
+   The words that replaced it overflowed the box and ran under the path. Sized
+   for the longest of them ("Conflict") and left-aligned, so every path in the
+   list starts at the same place. */
 .staging-area__badge {
   font-size: 10px;
   font-weight: 700;
-  width: 14px;
-  text-align: center;
-  flex-shrink: 0;
+  flex: 0 0 56px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .staging-area__badge--modified {
@@ -368,7 +372,7 @@
   color: var(--tm-danger);
 }
 .staging-area__badge--renamed {
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 .staging-area__badge--untracked {
   color: var(--tm-text-muted);
@@ -402,10 +406,10 @@
 
 .staging-area__truncation-banner {
   padding: 6px 10px;
-  background: rgba(209, 154, 102, 0.15);
+  background: color-mix(in srgb, var(--tm-warning) 15%, transparent);
   color: var(--tm-warning);
   font-size: 11px;
-  border-bottom: 1px solid rgba(209, 154, 102, 0.3);
+  border-bottom: 1px solid color-mix(in srgb, var(--tm-warning) 30%, transparent);
 }
 
 /* File Diff View */
@@ -467,7 +471,7 @@
 
 .file-diff-view__toggle-btn--active {
   background: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
 .file-diff-view__toggle-btn:not(.file-diff-view__toggle-btn--active):hover {
@@ -499,17 +503,17 @@
   align-items: center;
   justify-content: space-between;
   padding: 4px 10px;
-  background: rgba(97, 175, 239, 0.1);
-  border-bottom: 1px solid rgba(97, 175, 239, 0.3);
+  background: color-mix(in srgb, var(--tm-accent) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--tm-accent) 30%, transparent);
   font-size: 11px;
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
 }
 
 .file-diff-view__refresh-btn {
   background: none;
-  border: 1px solid rgba(97, 175, 239, 0.5);
+  border: 1px solid color-mix(in srgb, var(--tm-accent) 50%, transparent);
   border-radius: var(--tm-radius-xs);
-  color: var(--tm-accent);
+  color: var(--tm-accent-text);
   cursor: pointer;
   font-size: 10px;
   padding: 1px 6px;
@@ -517,7 +521,7 @@
 
 .file-diff-view__truncation-notice {
   padding: 6px 10px;
-  background: rgba(209, 154, 102, 0.1);
+  background: color-mix(in srgb, var(--tm-warning) 10%, transparent);
   color: var(--tm-warning);
   font-size: 11px;
 }
@@ -528,8 +532,8 @@
 }
 
 .diff-hunk-header {
-  background: rgba(97, 175, 239, 0.08);
-  color: var(--tm-accent);
+  background: color-mix(in srgb, var(--tm-accent) 8%, transparent);
+  color: var(--tm-accent-text);
   font-size: 11px;
   padding: 2px 8px;
   display: block;
@@ -597,7 +601,7 @@
 .diff-table__split-divider {
   width: 6px;
   min-width: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tm-overlay);
   padding: 0;
   cursor: col-resize;
   transition: background 0.15s;
@@ -626,53 +630,11 @@
 .pr-dialog {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--tm-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-}
-
-.pr-dialog__panel {
-  background: var(--tm-bg-surface);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  padding: 20px;
-  width: 560px;
-  max-width: 90vw;
-  max-height: 85vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.pr-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.pr-dialog__title {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.pr-dialog__close {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 2px 6px;
-  border-radius: var(--tm-radius-xs);
-  line-height: 1;
-}
-
-.pr-dialog__close:hover {
-  background: var(--tm-bg-card-hover);
-  color: var(--tm-text-primary);
+  z-index: var(--tm-layer-modal);
 }
 
 .pr-dialog__field {
@@ -810,7 +772,7 @@
 .pr-dialog__warning {
   font-size: 11px;
   color: var(--tm-warning);
-  background: rgba(209, 154, 102, 0.1);
+  background: color-mix(in srgb, var(--tm-warning) 10%, transparent);
   padding: 6px 10px;
   border-radius: var(--tm-radius-xs);
 }
@@ -818,13 +780,13 @@
 .pr-dialog__existing-pr {
   font-size: 12px;
   color: var(--tm-success);
-  background: rgba(152, 195, 121, 0.1);
+  background: color-mix(in srgb, var(--tm-success) 10%, transparent);
   padding: 8px 10px;
   border-radius: var(--tm-radius-xs);
 }
 
 .pr-dialog__existing-pr a {
-  color: #58a6ff;
+  color: var(--tm-accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -832,17 +794,9 @@
 .pr-dialog__error {
   font-size: 12px;
   color: var(--tm-danger);
-  background: rgba(224, 108, 117, 0.1);
+  background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
   padding: 6px 10px;
   border-radius: var(--tm-radius-xs);
-}
-
-.pr-dialog__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 4px;
 }
 
 .pr-dialog__status {
@@ -850,42 +804,6 @@
   color: var(--tm-text-secondary);
   margin-right: auto;
   font-style: italic;
-}
-
-.pr-dialog__cancel-btn {
-  background: transparent;
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-xs);
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-  font-size: 13px;
-  padding: 6px 14px;
-  font-family: inherit;
-}
-
-.pr-dialog__cancel-btn:hover {
-  background: var(--tm-bg-card-hover);
-}
-
-.pr-dialog__submit-btn {
-  background: var(--tm-accent);
-  border: none;
-  border-radius: var(--tm-radius-xs);
-  color: #fff;
-  cursor: pointer;
-  font-size: 13px;
-  padding: 6px 14px;
-  font-family: inherit;
-  font-weight: 500;
-}
-
-.pr-dialog__submit-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.pr-dialog__submit-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 /* Git Full View (project tab: diff LEFT, changes RIGHT) */
@@ -924,8 +842,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: rgba(224, 92, 92, 0.12);
-  border-bottom: 1px solid rgba(224, 92, 92, 0.3);
+  background: color-mix(in srgb, var(--tm-danger) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--tm-danger) 30%, transparent);
   flex-shrink: 0;
   gap: 8px;
 }
@@ -949,7 +867,7 @@
 }
 
 .git-full-view__conflict-banner-btn:hover {
-  background: rgba(224, 92, 92, 0.15);
+  background: color-mix(in srgb, var(--tm-danger) 15%, transparent);
 }
 
 .git-full-view__staging {
@@ -968,12 +886,90 @@
   width: 5px;
   flex-shrink: 0;
   cursor: col-resize;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--tm-overlay);
   transition: background 0.15s;
   position: relative;
-  z-index: 1;
+  z-index: var(--tm-layer-panel);
 }
 .git-resize-handle:hover {
   background: var(--tm-accent);
   opacity: 0.7;
+}
+
+/* Status is a word now, not a porcelain letter, so the badge needs room for it
+   and reads as a label rather than as a glyph. */
+.staging-area__badge {
+  min-width: 0;
+  padding: 1px 6px;
+  border-radius: var(--tm-radius-xs);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* One primary, with its alternates behind a caret. */
+.git-view__btn--grow {
+  flex: 1 1 auto;
+}
+
+.git-view__more {
+  position: relative;
+}
+
+/* Had only padding, so it inherited the browser's button and rendered as a
+   white pill. Matches the secondary button it sits beside. */
+.git-view__btn--caret {
+  padding: 0 8px;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  color: var(--tm-text-primary);
+}
+
+.git-view__btn--caret:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.git-view__menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--tm-radius-xs);
+  background: none;
+  color: var(--tm-text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.git-view__menu-item:hover:not(:disabled) {
+  background: var(--tm-bg-card-hover);
+}
+
+.git-view__menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.git-view__commit-hint {
+  margin: 6px 0 0;
+  color: var(--tm-text-muted);
+  font-size: 11px;
+}
+
+.git-sidebar__tracking {
+  display: block;
+  margin-top: 2px;
+  color: var(--tm-text-muted);
+  font-size: 11px;
+}
+
+/* Principle XII: sized here, not by a size prop. */
+.git-sidebar__branch svg,
+.git-view__btn--caret svg {
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
 }

@@ -35,7 +35,13 @@ const renderRow = (patch: Partial<BranchRowData> = {}, props: Record<string, unk
 /** What the row draws at rest, excluding the rail, which is identity not fact. */
 const restingElements = (container: HTMLElement): number => {
   const el = container.querySelector('.branch-row')!
-  const direct = [...el.children].filter((c) => !c.classList.contains('branch-row__hover'))
+  // The hover group is not at rest, and the disclosure is structure rather
+  // than a fact about the branch — it says where the row sits in the tree, the
+  // same way the repo header's chevron does.
+  const direct = [...el.children].filter(
+    (c) =>
+      !c.classList.contains('branch-row__hover') && !c.classList.contains('branch-row__disclosure')
+  )
   const meta = el.querySelector('.branch-row__meta')
   const metaCount = meta ? meta.children.length : 0
   const kindEmpty = el.querySelector('.branch-row__kind')!.children.length === 0 ? 1 : 0
@@ -137,10 +143,13 @@ describe('BranchRow', () => {
     expect(container.querySelector('.branch-row__count')).toBeNull()
   })
 
-  it('shows neither for a branch with no terminals', () => {
+  it('states neither a count nor an age for a branch with no terminals', () => {
+    // The box stays — it is the column every count in the sidebar shares, and
+    // dropping it would let the row's hover control sit where the numbers are
+    // — but it says nothing.
     const { container } = renderRow({ stateCount: 0, sessionCount: 0, lastActivityAt: null })
-    expect(container.querySelector('.branch-row__age')).toBeNull()
     expect(container.querySelector('.branch-row__count')).toBeNull()
+    expect(container.querySelector('.branch-row__age')!.textContent).toBe('')
   })
 
   // FR-026.

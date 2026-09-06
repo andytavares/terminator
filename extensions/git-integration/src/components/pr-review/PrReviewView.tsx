@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { RefreshCw, TriangleAlert } from 'lucide-react'
+import { Dialog } from '@terminator/extension-ui'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ChapterNav } from './ChapterNav'
 import { ChapterFileList } from './ChapterFileList'
@@ -213,7 +215,7 @@ export function PrReviewView({
               title="Refresh PR"
               aria-label="Refresh pull request"
             >
-              ↻
+              <RefreshCw aria-hidden="true" />
             </button>
             {showMultipleChapters && (
               <button
@@ -251,7 +253,7 @@ export function PrReviewView({
                 title="Refresh PR"
                 aria-label="Refresh pull request"
               >
-                ↻
+                <RefreshCw aria-hidden="true" />
               </button>
               <button
                 className="pr-view-mode-btn"
@@ -328,7 +330,7 @@ export function PrReviewView({
       {/* Large-PR cognitive load warning */}
       {showLargePrBanner && (
         <div className="pr-large-pr-banner" role="alert">
-          <span className="pr-large-pr-banner__icon">⚠</span>
+          <TriangleAlert aria-hidden="true" className="pr-large-pr-banner__icon" />
           <span className="pr-large-pr-banner__text">
             Large PR — {totalLoc.toLocaleString()} LOC, estimated {estimatedReviewMinutes} min to
             review. Consider requesting it be split.
@@ -399,14 +401,16 @@ export function PrReviewView({
 
       {/* Submit review overlay */}
       {showSubmit && (
-        <div className="pr-review-submit-overlay" role="dialog" aria-modal="true">
+        <Dialog title="Submit review" onDismiss={() => setShowSubmit(false)} actions={[]}>
+          {/* ReviewSubmitPanel carries its own submit controls, so the dialog
+              adds none of its own rather than showing a second set. */}
           <ReviewSubmitPanel
             repoRoot={repoRoot}
             prNumber={pr.number}
             isOwnPr={!!currentUserLogin && currentUserLogin === pr.author}
             onClose={() => setShowSubmit(false)}
           />
-        </div>
+        </Dialog>
       )}
     </div>
   )

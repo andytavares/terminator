@@ -3,12 +3,12 @@ import { CalendarDays, Inbox, FolderOpen, Layers, Archive, ClipboardList } from 
 import { useVaultStore, type VaultView } from '../stores/vault.store'
 
 const NAV_ITEMS: Array<{ view: VaultView; label: string; icon: React.ReactNode }> = [
-  { view: 'daily', label: 'Today', icon: <CalendarDays size={15} /> },
-  { view: 'inbox', label: 'Inbox', icon: <Inbox size={15} /> },
-  { view: 'projects', label: 'Projects', icon: <FolderOpen size={15} /> },
-  { view: 'areas', label: 'Areas', icon: <Layers size={15} /> },
-  { view: 'archive', label: 'History', icon: <Archive size={15} /> },
-  { view: 'review', label: 'Weekly Review', icon: <ClipboardList size={15} /> },
+  { view: 'daily', label: 'Today', icon: <CalendarDays className="tm-icon-lg" /> },
+  { view: 'inbox', label: 'Inbox', icon: <Inbox className="tm-icon-lg" /> },
+  { view: 'projects', label: 'Projects', icon: <FolderOpen className="tm-icon-lg" /> },
+  { view: 'areas', label: 'Areas', icon: <Layers className="tm-icon-lg" /> },
+  { view: 'archive', label: 'History', icon: <Archive className="tm-icon-lg" /> },
+  { view: 'review', label: 'Weekly review', icon: <ClipboardList className="tm-icon-lg" /> },
 ]
 
 export function VaultSidebar(): React.JSX.Element {

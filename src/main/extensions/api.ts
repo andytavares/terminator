@@ -221,6 +221,22 @@ export interface OpenTerminalTabInput {
   scrollbackLimit?: number
 }
 
+/** Matches the core's existing ToastType so no caller has to relearn it. */
+export type ExtensionToastTone = 'info' | 'success' | 'warning' | 'error'
+
+/**
+ * The stacking scale, published so an extension never writes a z-index.
+ * Ordering is the contract; these numbers are the implementation.
+ */
+export const EXTENSION_UI_LAYERS = Object.freeze({
+  panel: 100,
+  overlay: 200,
+  modal: 300,
+  // Above modal on purpose: a confirmation raised from inside a dialog has to
+  // be readable without dismissing the dialog first.
+  toast: 400,
+})
+
 export interface ExtensionAPI {
   db: import('../db/index.js').ExtensionDB
   readonly app: { readonly version: string }
@@ -277,6 +293,25 @@ export interface ExtensionAPI {
   }
   topBar: {
     registerMenuItem(item: TopBarMenuContribution): Disposable
+  }
+  /**
+   * The published interface floor (v1.3.0).
+   *
+   * The components themselves — dialog, confirmation, toast, empty state, icon
+   * button — ship as `@terminator/extension-ui`, because React components
+   * cannot cross a contextBridge: it serialises, and a component is a function.
+   * What lives here is what main-process code legitimately needs: raising a
+   * message in a view, and the stacking scale a stylesheet is generated from.
+   *
+   * `dialog` and `confirm` are deliberately absent. A dialog needs a React tree
+   * to render into and a person to answer it; exposing it to main would invite
+   * fire-and-forget prompts with no view guaranteed to be open.
+   */
+  ui: {
+    /** Raise a toast in this extension's view. */
+    toast(message: string, options?: { tone?: ExtensionToastTone; duration?: number }): void
+    /** The stacking order. Extensions style against these, never raw numbers. */
+    readonly layers: Readonly<Record<'panel' | 'overlay' | 'modal' | 'toast', number>>
   }
   shell: {
     exec(options: {
@@ -813,6 +848,17 @@ export function createExtensionAPI(
         const unsub = onProjectDelete(handler)
         return disposable(unsub)
       },
+    },
+    ui: {
+      toast(message: string, options?: { tone?: ExtensionToastTone; duration?: number }): void {
+        deps?.broadcastToWindows?.('extension:toast', {
+          extensionId,
+          message,
+          tone: options?.tone ?? 'info',
+          duration: options?.duration,
+        })
+      },
+      layers: EXTENSION_UI_LAYERS,
     },
     topBar: {
       registerMenuItem(item: TopBarMenuContribution): Disposable {

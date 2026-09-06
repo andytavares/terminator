@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { ArrowRight, Check } from 'lucide-react'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import { mergeFlowAPI } from '../../api/merge-flow'
 import { notificationsAPI } from '../../api/notifications'
@@ -123,7 +124,7 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
         {oursBranch && theirsBranch && (
           <div className="completion-screen__branch-crumb">
             <span className="completion-screen__branch">{oursBranch}</span>
-            <span className="completion-screen__branch-arrow">→</span>
+            <ArrowRight aria-hidden="true" className="completion-screen__branch-arrow" />
             <span className="completion-screen__branch">{theirsBranch}</span>
           </div>
         )}
@@ -132,7 +133,9 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
       <div className="completion-screen__body">
         {/* Success icon */}
         <div className="completion-screen__check-wrap">
-          <div className="completion-screen__check">✓</div>
+          <div className="completion-screen__check">
+            <Check aria-hidden="true" />
+          </div>
         </div>
 
         <h2 className="completion-screen__title">All conflicts resolved</h2>
@@ -144,7 +147,7 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
 
         {/* Resolution summary */}
         <div className="completion-screen__card">
-          <div className="completion-screen__card-label">RESOLUTION SUMMARY</div>
+          <div className="completion-screen__card-label">Resolution summary</div>
           <div className="completion-screen__summary-stats">
             {totals.mine > 0 && (
               <div className="completion-screen__summary-stat">
@@ -215,7 +218,7 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
 
         {/* Commit card */}
         <div className="completion-screen__card">
-          <div className="completion-screen__card-label">COMMIT MESSAGE</div>
+          <div className="completion-screen__card-label">Commit message</div>
           <textarea
             className="completion-screen__commit-message"
             value={commitMessage}
@@ -231,7 +234,7 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
               onClick={handleCommit}
               disabled={isCommitting || !commitMessage.trim()}
             >
-              {isCommitting ? 'Committing…' : 'Commit merge →'}
+              {isCommitting ? 'Committing…' : 'Commit merge'}
             </button>
           </div>
         </div>

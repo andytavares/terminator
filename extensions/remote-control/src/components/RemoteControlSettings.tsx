@@ -12,7 +12,6 @@ interface RemoteStatus {
 
 export function RemoteControlSettings(): React.JSX.Element {
   const [status, setStatus] = useState<RemoteStatus>({})
-  const [enabled, setEnabled] = useState(false)
   const [port, setPort] = useState(7681)
   const [maxSubscribers, setMaxSubscribers] = useState(5)
   const [passwordInput, setPasswordInput] = useState('')
@@ -24,7 +23,6 @@ export function RemoteControlSettings(): React.JSX.Element {
     const unsub = window.electronAPI.extensionBridge.on('remote:status', (data) => {
       const s = data as RemoteStatus
       setStatus(s)
-      if (s.enabled !== undefined) setEnabled(s.enabled)
     })
     // Load initial settings
     void window.electronAPI.extensionBridge
@@ -40,8 +38,8 @@ export function RemoteControlSettings(): React.JSX.Element {
           publicUrl?: string | null
         }
         if (s) {
-          setEnabled(s.enabled ?? false)
           setPort(s.port ?? 7681)
+          setStatus((prev) => ({ ...prev, enabled: s.enabled }))
           setMaxSubscribers(s.maxSubscribers ?? 5)
           setPasswordInput(s.password ?? '')
           setNgrokTokenInput(s.ngrokAuthToken ?? '')
@@ -59,34 +57,38 @@ export function RemoteControlSettings(): React.JSX.Element {
   }, [])
 
   return (
-    <div
-      className="settings-section"
-      style={{ padding: '24px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}
-    >
-      <h3 className="settings-section__title">Remote Control</h3>
+    <div className="settings-section">
+      {/* No heading and no on/off control here: the status band above owns both.
+          Two toggles for one thing is worse than none. */}
 
+      {/* Required before optional (FR-018). Without an account token there is no
+          public address at all, which is the whole point — it used to sit below
+          two settings that have sensible defaults. */}
       <div className="settings-section__field">
-        <label className="settings-section__label settings-section__label--inline">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => {
-              const next = e.target.checked
-              setEnabled(next)
-              void window.electronAPI.extensionBridge
-                .invoke('remote:toggle', { enabled: next })
-                .catch(() => {})
-            }}
-          />
-          Enable Remote Control
-        </label>
+        <label className="settings-section__label">Account token</label>
         <span className="settings-section__hint">
-          Starts a local server and an ngrok tunnel so you can access terminals from any browser.
+          Needed to reach your terminals from outside this network. Free from{' '}
+          <code>dashboard.ngrok.com</code>.
         </span>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
+          <input
+            type="password"
+            className="settings-section__input"
+            value={ngrokTokenInput}
+            onChange={(e) => setNgrokTokenInput(e.target.value)}
+            onBlur={() => {
+              void window.electronAPI.extensionBridge.invoke('remote:update-ngrok-token', {
+                ngrokAuthToken: ngrokTokenInput.trim(),
+              })
+            }}
+            placeholder="Paste your account token"
+            style={{ flex: 1 }}
+          />
+        </div>
       </div>
 
       <div className="settings-section__field">
-        <label className="settings-section__label">Port (1024–65535)</label>
+        <label className="settings-section__label">Port</label>
         <input
           type="number"
           className="settings-section__input"
@@ -103,12 +105,12 @@ export function RemoteControlSettings(): React.JSX.Element {
           }}
         />
         <span className="settings-section__hint">
-          Local server port. Changing while enabled auto-restarts the server.
+          Which port to listen on. Changing it while running restarts it.
         </span>
       </div>
 
       <div className="settings-section__field">
-        <label className="settings-section__label">Max Concurrent Viewers (1–20)</label>
+        <label className="settings-section__label">Viewers per terminal</label>
         <input
           type="number"
           className="settings-section__input"
@@ -128,15 +130,15 @@ export function RemoteControlSettings(): React.JSX.Element {
           }}
         />
         <span className="settings-section__hint">
-          Maximum simultaneous browser sessions per terminal (excess connections are rejected).
+          How many browsers can watch one terminal at once. Extra viewers are turned away.
         </span>
       </div>
 
-      {(enabled || status.enabled) && (
+      {status.enabled && (
         <>
           {status.publicUrl ? (
             <div className="settings-section__field">
-              <label className="settings-section__label">Public URL (ngrok)</label>
+              <label className="settings-section__label">Public address</label>
               <div
                 className="settings-section__hint"
                 style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}
@@ -183,7 +185,7 @@ export function RemoteControlSettings(): React.JSX.Element {
                 }}
               >
                 <span>
-                  ngrok not installed — public URL unavailable. Install:{' '}
+                  A public address needs one more program. Install it with:{' '}
                   <code>brew install ngrok</code>
                 </span>
                 <button
@@ -208,9 +210,9 @@ export function RemoteControlSettings(): React.JSX.Element {
             </div>
           ) : null}
 
-          {(status.lanUrl || enabled) && (
+          {(status.lanUrl || status.enabled) && (
             <div className="settings-section__field">
-              <label className="settings-section__label">LAN URL</label>
+              <label className="settings-section__label">Local address</label>
               <div
                 className="settings-section__hint"
                 style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}
@@ -328,28 +330,6 @@ export function RemoteControlSettings(): React.JSX.Element {
           </div>
         </>
       )}
-
-      <div className="settings-section__field">
-        <label className="settings-section__label">ngrok Auth Token</label>
-        <span className="settings-section__hint">
-          Required for public tunnel URL. Get yours free at <code>dashboard.ngrok.com</code>.
-        </span>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
-          <input
-            type="password"
-            className="settings-section__input"
-            value={ngrokTokenInput}
-            onChange={(e) => setNgrokTokenInput(e.target.value)}
-            onBlur={() => {
-              void window.electronAPI.extensionBridge.invoke('remote:update-ngrok-token', {
-                ngrokAuthToken: ngrokTokenInput.trim(),
-              })
-            }}
-            placeholder="Paste your ngrok auth token"
-            style={{ flex: 1 }}
-          />
-        </div>
-      </div>
     </div>
   )
 }

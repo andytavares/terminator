@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useDismissible } from '@terminator/extension-ui'
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 
 // ── Value format conventions ──────────────────────────────────────
@@ -205,6 +206,15 @@ export function DateTimePicker({
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
+  // Escape and click-outside come from the shared hook now; the trigger counts
+  // as inside so clicking it to close does not dismiss and immediately reopen.
+  useDismissible({
+    ref: popoverRef,
+    onDismiss: () => setOpen(false),
+    alsoInside: [triggerRef],
+    manageFocus: false,
+    enabled: open,
+  })
   const timeListRef = useRef<HTMLDivElement>(null)
 
   // Derive date and time parts from value
@@ -236,29 +246,6 @@ export function DateTimePicker({
   useEffect(() => {
     if (defaultOpen) openPicker()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (
-        triggerRef.current?.contains(e.target as Node) ||
-        popoverRef.current?.contains(e.target as Node)
-      )
-        return
-      setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [open])
 
   // Auto-scroll time list to selected slot (or closest slot in current AM/PM half)
   useEffect(() => {
@@ -380,7 +367,7 @@ export function DateTimePicker({
         className={`dtp__trigger${value ? ' dtp__trigger--has-value' : ''}${open ? ' dtp__trigger--open' : ''}`}
         onClick={() => (open ? setOpen(false) : openPicker())}
       >
-        {mode === 'time' ? <Clock size={13} /> : <Calendar size={13} />}
+        {mode === 'time' ? <Clock className="tm-icon" /> : <Calendar className="tm-icon" />}
         <span className="dtp__trigger-label">{getTriggerLabel()}</span>
       </button>
 
@@ -389,6 +376,7 @@ export function DateTimePicker({
         createPortal(
           <div
             ref={popoverRef}
+            data-tmui-surface=""
             className={[
               'dtp__popover',
               mode === 'datetime' && 'dtp__popover--wide',
@@ -432,13 +420,13 @@ export function DateTimePicker({
                 <div className="dtp__calendar">
                   <div className="dtp__cal-header">
                     <button type="button" className="dtp__cal-nav" onClick={prevMonth}>
-                      <ChevronLeft size={14} />
+                      <ChevronLeft className="tm-icon" />
                     </button>
                     <span className="dtp__cal-month-label">
                       {MONTH_NAMES[displayMonth]} {displayYear}
                     </span>
                     <button type="button" className="dtp__cal-nav" onClick={nextMonth}>
-                      <ChevronRight size={14} />
+                      <ChevronRight className="tm-icon" />
                     </button>
                   </div>
 

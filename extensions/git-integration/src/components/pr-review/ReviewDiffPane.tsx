@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { Check, ChevronLeft, TriangleAlert } from 'lucide-react'
 import { HealthChips } from './HealthChips'
 import { InlineCommentThread } from './InlineCommentThread'
 import { CommentComposer } from './CommentComposer'
@@ -280,12 +281,12 @@ export function ReviewDiffPane({
             className={`review-diff-risk-label review-diff-risk-label--${file.riskScore.level}`}
           >
             {file.riskScore.level === 'high'
-              ? 'HIGH RISK'
+              ? 'High risk'
               : file.riskScore.level === 'medium'
-                ? 'MED RISK'
-                : 'LOW RISK'}{' '}
+                ? 'Medium risk'
+                : 'Low risk'}{' '}
             <button className="review-diff-why-btn" onClick={onShowRisk}>
-              why?
+              Why?
             </button>
           </span>
         </div>
@@ -316,7 +317,11 @@ export function ReviewDiffPane({
           <span className="review-diff-changes">
             +{file.additions}/−{file.deletions}
           </span>
-          {isViewed && <span className="review-diff-viewed-badge">✓ Viewed</span>}
+          {isViewed && (
+            <span className="review-diff-viewed-badge">
+              <Check aria-hidden="true" /> Viewed
+            </span>
+          )}
         </div>
       </div>
 
@@ -714,7 +719,7 @@ export function ReviewDiffPane({
                     const hotspot = hotspots.find((h) => h.hunkIndex === hi)!
                     return (
                       <div className="complexity-hotspot-annotation" role="alert">
-                        ⚠ {hotspot.message}
+                        <TriangleAlert aria-hidden="true" /> {hotspot.message}
                       </div>
                     )
                   })()}
@@ -741,7 +746,7 @@ export function ReviewDiffPane({
         </div>
         <div className="review-diff-nav-right">
           <button className="review-diff-nav-btn" onClick={onPrevFile} aria-label="Previous file">
-            ← Prev
+            <ChevronLeft aria-hidden="true" /> Prev
           </button>
           {isLastFile ? (
             <button
@@ -755,7 +760,7 @@ export function ReviewDiffPane({
               className="review-diff-nav-btn review-diff-nav-btn--primary"
               onClick={onMarkViewed}
             >
-              Mark viewed → Next 1
+              Mark viewed, go to next
             </button>
           )}
         </div>

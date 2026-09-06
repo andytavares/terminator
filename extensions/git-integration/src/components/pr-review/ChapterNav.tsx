@@ -1,4 +1,5 @@
 import React from 'react'
+import { Check } from 'lucide-react'
 import type { Chapter } from '../../schemas/pr-review.schema'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { chapterRiskLevel } from '../../github/pr-review-service'
@@ -45,7 +46,7 @@ export function ChapterNav({ chapters, onSelectChapter }: Props) {
             </span>
             {status === 'complete' && (
               <span className="chapter-nav-check" aria-label="complete">
-                ✓
+                <Check aria-hidden="true" />
               </span>
             )}
           </button>

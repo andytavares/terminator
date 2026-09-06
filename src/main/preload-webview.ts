@@ -1,4 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import {
+  createDoubleEscapeDetector,
+  escapeContextFromTarget,
+  shouldSuppressExitGesture,
+} from '../shared/double-escape'
 
 // Inlined to keep the preload self-contained (no shared Rollup chunks that
 // Electron's sandboxed require cannot resolve).
@@ -24,20 +29,49 @@ const RESERVED_SHORTCUTS = new Set([
 // Escape twice in quick succession exits the extension and returns the user to
 // their terminal. The listener is deliberately passive and bubble-phase: the
 // page sees every Escape first, so an extension's own dismissals (dropdowns,
-// inline renames, modals) keep working on the first press. Mirrors
-// src/shared/double-escape.ts — inlined for the same reason as RESERVED_SHORTCUTS.
-const DOUBLE_ESCAPE_WINDOW_MS = 500
-let pendingEscapeAt: number | null = null
+// inline renames, modals) keep working on the first press.
+//
+// The pairing and the guards come from src/shared/double-escape.ts, which the
+// host window's detector also uses. They used to be two copies of one rule and
+// the copies disagreed: the host stood down inside terminals, text fields and
+// open dialogs, this one stood down for nothing, so Escape twice while typing
+// closed the extension and discarded the draft. Importing keeps them honest.
+//
+// Only this preload entry imports it, so Rollup inlines it into webview.js
+// rather than hoisting a shared chunk the sandboxed require cannot resolve —
+// the same constraint that keeps RESERVED_SHORTCUTS inline above.
+const escapeDetector = createDoubleEscapeDetector()
+
+// How many dialogs the page currently has open. The page cannot simply publish
+// this on its own `window`: extension views run with contextIsolation, so this
+// script's `window` is a different object entirely. @terminator/extension-ui
+// hands the count over the bridge instead, and it is held here — in the same
+// world as the listener that has to honour it.
+let openModalCount = 0
 
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return
-  const now = performance.now()
-  const paired = pendingEscapeAt !== null && now - pendingEscapeAt < DOUBLE_ESCAPE_WINDOW_MS
-  pendingEscapeAt = paired ? null : now
-  if (paired) ipcRenderer.send('extension:request-exit')
+
+  if (shouldSuppressExitGesture(escapeContextFromTarget(e.target, openModalCount))) {
+    // Reset so the suppressed press cannot pair with a later one and exit on a
+    // gesture the user never made.
+    escapeDetector.reset()
+    return
+  }
+
+  if (escapeDetector.register(performance.now())) ipcRenderer.send('extension:request-exit')
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  ui: {
+    /**
+     * Reported by @terminator/extension-ui whenever a dialog opens or closes, so
+     * the Escape listener above knows something else has claimed the key.
+     */
+    setModalDepth: (depth: number) => {
+      openModalCount = Number.isFinite(depth) && depth > 0 ? Math.floor(depth) : 0
+    },
+  },
   terminal: {
     create: (payload: unknown) => ipcRenderer.invoke('terminal:create', payload),
     close: (sessionId: string) => ipcRenderer.invoke('terminal:close', { sessionId }),

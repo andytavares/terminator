@@ -238,8 +238,8 @@ function Stalls({
     <>
       <div className="sk-sup__note">
         {shadowMode
-          ? 'Shadow mode: stalls are recorded here, not surfaced. Turn it off once the thresholds have earned it.'
-          : 'Stalls are surfaced as they happen.'}
+          ? 'Recorded here only, and not raised while you work. Turn shadow mode off once the thresholds have earned it.'
+          : 'A run that stops making progress is raised as it happens.'}
       </div>
       {firings.length === 0 ? (
         <div className="sk-sup__clear">Nothing has stopped making progress.</div>
@@ -714,6 +714,23 @@ function History({
 
 type Section = 'runs' | 'stalls' | 'review' | 'feed' | 'history'
 
+/**
+ * The tabs, named.
+ *
+ * They used to render their raw ids — lowercase "runs", "stalls" — and "stalls"
+ * is the implementation's word for it. "Stuck" is the reader's.
+ */
+const SECTIONS = [
+  { id: 'runs', label: 'Running' },
+  { id: 'stalls', label: 'Stuck' },
+  // "To review" rather than "Review": the section also contains a Review button
+  // that opens a diff, and a tab and an action reading the same word is
+  // ambiguous on screen, not only in a test.
+  { id: 'review', label: 'To review' },
+  { id: 'feed', label: 'Activity' },
+  { id: 'history', label: 'History' },
+] as const
+
 export function SupervisionPanel({
   cardLabel,
   workspacePath,
@@ -788,17 +805,27 @@ export function SupervisionPanel({
     history: 0,
   }
 
+  // The strip used to spend a full band of chrome above the board reporting an
+  // absence: a tab row plus a bordered box saying "Nothing is running."
+  //
+  // The tabs stay — they are the only route to History and Activity, and hiding
+  // them while quiet would make those unreachable exactly when you want to look
+  // back at what happened. What goes is the weight of the empty box, which is
+  // now one line (see .sk-sup__clear). It still says so rather than showing
+  // nothing: a surface empty because it failed to load looks exactly like one
+  // empty because all is well, and only one of those is fine.
   return (
     <div className="sk-sup">
-      <div className="sk-sup__tabs">
-        {(['runs', 'stalls', 'review', 'feed', 'history'] as const).map((id) => (
+      <div className="sk-sup__tabs" role="tablist" aria-label="Supervision">
+        {SECTIONS.map(({ id, label }) => (
           <button
             key={id}
+            role="tab"
             className={`sk-sup__tab${section === id ? ' sk-sup__tab--on' : ''}`}
             aria-selected={section === id}
             onClick={() => setSection(id)}
           >
-            {id} {counts[id] > 0 && <span className="sk-sup__count">{counts[id]}</span>}
+            {label} {counts[id] > 0 && <span className="sk-sup__count">{counts[id]}</span>}
           </button>
         ))}
       </div>

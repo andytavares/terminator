@@ -1,0 +1,346 @@
+/* Remote Control: status first, settings last.
+   Every colour comes from the published --tm-* contract, so both themes work
+   without a second stylesheet. */
+
+.rc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-4);
+  padding: var(--tm-space-5);
+  font-family: var(--tm-font-ui);
+  color: var(--tm-text-primary);
+}
+
+/* ── The status band ──────────────────────────────────────────────────── */
+
+.rc-band {
+  border: 1px solid var(--tm-border);
+  border-left-width: 2px;
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-surface);
+  padding: var(--tm-space-4);
+}
+
+/* State is carried by the data attribute as well as the edge colour, so it
+   never depends on hue alone. */
+.rc-band[data-state='off'] {
+  border-left-color: var(--tm-border-strong);
+}
+.rc-band[data-state='starting'] {
+  border-left-color: var(--tm-warning);
+}
+.rc-band[data-state='on'] {
+  border-left-color: var(--tm-success);
+}
+.rc-band[data-state='failed'] {
+  border-left-color: var(--tm-danger);
+}
+
+.rc-band__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tm-space-3);
+}
+
+/* Principle XII: flat, inherits currentColor, sized here rather than by a prop. */
+.rc-band__glyph {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+.rc-band[data-state='on'] .rc-band__glyph {
+  color: var(--tm-success);
+}
+.rc-band[data-state='failed'] .rc-band__glyph {
+  color: var(--tm-danger);
+}
+.rc-band[data-state='starting'] .rc-band__glyph {
+  color: var(--tm-warning);
+}
+
+.rc-band__glyph--spin {
+  animation: rc-spin 1.1s linear infinite;
+}
+
+@keyframes rc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-band__glyph--spin {
+    animation: none;
+  }
+}
+
+.rc-band__headline {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rc-band__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rc-band__sub {
+  margin: 2px 0 0;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ── Address, credential, code ────────────────────────────────────────── */
+
+.rc-reach {
+  display: flex;
+  gap: var(--tm-space-4);
+  align-items: flex-start;
+  margin-top: var(--tm-space-4);
+}
+
+.rc-address {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rc-label {
+  display: block;
+  color: var(--tm-text-muted);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.rc-address__row {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-2);
+  padding: 8px 10px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-input);
+}
+
+.rc-address__url {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--tm-font-mono);
+  font-size: 13px;
+  color: var(--tm-accent-text);
+}
+
+.rc-credential {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-2);
+  margin-top: var(--tm-space-3);
+}
+
+.rc-credential .rc-label {
+  margin: 0;
+}
+
+.rc-credential__value {
+  font-family: var(--tm-font-mono);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--tm-text-secondary);
+}
+
+.rc-credential__value[data-revealed] {
+  letter-spacing: normal;
+  color: var(--tm-text-primary);
+}
+
+/* The one line that says what access this grants. Not a warning banner — a
+   fact, placed where the decision is made. */
+.rc-consequence {
+  margin: var(--tm-space-3) 0 0;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+}
+
+.rc-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: var(--tm-space-2);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-elevated);
+}
+
+.rc-code__caption {
+  color: var(--tm-text-muted);
+  font-size: 11px;
+}
+
+/* ── Connected devices ────────────────────────────────────────────────── */
+
+.rc-devices {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-surface);
+  padding: var(--tm-space-4);
+}
+
+.rc-devices__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tm-space-2);
+  margin-bottom: var(--tm-space-3);
+}
+
+.rc-devices__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rc-count {
+  color: var(--tm-text-muted);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+}
+
+.rc-devices__none {
+  margin: 0;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+}
+
+.rc-devices__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rc-device {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-3);
+  font-size: 12.5px;
+}
+
+.rc-device__label {
+  font-weight: 500;
+}
+
+.rc-device__viewing {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-mono);
+  font-size: 11.5px;
+}
+
+.rc-device__since {
+  color: var(--tm-text-muted);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+}
+
+/* ── Settings, collapsed ──────────────────────────────────────────────── */
+
+.rc-settings {
+  border-top: 1px solid var(--tm-border);
+  padding-top: var(--tm-space-3);
+}
+
+.rc-settings__toggle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tm-space-2);
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* Principle XII: the disclosure marker is an icon, not a ▸ printed as text. */
+.rc-settings__caret {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.rc-settings__summary {
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+}
+
+.rc-settings__body {
+  padding-top: var(--tm-space-2);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.rc-btn {
+  padding: 5px 11px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.rc-btn:hover:not(:disabled) {
+  background: var(--tm-bg-card-hover);
+}
+
+.rc-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.rc-btn--primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.rc-btn--danger {
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
+}
+
+.rc-btn--ghost {
+  border-color: transparent;
+  color: var(--tm-text-secondary);
+}
+
+.rc-btn:focus-visible,
+.rc-settings__toggle:focus-visible {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 620px) {
+  .rc-reach {
+    flex-direction: column;
+  }
+}

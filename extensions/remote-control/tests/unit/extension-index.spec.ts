@@ -69,6 +69,9 @@ function makeServerHandle(startImpl: () => Promise<void> = () => Promise.resolve
     stop: vi.fn().mockResolvedValue(undefined),
     isListening: vi.fn(() => true),
     disconnectAllClients: vi.fn(),
+    // The real handle always carries this; the view reads the connected-device
+    // list from it, so a mock without it would pass while the feature is dead.
+    devices: { onChange: vi.fn(() => () => {}), list: vi.fn(() => []) },
     inject: vi.fn(),
   }
 }

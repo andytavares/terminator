@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { EmptyState } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
 import {
   Trash2,
@@ -23,7 +24,6 @@ import {
 } from 'lucide-react'
 import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
 import { SmartTaskInput } from './SmartTaskInput'
-import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { notify } from '../utils/notify'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 
@@ -41,6 +41,8 @@ interface DailyLogProps {
   onGoToToday?: () => void
   isToday?: boolean
   somedayTasks?: IndexedTask[]
+  /** Opens the inbox — the other place work comes from on an empty day. */
+  onOpenInbox?: () => void
   onPickUpToday?: (taskId: string) => Promise<void>
   onDeleteBacklogTask?: (taskId: string) => Promise<void>
   onRefreshBacklog?: () => Promise<void>
@@ -70,16 +72,23 @@ function StatusIcon({
   }
 }
 
+/**
+ * The heading spent its largest type on the least useful fact.
+ *
+ * "Saturday" was set at ~48px with the date it belongs to as secondary text
+ * underneath. You know what day it is; the date is what you are navigating by,
+ * so they share one line and the date carries the weight.
+ */
 function formatDate(iso: string): { weekday: string; detail: string } {
   const [y, m, d] = iso.split('-').map(Number)
   const dt = new Date(y, m - 1, d)
   return {
-    weekday: dt.toLocaleDateString('en-US', { weekday: 'long' }),
-    detail: dt.toLocaleDateString('en-US', {
+    weekday: dt.toLocaleDateString('en-US', {
+      weekday: 'long',
       month: 'long',
       day: 'numeric',
-      year: 'numeric',
     }),
+    detail: dt.toLocaleDateString('en-US', { year: 'numeric' }),
   }
 }
 
@@ -134,7 +143,7 @@ function SessionPicker({
       <span className="daily-log__link-picker">
         <span className="tv-text-muted-sm">No active terminal sessions.</span>
         <button className="tv-btn tv-btn--icon" onClick={onClose}>
-          <X size={14} />
+          <X className="tm-icon" />
         </button>
       </span>
     )
@@ -159,17 +168,17 @@ function SessionPicker({
         ))}
       </select>
       <button className="tv-btn tv-btn--icon" onClick={onClose}>
-        <X size={14} />
+        <X className="tm-icon" />
       </button>
     </span>
   )
 }
 
 function makeTaskNavHandler(taskId: string): () => void {
-  return () => {
-    useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-    useVaultNavStore.getState().navigateToTask(taskId)
-  }
+  // No tab activation here: this row is already inside the vault view, so the
+  // user is looking at it. The call that used to be here reached a copy of the
+  // core registry bundled into this view and moved nothing.
+  return () => useVaultNavStore.getState().navigateToTask(taskId)
 }
 
 function SubtaskRow({
@@ -242,7 +251,7 @@ function SubtaskRow({
             Save
           </button>
           <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
-            <X size={14} />
+            <X className="tm-icon" />
           </button>
         </span>
       ) : (
@@ -257,14 +266,14 @@ function SubtaskRow({
       {isOpen && !editing && (
         <span className="daily-log__subtask-actions">
           <button className="tv-btn tv-btn--outline" onClick={() => setEditing(true)} title="Edit">
-            <Pencil size={13} />
+            <Pencil className="tm-icon" />
           </button>
           <button
             className="tv-btn tv-btn--outline"
             onClick={() => void handleDelete()}
             title="Delete"
           >
-            <Trash2 size={13} />
+            <Trash2 className="tm-icon" />
           </button>
         </span>
       )}
@@ -276,7 +285,7 @@ function SubtaskRow({
             onClick={() => void handleDelete()}
             title="Delete"
           >
-            <Trash2 size={13} />
+            <Trash2 className="tm-icon" />
           </button>
         </span>
       )}
@@ -347,7 +356,7 @@ function GhostAddSubtaskRow({
           setActive(false)
         }}
       >
-        <X size={13} />
+        <X className="tm-icon" />
       </button>
     </div>
   )
@@ -478,10 +487,10 @@ function BlockModal({
     <div className="daily-log__block-modal-backdrop" onClick={onClose}>
       <div className="daily-log__block-modal" onClick={(e) => e.stopPropagation()}>
         <div className="daily-log__block-modal-header">
-          <OctagonAlert size={15} className="task-status task-status--blocked" />
+          <OctagonAlert className="task-status task-status--blocked tm-icon-lg" />
           <span>Mark as Blocked</span>
           <button className="tv-btn tv-btn--icon" onClick={onClose}>
-            <X size={14} />
+            <X className="tm-icon" />
           </button>
         </div>
         <label className="daily-log__block-modal-label">
@@ -508,7 +517,7 @@ function BlockModal({
             onClick={handleSubmit}
             disabled={!reason.trim() || (isCustom && !checkInterval)}
           >
-            Mark Blocked
+            Mark blocked
           </button>
         </div>
       </div>
@@ -612,10 +621,10 @@ function RecurrenceModal({
     <div className="daily-log__block-modal-backdrop" onClick={onClose}>
       <div className="daily-log__block-modal" onClick={(e) => e.stopPropagation()}>
         <div className="daily-log__block-modal-header">
-          <Repeat size={15} />
+          <Repeat className="tm-icon-lg" />
           <span>{existing ? 'Edit Recurrence' : 'Set Recurrence'}</span>
           <button className="tv-btn tv-btn--icon" onClick={onClose}>
-            <X size={14} />
+            <X className="tm-icon" />
           </button>
         </div>
 
@@ -955,7 +964,7 @@ function TaskRow({
       >
         {isDraggable && (
           <span className="daily-log__drag-handle" title="Drag to reorder">
-            <GripVertical size={14} />
+            <GripVertical className="tm-icon" />
           </span>
         )}
         {isOpen ? (
@@ -986,7 +995,7 @@ function TaskRow({
                 Save
               </button>
               <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
-                <X size={14} />
+                <X className="tm-icon" />
               </button>
             </span>
           ) : (
@@ -1027,14 +1036,14 @@ function TaskRow({
                       onClick={() => setMigratingOpen(true)}
                       title="Migrate to another day"
                     >
-                      <ArrowRight size={13} />
+                      <ArrowRight className="tm-icon" />
                     </button>
                     <button
                       className="tv-btn tv-btn--outline tv-btn--action-icon"
                       onClick={() => void handleSendToBacklog()}
                       title="Send to backlog"
                     >
-                      <Sunset size={13} />
+                      <Sunset className="tm-icon" />
                     </button>
                     {linked || task.terminatorLinks.length > 0 ? (
                       <button
@@ -1070,7 +1079,7 @@ function TaskRow({
                             })
                         }}
                       >
-                        <Zap size={13} />
+                        <Zap className="tm-icon" />
                       </button>
                     ) : (
                       <button
@@ -1078,7 +1087,7 @@ function TaskRow({
                         onClick={() => setLinking(true)}
                         title="Link to terminal session"
                       >
-                        <Zap size={13} />
+                        <Zap className="tm-icon" />
                       </button>
                     )}
                     {!hasSubtasks && (
@@ -1087,7 +1096,7 @@ function TaskRow({
                         onClick={() => setAddingSubtask(true)}
                         title="Add subtask"
                       >
-                        <ListPlus size={13} />
+                        <ListPlus className="tm-icon" />
                       </button>
                     )}
                     <button
@@ -1099,21 +1108,21 @@ function TaskRow({
                           : 'Set recurrence'
                       }
                     >
-                      <Repeat size={13} />
+                      <Repeat className="tm-icon" />
                     </button>
                     <button
                       className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--warning-hover"
                       onClick={() => setBlockModalOpen(true)}
                       title="Mark as blocked"
                     >
-                      <OctagonAlert size={13} />
+                      <OctagonAlert className="tm-icon" />
                     </button>
                     <button
                       className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
                       onClick={() => void handleCancel()}
                       title="Archive task"
                     >
-                      <Archive size={13} />
+                      <Archive className="tm-icon" />
                     </button>
                   </span>
                 )}
@@ -1126,7 +1135,7 @@ function TaskRow({
                         onClick={() => setAddingSubtask(true)}
                         title="Add subtask"
                       >
-                        <ListPlus size={13} />
+                        <ListPlus className="tm-icon" />
                       </button>
                     )}
                     <button
@@ -1141,7 +1150,7 @@ function TaskRow({
                       onClick={() => void handleCancel()}
                       title="Archive task"
                     >
-                      <Archive size={13} />
+                      <Archive className="tm-icon" />
                     </button>
                   </span>
                 )}
@@ -1165,7 +1174,7 @@ function TaskRow({
                         onClick={() => void handleDelete()}
                         title="Remove"
                       >
-                        <Trash2 size={13} />
+                        <Trash2 className="tm-icon" />
                       </button>
                     )}
                   </span>
@@ -1209,7 +1218,7 @@ function TaskRow({
                       className="daily-log__recurrence-badge"
                       title={`Repeats: ${formatRecurrenceRule(task.recurrenceRule)}${task.recurrenceNotifyAt ? ` at ${format12h(task.recurrenceNotifyAt)}` : ''}`}
                     >
-                      <Repeat size={11} />
+                      <Repeat className="tm-icon-sm" />
                     </span>
                   )}
                   {isStale && isOpen && (
@@ -1246,7 +1255,7 @@ function TaskRow({
                 Move
               </button>
               <button className="tv-btn tv-btn--icon" onClick={() => setMigratingOpen(false)}>
-                <X size={14} />
+                <X className="tm-icon" />
               </button>
             </span>
           )}
@@ -1289,7 +1298,7 @@ function TaskRow({
               setAddingSubtask(false)
             }}
           >
-            <X size={13} />
+            <X className="tm-icon" />
           </button>
         </div>
       )}
@@ -1337,10 +1346,16 @@ function TaskRow({
   )
 }
 
-function AddTaskRow({ onAdd }: { onAdd: (text: string) => Promise<void> }): React.JSX.Element {
+function AddTaskRow({
+  onAdd,
+  startOpen = false,
+}: {
+  onAdd: (text: string) => Promise<void>
+  startOpen?: boolean
+}): React.JSX.Element {
   const [text, setText] = useState('')
   const [adding, setAdding] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(startOpen)
 
   async function submit() {
     if (!text.trim()) return
@@ -1380,7 +1395,7 @@ function AddTaskRow({ onAdd }: { onAdd: (text: string) => Promise<void> }): Reac
         Add
       </button>
       <button className="daily-log__cancel-edit-btn" onClick={() => setOpen(false)}>
-        <X size={14} />
+        <X className="tm-icon" />
       </button>
     </div>
   )
@@ -1448,7 +1463,7 @@ function BacklogTaskRow({
               setEditing(false)
             }}
           >
-            <X size={14} />
+            <X className="tm-icon" />
           </button>
         </span>
       ) : (
@@ -1480,7 +1495,7 @@ function BacklogTaskRow({
               onClick={() => void onPickUpToday(task.id)}
               title="Pick up today"
             >
-              <CalendarCheck size={13} />
+              <CalendarCheck className="tm-icon" />
             </button>
           )}
           {onDelete && (
@@ -1489,7 +1504,7 @@ function BacklogTaskRow({
               onClick={() => void onDelete(task.id)}
               title="Delete"
             >
-              <Trash2 size={13} />
+              <Trash2 className="tm-icon" />
             </button>
           )}
         </span>
@@ -1514,6 +1529,7 @@ export function DailyLog({
   onGoToToday,
   isToday = false,
   somedayTasks = [],
+  onOpenInbox,
   onPickUpToday,
   onDeleteBacklogTask,
   onRefreshBacklog,
@@ -1550,6 +1566,12 @@ export function DailyLog({
   const progressPct = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0
   const allDone = totalTasks > 0 && doneTasks === totalTasks
   const { weekday, detail } = formatDate(log.date)
+
+  // One empty state, not three. The day is empty when it holds no tasks at all
+  // and the backlog under it is empty too; anything less and the sections speak
+  // for themselves.
+  const isEmptyDay = totalTasks === 0 && somedayTasks.length === 0
+  const [forceAddOpen, setForceAddOpen] = useState(false)
 
   function handleDragStart(taskId: string) {
     draggingId.current = taskId
@@ -1649,7 +1671,7 @@ export function DailyLog({
           disabled={!onPrevDay}
           title="Previous day"
         >
-          <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />
+          <ChevronRight className="tm-icon-lg" style={{ transform: 'rotate(180deg)' }} />
         </button>
         <div className="daily-log__date-text">
           <span className="daily-log__date-weekday">
@@ -1664,7 +1686,7 @@ export function DailyLog({
             onClick={onGoToToday}
             title="Back to today"
           >
-            <CornerUpLeft size={12} />
+            <CornerUpLeft className="tm-icon-sm" />
             Today
           </button>
         )}
@@ -1674,7 +1696,7 @@ export function DailyLog({
           disabled={!onNextDay}
           title="Next day"
         >
-          <ChevronRight size={16} />
+          <ChevronRight className="tm-icon-lg" />
         </button>
       </div>
 
@@ -1704,19 +1726,35 @@ export function DailyLog({
               <span className="daily-log__rollover-header-label">
                 ↩ From previous days ({rolledOverTasks.length})
               </span>
-              {rolloverExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {rolloverExpanded ? (
+                <ChevronDown className="tm-icon-sm" />
+              ) : (
+                <ChevronRight className="tm-icon-sm" />
+              )}
             </button>
             {rolloverExpanded && rolledOverTasks.map((task) => renderTaskWithSubtasks(task))}
             <div className="daily-log__rollover-divider" />
             <div className="daily-log__today-label">Today</div>
           </>
         )}
+        {isEmptyDay ? (
+          <EmptyState
+            heading="Nothing logged today"
+            description="Write what you are working on, or pull something across from the inbox."
+            actions={[
+              { label: 'Add task', tone: 'primary', onSelect: () => setForceAddOpen(true) },
+              { label: 'Open inbox', onSelect: () => onOpenInbox?.() },
+            ]}
+          />
+        ) : null}
         {activeTodayTasks.map((task) => renderTaskWithSubtasks(task, { draggable: true }))}
         {terminalTodayTasks.length > 0 && activeTodayTasks.length > 0 && (
           <div className="daily-log__done-divider" />
         )}
         {terminalTodayTasks.map((task) => renderTaskWithSubtasks(task))}
-        <AddTaskRow onAdd={handleAddTask} />
+        {(!isEmptyDay || forceAddOpen) && (
+          <AddTaskRow onAdd={handleAddTask} startOpen={forceAddOpen} />
+        )}
         <>
           <div className="daily-log__backlog-divider" />
           <button
@@ -1724,12 +1762,18 @@ export function DailyLog({
             onClick={() => setBacklogExpanded((v) => !v)}
           >
             <span className="daily-log__backlog-label">Backlog ({somedayTasks.length})</span>
-            {backlogExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            {backlogExpanded ? (
+              <ChevronDown className="tm-icon-sm" />
+            ) : (
+              <ChevronRight className="tm-icon-sm" />
+            )}
           </button>
           {backlogExpanded && (
             <div className="daily-log__backlog-list">
               {somedayTasks.length === 0 ? (
-                <p className="daily-log__backlog-empty">No backlog items.</p>
+                isEmptyDay ? null : (
+                  <p className="daily-log__backlog-empty">No backlog items.</p>
+                )
               ) : (
                 somedayTasks.map((task) => (
                   <BacklogTaskRow
@@ -1746,10 +1790,6 @@ export function DailyLog({
           )}
         </>
       </section>
-
-      {!log.exists && (
-        <p className="daily-log__new-file">No log for today yet. Add a task to get started.</p>
-      )}
     </div>
   )
 }

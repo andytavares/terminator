@@ -21,8 +21,8 @@ export function WeeklyReviewStep2Inbox({
       <div className="wr-step wr-step-2">
         <h3>Step 2: Process Inbox</h3>
         <p className="wr-step__done">Inbox cleared!</p>
-        <button className="wr-step__next" onClick={onComplete}>
-          Next
+        <button className="tv-btn tv-btn--primary" onClick={onComplete}>
+          Next: projects
         </button>
       </div>
     )
