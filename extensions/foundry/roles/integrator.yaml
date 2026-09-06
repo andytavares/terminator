@@ -1,0 +1,14 @@
+schemaVersion: 1
+id: integrator
+modelTier: deep
+allowResume: true
+reads: [lanes, verdicts]
+writes: [integration_branch]
+tools: [read, edit, git]
+outputSchema: integration
+prompt: |
+  Merge the lanes in their declared order and keep the result green.
+
+  A lane that consumes a change never merges before the lane that produces it.
+  Resolve conflicts in favour of what the order agreed, and raise anything you
+  cannot resolve rather than choosing for the operator.

@@ -1,0 +1,48 @@
+schemaVersion: 1
+id: refactor
+description: Change the shape, prove the behaviour did not change.
+requires:
+  - toolchain: test
+steps:
+  # Characterise first: without a record of what the code does now, "nothing
+  # changed" is an opinion.
+  - id: characterise
+    kind: agent
+    role: builder
+    expect: { tests_added: '>= 1' }
+
+  - id: baseline
+    kind: run
+    command: '${toolchain.test}'
+    after: [characterise]
+    expect: { exit_code: '== 0' }
+
+  - id: change
+    kind: fanout
+    over: plan.units[role=builder]
+    after: [baseline]
+    step: { kind: agent, role: builder }
+
+  - id: unchanged
+    kind: run
+    command: '${toolchain.test}'
+    after: [change]
+    expect: { exit_code: '== 0' }
+
+  - id: verify
+    kind: fanout
+    over: plan.units
+    after: [unchanged]
+    step: { kind: agent, role: verifier, context: fresh }
+
+  - id: integrate
+    kind: join
+    order: lane.ord
+    after: [verify]
+
+  - id: ship
+    kind: gate
+    rule: ready-for-review
+    options: [mark_ready, hold]
+    defaultIfIgnored: hold
+    after: [integrate]

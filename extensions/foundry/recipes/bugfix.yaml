@@ -1,0 +1,55 @@
+schemaVersion: 1
+id: bugfix
+description: Reproduce first, then fix, then prove the reproduction flips.
+requires:
+  - toolchain: test
+steps:
+  # The reproduction has to FAIL. A bug fix whose test passed before the fix
+  # proves nothing at all, and this is the one place a green command is the
+  # wrong answer.
+  - id: reproduce
+    kind: agent
+    role: builder
+    expect: { suite_exit_code: '!= 0' }
+
+  - id: fix
+    kind: fanout
+    over: plan.units[role=builder]
+    after: [reproduce]
+    step: { kind: agent, role: builder }
+
+  # And now it has to pass. The pair is the proof.
+  - id: flip
+    kind: run
+    command: '${toolchain.test}'
+    after: [fix]
+    expect: { exit_code: '== 0' }
+
+  - id: verify
+    kind: fanout
+    over: plan.units
+    after: [flip]
+    step: { kind: agent, role: verifier, context: fresh }
+
+  - id: inspect
+    kind: agent
+    role: inspector
+    when: risk.triggers is not empty
+    after: [verify]
+
+  - id: document
+    kind: agent
+    role: scribe
+    after: [verify]
+
+  - id: integrate
+    kind: join
+    order: lane.ord
+    after: [inspect, document]
+
+  - id: ship
+    kind: gate
+    rule: ready-for-review
+    options: [mark_ready, hold]
+    defaultIfIgnored: hold
+    after: [integrate]

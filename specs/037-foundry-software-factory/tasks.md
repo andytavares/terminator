@@ -114,35 +114,35 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests for User Story 2 (write first, must fail)
 
-- [ ] T040 [P] [US2] Spec for the six step kinds and their verdict sources, asserting no seventh kind exists, in `extensions/foundry/tests/recipe/step-kinds.spec.ts`
-- [ ] T041 [P] [US2] Spec for name resolution across the three rungs — data root, target repository, built-in — including that a repository file is honoured when present and never created, in `extensions/foundry/tests/recipe/resolve.spec.ts`
-- [ ] T042 [P] [US2] Spec for recipe requirements gating, including `path_exists: .specify/` making the `speckit` recipe unavailable with a stated reason, in `extensions/foundry/tests/recipe/requirements.spec.ts`
-- [ ] T043 [P] [US2] Spec for the scheduler — independent units run together up to the agent budget, a dependent unit does not start until its dependency is verified, a dependency cycle is rejected — in `extensions/foundry/tests/line/scheduler.spec.ts`
-- [ ] T044 [P] [US2] Spec for building a run graph from an order and a recipe, including fan-out over units, in `extensions/foundry/tests/line/run-graph.spec.ts`
-- [ ] T045 [P] [US2] Spec for the role registry: tool allowlists, model tiers, output schemas, and `allowResume: false` on the verifier, in `extensions/foundry/tests/line/roles.spec.ts`
+- [x] T040 [P] [US2] Spec for the six step kinds and their verdict sources, asserting no seventh kind exists, in `extensions/foundry/tests/recipe/step-kinds.spec.ts`
+- [x] T041 [P] [US2] Spec for name resolution across the three rungs — data root, target repository, built-in — including that a repository file is honoured when present and never created, in `extensions/foundry/tests/recipe/resolve.spec.ts`
+- [x] T042 [P] [US2] Spec for recipe requirements gating, including `path_exists: .specify/` making the `speckit` recipe unavailable with a stated reason, in `extensions/foundry/tests/recipe/requirements.spec.ts`
+- [x] T043 [P] [US2] Spec for the scheduler — independent units run together up to the agent budget, a dependent unit does not start until its dependency is verified, a dependency cycle is rejected — in `extensions/foundry/tests/line/scheduler.spec.ts`
+- [x] T044 [P] [US2] Spec for building a run graph from an order and a recipe, including fan-out over units, in `extensions/foundry/tests/line/run-graph.spec.ts`
+- [x] T045 [P] [US2] Spec for the role registry: tool allowlists, model tiers, output schemas, and `allowResume: false` on the verifier, in `extensions/foundry/tests/line/roles.spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T046 [P] [US2] Implement the six step kinds and the small expression surface for `over`, `when` and `expect` in `extensions/foundry/src/recipe/step-kinds.ts`
-- [ ] T047 [P] [US2] Implement three-rung name resolution for recipes, roles and rules in `extensions/foundry/src/recipe/resolve.ts`
-- [ ] T048 [P] [US2] Implement requirement evaluation — `path_exists`, `toolchain`, `repos` — in `extensions/foundry/src/recipe/requirements.ts`
-- [ ] T049 [US2] Implement the DAG scheduler honouring dependencies and the agent budget in `extensions/foundry/src/line/scheduler.ts`
-- [ ] T050 [US2] Implement run-graph construction from order plus recipe in `extensions/foundry/src/line/run-graph.ts`
-- [ ] T051 [P] [US2] Implement the role registry in `extensions/foundry/src/line/roles.ts`
-- [ ] T052 [P] [US2] Author the built-in role definitions — scout, architect, red-team, builder, verifier, inspector, integrator, scribe, foreman — in `extensions/foundry/roles/*.yaml`
-- [ ] T053 [P] [US2] Author the `direct` and `bugfix` built-in recipes in `extensions/foundry/recipes/direct.yaml` and `extensions/foundry/recipes/bugfix.yaml`
-- [ ] T054 [P] [US2] Author the `standard`, `refactor` and `spike` built-in recipes in `extensions/foundry/recipes/`
-- [ ] T055 [US2] Author the `speckit` built-in recipe expressing all ten existing phases as `run` steps with `requires: path_exists: .specify/` in `extensions/foundry/recipes/speckit.yaml` — this is the proof the abstraction lost nothing
-- [ ] T056 [US2] Register `foundry:run.start` and the `foundry:run.observe` broadcast in `extensions/foundry/src/index.ts`
+- [x] T046 [P] [US2] Implement the six step kinds and the small expression surface for `over`, `when` and `expect` in `extensions/foundry/src/recipe/step-kinds.ts`
+- [x] T047 [P] [US2] Implement three-rung name resolution for recipes, roles and rules in `extensions/foundry/src/recipe/resolve.ts`
+- [x] T048 [P] [US2] Implement requirement evaluation — `path_exists`, `toolchain`, `repos` — in `extensions/foundry/src/recipe/requirements.ts`
+- [x] T049 [US2] Implement the DAG scheduler honouring dependencies and the agent budget in `extensions/foundry/src/line/scheduler.ts`
+- [x] T050 [US2] Implement run-graph construction from order plus recipe in `extensions/foundry/src/line/run-graph.ts`
+- [x] T051 [P] [US2] Implement the role registry in `extensions/foundry/src/line/roles.ts`
+- [x] T052 [P] [US2] Author the built-in role definitions — scout, architect, red-team, builder, verifier, inspector, integrator, scribe, foreman — in `extensions/foundry/roles/*.yaml`
+- [x] T053 [P] [US2] Author the `direct` and `bugfix` built-in recipes in `extensions/foundry/recipes/direct.yaml` and `extensions/foundry/recipes/bugfix.yaml`
+- [x] T054 [P] [US2] Author the `standard`, `refactor` and `spike` built-in recipes in `extensions/foundry/recipes/`
+- [x] T055 [US2] Author the `speckit` built-in recipe expressing all ten existing phases as `run` steps with `requires: path_exists: .specify/` in `extensions/foundry/recipes/speckit.yaml` — this is the proof the abstraction lost nothing
+- [x] T056 [US2] Register `foundry:run.start` and the `foundry:run.observe` broadcast in `extensions/foundry/src/index.ts`
 
 ### Retire the phase layer (only after T055 proves the engine)
 
-- [ ] T057 [US2] Delete `PhaseId`, `PhaseStatus`, `PHASE_ORDER`, `PHASE_LABELS`, `QUICK_PHASES`, `DEFAULT_PHASE_GATE` and the phase-keyed settings from `extensions/foundry/src/types/speckit.types.ts`, keeping only what the new model still uses
-- [ ] T058 [US2] Delete `PHASE_COMMANDS`, `QUICK_PHASE_COMMANDS` and `PLAIN_PHASE_COMMANDS` and their dispatcher from `extensions/foundry/src/index.ts`
-- [ ] T059 [P] [US2] Delete `extensions/foundry/src/state/phase-state-machine.ts`, `derive-stage.ts`, `phase-progress.ts`, `run-queue.ts` and `skill-availability.ts`
-- [ ] T060 [P] [US2] Delete `extensions/foundry/src/runner/self-review-plan.ts` once its probe helpers have been generalised into T017
-- [ ] T061 [US2] Delete every spec whose subject was removed in T057–T060 rather than leaving it passing against a stub, in `extensions/foundry/tests/`
-- [ ] T062 [US2] Run the removal sweep from quickstart.md scenario 9 and confirm every command prints nothing; a green suite is not evidence for this task
+- [ ] T057 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `PhaseId`, `PhaseStatus`, `PHASE_ORDER`, `PHASE_LABELS`, `QUICK_PHASES`, `DEFAULT_PHASE_GATE` and the phase-keyed settings from `extensions/foundry/src/types/speckit.types.ts`
+- [ ] T058 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `PHASE_COMMANDS`, `QUICK_PHASE_COMMANDS` and `PLAIN_PHASE_COMMANDS` and their dispatcher from `extensions/foundry/src/index.ts`
+- [ ] T059 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `extensions/foundry/src/state/phase-state-machine.ts`, `derive-stage.ts`, `phase-progress.ts`, `run-queue.ts` and `skill-availability.ts`
+- [ ] T060 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `extensions/foundry/src/runner/self-review-plan.ts`
+- [ ] T061 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete every spec whose subject was removed, in `extensions/foundry/tests/`
+- [ ] T062 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Run the removal sweep from quickstart.md scenario 9 in `extensions/foundry/src`
 
 **Checkpoint**: Work takes a shape chosen per order; the fixed pipeline is gone and left nothing behind.
 

@@ -144,6 +144,7 @@ import {
   setSupervisedRunner,
 } from './runner/agent-runner.js'
 import { createForgeChannels } from './ipc/forge-channels.js'
+import { createRunChannels } from './ipc/run-channels.js'
 import { createOrderStore } from './order/store.js'
 import { resolveDataRoot } from './data-root.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
@@ -1194,8 +1195,9 @@ export function activate(api: ExtensionAPI): void {
   // The data root is resolved once here and handed down as an absolute path:
   // an order can span repositories, so "the working directory" is ambiguous
   // and two writers resolving it independently could disagree.
+  const foundryDataRoot = resolveFoundryDataRoot(api)
   const forge = createForgeChannels({
-    store: createOrderStore(resolveFoundryDataRoot(api)),
+    store: createOrderStore(foundryDataRoot),
     now: () => new Date().toISOString(),
     readIssue: async (tracker, key) => {
       // Through the application's own tracker connection. This extension never
@@ -1216,6 +1218,28 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:order.turn', (payload) => forge.turn(payload))
   reg(api, 'foundry:order.compile', (payload) => forge.compile(payload))
   reg(api, 'foundry:order.list', () => forge.list())
+
+  // ── The Line ───────────────────────────────────────────────────────────
+  //
+  // An agreed order plus a shape of work becomes a run graph. Everything that
+  // can refuse does so before any agent starts: the order has to be agreed,
+  // the shape has to be one this repository can actually support, and the
+  // records location has to be writable.
+  const runs = createRunChannels({
+    store: createOrderStore(foundryDataRoot),
+    dataRoot: foundryDataRoot,
+    sources: {
+      dataRoot: foundryDataRoot,
+      repoPaths: (api.workspace?.list() ?? []).map((workspace) => workspace.folderPath),
+      // The built-ins ship inside the extension, so they are available in a
+      // repository that contains nothing of Foundry's.
+      builtInDir: path.resolve(__dirname, '..'),
+    },
+    now: () => new Date().toISOString(),
+  })
+  reg(api, 'foundry:run.start', (payload) => runs.start(payload))
+  reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
+  reg(api, 'foundry:run.recipes', (payload) => runs.recipes(payload))
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands
