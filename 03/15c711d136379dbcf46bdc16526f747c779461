@@ -1,0 +1,53 @@
+extensions/foundry/src/components/Forge.tsx
+  s_357c91d2b54b02::t_4573d63db4f3ac 1,93-101,184,188,191,196,199-204,206,209-214,298,302
+extensions/foundry/tests/forge/converge.spec.ts
+  s_357c91d2b54b02::t_3b62cdf8b3a9b2 202-224
+extensions/foundry/src/components/foundry.css
+  s_357c91d2b54b02::t_5fe49dd3d599be 516-522
+extensions/foundry/src/components/Inbox.tsx
+  s_357c91d2b54b02::t_5fe49dd3d599be 21-23,125-129
+extensions/foundry/src/ipc/inbox-channels.ts
+  s_357c91d2b54b02::t_5fe49dd3d599be 4,79-84
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_357c91d2b54b02::t_61c98849dc8134 33-34,169-182
+  s_357c91d2b54b02::t_78090ed1957e9a 183
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_357c91d2b54b02::t_44d9cf37b770d3 363-385
+CHANGELOG.md
+  s_357c91d2b54b02::t_7848e6a6465740 19
+docs/adr/043-an-agent-proposes-the-order-and-never-writes-it.md
+  s_357c91d2b54b02::t_a9b38b59519a9f 1-91
+extensions/foundry/src/components/Floor.tsx
+  s_357c91d2b54b02::t_82782e0eb75c72 108-122,169-170,174-176,205,208-214,272-273,275-276,319-320,323-324,340-346,350-352,618-622,624-633,696-725,727
+  s_357c91d2b54b02::t_185dc67ae28e3a 62-71,171,292-297,353,567-570,641
+  s_357c91d2b54b02::t_db9d34a399143d 726,728
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_357c91d2b54b02::t_185dc67ae28e3a 76,372,694-711
+  s_357c91d2b54b02::t_f45edcea49905d 59-71,590-664,666-693
+  s_357c91d2b54b02::t_5dda9cccf96cf2 665
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_3e5a363507c48c 670,916-934,936-938,960,968-969,973,980-981
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_357c91d2b54b02::t_011bb3ae31b7a4 545-547,556-558,570
+  s_357c91d2b54b02::t_fc425be8b5ef6d 515-544,548-555,559-569,571-576
+docs/user-guide/USER-GUIDE.md
+  s_357c91d2b54b02::t_7848e6a6465740 571-579
+docs/ARCHITECTURE.md
+  s_357c91d2b54b02::t_b1c2351d604ad7 998
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "0315c711d136379dbcf46bdc16526f747c779461",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
