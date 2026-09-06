@@ -1,0 +1,20 @@
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_357c91d2b54b02::t_cbbbc4a15d3c91 7-9,221-257
+  s_357c91d2b54b02::t_0da07ec8a8d07f 258-261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "4692cf4e9b8ef23a8e2fcd33ed0bc3385f15a211",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
