@@ -1,0 +1,170 @@
+extensions/foundry/src/components/Forge.tsx
+  s_357c91d2b54b02::t_a7a1c649bfc327 226-229
+  s_357c91d2b54b02::t_4cfbeb035ca8d6 8-9,25-39,65,79-104,206-225,230-246
+  s_357c91d2b54b02::t_93be686c66cc78 247-249
+extensions/foundry/src/components/Floor.tsx
+  s_357c91d2b54b02::t_f6bf231d5758c0 1-126
+docs/adr/041-an-extension-may-move-an-issue.md
+  s_357c91d2b54b02::t_5cc89a5ca754c4 1-134
+extensions/foundry/tests/line/integrate.spec.ts
+  s_357c91d2b54b02::t_a7a1c649bfc327 73-75,334-336
+  s_357c91d2b54b02::t_c34740b6e1775c 1-46,48-57,59,61-70,76-86,88-95,98-101,105,108-133,136-140,142-143,146-149,152-156,159-167,170-172,175-198,200,202-210,213-225,227,229-233,236-238,241-247,249-261,263,266-271,273-275,278-283,285,288-293,295,297,299-305,308-311,313,315-318,321-324,327-330,333,338-339,342-345,347,350-352,355-356,359-360
+  s_357c91d2b54b02::t_441efca7ce9f0a 364-372,376-378,381-385
+  s_357c91d2b54b02::t_2df4cf1175cf79 389-429,431-433,436-437,440-442,445-447,449-451,454-461,464-472,475-482
+  s_357c91d2b54b02::t_ec09314c30d7f8 47,58,71-72,102-104,106-107,141,173-174,199,201,211-212,226,228,234-235,239-240,262,272,284,294,319,348-349,353-354,361-363,374-375,379-380,473-474
+docs/EXTENSION-DEVELOPMENT.md
+  s_357c91d2b54b02::t_da17ec61dcf782 615-653,704
+extensions/foundry/src/gates/autonomy.ts
+  s_357c91d2b54b02::t_d7bc79dd0d4b04 1-55
+extensions/foundry/tests/trackers/write-back.spec.ts
+  s_357c91d2b54b02::t_f1476eb4240e26 1-174,176-249,253-299
+  s_357c91d2b54b02::t_a7a1c649bfc327 175,250-252
+extensions/foundry/tests/line/executor.spec.ts
+  s_357c91d2b54b02::t_b386c0b8771cbe 295-367,382-387
+  s_357c91d2b54b02::t_a80a7c26637166 13
+  s_357c91d2b54b02::t_a93f3270f52493 1-12,14-47,56-61,64,67-71,79-84,89-173,177-192,196-203,207-226,233-294
+  s_357c91d2b54b02::t_fa8d7145e4573b 48-55,62-63,65-66,72-78,85-88,174-176,193-195,204-206,227-232,368-381
+extensions/foundry/src/trackers/write-back.ts
+  s_357c91d2b54b02::t_d6607cbd4bf905 1-172,177-228,230-249
+  s_357c91d2b54b02::t_a7a1c649bfc327 173-176,229
+specs/037-foundry-software-factory/contracts/extension-api-issues.md
+  s_357c91d2b54b02::t_7592a04c7dfdfe 109
+  s_357c91d2b54b02::t_100b36aaef758b 43-59,93-95,98-103,119-124,141-146
+extensions/foundry/src/gates/store.ts
+  s_357c91d2b54b02::t_13f3ff5e91583b 1-73
+tests/unit/integrations/issue-service-transition.spec.ts
+  s_357c91d2b54b02::t_a7bb7753500011 1-178
+extensions/foundry/src/ipc/run-channels.ts
+  s_357c91d2b54b02::t_d702d79e1e7af7 24,38-39,176-198
+src/main/integrations/issue-service.ts
+  s_357c91d2b54b02::t_7fdd13a2aca443 10-15,52-80,144-153,265-282,284
+  s_357c91d2b54b02::t_5e0ae94cc16a06 283,285
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_357c91d2b54b02::t_55c92dfaa4ba2e 1-67,69-149
+  s_357c91d2b54b02::t_a7a1c649bfc327 68
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_d702d79e1e7af7 15-16,621-644,655-658
+  s_357c91d2b54b02::t_10c822d76daf3a 12
+  s_357c91d2b54b02::t_c2de64e137e9dd 18-22,451-531,556,560-577,597-598,645-654
+  s_357c91d2b54b02::t_dbd18a1e85b4f8 118-121
+  s_357c91d2b54b02::t_770953b57c4724 823-825
+extensions/foundry/src/gates/rules.ts
+  s_357c91d2b54b02::t_ff67e1f07d245a 1-68,74-105,112-116,122-136,142-146,148-185,195-239,246-251
+  s_357c91d2b54b02::t_fa8d7145e4573b 69-73,106-110,117-121,137-141,147,240-245
+  s_357c91d2b54b02::t_c3e84943bd1810 111,186-194
+extensions/foundry/src/recipe/requirements.ts
+  s_357c91d2b54b02::t_dbd18a1e85b4f8 12-14
+extensions/foundry/tests/components/App.spec.tsx
+  s_357c91d2b54b02::t_da11efecb97706 6-10,26-41,56-61,64-67,70-75,78-80,83-86,88
+  s_357c91d2b54b02::t_7b17af34179a34 12-13,17-24,44,47,50-52
+  s_357c91d2b54b02::t_543d3e8a2322de 14-15
+  s_357c91d2b54b02::t_8a4195c9bef3e0 53
+extensions/foundry/src/ipc/inbox-channels.ts
+  s_357c91d2b54b02::t_fa8d7145e4573b 28-33,67-72
+  s_357c91d2b54b02::t_13f3ff5e91583b 1-5,7-27,44-66,73-112,121-125
+  s_357c91d2b54b02::t_65ec1eb54e92c7 6,34-43,113-120
+extensions/foundry/src/components/SettingsView.tsx
+  s_357c91d2b54b02::t_543d3e8a2322de 24-28
+  s_357c91d2b54b02::t_fa8d7145e4573b 69-71
+  s_357c91d2b54b02::t_e608aad61737db 1-19,30,35-48,51-66,68,72-85
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_357c91d2b54b02::t_0d24881aad6ae5 254-321,325-329
+  s_357c91d2b54b02::t_fa8d7145e4573b 322-324
+extensions/foundry/src/renderer/App.tsx
+  s_357c91d2b54b02::t_24a85b9076d866 18,79
+  s_357c91d2b54b02::t_ee35dcab7af99b 3,24,43-45,47,76-77
+  s_357c91d2b54b02::t_7038bbda31ecd4 71
+  s_357c91d2b54b02::t_ffdad4e18c13f2 1-2,5,7-16,25,27,32,59,61-62,69,72
+  s_357c91d2b54b02::t_63151ba987a74c 51-53,55
+tests/fixtures/integrations/linear/index.ts
+  s_357c91d2b54b02::t_bdfa97ef66d879 22,31-66,92
+tests/unit/extensions/api-issues.spec.ts
+  s_357c91d2b54b02::t_a7a1c649bfc327 126-128
+  s_357c91d2b54b02::t_7f50dee31f50a3 11-13,106-125,129-138,143-154,158,160-162,164
+extensions/foundry/src/line/integrate.ts
+  s_357c91d2b54b02::t_a7a1c649bfc327 147-153,253-256,342-346
+  s_357c91d2b54b02::t_441efca7ce9f0a 180-200
+  s_357c91d2b54b02::t_9d596a3fb3e2dc 1-146,154-179,201-252,257-341,347-348
+extensions/foundry/src/order/schema.ts
+  s_357c91d2b54b02::t_f4d870110c0d5d 190-204,218,247-248,306
+extensions/foundry/src/ipc/forge-channels.ts
+  s_357c91d2b54b02::t_0890aa6b52298b 9,11,40-48,55-64,72-75,211-273,291
+  s_357c91d2b54b02::t_c8c0e4856ff374 10,53-54,122-125
+extensions/foundry/src/gates/rank.ts
+  s_357c91d2b54b02::t_d7bc79dd0d4b04 1-47
+extensions/foundry/src/components/Orders.tsx
+  s_357c91d2b54b02::t_ee35dcab7af99b 4,67,80-82
+tests/integration/foundry-portability.spec.ts
+  s_357c91d2b54b02::t_8b04ebf5e31c44 52-58
+extensions/foundry/tests/ipc/run-actions-ipc.spec.ts
+  s_357c91d2b54b02::t_a733c4671f3dd5 180
+extensions/foundry/src/types/electron.ts
+  s_357c91d2b54b02::t_e608aad61737db 9,12
+  s_357c91d2b54b02::t_c49be1047a5bca 1-6,16-18,21-30,34,43
+extensions/foundry/src/components/foundry.css
+  s_357c91d2b54b02::t_7c5705582a503d 3291-3312
+  s_357c91d2b54b02::t_32d4679d5dcbe7 3676-3940
+  s_357c91d2b54b02::t_e608aad61737db 3941-3986
+extensions/foundry/src/runtime/run-seams.ts
+  s_357c91d2b54b02::t_146058fb103682 54,56-57
+  s_357c91d2b54b02::t_10c822d76daf3a 1-11,13,18-21,27-30,32,34,38,45-52,60,65-67,72-75,79,81-82,88-89
+src/shared/types/index.ts
+  s_357c91d2b54b02::t_7b7acf6cc424e0 220-225
+extensions/foundry/src/line/executor.ts
+  s_357c91d2b54b02::t_2c14c49845f4cb 1-188,193-195
+  s_357c91d2b54b02::t_fa8d7145e4573b 189-192
+src/main/integrations/providers/provider.ts
+  s_357c91d2b54b02::t_4048f4215d6345 40-45,66-97,108-142,144,146-158
+  s_357c91d2b54b02::t_0d0ae5f5d1ff6f 104-107
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_357c91d2b54b02::t_1f196c4020eb1e 16-23,57,116,190
+src/main/integrations/providers/linear.provider.ts
+  s_357c91d2b54b02::t_d6442b3fa0669a 12-18,36,115-121,134,196-255,336-392
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_357c91d2b54b02::t_8a51fc5c5be77f 1-102,104-106,113-217
+  s_357c91d2b54b02::t_fa8d7145e4573b 103,107-112
+  s_357c91d2b54b02::t_0d24881aad6ae5 218-240
+  s_357c91d2b54b02::t_65ec1eb54e92c7 241-283,287-288
+  s_357c91d2b54b02::t_a7a1c649bfc327 284-286
+extensions/foundry/tests/gates/rules.spec.ts
+  s_357c91d2b54b02::t_7e0f1fe8f5b22c 1-11,19-141,148-215
+  s_357c91d2b54b02::t_fa8d7145e4573b 12-18,142-147
+extensions/foundry/src/components/Inbox.tsx
+  s_357c91d2b54b02::t_a70832977673a2 1,10-20,28-163
+  s_357c91d2b54b02::t_fa8d7145e4573b 2-9,21-27
+tests/unit/integrations/providers/provider.spec.ts
+  s_357c91d2b54b02::t_e56ab4fbc53119 4,10-11,15-20,41-50,52-78,81-82,93-100
+src/main/extensions/api.ts
+  s_357c91d2b54b02::t_e013f7c0da566e 330-337,350-374,940-955
+  s_357c91d2b54b02::t_a7a1c649bfc327 141
+  s_357c91d2b54b02::t_954b7fd1d35727 143
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_357c91d2b54b02::t_83086730d5f2a0 357,363-370
+  s_357c91d2b54b02::t_94aa5df0b82e2d 349-356,358-362,371-401,410,427,436,449,464,476,499,508,519,528,538
+  s_357c91d2b54b02::t_a7a1c649bfc327 482-484
+  s_357c91d2b54b02::t_a34dc8dc674c25 348,402-409,411-426,428-435,437-448,450-463,465-475,477-481,485-498,500-507,509-518,520-527,529-537,539-560
+extensions/foundry/tests/runtime/run-seams.spec.ts
+  s_357c91d2b54b02::t_8a5a840fd75f23 1-103
+specs/037-foundry-software-factory/tasks.md
+  s_357c91d2b54b02::t_4a9ad8231d35c3 245-252,256-260,264-269
+  s_357c91d2b54b02::t_cd41533145b76c 140-145,213-218,222-229
+tests/unit/integrations/providers/linear-transition.spec.ts
+  s_357c91d2b54b02::t_9e84349d89714d 1-172,178-183
+  s_357c91d2b54b02::t_a7a1c649bfc327 173-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "b16b778477b836e36af0f160e3244bfca4c2a251",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
