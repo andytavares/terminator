@@ -295,6 +295,91 @@ Host Renderer (React)
 
 See [ADR-022](adr/022-webview-isolated-extension-renderer.md) for the full decision record.
 
+### The shared UI layer — `packages/extension-ui` (v1.3.0)
+
+Isolation is what makes extension UI safe, and it is also what made every
+extension reinvent the same overlay. A `WebContentsView` loads neither the core
+stylesheet nor the core's components, so before this layer existed there were
+four independent implementations of "a thing over the screen with a scrim",
+disagreeing about Escape, scrim-click, focus and stacking.
+
+`packages/extension-ui` is the single implementation, published outward — to the
+bundled extensions, to third parties, and to the core, which consumes it too
+(`src/renderer/components/ConfirmDialog.tsx` wraps the shared component).
+
+It is a **source-only** workspace package: `main`, `module` and `types` all point
+at `./src/index.ts`, and `react`, `react-dom` and `lucide-react` are peer
+dependencies. No build step, no second copy of React.
+
+| Export                                      | What it is                                    |
+| ------------------------------------------- | --------------------------------------------- |
+| `Dialog`, `ConfirmDialog`                   | Modal surfaces: scrim, focus trap, Escape     |
+| `Popover`                                   | A dismissible overlay that is **not** a modal |
+| `ToastRegion`, `Toast`                      | Transient messages, `role="status"`           |
+| `EmptyState`, `IconButton`                  | The two shapes every extension had rewritten  |
+| `useDismissible`                            | Outside-click + Escape + focus restore        |
+| `LAYERS`, `layerValue`, `nestedLayerValue`  | The stacking scale                            |
+| `createModalDepthRegistry`, `getModalDepth` | Per-document modal depth                      |
+
+A dialog renders **inside the extension's own view**, never in the core — see
+[ADR-038](adr/038-dialogs-render-in-the-extension-view.md). A `WebContentsView`
+composites above the host DOM, so a core-drawn dialog would be invisible, and
+hiding the view (what `useModalEffect` does for core modals) would blank the
+very screen the dialog is asking about.
+
+Three consequences follow from "many documents, one implementation":
+
+**Modal depth is per document.** `contextIsolation: true` gives the extension's
+page and its preload different `window` objects, so a counter set by the page is
+not readable by the preload. `Dialog` mirrors depth across the bridge via
+`electronAPI.ui.setModalDepth`, which is how the double-Escape exit gesture
+learns to stand down while a dialog is open.
+
+**Escape is answered by the innermost surface only.** Several dialogs mounted in
+one document would otherwise all close on one keystroke; each registers its
+depth and `isInnermost()` gates the handler.
+
+**Stacking comes from a named scale**, not from whoever picked the biggest
+number — which is how 38 unmanaged `z-index` values had ordered themselves:
+
+| Layer     | Value | For                               |
+| --------- | ----- | --------------------------------- |
+| `panel`   | 100   | In-flow raised surfaces           |
+| `overlay` | 200   | Popovers, dropdowns, pickers      |
+| `modal`   | 300   | Dialogs and their scrims          |
+| `toast`   | 400   | Above everything, modals included |
+
+`nestedLayerValue(name, containerValue)` places a surface inside another without
+leaving its band. A raw `z-index` number in an extension is a lint error.
+
+### Design tokens and themes in extension views
+
+Tokens cannot travel as an import, because CSS in a separate document has to be
+injected into that document. `EXTENSION_BASE_CSS` in
+`src/main/extensions/extension-view-host.ts` is that injection, and it is the
+authority for which `--tm-*` names exist — colour, spacing, radius, fonts and the
+`--tm-layer-*` scale. A name referenced but not defined there makes its
+declaration invalid and the browser drops it.
+
+It carries **both** palettes: a dark `:root` and a light `:root[data-theme='light']`
+mirroring the core's AA-verified light values. An extension document never sees
+the renderer's `data-theme`, so the host stamps it — `ExtensionViewHost.setTheme`
+restamps every open view and remembers the theme for views created later, driven
+from the renderer over `extension:set-theme`.
+
+`extensions/remote-control/src/server/remote-server.ts` keeps a verbatim copy of
+the constant for the remote client, enforced by a parity spec.
+
+Contrast is verified by rendering, not by reading: `tests/e2e/extension-themes.spec.ts`
+walks every visible text node in each extension view, in both themes, resolves the
+real composited backdrop through the translucent layers above it, and asserts WCAG
+AA. Parsing the stylesheet cannot do this — `color-mix` and layered alpha only
+resolve in a browser.
+
+The written rules are `docs/EXTENSION-STYLE.md`; its vocabulary rules are ESLint
+selectors with a fixture spec. See
+[ADR-039](adr/039-one-ui-layer-published-outward.md).
+
 ### Escape-to-terminal exit
 
 Pressing `Esc` twice within 500 ms inside any extension surface returns the user to the terminal session they were last in. Because an extension view is its own `webContents`, the gesture is detected in two places and converges on one action:

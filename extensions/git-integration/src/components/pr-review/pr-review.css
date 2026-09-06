@@ -259,6 +259,13 @@
   font-size: 13px;
 }
 
+/* The retry button inside it carries an icon, not a glyph (Principle XII). */
+.pr-queue-error .pr-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .pr-queue-error {
   padding: 16px;
   color: var(--tm-danger);

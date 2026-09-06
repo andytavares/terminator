@@ -353,6 +353,110 @@ regardless of configuration.
 
 ---
 
+### `api.ui` — Toasts in your own view, and the stacking scale _(v1.3.0)_
+
+```typescript
+api.ui.toast('Committed 3 files', { tone: 'success' })
+api.ui.toast('Could not reach GitHub', { tone: 'error' }) // errors are sticky
+api.ui.layers // { panel: 100, overlay: 200, modal: 300, toast: 400 }
+```
+
+`api.ui.toast` raises a message **in this extension's view**, which is the
+difference from `api.notifications.showToast`: that one asks the application to
+notify the user and the delivery target is resolved from their settings, so it
+may become an OS notification or a notification-centre entry instead. Use
+`api.notifications` for anything the user should learn about while looking
+elsewhere; use `api.ui.toast` for feedback on something they just did here.
+
+`api.ui.layers` is the same scale `--tm-layer-*` publishes to CSS. Style against
+it; a raw `z-index` number in an extension is a lint error.
+
+---
+
+## Shared UI components — `@terminator/extension-ui` _(v1.3.0)_
+
+Your extension renders in its own `WebContentsView`, which loads neither the core
+stylesheet nor the core's components. Rather than each extension writing its own
+dialog — which is what happened, four times, with four different answers to what
+Escape does — the shared implementation is published as a package.
+
+```bash
+npm install @terminator/extension-ui
+```
+
+It is source-only (no build step) with `react`, `react-dom` and `lucide-react` as
+**peer** dependencies, so it adds no second copy of React to your bundle.
+
+```tsx
+import {
+  Dialog,
+  ConfirmDialog,
+  Popover,
+  ToastRegion,
+  EmptyState,
+  IconButton,
+} from '@terminator/extension-ui'
+;<Dialog
+  title="Rename branch"
+  onDismiss={close}
+  actions={[
+    { label: 'Cancel', onSelect: close },
+    { label: 'Rename', tone: 'primary', onSelect: rename, disabled: !name.trim() },
+  ]}
+>
+  <input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+</Dialog>
+```
+
+| Export                                       | Use it for                                                    |
+| -------------------------------------------- | ------------------------------------------------------------- |
+| `Dialog`                                     | A modal question or form. Scrim, focus trap, Escape.          |
+| `ConfirmDialog`                              | Yes/no, with the consequence stated.                          |
+| `Popover`                                    | A dropdown or picker — dismissible, **not** modal.            |
+| `ToastRegion` / `Toast`                      | Transient messages. `role="status"`, mount the region once.   |
+| `EmptyState`                                 | Heading, one line of why, and the control that fills it.      |
+| `IconButton`                                 | An icon-only control that still has an accessible name.       |
+| `useDismissible`                             | Outside-click + Escape + focus restore, for your own surface. |
+| `LAYERS` / `layerValue` / `nestedLayerValue` | Stacking, by name.                                            |
+
+Three things the package handles that are easy to get wrong on your own:
+
+- **Escape closes only the innermost surface.** Several dialogs in one document
+  would otherwise all close on one keystroke.
+- **The double-Escape exit gesture stands down while a dialog is open.** Depth is
+  mirrored to the host over `electronAPI.ui.setModalDepth`; `Dialog` does this for
+  you. If you write your own modal, call it yourself or a user's Escape will
+  close your extension and lose their draft.
+- **A dialog renders in your view, never in the core.** The core cannot draw over
+  a `WebContentsView` — see [ADR-038](adr/038-dialogs-render-in-the-extension-view.md).
+
+### Styling
+
+Every colour, space and radius comes from the `--tm-*` tokens injected into your
+document. They carry both themes; the host sets `data-theme` on your `<html>` and
+restamps it when the user switches. A hardcoded hex cannot follow the theme, and a
+`--tm-*` name that is not published resolves to nothing and drops the whole
+declaration.
+
+`docs/EXTENSION-STYLE.md` is the rule set — vocabulary, sentence case, button
+voice, empty states, icons, colour and layering. The vocabulary rules are enforced
+by ESLint on `extensions/*/src/**/*.tsx`.
+
+### Migrating an existing extension
+
+Nothing breaks: the package is additive and the API is backward compatible. When
+you next touch a surface —
+
+1. Replace your own overlay with `Dialog` / `ConfirmDialog` / `Popover`. Pick
+   `Popover` for anything a click outside should close without it being modal —
+   `aria-modal` on a dropdown is a defect, not a detail.
+2. Replace raw `z-index` numbers with `layerValue()` or `var(--tm-layer-*)`.
+3. Replace hardcoded colours with `--tm-*` tokens, and check your surface in both
+   themes.
+4. Replace `size={n}` on lucide icons with CSS sizing (Constitution XII).
+
+---
+
 ### `api.nativeMenu` — Native Application Menu _(v1.1.0)_
 
 Add items to the application's native **View** menu (macOS menu bar, Windows/Linux system menu).

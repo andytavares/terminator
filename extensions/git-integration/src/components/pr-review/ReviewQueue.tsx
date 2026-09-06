@@ -132,7 +132,7 @@ export function ReviewQueue({
         <div className="pr-queue-error">
           Failed to load queue: {queueError}
           <button className="pr-refresh-btn" onClick={handleRefresh} disabled={refreshing}>
-            {refreshing ? '↻' : '↺'} Retry
+            <RefreshCw aria-hidden="true" /> Retry
           </button>
         </div>
       )}

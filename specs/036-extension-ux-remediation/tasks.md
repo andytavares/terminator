@@ -293,15 +293,15 @@ measured from computed colours rather than parsed stylesheet text.
 
 ## Phase 11: Polish & Cross-Cutting Concerns
 
-- [ ] T098 [P] Write `docs/adr/038-dialogs-render-in-the-extension-view.md` recording the decision, the motivation, and why core-hosted was rejected — `WebContentsView` composites above the host DOM, so `useModalEffect` hides the extension, which would break the scrim FR-002 promises (Constitution IX)
-- [ ] T099 [P] Write `docs/adr/039-one-ui-layer-published-outward.md` recording the single-implementation decision and the alternatives considered (Constitution IX)
-- [ ] T100 [P] Update `docs/ARCHITECTURE.md` with the `packages/extension-ui` layer, the layer scale, and the per-document modal depth model
-- [ ] T101 [P] Update `docs/EXTENSION-DEVELOPMENT.md` and `packages/extension-sdk/README.md` with the v1.3.0 surface and a migration note for third-party extensions
-- [ ] T102 [P] Update `README.md` and `docs/user-guide/USER-GUIDE.md` for the four redesigned views
-- [ ] T103 [P] Add the CHANGELOG entry under `### Fixed` describing the behaviour matrix, the Escape defect and the four redesigns
+- [x] T098 [P] Write `docs/adr/038-dialogs-render-in-the-extension-view.md` recording the decision, the motivation, and why core-hosted was rejected — `WebContentsView` composites above the host DOM, so `useModalEffect` hides the extension, which would break the scrim FR-002 promises (Constitution IX)
+- [x] T099 [P] Write `docs/adr/039-one-ui-layer-published-outward.md` recording the single-implementation decision and the alternatives considered (Constitution IX)
+- [x] T100 [P] Update `docs/ARCHITECTURE.md` with the `packages/extension-ui` layer, the layer scale, and the per-document modal depth model
+- [x] T101 [P] Update `docs/EXTENSION-DEVELOPMENT.md` and `packages/extension-sdk/README.md` with the v1.3.0 surface and a migration note for third-party extensions
+- [x] T102 [P] Update `README.md` and `docs/user-guide/USER-GUIDE.md` for the four redesigned views
+- [x] T103 [P] Add the CHANGELOG entry under `### Fixed` describing the behaviour matrix, the Escape defect and the four redesigns
 - [x] T104 Convert `size={n}` icon props to CSS-controlled sizing in every component this feature rewrote, per the Complexity Tracking position (Principle XII)
 - [x] T105 Replace unicode characters used as visual elements with lucide icons in `extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx`, `merge-flow/ConflictHub.tsx` and `pr-review/FullFileList.tsx` (Principle XII)
-- [ ] T106 Record the remaining Principle XII debt in the untouched components as a follow-up issue rather than sweeping it silently into this PR
+- [x] T106 Record the remaining Principle XII debt in the untouched components as a follow-up issue rather than sweeping it silently into this PR
 - [x] T107 Delete every superseded implementation left dormant, verifying nothing references it (Constitution X)
 - [ ] T108 Run the full `quickstart.md` validation end to end
 - [ ] T109 Run the done gate from the worktree: `npm run format`, `npm run lint` (0 errors), `npm run test` — check the **exit code**, not the printed pass count — then `npx playwright test`
