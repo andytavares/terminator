@@ -199,18 +199,18 @@ showing something else. Walk all six review steps — the filled primary always 
 
 ### Tests for User Story 5 ⚠️ Write first, confirm they FAIL
 
-- [ ] T066 [P] [US5] Write a failing spec in `tests/unit/extensions/task-vault/daily-log.spec.tsx` asserting exactly one empty state renders in the main column when a day has no entries
-- [ ] T067 [P] [US5] Write a failing spec asserting the Weekly Review's primary action advances the step on all six steps (FR-030)
+- [x] T066 [P] [US5] Write a failing spec in `tests/unit/extensions/task-vault/daily-log.spec.tsx` asserting exactly one empty state renders in the main column when a day has no entries
+- [x] T067 [P] [US5] Write a failing spec asserting the Weekly Review's primary action advances the step on all six steps (FR-030)
 
 ### Implementation for User Story 5
 
-- [ ] T068 [US5] Replace the three stacked empty treatments in `extensions/task-vault/src/components/DailyLog.tsx` with one shared `EmptyState` carrying heading, explanation and two actions (FR-026)
-- [ ] T069 [US5] Rebalance the day heading so the date carries at least the weight of the day name in `extensions/task-vault/src/components/DailyLog.tsx` (FR-028)
-- [ ] T070 [US5] Replace the rail's duplicate day view with a week summary in `extensions/task-vault/src/components/TaskVaultView.tsx` (FR-027)
-- [ ] T071 [US5] Name all six steps and state position once in `extensions/task-vault/src/components/WeeklyReview.tsx`, letting the named steps double as the progress indicator (FR-029)
-- [ ] T072 [US5] Make the filled primary advance and demote skip to a subordinate link across the six step components in `extensions/task-vault/src/components/WeeklyReviewStep*.tsx` (FR-030)
-- [ ] T073 [US5] Add per-day load indication and overdue colouring in `extensions/task-vault/src/components/CalendarDrawer.tsx` (FR-031)
-- [ ] T074 [US5] Replace the icon-only toolbar controls with labelled `IconButton`s and rename "Context" to what it does in `extensions/task-vault/src/components/TaskVaultView.tsx` (FR-005)
+- [x] T068 [US5] Replace the three stacked empty treatments in `extensions/task-vault/src/components/DailyLog.tsx` with one shared `EmptyState` carrying heading, explanation and two actions (FR-026)
+- [x] T069 [US5] Rebalance the day heading so the date carries at least the weight of the day name in `extensions/task-vault/src/components/DailyLog.tsx` (FR-028)
+- [x] T070 [US5] Replace the rail's duplicate day view with a week summary in `extensions/task-vault/src/components/TaskVaultView.tsx` (FR-027)
+- [x] T071 [US5] Name all six steps and state position once in `extensions/task-vault/src/components/WeeklyReview.tsx`, letting the named steps double as the progress indicator (FR-029)
+- [x] T072 [US5] Make the filled primary advance and demote skip to a subordinate link across the six step components in `extensions/task-vault/src/components/WeeklyReviewStep*.tsx` (FR-030)
+- [x] T073 [US5] Add per-day load indication and overdue colouring in `extensions/task-vault/src/components/CalendarDrawer.tsx` (FR-031)
+- [x] T074 [US5] Replace the icon-only toolbar controls with labelled `IconButton`s and rename "Context" to what it does in `extensions/task-vault/src/components/TaskVaultView.tsx` (FR-005)
 
 **Checkpoint**: An empty day invites one action instead of reporting nothing four times.
 

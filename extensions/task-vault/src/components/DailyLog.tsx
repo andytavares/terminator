@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { EmptyState } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
 import {
   Trash2,
@@ -40,6 +41,8 @@ interface DailyLogProps {
   onGoToToday?: () => void
   isToday?: boolean
   somedayTasks?: IndexedTask[]
+  /** Opens the inbox — the other place work comes from on an empty day. */
+  onOpenInbox?: () => void
   onPickUpToday?: (taskId: string) => Promise<void>
   onDeleteBacklogTask?: (taskId: string) => Promise<void>
   onRefreshBacklog?: () => Promise<void>
@@ -69,16 +72,23 @@ function StatusIcon({
   }
 }
 
+/**
+ * The heading spent its largest type on the least useful fact.
+ *
+ * "Saturday" was set at ~48px with the date it belongs to as secondary text
+ * underneath. You know what day it is; the date is what you are navigating by,
+ * so they share one line and the date carries the weight.
+ */
 function formatDate(iso: string): { weekday: string; detail: string } {
   const [y, m, d] = iso.split('-').map(Number)
   const dt = new Date(y, m - 1, d)
   return {
-    weekday: dt.toLocaleDateString('en-US', { weekday: 'long' }),
-    detail: dt.toLocaleDateString('en-US', {
+    weekday: dt.toLocaleDateString('en-US', {
+      weekday: 'long',
       month: 'long',
       day: 'numeric',
-      year: 'numeric',
     }),
+    detail: dt.toLocaleDateString('en-US', { year: 'numeric' }),
   }
 }
 
@@ -1336,10 +1346,16 @@ function TaskRow({
   )
 }
 
-function AddTaskRow({ onAdd }: { onAdd: (text: string) => Promise<void> }): React.JSX.Element {
+function AddTaskRow({
+  onAdd,
+  startOpen = false,
+}: {
+  onAdd: (text: string) => Promise<void>
+  startOpen?: boolean
+}): React.JSX.Element {
   const [text, setText] = useState('')
   const [adding, setAdding] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(startOpen)
 
   async function submit() {
     if (!text.trim()) return
@@ -1513,6 +1529,7 @@ export function DailyLog({
   onGoToToday,
   isToday = false,
   somedayTasks = [],
+  onOpenInbox,
   onPickUpToday,
   onDeleteBacklogTask,
   onRefreshBacklog,
@@ -1549,6 +1566,12 @@ export function DailyLog({
   const progressPct = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0
   const allDone = totalTasks > 0 && doneTasks === totalTasks
   const { weekday, detail } = formatDate(log.date)
+
+  // One empty state, not three. The day is empty when it holds no tasks at all
+  // and the backlog under it is empty too; anything less and the sections speak
+  // for themselves.
+  const isEmptyDay = totalTasks === 0 && somedayTasks.length === 0
+  const [forceAddOpen, setForceAddOpen] = useState(false)
 
   function handleDragStart(taskId: string) {
     draggingId.current = taskId
@@ -1710,12 +1733,24 @@ export function DailyLog({
             <div className="daily-log__today-label">Today</div>
           </>
         )}
+        {isEmptyDay ? (
+          <EmptyState
+            heading="Nothing logged today"
+            description="Write what you are working on, or pull something across from the inbox."
+            actions={[
+              { label: 'Add task', tone: 'primary', onSelect: () => setForceAddOpen(true) },
+              { label: 'Open inbox', onSelect: () => onOpenInbox?.() },
+            ]}
+          />
+        ) : null}
         {activeTodayTasks.map((task) => renderTaskWithSubtasks(task, { draggable: true }))}
         {terminalTodayTasks.length > 0 && activeTodayTasks.length > 0 && (
           <div className="daily-log__done-divider" />
         )}
         {terminalTodayTasks.map((task) => renderTaskWithSubtasks(task))}
-        <AddTaskRow onAdd={handleAddTask} />
+        {(!isEmptyDay || forceAddOpen) && (
+          <AddTaskRow onAdd={handleAddTask} startOpen={forceAddOpen} />
+        )}
         <>
           <div className="daily-log__backlog-divider" />
           <button
@@ -1728,7 +1763,9 @@ export function DailyLog({
           {backlogExpanded && (
             <div className="daily-log__backlog-list">
               {somedayTasks.length === 0 ? (
-                <p className="daily-log__backlog-empty">No backlog items.</p>
+                isEmptyDay ? null : (
+                  <p className="daily-log__backlog-empty">No backlog items.</p>
+                )
               ) : (
                 somedayTasks.map((task) => (
                   <BacklogTaskRow
@@ -1745,10 +1782,6 @@ export function DailyLog({
           )}
         </>
       </section>
-
-      {!log.exists && (
-        <p className="daily-log__new-file">No log for today yet. Add a task to get started.</p>
-      )}
     </div>
   )
 }

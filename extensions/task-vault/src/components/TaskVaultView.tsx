@@ -10,7 +10,7 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { Dialog } from '@terminator/extension-ui'
+import { Dialog, IconButton } from '@terminator/extension-ui'
 import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
@@ -551,28 +551,31 @@ export function TaskVaultView(): React.JSX.Element {
         <div className="task-vault-view__toolbar-row">
           <div className="task-vault-view__toolbar">
             <div className="task-vault-view__toolbar-right">
-              <button
-                className={`tv-btn tv-btn--xs${viewMode === 'list' ? ' tv-btn--secondary' : ' tv-btn--ghost'}`}
+              {/* These carried `title` alone, so enumerating every button in the
+                  running view returned neither of them: a tooltip is not a
+                  label, and never appears for keyboard or touch. IconButton
+                  takes the label as a required prop. */}
+              <IconButton
+                icon={List}
+                label="List view"
+                pressed={viewMode === 'list'}
                 onClick={() => setViewMode('list')}
-                title="List view"
-              >
-                <List size={13} />
-              </button>
-              <button
-                className={`tv-btn tv-btn--xs${viewMode === 'kanban' ? ' tv-btn--secondary' : ' tv-btn--ghost'}`}
+              />
+              <IconButton
+                icon={Kanban}
+                label="Board view"
+                pressed={viewMode === 'kanban'}
                 onClick={() => setViewMode('kanban')}
-                title="Kanban view"
-              >
-                <Kanban size={13} />
-              </button>
+              />
               <div className="tv-context-filter" ref={contextMenuRef}>
                 <button
                   className={`tv-btn tv-btn--xs tv-context-filter__btn${selectedContexts.length > 0 ? ' tv-btn--secondary' : ' tv-btn--ghost'}`}
                   onClick={() => setContextMenuOpen((v) => !v)}
-                  title="Filter by context"
+                  title="Filter"
+                  aria-label="Filter by context"
                 >
                   {selectedContexts.length === 0
-                    ? 'Context'
+                    ? 'Filter'
                     : selectedContexts.length === 1
                       ? `+${selectedContexts[0]}`
                       : `${selectedContexts.length} contexts`}

@@ -110,8 +110,11 @@ describe('CalendarDrawer', () => {
     })
 
     await renderDrawer()
-    await waitFor(() => screen.getByTitle(todayStr))
-    await user.click(screen.getByTitle(todayStr))
+    // The cell's label now says what the day is carrying, not just its date —
+    // a grid already shows the date.
+    const todayCell = () => screen.getByRole('button', { name: new RegExp(`^${todayStr}`) })
+    await waitFor(todayCell)
+    await user.click(todayCell())
 
     expect(mockLoadToday).toHaveBeenCalled()
     await waitFor(() => {
@@ -213,6 +216,7 @@ describe('CalendarDrawer', () => {
     expect(screen.queryByText('Updated task')).toBeNull()
 
     // Also verify today's date is still selected (selected-date not reset)
-    expect(screen.getByTitle(todayStr)).toBeTruthy()
+    // The cell's label says what the day is carrying now, not just its date.
+    expect(screen.getByRole('button', { name: new RegExp(`^${todayStr}`) })).toBeTruthy()
   })
 })

@@ -76,8 +76,8 @@ export function WeeklyReviewStep3Projects({
         ))}
       </ul>
 
-      <button className="wr-step__next" onClick={onComplete}>
-        Next
+      <button className="tv-btn tv-btn--primary" onClick={onComplete}>
+        Next: stale
       </button>
     </div>
   )

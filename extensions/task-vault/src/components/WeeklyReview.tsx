@@ -23,6 +23,16 @@ interface WeeklyReviewPayload {
 
 const TOTAL_STEPS = 6
 
+/**
+ * The six steps, named.
+ *
+ * Position used to be stated four times over — a large numeral, the words
+ * "step 1 of 6", six unlabelled dots, and the step's own heading — while what
+ * the steps actually are was never shown. Naming them makes the row a map as
+ * well as a progress indicator, and one statement of position is enough.
+ */
+const STEP_NAMES = ['Get clear', 'Inbox', 'Projects', 'Stale', 'Someday', 'Reflect'] as const
+
 const DRAFT_KEY = 'task-vault:weekly-review-draft'
 
 export function WeeklyReview(): React.JSX.Element {
@@ -156,23 +166,20 @@ export function WeeklyReview(): React.JSX.Element {
   return (
     <div className="weekly-review">
       <div className="weekly-review__header">
-        <div className="weekly-review__header-left">
-          <span className="weekly-review__step-num">{step}</span>
-          <div>
-            <h2>Weekly Review</h2>
-            <span className="weekly-review__stepper">
-              step {step} of {TOTAL_STEPS}
-            </span>
-          </div>
-        </div>
-        <div className="weekly-review__progress">
-          {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+        <nav className="weekly-review__steps" aria-label="Weekly review steps">
+          {STEP_NAMES.map((name, i) => (
             <span
-              key={i}
-              className={`weekly-review__dot${i + 1 === step ? ' weekly-review__dot--active' : i + 1 < step ? ' weekly-review__dot--done' : ''}`}
-            />
+              key={name}
+              aria-current={i + 1 === step ? 'step' : undefined}
+              className={`weekly-review__step${i + 1 === step ? ' weekly-review__step--on' : i + 1 < step ? ' weekly-review__step--done' : ''}`}
+            >
+              {name}
+            </span>
           ))}
-        </div>
+        </nav>
+        <span className="weekly-review__stepper">
+          {step} of {TOTAL_STEPS}
+        </span>
         <div className="weekly-review__nav">
           <button className="weekly-review__nav-text-btn" onClick={openHistory}>
             History

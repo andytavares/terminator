@@ -7819,3 +7819,104 @@ h2.daily-log__date {
 .tv-data-tools[data-wide] {
   width: min(760px, 86vw);
 }
+
+/* ── Weekly Review steps (036) ───────────────────────────────────────────
+   Named, so the row is a map as well as a progress indicator. Position is
+   stated once beside it rather than four times over. */
+
+.weekly-review__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.weekly-review__step {
+  padding: 0 10px 6px 0;
+  border-bottom: 2px solid transparent;
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.weekly-review__step--done {
+  color: var(--tm-text-secondary);
+}
+
+.weekly-review__step--on {
+  border-bottom-color: var(--tm-accent);
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
+
+/* The step's own action row: the filled button always advances, and skipping
+   stays available as a link rather than as the loudest thing on screen. */
+.wr-step__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.wr-step__skip {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--tm-text-muted);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.wr-step__skip:hover {
+  color: var(--tm-text-secondary);
+}
+
+.wr-step__actions-spacer {
+  flex: 1 1 auto;
+}
+
+/* A past day still holding unfinished work. Marked by an edge as well as a
+   colour, so it does not depend on hue alone. */
+.cal-drawer__cell--overdue {
+  box-shadow: inset 0 -2px 0 var(--tm-danger);
+}
+
+/* The rail's default view. It used to repeat today's tasks — the same list the
+   main column is already showing. */
+.cal-drawer__week {
+  padding: 8px 0 4px;
+}
+
+.cal-drawer__week-title {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--tm-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cal-drawer__week-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cal-drawer__week-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+}
+
+.cal-drawer__week-count {
+  color: var(--tm-text-muted);
+  font-family: var(--tm-font-mono);
+  font-variant-numeric: tabular-nums;
+}

@@ -106,23 +106,33 @@ beforeEach(() => {
 })
 
 describe('WeeklyReview', () => {
-  it('renders 6-step stepper', async () => {
+  // Position used to be stated four times over — a large numeral, "step 1 of 6",
+  // six unlabelled dots, and the step's own heading — while what the six steps
+  // are was never shown. Now the steps are named and position is stated once.
+  it('names all six steps and states position once', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => {
-      expect(screen.getByText(/step 1 of 6/i)).toBeTruthy()
-    })
+    await waitFor(() => expect(screen.getByText('1 of 6')).toBeTruthy())
+    for (const name of ['Get clear', 'Inbox', 'Projects', 'Stale', 'Someday', 'Reflect']) {
+      expect(screen.getByText(name)).toBeTruthy()
+    }
+  })
+
+  it('marks which step you are on', async () => {
+    render(<WeeklyReview />)
+    await waitFor(() => expect(screen.getByText('1 of 6')).toBeTruthy())
+    expect(screen.getByText('Get clear').getAttribute('aria-current')).toBe('step')
   })
 
   it('step 3 shows all active projects', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 6/i))
+    await waitFor(() => screen.getByText('1 of 6'))
 
     // Navigate using header nav button (aria-label="Next step")
     const nextStepBtn = screen.getByRole('button', { name: 'Next step' })
     fireEvent.click(nextStepBtn) // → step 2
-    await waitFor(() => screen.getByText(/step 2 of 6/i))
+    await waitFor(() => screen.getByText('2 of 6'))
     fireEvent.click(screen.getByRole('button', { name: 'Next step' })) // → step 3
-    await waitFor(() => screen.getByText(/step 3 of 6/i))
+    await waitFor(() => screen.getByText('3 of 6'))
 
     expect(screen.getByText('Alpha Project')).toBeTruthy()
     expect(screen.getByText('Stale Project')).toBeTruthy()
@@ -130,13 +140,13 @@ describe('WeeklyReview', () => {
 
   it('archiving stale project removes it from step 3 list', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 6/i))
+    await waitFor(() => screen.getByText('1 of 6'))
 
     // Navigate to step 3
     fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
-    await waitFor(() => screen.getByText(/step 2 of 6/i))
+    await waitFor(() => screen.getByText('2 of 6'))
     fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
-    await waitFor(() => screen.getByText(/step 3 of 6/i))
+    await waitFor(() => screen.getByText('3 of 6'))
 
     const archiveBtn = screen.getAllByRole('button', { name: /archive/i })[0]
     fireEvent.click(archiveBtn)
@@ -174,13 +184,16 @@ describe('WeeklyReview', () => {
       })
 
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 6/i))
+    await waitFor(() => screen.getByText('1 of 6'))
 
-    // Click the step 1 "Next" button (inside step content, not header nav)
-    const step1Next = screen.getByRole('button', { name: /nothing to add|done capturing/i })
+    // Click the step 1 advance button inside the step content, not the header
+    // nav. It used to read "Nothing to add — Next", which made the loudest
+    // control on the screen the one that skips the step; it now says where it
+    // goes, and skipping is a link beside it.
+    const step1Next = screen.getByRole('button', { name: /next: inbox/i })
     fireEvent.click(step1Next)
 
-    await waitFor(() => screen.getByText(/step 2 of 6/i))
+    await waitFor(() => screen.getByText('2 of 6'))
 
     // weekly-review was called twice: once at mount, once on step 1 completion
     const reviewCalls = mockInvoke.mock.calls.filter(
@@ -205,7 +218,7 @@ describe('WeeklyReview', () => {
   // arrows; a text button in that row must opt out or its label overflows.
   it('gives the History button the text-button class, not the square arrow sizing', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 6/i))
+    await waitFor(() => screen.getByText('1 of 6'))
 
     const history = screen.getByRole('button', { name: 'History' })
     expect(history.className).toContain('weekly-review__nav-text-btn')
@@ -213,7 +226,7 @@ describe('WeeklyReview', () => {
 
   it('gives the Back button the same text-button class', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 6/i))
+    await waitFor(() => screen.getByText('1 of 6'))
     fireEvent.click(screen.getByRole('button', { name: 'History' }))
 
     await waitFor(() => screen.getByText('Past Reviews'))
@@ -224,7 +237,7 @@ describe('WeeklyReview', () => {
 
   it('offers a way into past reviews', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 6/i))
+    await waitFor(() => screen.getByText('1 of 6'))
 
     fireEvent.click(screen.getByRole('button', { name: 'History' }))
     await waitFor(() => {
@@ -235,7 +248,7 @@ describe('WeeklyReview', () => {
 
   it('completing all steps records the reflection against the review', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 6/i))
+    await waitFor(() => screen.getByText('1 of 6'))
 
     // Navigate through steps 1-5 using header nav
     for (let i = 0; i < 5; i++) {
