@@ -1,0 +1,81 @@
+extensions/speckit-pilot/tests/components/GatePanel.spec.tsx
+  s_8aa585ff1f786f::t_5bcccba6dde916 55
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 274
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 188
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_8aa585ff1f786f::t_35a5b7389706c9 288,758
+  s_8aa585ff1f786f::t_c2533dddbbba91 283,285-286
+extensions/git-integration/src/components/merge-flow/ConflictHub.tsx
+  s_8aa585ff1f786f::t_c2533dddbbba91 198,204,210,238,260
+tests/unit/lint/extension-vocabulary.spec.ts
+  s_8aa585ff1f786f::t_ee13adb296cc05 1-44,49-68,77-94
+  s_8aa585ff1f786f::t_02a270af840a70 45-48,69-76
+.eslintrc.json
+  s_8aa585ff1f786f::t_b9d2d8196398e0 63-64,66
+  s_8aa585ff1f786f::t_f6c9ac49bbbaa8 51-52,54-56,58-60,62
+  s_8aa585ff1f786f::t_ee14bb9e1b36a0 65
+  s_8aa585ff1f786f::t_d4e4f63b0eb4c5 53,57,61
+docs/EXTENSION-STYLE.md
+  s_8aa585ff1f786f::t_5cde97feee6133 1-133
+extensions/notepad/src/components/EmptyState.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 17-18
+extensions/speckit-pilot/tests/components/SupervisionPanel.spec.tsx
+  s_8aa585ff1f786f::t_5bcccba6dde916 264
+extensions/speckit-pilot/src/components/SupervisionPanel.tsx
+  s_8aa585ff1f786f::t_02a270af840a70 241-242
+extensions/task-vault/src/components/DailyLog.tsx
+  s_8aa585ff1f786f::t_35a5b7389706c9 520
+extensions/git-integration/src/components/merge-flow/KeepBothModal.tsx
+  s_8aa585ff1f786f::t_c2533dddbbba91 131,137,147,149,239
+extensions/git-integration/src/components/pr-review/HealthChips.tsx
+  s_8aa585ff1f786f::t_c2533dddbbba91 143
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_8aa585ff1f786f::t_c2533dddbbba91 349
+extensions/git-integration/src/components/merge-flow/ManualEditor.tsx
+  s_8aa585ff1f786f::t_c2533dddbbba91 130-132
+extensions/task-vault/src/components/LinkPicker.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 62
+extensions/remote-control/src/components/RemoteControlSettings.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 140,187
+  s_8aa585ff1f786f::t_c2533dddbbba91 214
+extensions/task-vault/src/components/LinkedVaultPanel.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 54
+  s_8aa585ff1f786f::t_ef506e54c5326f 56
+extensions/speckit-pilot/src/components/RunDashboard.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 359
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_8aa585ff1f786f::t_35a5b7389706c9 140,145,404
+  s_8aa585ff1f786f::t_5bcccba6dde916 142,148,191,208,211,407
+extensions/speckit-pilot/src/components/ArtifactsPanel.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 116
+extensions/speckit-pilot/src/components/CardDetail.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 17
+extensions/notepad/src/components/NoteList.tsx
+  s_8aa585ff1f786f::t_35a5b7389706c9 209
+extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx
+  s_8aa585ff1f786f::t_c2533dddbbba91 147,218
+extensions/speckit-pilot/src/components/GatePanel.tsx
+  s_8aa585ff1f786f::t_8b109f753d2573 142
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_8aa585ff1f786f::t_d0532002b39f31 500
+specs/036-extension-ux-remediation/tasks.md
+  s_8aa585ff1f786f::t_d0f1bb515463a8 257,261-265
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "d6b1d9ef4103f33fbc9a9ced571ea2f30fe34806",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
