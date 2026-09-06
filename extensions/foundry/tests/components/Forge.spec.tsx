@@ -46,6 +46,9 @@ function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
     if (channel === 'foundry:run.recipes') return { recipes: [], proposed: 'standard' }
     if (channel === 'foundry:order.converge')
       return { order: current, compile: compileOrder(current) }
+    if (channel === 'foundry:order.writeBack') {
+      return { order: current, compile: compileOrder(current) }
+    }
     if (channel === 'foundry:order.mapState') {
       return { ok: true, mapping: { started: null, in_review: 'st-progress', done: null } }
     }
@@ -572,5 +575,27 @@ describe('while the architect is working', () => {
     await vi.advanceTimersByTimeAsync(9_000)
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length).toBe(settled)
     vi.useRealTimers()
+  })
+})
+
+describe('what this order writes back (FR-062)', () => {
+  it('offers each write-back, checked from the order', async () => {
+    mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
+    await waitFor(() => screen.getByText('Tracker write-back'))
+    expect(screen.getByLabelText(/The agreed order, as a comment/)).toBeTruthy()
+    expect(screen.getByLabelText(/Move its workflow state/)).toBeTruthy()
+    expect(screen.getByLabelText(/The pull request links/)).toBeTruthy()
+  })
+
+  it('turns one on for this order alone', async () => {
+    mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
+    await waitFor(() => screen.getByText('Tracker write-back'))
+    fireEvent.click(screen.getByLabelText(/Move its workflow state/))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.writeBack', {
+        id: 'WO-1',
+        writeBack: ['status'],
+      })
+    )
   })
 })

@@ -152,3 +152,48 @@ describe('merging one in', () => {
     expect(() => applyProposal(bad as WorkOrder, parseProposal({}), NOW)).toThrow()
   })
 })
+
+describe('what an agent read, as opposed to what Foundry measured', () => {
+  it('takes the findings half of context', () => {
+    const after = applyProposal(
+      order(),
+      parseProposal({
+        findings: {
+          entryPoints: ['src/auth/session.ts'],
+          conventions: ['errors are returned, never thrown'],
+          priorArt: ['abc123 widened the same row'],
+        },
+      }),
+      NOW
+    )
+    expect(after.context.entryPoints).toEqual(['src/auth/session.ts'])
+    expect(after.context.conventions).toEqual(['errors are returned, never thrown'])
+    expect(after.context.priorArt).toEqual(['abc123 widened the same row'])
+  })
+
+  it('refuses the measured half — a probe result is not the agent to rewrite', () => {
+    // An agent that could rewrite the toolchain could tell the ladder a
+    // command exists that does not.
+    for (const field of ['repos', 'toolchain', 'houseDocs']) {
+      expect(() => parseProposal({ findings: { [field]: [] } }), field).toThrow(ProposalRejected)
+    }
+  })
+
+  it('refuses `context` itself', () => {
+    expect(() => parseProposal({ context: {} })).toThrow(ProposalRejected)
+  })
+
+  it('leaves the measured half exactly as it was', () => {
+    const before = order()
+    const after = applyProposal(before, parseProposal({ findings: { conventions: ['x'] } }), NOW)
+    expect(after.context.repos).toEqual(before.context.repos)
+    expect(after.context.toolchain).toEqual(before.context.toolchain)
+    expect(after.context.houseDocs).toEqual(before.context.houseDocs)
+  })
+
+  it('leaves findings alone when the proposal named none', () => {
+    const before = order()
+    const after = applyProposal(before, parseProposal({ note: 'x' }), NOW)
+    expect(after.context.conventions).toEqual(before.context.conventions)
+  })
+})

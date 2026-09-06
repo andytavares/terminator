@@ -15,9 +15,27 @@ import type { WorkOrder } from './schema.js'
 
 const orderShape = WorkOrderSchema.shape
 
+/**
+ * The half of context an agent may propose.
+ *
+ * What Foundry *measured* — the repositories, the probed toolchain, the house
+ * documents it found — is not the agent's to overwrite. What the agent *read*
+ * is: the entry points a change would touch, the conventions the surrounding
+ * code keeps, and the prior art it found. Those are findings, and nothing else
+ * fills them: Scout runs after agreement, which is too late to inform one.
+ */
+const FindingsSchema = z
+  .object({
+    entryPoints: z.array(z.string()).optional(),
+    conventions: z.array(z.string()).optional(),
+    priorArt: z.array(z.string()).optional(),
+  })
+  .strict()
+
 export const ProposalSchema = z
   .object({
     intent: orderShape.intent.optional(),
+    findings: FindingsSchema.optional(),
     acceptance: orderShape.acceptance.optional(),
     risk: orderShape.risk.optional(),
     budgets: orderShape.budgets.optional(),
@@ -64,15 +82,24 @@ export function parseProposal(value: unknown): Proposal {
  * replacement, so an operator's struck assumption is not undone by the next
  * redraft.
  *
- * `status`, `id`, `source`, `provenance`, `context` and `redTeam` are not
- * reachable from here at all. The first two would let an agent agree its own
- * work; `context` is Scout's, read from the repository rather than decided;
- * and `redTeam` is written by a reader who is not allowed to fix what it finds.
+ * `status`, `id`, `source`, `provenance` and `redTeam` are not reachable from
+ * here at all. The first two would let an agent agree its own work, and
+ * `redTeam` is written by a reader who is not allowed to fix what it finds.
+ * Of `context`, only the findings half is reachable — see `FindingsSchema`.
  */
 export function applyProposal(order: WorkOrder, proposal: Proposal, at: string): WorkOrder {
   const next: WorkOrder = {
     ...order,
     intent: proposal.intent ?? order.intent,
+    // Findings only. `repos`, `toolchain` and `houseDocs` are what Foundry
+    // measured, and an agent that could rewrite them could tell the ladder a
+    // command exists that does not.
+    context: {
+      ...order.context,
+      entryPoints: proposal.findings?.entryPoints ?? order.context.entryPoints,
+      conventions: proposal.findings?.conventions ?? order.context.conventions,
+      priorArt: proposal.findings?.priorArt ?? order.context.priorArt,
+    },
     acceptance: proposal.acceptance ?? order.acceptance,
     risk: proposal.risk ?? order.risk,
     budgets: proposal.budgets ?? order.budgets,

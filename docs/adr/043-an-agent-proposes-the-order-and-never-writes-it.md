@@ -39,11 +39,19 @@ one-line note.
 Four properties carry the decision.
 
 **The order is not writable by an agent.** `status`, `id`, `source`,
-`provenance`, `context` and `redTeam` are unreachable from a proposal. An agent
-that could set `status` could agree its own work; one that could rewrite
-`provenance` could erase how the order got that way; `context` is read from the
-repository rather than decided; and `redTeam` belongs to a reader that is not
-allowed to fix what it finds.
+`provenance` and `redTeam` are unreachable from a proposal. An agent that could
+set `status` could agree its own work; one that could rewrite `provenance`
+could erase how the order got that way; and `redTeam` belongs to a reader that
+is not allowed to fix what it finds.
+
+`context` is split, because the two halves have different owners. What Foundry
+**measured** — the repositories, the probed toolchain, the house documents it
+found — is unreachable: an agent that could rewrite the toolchain could tell
+the verification ladder a command exists that does not. What the agent **read**
+— entry points, the conventions the surrounding code keeps, prior art — is
+reachable as `findings`, because it is a finding rather than a measurement and
+nothing else fills it: Scout runs after agreement, which is too late to inform
+one.
 
 **A refused field is refused, not dropped.** The schema is `strict()`, so a
 proposal carrying `status: "agreed"` fails and says so. Silently discarding it

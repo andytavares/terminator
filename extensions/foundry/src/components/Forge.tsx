@@ -5,7 +5,7 @@ import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
 import { surfacedQuestions } from '../forge/interview.js'
 import { liveAssumptions } from '../forge/assumptions.js'
-import type { StateMapping, TransitionIntent } from '../order/schema.js'
+import type { StateMapping, TransitionIntent, WriteBack } from '../order/schema.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
 
 // The Forge.
@@ -49,6 +49,13 @@ interface RecipesView {
 }
 
 const INTENTS: readonly TransitionIntent[] = ['started', 'in_review', 'done']
+
+/** What this order writes back to its issue, and what each one is. */
+const WRITE_BACKS: readonly { id: WriteBack; label: string }[] = [
+  { id: 'summary_comment', label: 'The agreed order, as a comment' },
+  { id: 'status', label: 'Move its workflow state' },
+  { id: 'pr_link', label: 'The pull request links' },
+]
 
 /** What each intent means in plain terms — the tracker's words are its own. */
 const INTENT_LABELS: Record<TransitionIntent, string> = {
@@ -140,6 +147,16 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
       live = false
     }
   }, [orderId])
+
+  const setWriteBack = useCallback(
+    async (writeBack: WriteBack[]) => {
+      const next = (await invoke('foundry:order.writeBack', { id: orderId, writeBack })) as
+        | OrderView
+        | { error: string }
+      if ('order' in next) setView(next)
+    },
+    [orderId]
+  )
 
   const mapIntent = useCallback(
     async (intent: TransitionIntent, optionId: string | null) => {
@@ -423,6 +440,28 @@ export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element
                 ))}
               </>
             )}
+
+            {/* Per order, defaulting from configuration (FR-062). A run
+                against somebody else's repository is a reason to turn one off
+                without changing the setting for every order after it. */}
+            <div className="fdry-writebacks">
+              {WRITE_BACKS.map((kind) => (
+                <label key={kind.id} className="fdry-writeback">
+                  <input
+                    type="checkbox"
+                    checked={order.writeBack.includes(kind.id)}
+                    onChange={(event) =>
+                      void setWriteBack(
+                        event.target.checked
+                          ? [...order.writeBack, kind.id]
+                          : order.writeBack.filter((w) => w !== kind.id)
+                      )
+                    }
+                  />
+                  {kind.label}
+                </label>
+              ))}
+            </div>
           </section>
         ) : null}
 

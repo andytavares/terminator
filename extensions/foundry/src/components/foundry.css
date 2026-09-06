@@ -682,6 +682,23 @@
   color: var(--tm-text-secondary);
 }
 
+.fdry-writebacks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.fdry-writeback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
 /* One intent per row: what it means, and which state it maps to. */
 .fdry-map {
   display: flex;

@@ -6,7 +6,7 @@ import { strikeAssumption } from '../forge/assumptions.js'
 import { applyFindings, resolveFinding, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
-import { TransitionIntentSchema } from '../order/schema.js'
+import { TransitionIntentSchema, WriteBackSchema } from '../order/schema.js'
 import type { TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
 
@@ -58,6 +58,11 @@ const TurnPayload = z.object({
 })
 
 const CompilePayload = z.object({ id: z.string(), commit: z.boolean().default(false) })
+
+const WriteBackPayload = z.object({
+  id: z.string(),
+  writeBack: z.array(WriteBackSchema),
+})
 
 const MapStatePayload = z.object({
   id: z.string(),
@@ -113,6 +118,8 @@ export interface ForgeChannels {
   states(payload: unknown): Promise<unknown>
   /** Record which state one intent means for this order. */
   mapState(payload: unknown): Promise<unknown>
+  /** Turn each write-back on or off for this order (FR-062). */
+  setWriteBack(payload: unknown): Promise<unknown>
 }
 
 /** The order plus its checks — what every Forge channel hands back. */
@@ -412,5 +419,37 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     }
   }
 
-  return { create, turn, compile, list, states, mapState, converge }
+  /**
+   * Which write-backs this order does.
+   *
+   * Per order, defaulting from configuration (FR-062): a run against somebody
+   * else's repository, or one seeded from an issue nobody else watches, is a
+   * reason to turn one off without changing the setting for every order after
+   * it.
+   */
+  async function setWriteBack(raw: unknown): Promise<unknown> {
+    const parsed = WriteBackPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const order = await deps.store.load(parsed.data.id)
+    if (order === null) return { error: `No order ${parsed.data.id}.` }
+
+    const next: WorkOrder = { ...order, writeBack: parsed.data.writeBack }
+    await deps.store.save(next)
+    await deps.store.record({
+      at: deps.now(),
+      orderId: parsed.data.id,
+      actor: 'operator',
+      action: 'writeback.configured',
+      subject: parsed.data.id,
+      reason:
+        parsed.data.writeBack.length === 0
+          ? 'nothing is written back to the tracker'
+          : parsed.data.writeBack.join(', '),
+      evidence: [],
+    })
+    return view(next, ['writeBack'])
+  }
+
+  return { create, turn, compile, list, states, mapState, converge, setWriteBack }
 }

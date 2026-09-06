@@ -761,3 +761,55 @@ describe('clearing an adversarial finding — the other thing that blocked the g
     expect(compiled.compile.failures.map((f) => f.check)).not.toContain('redTeam')
   })
 })
+
+describe('turning a write-back off for one order (FR-062)', () => {
+  it('keeps what the operator chose', async () => {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    const r = (await channels().setWriteBack({
+      id: seed.order.id,
+      writeBack: ['summary_comment'],
+    })) as OrderView
+
+    expect(r.order.writeBack).toEqual(['summary_comment'])
+    expect((await store.load(seed.order.id))?.writeBack).toEqual(['summary_comment'])
+  })
+
+  it('takes none at all', async () => {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    const r = (await channels().setWriteBack({ id: seed.order.id, writeBack: [] })) as OrderView
+    expect(r.order.writeBack).toEqual([])
+  })
+
+  it('records the choice, and says what it means when it is nothing', async () => {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    await channels().setWriteBack({ id: seed.order.id, writeBack: [] })
+    const ledger = fs.readFileSync(path.join(root, 'orders', seed.order.id, 'ledger.jsonl'), 'utf8')
+    expect(ledger).toContain('writeback.configured')
+    expect(ledger).toContain('nothing is written back')
+  })
+
+  it('refuses a write-back this build does not have', async () => {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(await channels().setWriteBack({ id: seed.order.id, writeBack: ['everything'] })).toEqual(
+      { error: 'Malformed request.' }
+    )
+  })
+
+  it('reports an order it cannot find', async () => {
+    expect(await channels().setWriteBack({ id: 'WO-nope', writeBack: [] })).toEqual({
+      error: 'No order WO-nope.',
+    })
+  })
+})
