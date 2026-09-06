@@ -1,0 +1,81 @@
+extensions/foundry/tests/ipc/run-actions-ipc.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-500
+tests/e2e/extension-themes.spec.ts
+  s_357c91d2b54b02::t_e377bd97d8e7b1 94,101,108,112,119,123,127
+extensions/foundry/tests/ipc/approval-hash-ipc.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-301
+package.json
+  s_357c91d2b54b02::t_49ef0b9355ef2e 34
+extensions/foundry/tests/runner/agent-runner.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-1074
+tests/unit/renderer/extensions/registry.spec.ts
+  s_357c91d2b54b02::t_e377bd97d8e7b1 365,379
+extensions/foundry/tests/components/RunDashboard.spec.tsx
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-372
+extensions/foundry/tests/runtime/claude-launch.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-258
+extensions/foundry/src/renderer/main.tsx
+  s_357c91d2b54b02::t_e8811adf55b60d 1-8
+extensions/foundry/tests/components/SettingsMaxConcurrent.spec.tsx
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-54
+tests/e2e/extension-smoke.spec.ts
+  s_357c91d2b54b02::t_e377bd97d8e7b1 33
+tests/e2e/extension-keyboard.spec.ts
+  s_357c91d2b54b02::t_e377bd97d8e7b1 139
+extensions/foundry/tests/ipc/index-ipc.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-1468
+extensions/foundry/src/components/SettingsView.tsx
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-635
+extensions/foundry/CLAUDE.md
+  s_357c91d2b54b02::t_5ef2fbe0749918 1-56
+extensions/foundry/tests/components/App.spec.tsx
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-242
+extensions/foundry/src/types/electron.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-613
+extensions/foundry/package.json
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-19
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-2906
+extensions/foundry/tests/unit/renderer/main.spec.tsx
+  s_357c91d2b54b02::t_3c7e75b478676e 1-27
+extensions/foundry/tests/types/electron.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-93
+extensions/foundry/index.html
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-12
+extensions/foundry/tests/ipc/speckit.ipc.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-173
+specs/037-foundry-software-factory/tasks.md
+  s_357c91d2b54b02::t_6b3b0de502cbbc 31-40
+extensions/foundry/src/runner/agent-runner.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-766
+extensions/foundry/src/runtime/permission-bridge.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-337
+extensions/foundry/tests/ipc/phase4-ipc.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-554
+extensions/foundry/src/components/RunDashboard.tsx
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-431
+extensions/foundry/tests/ipc/diag.spec.ts
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-95
+extensions/foundry/manifest.json
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-16
+extensions/foundry/src/renderer/App.tsx
+  s_357c91d2b54b02::t_49ef0b9355ef2e 1-174
+package-lock.json
+  s_357c91d2b54b02::t_790c98a66c9d32 74-87,210,3191-3194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "3b8b830944ea05a38c5a2bd92afeb8952dd4e77b",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
