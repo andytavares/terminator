@@ -146,7 +146,7 @@ import {
 import { createForgeChannels } from './ipc/forge-channels.js'
 import { createRunChannels } from './ipc/run-channels.js'
 import { createOrderStore } from './order/store.js'
-import { resolveDataRoot } from './data-root.js'
+import { resolveDataRoot, untrackedNotice } from './data-root.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
 import { createPendingPermissions } from './runtime/pending-permissions.js'
@@ -332,6 +332,25 @@ function makePhaseCallbacks(
  * change. A configured absolute path takes every order, which is the only
  * workable answer once an order spans repositories.
  */
+/**
+ * Tell the operator once that the default records location is untracked.
+ *
+ * Best-effort in every direction: a host with no notification surface, or a
+ * settings store that will not answer, must not stop the extension loading.
+ */
+function noteUntrackedDataRoot(api: ExtensionAPI, root: string): void {
+  try {
+    const configured = api.settings?.get<string>('terminator.foundry.dataDir') ?? ''
+    const notice = untrackedNotice({ root, usingDefault: configured.trim() === '' })
+    if (notice === null) return
+    if (api.settings?.get<boolean>('terminator.foundry.untrackedNoticeSeen') === true) return
+    api.notifications?.showToast('info', notice, 'untrackedDataRoot')
+    api.settings?.set('terminator.foundry.untrackedNoticeSeen', true)
+  } catch {
+    // Nothing here is worth failing activation for.
+  }
+}
+
 function resolveFoundryDataRoot(api: ExtensionAPI): string {
   // Every read here is optional. Activation is called synchronously by the
   // host and must not throw because one capability is absent — a host that
@@ -1196,6 +1215,11 @@ export function activate(api: ExtensionAPI): void {
   // an order can span repositories, so "the working directory" is ambiguous
   // and two writers resolving it independently could disagree.
   const foundryDataRoot = resolveFoundryDataRoot(api)
+
+  // Said once, and only when the default location is in use. Foundry will not
+  // add the ignore entry itself — that would be editing a file no order asked
+  // to change — so the operator is told what it costs and what avoids it.
+  noteUntrackedDataRoot(api, foundryDataRoot)
   const forge = createForgeChannels({
     store: createOrderStore(foundryDataRoot),
     now: () => new Date().toISOString(),
@@ -2967,6 +2991,12 @@ export function activate(api: ExtensionAPI): void {
             'Touching one of these raises a decision before anything is pushed. Foundry never infers this list.',
           default: '',
           workspaceScoped: true,
+        },
+        // Written by the extension, not shown: it is how "once" is remembered.
+        'terminator.foundry.untrackedNoticeSeen': {
+          type: 'boolean',
+          label: 'Untracked records notice has been shown',
+          default: false,
         },
         'terminator.foundry.enabled': {
           type: 'boolean',

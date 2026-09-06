@@ -230,3 +230,24 @@ describe('proposeRecipe', () => {
     ).toBe('standard')
   })
 })
+
+describe('the records location', () => {
+  it('refuses to start when the records location cannot be written to, before any work begins', async () => {
+    await store.save(order())
+    const wall = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-wall-'))
+    fs.chmodSync(wall, 0o500)
+    const blocked = createRunChannels({
+      store,
+      dataRoot: path.join(wall, 'foundry'),
+      sources: { dataRoot, repoPaths: [repo], builtInDir },
+      now: () => '2026-09-06T10:00:00.000Z',
+    })
+    const r = (await blocked.start({ id: 'WO-1' })) as { error: string }
+    fs.chmodSync(wall, 0o700)
+    fs.rmSync(wall, { recursive: true, force: true })
+
+    expect(r.error).toContain('foundry')
+    // And the order is untouched — no half-started run.
+    expect((await store.load('WO-1'))?.status).toBe('agreed')
+  })
+})

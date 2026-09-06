@@ -186,17 +186,17 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests for User Story 4 (write first, must fail)
 
-- [ ] T077 [P] [US4] Spec asserting no write path targets a directory inside a target repository other than the change itself — including that `.gitignore` is never touched — in `extensions/foundry/tests/data-root.spec.ts`
-- [ ] T078 [P] [US4] Spec for the unwritable records location failing at order start, naming the path, with no work begun, in `extensions/foundry/tests/data-root.spec.ts`
-- [ ] T079 [P] [US4] Spec for unavailable checks being reported before work starts rather than at the end, in `extensions/foundry/tests/verify/toolchain-probe.spec.ts`
-- [ ] T080 [P] [US4] End-to-end footprint spec: run an order in a scratch repository and assert `git status --porcelain` shows the change and at most the warned-about untracked directory, in `tests/e2e/foundry-footprint.spec.ts`
+- [x] T077 [P] [US4] Spec asserting no write path targets a directory inside a target repository other than the change itself — including that `.gitignore` is never touched — in `extensions/foundry/tests/data-root.spec.ts`
+- [x] T078 [P] [US4] Spec for the unwritable records location failing at order start, naming the path, with no work begun, in `extensions/foundry/tests/data-root.spec.ts`
+- [x] T079 [P] [US4] Spec for unavailable checks being reported before work starts rather than at the end, in `extensions/foundry/tests/verify/toolchain-probe.spec.ts`
+- [x] T080 [P] [US4] Footprint spec: run an order in a scratch git repository in another language and assert `git status --porcelain` is empty afterwards, in `tests/integration/foundry-portability.spec.ts`. **Moved out of Playwright**: the test drives no interface, and Playwright's loader cannot resolve the extension's `.js` import specifiers. Putting a filesystem-and-process test behind a browser runner bought nothing but a slower loop
 
 ### Implementation for User Story 4
 
-- [ ] T081 [US4] Implement the pre-flight writability check at order start in `extensions/foundry/src/line/scheduler.ts`
-- [ ] T082 [US4] Surface the probed toolchain, including which checks will be unavailable, on the order before work starts in `extensions/foundry/src/components/Forge.tsx`
-- [ ] T083 [US4] Emit the one-time untracked-directory notice when the default records location is used, without modifying any repository file, in `extensions/foundry/src/data-root.ts`
-- [ ] T084 [P] [US4] Read whatever house documents the repository carries — constitution, `CLAUDE.md`, `AGENTS.md`, editor and lint config — and complete intake when it carries none, in `extensions/foundry/src/forge/intake-source.ts`
+- [x] T081 [US4] Implement the pre-flight writability check at order start in `extensions/foundry/src/line/scheduler.ts`
+- [x] T082 [US4] Surface the probed toolchain, including which checks will be unavailable, on the order before work starts in `extensions/foundry/src/components/Forge.tsx`
+- [x] T083 [US4] Emit the one-time untracked-directory notice when the default records location is used, without modifying any repository file, in `extensions/foundry/src/data-root.ts`
+- [x] T084 [P] [US4] Read whatever house documents the repository carries — constitution, `CLAUDE.md`, `AGENTS.md`, editor and lint config — and complete intake when it carries none, in `extensions/foundry/src/forge/intake-source.ts`
 
 **Checkpoint**: The tool works in a repository it has never seen, and proves it in a repository that is not this one.
 

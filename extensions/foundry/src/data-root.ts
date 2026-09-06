@@ -67,6 +67,24 @@ export function ledgerPath(root: string, orderId: string): string {
 export type WritableResult = { ok: true } | { ok: false; reason: string }
 
 /**
+ * What to tell the operator, once, about the default location.
+ *
+ * Taking the default leaves an untracked directory in every repository an
+ * order runs in, and Foundry will not tidy it away — adding an ignore entry
+ * means editing a file the order did not ask to change. So it says so, and
+ * says what avoids it, and then never mentions it again.
+ */
+export function untrackedNotice(resolution: DataRootResolution): string | null {
+  if (!resolution.usingDefault) return null
+  return (
+    `Foundry is writing its records to ${resolution.root}, which is untracked and which ` +
+    `Foundry will not add to your .gitignore — that would mean editing a file your order did ` +
+    `not ask to change. Setting one folder in settings avoids it, and is the only workable ` +
+    `answer once an order spans repositories.`
+  )
+}
+
+/**
  * Checked when an order starts, not at first write (FR-075).
  *
  * An order that fails half way through because a directory could not be
