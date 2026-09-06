@@ -1,0 +1,91 @@
+extensions/foundry/src/line/roles.ts
+  s_357c91d2b54b02::t_d8ebd8fdb3e7bb 1-82
+extensions/foundry/roles/red-team.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-18
+extensions/foundry/src/ipc/run-channels.ts
+  s_357c91d2b54b02::t_809204a7e9b094 1-169
+  s_357c91d2b54b02::t_2d43b12af2030e 170-174
+extensions/foundry/tests/recipe/step-kinds.spec.ts
+  s_357c91d2b54b02::t_072ffe1ffb9a12 1-141
+  s_357c91d2b54b02::t_decca01d5a7c64 142-159
+extensions/foundry/recipes/bugfix.yaml
+  s_357c91d2b54b02::t_81c7120b32814f 1-55
+extensions/foundry/tests/line/roles.spec.ts
+  s_357c91d2b54b02::t_71556ec6d954dd 1-112
+extensions/foundry/tests/line/run-graph.spec.ts
+  s_357c91d2b54b02::t_1e8cb166fd0028 1-167
+  s_357c91d2b54b02::t_9b638e882e23e3 168-237
+  s_357c91d2b54b02::t_a535549409c469 238-264
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_357c91d2b54b02::t_68bae55d94e2d5 1-200
+  s_357c91d2b54b02::t_cfe86bd24cb618 201-232
+extensions/foundry/tests/line/scheduler.spec.ts
+  s_357c91d2b54b02::t_5f9b2670e0f419 1-266
+  s_357c91d2b54b02::t_d9a9aa4c63f19e 267-274
+extensions/foundry/src/line/run-graph.ts
+  s_357c91d2b54b02::t_4e4614b8a3e03e 1-131
+extensions/foundry/roles/foreman.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-14
+extensions/foundry/roles/architect.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-21
+extensions/foundry/recipes/refactor.yaml
+  s_357c91d2b54b02::t_81c7120b32814f 1-48
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_357c91d2b54b02::t_8cd240445f0b64 1-176,184,196,207-214
+  s_357c91d2b54b02::t_effef9e0405c8d 177-183,185-195,197-206
+  s_357c91d2b54b02::t_a6b984a7e42fe4 215-217
+extensions/foundry/roles/builder.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-17
+extensions/foundry/recipes/standard.yaml
+  s_357c91d2b54b02::t_81c7120b32814f 1-45
+specs/037-foundry-software-factory/tasks.md
+  s_357c91d2b54b02::t_5134c747934f89 117-122,126-136,140-145
+extensions/foundry/roles/integrator.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-14
+extensions/foundry/src/recipe/resolve.ts
+  s_357c91d2b54b02::t_3913d0ca2382a7 1-135
+  s_357c91d2b54b02::t_5b5797d1bbb9ba 136-141
+extensions/foundry/src/recipe/requirements.ts
+  s_357c91d2b54b02::t_03f8496293bce3 1-99
+extensions/foundry/tests/recipe/resolve.spec.ts
+  s_357c91d2b54b02::t_6ac28120dc060d 1-217
+  s_357c91d2b54b02::t_7eaa1961dc8ac4 218-222
+extensions/foundry/roles/scribe.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-17
+extensions/foundry/roles/verifier.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-21
+extensions/foundry/recipes/direct.yaml
+  s_357c91d2b54b02::t_81c7120b32814f 1-37
+extensions/foundry/recipes/spike.yaml
+  s_357c91d2b54b02::t_81c7120b32814f 1-19
+extensions/foundry/roles/scout.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-19
+extensions/foundry/recipes/speckit.yaml
+  s_357c91d2b54b02::t_81c7120b32814f 1-62
+extensions/foundry/src/line/scheduler.ts
+  s_357c91d2b54b02::t_96c6e91976cce7 1-185
+  s_357c91d2b54b02::t_39b1119895c5ae 186-191
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_678586fce9b044 147,1198,1200,1222-1242
+  s_357c91d2b54b02::t_c1937dd0eede44 1243
+extensions/foundry/src/recipe/step-kinds.ts
+  s_357c91d2b54b02::t_7aa7620f58990c 1-127
+extensions/foundry/roles/inspector.yaml
+  s_357c91d2b54b02::t_d357696e43c7cd 1-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "8e785f9c1cc30b7f0796f1eef55d55c1d7192c5f",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
