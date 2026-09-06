@@ -1,0 +1,57 @@
+docs/user-guide/USER-GUIDE.md
+  s_357c91d2b54b02::t_a50e8555b9e784 615-623
+  s_357c91d2b54b02::t_ca868c433e429b 580-586
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_357c91d2b54b02::t_c4ae760b370c9d 242-245,248-252,257-258,263
+  s_357c91d2b54b02::t_87466b1e3a82b2 201-204,208-212,227-229,233-241,246-247,253-256,259-262,264-268
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_357c91d2b54b02::t_3bc4112eb43b52 210,263-278
+  s_357c91d2b54b02::t_63e3115da3f766 279
+extensions/foundry/tests/ipc/ledger-channels.spec.ts
+  s_357c91d2b54b02::t_c5cb2985d3f80c 10,20-40,46,298-353
+  s_357c91d2b54b02::t_dfaee66046f7d9 354
+extensions/foundry/src/ipc/ledger-channels.ts
+  s_357c91d2b54b02::t_5ab00f2a59d29d 6-12,37-46,53-59,67-68,153-188
+extensions/foundry/src/ipc/run-channels.ts
+  s_357c91d2b54b02::t_5521141984f86c 81-86,88,94-98,100-117,150-152,168,174,177-183,328-329
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_5865f40cc8cddc 12,1248-1265,1271-1272
+extensions/foundry/src/components/Ledger.tsx
+  s_357c91d2b54b02::t_a34dc07f1cba0d 2,21-32,52,55,63-64,80-82,110-131,219-220,222-223,225-232,239,241-246
+  s_357c91d2b54b02::t_886cc8b13d85df 56-62,218,221,224,238,240
+  s_357c91d2b54b02::t_c315bdc777bf77 90-109
+  s_357c91d2b54b02::t_c87c9afc59003b 83,233-237,247-249
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_357c91d2b54b02::t_c315bdc777bf77 205-212,278-287,291-298,302-306,310-316,320-326,330-333
+  s_357c91d2b54b02::t_6c1fea637170ce 7-9,78-104,269-277,288-290,299-301,307-309,317-319,327-329
+  s_357c91d2b54b02::t_a0e359fb8d3463 192,202-204,217-251
+  s_357c91d2b54b02::t_7b8d2eb01bb05c 105
+extensions/foundry/src/components/Forge.tsx
+  s_357c91d2b54b02::t_a34cf424c4ee2d 48-49,350-354
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_357c91d2b54b02::t_75714719056f25 64-67,235-296
+  s_357c91d2b54b02::t_470f5b516b3fa3 297
+extensions/foundry/src/verify/rules.ts
+  s_357c91d2b54b02::t_c315bdc777bf77 167
+  s_357c91d2b54b02::t_866c3209eea838 162-166,168-173
+  s_357c91d2b54b02::t_93392a73ec3655 161
+extensions/foundry/tests/channel-registry.spec.ts
+  s_357c91d2b54b02::t_9f92d4c2757cd9 17-30,52-58
+  s_357c91d2b54b02::t_e6de0ade0551a6 59-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "6eaa7569a3ba364710316bd7e97184f5dc0341f8",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
