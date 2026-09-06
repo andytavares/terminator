@@ -276,14 +276,12 @@
   text-align: left;
 }
 
-.rc-settings__toggle::before {
-  content: '▸';
-  font-family: var(--tm-font-mono);
-  font-size: 10px;
-}
-
-.rc-settings__toggle[aria-expanded='true']::before {
-  content: '▾';
+/* Principle XII: the disclosure marker is an icon, not a ▸ printed as text. */
+.rc-settings__caret {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  align-self: center;
 }
 
 .rc-settings__summary {

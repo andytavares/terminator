@@ -163,7 +163,7 @@
 }
 
 .git-view__hook-output-summary:hover {
-  background: rgba(255, 80, 80, 0.08);
+  background: color-mix(in srgb, var(--tm-danger) 8%, transparent);
 }
 
 .git-view__hook-output-pre {
@@ -187,7 +187,7 @@
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--tm-text-primary);
-  background: var(--tm-bg-surface, rgba(0, 0, 0, 0.2));
+  background: var(--tm-bg-surface);
   border-radius: 4px;
   max-height: 160px;
   overflow-y: auto;
@@ -265,7 +265,7 @@
 }
 
 .git-view__btn--danger:hover:not(:disabled) {
-  background: rgba(255, 80, 80, 0.1);
+  background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
 }
 
 .git-view__btn--danger:disabled {
@@ -341,11 +341,11 @@
 }
 
 .staging-area__file-row--selected {
-  background: rgba(97, 175, 239, 0.12);
+  background: color-mix(in srgb, var(--tm-accent) 12%, transparent);
 }
 
 .staging-area__file-row--selected:hover {
-  background: rgba(97, 175, 239, 0.18);
+  background: color-mix(in srgb, var(--tm-accent) 18%, transparent);
 }
 
 .staging-area__badge {
@@ -400,10 +400,10 @@
 
 .staging-area__truncation-banner {
   padding: 6px 10px;
-  background: rgba(209, 154, 102, 0.15);
+  background: color-mix(in srgb, var(--tm-warning) 15%, transparent);
   color: var(--tm-warning);
   font-size: 11px;
-  border-bottom: 1px solid rgba(209, 154, 102, 0.3);
+  border-bottom: 1px solid color-mix(in srgb, var(--tm-warning) 30%, transparent);
 }
 
 /* File Diff View */
@@ -497,15 +497,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 4px 10px;
-  background: rgba(97, 175, 239, 0.1);
-  border-bottom: 1px solid rgba(97, 175, 239, 0.3);
+  background: color-mix(in srgb, var(--tm-accent) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--tm-accent) 30%, transparent);
   font-size: 11px;
   color: var(--tm-accent-text);
 }
 
 .file-diff-view__refresh-btn {
   background: none;
-  border: 1px solid rgba(97, 175, 239, 0.5);
+  border: 1px solid color-mix(in srgb, var(--tm-accent) 50%, transparent);
   border-radius: var(--tm-radius-xs);
   color: var(--tm-accent-text);
   cursor: pointer;
@@ -515,7 +515,7 @@
 
 .file-diff-view__truncation-notice {
   padding: 6px 10px;
-  background: rgba(209, 154, 102, 0.1);
+  background: color-mix(in srgb, var(--tm-warning) 10%, transparent);
   color: var(--tm-warning);
   font-size: 11px;
 }
@@ -526,7 +526,7 @@
 }
 
 .diff-hunk-header {
-  background: rgba(97, 175, 239, 0.08);
+  background: color-mix(in srgb, var(--tm-accent) 8%, transparent);
   color: var(--tm-accent-text);
   font-size: 11px;
   padding: 2px 8px;
@@ -766,7 +766,7 @@
 .pr-dialog__warning {
   font-size: 11px;
   color: var(--tm-warning);
-  background: rgba(209, 154, 102, 0.1);
+  background: color-mix(in srgb, var(--tm-warning) 10%, transparent);
   padding: 6px 10px;
   border-radius: var(--tm-radius-xs);
 }

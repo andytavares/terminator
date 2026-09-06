@@ -35,21 +35,21 @@
   --tv-color-danger: var(--tm-danger);
   --tv-color-warning: var(--tm-warning);
   --tv-color-success: var(--tm-success);
-  --tv-color-danger-bg: rgba(224, 82, 96, 0.1);
-  --tv-color-danger-border: rgba(224, 82, 96, 0.35);
+  --tv-color-danger-bg: color-mix(in srgb, var(--tm-danger) 10%, transparent);
+  --tv-color-danger-border: color-mix(in srgb, var(--tm-danger) 35%, transparent);
   --tv-color-warning-bg: color-mix(in srgb, var(--tm-warning) 12%, transparent);
   --tv-color-warning-border: color-mix(in srgb, var(--tm-warning) 35%, transparent);
   --tv-color-success-bg: color-mix(in srgb, var(--tm-success) 12%, transparent);
   --tv-color-success-border: color-mix(in srgb, var(--tm-success) 30%, transparent);
 
   /* Status colors — always explicit, never rely on inheritance */
-  --tv-status-open: var(--tm-text-secondary, rgba(255, 255, 255, 0.65));
+  --tv-status-open: var(--tm-text-secondary);
   --tv-status-in-progress: var(--tm-warning);
   --tv-status-in-review: var(--tm-accent);
   --tv-status-blocked: var(--tv-color-warning);
   --tv-status-done: var(--tv-color-success);
-  --tv-status-migrated: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
-  --tv-status-cancelled: var(--tm-text-muted, rgba(255, 255, 255, 0.35));
+  --tv-status-migrated: var(--tm-text-muted);
+  --tv-status-cancelled: var(--tm-text-muted);
 }
 
 /* ── Task Vault Extension Styles ───────────────────────────────── */
@@ -5908,7 +5908,7 @@ h2.daily-log__date {
 }
 
 .tv-detail__markdown code {
-  background: var(--tm-bg-input, rgba(0, 0, 0, 0.12));
+  background: var(--tm-bg-input);
   padding: 1px 4px;
   border-radius: 3px;
   font-family: monospace;
@@ -5916,7 +5916,7 @@ h2.daily-log__date {
 }
 
 .tv-detail__markdown pre {
-  background: var(--tm-bg-input, rgba(0, 0, 0, 0.12));
+  background: var(--tm-bg-input);
   padding: 6px 8px;
   border-radius: 4px;
   overflow-x: auto;
@@ -7347,7 +7347,7 @@ h2.daily-log__date {
 .dtp__cal-dow {
   font-size: 10px;
   font-weight: 600;
-  color: var(--tm-text-muted, rgba(120, 120, 176, 0.7));
+  color: var(--tm-text-muted, color-mix(in srgb, var(--tm-accent) 70%, transparent));
   text-align: center;
   padding: 2px 0 4px;
 }
@@ -7376,7 +7376,7 @@ h2.daily-log__date {
 }
 
 .dtp__cal-day--other {
-  color: var(--tm-text-muted, rgba(120, 120, 176, 0.4));
+  color: var(--tm-text-muted, color-mix(in srgb, var(--tm-accent) 40%, transparent));
   opacity: 0.4;
 }
 
@@ -7422,7 +7422,7 @@ h2.daily-log__date {
   flex: 1;
   background: none;
   border: none;
-  color: var(--tm-text-muted, rgba(120, 120, 176, 0.6));
+  color: var(--tm-text-muted, color-mix(in srgb, var(--tm-accent) 60%, transparent));
   font-size: 11px;
   font-weight: 600;
   font-family: inherit;
@@ -7451,7 +7451,7 @@ h2.daily-log__date {
 .dtp__time-header {
   font-size: 10px;
   font-weight: 600;
-  color: var(--tm-text-muted, rgba(120, 120, 176, 0.7));
+  color: var(--tm-text-muted, color-mix(in srgb, var(--tm-accent) 70%, transparent));
   padding: 10px 12px 6px;
   border-bottom: 1px solid var(--tm-border);
 }
@@ -7462,7 +7462,7 @@ h2.daily-log__date {
   max-height: 230px;
   padding: 4px 6px;
   scrollbar-width: thin;
-  scrollbar-color: var(--tm-border-strong, rgba(255, 255, 255, 0.12)) transparent;
+  scrollbar-color: var(--tm-border-strong) transparent;
 }
 
 .dtp__time-list::-webkit-scrollbar {

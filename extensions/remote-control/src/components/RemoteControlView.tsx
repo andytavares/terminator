@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Eye, EyeOff, Loader, Wifi, WifiOff, TriangleAlert } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Loader,
+  TriangleAlert,
+  Wifi,
+  WifiOff,
+} from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { OFF, reduceStatus, tunnelDropped, type RemoteStatus } from '../state/status'
 import type { ConnectedDevice } from '../server/connected-devices'
@@ -324,6 +333,11 @@ function SettingsSection({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
+        {open ? (
+          <ChevronDown aria-hidden="true" className="rc-settings__caret" />
+        ) : (
+          <ChevronRight aria-hidden="true" className="rc-settings__caret" />
+        )}
         <span>Settings</span>
         <span className="rc-settings__summary">
           port {port} · up to {maxViewers} viewers

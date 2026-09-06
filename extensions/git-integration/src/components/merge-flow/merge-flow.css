@@ -346,7 +346,7 @@
   font-size: 0.75rem;
   padding: 3px 10px;
   border-radius: 12px;
-  background: rgba(107, 114, 128, 0.15);
+  background: color-mix(in srgb, var(--tm-text-muted) 15%, transparent);
   color: var(--tm-text-muted);
   white-space: nowrap;
 }
@@ -1621,7 +1621,7 @@
 }
 
 .strategy-tag--both {
-  background: rgba(6, 182, 212, 0.15);
+  background: color-mix(in srgb, var(--tm-syntax-literal) 15%, transparent);
   color: var(--tm-syntax-literal);
 }
 

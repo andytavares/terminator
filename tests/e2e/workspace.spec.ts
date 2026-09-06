@@ -64,9 +64,13 @@ test('US1-5: removing a workspace removes it from the sidebar (in-app confirm)',
 
   await workspaceRow(page, 'Temp Workspace').click({ button: 'right' })
   await page.locator('.ctx-menu__item').filter({ hasText: 'Remove workspace' }).click()
-  // In-app ConfirmDialog (no native browser dialog)
-  await expect(page.locator('.dialog__title')).toContainText('Remove workspace')
-  await page.locator('.dialog__btn-primary').filter({ hasText: 'Remove' }).click()
+  // In-app ConfirmDialog (no native browser dialog). Addressed by role and
+  // accessible name rather than by class: the implementation moved into
+  // @terminator/extension-ui with this feature, and a test that names a CSS
+  // class breaks on a refactor that changed nothing a user can see.
+  const confirm = page.getByRole('dialog')
+  await expect(confirm).toContainText('Remove workspace')
+  await confirm.getByRole('button', { name: 'Remove', exact: true }).click()
 
   await expect(page.locator('.repo-header')).toHaveCount(before - 1)
   await expect(

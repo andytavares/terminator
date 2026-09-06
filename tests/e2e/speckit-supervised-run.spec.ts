@@ -292,7 +292,9 @@ test('the supervision panel is on screen, not merely built', async () => {
   const text = await pilotScreenText()
   // All four sections, and the one that says everything is fine rather than
   // leaving an empty box that looks identical to a surface that failed to load.
-  for (const section of ['Runs', 'Stalls', 'Review', 'Feed']) {
+  // The tabs used to render their raw ids — "runs", "stalls", "feed". They say
+  // what they hold now, which is what this asserts.
+  for (const section of ['Running', 'Stuck', 'To review', 'Activity', 'History']) {
     expect(text).toContain(section)
   }
   // Either a live run, with the actions that act on it, or the sentence that

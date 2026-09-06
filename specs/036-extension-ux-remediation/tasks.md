@@ -303,8 +303,8 @@ measured from computed colours rather than parsed stylesheet text.
 - [x] T105 Replace unicode characters used as visual elements with lucide icons in `extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx`, `merge-flow/ConflictHub.tsx` and `pr-review/FullFileList.tsx` (Principle XII)
 - [x] T106 Record the remaining Principle XII debt in the untouched components as a follow-up issue rather than sweeping it silently into this PR
 - [x] T107 Delete every superseded implementation left dormant, verifying nothing references it (Constitution X)
-- [ ] T108 Run the full `quickstart.md` validation end to end
-- [ ] T109 Run the done gate from the worktree: `npm run format`, `npm run lint` (0 errors), `npm run test` — check the **exit code**, not the printed pass count — then `npx playwright test`
+- [x] T108 Run the full `quickstart.md` validation end to end
+- [x] T109 Run the done gate from the worktree: `npm run format`, `npm run lint` (0 errors), `npm run test` — check the **exit code**, not the printed pass count — then `npx playwright test`
 
 ---
 

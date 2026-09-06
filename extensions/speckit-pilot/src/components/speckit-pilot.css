@@ -1227,7 +1227,7 @@
 }
 
 .sk-diff__ln--old {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--tm-overlay-subtle);
 }
 
 .sk-diff__prefix {
@@ -3098,7 +3098,7 @@
   content: '';
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 55%);
+  background: var(--tm-scrim);
   z-index: var(--tm-layer-modal);
 }
 
