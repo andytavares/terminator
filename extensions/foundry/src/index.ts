@@ -208,7 +208,7 @@ function defaultModel(api: ExtensionAPI): string {
  * An alias again rather than a pinned id, for the same reason: `haiku`
  * follows the latest of that family.
  */
-export function modelForTier(api: ExtensionAPI, tier: 'fast' | 'deep'): string {
+function modelForTier(api: ExtensionAPI, tier: 'fast' | 'deep'): string {
   const chosen = defaultModel(api)
   // An empty choice means "pass no --model", and a role asking for the fast
   // tier must not override the operator's decision to configure it themselves.

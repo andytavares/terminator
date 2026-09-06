@@ -25,14 +25,6 @@ export class ResumeForbiddenError extends Error {
   }
 }
 
-export class ToolNotAllowedError extends Error {
-  readonly code = 'TOOL_NOT_ALLOWED'
-  constructor(roleId: string, tool: string) {
-    super(`The "${roleId}" role may not use ${tool}.`)
-    this.name = 'ToolNotAllowedError'
-  }
-}
-
 export interface RoleRegistry {
   get(id: string): Role | null
   /** Throws when a role that may not resume is handed a session to resume. */
