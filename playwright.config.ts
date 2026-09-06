@@ -2,6 +2,11 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // `tools/` holds specs that write into the repository — screenshot capture
+  // for the user guide. They are run deliberately, never as part of the suite,
+  // because a CI run that rewrites a committed file leaves a dirty tree. Set
+  // `E2E_TOOLS=1` to include them.
+  testIgnore: process.env.E2E_TOOLS === '1' ? [] : '**/tools/**',
   timeout: 30000,
   // CI runners are resource-constrained and each test launches a full Electron
   // app, so cap parallelism and allow one retry to absorb rare launch flakes.

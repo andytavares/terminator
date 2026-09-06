@@ -23,8 +23,10 @@ let store: OrderStore
 function channels() {
   return createRunChannels({
     store,
-    dataRoot,
-    sources: { dataRoot, repoPaths: [repo], builtInDir },
+    // Resolved on every call in the host, because the records location follows
+    // the open workspace — a fixed value here is what that resolver returns.
+    dataRoot: () => dataRoot,
+    sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
     now: () => '2026-09-06T10:00:00.000Z',
   })
 }
@@ -238,8 +240,8 @@ describe('the records location', () => {
     fs.chmodSync(wall, 0o500)
     const blocked = createRunChannels({
       store,
-      dataRoot: path.join(wall, 'foundry'),
-      sources: { dataRoot, repoPaths: [repo], builtInDir },
+      dataRoot: () => path.join(wall, 'foundry'),
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
       now: () => '2026-09-06T10:00:00.000Z',
     })
     const r = (await blocked.start({ id: 'WO-1' })) as { error: string }
@@ -406,5 +408,87 @@ describe('what run.observe says about lanes (FR-067, FR-068)', () => {
     const r = (await channels().observe({ id: 'WO-1' })) as Observed
     expect(r.lanes).toHaveLength(1)
     expect(r.lanes[0]).toMatchObject({ collisions: [], blockedBy: [], hold: null })
+  })
+})
+
+describe('the graph is actually run (FR-020)', () => {
+  it('hands the graph to whatever executes it', async () => {
+    await store.save(order())
+    const execute = vi.fn(async () => undefined)
+    const r = (await createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      execute,
+    }).start({ id: 'WO-1' })) as { started: boolean }
+
+    expect(r.started).toBe(true)
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'running' }),
+      expect.objectContaining({ steps: expect.anything() }),
+      expect.objectContaining({ nodes: expect.anything() })
+    )
+  })
+
+  it('says so when there is nothing to run it, rather than reporting a started run', async () => {
+    await store.save(order())
+    const r = (await channels().start({ id: 'WO-1' })) as { started: boolean; reason: string }
+    expect(r.started).toBe(false)
+    expect(r.reason).toMatch(/not available/)
+  })
+
+  it('does not wait for the run to finish before answering', async () => {
+    await store.save(order())
+    let released = (): void => {}
+    const execute = vi.fn(() => new Promise<void>((r) => (released = r)))
+    const r = await createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      execute: execute as never,
+    }).start({ id: 'WO-1' })
+
+    // Answered while the run is still going: a channel that blocked until the
+    // last agent finished would hold the bridge for the length of the work.
+    expect(r).toMatchObject({ started: true })
+    released()
+  })
+
+  it('records a run that failed to start rather than losing it', async () => {
+    await store.save(order())
+    await createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      execute: async () => Promise.reject(new Error('no worktree could be prepared')),
+    }).start({ id: 'WO-1' })
+
+    // The rejection is handled off the call — that is the point of not
+    // awaiting it — so poll for the entry rather than assuming one turn of the
+    // microtask queue is enough. One turn passed most of the time, which is
+    // the worst kind of enough.
+    const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
+    let ledger = ''
+    for (let attempt = 0; attempt < 50 && !ledger.includes('run.failed'); attempt++) {
+      await new Promise((r) => setTimeout(r, 10))
+      ledger = fs.readFileSync(ledgerFile, 'utf8')
+    }
+    expect(ledger).toContain('run.failed')
+    expect(ledger).toContain('no worktree could be prepared')
+  })
+
+  it('runs nothing for an order that was refused', async () => {
+    const execute = vi.fn(async () => undefined)
+    await createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      execute,
+    }).start({ id: 'WO-nope' })
+    expect(execute).not.toHaveBeenCalled()
   })
 })

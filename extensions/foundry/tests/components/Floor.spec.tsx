@@ -52,10 +52,20 @@ function reply(over: Record<string, unknown> = {}) {
 
 let invoke: ReturnType<typeof vi.fn>
 
-function mount(view: Record<string, unknown>) {
+function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}) {
   invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:run.observe') return view
-    return { terminalSessionId: 't-1' }
+    if (channel === 'foundry:permissions-list') return { pending: live.pending ?? [] }
+    if (channel === 'foundry:run-transcript') return { lines: live.lines ?? [] }
+    if (channel === 'foundry:permission-resolve') return live.resolve ?? { ok: true }
+    if (
+      channel === 'foundry:run-interrupt' ||
+      channel === 'foundry:run-stop' ||
+      channel === 'foundry:run-redirect'
+    ) {
+      return live.control ?? { ok: true }
+    }
+    return { terminalSessionId: 't-1', ok: true }
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
@@ -172,5 +182,160 @@ describe('when there is no run', () => {
   it('says so rather than spinning', async () => {
     mount({ error: 'No run for WO-1.' })
     await waitFor(() => expect(screen.getByText('No run for WO-1.')).toBeTruthy())
+  })
+})
+
+const ASK = {
+  requestId: 'r-1',
+  sessionId: 's-1',
+  toolName: 'Write',
+  summary: 'Write src/auth/session.ts',
+  detail: '{ "file_path": "src/auth/session.ts" }',
+  at: 1,
+}
+
+describe('a held tool call', () => {
+  it('shows what is being asked, and which tool is asking', async () => {
+    mount(reply(), { pending: [ASK] })
+    await waitFor(() => expect(screen.getByText('Waiting on you — 1')).toBeTruthy())
+    expect(screen.getByText('Write src/auth/session.ts')).toBeTruthy()
+    expect(screen.getByText('Write')).toBeTruthy()
+  })
+
+  it('shows the ask in full, not only its one-line summary', async () => {
+    mount(reply(), { pending: [ASK] })
+    await waitFor(() => screen.getByText('Waiting on you — 1'))
+    expect(screen.getByText(/file_path/)).toBeTruthy()
+  })
+
+  it('can be answered without leaving the surface', async () => {
+    mount(reply(), { pending: [ASK] })
+    await waitFor(() => screen.getByText('Waiting on you — 1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:permission-resolve', {
+        requestId: 'r-1',
+        decision: 'allow',
+      })
+    )
+  })
+
+  it('can be refused', async () => {
+    mount(reply(), { pending: [ASK] })
+    await waitFor(() => screen.getByText('Waiting on you — 1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:permission-resolve', {
+        requestId: 'r-1',
+        decision: 'deny',
+      })
+    )
+  })
+
+  it('says why a click did nothing, rather than looking answered', async () => {
+    mount(reply(), {
+      pending: [ASK],
+      resolve: { ok: false, reason: 'that request is no longer waiting' },
+    })
+    await waitFor(() => screen.getByText('Waiting on you — 1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }))
+    await waitFor(() => expect(screen.getByText(/no longer waiting/)).toBeTruthy())
+  })
+
+  it('hands one back to the terminal and goes there', async () => {
+    mount(reply(), { pending: [ASK] })
+    await waitFor(() => screen.getByText('Waiting on you — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /In the terminal/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:permission-hand-back', { requestId: 'r-1' })
+    )
+    expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
+  })
+
+  it('shows no panel when nothing is waiting', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText(/Waiting on you/)).toBeNull()
+  })
+})
+
+describe('watching a run', () => {
+  it('shows nothing until a unit is chosen', async () => {
+    mount(reply(), { lines: ['reading src/auth/session.ts'] })
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:run-transcript')).toHaveLength(0)
+  })
+
+  it('shows what the agent has been saying', async () => {
+    mount(reply(), { lines: ['reading src/auth/session.ts'] })
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    await waitFor(() => expect(screen.getByText(/reading src\/auth/)).toBeTruthy())
+  })
+
+  it('says so when there is nothing yet, rather than showing an empty box', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    await waitFor(() => expect(screen.getByText('Nothing yet.')).toBeTruthy())
+  })
+
+  it('redirects it', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    await waitFor(() => screen.getByLabelText('Tell it what to do instead'))
+
+    fireEvent.change(screen.getByLabelText('Tell it what to do instead'), {
+      target: { value: 'use the existing helper' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Redirect/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-redirect', {
+        sessionId: 's-1',
+        message: 'use the existing helper',
+      })
+    )
+  })
+
+  it('interrupts it', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Interrupt' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Interrupt' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-interrupt', { sessionId: 's-1' })
+    )
+  })
+
+  it('stops it, saying why', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    await waitFor(() => screen.getByRole('button', { name: /Stop/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Stop/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-stop', {
+        sessionId: 's-1',
+        reason: 'stopped from the floor',
+      })
+    )
+  })
+
+  it('says so when the run is already over', async () => {
+    mount(reply(), { control: { ok: false } })
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Interrupt' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Interrupt' }))
+    await waitFor(() => expect(screen.getByText('that run is no longer live')).toBeTruthy())
+  })
+
+  it('offers neither control for a unit with no session', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByRole('button', { name: 'Watch N-2' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Attach to N-2' })).toBeNull()
   })
 })

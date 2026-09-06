@@ -1,14 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { execFile } from 'node:child_process'
+import { describe, it, expect } from 'vitest'
 import { decideReadOnly } from '../../src/runtime/read-only-policy.js'
-import { installReadOnlyHookScript } from '../../src/runtime/read-only-hook.js'
 
-// Self-review used to bypass permissions outright, so a review could rewrite
-// the worktree it was reviewing. It now decides from this policy, with no person
-// asked — an automated gate that waits on a human is a flaky one.
+// A read-only role used to be a request in a prompt, so a reviewer could
+// rewrite the worktree it was reviewing. It now decides from this policy, with
+// no person asked — an automated gate that waits on a human is a flaky one.
 
 describe('what a review may do', () => {
   const allowed = (tool: string, input?: unknown) => decideReadOnly(tool, input).allow
@@ -92,71 +87,13 @@ describe('what a review may do', () => {
 // import, so it carries its own copy of the rules. These run the real script the
 // way Claude Code does and check it agrees with the module — the two cannot
 // drift silently.
-describe('the hook script agrees with the policy', () => {
-  let dir: string
-
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'read-only-hook-'))
-  })
-
-  afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))
-
-  function run(toolName: string, toolInput: unknown): Promise<string> {
-    const script = installReadOnlyHookScript(dir)
-    return new Promise((resolve, reject) => {
-      const child = execFile(
-        process.execPath,
-        [script],
-        { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } },
-        (error, stdout) => (error ? reject(error) : resolve(stdout))
-      )
-      child.stdin?.end(
-        JSON.stringify({
-          hook_event_name: 'PreToolUse',
-          tool_name: toolName,
-          tool_input: toolInput,
-        })
-      )
-    })
-  }
-
-  const cases: Array<[string, unknown]> = [
-    ['Read', { file_path: '/a.ts' }],
-    ['Write', { file_path: '/a.ts' }],
-    ['Bash', { command: 'git diff main' }],
-    ['Bash', { command: 'git checkout main' }],
-    ['Bash', { command: 'echo banana > probe.txt' }],
-    ['Bash', { command: 'git diff; rm -rf .' }],
-    ['Bash', { command: 'rm -rf .' }],
-    ['SomeNewTool', {}],
-  ]
-
-  for (const [toolName, toolInput] of cases) {
-    it(`decides ${toolName} ${JSON.stringify(toolInput)} the same way`, async () => {
-      const stdout = await run(toolName, toolInput)
-      const decision = JSON.parse(stdout).hookSpecificOutput
-      expect(decision.hookEventName).toBe('PreToolUse')
-      expect(decision.permissionDecision).toBe(
-        decideReadOnly(toolName, toolInput).allow ? 'allow' : 'deny'
-      )
-    })
-  }
-
-  it('refuses when handed something that is not hook input', async () => {
-    const script = installReadOnlyHookScript(dir)
-    const stdout = await new Promise<string>((resolve, reject) => {
-      const child = execFile(
-        process.execPath,
-        [script],
-        { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } },
-        (error, out) => (error ? reject(error) : resolve(out))
-      )
-      child.stdin?.end('not json')
-    })
-    // Unreadable input is not a reason to let a review write.
-    expect(JSON.parse(stdout).hookSpecificOutput.permissionDecision).toBe('deny')
-  })
-})
+// The cross-process agreement test that sat here is gone with the second hook
+// script it checked. There was a separate `read-only-hook.mjs` written for the
+// self-review runner, and it had to be proven to decide the same way as this
+// policy because it was a copy of it in another process. The Line does not
+// copy it: `executor.ts` hands `decideReadOnly` itself to the supervised
+// runner as `autoDecide`, so there is one implementation and nothing to agree
+// with.
 
 describe('the ways this was bypassable', () => {
   // Every one of these was allowed, verified by running the policy directly.

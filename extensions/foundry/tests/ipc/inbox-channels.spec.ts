@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { createInboxChannels } from '../../src/ipc/inbox-channels.js'
-import { createGateStore } from '../../src/gates/store.js'
+import { createGateStore, createLiveGateStore } from '../../src/gates/store.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
@@ -284,5 +284,28 @@ describe('acting on the decision', () => {
     expect(await channels().decide({ gateId: 'G-1', option: 'approve' })).toMatchObject({
       ok: true,
     })
+  })
+})
+
+describe('a gate store whose root follows the workspace', () => {
+  it('reads and writes wherever the resolver points, on each call', async () => {
+    const a = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-gates-a-'))
+    const b = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-gates-b-'))
+    let here = a
+    const store = createLiveGateStore(() => here)
+
+    await store.save(gate({ id: 'G-a' }))
+    here = b
+    await store.save(gate({ id: 'G-b' }))
+
+    expect((await createGateStore(a).list()).map((g) => g.id)).toEqual(['G-a'])
+    expect((await createGateStore(b).list()).map((g) => g.id)).toEqual(['G-b'])
+
+    // And the reads go through the same resolver as the writes.
+    expect((await store.get('G-b'))?.id).toBe('G-b')
+    expect(await store.forOrder('WO-1')).toHaveLength(1)
+    expect(await store.list()).toHaveLength(1)
+
+    for (const dir of [a, b]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })
 })

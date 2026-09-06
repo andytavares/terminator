@@ -30,7 +30,8 @@ const DecidePayload = z.object({
 
 export interface LedgerDeps {
   readonly store: OrderStore
-  readonly dataRoot: string
+  /** Resolved on every call: the records location follows the open workspace. */
+  readonly dataRoot: () => string
   /** Rule ids already in force, so nothing already covered is proposed. */
   readonly existingRuleIds: () => readonly string[]
   readonly now: () => string
@@ -54,7 +55,9 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
   async function entriesFor(orderId: string | undefined): Promise<LedgerEntry[]> {
     const ids =
       orderId === undefined ? (await deps.store.list()).map((order) => order.id) : [orderId]
-    const perOrder = await Promise.all(ids.map((id) => queryEntries(ledgerPath(deps.dataRoot, id))))
+    const perOrder = await Promise.all(
+      ids.map((id) => queryEntries(ledgerPath(deps.dataRoot(), id)))
+    )
     return perOrder.flat().sort((a, b) => a.at.localeCompare(b.at))
   }
 
@@ -91,7 +94,7 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     const proposals = propose({
       entries: await entriesFor(parsed.data.orderId),
       existingRuleIds: deps.existingRuleIds(),
-      rejectedIds: await declinedProposals(deps.dataRoot),
+      rejectedIds: await declinedProposals(deps.dataRoot()),
     })
     return { proposals }
   }
@@ -106,7 +109,7 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     // and a rule accepted on stale evidence is one nobody can justify.
     const found = propose({
       entries: await entriesFor(undefined),
-      rejectedIds: accept ? await declinedProposals(deps.dataRoot) : [],
+      rejectedIds: accept ? await declinedProposals(deps.dataRoot()) : [],
     }).find((candidate) => candidate.id === proposalId)
 
     if (found === undefined) {
@@ -114,11 +117,11 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     }
 
     if (!accept) {
-      await declineProposal(deps.dataRoot, proposalId, reason ?? 'declined by the operator')
+      await declineProposal(deps.dataRoot(), proposalId, reason ?? 'declined by the operator')
       return { ok: true, accepted: false }
     }
 
-    const file = await acceptProposal(deps.dataRoot, found)
+    const file = await acceptProposal(deps.dataRoot(), found)
     return { ok: true, accepted: true, file, rule: found.id }
   }
 

@@ -99,8 +99,8 @@ describe('Foundry in a repository it has never seen', () => {
 
     const runs = createRunChannels({
       store,
-      dataRoot,
-      sources: { dataRoot, repoPaths: [repo], builtInDir },
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
       now: () => new Date().toISOString(),
     })
     const offered = (await runs.recipes({ id: seeded.order.id })) as {

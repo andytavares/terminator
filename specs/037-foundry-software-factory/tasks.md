@@ -67,7 +67,7 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 - [x] T019 [P] Implement recipe, role and rule schemas and the YAML loader using `js-yaml`'s default safe `load` in `extensions/foundry/src/recipe/parse.ts`
 - [x] T020 [P] Implement append-only JSONL ledger writes in `extensions/foundry/src/ledger/append.ts`
 - [x] T021 Register the settings from contracts/ipc-channels.md — `dataDir`, `autoOpenDraftPr`, `autonomy`, the three budgets, `writeBack`, `criticalPaths` — in `extensions/foundry/src/index.ts`. Two shapes changed against the contract because `SettingDefinition` has no array or record type: `writeBack` became three booleans (each is independently worth turning off anyway), and `criticalPaths` became a newline-separated workspace-scoped string, with the per-repository map deferred to `config.yaml` under the data root where the contract already puts it
-- [ ] T022 **Moved to Phase 4 (with T057–T061).** Deleting `extensions/foundry/src/schemas/speckit.schemas.ts` cannot happen here: `src/state/state-persistence.ts` imports it and is still the live phase state until the pipeline is retired. Deleting it now would break the build for the whole of Phase 3, so it is done alongside the rest of the removal, after the `speckit` recipe has proved the engine
+- [x] T022 **Moved to Phase 4 (with T057–T061), and done there.** `src/schemas/` and `src/state/state-persistence.ts` are both gone; `src/state/` holds only `model-catalog.ts`. Deleting `extensions/foundry/src/schemas/speckit.schemas.ts` cannot happen here: `src/state/state-persistence.ts` imports it and is still the live phase state until the pipeline is retired. Deleting it now would break the build for the whole of Phase 3, so it is done alongside the rest of the removal, after the `speckit` recipe has proved the engine
 
 **Checkpoint**: The contract, its storage and the project probe exist and are tested. User stories can begin.
 
@@ -226,7 +226,7 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 - [x] T095 [US5] Register `foundry:inbox.list`, `foundry:inbox.decide` and `foundry:session.attach` in `extensions/foundry/src/index.ts`
 - [x] T096 [US5] Build the Inbox surface — ranked rows, each naming its rule, its evidence, its options and its default — plus the empty state in `extensions/foundry/src/components/Inbox.tsx`
 - [x] T097 [US5] Build the read-only Floor surface with per-lane units, live feed and an Attach control on every running agent in `extensions/foundry/src/components/Floor.tsx`
-- [ ] T098 [US5] End-to-end spec addressing all four surfaces by role and accessible name, in `tests/e2e/foundry.spec.ts`. **Not done.** The extension's UI is an overlaid WebContentsView, so this needs `launchApp` plus `electronApp.evaluate` over `getAllWebContents`; the component-level specs cover the surfaces by role in jsdom, but that is not the same assertion and this task is not complete
+- [x] T098 [US5] End-to-end spec addressing all four surfaces by role and accessible name, in `tests/e2e/foundry.spec.ts` — eleven tests through `launchApp` plus `electronApp.evaluate` over `getAllWebContents`, replacing the dead `speckit-supervised-run.spec.ts`. `extension-escape.spec.ts` was also driving a deleted input on a view whose URL no longer matched, and was updated
 
 **Checkpoint**: The operator is interrupted by rules, not by phases, and can always take over.
 
@@ -323,15 +323,21 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ## Phase 11: Polish & Cross-Cutting Concerns
 
-- [ ] T135 [P] Write ADR-040 recording the work order as the only contract between intake and execution, superseding ADR-010 and ADR-012, in `docs/adr/040-the-work-order-is-the-contract.md`
-- [ ] T136 [P] Write ADR-041 recording tracker writes beyond comments, superseding the restriction adopted in feature 031, in `docs/adr/041-tracker-writes-beyond-comments.md`
-- [ ] T137 [P] Write ADR-042 recording that Foundry installs nothing into a target repository and where its data lives, in `docs/adr/042-foundry-installs-nothing.md`
-- [ ] T138 [P] Replace the SpecKit tab section with Foundry in `README.md`
-- [ ] T139 [P] Retake and rename the user-guide screenshots that show the SpecKit tab in `docs/user-guide/screenshots/`
-- [ ] T140 [P] Add the Foundry entry to `CHANGELOG.md`
-- [ ] T141 Run the four-check audit over `extensions/foundry/src/` and `src/main/integrations/` — every new component reachable from a mounted parent, every new module imported by production code, no stubs, no permanently-empty wiring, and every collection feeding an allocator or gate proven to be written to
-- [ ] T142 Run every scenario in `specs/037-foundry-software-factory/quickstart.md`, including scenario 3 in a repository that is not this one
-- [ ] T143 Run the gate in order and confirm each command's exit status: `npm run format`, `npm run lint` with 0 errors, `npx vitest run --coverage`, then `node scripts/check-patch-coverage.cjs`
+- [x] T135 [P] Write ADR-040 recording the work order as the only contract between intake and execution, superseding ADR-010 and ADR-012, in `docs/adr/040-the-work-order-is-the-contract.md`
+- [x] T136 [P] Write ADR-041 recording tracker writes beyond comments, superseding the restriction adopted in feature 031 — filed as `docs/adr/041-an-extension-may-move-an-issue.md`; same number, a title that says what was decided rather than what it is about
+- [x] T137 [P] Write ADR-042 recording that Foundry installs nothing into a target repository and where its data lives, in `docs/adr/042-foundry-installs-nothing.md`
+- [x] T138 [P] Replace the SpecKit tab section with Foundry in `README.md`
+- [x] T139 [P] Retake and rename the user-guide screenshots that show the SpecKit tab — `08-speckit-tab.png` and the stray `ss_speckit.png` are deleted, `08-foundry-tab.png` captured from the running app by `tests/e2e/tools/capture-foundry-screenshot.spec.ts`, which `playwright.config.ts` excludes from the suite because it writes into `docs/`
+- [x] T140 [P] Add the Foundry entry to `CHANGELOG.md`
+- [x] T141 Run the four-check audit over `extensions/foundry/src/` and `src/main/integrations/`. **It found four real defects, all fixed, and one finding left open:**
+  1. **The Line never ran.** `line/executor.ts` was imported by its own spec and nothing else: `foundry:run.start` built a graph, persisted it and stopped. Fixed by an `execute` seam on `RunDeps`, `line/worktree.ts` (a git worktree per lane, under the data root), and `executeRun` in `index.ts` joining the checkouts, the supervised runner and the wave loop. `run.start` now reports `started: false` with a reason when there is nothing to run it, rather than reporting a run that never began.
+  2. **The Forge never started anything.** "Compile & hand off" agreed the order and left it idle; the Floor only renders a `running` order, which nothing produced. Fixed: hand-off compiles, agrees and starts, and reports the run's refusal separately from the agreement.
+  3. **The records went to the wrong repository.** The data root was resolved once at activation, before any workspace exists, so it fell back to `process.cwd()` — the Terminator repository. The evidence was a `.foundry/` directory here with twelve orders in it from four different fixtures. Fixed: resolved from the current workspace on every read (memoised), with `app.getPath('userData')` as the fallback, never a working directory. `createLiveOrderStore` / `createLiveGateStore` and `() => string` deps carry it.
+  4. **`foundry:run.recipes` had no caller.** The operator could not choose a shape of work, which FR-024 requires. Fixed: a picker on the Forge that shows unavailable shapes with the requirement they do not meet.
+  - **Deleted as unreachable:** `runner/stream-json.ts`, `utils/retry.ts`, `runtime/read-only-hook.ts` and `foundry:self-review-read`, with their specs. All belonged to the headless runner and the self-review path the Phase 4 retirement removed. The cross-process "hook script agrees with the policy" test went too: the Line hands `decideReadOnly` itself to the runner as `autoDecide`, so there is one implementation and nothing to agree with.
+  - **Left open, deliberately, and reported to the operator:** twelve `foundry:feed-*` and `foundry:review-*` channels have no caller. They are feature 021's supervision console — the activity feed and per-hunk review — whose surfaces went with the board in the Phase 4 retirement. The runtime behind them is still live and the Line uses it. Deleting another feature's capability is the operator's call, not this feature's, so it is stated rather than taken.
+- [x] T142 Run every scenario in `specs/037-foundry-software-factory/quickstart.md`, including scenario 3 in a repository that is not this one (`tests/integration/foundry-portability.spec.ts`). Scenario 9 found ~2,900 lines of dead CSS — 443 rules, 2 orphaned at-rules and 34 comments describing nothing, all belonging to the deleted board — and `foundry.css` went from 4,232 lines to 1,183. Deleted by exact class name against the set the TSX actually uses, never by prefix, and verified by re-rendering: the extension smoke and theme e2e both pass and the screenshot is pixel-identical
+- [x] T143 Run the gate in order and confirm each command's exit status: `npm run format` (0), `npm run lint` (0 errors, 25 pre-existing warnings), `npx vitest run` (0, 406 files / 7698 tests), `node scripts/check-patch-coverage.cjs` (every staged file above 80%), plus `npx playwright test` over the Foundry, smoke and escape e2e specs
 
 ---
 

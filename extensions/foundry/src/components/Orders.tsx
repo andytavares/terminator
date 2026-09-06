@@ -32,6 +32,7 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
   const [idea, setIdea] = useState('')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  const [started, setStarted] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     const r = (await invoke('foundry:order.list')) as { orders?: OrderRow[] }
@@ -64,7 +65,10 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
   }, [idea, repoRoot, refresh])
 
   if (open !== null) {
-    const running = rows.find((row) => row.id === open)?.status === 'running'
+    const status = rows.find((row) => row.id === open)?.status
+    // `started` is what the Forge reports the moment a run begins, so the
+    // surface swaps without waiting for the list to be refetched.
+    const running = status === 'running' || started === open
     return (
       <div className="fdry-shell">
         <button
@@ -79,7 +83,17 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
         </button>
         {/* An order that is running is watched on the Floor; one that is still
             being agreed is worked on in the Forge. */}
-        {running ? <Floor orderId={open} /> : <Forge orderId={open} />}
+        {running ? (
+          <Floor orderId={open} />
+        ) : (
+          <Forge
+            orderId={open}
+            onStarted={(id) => {
+              setStarted(id)
+              void refresh()
+            }}
+          />
+        )}
       </div>
     )
   }

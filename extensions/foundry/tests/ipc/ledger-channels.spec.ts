@@ -19,7 +19,7 @@ let root: string
 function channels(existingRuleIds: string[] = []) {
   return createLedgerChannels({
     store: createOrderStore(root),
-    dataRoot: root,
+    dataRoot: () => root,
     existingRuleIds: () => existingRuleIds,
     now: () => '2026-09-06T12:00:00.000Z',
   })

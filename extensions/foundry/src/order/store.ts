@@ -23,6 +23,24 @@ export interface OrderStore {
   record(entry: LedgerEntry): Promise<void>
 }
 
+/**
+ * A store whose root is resolved on every call.
+ *
+ * For the extension host, where the records location depends on the open
+ * workspace and activation runs before there is one. The resolver is still
+ * `data-root.ts` and every write still receives an absolute path; what this
+ * removes is the assumption that the answer is known at activation.
+ */
+export function createLiveOrderStore(root: () => string): OrderStore {
+  return {
+    save: (order) => createOrderStore(root()).save(order),
+    load: (id) => createOrderStore(root()).load(id),
+    list: () => createOrderStore(root()).list(),
+    findByIssue: (tracker, key) => createOrderStore(root()).findByIssue(tracker, key),
+    record: (entry) => createOrderStore(root()).record(entry),
+  }
+}
+
 export function createOrderStore(root: string): OrderStore {
   const dirFor = (id: string): string => orderDir(root, id)
 

@@ -5,6 +5,7 @@ import { orderDir, ensureWritable } from '../data-root.js'
 import { laneViews, mayMergeLane } from '../order/lanes.js'
 import { buildRunGraph } from '../line/run-graph.js'
 import type { RunGraph } from '../line/run-graph.js'
+import type { Recipe } from '../recipe/parse.js'
 import { readyNodes, blockedReason } from '../line/scheduler.js'
 import { resolveRecipe, availableNames } from '../recipe/resolve.js'
 import type { ResolveSources } from '../recipe/resolve.js'
@@ -26,9 +27,24 @@ const AttachPayload = z.object({ orderId: z.string(), nodeId: z.string() })
 
 export interface RunDeps {
   readonly store: OrderStore
-  readonly dataRoot: string
-  readonly sources: ResolveSources
+  /** Resolved on every call: the records location follows the open workspace. */
+  readonly dataRoot: () => string
+  /**
+   * Resolved on every call, like `dataRoot`: which repositories are open,
+   * and therefore which `.foundry/` directories are honoured, is not known at
+   * activation and changes when the operator switches workspace.
+   */
+  readonly sources: () => ResolveSources
   readonly now: () => string
+  /**
+   * Actually run the graph.
+   *
+   * A seam, so this file keeps knowing nothing about terminals, worktrees or
+   * agents — and so a test can assert the graph was handed over without
+   * launching one. Optional: a host with no supervision runtime persists the
+   * graph and says so, rather than reporting a run that never began.
+   */
+  readonly execute?: (order: WorkOrder, recipe: Recipe, graph: RunGraph) => Promise<void>
 }
 
 export interface RunChannels {
@@ -42,6 +58,22 @@ export interface RunChannels {
 
 function graphPath(dataRoot: string, orderId: string): string {
   return path.join(orderDir(dataRoot, orderId), 'run-graph.json')
+}
+
+/**
+ * Persist a graph.
+ *
+ * Exported because the executor writes the graph back as it progresses, and
+ * two files claiming to be the run's state is worse than one written from two
+ * places.
+ */
+export async function writeRunGraph(dataRoot: string, graph: RunGraph): Promise<void> {
+  await fs.promises.mkdir(orderDir(dataRoot, graph.orderId), { recursive: true })
+  await fs.promises.writeFile(
+    graphPath(dataRoot, graph.orderId),
+    `${JSON.stringify(graph, null, 2)}\n`,
+    'utf8'
+  )
 }
 
 /**
@@ -60,18 +92,13 @@ export function proposeRecipe(order: WorkOrder): string {
 
 export function createRunChannels(deps: RunDeps): RunChannels {
   async function saveGraph(graph: RunGraph): Promise<void> {
-    await fs.promises.mkdir(orderDir(deps.dataRoot, graph.orderId), { recursive: true })
-    await fs.promises.writeFile(
-      graphPath(deps.dataRoot, graph.orderId),
-      `${JSON.stringify(graph, null, 2)}\n`,
-      'utf8'
-    )
+    await writeRunGraph(deps.dataRoot(), graph)
   }
 
   async function loadGraph(orderId: string): Promise<RunGraph | null> {
     try {
       return JSON.parse(
-        await fs.promises.readFile(graphPath(deps.dataRoot, orderId), 'utf8')
+        await fs.promises.readFile(graphPath(deps.dataRoot(), orderId), 'utf8')
       ) as RunGraph
     } catch {
       return null
@@ -90,11 +117,11 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       }
     }
 
-    const writable = await ensureWritable(deps.dataRoot)
+    const writable = await ensureWritable(deps.dataRoot())
     if (!writable.ok) return { error: writable.reason }
 
     const name = parsed.data.recipe ?? proposeRecipe(order)
-    const resolved = resolveRecipe(name, deps.sources)
+    const resolved = resolveRecipe(name, deps.sources())
     if (!resolved.ok) return { error: resolved.reason }
 
     const availability = checkRequirements(resolved.resolved.value.requires, order)
@@ -124,7 +151,34 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       evidence: [],
     })
 
-    return { graph, order: running }
+    if (deps.execute === undefined) {
+      // Said out loud. A graph persisted with nothing to run it is what the
+      // Forge's hand-off used to produce, and it read as a started run.
+      return {
+        graph,
+        order: running,
+        started: false,
+        reason: 'The supervision runtime is not available, so nothing was started.',
+      }
+    }
+
+    // Not awaited: a run outlives the call that started it, and a channel that
+    // blocked until the last agent finished would hold the bridge for the
+    // length of the work. Failures reach the ledger and the graph, which is
+    // where a surface reads them.
+    void deps.execute(running, resolved.resolved.value, graph).catch(async (error: unknown) => {
+      await deps.store.record({
+        at: deps.now(),
+        orderId: order.id,
+        actor: 'rule:line',
+        action: 'run.failed',
+        subject: order.id,
+        reason: error instanceof Error ? error.message : String(error),
+        evidence: [],
+      })
+    })
+
+    return { graph, order: running, started: true }
   }
 
   async function observe(raw: unknown): Promise<unknown> {
@@ -174,8 +228,8 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const order = await deps.store.load(parsed.data.id)
     if (order === null) return { error: `No order ${parsed.data.id}.` }
 
-    const offered = availableNames('recipes', deps.sources).map((name) => {
-      const resolved = resolveRecipe(name, deps.sources)
+    const offered = availableNames('recipes', deps.sources()).map((name) => {
+      const resolved = resolveRecipe(name, deps.sources())
       if (!resolved.ok) return { name, available: false, unmet: [resolved.reason], rung: null }
       const availability = checkRequirements(resolved.resolved.value.requires, order)
       return {

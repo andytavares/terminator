@@ -28,6 +28,21 @@ interface StatesView {
   error?: string
 }
 
+/** One shape of work this order could take, and why not where it cannot. */
+interface RecipeOption {
+  name: string
+  available: boolean
+  unmet: string[]
+  rung: string | null
+  description?: string
+}
+
+interface RecipesView {
+  recipes?: RecipeOption[]
+  proposed?: string
+  error?: string
+}
+
 const INTENTS: readonly TransitionIntent[] = ['started', 'in_review', 'done']
 
 /** What each intent means in plain terms — the tracker's words are its own. */
@@ -56,13 +71,18 @@ export interface ForgeProps {
   readonly orderId: string
   /** Take me to the agent's live session. The backstop, from any surface. */
   readonly onAttach?: (orderId: string) => void
+  /** The run has begun; the caller swaps this surface for the Floor. */
+  readonly onStarted?: (orderId: string) => void
 }
 
-export function Forge({ orderId, onAttach }: ForgeProps): JSX.Element {
+export function Forge({ orderId, onAttach, onStarted }: ForgeProps): JSX.Element {
   const [view, setView] = useState<OrderView | null>(null)
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
+  const [problem, setProblem] = useState<string | null>(null)
   const [states, setStates] = useState<StatesView | null>(null)
+  const [recipes, setRecipes] = useState<RecipesView | null>(null)
+  const [chosen, setChosen] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     const next = (await invoke('foundry:order.compile', { id: orderId, commit: false })) as
@@ -84,6 +104,19 @@ export function Forge({ orderId, onAttach }: ForgeProps): JSX.Element {
     void (async () => {
       const next = (await invoke('foundry:order.states', { id: orderId })) as StatesView
       if (live) setStates(next)
+    })()
+    return () => {
+      live = false
+    }
+  }, [orderId])
+
+  // Read once, alongside the document. What shapes of work this repository can
+  // actually support is a fact about the repository, not about the draft.
+  useEffect(() => {
+    let live = true
+    void (async () => {
+      const next = (await invoke('foundry:run.recipes', { id: orderId })) as RecipesView
+      if (live) setRecipes(next)
     })()
     return () => {
       live = false
@@ -117,17 +150,49 @@ export function Forge({ orderId, onAttach }: ForgeProps): JSX.Element {
     [orderId]
   )
 
+  /**
+   * Compile, agree, and start the Line.
+   *
+   * One action, because "handed off" that leaves the order sitting agreed with
+   * nothing running is the failure this button exists to avoid — the operator
+   * pressed hand off, and work has to start.
+   *
+   * The run is started separately from the agreement rather than inside it:
+   * agreeing is a decision and is recorded; starting can fail on a recipe this
+   * repository cannot support, and that must not un-agree what was agreed.
+   */
   const handOff = useCallback(async () => {
     setBusy(true)
+    setProblem(null)
     try {
       const next = (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
         | OrderView
         | { error: string }
-      if (!('error' in next)) setView(next)
+      if ('error' in next) {
+        setProblem(next.error)
+        return
+      }
+      setView(next)
+      if (next.order.status !== 'agreed') return
+
+      const started = (await invoke('foundry:run.start', {
+        id: orderId,
+        // Only when the operator picked one. Absent means the proposal
+        // stands, and the ledger records which of the two it was.
+        ...(chosen === null ? {} : { recipe: chosen }),
+      })) as {
+        error?: string
+        order?: { status: string }
+      }
+      if (started.error !== undefined) {
+        setProblem(`The order is agreed, but the run did not start: ${started.error}`)
+        return
+      }
+      onStarted?.(orderId)
     } finally {
       setBusy(false)
     }
-  }, [orderId])
+  }, [orderId, onStarted, chosen])
 
   if (view === null) {
     return <div className="fdry-empty">Loading the order…</div>
@@ -173,7 +238,40 @@ export function Forge({ orderId, onAttach }: ForgeProps): JSX.Element {
                 ? 'Compile & hand off'
                 : `Blocked by ${compile.failures.length}`}
           </button>
+          {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
         </section>
+
+        {/* The shape of work. Proposed rather than chosen — a proposal nobody
+            can predict is worse than a plain one — and overridden in one
+            click, with the override recorded. */}
+        {(recipes?.recipes?.length ?? 0) > 0 && order.status === 'draft' ? (
+          <section className="fdry-panel">
+            <h2 className="fdry-panel-h">Shape of work</h2>
+            {recipes?.recipes?.map((option) => {
+              const isChosen = (chosen ?? recipes.proposed) === option.name
+              return (
+                <button
+                  key={option.name}
+                  type="button"
+                  className={`fdry-recipe ${isChosen ? 'is-on' : ''}`}
+                  disabled={!option.available || busy}
+                  title={option.available ? option.description : option.unmet.join('; ')}
+                  onClick={() => setChosen(option.name)}
+                >
+                  <b>{option.name}</b>
+                  <small>
+                    {option.available
+                      ? (option.description ?? `from ${option.rung ?? 'built-in'}`)
+                      : option.unmet.join('; ')}
+                  </small>
+                  {option.name === recipes.proposed && chosen === null ? (
+                    <span className="fdry-recipe-mark">proposed</span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </section>
+        ) : null}
 
         {questions.length > 0 ? (
           <section className="fdry-panel">

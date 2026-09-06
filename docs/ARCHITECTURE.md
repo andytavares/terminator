@@ -494,7 +494,7 @@ credential or contacts a tracker. See [ADR-029](adr/029-core-issue-tracker-servi
     dialogs, drawer)           │    tracker-store    creds (safeStorage)│
                                │    issue-service    cache, single-     │──▶ Linear (@linear/sdk)
   extensions ──api.issues────▶ │                     flight, backoff    │──▶ Jira (REST v3)
-   (speckit-pilot,             │    providers/       one per tracker    │
+   (foundry,                   │    providers/       one per tracker    │
     git-integration)           │    adf-to-markdown  Jira ADF → md      │
                                └────────────────────────────────────────┘
 ```
@@ -856,133 +856,147 @@ Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md` and typed i
 
 ---
 
-## SpecKit Pilot Extension (`extensions/speckit-pilot/`)
+## Foundry Extension (`extensions/foundry/`)
 
-SpecKit Pilot is a Quill-style **workflow board** for controlling feature implementation end-to-end when offloading to agents. The home surface is a kanban board of six stage columns (Backlog → Spec → Plan → Implement → In Review → Done); each unit of work is a **card**. A card is a feature dir (`specs/NNN-slug/`) with a brief (`.pilot/card.json`); handing it off runs the 10-phase Spec-Kit pipeline using Claude Code **in a visible terminal** in an isolated git worktree, with every tool call held at a `PreToolUse` hook until somebody decides (see [ADR-026](adr/026-supervised-runs-in-a-terminal.md)).
+Foundry is a **software factory**: an idea or a tracker issue becomes a **work
+order** that compiles, and the order is executed by an orchestration that
+manages the agents, the checks and the interruptions. It replaces the SpecKit
+Pilot's card model and ten-phase pipeline (ADR-040, superseding ADR-010 and
+ADR-012).
 
-### Card model & board stages
+Two loops, one contract. Nothing but the work order crosses between them — no
+phase name, no state file, no directory layout, no card.
 
-A card unifies the former feature/ticket/run notions (see [ADR-010](adr/010-speckit-card-model.md)). `PilotState` is **v3**: it adds `card: CardBrief` and `stage: BoardStage`. A card can exist in **Backlog** with a brief and no run. The board stage is **derived** from phase progress by the pure `deriveStage(phases, run)` in `src/state/derive-stage.ts` (Backlog = no run; Spec = constitution/specify/clarify; Plan = plan/checklist; Implement = tasks/analyze/implement; In Review = self-review/open-pr; Done = PR opened or run completed). A v2→v3 migration synthesizes the brief and derives the stage on read.
+### The work order
 
-### Parallel runs
+Validated with zod on every read, because it is written by an agent and edited
+through a surface, so nothing about it is trustworthy by construction. It
+carries the intent, the acceptance criteria and how each is proven, the plan
+(units and lanes), the risk grade and its triggers, the budgets, the
+assumptions, the open questions, the adversarial findings, and the provenance
+of every decision taken about it.
 
-Multiple cards run concurrently, each in its own worktree, up to a configurable `maxConcurrentRuns` cap (default 3; see [ADR-011](adr/011-speckit-parallel-runs.md)). Hand-off counts active run slots from persisted state; over the cap, a card is set `queuePosition: 'pending'` and started automatically by `advanceQueue` when a slot frees (run cancelled, parked to Backlog, or PR opened).
+`src/order/schema.ts` answers _shape_; `src/order/compile.ts` answers
+_completeness_. Six checks, none of which can be waved through:
 
-### 10-Phase Lifecycle
+| Check        | Fails when                                                                                                     |
+| ------------ | -------------------------------------------------------------------------------------------------------------- |
+| `questions`  | anything is still unanswered                                                                                   |
+| `verifiable` | a criterion has no executable proof and was not accepted as unverifiable **in writing**                        |
+| `coverage`   | a criterion has no unit, a unit satisfies no criterion, or two lanes change one file with no declared producer |
+| `risk`       | the plan touches something outside the blast radius the grade was taken over                                   |
+| `redTeam`    | an adversarial finding is neither resolved nor accepted with a reason                                          |
+| `budgets`    | the plan cannot fit inside the budgets it declares                                                             |
+
+`agreeOrder` is the only thing that may set an order to `agreed`, which is what
+makes the checks a gate rather than a suggestion. It also writes down the
+derived lane ordering, so the Line reads the plan that was agreed rather than
+repeating a derivation it could get differently.
+
+### The Forge (`src/forge/`)
+
+Seeds an order from typed text or a tracker issue, having already read the
+repository: the toolchain probe, the house documents, and the past decisions
+about any file the idea names. A question that survives that is one the code
+genuinely could not answer — a question the code _could_ have answered is a
+defect in intake rather than a question. At most three questions are ever
+surfaced at once.
+
+### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
+
+- **Recipes** (`recipe/parse.ts`, `recipe/resolve.ts`) are YAML: a list of steps
+  over six kinds — `agent`, `run`, `judge`, `gate`, `fanout`, `join`. There is
+  no seventh. The ten SpecKit phases are one recipe, `recipes/speckit.yaml`.
+- **Roles** are YAML data too, with a write list. A role with none is run
+  read-only, enforced by the `PreToolUse` hook rather than by its prompt.
+  `verifier` carries `allowResume: false`, and `assertResumable` refuses to
+  hand it a session — a verdict from the working session is the builder marking
+  its own homework with extra steps.
+- **Three-rung resolution** for every recipe, role and rule: the data root, the
+  repository's own `.foundry/`, then the built-ins. The middle rung is honoured
+  and never created (ADR-042).
+- **Verdicts** are three-valued: `pass`, `fail`, `not_measured`. Coercing the
+  third to a boolean anywhere turns "we did not check" into "it is fine".
+- **The ladder** (`verify/ladder.ts`) stops at the first failure, so a run does
+  not spend an inspection budget on a change that does not compile.
+- **Gates** (`gates/rules.ts`) are raised by nine named rules, never by phase
+  boundaries. Each carries the rule, the reason, the evidence, its options with
+  their consequences, and what happens if nobody answers. The **autonomy dial**
+  selects which are live; four — `risk.p0`, `budget.exceeded`, `destructive`,
+  `ready-for-review` — stay live at every setting.
+- **The executor** (`line/executor.ts`) joins the scheduler, the roles and the
+  supervised runner: a wave at a time, so the agent budget means something.
+
+### Shipping (`src/line/integrate.ts`, `src/trackers/write-back.ts`)
+
+Work ends in a draft pull request without being asked, one per repository, in
+merge order, cross-linked. The decision offered afterwards is whether to mark
+it ready — never whether to create it. For the two highest risk grades the
+operator decides before anything reaches the remote; for everything lower the
+draft opens first, so review happens on a real change.
+
+Three write-backs to the source issue: the agreed order as a comment, the
+workflow state (`ExtensionAPI.issues.transition`, v2.3.0, ADR-041), and the
+pull request links. A tracker write never affects the work: a failure is
+retried, an unsupported capability is recorded once at agreement and never
+asked about again.
+
+### The ledger (`src/ledger/`)
+
+Append-only JSONL, one file per order, one object per line. A reversal is a new
+entry; nothing rewrites a line. That is what lets several unit writers append
+at once without a lock, and what makes the curator's citations meaningful
+later. Every entry names an actor (`operator`, `rule:<id>` or `role:<id>`), an
+action, a subject and a reason.
+
+The **curator** (`ledger/curator.ts`) reads it and, _only when asked_, proposes
+a rule for anything the operator has rejected three times for the same reason,
+citing the entries. It imports no filesystem module and schedules nothing, and
+the append path cannot reach it — an assistant that volunteers rules is one
+whose rules get accepted without being read.
+
+### Surfaces
 
 ```
-constitution → specify → clarify → plan → checklist → tasks → analyze → implement → self-review → open-pr
+App
+  ├─ Inbox   — the one surface required to visit: one queue, ranked by how much
+  │            work each decision unblocks, every row naming the rule that
+  │            raised it and what happens if it is ignored
+  ├─ Orders  — the door
+  │    ├─ Forge  — the document, six checks, at most three questions
+  │    └─ Floor  — the run graph, the merge order, held tool calls, the live
+  │                transcript, and a way into the terminal
+  ├─ Ledger  — every decision, filtered by order / actor / action; the one
+  │            button that asks the curator
+  └─ Settings — the model picker; everything else is registered through the
+                application's own settings API
 ```
 
-Each phase has a `PhaseState` (status: `locked | ready | running | awaiting_review | approved | stale | modified | failed | skipped`) persisted to `.pilot/state.json` inside the feature directory.
+### What it does not do
 
-### Main-Process Architecture (`extensions/speckit-pilot/src/index.ts`)
-
-```
-activate(api)
-  ├─ IPC handlers (via api.ipc.registerHandler)
-  │    ├─ speckit:dispatch          → create worktree, branch, start phase runner
-  │    ├─ speckit:pilot-state       → read .pilot/state.json, marking any approved
-  │    │                              phase whose artifacts have changed since
-  │    ├─ speckit:phase-approve     → persist approval + a hash of its artifacts,
-  │    │                              start next phase runner
-  │    ├─ speckit:phase-skip / -unskip → a phase this card does not need
-  │    ├─ speckit:phase-request-changes → record feedback, re-queue runner
-  │    ├─ speckit:phase-comment     → append history entry (no re-run)
-  │    ├─ speckit:phase-revoke      → reset approved → ready
-  │    ├─ speckit:checkin-decision  → batch continue / pause / split
-  │    ├─ speckit:self-review-read  → read .pilot/self-review.json
-  │    ├─ speckit:credentials-set   → store Linear/Jira keys in main-process secrets store
-  │    ├─ speckit:credentials-status → return { connected: boolean } ONLY
-  │    ├─ speckit:ticket-list       → fetch from Linear/Jira APIs
-  │    ├─ speckit:open-pr           → run gh pr create subprocess
-  │    ├─ speckit:card-list         → board data: CardSummary[] (brief + derived stage + phase summary)
-  │    ├─ speckit:card-create       → create a native/ticket-seeded card in the backlog
-  │    ├─ speckit:card-update       → edit a card's brief (.pilot/card.json)
-  │    ├─ speckit:card-move         → Backlog→Spec handoff or park →Backlog (enforces concurrency cap)
-  │    ├─ speckit:card-comment      → append steering comment (.pilot/comments.jsonl)
-  │    ├─ speckit:comment-list      → load a card's comments
-  │    ├─ speckit:artifact-list     → artifacts + git revision history
-  │    ├─ speckit:knowledge-search  → keyword search over repo markdown + briefs (git grep, fs fallback)
-  │    │
-  │    ├─ speckit:permissions-list / -resolve / -hand-back → tool calls held at a PreToolUse hook
-  │    ├─ speckit:supervision-snapshot → what is running, what is queued, whether the gate is open
-  │    ├─ speckit:stalls-list        → firings, and whether they were recorded or surfaced
-  │    ├─ speckit:feed-list / -digest → what happened, and what happened since you last looked
-  │    ├─ speckit:review-hunks / -decide-hunk / -intent / -apply / -done → per-hunk review,
-  │    │                                              applied by reverting the rejected hunks
-  │    ├─ speckit:backpressure-override → recorded with the queue depth it ignored
-  │    ├─ speckit:lanes / -may-merge  → merge ordering across a card's repositories
-  │    └─ speckit:run-terminal / -transcript / -interrupt / -redirect / -stop / -discard
-  │
-  ├─ Supervision runtime (src/runtime/, see SUPERVISION.md and ADR-026)
-  │    ├─ control-server  — loopback endpoint the agents' hooks answer on, token per run
-  │    ├─ supervised-runner — worktree → project → terminal tab running `claude --session-id`
-  │    ├─ supervision     — run register, review queue, backpressure gate, feed
-  │    └─ stall-watcher   — a run that stops making progress without asking (shadow mode by default)
-  │
-  └─ AgentRunner (src/runner/agent-runner.ts)
-       ├─ A phase runs supervised, in a terminal, with every tool call asked about
-       ├─ Streams transcript output → broadcasts speckit:run-output push event
-       ├─ On turn end: measures the diff, grades it, queues it for review
-       └─ self-review keeps the headless spawn (ADR-007), confined by a command policy.
-          Four steps, not an && chain: each records its own exit code, and each is
-          asked for its findings as data (eslint --format json, vitest
-          --coverage.reporter=json-summary) so the gate's table is measured rather
-          than scraped. Formatting is checked with the repo's format:check, never
-          `format` — that writes, and a review may only read.
-```
-
-### Renderer Architecture (`extensions/speckit-pilot/src/renderer/`)
-
-```
-App.tsx  (board home + header: KnowledgeSearch / Import ticket (manual refresh) / Settings)
-  ├─ On open (and workspace change) auto-reconciles assigned Linear/Jira tickets onto
-  │    the board via reconcileAssignedTickets(): fetch ticketList() + cardList(), dedup on
-  │    source:sourceKey, cardCreate() the missing ones. The "Import ticket" button re-runs
-  │    the same reconcile as a manual refresh. New cards surface via speckit:state-changed.
-  ├─ PermissionQueue — tool calls a supervised run is holding until somebody decides
-  ├─ SupervisionPanel — runs / stalls / review / feed; the four actions on a run, per-hunk review
-  ├─ BoardView       — six stage columns (@dnd-kit); buckets CardSummary[] by derived stage
-  │    └─ CardTile        — type badge, title, scope, compact phase rail, run-status chip
-  ├─ CardDetail      — slide-over drawer with tabs:
-  │    ├─ Brief          — CardBriefEditor (title/type/scope/checklist) → card-update / card-create
-  │    ├─ Phases         — RunDashboard (backlog card shows "Hand off to agent" CTA)
-  │    │    ├─ GatePanel      — generic phase gate (approve / request-changes / revoke / comment / inline-edit)
-  │    │    ├─ SelfReviewGate — format+lint+coverage+google-review quality summary gate
-  │    │    ├─ OpenPrGate     — PR title input + gh pr create trigger
-  │    │    └─ BatchCheckIn   — implement batch boundary: continue / pause / split / redirect
-  │    ├─ Activity       — ActivityFeed: comments + audit log, composer (steers next phase)
-  │    └─ Artifacts      — ArtifactsPanel: artifacts + revision history + diff/markdown viewer
-  ├─ KnowledgeSearch — keyword search; attach a result to a card brief
-  └─ SettingsView    — integrations / autonomy & gates (incl. maxConcurrentRuns) / agent runner
-```
-
-Drag/drop and stage-bucketing logic is factored into pure, unit-tested helpers
-(`src/components/board-util.ts` — `bucketCards`, `resolveDrop`; `src/state/run-queue.ts`
-— `shouldQueue`, `orderPending`, `classifyMove`).
-
-### Security Constraints
-
-- Credentials (Linear API key, Jira token) are stored in the main-process secrets store and **never cross the IPC boundary** to the renderer. `speckit:credentials-status` returns `{ connected: boolean }` only.
-- The extension never force-pushes, modifies `main`, or merges PRs automatically.
-- All `speckit:*` IPC channels are extension-owned (not core channels). The core app has no knowledge of them.
-
-### State Persistence
-
-All state lives in `.pilot/` inside the feature directory (a subdirectory of `specs/`):
-
-- `.pilot/state.json` — `PilotState` v3 (card brief, stage, phases, ticket ref, run meta, settings)
-- `.pilot/card.json` — the card brief (title/type/scope/checklist/attachments/knowledge refs)
-- `.pilot/comments.jsonl` — append-only steering comments (feed the agent's next phase run)
-- `.pilot/history.jsonl` — append-only audit log of all phase events
-- `.pilot/self-review.json` — last self-review result (format/lint/coverage/google-review)
+- **It writes nothing into the repositories it works on** — no scaffolding, no
+  configuration, not even a `.gitignore` entry (ADR-042). Records go to
+  `terminator.foundry.dataDir`, or `<workdir>/.foundry/`, resolved once in
+  `src/data-root.ts` and handed down as an absolute path.
+- **It assumes no toolchain.** `verify/toolchain-probe.ts` reads manifests,
+  tool configuration, Makefiles and CI workflows — and never executes them —
+  recording the real command or `null`.
+- **It holds no credential.** Tracker access is `ExtensionAPI.issues`, and
+  `api.shell.exec` admits only `git` and `gh`. Verification commands run as
+  steps inside the supervised terminal session, which is what makes their
+  output visible and their tool calls hook-gated.
+- All `foundry:*` IPC channels are extension-owned. The core app has no
+  knowledge of them: delete `extensions/foundry/` and core still builds.
 
 ### ADRs
 
 - [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) — spawn Claude Code as a child process rather than using the Anthropic API directly.
-- [ADR-010: card model](adr/010-speckit-card-model.md) — a card unifies feature dir, ticket, and run; `PilotState` v3.
-- [ADR-011: parallel runs](adr/011-speckit-parallel-runs.md) — concurrency cap replaces the single-active-run queue.
-- [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — a phase runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
+- [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
+- [ADR-040: the work order is the contract](adr/040-the-work-order-is-the-contract.md) — supersedes the card model (ADR-010) and the run modes (ADR-012).
+- [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
+- [ADR-042: Foundry installs nothing](adr/042-foundry-installs-nothing.md) — the data root, the three rungs, and the toolchain probe.
 
-See [`extensions/speckit-pilot/SUPERVISION.md`](../extensions/speckit-pilot/SUPERVISION.md) for the operator-facing account: the surfaces, the four actions on a run, risk grading, backpressure and stall thresholds.
+The feature's own design documents are in
+[`specs/037-foundry-software-factory/`](../specs/037-foundry-software-factory/):
+the spec, the plan, fourteen research decisions, the data model, five contracts
+and a ten-scenario quickstart.

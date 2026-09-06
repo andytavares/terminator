@@ -31,6 +31,16 @@ async function read(root: string, orderId: string): Promise<Gate[]> {
   }
 }
 
+/** A gate store whose root is resolved on every call. See createLiveOrderStore. */
+export function createLiveGateStore(root: () => string): GateStore {
+  return {
+    save: (gate) => createGateStore(root()).save(gate),
+    list: () => createGateStore(root()).list(),
+    forOrder: (orderId) => createGateStore(root()).forOrder(orderId),
+    get: (id) => createGateStore(root()).get(id),
+  }
+}
+
 export function createGateStore(root: string): GateStore {
   async function orderIds(): Promise<string[]> {
     try {

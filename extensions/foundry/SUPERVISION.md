@@ -17,15 +17,15 @@ in four sections:
 
 | Section     | Reads                                      | Answers                                |
 | ----------- | ------------------------------------------ | -------------------------------------- |
-| **runs**    | `speckit:supervision-snapshot`             | what is running, and how it is going   |
-| **stalls**  | `speckit:stalls-list`                      | what stopped making progress           |
-| **review**  | `speckit:supervision-snapshot`             | what is waiting on a decision from you |
-| **feed**    | `speckit:feed-list`, `speckit:feed-digest` | what happened while you were away      |
-| **history** | `speckit:supervision-snapshot`             | what is over, and what it did          |
+| **runs**    | `foundry:supervision-snapshot`             | what is running, and how it is going   |
+| **stalls**  | `foundry:stalls-list`                      | what stopped making progress           |
+| **review**  | `foundry:supervision-snapshot`             | what is waiting on a decision from you |
+| **feed**    | `foundry:feed-list`, `foundry:feed-digest` | what happened while you were away      |
+| **history** | `foundry:supervision-snapshot`             | what is over, and what it did          |
 
 A card's drawer shows the same run: the phase's console renders the **terminal's
 transcript**, with **Open the terminal** next to it. A supervised phase
-broadcasts nothing on `speckit:run-output` — it runs in a terminal and its
+broadcasts nothing on `foundry:run-output` — it runs in a terminal and its
 output goes there — so the console read "Waiting for output…" for the whole run
 until this. Replying in the drawer types into that session rather than starting
 a second, invisible agent.
@@ -49,15 +49,17 @@ moment you most want to redirect an agent is usually before that.
 
 | Action         | Channel                  | What it does                                                    |
 | -------------- | ------------------------ | --------------------------------------------------------------- |
-| **Terminal**   | `speckit:run-terminal`   | goes to where it is actually running                            |
-| **Transcript** | `speckit:run-transcript` | the last 20 things said, in its own words                       |
-| **Interrupt**  | `speckit:run-interrupt`  | ends the turn, **keeps** the session, so the next message lands |
-| **Redirect**   | `speckit:run-redirect`   | interrupt, then say what to do instead                          |
-| **Stop**       | `speckit:run-stop`       | says why first, so the agent's own record carries it            |
-| **Discard**    | `speckit:run-discard`    | ends it and removes its worktree **and branch**                 |
+| **Terminal**   | `foundry:run-terminal`   | goes to where it is actually running                            |
+| **Transcript** | `foundry:run-transcript` | the last 20 things said, in its own words                       |
+| **Interrupt**  | `foundry:run-interrupt`  | ends the turn, **keeps** the session, so the next message lands |
+| **Redirect**   | `foundry:run-redirect`   | interrupt, then say what to do instead                          |
+| **Stop**       | `foundry:run-stop`       | says why first, so the agent's own record carries it            |
 
-Discard takes the run off the review queue too. A discarded diff holding a
-review slot would gate the next run on reviewing something that no longer
+Discard is gone with the card model it belonged to: a run is a node in an
+order's graph, and removing its worktree and branch is `foundry:run-stop`
+followed by the ordinary cleanup. What used to be true of it still is — a
+discarded diff holding a review slot would gate the next run on reviewing
+something that no longer
 exists.
 
 ## One conversation per card
@@ -150,7 +152,7 @@ depth. The constraint is one person's capacity to review, which does not scale
 with the number of cards.
 
 The refusal appears on the card, with **Start anyway** next to it. Overriding is
-one click and is **recorded with the queue depth at the moment it was ignored** (`.speckit-pilot-runtime/backpressure-overrides.jsonl`), so a backlog
+one click and is **recorded with the queue depth at the moment it was ignored** (`foundry-runtime/backpressure-overrides.jsonl`), so a backlog
 built by overriding is visible afterwards rather than only felt.
 
 ## Review steps, and multi-repository cards
@@ -185,7 +187,7 @@ exemption every test run reads as a stall.
 
 **Shadow mode is on by default**: firings are recorded and shown in the stalls
 section, not notified. Judge them against your own read for a week, then turn it
-off with `terminator.speckit-pilot.stallShadowMode`.
+off with `terminator.foundry.stallShadowMode`.
 
 A firing is posted to the feed **attributed to the pilot**, never to the agent.
 The agent did not say it, and a feed that blurs the two is one you stop trusting.
@@ -212,21 +214,22 @@ does; the entries keep arriving in the feed. Mutes persist, because one you have
 to set again after every restart is one you stop bothering with — and then
 notifications get turned off wholesale.
 
-## When the SpecKit skills are not installed
+## When a recipe needs something this repository does not have
 
-A phase sends `/speckit-<phase>` only when the **worktree** has that skill —
-`.claude/skills/speckit-<phase>/SKILL.md` or `.claude/commands/speckit-<phase>.md`.
-Checked in the worktree because that is where the agent runs, and
+A recipe declares what it requires, and `recipe/requirements.ts` checks it
+against the order before anything starts. The `speckit` recipe requires the
+SpecKit skills, so it is simply not offered in a repository without them —
+rather than being started and answering "Unknown command: /speckit-specify"
+with the step over before it began.
+
+The check runs in the **worktree**, because that is where the agent runs, and
 `git worktree add` only brings across what is committed: `.claude/skills/` is
-routinely untracked, so the run's checkout often does not have it even when your
-main one does.
+routinely untracked, so the run's checkout often does not have it even when
+your main one does.
 
-Without it the phase is asked for in plain words instead. Each fallback names
-the file the pipeline expects — the gates, the artifact list and the review
-queue all read `$SPECIFY_FEATURE_DIRECTORY/<file>`, and an agent left to choose
-writes it at the repository root. Sending the slash command anyway is what used
-to happen, and the runtime's answer was "Unknown command: /speckit-specify",
-with the phase over before it began.
+`foundry:run.recipes` returns every recipe with `available` and, when it is
+false, the specific requirement that is unmet — so the reason a shape of work
+is not on offer is readable rather than inferred.
 
 ## Which model, and how many questions
 
@@ -247,14 +250,14 @@ stale sitting in the source — which is exactly what the pinned `claude-opus-4-
 it replaces did. Choosing nothing passes no `--model` at all, so the run follows
 your own Claude Code configuration.
 
-The picker reads `speckit:models-list`: the aliases always, plus every model the
+The picker reads `foundry:models-list`: the aliases always, plus every model the
 account can reach from `GET /v1/models` when the environment carries an
 `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`. There is no CLI subcommand that
 lists models, and a subscription login is not a Models API credential, so for
 most people the aliases are the whole list — which is why they are the ones that
 have to keep working.
 
-The choice is persisted through `speckit:model-set` into the extension's own
+The choice is persisted through `foundry:model-set` into the extension's own
 settings, because the main process is the only thing that builds a `claude`
 command line. It previously lived only in the renderer's `localStorage`, which
 is why the setting existed, rendered, and did nothing at all.
@@ -281,7 +284,7 @@ waiting on it and sends you to the terminal.
 - **In memory** — the run register, the review queue, the stall firings. A run
   does not outlive the application: its terminal is a child of this process, and
   a registry reloaded from disk would describe runs that no longer exist.
-- **On disk**, under `userData/speckit-pilot-runtime/` — the feed
+- **On disk**, under `userData/foundry-runtime/` — the feed
   (`feed.jsonl`), backpressure overrides, mute rules, and the per-session
   `--settings` files and hook script.
 - **In the browser** — when you last read the feed. That is a property of the
@@ -289,13 +292,14 @@ waiting on it and sends you to the terminal.
 
 ## Testing it
 
-`npx vitest run extensions/speckit-pilot` covers the units and the IPC.
+`npx vitest run extensions/foundry` covers the units and the IPC.
 
-The one that matters is `tests/e2e/speckit-supervised-run.spec.ts`: it drives a
-real dispatch through the real application and asserts the worktree became a
-project, the terminal exists, and `claude --session-id` is visible in it — never
-`bypassPermissions`. Every worst bug on this line of work passed its unit tests
-and only appeared when the application ran.
+The one that matters is `tests/e2e/foundry.spec.ts`: it drives the real
+extension inside the real application, through the same IPC its own UI uses,
+and asserts all four surfaces render, that an idea becomes an order, that an
+order nobody agreed cannot be started, and that the repository is left exactly
+as it was found. Every worst bug on this line of work passed its unit tests and
+only appeared when the application ran.
 
 ## Approved, and then edited
 

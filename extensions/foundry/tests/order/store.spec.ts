@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { createOrderStore } from '../../src/order/store.js'
+import { createOrderStore, createLiveOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { SCHEMA_VERSION } from '../../src/order/schema.js'
@@ -136,5 +136,55 @@ describe('createOrderStore', () => {
     })
     const ledger = path.join(root, 'orders', 'WO-0913-c71', 'ledger.jsonl')
     expect(JSON.parse(fs.readFileSync(ledger, 'utf8').trim()).action).toBe('order.agreed')
+  })
+})
+
+describe('a store whose root follows the workspace', () => {
+  it('writes wherever the resolver points, on each call', async () => {
+    const a = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-a-'))
+    const b = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-b-'))
+    let here = a
+    const store = createLiveOrderStore(() => here)
+
+    await store.save(order({ id: 'WO-A' }))
+    here = b
+    await store.save(order({ id: 'WO-B' }))
+
+    // Resolved on every call, because activation runs before a workspace
+    // exists and pinning the answer there sent every order to one place.
+    expect((await createOrderStore(a).list()).map((o) => o.id)).toEqual(['WO-A'])
+    expect((await createOrderStore(b).list()).map((o) => o.id)).toEqual(['WO-B'])
+
+    for (const dir of [a, b]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  it('reads, lists, finds and records through the same resolver', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-c-'))
+    const store = createLiveOrderStore(() => dir)
+
+    await store.save(
+      order({
+        id: 'WO-1',
+        source: { kind: 'tracker', tracker: 'linear', key: 'TAV-42', url: 'https://x' },
+      })
+    )
+    await store.record({
+      at: '2026-09-06T10:00:00.000Z',
+      orderId: 'WO-1',
+      actor: 'operator',
+      action: 'order.seeded',
+      subject: 'WO-1',
+      reason: 'typed',
+      evidence: [],
+    })
+
+    expect((await store.load('WO-1'))?.id).toBe('WO-1')
+    expect(await store.list()).toHaveLength(1)
+    expect(await store.findByIssue('linear', 'TAV-42')).toMatchObject({ id: 'WO-1' })
+    expect(fs.readFileSync(path.join(dir, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')).toContain(
+      'order.seeded'
+    )
+
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })
 })

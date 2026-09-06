@@ -1,6 +1,5 @@
 import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
 import { app } from 'electron'
-import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { modelCatalog } from './state/model-catalog.js'
 
@@ -11,18 +10,26 @@ import {
   setSupervisedRunner,
 } from './runtime/run-seams.js'
 import { createForgeChannels } from './ipc/forge-channels.js'
-import { createRunChannels } from './ipc/run-channels.js'
+import { createRunChannels, writeRunGraph } from './ipc/run-channels.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
 import { createLedgerChannels } from './ipc/ledger-channels.js'
 import { rulesFor } from './verify/rules.js'
-import { createGateStore } from './gates/store.js'
-import { createOrderStore } from './order/store.js'
+import type { ResolveSources } from './recipe/resolve.js'
+import { createLiveGateStore } from './gates/store.js'
+import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { markReady, readPulls } from './line/integrate.js'
+import type { ShellExec } from './line/integrate.js'
+import { ensureCheckouts } from './line/worktree.js'
+import { execute } from './line/executor.js'
+import type { StartedRun } from './line/executor.js'
+import type { RunGraph, RunNode } from './line/run-graph.js'
+import type { Recipe } from './recipe/parse.js'
+import { decideReadOnly } from './runtime/read-only-policy.js'
 import type { IntegrateDeps } from './line/integrate.js'
 import { checkCapability, writeBack } from './trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
 import type { WorkOrder, WriteBack } from './order/schema.js'
-import { resolveDataRoot, untrackedNotice, ledgerPath } from './data-root.js'
+import { resolveDataRoot, untrackedNotice, ledgerPath, orderDir } from './data-root.js'
 import { queryEntries } from './ledger/append.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
@@ -86,25 +93,81 @@ function noteUntrackedDataRoot(api: ExtensionAPI, root: string): void {
   }
 }
 
+/**
+ * Where the records go when there is no workspace to be beside.
+ *
+ * Never `process.cwd()`. The extension host's working directory is wherever
+ * the application was launched from — in development, the Terminator
+ * repository itself — so defaulting to it writes one workspace's orders into
+ * another repository's working tree. That happened, and the evidence was a
+ * `.foundry/` directory in this repository with twelve orders in it from four
+ * different fixtures.
+ */
+/**
+ * The three rungs a recipe, role or rule is looked up in.
+ *
+ * Built on every read rather than captured at activation: which repositories
+ * are open — and therefore which `.foundry/` directories are honoured — is not
+ * known when the host loads the extension.
+ */
+function resolveSources(api: ExtensionAPI, root: string): ResolveSources {
+  return {
+    dataRoot: root,
+    repoPaths: (api.workspace?.list() ?? []).map((workspace) => workspace.folderPath),
+    // The built-ins ship inside the extension, so they are available in a
+    // repository that contains nothing of Foundry's.
+    builtInDir: path.resolve(__dirname, '..'),
+  }
+}
+
+function fallbackDataRoot(): string {
+  return path.join(app.getPath('userData'), 'foundry')
+}
+
+/**
+ * Where Foundry keeps its records.
+ *
+ * Resolved from the setting and the current workspace on each read rather than
+ * once at activation, because activation runs before a workspace exists: the
+ * host calls it synchronously at load, and `api.workspace.list()` is empty
+ * until the operator opens something. Resolving once there pinned every order
+ * to the fallback for the life of the process.
+ *
+ * Still one resolver in one place — `data-root.ts` — and every writer still
+ * receives an absolute path it never resolves again. Memoised on the inputs so
+ * a surface polling a channel is not recomputing a path, and so the untracked
+ * notice is decided from the same answer the writers use.
+ */
+const dataRootMemo = new Map<string, string>()
+
 function resolveFoundryDataRoot(api: ExtensionAPI): string {
   // Every read here is optional. Activation is called synchronously by the
   // host and must not throw because one capability is absent — a host that
   // has no workspace yet is a normal state, not a reason to fail to load.
   let configured = ''
-  let workdir = process.cwd()
+  let workdir: string | null = null
   try {
     configured = api.settings?.get<string>('terminator.foundry.dataDir') ?? ''
-    workdir = api.workspace?.list()[0]?.folderPath ?? process.cwd()
+    workdir = api.workspace?.list()[0]?.folderPath ?? null
   } catch {
     // Leave the defaults.
   }
+
+  const key = `${configured}\u0000${workdir ?? ''}`
+  const memo = dataRootMemo.get(key)
+  if (memo !== undefined) return memo
+
+  const base = workdir ?? fallbackDataRoot()
+  let root: string
   try {
-    return resolveDataRoot(configured, workdir).root
+    root = resolveDataRoot(configured, base).root
   } catch {
     // A relative path was configured, which is ambiguous once an order spans
     // repositories. Fall back to the default rather than refusing to activate.
-    return resolveDataRoot('', workdir).root
+    root = resolveDataRoot('', base).root
   }
+  dataRootMemo.set(key, root)
+  return root
 }
 
 const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
@@ -551,6 +614,130 @@ function integrateDepsFor(api: ExtensionAPI, root: string): IntegrateDeps {
   }
 }
 
+/**
+ * Actually run a graph.
+ *
+ * The seam `run.start` hands the graph to, and the one place the Line's pieces
+ * meet the application: worktrees from `line/worktree.ts`, sessions from the
+ * supervised runner, and the wave loop from `line/executor.ts`.
+ *
+ * Everything the executor enforces is enforced structurally rather than asked
+ * for in a prompt — a role that may not resume is never handed a session, and
+ * a role with no write list is run read-only, refused by the `PreToolUse` hook
+ * rather than by a reminder in its own instructions.
+ */
+async function executeRun(
+  api: ExtensionAPI,
+  root: string,
+  order: WorkOrder,
+  recipe: Recipe,
+  graph: RunGraph
+): Promise<void> {
+  const exec: ShellExec = (options) => api.shell.exec(options)
+  // Every checkout before any agent starts: a run that provisions lane 2 half
+  // way through and fails has already spent lane 1's agent budget.
+  const checkouts = await ensureCheckouts(order, { exec, root })
+
+  const workspaceId = api.workspace?.list()[0]?.id ?? ''
+  const store = createOrderStore(root)
+  const featureDir = orderDir(root, order.id)
+
+  /**
+   * One node, from launch to the end of its turn.
+   *
+   * A promise around the runner's callbacks rather than an await, because the
+   * runner reports an ending through `onEnd` and returns as soon as the
+   * session exists. Settled exactly once: an agent that both fails to start
+   * and reports an end would otherwise resolve twice.
+   */
+  function runNode(input: {
+    node: RunNode
+    role: string | null
+    prompt: string
+    resumeSessionId: string | undefined
+    readOnly: boolean
+  }): Promise<StartedRun> {
+    const checkout = checkouts.get(input.node.lane ?? 1)
+    // No checkout and no runner mean nothing ran. Reported with a null exit
+    // status, which the verdict path reads as "not measured" — calling it a
+    // pass or a failure would both be claims nobody checked.
+    const runner = supervisedRunner
+    if (checkout === undefined || runner === null) {
+      return Promise.resolve({ sessionId: `${input.node.id}-unstarted`, exitCode: null })
+    }
+
+    return new Promise<StartedRun>((resolve) => {
+      let sessionId = `${input.node.id}-unstarted`
+      let settled = false
+      const finish = (exitCode: number | null): void => {
+        if (settled) return
+        settled = true
+        resolve({ sessionId, exitCode })
+      }
+
+      void runner
+        .start({
+          featureDir,
+          worktreePath: checkout.path,
+          workspaceId,
+          branch: checkout.branch,
+          prompt: input.prompt,
+          phase: (input.role ?? input.node.id) as never,
+          resumeSessionId: input.resumeSessionId,
+          model: defaultModel(api),
+          // The read-only decision is taken by the same policy the hook
+          // applies, so a verifier that decides to fix what it found is
+          // refused rather than reminded.
+          autoDecide: input.readOnly
+            ? (tool, toolInput) => {
+                const decision = decideReadOnly(tool, toolInput)
+                return decision.allow ? null : { allow: false, message: decision.reason }
+              }
+            : undefined,
+          onPending: (pending) => pendingPermissions.add({ ...pending, featureDir }),
+          onResolved: (requestId) => pendingPermissions.remove(requestId),
+          onEnd: (exitCode) => finish(exitCode),
+        })
+        .then((run) => {
+          if (run === null) finish(null)
+          else sessionId = run.sessionId
+        })
+        .catch(() => finish(null))
+    })
+  }
+
+  const outcome = await execute(order, recipe, graph, {
+    now: () => new Date().toISOString(),
+    sources: resolveSources(api, root),
+    run: runNode,
+    onEvent: (event) => {
+      if (event.type !== 'verdict') return
+      void store.record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: `role:${event.verdict.producedBy.role}`,
+        action: 'verify.verdict',
+        subject: event.verdict.criterionId,
+        reason: `${event.verdict.result}${event.verdict.reason === '' ? '' : `: ${event.verdict.reason}`}`,
+        evidence: [...event.verdict.evidence],
+      })
+    },
+  })
+
+  await writeRunGraph(root, outcome.graph)
+  await store.record({
+    at: new Date().toISOString(),
+    orderId: order.id,
+    actor: 'rule:line',
+    action: outcome.complete ? 'run.complete' : 'run.halted',
+    subject: order.id,
+    reason: outcome.complete
+      ? `${outcome.verdicts.length} verdicts`
+      : `waiting on ${outcome.awaitingDecision.join(', ') || 'a gate'}`,
+    evidence: [],
+  })
+}
+
 export function activate(api: ExtensionAPI): void {
   // Kept, so a phase can wait for it. Activation cannot be async — the host
   // calls it synchronously — but a dispatch that arrives in the meantime used
@@ -569,34 +756,29 @@ export function activate(api: ExtensionAPI): void {
   // The data root is resolved once here and handed down as an absolute path:
   // an order can span repositories, so "the working directory" is ambiguous
   // and two writers resolving it independently could disagree.
-  const foundryDataRoot = resolveFoundryDataRoot(api)
+  const dataRoot = (): string => resolveFoundryDataRoot(api)
 
   // Said once, and only when the default location is in use. Foundry will not
   // add the ignore entry itself — that would be editing a file no order asked
   // to change — so the operator is told what it costs and what avoids it.
-  noteUntrackedDataRoot(api, foundryDataRoot)
+  noteUntrackedDataRoot(api, dataRoot())
   const issuesPort = issuesPortFor(api)
   const forge = createForgeChannels({
-    store: createOrderStore(foundryDataRoot),
+    store: createLiveOrderStore(dataRoot),
     now: () => new Date().toISOString(),
     writeBackDefault: defaultWriteBack(api),
-    priorArtFor: (paths) => priorArtFor(foundryDataRoot, paths),
+    priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
     // FR-059a: asked when the order is agreed, so an issue that will never
     // move is known before the run rather than after it.
     capability:
       issuesPort === null
         ? undefined
-        : (order) =>
-            checkCapability(order, writeBackDepsFor(api, foundryDataRoot, order, issuesPort)),
+        : (order) => checkCapability(order, writeBackDepsFor(api, dataRoot(), order, issuesPort)),
     onAgreed:
       issuesPort === null
         ? undefined
         : async (order) => {
-            await writeBack(
-              order,
-              'agreed',
-              writeBackDepsFor(api, foundryDataRoot, order, issuesPort)
-            )
+            await writeBack(order, 'agreed', writeBackDepsFor(api, dataRoot(), order, issuesPort))
           },
     readIssue: async (tracker, key) => {
       // Through the application's own tracker connection. This extension never
@@ -627,16 +809,11 @@ export function activate(api: ExtensionAPI): void {
   // the shape has to be one this repository can actually support, and the
   // records location has to be writable.
   const runs = createRunChannels({
-    store: createOrderStore(foundryDataRoot),
-    dataRoot: foundryDataRoot,
-    sources: {
-      dataRoot: foundryDataRoot,
-      repoPaths: (api.workspace?.list() ?? []).map((workspace) => workspace.folderPath),
-      // The built-ins ship inside the extension, so they are available in a
-      // repository that contains nothing of Foundry's.
-      builtInDir: path.resolve(__dirname, '..'),
-    },
+    store: createLiveOrderStore(dataRoot),
+    dataRoot,
+    sources: () => resolveSources(api, dataRoot()),
     now: () => new Date().toISOString(),
+    execute: (order, recipe, graph) => executeRun(api, dataRoot(), order, recipe, graph),
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
@@ -649,14 +826,14 @@ export function activate(api: ExtensionAPI): void {
   // a named rule did not raise, which is what makes "nothing needs you" a
   // state worth trusting rather than a state worth double-checking.
   const inbox = createInboxChannels({
-    gates: createGateStore(foundryDataRoot),
-    orders: createOrderStore(foundryDataRoot),
+    gates: createLiveGateStore(dataRoot),
+    orders: createLiveOrderStore(dataRoot),
     autonomy: () =>
       api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
       'standard',
     now: () => new Date().toISOString(),
     record: async (orderId, action, subject, reason) => {
-      await createOrderStore(foundryDataRoot).record({
+      await createOrderStore(dataRoot()).record({
         at: new Date().toISOString(),
         orderId,
         actor: 'operator',
@@ -671,8 +848,8 @@ export function activate(api: ExtensionAPI): void {
     // pull request was never their decision to take.
     act: async (gate, option) => {
       if (gate.rule !== 'ready-for-review' || option !== 'mark_ready') return
-      const deps = integrateDepsFor(api, foundryDataRoot)
-      for (const pull of await readPulls(foundryDataRoot, gate.orderId)) {
+      const deps = integrateDepsFor(api, dataRoot())
+      for (const pull of await readPulls(dataRoot(), gate.orderId)) {
         await markReady(pull, deps)
       }
     },
@@ -687,20 +864,14 @@ export function activate(api: ExtensionAPI): void {
   // channel the operator's own button reaches, never a subscription and never
   // anything the append path can trigger.
   const ledger = createLedgerChannels({
-    store: createOrderStore(foundryDataRoot),
-    dataRoot: foundryDataRoot,
-    existingRuleIds: () =>
-      rulesFor(
-        {
-          dataRoot: foundryDataRoot,
-          repoPaths: (api.workspace?.list() ?? []).map((workspace) => workspace.folderPath),
-          builtInDir: path.resolve(__dirname, '..'),
-        },
-        {
-          repoPaths: (api.workspace?.list() ?? []).map((workspace) => workspace.folderPath),
-          houseDocs: [],
-        }
-      ).rules.map((rule) => rule.id),
+    store: createLiveOrderStore(dataRoot),
+    dataRoot,
+    existingRuleIds: () => {
+      const sources = resolveSources(api, dataRoot())
+      return rulesFor(sources, { repoPaths: sources.repoPaths, houseDocs: [] }).rules.map(
+        (rule) => rule.id
+      )
+    },
     now: () => new Date().toISOString(),
   })
   reg(api, 'foundry:ledger.query', (payload) => ledger.query(payload))
@@ -986,76 +1157,6 @@ export function activate(api: ExtensionAPI): void {
     return { ok }
   })
 
-  // Kill and discard: the run ends, its worktree and branch go with it, and the
-  // card is put back where it can be started again. A discarded run must not
-  // keep occupying a review slot — that would gate the next run on reviewing a
-  // diff that no longer exists.
-  // speckit:card-list — board data: every card with brief + derived stage + phase summary
-  // speckit:card-create — create a native (or ticket-seeded) card in the backlog
-  // speckit:card-update — edit a card's brief
-  // speckit:card-comment — append a comment; queued to steer the next phase run
-  // speckit:run-output-read — load persisted output for a phase (review past runs)
-  // speckit:comment-list — load a card's comments
-  // speckit:card-move — user-driven board organization. Sets the card's stage; it
-  // never starts a run. Dropping an active card onto Backlog parks (stops) its run.
-  // speckit:card-handoff — explicit "start" action: run the card through the pipeline
-  // speckit:artifact-list — enumerate a card's artifacts with git revision history
-  // speckit:knowledge-search — keyword search across repo markdown + card briefs/specs
-  // speckit:pilot-state — load or create .pilot/state.json
-  // speckit:phase-approve — mark a phase approved
-  // speckit:phase-revoke — revoke approval, mark downstream stale
-  // speckit:artifact-read — read current file + last approved (via git) for diff.
-  // When `commit` is given, `current` is that revision's content (git show <commit>:path).
-  // speckit:history-load — read and parse history.jsonl
-  // speckit:phase-skip — mark a phase as intentionally skipped
-  // speckit:phase-unskip — restore a skipped phase back to ready
-  // speckit:file-write — write any file within the project (markdown edits)
-  // speckit:ticket-list — the operator's assigned issues, from the
-  // application's single tracker connection.
-  //
-  // This extension used to own two API clients and two credentials. It now
-  // owns neither: core connects, core caches, and this asks (ExtensionAPI
-  // v2.2.0). The board's own behaviour is unchanged.
-  // speckit:credentials-set and speckit:credentials-status are gone.
-  //
-  // Tracker credentials are the application's now, entered once in
-  // Settings → Integrations and encrypted with the OS keychain. This extension
-  // holds none, which is the whole point of the migration — uninstall it and
-  // nothing is orphaned.
-
-  // speckit:dispatch — create the feature dir, its state, and start the first
-  // phase, in one call.
-  //
-  // The board's own route is card-create then card-handoff; this is the
-  // one-step entry a tracker or the remote bridge uses, and what the e2e drives
-  // to prove a phase really opens a terminal.
-  // speckit:run-cancel — stop runner, optionally remove worktree+branch, update state
-  // speckit:card-reset — wipe a card's entire run so it can start over. Stops the
-  // runner, removes the worktree + branch, deletes .pilot logs/history/self-review,
-  // and resets phases/run to the initial state. The card brief, ticket, mode, and
-  // settings are preserved so the card can be re-dispatched cleanly.
-  // speckit:run-reply — answer the model's question from the run console by
-  // resuming the last Claude session with the user's text. Output streams back
-  // into the same phase console.
-  // speckit:open-pr — run gh pr create, write prUrl to state, comment on ticket
-  // speckit:checkin-decision — batch check-in: continue/pause/split
-  // speckit:self-review-read — read .pilot/self-review.json
-  reg(api, 'foundry:self-review-read', async (payload: unknown) => {
-    const { featureDir } = payload as { featureDir?: string }
-    if (!featureDir) return { error: 'featureDir required' }
-    const filePath = path.join(featureDir, '.pilot', 'self-review.json')
-    try {
-      const raw = await fs.promises.readFile(filePath, 'utf-8')
-      return { result: JSON.parse(raw) }
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code
-      if (code === 'ENOENT') return { notFound: true, error: 'self-review.json not found' }
-      return { error: String(err) }
-    }
-  })
-
-  // speckit:phase-request-changes — store feedback, set phase to ready, re-run with note
-  // speckit:phase-comment — append an audit note without triggering re-run
   // Track terminal sessions for the session-list IPC
   if (api.terminal?.onSessionCreate) {
     disposables.push(

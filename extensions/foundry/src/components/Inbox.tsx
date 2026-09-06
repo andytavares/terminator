@@ -90,10 +90,6 @@ export function Inbox(): JSX.Element {
         <div className="fdry-nothing">
           <CheckCircle2 aria-hidden="true" />
           <p>Nothing needs you.</p>
-          <small>
-            {view.summary.building} building · {view.summary.converging} converging ·{' '}
-            {view.summary.automatic} decisions taken by rule
-          </small>
         </div>
       ) : (
         <ul className="fdry-queue">
