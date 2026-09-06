@@ -156,3 +156,18 @@ export function nodeLabel(order: WorkOrder | null, node: RunNode): string {
 export function nodeLabels(order: WorkOrder | null, graph: RunGraph): Record<string, string> {
   return Object.fromEntries(graph.nodes.map((node) => [node.id, nodeLabel(order, node)]))
 }
+
+/**
+ * Whether this node's step asked for a conversation of its own.
+ *
+ * A fan-out declares its child's shape in `step:`, so `context: fresh` sits on
+ * the inner object rather than on the step itself — which is exactly where
+ * five of the six built-in shapes put it, on their verify step.
+ */
+export function wantsFreshContext(recipe: Recipe, node: RunNode): boolean {
+  const step = stepFor(recipe, node)
+  if (step === undefined) return false
+  if (step.context === 'fresh') return true
+  const inner = (step.step ?? {}) as { context?: string }
+  return inner.context === 'fresh'
+}

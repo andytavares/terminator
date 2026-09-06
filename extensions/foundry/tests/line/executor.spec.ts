@@ -1079,3 +1079,95 @@ steps:
     for (const tier of seen) expect(tier).toBe('deep')
   })
 })
+
+// Two step fields that parsed and reached nothing. `deadlineMinutes` is what
+// makes "what happens when nobody answers" a promise a gate can keep, and
+// `context: fresh` is how a shape demands a clean conversation from a role
+// that is otherwise allowed to resume.
+describe('what a step declares about its gate and its conversation', () => {
+  const DEADLINE = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: checkpoint
+    kind: gate
+    rule: unit.boundary
+    options: [go_on, hold]
+    defaultIfIgnored: hold
+    deadlineMinutes: 30
+    after: [build]
+`
+
+  const FRESH = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: recheck
+    kind: fanout
+    over: plan.units
+    after: [build]
+    step: { kind: agent, role: builder, context: fresh }
+`
+
+  it('gives the gate the deadline its step declared', async () => {
+    const raised: Gate[] = []
+    const o = order([unit('U-1')])
+    const r = recipe(DEADLINE)
+    await execute(o, r, buildRunGraph(o, r), {
+      ...deps(ok),
+      autonomy: 'escorted' as const,
+      raise: async (gate: Gate) => {
+        raised.push(gate)
+      },
+    })
+    const checkpoint = raised.find((g) => g.rule === 'unit.boundary')
+    expect(checkpoint).toBeDefined()
+    expect(checkpoint?.deadline).toBe('2026-09-06T11:30:00.000Z')
+  })
+
+  it('leaves a gate whose step named no deadline waiting for ever, on purpose', async () => {
+    const raised: Gate[] = []
+    const o = order([unit('U-1')])
+    const r = recipe(PAUSING)
+    await execute(o, r, buildRunGraph(o, r), {
+      ...deps(ok),
+      autonomy: 'escorted' as const,
+      raise: async (gate: Gate) => {
+        raised.push(gate)
+      },
+    })
+    expect(raised.find((g) => g.rule === 'unit.boundary')?.deadline).toBeNull()
+  })
+
+  it('offers no session to resume where the step asked for a fresh one', async () => {
+    const seen: { node: string; resumeSessionId: string | undefined }[] = []
+    const run = vi.fn(
+      async (input: { node: { id: string }; resumeSessionId: string | undefined }) => {
+        seen.push({ node: input.node.id, resumeSessionId: input.resumeSessionId })
+        return ok(input)
+      }
+    )
+    const o = order([unit('U-1')])
+    const r = recipe(FRESH)
+    await execute(o, r, buildRunGraph(o, r), {
+      ...deps(run as never),
+      // The builder may resume, and one is on offer for its lane. The step is
+      // the only thing that should stop it being taken.
+      sessionFor: () => 'sess-lane-1',
+    })
+    const fresh = seen.filter((s) => s.node.includes('recheck'))
+    expect(fresh.length).toBeGreaterThan(0)
+    for (const step of fresh) expect(step.resumeSessionId).toBeUndefined()
+    const resumed = seen.filter((s) => s.node.includes('build'))
+    expect(resumed.length).toBeGreaterThan(0)
+    expect(resumed.some((s) => s.resumeSessionId === 'sess-lane-1')).toBe(true)
+  })
+})

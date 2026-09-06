@@ -246,6 +246,17 @@ than asked for in a prompt.
 validated by `ProposalSchema`) and the rest are a diff and an exit status. A
 field nothing could enforce reads as a contract that holds.
 
+**Step fields, and what honours each.** `after` and `over` build the graph;
+`when` decides whether the step applies; `role` names the agent; `command` is
+run verbatim; `expect` names what the step promises, and anything it names that
+was not observed is `not_measured` rather than a pass; `rule`, `options` and
+`defaultIfIgnored` shape the gate it raises; `deadlineMinutes` becomes that
+gate's deadline, and a gate past its deadline takes its stated default **and
+the default is acted on**, not only recorded — the alternative is a line that
+waits for ever on a decision the record says was taken; `context: fresh`
+refuses a resumable role a session to resume, read from the inner object on a
+fan-out because that is where every built-in shape puts it.
+
 ### Rule
 
 `id`, `scope` (`universal` \| `project`), `rung` (`L0`–`L6`), `asserts`, `appliesWhen`, `origin` (`built-in` \| `curator:<ledger ids>` \| `operator`). Project-scoped rules load only where the repository carries what they depend on (FR-042).

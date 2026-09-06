@@ -18,7 +18,10 @@ import type { WorkOrder } from '../../src/order/schema.js'
 let root: string
 let record: ReturnType<typeof vi.fn>
 
-function channels(autonomy: Autonomy = 'standard') {
+function channels(
+  autonomy: Autonomy = 'standard',
+  act?: (gate: Gate, option: string) => Promise<void>
+) {
   record = vi.fn(async () => undefined)
   return createInboxChannels({
     gates: createGateStore(root),
@@ -26,6 +29,7 @@ function channels(autonomy: Autonomy = 'standard') {
     autonomy: () => autonomy,
     now: () => '2026-09-06T12:00:00.000Z',
     record: record as never,
+    act: act as never,
   })
 }
 
@@ -111,6 +115,54 @@ describe('foundry:inbox.list', () => {
       expect.stringContaining('no answer')
     )
     expect((await createGateStore(root).get('G-late'))?.decision?.by).toBe('default')
+  })
+
+  // A default that changes the row and leaves the run halted is not a default:
+  // the line waits for ever on a decision the record says was taken.
+  it('acts on the default, rather than only recording it', async () => {
+    await createGateStore(root).save(gate({ id: 'G-late', deadline: '2026-09-06T11:00:00.000Z' }))
+    const acted: { id: string; option: string }[] = []
+    const c = channels('standard', async (g, option) => {
+      acted.push({ id: g.id, option })
+    })
+    await c.list()
+    expect(acted).toEqual([{ id: 'G-late', option: 'hold' }])
+  })
+
+  it('does not act on a gate nobody has defaulted', async () => {
+    await createGateStore(root).save(gate({ id: 'G-patient', deadline: null }))
+    const acted: string[] = []
+    const c = channels('standard', async (g) => {
+      acted.push(g.id)
+    })
+    await c.list()
+    expect(acted).toEqual([])
+  })
+
+  it('records a failed action rather than failing the question "what is waiting"', async () => {
+    await createGateStore(root).save(gate({ id: 'G-late', deadline: '2026-09-06T11:00:00.000Z' }))
+    const c = channels('standard', async () => {
+      throw new Error('gh: not authenticated')
+    })
+    const r = (await c.list()) as { gates: Gate[] }
+    expect(r.gates).toHaveLength(0)
+    expect(record).toHaveBeenCalledWith(
+      'WO-1',
+      'gate.action_failed',
+      'G-late',
+      'gh: not authenticated'
+    )
+  })
+
+  it('acts once, not on every read of the inbox', async () => {
+    await createGateStore(root).save(gate({ id: 'G-late', deadline: '2026-09-06T11:00:00.000Z' }))
+    const acted: string[] = []
+    const c = channels('standard', async (g) => {
+      acted.push(g.id)
+    })
+    await c.list()
+    await c.list()
+    expect(acted).toEqual(['G-late'])
   })
 
   it('leaves a gate with no deadline waiting, however long', async () => {

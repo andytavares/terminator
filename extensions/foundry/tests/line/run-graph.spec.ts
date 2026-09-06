@@ -6,6 +6,7 @@ import {
   stepFor,
   nodeLabel,
   nodeLabels,
+  wantsFreshContext,
 } from '../../src/line/run-graph.js'
 import type { RunNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
@@ -353,5 +354,56 @@ describe('what to call a node', () => {
       n1: 'architect',
       n2: 'U-1 refresh the token on a 401',
     })
+  })
+})
+
+describe('a step that asks for a fresh conversation', () => {
+  const OUTER = `
+schemaVersion: 1
+id: bugfix
+steps:
+  - id: verify
+    kind: agent
+    role: verifier
+    context: fresh
+`
+  const INNER = `
+schemaVersion: 1
+id: bugfix
+steps:
+  - id: verify
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: verifier, context: fresh }
+`
+  const NEITHER = `
+schemaVersion: 1
+id: bugfix
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+`
+
+  function nodeOf(text: string) {
+    const r = recipe(text)
+    const o = order()
+    return { recipe: r, node: buildRunGraph(o, r).nodes[0] }
+  }
+
+  it('reads it from the step itself', () => {
+    const { recipe: r, node } = nodeOf(OUTER)
+    expect(wantsFreshContext(r, node)).toBe(true)
+  })
+
+  it("reads it from a fan-out's inner step, which is where every built-in puts it", () => {
+    const { recipe: r, node } = nodeOf(INNER)
+    expect(wantsFreshContext(r, node)).toBe(true)
+  })
+
+  it('is false where nothing asked for one', () => {
+    const { recipe: r, node } = nodeOf(NEITHER)
+    expect(wantsFreshContext(r, node)).toBe(false)
   })
 })

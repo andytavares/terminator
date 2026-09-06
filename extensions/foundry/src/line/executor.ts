@@ -8,7 +8,7 @@ import {
   hasStalled,
   blockedNodes,
 } from './scheduler.js'
-import { withNode, stepFor } from './run-graph.js'
+import { withNode, stepFor, wantsFreshContext } from './run-graph.js'
 import { checkExpect } from '../recipe/step-kinds.js'
 import type { RunGraph, RunNode } from './run-graph.js'
 import { createRoleRegistry } from './roles.js'
@@ -222,7 +222,19 @@ export async function execute(
    */
   async function raise(
     rule: GateRuleId,
-    input: { summary: string; why: string; nodeId?: string | null; blockedUnits?: number }
+    input: {
+      summary: string
+      why: string
+      nodeId?: string | null
+      blockedUnits?: number
+      /**
+       * Minutes before this gate takes its stated default. A recipe's own
+       * `deadlineMinutes`, when the step declared one — without this the field
+       * parsed and reached nothing, so "what happens when nobody answers" was
+       * a promise no gate could keep.
+       */
+      deadlineMinutes?: number
+    }
   ): Promise<boolean> {
     if (!isLive(rule, autonomy)) return false
     gateSeq += 1
@@ -236,6 +248,10 @@ export async function execute(
       riskGrade: order.risk.grade,
       blockedUnits: input.blockedUnits ?? current.nodes.filter((n) => n.state === 'waiting').length,
       at: deps.now(),
+      deadline:
+        input.deadlineMinutes === undefined
+          ? null
+          : new Date(Date.parse(deps.now()) + input.deadlineMinutes * 60_000).toISOString(),
     })
     gates.push(gate)
     deps.onEvent?.({ type: 'gate', gate })
@@ -313,6 +329,7 @@ export async function execute(
         summary: `${order.title} reached the "${blocking.stepId}" checkpoint`,
         why: `The "${recipe.id}" shape of work stops here by design.`,
         nodeId: blocking.id,
+        deadlineMinutes: stepFor(recipe, blocking)?.deadlineMinutes,
       })
       // A silenced checkpoint is a checkpoint that does not stop anything —
       // but the node still has to leave the graph, or the wave loops on it.
@@ -337,7 +354,14 @@ export async function execute(
           // `assertResumable` is what makes the permission structural: a role
           // with `allowResume: false` is *handed* undefined, so the refusal
           // cannot be forgotten by a caller.
-          const offered = deps.sessionFor?.(node.lane ?? 1)
+          // A step may demand a fresh conversation even from a role that is
+          // allowed to resume. Five of the six built-in shapes say
+          // `context: fresh` on their verify step, and it reached nothing —
+          // the effect happened to hold only because the verifier's own role
+          // file forbids resuming, so a recipe asking it of any other role got
+          // a resumed session anyway.
+          const wantsFresh = wantsFreshContext(recipe, node)
+          const offered = wantsFresh ? undefined : deps.sessionFor?.(node.lane ?? 1)
           const resumeSessionId =
             roleId !== null && offered !== undefined && roles.mayResume(roleId)
               ? offered

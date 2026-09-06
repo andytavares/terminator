@@ -70,6 +70,17 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
           gate.id,
           `${gate.rule}: no answer by the deadline`
         )
+        // Acted on, not only recorded. A default that changes the row and
+        // leaves the run halted is not a default — the line waits for ever on
+        // a decision that has already been taken, and the record says it was
+        // taken. Same seam the operator's own decision goes through, and the
+        // same treatment for a failure: written down, never thrown at a caller
+        // that was only asking what is waiting.
+        try {
+          await deps.act?.(gate, gate.decision.option)
+        } catch (error) {
+          await deps.record(gate.orderId, 'gate.action_failed', gate.id, (error as Error).message)
+        }
       }
     }
 
