@@ -51,11 +51,9 @@ export function LinkedVaultPanel({ targetId }: LinkedVaultPanelProps): React.JSX
 
   return (
     <div className="linked-vault-panel">
-      <p className="linked-vault-panel__title">Linked vault items</p>
+      <p className="linked-vault-panel__title">Linked tasks and projects</p>
 
-      {isEmpty && (
-        <p className="linked-vault-panel__empty">No vault items linked to this terminal session.</p>
-      )}
+      {isEmpty && <p className="linked-vault-panel__empty">Nothing linked to this terminal yet.</p>}
 
       {links.tasks.length > 0 && (
         <section className="linked-vault-panel__section">

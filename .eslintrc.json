@@ -48,6 +48,22 @@
           {
             "selector": "JSXAttribute[name.name='style'] Property[key.name='zIndex'] > Literal[value=/^[0-9]+$/]",
             "message": "Stacking comes from the published layer scale. Use layerValue()/nestedLayerValue() from @terminator/extension-ui, or var(--tm-layer-*) in CSS \u2014 a raw number is how 14 unmanaged values ended up deciding order by whoever picked the biggest."
+          },
+          {
+            "selector": "JSXElement[openingElement.name.name!='code'] > JSXText[value=/\\b(?:vault|[Aa]rtifacts?|[Ss]talls?|ngrok)\\b/]",
+            "message": "Extension UI says what the reader sees, not how it is stored or which vendor is behind it (docs/EXTENSION-STYLE.md): notes are saved, not \"saved to vault\"; a phase writes files, it does not produce \"Artifacts\"; a run is stuck, not a \"Stall\"; the address is public, the vendor is ngrok's business. Identifiers, IPC channels and class names keep whatever name they have \u2014 this rule only reads text, labels, placeholders, tooltips and accessible names."
+          },
+          {
+            "selector": "Property[key.name='label'] > Literal[value=/\\b(?:vault|[Aa]rtifacts?|[Ss]talls?|ngrok)\\b/]",
+            "message": "Extension UI says what the reader sees, not how it is stored or which vendor is behind it (docs/EXTENSION-STYLE.md): notes are saved, not \"saved to vault\"; a phase writes files, it does not produce \"Artifacts\"; a run is stuck, not a \"Stall\"; the address is public, the vendor is ngrok's business. Identifiers, IPC channels and class names keep whatever name they have \u2014 this rule only reads text, labels, placeholders, tooltips and accessible names."
+          },
+          {
+            "selector": "JSXAttribute[name.name=/^(placeholder|title|aria-label)$/] > Literal[value=/\\b(?:vault|[Aa]rtifacts?|[Ss]talls?|ngrok)\\b/]",
+            "message": "Extension UI says what the reader sees, not how it is stored or which vendor is behind it (docs/EXTENSION-STYLE.md): notes are saved, not \"saved to vault\"; a phase writes files, it does not produce \"Artifacts\"; a run is stuck, not a \"Stall\"; the address is public, the vendor is ngrok's business. Identifiers, IPC channels and class names keep whatever name they have \u2014 this rule only reads text, labels, placeholders, tooltips and accessible names."
+          },
+          {
+            "selector": "JSXElement > JSXExpressionContainer > ConditionalExpression > Literal[value=/\\b(?:vault|[Aa]rtifacts?|[Ss]talls?|ngrok)\\b/]",
+            "message": "Extension UI says what the reader sees, not how it is stored or which vendor is behind it (docs/EXTENSION-STYLE.md): notes are saved, not \"saved to vault\"; a phase writes files, it does not produce \"Artifacts\"; a run is stuck, not a \"Stall\"; the address is public, the vendor is ngrok's business. Identifiers, IPC channels and class names keep whatever name they have \u2014 this rule only reads text, labels, placeholders, tooltips and accessible names."
           }
         ]
       }

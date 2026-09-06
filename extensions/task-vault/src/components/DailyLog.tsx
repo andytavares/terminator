@@ -517,7 +517,7 @@ function BlockModal({
             onClick={handleSubmit}
             disabled={!reason.trim() || (isCustom && !checkInterval)}
           >
-            Mark Blocked
+            Mark blocked
           </button>
         </div>
       </div>

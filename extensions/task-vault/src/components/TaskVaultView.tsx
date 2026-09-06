@@ -185,7 +185,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
             style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
           >
             <p style={{ fontSize: 12, color: 'var(--tm-text-muted)', margin: 0 }}>
-              Export your vault to JSON for backup or migration. Import merges records by ID —
+              Export everything to JSON for backup or migration. Import merges records by ID —
               existing data is not overwritten.
             </p>
             <div style={{ display: 'flex', gap: 8 }}>

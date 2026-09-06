@@ -52,7 +52,7 @@ describe('GatePanel', () => {
         onRequestChanges={noop}
       />
     )
-    expect(screen.getByText(/no artifact/i)).toBeTruthy()
+    expect(screen.getByText(/nothing to preview/i)).toBeTruthy()
   })
 
   it('shows Approve button', () => {

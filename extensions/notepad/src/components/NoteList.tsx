@@ -206,7 +206,7 @@ function ItemEditModal({
           <TagChipInput tags={tags} onChange={setTags} />
         </div>
         <div className="notepad-dialog__footer">
-          <span className="notepad-dialog__hint">⌘↵ save · Esc cancel</span>
+          <span className="notepad-dialog__hint">⌘↵ Save · Esc Cancel</span>
           <button className="notepad-btn-ghost" onClick={onClose} disabled={saving}>
             Cancel
           </button>

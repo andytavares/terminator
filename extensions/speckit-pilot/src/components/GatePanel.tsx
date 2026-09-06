@@ -139,7 +139,7 @@ export function GatePanel({
           }}
         >
           {artifactContent ?? (
-            <span style={{ color: 'var(--tm-text-secondary)' }}>No artifact to preview.</span>
+            <span style={{ color: 'var(--tm-text-secondary)' }}>Nothing to preview.</span>
           )}
         </div>
       )}

@@ -14,7 +14,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'brief', label: 'Brief' },
   { id: 'phases', label: 'Phases' },
   { id: 'activity', label: 'Activity' },
-  { id: 'artifacts', label: 'Artifacts' },
+  { id: 'artifacts', label: 'Files' },
 ]
 
 interface CardDetailProps {

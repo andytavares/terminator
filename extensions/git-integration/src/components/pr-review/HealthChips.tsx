@@ -140,7 +140,7 @@ export function HealthChips({
               : 'fail',
     },
     {
-      label: 'DRY',
+      label: 'Duplication',
       tooltip:
         'Duplicate code detection — similar blocks found in multiple files in this PR. 0=pass, warn if violations found.',
       value:

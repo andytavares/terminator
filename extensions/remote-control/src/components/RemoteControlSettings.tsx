@@ -137,7 +137,7 @@ export function RemoteControlSettings(): React.JSX.Element {
         <>
           {status.publicUrl ? (
             <div className="settings-section__field">
-              <label className="settings-section__label">Public URL (ngrok)</label>
+              <label className="settings-section__label">Public address</label>
               <div
                 className="settings-section__hint"
                 style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}
@@ -184,7 +184,7 @@ export function RemoteControlSettings(): React.JSX.Element {
                 }}
               >
                 <span>
-                  ngrok not installed — public URL unavailable. Install:{' '}
+                  A public address needs one more program. Install it with:{' '}
                   <code>brew install ngrok</code>
                 </span>
                 <button
@@ -211,7 +211,7 @@ export function RemoteControlSettings(): React.JSX.Element {
 
           {(status.lanUrl || enabled) && (
             <div className="settings-section__field">
-              <label className="settings-section__label">LAN URL</label>
+              <label className="settings-section__label">Local address</label>
               <div
                 className="settings-section__hint"
                 style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}

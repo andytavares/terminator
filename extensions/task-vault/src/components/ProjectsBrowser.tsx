@@ -497,9 +497,7 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
       </div>
 
       {tasks.length === 0 && (
-        <div className="projects-browser__task-list-empty">
-          No tasks tagged @{projectName} across vault.
-        </div>
+        <div className="projects-browser__task-list-empty">No tasks tagged @{projectName}.</div>
       )}
       {openTasks.map((t) => (
         <div key={t.id} className="projects-browser__task-row">

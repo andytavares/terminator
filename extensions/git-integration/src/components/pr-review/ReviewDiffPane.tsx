@@ -280,12 +280,12 @@ export function ReviewDiffPane({
             className={`review-diff-risk-label review-diff-risk-label--${file.riskScore.level}`}
           >
             {file.riskScore.level === 'high'
-              ? 'HIGH RISK'
+              ? 'High risk'
               : file.riskScore.level === 'medium'
-                ? 'MED RISK'
-                : 'LOW RISK'}{' '}
+                ? 'Medium risk'
+                : 'Low risk'}{' '}
             <button className="review-diff-why-btn" onClick={onShowRisk}>
-              why?
+              Why?
             </button>
           </span>
         </div>
@@ -755,7 +755,7 @@ export function ReviewDiffPane({
               className="review-diff-nav-btn review-diff-nav-btn--primary"
               onClick={onMarkViewed}
             >
-              Mark viewed → Next 1
+              Mark viewed, go to next
             </button>
           )}
         </div>

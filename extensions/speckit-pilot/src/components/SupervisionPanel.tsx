@@ -238,8 +238,8 @@ function Stalls({
     <>
       <div className="sk-sup__note">
         {shadowMode
-          ? 'Shadow mode: stalls are recorded here, not surfaced. Turn it off once the thresholds have earned it.'
-          : 'Stalls are surfaced as they happen.'}
+          ? 'Recorded here only, and not raised while you work. Turn shadow mode off once the thresholds have earned it.'
+          : 'A run that stops making progress is raised as it happens.'}
       </div>
       {firings.length === 0 ? (
         <div className="sk-sup__clear">Nothing has stopped making progress.</div>

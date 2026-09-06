@@ -137,15 +137,15 @@ describe('ReviewDiffPane', () => {
     expect(screen.getByText('+5/−2')).toBeTruthy()
   })
 
-  it('shows LOW RISK label for low risk file', async () => {
+  it('shows low-risk label for low risk file', async () => {
     await renderPane()
-    expect(screen.getByText(/LOW RISK/)).toBeTruthy()
+    expect(screen.getByText(/Low risk/)).toBeTruthy()
   })
 
-  it('shows HIGH RISK label for high risk file', async () => {
+  it('shows high-risk label for high risk file', async () => {
     const highFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'high' as const } }
     await renderPane({ file: highFile })
-    expect(screen.getByText(/HIGH RISK/)).toBeTruthy()
+    expect(screen.getByText(/High risk/)).toBeTruthy()
   })
 
   it('shows binary message for binary files', async () => {
@@ -188,7 +188,7 @@ describe('ReviewDiffPane', () => {
 
   it('shows Mark viewed button when not on last file', async () => {
     await renderPane({ chapterProgress: { index: 0, total: 2 } })
-    expect(screen.getByText('Mark viewed → Next 1')).toBeTruthy()
+    expect(screen.getByText('Mark viewed, go to next')).toBeTruthy()
   })
 
   it('calls onPause when Pause review is clicked', async () => {
@@ -205,10 +205,10 @@ describe('ReviewDiffPane', () => {
     expect(onOpenSubmit).toHaveBeenCalled()
   })
 
-  it('calls onShowRisk when why? button is clicked', async () => {
+  it('calls onShowRisk when the Why? button is clicked', async () => {
     const onShowRisk = vi.fn()
     await renderPane({ onShowRisk })
-    fireEvent.click(screen.getByText('why?'))
+    fireEvent.click(screen.getByText('Why?'))
     expect(onShowRisk).toHaveBeenCalled()
   })
 
@@ -401,9 +401,9 @@ describe('ReviewDiffPane', () => {
     expect(onMarkViewed).toHaveBeenCalled()
   })
 
-  it('shows MED RISK label for medium risk file', async () => {
+  it('shows medium-risk label for medium risk file', async () => {
     const medFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'medium' as const } }
     await renderPane({ file: medFile })
-    expect(screen.getByText(/MED RISK/)).toBeTruthy()
+    expect(screen.getByText(/Medium risk/)).toBeTruthy()
   })
 })

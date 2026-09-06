@@ -346,7 +346,7 @@ export function PrOverviewPanel({
                   className={`pr-overview-hotspot-item pr-overview-hotspot-item--${f.riskScore.level}`}
                 >
                   <span className={`pr-risk-chip pr-risk-chip--${f.riskScore.level}`}>
-                    {f.riskScore.level === 'high' ? 'HIGH' : 'MED'}
+                    {f.riskScore.level === 'high' ? 'High' : 'Medium'}
                   </span>
                   <span className="pr-overview-hotspot-path" title={f.path}>
                     {formatShortPath(f.path)}

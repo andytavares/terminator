@@ -356,8 +356,7 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
       )}
       {state && displayPhase && state.phases[displayPhase]?.status === 'modified' && (
         <div className="sk-sup__warn" role="status">
-          Its artifacts have changed since you approved them — what is on disk is not what was
-          approved.
+          Its files have changed since you approved them — what is on disk is not what was approved.
           <button className="sk-sup__btn" onClick={() => void handleApprove(displayPhase)}>
             Approve as it stands
           </button>

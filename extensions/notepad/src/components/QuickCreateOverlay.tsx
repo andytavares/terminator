@@ -271,7 +271,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
           </div>
           {type === 'note' && (
             <span className="notepad-quick-create__vault-status">
-              saved to vault · exports as <code>{exportFilename}</code>
+              saved · exports as <code>{exportFilename}</code>
             </span>
           )}
         </div>

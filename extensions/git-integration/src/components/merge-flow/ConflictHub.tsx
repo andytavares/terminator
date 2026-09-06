@@ -195,19 +195,19 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
         <div className="conflict-hub__stats">
           <div className="conflict-hub__stat">
             <span className="conflict-hub__stat-value">{session.files.length}</span>
-            <span className="conflict-hub__stat-label">FILES CONFLICTED</span>
+            <span className="conflict-hub__stat-label">Files conflicted</span>
           </div>
           <div className="conflict-hub__stat">
             <span className="conflict-hub__stat-value conflict-hub__stat-value--accent">
               {session.totalConflicts}
             </span>
-            <span className="conflict-hub__stat-label">TOTAL CONFLICTS</span>
+            <span className="conflict-hub__stat-label">Total conflicts</span>
           </div>
           <div className="conflict-hub__stat">
             <span className="conflict-hub__stat-value conflict-hub__stat-value--muted">
               ~{estimatedMin} min
             </span>
-            <span className="conflict-hub__stat-label">ESTIMATED TIME</span>
+            <span className="conflict-hub__stat-label">Estimated time</span>
           </div>
         </div>
         <div className="conflict-hub__progress">
@@ -235,7 +235,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
       {/* Unresolved files */}
       {unresolvedFiles.length > 0 && (
         <div className="conflict-hub__section">
-          <div className="conflict-hub__section-label">NEEDS YOUR ATTENTION</div>
+          <div className="conflict-hub__section-label">Needs your attention</div>
           {unresolvedFiles.map((file) => {
             const idx = session.files.indexOf(file)
             return (
@@ -257,7 +257,7 @@ export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
       {/* Resolved files */}
       {resolvedFiles.length > 0 && (
         <div className="conflict-hub__section">
-          <div className="conflict-hub__section-label">RESOLVED</div>
+          <div className="conflict-hub__section-label">Resolved</div>
           {resolvedFiles.map((file) => {
             const idx = session.files.indexOf(file)
             return (

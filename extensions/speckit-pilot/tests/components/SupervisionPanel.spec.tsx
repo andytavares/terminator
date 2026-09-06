@@ -261,7 +261,7 @@ describe('what stopped making progress', () => {
     // unreported too. Saying which mode it is in is the whole point.
     panel()
     fireEvent.click(await screen.findByRole('tab', { name: /Stuck/ }))
-    expect(await screen.findByText(/Shadow mode/)).toBeDefined()
+    expect(await screen.findByText(/Recorded here only/)).toBeDefined()
   })
 
   it('shows the numbers that justified the firing', async () => {

@@ -128,13 +128,13 @@ export function KeepBothModal({
 
   const first =
     order === 'ours-first'
-      ? { id: 'ours', text: block.oursText, author: oursAuthor, branch: oursBranch, label: 'YOURS' }
+      ? { id: 'ours', text: block.oursText, author: oursAuthor, branch: oursBranch, label: 'Yours' }
       : {
           id: 'theirs',
           text: block.theirsText,
           author: theirsAuthor,
           branch: theirsBranch,
-          label: 'THEIRS',
+          label: 'Theirs',
         }
 
   const second =
@@ -144,9 +144,9 @@ export function KeepBothModal({
           text: block.theirsText,
           author: theirsAuthor,
           branch: theirsBranch,
-          label: 'THEIRS',
+          label: 'Theirs',
         }
-      : { id: 'ours', text: block.oursText, author: oursAuthor, branch: oursBranch, label: 'YOURS' }
+      : { id: 'ours', text: block.oursText, author: oursAuthor, branch: oursBranch, label: 'Yours' }
 
   const firstName = first.author?.name
     ? `${first.author.name}'s change (${first.label})`
@@ -236,7 +236,7 @@ export function KeepBothModal({
       {/* THEN divider */}
       <div className="keep-both-modal__then">
         <span className="keep-both-modal__then-line" />
-        <span className="keep-both-modal__then-label">THEN</span>
+        <span className="keep-both-modal__then-label">then</span>
         <span className="keep-both-modal__then-line" />
       </div>
 

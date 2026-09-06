@@ -178,8 +178,6 @@
 .daily-log__notes h3 {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--tm-text-muted);
   margin: 0 0 8px;
 }
@@ -762,8 +760,6 @@
 .wr-step__section-title {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--tm-text-muted);
   margin: 14px 0 6px;
 }
@@ -1077,8 +1073,6 @@
   font-size: 11px;
   color: var(--tm-text-muted);
   margin-bottom: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .inbox-processor__item {
@@ -1239,8 +1233,6 @@
   border-radius: 8px;
   padding: 1px 6px;
   flex-shrink: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .link-picker__result-text {
@@ -1273,8 +1265,6 @@
 .linked-vault-panel__title {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
   color: var(--tm-text-muted);
   margin: 0 0 10px;
 }
@@ -1292,8 +1282,6 @@
 .linked-vault-panel__section-title {
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
   color: var(--tm-text-muted);
   margin: 0 0 6px;
 }
@@ -2118,8 +2106,6 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--tm-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .create-project-form__field input {
@@ -2616,8 +2602,6 @@
 .archive-view__section-title {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--tm-text-muted);
   margin: 16px 0 8px;
 }
@@ -3097,8 +3081,6 @@
   padding: 6px 12px;
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--tm-text-muted);
   border-bottom: 1px solid var(--tm-border);
 }
@@ -3322,8 +3304,6 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--tm-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   margin: 0 0 8px;
 }
 
@@ -3643,8 +3623,6 @@
 .projects-browser__section-title {
   font-size: var(--tv-text-sm);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
   color: var(--tm-text-muted);
 }
 
@@ -3905,8 +3883,6 @@
 .daily-log__today-badge {
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--tm-accent);
   background: var(--tm-accent-muted, rgba(99, 102, 241, 0.14));
   border-radius: 4px;
@@ -4025,8 +4001,6 @@ h2.daily-log__date {
 .archive-view__section-title {
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   color: var(--tm-text-muted);
   margin: 20px 0 6px;
   padding-bottom: 6px;
@@ -4311,8 +4285,6 @@ h2.daily-log__date {
 .projects-browser__task-list-header {
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   padding: 5px 10px;
 }
 
@@ -4751,8 +4723,6 @@ h2.daily-log__date {
 .weekly-review__stepper {
   font-size: 10px;
   color: var(--tm-text-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   font-weight: 500;
   margin-top: 1px;
 }
@@ -5186,8 +5156,6 @@ h2.daily-log__date {
 .daily-log__rollover-header-label {
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   flex: 1;
   text-align: left;
 }
@@ -5201,8 +5169,6 @@ h2.daily-log__date {
 .daily-log__today-label {
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--tm-text-muted);
   padding: 2px 0 4px;
 }
@@ -5295,8 +5261,6 @@ h2.daily-log__date {
 .tv-kanban__swimlane-header {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--tm-text-muted);
   padding: 2px 0;
   border-bottom: 1px solid var(--tm-border);
@@ -5340,8 +5304,6 @@ h2.daily-log__date {
 .tv-kanban__lane-title {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--tm-text-muted);
 }
 
@@ -5679,8 +5641,6 @@ h2.daily-log__date {
 .tv-context-filter__heading {
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--tm-text-muted);
 }
 
@@ -5822,8 +5782,6 @@ h2.daily-log__date {
   font-size: 10px;
   font-weight: 700;
   color: var(--tm-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 .tv-detail__preview {
@@ -6107,8 +6065,6 @@ h2.daily-log__date {
 .db-admin__section-title {
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
   color: var(--tm-text-muted);
 }
 
@@ -6282,8 +6238,6 @@ h2.daily-log__date {
   background: var(--tm-bg-elevated);
   color: var(--tm-text-muted);
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   border-bottom: 1px solid var(--tm-border);
   white-space: nowrap;
 }
@@ -6472,8 +6426,6 @@ h2.daily-log__date {
   color: var(--tm-text-muted);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   width: 100%;
   text-align: left;
 }
@@ -6829,8 +6781,6 @@ h2.daily-log__date {
   font-size: 11px;
   font-weight: 500;
   color: var(--tm-text-muted);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   padding: 4px 0 8px;
 }
 
@@ -7046,8 +6996,6 @@ h2.daily-log__date {
   font-size: 9px;
   font-weight: 600;
   color: var(--tm-text-muted);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
   padding: 3px 0 6px;
 }
 
@@ -7399,8 +7347,6 @@ h2.daily-log__date {
   color: var(--tm-text-muted, rgba(120, 120, 176, 0.7));
   text-align: center;
   padding: 2px 0 4px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .dtp__cal-day {
@@ -7503,8 +7449,6 @@ h2.daily-log__date {
   font-size: 10px;
   font-weight: 600;
   color: var(--tm-text-muted, rgba(120, 120, 176, 0.7));
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   padding: 10px 12px 6px;
   border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.06));
 }

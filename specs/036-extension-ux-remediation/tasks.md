@@ -254,15 +254,15 @@ confirm the build rejects it, naming the file and string.
 
 ### Tests for User Story 7 ⚠️ Write first, confirm they FAIL
 
-- [ ] T086 [P] [US7] Write a failing lint fixture spec in `tests/unit/lint/extension-vocabulary.spec.ts` asserting the rule rejects "ngrok auth token", "vault", "artifacts" and "stalls" in user-facing strings
+- [x] T086 [P] [US7] Write a failing lint fixture spec in `tests/unit/lint/extension-vocabulary.spec.ts` asserting the rule rejects "ngrok auth token", "vault", "artifacts" and "stalls" in user-facing strings
 
 ### Implementation for User Story 7
 
-- [ ] T087 [US7] Write the rule set at `docs/EXTENSION-STYLE.md` covering label case, button voice, empty-state shape and forbidden vocabulary (FR-038)
-- [ ] T088 [US7] Extend the `no-restricted-syntax` override in `.eslintrc.json` to cover `extensions/*/src/**/*.tsx` with the same three selectors already used for "project" (research R6, FR-039)
-- [ ] T089 [P] [US7] Convert caps section labels to sentence case across `extensions/git-integration`, `extensions/task-vault` and `extensions/remote-control`
-- [ ] T090 [P] [US7] Normalise button labels to verb-first sentence case across all five extensions, including Notepad's lowercase "cancel" beside its capitalised "Save"
-- [ ] T091 [US7] Replace implementation vocabulary in user-facing strings — "saved to vault", "Artifacts", "Stalls", "excess connections are rejected" — across all five extensions
+- [x] T087 [US7] Write the rule set at `docs/EXTENSION-STYLE.md` covering label case, button voice, empty-state shape and forbidden vocabulary (FR-038)
+- [x] T088 [US7] Extend the `no-restricted-syntax` override in `.eslintrc.json` to cover `extensions/*/src/**/*.tsx` with the same three selectors already used for "project" (research R6, FR-039)
+- [x] T089 [P] [US7] Convert caps section labels to sentence case across `extensions/git-integration`, `extensions/task-vault` and `extensions/remote-control`
+- [x] T090 [P] [US7] Normalise button labels to verb-first sentence case across all five extensions, including Notepad's lowercase "cancel" beside its capitalised "Save"
+- [x] T091 [US7] Replace implementation vocabulary in user-facing strings — "saved to vault", "Artifacts", "Stalls", "excess connections are rejected" — across all five extensions
 
 **Checkpoint**: The style is written down, and the linter keeps it.
 

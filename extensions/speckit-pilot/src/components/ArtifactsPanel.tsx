@@ -113,7 +113,7 @@ export function ArtifactsPanel({ featureDir }: ArtifactsPanelProps) {
             )}
           </>
         ) : (
-          <p className="sk-artifacts__hint">Select an artifact to view it.</p>
+          <p className="sk-artifacts__hint">Select a file to view it.</p>
         )}
       </div>
     </div>

@@ -118,8 +118,6 @@
   color: var(--tm-warning);
   border-radius: 10px;
   padding: 2px 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   margin-left: auto;
 }
 
@@ -174,8 +172,6 @@
 
 .conflict-hub__stat-label {
   font-size: 0.625rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--tm-text-muted);
 }
 
@@ -241,8 +237,6 @@
 
 .conflict-hub__section-label {
   font-size: 0.625rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--tm-text-muted);
   margin-bottom: 8px;
   padding: 0 2px;
@@ -650,8 +644,6 @@
 }
 
 .conflict-panel__label-text {
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .conflict-panel__author {
@@ -787,8 +779,6 @@
   padding: 4px 12px;
   background: var(--tm-bg-surface);
   flex-shrink: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .result-preview-strip__resolved-badge {
@@ -798,8 +788,6 @@
   border-radius: 3px;
   padding: 1px 6px;
   font-size: 0.625rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .result-preview-strip__code {
@@ -993,9 +981,7 @@
   align-items: center;
   gap: 8px;
   font-size: 0.6875rem;
-  letter-spacing: 0.06em;
   color: var(--tm-text-muted);
-  text-transform: uppercase;
 }
 
 .keep-both-modal__block-num {
@@ -1144,9 +1130,7 @@
 
 .keep-both-modal__preview-label {
   font-size: 0.6875rem;
-  letter-spacing: 0.06em;
   color: var(--tm-text-muted);
-  text-transform: uppercase;
 }
 
 .keep-both-modal__preview {
@@ -1289,8 +1273,6 @@
   border: 1px solid var(--tm-border);
   padding: 1px 6px;
   border-radius: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .manual-editor__line-count {
@@ -1485,8 +1467,6 @@
 
 .completion-screen__card-label {
   font-size: 0.625rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--tm-text-muted);
   margin-bottom: 16px;
 }

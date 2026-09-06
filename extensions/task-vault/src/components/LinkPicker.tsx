@@ -59,7 +59,7 @@ export function LinkPicker({ targetId, onLink, onCancel }: LinkPickerProps): Rea
   return (
     <div className="link-picker" ref={surfaceRef} data-tmui-surface="">
       <div className="link-picker__header">
-        <p className="link-picker__title">Link to vault item</p>
+        <p className="link-picker__title">Link to a task or project</p>
         <button className="link-picker__close" onClick={onCancel} aria-label="Cancel">
           ×
         </button>

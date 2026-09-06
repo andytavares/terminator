@@ -144,7 +144,7 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
 
         {/* Resolution summary */}
         <div className="completion-screen__card">
-          <div className="completion-screen__card-label">RESOLUTION SUMMARY</div>
+          <div className="completion-screen__card-label">Resolution summary</div>
           <div className="completion-screen__summary-stats">
             {totals.mine > 0 && (
               <div className="completion-screen__summary-stat">
@@ -215,7 +215,7 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
 
         {/* Commit card */}
         <div className="completion-screen__card">
-          <div className="completion-screen__card-label">COMMIT MESSAGE</div>
+          <div className="completion-screen__card-label">Commit message</div>
           <textarea
             className="completion-screen__commit-message"
             value={commitMessage}
