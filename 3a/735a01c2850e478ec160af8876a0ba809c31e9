@@ -1,0 +1,59 @@
+extensions/git-integration/src/components/StagingArea.tsx
+  s_8aa585ff1f786f::t_fb565946f10302 6-13,15-20,24-29,50
+extensions/git-integration/tests/unit/commit-controls.spec.ts
+  s_8aa585ff1f786f::t_c65556a95d62c3 1-27,31-60
+  s_8aa585ff1f786f::t_09b0d6d829411f 28-30
+extensions/git-integration/src/stores/pr-review.store.ts
+  s_8aa585ff1f786f::t_40ea7ed46cea69 24-25,58,140,161
+extensions/git-integration/src/components/git-integration.css
+  s_8aa585ff1f786f::t_18c59f305e4c74 906-962
+  s_8aa585ff1f786f::t_fb565946f10302 894-905
+specs/036-extension-ux-remediation/tasks.md
+  s_8aa585ff1f786f::t_09b0d6d829411f 229-230,234-242
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_8aa585ff1f786f::t_0c9589c7e92f2d 1
+  s_8aa585ff1f786f::t_2789e729e866e2 22-24,34-36,86-103
+extensions/git-integration/src/components/GitSidebarPanel.tsx
+  s_8aa585ff1f786f::t_31867cc5fa9e2b 58,157-164,205-207,210,214,216-251,253-255,259
+  s_8aa585ff1f786f::t_09b0d6d829411f 16-20,256-258
+  s_8aa585ff1f786f::t_18c59f305e4c74 2-3,12-15,21-42
+  s_8aa585ff1f786f::t_c5bdbe065f956c 43
+extensions/git-integration/src/components/pr-review/ReviewQueue.tsx
+  s_8aa585ff1f786f::t_69388d949067c5 140-144,146,148-151,158-159,161-162
+  s_8aa585ff1f786f::t_655be0b90e0335 145
+  s_8aa585ff1f786f::t_09b0d6d829411f 152-157,245
+  s_8aa585ff1f786f::t_f0b6f47d9872cb 2,170,274-278,290-292,298,317,327,338-339,341,343,354
+  s_8aa585ff1f786f::t_48ebb60222b658 196-202,211
+  s_8aa585ff1f786f::t_1ef7b94cc1354f 33
+  s_8aa585ff1f786f::t_dd1a0bbf2eb953 6,116-117,119,147,160,203-210,237-239,244
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_8aa585ff1f786f::t_40ea7ed46cea69 98,116,122,140,148,152-155
+extensions/git-integration/tests/unit/StagingArea.spec.tsx
+  s_8aa585ff1f786f::t_791ad95c717bc1 26-28,30-44,99-101
+extensions/git-integration/tests/unit/review-queue-ux.spec.tsx
+  s_8aa585ff1f786f::t_a63419ba4f5e14 74-77
+  s_8aa585ff1f786f::t_744199be5d2825 1-73,78-139
+extensions/git-integration/tests/unit/ReviewQueue.spec.tsx
+  s_8aa585ff1f786f::t_9523a6fe87621a 49,84-89,91-95,137,139-142,148,186,190,194-195,198,204,236-242,258,269
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_8aa585ff1f786f::t_2789e729e866e2 118,181-186,197,221
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_8aa585ff1f786f::t_48ebb60222b658 71,73,142-143,148,150,229-230
+  s_8aa585ff1f786f::t_655be0b90e0335 68-69,77-98,117-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "3a735a01c2850e478ec160af8876a0ba809c31e9",
+  "prompts": {},
+  "sessions": {
+    "s_8aa585ff1f786f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06361f5b-66c2-4087-b18f-7211ba1cd24e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
