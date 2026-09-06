@@ -8,8 +8,6 @@
  * branch shipped was in exactly that gap.
  */
 import { tmpdir as tmpdirForUserData } from 'node:os'
-import { mkdtempSync } from 'node:fs'
-import { join } from 'node:path'
 
 // A real directory. The supervision runtime writes its feed, mutes and
 // per-session settings under userData, and a path that does not exist fails at
@@ -179,6 +177,7 @@ beforeEach(() => {
   exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
 })
 
+// Discarding a run and deciding a phase went with the card model; what is left here is the supervised-run surface the Line still uses.
 describe('the runtime came up', () => {
   it('registered every run action, not just the read-only ones', () => {
     // A missing channel is the failure this whole file exists to catch.
@@ -188,7 +187,6 @@ describe('the runtime came up', () => {
       'foundry:run-interrupt',
       'foundry:run-redirect',
       'foundry:run-stop',
-      'foundry:run-discard',
     ]) {
       expect(getHandler(channel)).toBeDefined()
     }
@@ -287,214 +285,5 @@ describe('ending a run', () => {
   it('reports a stop that did not land', async () => {
     runner.stop.mockReturnValue(false)
     expect(await call('foundry:run-stop', { sessionId: 'gone' })).toEqual({ ok: false })
-  })
-})
-
-describe('discarding a run', () => {
-  it('removes the worktree and the branch, not just the worktree', async () => {
-    // A removed worktree whose branch survives leaves a branch nobody will
-    // check out and makes recreating the card fail on "already exists".
-    startRun('session-discard')
-    await call('foundry:run-discard', {
-      sessionId: 'session-discard',
-      workspacePath: '/repo',
-    })
-    const commands = exec.mock.calls.map((c) => (c[0] as { args: string[] }).args)
-    expect(commands).toContainEqual(['worktree', 'remove', '/repo/.worktrees/thing', '--force'])
-    expect(commands).toContainEqual(['branch', '-D', 'feat/thing'])
-  })
-
-  it('takes it off the review queue, so the gate is not held by a dead diff', async () => {
-    startRun('session-slot')
-    await call('foundry:run-discard', { sessionId: 'session-slot', workspacePath: '/repo' })
-    const snapshot = (await call('foundry:supervision-snapshot')) as {
-      runs: Array<{ sessionId: string }>
-      review: Array<{ sessionId: string }>
-    }
-    expect(snapshot.runs.some((r) => r.sessionId === 'session-slot')).toBe(false)
-    expect(snapshot.review.some((r) => r.sessionId === 'session-slot')).toBe(false)
-  })
-
-  it('does not throw when no repository was named', async () => {
-    startRun('session-nowhere')
-    expect(await call('foundry:run-discard', { sessionId: 'session-nowhere' })).toEqual({
-      ok: true,
-    })
-  })
-
-  it('says so rather than pretending, when there is no such run', async () => {
-    expect(
-      await call('foundry:run-discard', { sessionId: 'nobody', workspacePath: '/repo' })
-    ).toEqual({ ok: false })
-  })
-})
-
-describe('what is allowed to interrupt you', () => {
-  // Automation complacency is the documented failure mode of supervisory
-  // control. The rule is fixed rather than per-call: only a blocking request
-  // may interrupt, and a request nobody sees is a twelve-hour hang.
-  const ask = {
-    sessionId: 'session-1',
-    requestId: 'req-1',
-    featureDir: '/repo/specs/021-thing',
-    toolName: 'Bash',
-    summary: 'redis-cli -h prod-cache-01',
-    detail: null,
-    at: 1,
-  }
-
-  it('raises a held tool call rather than waiting to be looked at', () => {
-    permissionSink?.onPending(ask)
-    expect(createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ title: expect.stringContaining('redis-cli -h prod-cache-01') })
-    )
-  })
-
-  it('carries the answer with it, so it can be answered from there', () => {
-    permissionSink?.onPending(ask)
-    const actions = createNotification.mock.calls[0][0].actions as Array<{
-      id: string
-      handler: () => void
-    }>
-    // Just the two answers. "Open the board" used to sit here as a third
-    // button, which is the wrong shape — opening the thing is not an answer to
-    // the question, it is what clicking the notification should do.
-    expect(actions.map((a) => a.id)).toEqual(['allow', 'deny'])
-
-    actions.find((a) => a.id === 'allow')?.handler()
-    expect(runner.resolve).toHaveBeenCalledWith('session-1', 'req-1', { allow: true })
-  })
-
-  it('takes you to the run it is about when the row itself is clicked', () => {
-    permissionSink?.onPending(ask)
-    const { onClick } = createNotification.mock.calls[0][0] as { onClick?: () => void }
-    expect(onClick).toBeTypeOf('function')
-    onClick?.()
-    // The window first — navigation behind another window has done nothing you
-    // can see — then the terminal the agent is actually in.
-    expect(api.window.focusSelf).toHaveBeenCalled()
-    expect(api.window.broadcast).toHaveBeenCalledWith('terminal:navigate-to-session', {
-      sessionId: 'terminal-1',
-      projectId: 'project-1',
-    })
-  })
-
-  it('takes it away once answered', () => {
-    // One left behind after the thing it was about is answered teaches you to
-    // dismiss without reading.
-    const dispose = vi.fn()
-    createNotification.mockReturnValueOnce({ dispose })
-    permissionSink?.onPending(ask)
-    permissionSink?.onResolved('req-1')
-    expect(dispose).toHaveBeenCalled()
-  })
-
-  it('does not interrupt for a request that is no longer held', () => {
-    permissionSink?.onResolved('never-raised')
-    expect(createNotification).not.toHaveBeenCalled()
-  })
-})
-
-describe('what a decision on a card stops saying about it', () => {
-  // Approving writes the card's state, so this one needs a real directory
-  // rather than the fabricated paths the read-only channels above use.
-  let cardDir: string
-
-  /** The queue only takes a diff that actually changed something (FR-045). */
-  function queueDiffFor(sessionId = 'session-1'): void {
-    supervision.runs.noteDiff(sessionId, { files: 2, added: 40, removed: 1 })
-    supervision.review.enqueue({
-      sessionId,
-      repoPath: '/repo',
-      branch: 'feat/thing',
-      diffSummary: { files: 2, added: 40, removed: 1 },
-      change: {
-        files: ['src/a.ts'],
-        linesChanged: 41,
-        checkState: 'passing' as never,
-        sharedContractFiles: [],
-        criticalPaths: [],
-      },
-      queuedAt: 1,
-    })
-  }
-
-  beforeEach(() => {
-    cardDir = mkdtempSync(join(tmpdirForUserData(), 'speckit-approve-'))
-    supervision.runs.add({
-      sessionId: 'session-1',
-      featureDir: cardDir,
-      phase: 'implement',
-      worktreePath: '/repo/.worktrees/thing',
-      branch: 'feat/thing',
-      terminalSessionId: 'terminal-1',
-      transcriptPath: '/t.jsonl',
-      startedAt: 0,
-    })
-    queueDiffFor()
-  })
-
-  it('takes the diff out of the review queue when the phase is approved', async () => {
-    // Approving is reviewing. The Review tab used to keep offering work that
-    // had already been accepted.
-    expect(supervision.review.count()).toBe(1)
-    await call('foundry:phase-approve', { featureDir: cardDir, phase: 'implement' })
-    expect(supervision.review.count()).toBe(0)
-  })
-
-  it('reopens the gate, since the queue is what backpressure counts', async () => {
-    // Three approved phases were enough to refuse the next run outright.
-    await call('foundry:phase-approve', { featureDir: cardDir, phase: 'implement' })
-    const snapshot = (await call('foundry:supervision-snapshot')) as {
-      backpressure: { unreviewed: number }
-    }
-    expect(snapshot.backpressure.unreviewed).toBe(0)
-  })
-
-  it('takes the run off the live list rather than stacking it there forever', async () => {
-    await call('foundry:phase-approve', { featureDir: cardDir, phase: 'implement' })
-    const snapshot = (await call('foundry:supervision-snapshot')) as {
-      runs: Array<{ sessionId: string; state: string }>
-    }
-    // Other tests in this file leave runs on the shared register; what matters
-    // is that this card's is no longer live.
-    expect(snapshot.runs.find((run) => run.sessionId === 'session-1')?.state).toBe('finished')
-  })
-
-  it('keeps what it did, in the record', async () => {
-    await call('foundry:phase-approve', { featureDir: cardDir, phase: 'implement' })
-    const snapshot = (await call('foundry:supervision-snapshot')) as {
-      history: Array<{ phase: string; outcome: string; diff: { files: number } }>
-    }
-    // Newest first, and the register is shared across this file's tests.
-    expect(snapshot.history[0]).toMatchObject({
-      phase: 'implement',
-      outcome: 'approved',
-      diff: { files: 2 },
-    })
-  })
-
-  it('leaves another card’s queued diff exactly where it is', async () => {
-    supervision.runs.add({
-      sessionId: 'session-2',
-      featureDir: join(cardDir, 'other'),
-      phase: 'implement',
-      worktreePath: '/repo/.worktrees/other',
-      branch: 'feat/other',
-      terminalSessionId: 'terminal-2',
-      transcriptPath: '/t2.jsonl',
-      startedAt: 0,
-    })
-    queueDiffFor('session-2')
-    await call('foundry:phase-approve', { featureDir: cardDir, phase: 'implement' })
-    expect(supervision.review.list().map((item) => item.sessionId)).toEqual(['session-2'])
-  })
-
-  it('records a run that was stopped, not just one that was approved', async () => {
-    await call('foundry:run-stop', { sessionId: 'session-1', reason: 'wrong approach' })
-    const snapshot = (await call('foundry:supervision-snapshot')) as {
-      history: Array<{ outcome: string }>
-    }
-    expect(snapshot.history[0]?.outcome).toBe('stopped')
   })
 })

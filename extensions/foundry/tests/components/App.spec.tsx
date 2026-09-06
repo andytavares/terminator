@@ -1,263 +1,90 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
-import { createInitialState } from '../../src/state/state-persistence.js'
-
-const mockCardList = vi.fn()
-const mockCardCreate = vi.fn()
-const mockTicketList = vi.fn()
-const mockPilotState = vi.fn()
-const mockOnStateChanged = vi.fn().mockReturnValue(vi.fn())
-
-// The Forge is the home surface now, and it asks the extension bridge for the
-// list of orders on mount.
-const mockBridgeInvoke = vi.fn(async (channel: string) =>
-  channel === 'foundry:order.list' ? { orders: [] } : {}
-)
-
-vi.mock('../../src/types/electron.js', () => ({
-  getSpeckitAPI: () => ({
-    cardList: mockCardList,
-    cardCreate: mockCardCreate,
-    cardMove: vi.fn().mockResolvedValue({ ok: true }),
-    cardUpdate: vi.fn().mockResolvedValue({ ok: true }),
-    pilotState: mockPilotState,
-    commentList: vi.fn().mockResolvedValue({ comments: [] }),
-    historyLoad: vi.fn().mockResolvedValue({ entries: [] }),
-    artifactList: vi.fn().mockResolvedValue({ artifacts: [] }),
-    knowledgeSearch: vi.fn().mockResolvedValue({ results: [] }),
-    ticketList: mockTicketList,
-    credentialsStatus: vi.fn().mockResolvedValue({ connected: false }),
-    credentialsSet: vi.fn().mockResolvedValue({ ok: true }),
-    onStateChanged: mockOnStateChanged,
-    onPermissionsChanged: vi.fn().mockReturnValue(vi.fn()),
-    permissionsList: vi.fn().mockResolvedValue({ pending: [] }),
-    permissionResolve: vi.fn().mockResolvedValue({ ok: true }),
-    permissionHandBack: vi.fn().mockResolvedValue({ ok: true }),
-    // The board carries the supervision panel, which reads on mount.
-    supervisionSnapshot: vi.fn().mockResolvedValue({
-      runs: [],
-      review: [],
-      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
-    }),
-    stallsList: vi.fn().mockResolvedValue({ firings: [], shadowMode: true }),
-    feedList: vi.fn().mockResolvedValue({ entries: [] }),
-    onPaletteGoto: vi.fn().mockReturnValue(vi.fn()),
-  }),
-}))
-
 import { App } from '../../src/renderer/App.js'
 
-// Capture extensionBridge handlers so tests can fire push events
-let bridgeHandlers: Record<string, (data: unknown) => void>
-const projectCreate = vi.fn()
-const workspaceList = vi.fn()
+// Two surfaces and a way into settings. The board, the card drawer, the phase
+// rail and the ticket importer are gone with the pipeline underneath them, so
+// what is left to assert here is small — which is the point.
 
-function card() {
-  return {
-    featureDir: '/repo/specs/016-a',
-    title: 'Card A',
-    type: 'feature' as const,
-    scopeLine: '',
-    source: 'native' as const,
-    sourceUrl: null,
-    sourceKey: null,
-    stage: 'backlog' as const,
-    runStatus: 'none' as const,
-    phaseSummary: { done: 0, total: 10, awaitingReview: false },
-    prUrl: null,
+const bridgeHandlers: Record<string, (data: unknown) => void> = {}
+
+const mockBridgeInvoke = vi.fn(async (channel: string) => {
+  if (channel === 'foundry:order.list') return { orders: [] }
+  if (channel === 'foundry:models-list') {
+    return { models: [{ id: '', label: 'Inherit', floating: true }], selected: '' }
   }
-}
+  if (channel === 'foundry:inbox.list') {
+    return {
+      gates: [],
+      summary: { waiting: 0, orders: 0, automatic: 0, building: 0, converging: 0 },
+    }
+  }
+  return {}
+})
 
-/**
- * The Forge is the home surface, so a test about the board opens it first.
- * The board is legacy while the pipeline underneath is being retired; it is
- * still reachable and still has to work.
- */
-function renderBoard(): void {
-  render(<App />)
-  fireEvent.click(screen.getByRole('button', { name: 'Board' }))
-}
+beforeEach(() => {
+  vi.clearAllMocks()
+  for (const key of Object.keys(bridgeHandlers)) delete bridgeHandlers[key]
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    extensionBridge: {
+      on: vi.fn((event: string, handler: (data: unknown) => void) => {
+        bridgeHandlers[event] = handler
+        return vi.fn()
+      }),
+      invoke: mockBridgeInvoke,
+    },
+    workspace: { list: vi.fn().mockResolvedValue({ workspaces: [] }) },
+    project: { create: vi.fn() },
+  }
+  window.history.replaceState({}, '', '/?repoRoot=/repo')
+})
 
 describe('App', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    bridgeHandlers = {}
-    mockOnStateChanged.mockReturnValue(vi.fn())
-    mockCardList.mockResolvedValue({ cards: [] })
-    mockCardCreate.mockResolvedValue({ featureDir: '/repo/specs/001-x' })
-    mockTicketList.mockResolvedValue({ tickets: [] })
-    mockPilotState.mockResolvedValue({ state: createInitialState('/repo/specs/016-a') })
-    workspaceList.mockResolvedValue({ workspaces: [{ id: 'w1', folderPath: '/repo' }] })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: {
-        on: vi.fn((event: string, handler: (data: unknown) => void) => {
-          bridgeHandlers[event] = handler
-          return vi.fn()
-        }),
-        invoke: mockBridgeInvoke,
-      },
-      workspace: { list: workspaceList },
-      project: { create: projectCreate },
-    }
-    window.history.replaceState({}, '', '/?repoRoot=/repo')
-  })
-
-  it('renders the Forge as the home surface', async () => {
+  it('renders the inbox as the home surface', async () => {
     render(<App />)
     expect(screen.getByText('Foundry')).toBeTruthy()
+    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+  })
+
+  it('reaches the Forge from its own tab', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
     await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
   })
 
-  it('reaches the board from its own tab, while the pipeline is still being retired', async () => {
-    renderBoard()
-    await waitFor(() => expect(screen.getByText(/create your first card/i)).toBeTruthy())
+  it('comes back to the inbox', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
+    await waitFor(() => screen.getByText(/no orders yet/i))
+    fireEvent.click(screen.getByRole('button', { name: 'Inbox' }))
+    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
   })
 
-  it('opens the New card modal, creates a card, and cancels', async () => {
-    renderBoard()
-    await waitFor(() => screen.getByText(/new card/i))
-    fireEvent.click(screen.getByText(/new card/i))
-    expect(screen.getByRole('dialog', { name: 'New card' })).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Card title'), { target: { value: 'Fresh card' } })
-    fireEvent.click(screen.getByText('Create card'))
-    await waitFor(() =>
-      expect(mockCardCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          repoRoot: '/repo',
-          brief: expect.objectContaining({ title: 'Fresh card' }),
-        })
-      )
-    )
-    // reopen and cancel
-    fireEvent.click(screen.getByText(/new card/i))
-    fireEvent.click(screen.getByText('Cancel'))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New card' })).toBeNull())
+  it('marks which surface is showing, for anything reading state rather than colour', () => {
+    render(<App />)
+    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('auto-imports assigned tickets that are not already on the board', async () => {
-    mockCardList.mockResolvedValue({ cards: [] })
-    mockTicketList.mockResolvedValue({
-      tickets: [
-        { source: 'linear', key: 'TAV-1', title: 'First', sourceUrl: 'https://l/TAV-1' },
-        { source: 'linear', key: 'TAV-2', title: 'Second', sourceUrl: 'https://l/TAV-2' },
-      ],
-    })
-    renderBoard()
-    await waitFor(() => expect(mockCardCreate).toHaveBeenCalledTimes(2))
-    expect(mockCardCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ ticket: expect.objectContaining({ key: 'TAV-1' }) })
-    )
+  it('opens settings and comes back', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /back/i })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /back/i }))
+    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
   })
 
-  it('does not re-import tickets already on the board', async () => {
-    mockCardList.mockResolvedValue({
-      cards: [{ ...card(), source: 'linear', sourceKey: 'TAV-1' }],
-    })
-    mockTicketList.mockResolvedValue({
-      tickets: [{ source: 'linear', key: 'TAV-1', title: 'First', sourceUrl: 'https://l/TAV-1' }],
-    })
-    renderBoard()
-    await waitFor(() => expect(mockTicketList).toHaveBeenCalled())
-    expect(mockCardCreate).not.toHaveBeenCalled()
+  it('asks the inbox what needs the operator, on load', async () => {
+    render(<App />)
+    await waitFor(() => expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:inbox.list', {}))
   })
 
-  it('re-runs the reconcile when Import ticket is clicked', async () => {
-    renderBoard()
-    await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(1))
-    fireEvent.click(screen.getByText(/import ticket/i))
-    await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(2))
-  })
-
-  it('still renders the board when the ticket fetch fails', async () => {
-    mockTicketList.mockResolvedValue({ error: 'no creds' })
-    renderBoard()
-    await waitFor(() => expect(screen.getByText(/create your first card/i)).toBeTruthy())
-    expect(mockCardCreate).not.toHaveBeenCalled()
-  })
-
-  it('disables the Import ticket button while a reconcile is in flight', async () => {
-    let resolveTickets!: (v: { tickets: unknown[] }) => void
-    mockTicketList.mockReturnValue(
-      new Promise((resolve) => {
-        resolveTickets = resolve
-      })
-    )
-    renderBoard()
-    const button = screen.getByRole('button', { name: /importing/i })
-    expect(button.hasAttribute('disabled')).toBe(true)
-    expect(button.getAttribute('aria-busy')).toBe('true')
-    resolveTickets({ tickets: [] })
-    await waitFor(() => expect(screen.getByText(/import ticket/i)).toBeTruthy())
-  })
-
-  it('skips auto-load when no workspace is open', async () => {
-    window.history.replaceState({}, '', '/')
-    renderBoard()
-    await waitFor(() => screen.getByText('Foundry'))
-    expect(mockTicketList).not.toHaveBeenCalled()
-  })
-
-  it('recovers the Import button when a reconcile call rejects', async () => {
-    mockTicketList.mockRejectedValue(new Error('boom'))
-    renderBoard()
-    // The rejection is swallowed; the button returns to its idle, enabled state.
-    await waitFor(() => {
-      const button = screen.getByRole('button', { name: /import ticket/i })
-      expect(button.hasAttribute('disabled')).toBe(false)
-    })
-    expect(screen.getByText(/create your first card/i)).toBeTruthy()
-  })
-
-  it('re-runs the reconcile for a new workspace after workspace:changed', async () => {
-    renderBoard()
-    await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(1))
+  it('closes settings when the workspace changes underneath it', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await waitFor(() => screen.getByRole('button', { name: /back/i }))
     bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
-    await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(2))
-    expect(mockCardList).toHaveBeenCalledWith({ repoRoot: '/other' })
-  })
-
-  it('shows settings and returns to the board', async () => {
-    renderBoard()
-    await waitFor(() => screen.getByLabelText('Settings'))
-    fireEvent.click(screen.getByLabelText('Settings'))
-    const back = await screen.findByText(/back to board/i)
-    fireEvent.click(back)
-    await waitFor(() => expect(screen.getByText(/create your first card/i)).toBeTruthy())
-  })
-
-  it('opens a card detail drawer and closes it', async () => {
-    mockCardList.mockResolvedValue({ cards: [card()] })
-    renderBoard()
-    await waitFor(() => screen.getByText('Card A'))
-    fireEvent.click(screen.getByText('Card A'))
-    await waitFor(() => screen.getByRole('dialog', { name: 'Card detail' }))
-    fireEvent.click(screen.getByLabelText('Close'))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Card detail' })).toBeNull())
-  })
-
-  it('mirrors a dispatched worktree into the workspace project list', async () => {
-    renderBoard()
-    await waitFor(() => screen.getByText('Foundry'))
-    bridgeHandlers['foundry:dispatch-started']({
-      featureDir: '/repo/specs/016-a',
-      branchName: 'feature/a',
-      worktreePath: '/repo/.wt/a',
-    })
-    await waitFor(() =>
-      expect(projectCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ workspaceId: 'w1', gitBranch: 'feature/a', isWorktree: true })
-      )
-    )
-  })
-
-  it('closes the open card drawer on workspace change', async () => {
-    mockCardList.mockResolvedValue({ cards: [card()] })
-    renderBoard()
-    await waitFor(() => screen.getByText('Card A'))
-    fireEvent.click(screen.getByText('Card A'))
-    await waitFor(() => screen.getByRole('dialog', { name: 'Card detail' }))
-    bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Card detail' })).toBeNull())
+    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
   })
 })

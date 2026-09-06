@@ -2,150 +2,24 @@ import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/m
 import { app } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type {
-  CardBrief,
-  CardComment,
-  CardSummary,
-  HistoryEntry,
-  PhaseId,
-  PilotState,
-  RunMode,
-  Ticket,
-  TicketRef,
-} from './types/speckit.types.js'
-import {
-  DEFAULT_SETTINGS,
-  PHASE_ORDER,
-  QUICK_PHASES,
-  STAGE_ORDER,
-  createDefaultBrief,
-} from './types/speckit.types.js'
-import {
-  readState as readMigratedState,
-  writeState,
-  readCard,
-  writeCard,
-  appendComment,
-  readComments,
-  consumePendingComments,
-  createInitialState,
-} from './state/state-persistence.js'
-import { buildCardSummary } from './state/card-summary.js'
-import { deriveStage } from './state/derive-stage.js'
-import { hasSpeckitSkill } from './state/skill-availability.js'
-import { shouldQueue, orderPending } from './state/run-queue.js'
-import { parseRgLines, searchFiles } from './utils/knowledge-search.js'
-import { parseGitLog, artifactSpecs, buildArtifactRef } from './state/artifact-list.js'
-import { buildTicketMarkdown } from './state/ticket-markdown.js'
 import { modelCatalog } from './state/model-catalog.js'
-import type { ArtifactRef, BoardStage } from './types/speckit.types.js'
 
-// SpecKit-mode phases invoke the project's native `/speckit-*` skills rather
-// than freeform prose. The skills already encode feature-dir placement, template
-// resolution, and stop conditions — which is what keeps runs from wandering
-// (writing spec.md at the repo root, asking where files go, etc.). They resolve
-// the correct feature directory from the SPECIFY_FEATURE_DIRECTORY env var the
-// runner sets, independent of the branch name. `${DESCRIPTION}` is substituted
-// with the card title for /speckit-specify.
-const PHASE_COMMANDS: Record<PhaseId, string> = {
-  constitution: '/speckit-constitution',
-  specify: '/speckit-specify Based on the ticket in ticket.md: ${DESCRIPTION}',
-  clarify: '/speckit-clarify',
-  plan: '/speckit-plan',
-  checklist: '/speckit-checklist',
-  tasks: '/speckit-tasks',
-  analyze: '/speckit-analyze',
-  implement: '/speckit-implement',
-  'self-review': '', // handled by SELF_REVIEW_CMD in agent-runner; not dispatched as a prompt
-  'open-pr': '', // not auto-started; triggered explicitly by user action
-}
-
-// Quick-fix runs skip specify/tasks (so there is no spec.md/tasks.md for the
-// native plan/implement skills to read), so they use direct prose prompts that
-// work straight from the ticket/plan.
-const QUICK_PHASE_COMMANDS: Partial<Record<PhaseId, string>> = {
-  plan: 'Create a concise technical implementation plan in plan.md based on the ticket in ticket.md',
-  implement: 'Implement the change described in plan.md',
-}
-
-/**
- * The same phases, asked for in plain words.
- *
- * Used when the repository has no SpecKit skills — otherwise the phase sends
- * `/speckit-specify`, the runtime answers "Unknown command", and the run is
- * over before it began having written nothing.
- *
- * Each one names the file the pipeline expects, because that placement is most
- * of what the skill was providing: the gates, the artifact list and the review
- * queue all read `$SPECIFY_FEATURE_DIRECTORY/<file>`, and an agent left to
- * choose writes it at the repository root.
- */
-const PLAIN_PHASE_COMMANDS: Record<PhaseId, string> = {
-  constitution:
-    'Read .specify/memory/constitution.md if it exists and summarise the rules this change must follow. Do not edit code.',
-  specify:
-    'Read ticket.md. Write a specification to $SPECIFY_FEATURE_DIRECTORY/spec.md covering: the problem, user stories with acceptance criteria, functional requirements, and what is explicitly out of scope. Ask about anything genuinely ambiguous rather than guessing. Do not write code.',
-  clarify:
-    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md. List anything ambiguous or underspecified that would change the implementation, ask about it, and fold the answers back into spec.md. Do not write code.',
-  plan: 'Read $SPECIFY_FEATURE_DIRECTORY/spec.md. Write a technical implementation plan to $SPECIFY_FEATURE_DIRECTORY/plan.md: the approach, the files it touches, the trade-offs, and anything it deliberately does not do. Do not write code.',
-  checklist:
-    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md and plan.md. Write a review checklist to $SPECIFY_FEATURE_DIRECTORY/checklists/requirements.md covering what has to be true for this to be done. Do not write code.',
-  tasks:
-    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md and plan.md. Write an ordered task breakdown to $SPECIFY_FEATURE_DIRECTORY/tasks.md, each task with the file it touches and how to tell it is finished. Do not write code.',
-  analyze:
-    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md, plan.md and tasks.md together. Report inconsistencies, duplication, and requirements no task covers. Do not change the files; report what you find.',
-  implement:
-    'Work through $SPECIFY_FEATURE_DIRECTORY/tasks.md in order, following plan.md. Write tests first where the repository has them, and keep to the conventions of the code around you.',
-  'self-review': '', // handled by the self-review plan; not dispatched as a prompt
-  'open-pr': '', // not auto-started; triggered explicitly by user action
-}
-
-// The prompt for a phase, honoring the card's run mode. `description` seeds
-// /speckit-specify with the card title.
-function phaseCommandFor(
-  phase: PhaseId,
-  mode: RunMode,
-  description = '',
-  worktreePath?: string
-): string {
-  if (mode === 'quick') return QUICK_PHASE_COMMANDS[phase] ?? PHASE_COMMANDS[phase]
-
-  // Without the skill installed, the slash command is not a command — it is a
-  // message the runtime rejects. Ask for the same thing in words instead.
-  if (worktreePath !== undefined && !hasSpeckitSkill(worktreePath, phase)) {
-    const plain = PLAIN_PHASE_COMMANDS[phase]
-    if (plain !== '') {
-      return description ? `${plain}\n\nThe ticket: ${description}` : plain
-    }
-  }
-
-  return PHASE_COMMANDS[phase].replace('${DESCRIPTION}', description || 'the assigned ticket')
-}
-
-/**
- * The phase prompt, exposed so a test can assert the fallback without starting
- * a run. Same function the dispatcher uses; nothing here is test-only
- * behaviour.
- */
-export const phaseCommandForTests = phaseCommandFor
-
-// Card title, tolerant of pre-v3 states read raw (which have no `card` field).
-function cardTitleOf(state: PilotState): string {
-  const card = state.card as CardBrief | undefined
-  return card?.title ?? state.ticket?.title ?? ''
-}
 import {
-  createAgentRunner,
-  phaseLogPath,
-  pruneOldLogs,
   setPermissionSink,
   setReadOnlyStateDir,
   setRunSupervision,
   setSupervisedRunner,
-} from './runner/agent-runner.js'
+} from './runtime/run-seams.js'
 import { createForgeChannels } from './ipc/forge-channels.js'
 import { createRunChannels } from './ipc/run-channels.js'
+import { createInboxChannels } from './ipc/inbox-channels.js'
+import { createGateStore } from './gates/store.js'
 import { createOrderStore } from './order/store.js'
+import { markReady, readPulls } from './line/integrate.js'
+import type { IntegrateDeps } from './line/integrate.js'
+import { checkCapability, writeBack } from './trackers/write-back.js'
+import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
+import type { WorkOrder, WriteBack } from './order/schema.js'
 import { resolveDataRoot, untrackedNotice } from './data-root.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
@@ -155,10 +29,6 @@ import { createSupervision, type Supervision } from './runtime/supervision.js'
 import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/digest.js'
 import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
-import { hashArtifacts } from './state/artifact-hash.js'
-import { applyHashVerification, computeStalePhases } from './state/phase-state-machine.js'
-import { artifactEntries, resolveArtifactPath } from './state/artifact-paths.js'
-import { readCardLanes, WORKITEM_FILE } from './runtime/workitem.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
@@ -170,45 +40,11 @@ interface HunkView {
   decision: HunkDecision | null
 }
 import type { StallFiring } from './runtime/evaluate-stall.js'
-import type { RunnerHandle } from './runner/agent-runner.js'
 
 const disposables: Disposable[] = []
 
 // Active session registry: sessionId → session metadata
 const activeSessions: Map<string, { id: string; name: string }> = new Map()
-
-// Active agent runner handles: featureDir → RunnerHandle
-const activeRunnerHandles: Map<string, RunnerHandle> = new Map()
-
-// Latest Claude session id per card, so the run console can resume the
-// conversation to answer the model's questions. featureDir → sessionId
-const phaseSessionIds: Map<string, string> = new Map()
-
-async function appendHistory(featureDir: string, entry: HistoryEntry): Promise<void> {
-  const pilotDir = path.join(featureDir, '.pilot')
-  await fs.promises.mkdir(pilotDir, { recursive: true })
-  const historyFile = path.join(pilotDir, 'history.jsonl')
-  await fs.promises.appendFile(historyFile, JSON.stringify(entry) + '\n', 'utf-8')
-}
-
-async function readHistory(featureDir: string): Promise<HistoryEntry[]> {
-  const historyFile = path.join(featureDir, '.pilot', 'history.jsonl')
-  try {
-    const raw = await fs.promises.readFile(historyFile, 'utf-8')
-    const lines = raw.split('\n').filter((l) => l.trim())
-    const entries: HistoryEntry[] = []
-    for (const line of lines) {
-      try {
-        entries.push(JSON.parse(line) as HistoryEntry)
-      } catch {
-        // skip malformed lines
-      }
-    }
-    return entries
-  } catch {
-    return []
-  }
-}
 
 function reg(
   api: ExtensionAPI,
@@ -216,110 +52,6 @@ function reg(
   handler: (payload: unknown) => Promise<unknown> | unknown
 ) {
   disposables.push(api.ipc.registerHandler(channel, handler))
-}
-
-// Scan specs/ for card dirs — any dir with a pilot state, card brief, or spec.md.
-// Unlike listFeatures, this includes backlog cards that have no spec.md yet.
-async function listCardDirs(repoRoot: string): Promise<string[]> {
-  const specsDir = path.join(repoRoot, 'specs')
-  let entries: string[] = []
-  try {
-    entries = await fs.promises.readdir(specsDir)
-  } catch {
-    return []
-  }
-  const dirs: string[] = []
-  for (const name of entries.sort()) {
-    const dir = path.join(specsDir, name)
-    try {
-      const stat = await fs.promises.stat(dir)
-      if (!stat.isDirectory()) continue
-    } catch {
-      continue
-    }
-    const candidates = [
-      path.join(dir, '.pilot', 'state.json'),
-      path.join(dir, '.pilot', 'card.json'),
-      path.join(dir, 'spec.md'),
-    ]
-    for (const c of candidates) {
-      try {
-        await fs.promises.access(c)
-        dirs.push(dir)
-        break
-      } catch {
-        // keep checking
-      }
-    }
-  }
-  return dirs
-}
-
-// Read pilot state from .pilot/state.json inside featureDir
-async function readPilotState(featureDir: string): Promise<PilotState | null> {
-  const stateFile = path.join(featureDir, '.pilot', 'state.json')
-  try {
-    const raw = await fs.promises.readFile(stateFile, 'utf-8')
-    return JSON.parse(raw) as PilotState
-  } catch {
-    return null
-  }
-}
-
-// One writer for the card's state, in state-persistence. This wrapper exists so
-// the fifty call sites below do not all have to say `writeState`.
-async function writePilotState(featureDir: string, state: PilotState): Promise<void> {
-  await writeState(featureDir, state)
-}
-
-// Create initial pilot state for a feature dir (v3, backlog card).
-function createPilotState(featureDir: string): PilotState {
-  return createInitialState(featureDir)
-}
-
-function makePhaseCallbacks(
-  api: ExtensionAPI,
-  featureDir: string,
-  phase: PhaseId,
-  batchIndex?: number
-) {
-  return {
-    onSession: (sessionId: string) => {
-      phaseSessionIds.set(featureDir, sessionId)
-      api.window.broadcast('foundry:run-session', { featureDir, phase, sessionId })
-    },
-    onStart: async () => {
-      const state = await readPilotState(featureDir)
-      if (!state) return
-      const ps = state.phases[phase]
-      if (ps) {
-        ps.status = 'running'
-        ps.lastRunAt = new Date().toISOString()
-      }
-      if (state.run) state.run.status = 'running'
-      // While a run is active, the board column tracks phase progress automatically.
-      state.stage = deriveStage(state.phases, state.run)
-      await writePilotState(featureDir, state)
-      api.window.broadcast('foundry:state-changed', { state })
-    },
-    onComplete: async (exitCode: number) => {
-      // Batch implement phases emit checkin-ready — phase stays running until user decides
-      if (phase === 'implement' && batchIndex !== undefined) return
-      const state = await readPilotState(featureDir)
-      if (!state) return
-      const ps = state.phases[phase]
-      if (ps) ps.status = exitCode === 0 ? 'awaiting_review' : 'ready'
-      state.stage = deriveStage(state.phases, state.run)
-      await writePilotState(featureDir, state)
-      await appendHistory(featureDir, {
-        ts: new Date().toISOString(),
-        actor: 'agent',
-        action: exitCode === 0 ? 'run_complete' : 'run_failed',
-        phase,
-      })
-      api.window.broadcast('foundry:state-changed', { state })
-    },
-  }
 }
 
 /** Where the chosen model lives, on the side of the bridge that launches runs. */
@@ -383,459 +115,10 @@ const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
  */
 function defaultModel(api: ExtensionAPI): string {
   const value = api.settings.get<string>(MODEL_SETTING_KEY)
-  return typeof value === 'string' ? value : DEFAULT_SETTINGS.defaultModel
-}
-
-function getMaxConcurrent(api: ExtensionAPI): number {
-  const v = api.settings.get<number>('terminator.foundry.maxConcurrentRuns')
-  return typeof v === 'number' && v >= 1 ? Math.floor(v) : 3
-}
-
-function getLogRetentionDays(api: ExtensionAPI): number {
-  const v = api.settings.get<number>('terminator.foundry.logRetentionDays')
-  return typeof v === 'number' && v >= 1 ? Math.floor(v) : 30
-}
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fs.promises.access(p)
-    return true
-  } catch {
-    return false
-  }
-}
-
-// Count cards currently occupying a run slot (active + running, incl. awaiting review).
-async function countActiveRuns(workspacePath: string): Promise<number> {
-  const dirs = await listCardDirs(workspacePath)
-  let n = 0
-  for (const dir of dirs) {
-    const s = await readMigratedState(dir)
-    if (s && s.queuePosition === 'active' && s.run && s.run.status === 'running') n++
-  }
-  return n
-}
-
-// Lowercase, hyphen-separated slug (trimmed of leading/trailing/ repeated
-// hyphens, capped so branch names stay readable).
-function kebabCase(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60)
-    .replace(/-+$/g, '')
-}
-
-// The committer's git user.name as a slug, for the fallback branch prefix.
-async function gitUsername(api: ExtensionAPI, cwd: string): Promise<string> {
-  try {
-    const res = await api.shell.exec({ command: 'git', args: ['config', 'user.name'], cwd })
-    const name = kebabCase(res.stdout.trim())
-    if (name) return name
-  } catch {
-    // fall through to a generic prefix
-  }
-  return 'user'
-}
-
-/**
- * Marks any approved phase whose artifacts are no longer what was approved.
- *
- * Read-only: it never writes the state back. The record of what you approved is
- * the approval, and rewriting it on a read would make "modified" survive the
- * edit being undone.
- */
-async function withHashVerification(state: PilotState): Promise<PilotState> {
-  const hashes: Partial<Record<PhaseId, string | null>> = {}
-  let anyToCheck = false
-  for (const phase of PHASE_ORDER) {
-    const phaseState = state.phases[phase]
-    if (!phaseState || phaseState.status !== 'approved' || !phaseState.approvedHash) continue
-    anyToCheck = true
-    hashes[phase] = await hashArtifacts(
-      artifactEntries(
-        { featureDir: state.featureDir, worktreePath: state.worktreePath },
-        phaseState.artifactPaths
-      )
-    )
-  }
-  return anyToCheck ? applyHashVerification(state, hashes) : state
-}
-
-/**
- * A card's lanes, from wherever `workitem.json` actually is.
- *
- * The plan phase writes it, and a phase runs in the worktree — so it lands
- * there, not beside the card in the main checkout. Reading the recorded path
- * found nothing and every multi-repository card looked like a single-repository
- * one.
- */
-async function readLanesFor(featureDir: string): Promise<ReturnType<typeof readCardLanes>> {
-  const state = await readPilotState(featureDir)
-  const dir = path.dirname(
-    resolveArtifactPath(
-      { featureDir, worktreePath: state?.worktreePath },
-      path.join(featureDir, WORKITEM_FILE)
-    )
-  )
-  return readCardLanes(dir) ?? readCardLanes(featureDir)
-}
-
-// Decide the branch name for a card's worktree. Prefer the tracker's suggested
-// VCS branch (Linear provides one per issue); otherwise
-// <username>/<ticket-key>-<kebab-title>; fall back to feature/<slug> for native
-// cards that have no ticket.
-async function resolveBranchName(
-  api: ExtensionAPI,
-  featureDir: string,
-  workspacePath: string,
-  ticket: TicketRef | null
-): Promise<string> {
-  if (ticket?.branchName) return ticket.branchName
-  if (ticket?.key) {
-    const username = await gitUsername(api, workspacePath)
-    return `${username}/${ticket.key.toLowerCase()}-${kebabCase(ticket.title)}`
-  }
-  const slug = path.basename(featureDir).replace(/^\d+-/, '') || path.basename(featureDir)
-  return `feature/${slug}`
-}
-
-// True when a local git branch already exists.
-async function branchExists(
-  api: ExtensionAPI,
-  workspacePath: string,
-  branchName: string
-): Promise<boolean> {
-  const res = await api.shell.exec({
-    command: 'git',
-    args: ['rev-parse', '--verify', '--quiet', `refs/heads/${branchName}`],
-    cwd: workspacePath,
-  })
-  return res.exitCode === 0
-}
-
-// Create a git worktree for a card; returns its path + branch name. Reuses an
-// existing branch (e.g. when recreating a removed worktree) instead of failing
-// on `-b`.
-async function createWorktree(
-  api: ExtensionAPI,
-  featureDir: string,
-  workspacePath: string,
-  ticket: TicketRef | null,
-  baseBranch?: string
-): Promise<{ worktreePath: string; branchName: string }> {
-  const slug = path.basename(featureDir).replace(/^\d+-/, '') || path.basename(featureDir)
-  const branchName = await resolveBranchName(api, featureDir, workspacePath, ticket)
-  // Respect the core app's worktree location setting (workspace override →
-  // global → <repo>/.worktrees) instead of a private directory.
-  const worktreeRoot = api.settings.resolveWorktreeBaseDir(workspacePath)
-  const worktreePath = path.join(worktreeRoot, slug)
-  const args = ['worktree', 'add', worktreePath]
-  if (await branchExists(api, workspacePath, branchName)) {
-    args.push(branchName)
-  } else {
-    args.push('-b', branchName)
-    if (baseBranch) args.push(baseBranch)
-  }
-  const res = await api.shell.exec({ command: 'git', args, cwd: workspacePath })
-  if (res.exitCode !== 0) throw new Error(res.stderr || res.stdout || 'git worktree add failed')
-  return { worktreePath, branchName }
-}
-
-// Reclaim a worktree and the branch it was on.
-//
-// Both, always: a removed worktree whose branch survives leaves a branch nobody
-// will ever check out and makes recreating the card fail on "already exists".
-// Failures are swallowed deliberately — this runs when the operator has already
-// decided the work is going away, and a discard that half-happens and then
-// throws leaves worse state than one that finishes quietly.
-async function discardWorktree(
-  api: ExtensionAPI,
-  workspacePath: string,
-  worktreePath: string | null,
-  branchName: string | null
-): Promise<void> {
-  if (!workspacePath) return
-  if (worktreePath) {
-    await api.shell
-      .exec({
-        command: 'git',
-        args: ['worktree', 'remove', worktreePath, '--force'],
-        cwd: workspacePath,
-      })
-      .catch(() => {})
-  }
-  if (branchName) {
-    await api.shell
-      .exec({ command: 'git', args: ['branch', '-D', branchName], cwd: workspacePath })
-      .catch(() => {})
-  }
-}
-
-// Guarantee a card runs in its own worktree, never the main checkout. Returns
-// the existing worktree when present, otherwise creates one and persists it to
-// state. Every phase runner must resolve its cwd through this.
-async function ensureWorktreePath(
-  api: ExtensionAPI,
-  featureDir: string,
-  state: PilotState
-): Promise<string> {
-  if (state.worktreePath && (await pathExists(state.worktreePath))) return state.worktreePath
-  const workspacePath = path.dirname(path.dirname(featureDir))
-  const { worktreePath, branchName } = await createWorktree(
-    api,
-    featureDir,
-    workspacePath,
-    state.ticket
-  )
-  state.worktreePath = worktreePath
-  state.branchName = branchName
-  await writePilotState(featureDir, state)
-  return worktreePath
-}
-
-// Materialize the card's ticket content into the worktree so the `specify`
-// phase prompt can read it from ticket.md (see PHASE_COMMANDS.specify). Without
-// this the agent has no ticket to work from and stops to ask for a source.
-async function writeWorktreeTicket(
-  worktreePath: string,
-  card: CardBrief | null,
-  ticket: TicketRef | null
-): Promise<void> {
-  await fs.promises.writeFile(
-    path.join(worktreePath, 'ticket.md'),
-    buildTicketMarkdown(card, ticket),
-    'utf-8'
-  )
-}
-
-// The first phase that still needs to run (skip already-skipped/approved phases).
-function firstRunnablePhase(state: PilotState): PhaseId {
-  return (
-    PHASE_ORDER.find((id) => {
-      const s = state.phases[id]?.status
-      return s !== 'skipped' && s !== 'approved'
-    }) ?? 'specify'
-  )
-}
-
-// Start the given phase's runner for a card, steering with any pending comments.
-async function startRunAt(
-  api: ExtensionAPI,
-  featureDir: string,
-  worktreePath: string,
-  phase: PhaseId,
-  mode: RunMode = 'speckit',
-  description = '',
-  baseBranch?: string
-): Promise<void> {
-  // Before anything is started: the runner is installed asynchronously during
-  // activation, and a phase that beat it ran unsupervised.
-  await runtimeStarting
-  const runId = `run-${Date.now()}`
-  const feedbackNote = (await consumePendingComments(featureDir, runId)) ?? undefined
-  const runner = createAgentRunner(api)
-  const handle = runner.startPhaseRunner({
-    featureDir,
-    worktreePath,
-    phaseCommand: phaseCommandFor(phase, mode, description, worktreePath),
-    phase,
-    // What its diff is measured against, all the way down to the review queue.
-    baseBranch,
-    feedbackNote,
-    model: defaultModel(api),
-    ...makePhaseCallbacks(api, featureDir, phase),
-  })
-  activeRunnerHandles.set(featureDir, handle)
-}
-
-// Prepare a card's phases for a run. Quick-fix cards skip every phase outside
-// QUICK_PHASES; SpecKit cards honor the "skip Constitution" setting.
-function primePhasesForRun(state: PilotState): void {
-  if (state.mode === 'quick') {
-    for (const id of PHASE_ORDER) {
-      const ps = state.phases[id]
-      if (!ps || ps.status === 'approved') continue
-      if (QUICK_PHASES.includes(id)) {
-        if (id === 'plan' && ps.status === 'locked') ps.status = 'ready'
-      } else {
-        ps.status = 'skipped'
-      }
-    }
-    return
-  }
-  const constitution = state.phases['constitution']
-  const specify = state.phases['specify']
-  if (!constitution) return
-  const runConstitution = state.settings.runConstitutionPhase
-  if (!runConstitution && constitution.status !== 'approved') {
-    constitution.status = 'skipped'
-    if (specify && specify.status === 'locked') specify.status = 'ready'
-  } else if (runConstitution && constitution.status === 'locked') {
-    constitution.status = 'ready'
-  }
-}
-
-// Hand a backlog card off to an agent: start now if under the cap, else queue it.
-async function handoffCard(
-  api: ExtensionAPI,
-  featureDir: string,
-  workspacePath: string,
-  baseBranch?: string,
-  mode?: RunMode,
-  /** Set after the operator accepts a recorded refusal. */
-  overrideBackpressure?: boolean
-): Promise<
-  | { ok: true; dispatched: true; queued: boolean }
-  | { ok: false; error: string; reason?: string | null; backpressure?: unknown }
-  | { error: string; message?: string }
-> {
-  const state = await readMigratedState(featureDir)
-  if (!state) return { error: 'No card state found' }
-  const card = await readCard(featureDir)
-  const title = card?.title ?? state.card.title
-  if (!title || title.trim().length === 0) {
-    return { error: 'VALIDATION_ERROR', message: 'A card needs a title before handoff' }
-  }
-  if (mode) state.mode = mode
-  // Refused before anything is touched: starting a fourth agent while three
-  // diffs are waiting is how a backlog nobody can review gets built, and the
-  // constraint is one person's attention rather than machine capacity.
-  //
-  // Checked before the card is primed, not after. Priming rearranges phase
-  // statuses — skipping the constitution, collapsing a quick-fix run — and a
-  // refusal that happens afterwards leaves the card rearranged for a run that
-  // never started.
-  //
-  // Overridden deliberately rather than not enforced — the override is recorded
-  // with the depth at the moment it was ignored, so a backlog built this way is
-  // visible afterwards rather than only felt.
-  const gate = supervision?.backpressure.check()
-  if (gate !== undefined && !gate.allowed && overrideBackpressure !== true) {
-    return { ok: false, error: 'backpressure', reason: gate.reason, backpressure: gate }
-  }
-  if (gate !== undefined && !gate.allowed && overrideBackpressure === true) {
-    supervision?.backpressure.override(featureDir, Date.now())
-  }
-
-  const now = new Date().toISOString()
-  state.run = {
-    status: 'running',
-    startedAt: now,
-    completedAt: null,
-    autonomyLevel: state.run?.autonomyLevel ?? state.settings.defaultAutonomy ?? 'standard',
-  }
-  primePhasesForRun(state)
-  // Before any early return. A card that queues here is started later by
-  // `advanceQueue`, which reads this — and without it every queued card's diff
-  // is measured against `main`, which on a repository whose default is
-  // something else fails and reads as "changed nothing".
-  state.baseBranch = baseBranch ?? state.baseBranch ?? null
-
-  const cap = getMaxConcurrent(api)
-  const active = await countActiveRuns(workspacePath)
-  if (shouldQueue(active, cap)) {
-    state.queuePosition = 'pending'
-    state.stage = deriveStage(state.phases, state.run)
-    await writePilotState(featureDir, state)
-    api.window.broadcast('foundry:state-changed', { state })
-    return { ok: true, dispatched: true, queued: true }
-  }
-
-  // Reuse an existing worktree (e.g. resuming a card that was already started);
-  // only create one when it's missing.
-  let worktreePath = state.worktreePath
-  let branchName = state.branchName
-  const existingUsable = worktreePath ? await pathExists(worktreePath) : false
-  if (!existingUsable) {
-    const created = await createWorktree(api, featureDir, workspacePath, state.ticket, baseBranch)
-    worktreePath = created.worktreePath
-    branchName = created.branchName
-  }
-  if (!worktreePath) return { error: 'Could not resolve a worktree for the card' }
-  state.worktreePath = worktreePath
-  state.branchName = branchName
-  state.queuePosition = 'active'
-  state.stage = deriveStage(state.phases, state.run)
-  await writePilotState(featureDir, state)
-  await writeWorktreeTicket(worktreePath, card, state.ticket)
-  await startRunAt(
-    api,
-    featureDir,
-    worktreePath,
-    firstRunnablePhase(state),
-    state.mode,
-    state.card.title,
-    baseBranch
-  )
-  api.window.broadcast('foundry:dispatch-started', { featureDir, branchName, worktreePath })
-  api.window.broadcast('foundry:state-changed', { state })
-  return { ok: true, dispatched: true, queued: false }
-}
-
-// Start queued (pending) cards while there is spare capacity.
-async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<void> {
-  const cap = getMaxConcurrent(api)
-  const dirs = await listCardDirs(workspacePath)
-  const pending: PilotState[] = []
-  for (const dir of dirs) {
-    const s = await readMigratedState(dir)
-    if (s && s.queuePosition === 'pending') pending.push(s)
-  }
-  const ordered = orderPending(
-    pending.map((s) => ({
-      featureDir: s.featureDir,
-      startedAt: s.run?.startedAt ?? null,
-      state: s,
-    }))
-  )
-  for (const item of ordered) {
-    const active = await countActiveRuns(workspacePath)
-    if (shouldQueue(active, cap)) break
-    // The queue drains into the same wall: unreviewed diffs pile up whether a
-    // run was started by hand or by the queue emptying itself.
-    if (supervision?.backpressure.check().allowed === false) break
-    const s = item.state
-    try {
-      // Reuse the one it already has. A card queued by `dispatch` was
-      // provisioned before it hit the gate, and creating a worktree at a path
-      // git already knows fails — so the card sat pending forever with a live
-      // worktree and no agent.
-      const existing = s.worktreePath !== null && (await pathExists(s.worktreePath))
-      const { worktreePath, branchName } = existing
-        ? { worktreePath: s.worktreePath as string, branchName: s.branchName ?? '' }
-        : await createWorktree(api, s.featureDir, workspacePath, s.ticket)
-      s.worktreePath = worktreePath
-      s.branchName = branchName
-      s.queuePosition = 'active'
-      s.stage = deriveStage(s.phases, s.run)
-      await writePilotState(s.featureDir, s)
-      const qCard = (await readCard(s.featureDir)) ?? s.card
-      await writeWorktreeTicket(worktreePath, qCard, s.ticket)
-      await startRunAt(
-        api,
-        s.featureDir,
-        worktreePath,
-        firstRunnablePhase(s),
-        s.mode,
-        s.card.title,
-        s.baseBranch ?? undefined
-      )
-      api.window.broadcast('foundry:dispatch-started', {
-        featureDir: s.featureDir,
-        branchName,
-        worktreePath,
-      })
-      api.window.broadcast('foundry:state-changed', { state: s })
-    } catch (err) {
-      api.notifications.showToast(
-        'error',
-        `Could not start queued card: ${String(err)}`,
-        'startQueuedCardFailed'
-      )
-    }
-  }
+  // An alias, not a pinned id: `--model opus` resolves to the latest of that
+  // family, so this default cannot go a generation stale sitting here — which
+  // is exactly what the pinned id it replaced did.
+  return typeof value === 'string' ? value : 'opus'
 }
 
 // Every notification kind this extension ever raises, so the user can
@@ -979,37 +262,6 @@ function notify(
  * exists is not something to reload on the next start.
  */
 const stallFirings: Array<{ firing: StallFiring; featureDir: string; shadow: boolean }> = []
-
-/**
- * Everything a decision on a card's work should stop saying about it.
- *
- * Approving a phase is the operator having read the diff and accepted it, and
- * until now nothing downstream heard about that. The diff stayed in the review
- * queue — where backpressure counts it, so approving three phases was enough to
- * refuse the next run — and any stall the run had fired stayed in the Stalls
- * tab, still offering Interrupt and Discard for work that had been signed off.
- *
- * Both are cleared by session, not by phase: a card now keeps one conversation
- * across its phases, so the session that produced the approved diff is the one
- * about to start the next phase.
- */
-function clearReviewFor(featureDir: string): void {
-  const sessions = (supervision?.runs.list() ?? [])
-    .filter((run) => run.featureDir === featureDir)
-    .map((run) => run.sessionId)
-  for (const sessionId of sessions) {
-    supervision?.review.remove(sessionId)
-    // Off the live list and into the record. The run list used to stack every
-    // approved phase forever, so by the third card it answered "what has this
-    // workspace ever done" instead of "what is happening now". If the card has
-    // another phase, `notePhase` brings this straight back to `working` when it
-    // starts — the same session, correctly named.
-    supervision?.runs.archive(sessionId, 'approved', Date.now())
-  }
-  const keep = stallFirings.filter((entry) => !sessions.includes(entry.firing.sessionId))
-  stallFirings.length = 0
-  stallFirings.push(...keep)
-}
 
 /**
  * How many firings to keep.
@@ -1196,6 +448,87 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
   }
 }
 
+/**
+ * The application's tracker connection, narrowed to what write-back needs.
+ *
+ * Null when the host has no `issues` surface at all — an older core, or a test
+ * harness with a partial API. Every caller treats that as "no write-back",
+ * never as a failure.
+ */
+function issuesPortFor(api: ExtensionAPI): IssuesPort | null {
+  const issues = api.issues
+  if (issues === undefined || typeof issues.supportsTransitions !== 'function') return null
+  return {
+    comment: (tracker, key, body) => issues.comment(tracker as never, key, body),
+    transition: (tracker, key, intent, optionId) =>
+      issues.transition(tracker as never, key, intent, optionId),
+    states: async (tracker, key) => issues.states(tracker as never, key),
+    supportsTransitions: (tracker) => issues.supportsTransitions(tracker as never),
+  }
+}
+
+/** Which write-backs a new order starts with, from the operator's settings. */
+function defaultWriteBack(api: ExtensionAPI): WriteBack[] {
+  const on = (key: string): boolean => api.settings?.get<boolean>(key) ?? true
+  const enabled: WriteBack[] = []
+  if (on('terminator.foundry.writeBack.summaryComment')) enabled.push('summary_comment')
+  if (on('terminator.foundry.writeBack.status')) enabled.push('status')
+  if (on('terminator.foundry.writeBack.prLink')) enabled.push('pr_link')
+  return enabled
+}
+
+function writeBackDepsFor(
+  api: ExtensionAPI,
+  root: string,
+  order: WorkOrder,
+  issues: IssuesPort
+): WriteBackDeps {
+  return {
+    issues,
+    now: () => new Date().toISOString(),
+    // Null means "let the tracker resolve it", which is not the same as an
+    // empty override, so the nulls are stripped rather than passed through.
+    mapping: Object.fromEntries(
+      Object.entries(order.stateMapping).filter(([, value]) => value !== null)
+    ) as WriteBackDeps['mapping'],
+    record: async (action, subject, reason) => {
+      await createOrderStore(root).record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'rule:writeback',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      })
+    },
+  }
+}
+
+function integrateDepsFor(api: ExtensionAPI, root: string): IntegrateDeps {
+  return {
+    exec: (options) => api.shell.exec(options),
+    root,
+    now: () => new Date().toISOString(),
+    autoOpen: api.settings?.get<boolean>('terminator.foundry.autoOpenDraftPr') ?? true,
+    // Nothing in the extension host answers a gate; the operator does, through
+    // the inbox. A shipping decision reaching this seam means it was never
+    // raised, and holding is the only safe reading of that.
+    decide: async () => 'hold',
+    record: async (action, subject, reason) => {
+      await createOrderStore(root).record({
+        at: new Date().toISOString(),
+        orderId: subject,
+        actor: 'rule:ship',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      })
+    },
+  }
+}
+
 export function activate(api: ExtensionAPI): void {
   // Kept, so a phase can wait for it. Activation cannot be async — the host
   // calls it synchronously — but a dispatch that arrives in the meantime used
@@ -1220,9 +553,28 @@ export function activate(api: ExtensionAPI): void {
   // add the ignore entry itself — that would be editing a file no order asked
   // to change — so the operator is told what it costs and what avoids it.
   noteUntrackedDataRoot(api, foundryDataRoot)
+  const issuesPort = issuesPortFor(api)
   const forge = createForgeChannels({
     store: createOrderStore(foundryDataRoot),
     now: () => new Date().toISOString(),
+    writeBackDefault: defaultWriteBack(api),
+    // FR-059a: asked when the order is agreed, so an issue that will never
+    // move is known before the run rather than after it.
+    capability:
+      issuesPort === null
+        ? undefined
+        : (order) =>
+            checkCapability(order, writeBackDepsFor(api, foundryDataRoot, order, issuesPort)),
+    onAgreed:
+      issuesPort === null
+        ? undefined
+        : async (order) => {
+            await writeBack(
+              order,
+              'agreed',
+              writeBackDepsFor(api, foundryDataRoot, order, issuesPort)
+            )
+          },
     readIssue: async (tracker, key) => {
       // Through the application's own tracker connection. This extension never
       // holds a credential and never contacts a tracker itself. A host with no
@@ -1242,6 +594,8 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:order.turn', (payload) => forge.turn(payload))
   reg(api, 'foundry:order.compile', (payload) => forge.compile(payload))
   reg(api, 'foundry:order.list', () => forge.list())
+  reg(api, 'foundry:order.states', (payload) => forge.states(payload))
+  reg(api, 'foundry:order.mapState', (payload) => forge.mapState(payload))
 
   // ── The Line ───────────────────────────────────────────────────────────
   //
@@ -1264,6 +618,44 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
   reg(api, 'foundry:run.recipes', (payload) => runs.recipes(payload))
+  reg(api, 'foundry:session.attach', (payload) => runs.attach(payload))
+
+  // ── The inbox ──────────────────────────────────────────────────────────
+  //
+  // The one surface the operator is required to visit. Nothing reaches it that
+  // a named rule did not raise, which is what makes "nothing needs you" a
+  // state worth trusting rather than a state worth double-checking.
+  const inbox = createInboxChannels({
+    gates: createGateStore(foundryDataRoot),
+    orders: createOrderStore(foundryDataRoot),
+    autonomy: () =>
+      api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
+      'standard',
+    now: () => new Date().toISOString(),
+    record: async (orderId, action, subject, reason) => {
+      await createOrderStore(foundryDataRoot).record({
+        at: new Date().toISOString(),
+        orderId,
+        actor: 'operator',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      })
+    },
+    // "Mark ready" is the decision the operator is offered on a finished
+    // order (FR-057), and this is what makes it mean something. Creating the
+    // pull request was never their decision to take.
+    act: async (gate, option) => {
+      if (gate.rule !== 'ready-for-review' || option !== 'mark_ready') return
+      const deps = integrateDepsFor(api, foundryDataRoot)
+      for (const pull of await readPulls(foundryDataRoot, gate.orderId)) {
+        await markReady(pull, deps)
+      }
+    },
+  })
+  reg(api, 'foundry:inbox.list', () => inbox.list())
+  reg(api, 'foundry:inbox.decide', (payload) => inbox.decide(payload))
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands
@@ -1402,33 +794,6 @@ export function activate(api: ExtensionAPI): void {
   // Read from the card's own `workitem.json` rather than taken as a payload:
   // the contract between the pipeline and the console is a file, and a surface
   // that had to carry the lanes in would need a producer of its own.
-  reg(api, 'foundry:lanes', async (payload: unknown) => {
-    const { featureDir } = payload as { featureDir: string }
-    const card = await readLanesFor(featureDir)
-    // Null means one repository, which is not a card with a broken work item.
-    return { lanes: card === null ? [] : (supervision?.lanes(card) ?? []) }
-  })
-
-  reg(api, 'foundry:lane-may-merge', async (payload: unknown) => {
-    const { featureDir, ord, merged } = payload as {
-      featureDir: string
-      ord: number
-      merged: number[]
-    }
-    const card = await readLanesFor(featureDir)
-    if (card === null) {
-      // Nothing declared, nothing to wait for.
-      return { allowed: true, reason: null, blockingLane: null }
-    }
-    return (
-      supervision?.mayMerge(card, ord, merged ?? []) ?? {
-        allowed: false,
-        reason: 'the supervision runtime is not running',
-        blockingLane: null,
-      }
-    )
-  })
-
   // Applying the decisions is what makes a rejection mean anything: the
   // rejected hunks come back out of the working copy, the accepted ones stay.
   reg(api, 'foundry:review-apply', async (payload: unknown) => {
@@ -1453,14 +818,11 @@ export function activate(api: ExtensionAPI): void {
 
   reg(api, 'foundry:review-done', async (payload: unknown) => {
     const { sessionId } = payload as { sessionId: string }
-    const run = supervision?.runs.get(sessionId) ?? null
     supervision?.review.remove(sessionId)
     supervision?.runs.forget(sessionId)
-    // Reviewing one is what reopens the gate. Cards held back by backpressure
-    // stayed pending until something else happened to drain the queue.
-    if (run !== null) {
-      await advanceQueue(api, path.dirname(path.dirname(run.featureDir)))
-    }
+    // Reviewing one reopens the backpressure gate. What starts next is the
+    // scheduler's decision now, taken from the run graph rather than from a
+    // queue this channel had to remember to drain.
     return { ok: true }
   })
 
@@ -1583,703 +945,32 @@ export function activate(api: ExtensionAPI): void {
   // card is put back where it can be started again. A discarded run must not
   // keep occupying a review slot — that would gate the next run on reviewing a
   // diff that no longer exists.
-  reg(api, 'foundry:run-discard', async (payload: unknown) => {
-    const { sessionId, workspacePath } = payload as {
-      sessionId: string
-      workspacePath?: string
-    }
-    const run = supervision?.runs.get(sessionId) ?? null
-    if (run !== null) {
-      // Killed, not asked. `stop` types `/exit` into the terminal and returns
-      // immediately: the write is asynchronous and nothing waits for the
-      // process, so removing the worktree underneath it raced an agent still
-      // running in that directory.
-      api.pty.kill(run.terminalSessionId)
-      await discardWorktree(api, workspacePath ?? '', run.worktreePath, run.branch)
-      supervision?.review.remove(sessionId)
-      // Recorded first: `forget` drops it entirely, and a discard is the run
-      // you are most likely to want to look back at.
-      supervision?.runs.archive(sessionId, 'discarded', Date.now())
-      supervision?.runs.forget(sessionId)
-
-      // The card has to forget it too. Leaving `run` running and a
-      // `worktreePath` pointing at a directory that no longer exists makes the
-      // board show a live phase, and the next handoff provision against a path
-      // that is gone.
-      activeRunnerHandles.get(run.featureDir)?.stop()
-      activeRunnerHandles.delete(run.featureDir)
-      const state = await readMigratedState(run.featureDir)
-      if (state) {
-        if (state.run) {
-          state.run = {
-            ...state.run,
-            status: 'cancelled',
-            completedAt: new Date().toISOString(),
-          }
-        }
-        state.worktreePath = null
-        state.branchName = null
-        state.queuePosition = null
-        state.stage = deriveStage(state.phases, state.run)
-        await writePilotState(run.featureDir, state)
-        await appendHistory(run.featureDir, {
-          ts: new Date().toISOString(),
-          actor: 'user',
-          action: 'run_cancelled',
-          // The phase it was actually on. Recording a constant made the audit
-          // log claim every discard happened during the constitution.
-          phase: (run.phase as PhaseId) ?? 'constitution',
-          note: 'run discarded, worktree removed',
-        })
-        api.window.broadcast('foundry:state-changed', { state })
-      }
-      // Everything said about it goes too: the run, its worktree and its branch
-      // are gone, so its feed entries are noise about something that no longer
-      // exists. Posted after, so the discard itself is what remains.
-      supervision?.feed.forget(sessionId)
-      // The project the run needed goes with the directory it pointed at.
-      // Left behind, the sidebar keeps an entry for a path that is gone.
-      const workspace = api.workspace.list().find((w) => w.folderPath === (workspacePath ?? ''))
-      const project = workspace
-        ? api.workspace
-            .listProjects(workspace.id)
-            .find((candidate) => candidate.name === run.branch)
-        : undefined
-      if (project !== undefined) api.workspace.deleteProject(project.id)
-
-      supervision?.feed.post({
-        at: Date.now(),
-        sessionId,
-        author: 'console',
-        summary: `discarded ${path.basename(run.featureDir)} and removed its worktree`,
-      })
-    }
-    return { ok: run !== null }
-  })
-
   // speckit:card-list — board data: every card with brief + derived stage + phase summary
-  reg(api, 'foundry:card-list', async (payload: unknown) => {
-    const { repoRoot } = payload as { repoRoot: string }
-    if (!repoRoot) return { error: 'repoRoot required' }
-    const dirs = await listCardDirs(repoRoot)
-    const retentionDays = getLogRetentionDays(api)
-    const cards: CardSummary[] = []
-    for (const dir of dirs) {
-      void pruneOldLogs(dir, retentionDays).catch(() => {})
-      const state = await readMigratedState(dir)
-      if (!state) continue
-      const card = await readCard(dir)
-      cards.push(buildCardSummary(state, card))
-    }
-    return { cards }
-  })
-
   // speckit:card-create — create a native (or ticket-seeded) card in the backlog
-  reg(api, 'foundry:card-create', async (payload: unknown) => {
-    const { repoRoot, brief, ticket } = payload as {
-      repoRoot: string
-      brief: Partial<CardBrief> & { title: string }
-      ticket?: TicketRef
-    }
-    if (!repoRoot) return { error: 'repoRoot required' }
-    if (!brief || !brief.title || brief.title.trim().length === 0) {
-      return { error: 'VALIDATION_ERROR', message: 'A card needs a title' }
-    }
-    try {
-      const specsDir = path.join(repoRoot, 'specs')
-      await fs.promises.mkdir(specsDir, { recursive: true })
-      const existing = await fs.promises.readdir(specsDir).catch(() => [])
-      const nums = existing
-        .map((d) => parseInt(d.split('-')[0] ?? '0', 10))
-        .filter((n) => !isNaN(n))
-      const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1
-      const slugBase = (ticket?.key ?? brief.title).toLowerCase().replace(/[^a-z0-9]+/g, '-')
-      const slug = slugBase.replace(/^-|-$/g, '') || 'card'
-      const featureDirName = `${String(nextNum).padStart(3, '0')}-${slug}`
-      const featureDir = path.join(specsDir, featureDirName)
-      await fs.promises.mkdir(featureDir, { recursive: true })
-
-      const card: CardBrief = {
-        ...createDefaultBrief(brief.title, brief.source ?? ticket?.source ?? 'native'),
-        ...brief,
-        title: brief.title,
-      }
-      await writeCard(featureDir, card)
-      const state = createInitialState(featureDir, { card, ticket: ticket ?? null })
-      await writePilotState(featureDir, state)
-      api.window.broadcast('foundry:state-changed', { state })
-      return { featureDir }
-    } catch (err) {
-      api.notifications.showToast(
-        'error',
-        `Could not create card: ${String(err)}`,
-        'createCardFailed'
-      )
-      return { error: String(err) }
-    }
-  })
-
   // speckit:card-update — edit a card's brief
-  reg(api, 'foundry:card-update', async (payload: unknown) => {
-    const { featureDir, brief } = payload as { featureDir: string; brief: Partial<CardBrief> }
-    if (!featureDir) return { error: 'featureDir required' }
-    if (brief.title !== undefined && brief.title.trim().length === 0) {
-      return { error: 'VALIDATION_ERROR', message: 'Title cannot be empty' }
-    }
-    try {
-      const existing = (await readCard(featureDir)) ?? createDefaultBrief(path.basename(featureDir))
-      const updated: CardBrief = { ...existing, ...brief }
-      await writeCard(featureDir, updated)
-      const state = await readMigratedState(featureDir)
-      if (state) {
-        state.card = updated
-        await writePilotState(featureDir, state)
-        api.window.broadcast('foundry:state-changed', { state })
-      }
-      return { ok: true }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // speckit:card-comment — append a comment; queued to steer the next phase run
-  reg(api, 'foundry:card-comment', async (payload: unknown) => {
-    const { featureDir, body } = payload as { featureDir: string; body: string }
-    if (!featureDir) return { error: 'featureDir required' }
-    if (!body || body.trim().length === 0) {
-      return { error: 'VALIDATION_ERROR', message: 'Comment cannot be empty' }
-    }
-    try {
-      const comment: CardComment = {
-        id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        author: 'you',
-        body,
-        ts: new Date().toISOString(),
-        appliedToRunId: null,
-      }
-      await appendComment(featureDir, comment)
-      const state = await readMigratedState(featureDir)
-      if (state) api.window.broadcast('foundry:state-changed', { state })
-      return { comment }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // speckit:run-output-read — load persisted output for a phase (review past runs)
-  reg(api, 'foundry:run-output-read', async (payload: unknown) => {
-    const { featureDir, phase } = payload as { featureDir: string; phase: PhaseId }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    try {
-      const raw = await fs.promises.readFile(phaseLogPath(featureDir, phase), 'utf-8')
-      const lines = raw.split('\n').filter((l) => l.length > 0)
-      return { lines }
-    } catch {
-      return { lines: [] }
-    }
-  })
-
   // speckit:comment-list — load a card's comments
-  reg(api, 'foundry:comment-list', async (payload: unknown) => {
-    const { featureDir } = payload as { featureDir: string }
-    if (!featureDir) return { error: 'featureDir required' }
-    const comments = await readComments(featureDir)
-    return { comments }
-  })
-
   // speckit:card-move — user-driven board organization. Sets the card's stage; it
   // never starts a run. Dropping an active card onto Backlog parks (stops) its run.
-  reg(api, 'foundry:card-move', async (payload: unknown) => {
-    const { featureDir, workspacePath, toStage } = payload as {
-      featureDir: string
-      workspacePath: string
-      toStage: BoardStage
-    }
-    if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
-    if (!STAGE_ORDER.includes(toStage)) {
-      return { error: 'VALIDATION_ERROR', message: `Unknown stage: ${toStage}` }
-    }
-    try {
-      const state = await readMigratedState(featureDir)
-      if (!state) return { error: 'No card state found' }
-
-      const runActive = state.run != null && state.run.status === 'running'
-      // Parking an in-flight run: stop it, drop the worktree, free the slot.
-      if (toStage === 'backlog' && runActive) {
-        const handle = activeRunnerHandles.get(featureDir)
-        if (handle) {
-          handle.stop()
-          activeRunnerHandles.delete(featureDir)
-        }
-        await discardWorktree(api, workspacePath, state.worktreePath, state.branchName)
-        // Its worktree is gone, so everything the supervision layer holds about
-        // it describes something that no longer exists: a run on the register,
-        // a diff in the review queue holding the gate shut, tool calls waiting
-        // on an answer that can no longer reach anyone.
-        for (const run of supervision?.runs.list() ?? []) {
-          if (run.featureDir !== featureDir) continue
-          supervision?.review.remove(run.sessionId)
-          supervision?.feed.forget(run.sessionId)
-        }
-        supervision?.runs.forgetCard(featureDir)
-        pendingPermissions.forgetCard(featureDir)
-        state.run = { ...state.run!, status: 'cancelled', completedAt: new Date().toISOString() }
-        state.queuePosition = null
-        state.worktreePath = null
-        state.branchName = null
-        await appendHistory(featureDir, {
-          ts: new Date().toISOString(),
-          actor: 'user',
-          action: 'run_cancelled',
-          phase: 'constitution',
-          note: 'parked to backlog',
-        })
-      }
-
-      state.stage = toStage
-      await writePilotState(featureDir, state)
-      api.window.broadcast('foundry:state-changed', { state })
-      if (toStage === 'backlog' && runActive) await advanceQueue(api, workspacePath)
-      return { ok: true }
-    } catch (err) {
-      api.notifications.showToast('error', `Could not move card: ${String(err)}`, 'moveCardFailed')
-      return { error: String(err) }
-    }
-  })
-
   // speckit:card-handoff — explicit "start" action: run the card through the pipeline
-  reg(api, 'foundry:card-handoff', async (payload: unknown) => {
-    const { featureDir, workspacePath, baseBranch, mode, overrideBackpressure } = payload as {
-      featureDir: string
-      workspacePath: string
-      baseBranch?: string
-      mode?: RunMode
-      overrideBackpressure?: boolean
-    }
-    if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
-    try {
-      return await handoffCard(
-        api,
-        featureDir,
-        workspacePath,
-        baseBranch,
-        mode,
-        overrideBackpressure
-      )
-    } catch (err) {
-      api.notifications.showToast('error', `Handoff failed: ${String(err)}`, 'handoffFailed')
-      return { error: String(err) }
-    }
-  })
-
   // speckit:artifact-list — enumerate a card's artifacts with git revision history
-  reg(api, 'foundry:artifact-list', async (payload: unknown) => {
-    const { featureDir } = payload as { featureDir: string }
-    if (!featureDir) return { error: 'featureDir required' }
-    try {
-      const state = await readMigratedState(featureDir)
-      const cwd = state?.worktreePath ?? path.dirname(path.dirname(featureDir))
-      const artifacts: ArtifactRef[] = []
-      for (const spec of artifactSpecs()) {
-        if (spec.relPath === null) {
-          artifacts.push(
-            buildArtifactRef(spec, { exists: false, revisions: [], prUrl: state?.prUrl })
-          )
-          continue
-        }
-        const absPath = resolveArtifactPath(
-          { featureDir, worktreePath: state?.worktreePath },
-          path.join(featureDir, spec.relPath)
-        )
-        let exists = false
-        try {
-          await fs.promises.access(absPath)
-          exists = true
-        } catch {
-          exists = false
-        }
-        let revisions: ReturnType<typeof parseGitLog> = []
-        if (exists) {
-          try {
-            const rel = path.relative(cwd, absPath)
-            const res = await api.shell.exec({
-              command: 'git',
-              args: ['log', '--pretty=format:%h%x09%cI%x09%s', '--', rel],
-              cwd,
-            })
-            if (res.exitCode === 0) revisions = parseGitLog(res.stdout)
-          } catch {
-            revisions = []
-          }
-        }
-        artifacts.push(buildArtifactRef(spec, { exists, revisions }))
-      }
-      return { artifacts }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // speckit:knowledge-search — keyword search across repo markdown + card briefs/specs
-  reg(api, 'foundry:knowledge-search', async (payload: unknown) => {
-    const { repoRoot, query } = payload as { repoRoot: string; query: string }
-    if (!repoRoot || !query) return { error: 'repoRoot and query required' }
-    try {
-      // `git grep`, not `rg`: the host only permits git and gh, so the ripgrep
-      // call this replaced threw on every search and the fallback below was
-      // doing all the work — silently, because nothing typechecked this file.
-      // Same `path:line:text` output, so the parser is unchanged.
-      const res = await api.shell.exec({
-        command: 'git',
-        args: ['grep', '--line-number', '--no-color', '-I', '-i', '-e', query, '--', '*.md'],
-        cwd: repoRoot,
-      })
-      // 0 = matches, 1 = none. Both are answers; anything else is a failure.
-      if (res.exitCode === 0 || res.exitCode === 1) {
-        return { results: parseRgLines(res.stdout) }
-      }
-    } catch {
-      // Not a repository, or git is unavailable — fall through to the fs scan,
-      // which also covers files git has never seen.
-    }
-    // Fallback: scan markdown under specs/ and docs/ plus README.md
-    const files: { file: string; content: string }[] = []
-    const roots = ['specs', 'docs']
-    async function walk(rel: string): Promise<void> {
-      const abs = path.join(repoRoot, rel)
-      let entries: fs.Dirent[] = []
-      try {
-        entries = await fs.promises.readdir(abs, { withFileTypes: true })
-      } catch {
-        return
-      }
-      for (const e of entries) {
-        const childRel = path.join(rel, e.name)
-        if (e.isDirectory()) {
-          await walk(childRel)
-        } else if (e.name.endsWith('.md')) {
-          try {
-            files.push({
-              file: childRel,
-              content: await fs.promises.readFile(path.join(repoRoot, childRel), 'utf-8'),
-            })
-          } catch {
-            // skip unreadable
-          }
-        }
-      }
-    }
-    for (const r of roots) await walk(r)
-    try {
-      const readme = await fs.promises.readFile(path.join(repoRoot, 'README.md'), 'utf-8')
-      files.push({ file: 'README.md', content: readme })
-    } catch {
-      // no README
-    }
-    return { results: searchFiles(files, query) }
-  })
-
   // speckit:pilot-state — load or create .pilot/state.json
-  reg(api, 'foundry:pilot-state', async (payload: unknown) => {
-    const { featureDir } = payload as { featureDir: string }
-    if (!featureDir) return { error: 'featureDir required' }
-    const state = await readPilotState(featureDir)
-    if (!state) return { notFound: true }
-    // Approve a spec, edit it by hand, and the board said nothing. Now it does.
-    return { state: await withHashVerification(state) }
-  })
-
   // speckit:phase-approve — mark a phase approved
-  reg(api, 'foundry:phase-approve', async (payload: unknown) => {
-    const { featureDir, phase, note } = payload as {
-      featureDir: string
-      phase: PhaseId
-      note?: string
-    }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    let state = await readPilotState(featureDir)
-    if (!state) state = createPilotState(featureDir)
-    const ps = state.phases[phase]
-    if (!ps) return { error: `Unknown phase: ${phase}` }
-    ps.status = 'approved'
-    ps.approvedAt = new Date().toISOString()
-    ps.approvedBy = 'user'
-    // What was approved, so an edit afterwards is visible rather than silent.
-    ps.approvedHash = await hashArtifacts(
-      artifactEntries({ featureDir, worktreePath: state.worktreePath }, ps.artifactPaths)
-    )
-    if (note) ps.lastRunId = note
-    // Everything downstream was approved against what this phase used to say.
-    for (const downstream of computeStalePhases(state, phase)) {
-      state.phases[downstream].status = 'stale'
-    }
-    if (state.run && state.run.status === 'running') {
-      state.stage = deriveStage(state.phases, state.run)
-    }
-    // Approving is reviewing. Without this the diff stayed queued after the
-    // decision was made: the Review tab kept offering work that had already
-    // been accepted, and — because the queue is what backpressure counts —
-    // three approved phases were enough to refuse the next run outright.
-    clearReviewFor(featureDir)
-    await writePilotState(featureDir, state)
-    await appendHistory(featureDir, {
-      ts: new Date().toISOString(),
-      actor: 'user',
-      action: 'approved',
-      phase,
-      note,
-    })
-    api.window.broadcast('foundry:state-changed', { state })
-
-    // Auto-start the next phase if the run is still active
-    const nextPhaseId = PHASE_ORDER[PHASE_ORDER.indexOf(phase) + 1]
-    if (nextPhaseId && nextPhaseId !== 'open-pr' && state.run?.status !== 'cancelled') {
-      const nextPs = state.phases[nextPhaseId]
-      if (nextPs && (nextPs.status === 'locked' || nextPs.status === 'ready')) {
-        nextPs.status = 'ready'
-        await writePilotState(featureDir, state)
-        const steer = (await consumePendingComments(featureDir, `run-${Date.now()}`)) ?? undefined
-        const worktreePath = await ensureWorktreePath(api, featureDir, state)
-        const runner = createAgentRunner(api)
-        const handle = runner.startPhaseRunner({
-          featureDir,
-          worktreePath,
-          phaseCommand: phaseCommandFor(nextPhaseId, state.mode, cardTitleOf(state), worktreePath),
-          phase: nextPhaseId,
-          feedbackNote: steer,
-          model: defaultModel(api),
-          ...makePhaseCallbacks(api, featureDir, nextPhaseId),
-        })
-        activeRunnerHandles.set(featureDir, handle)
-      }
-    }
-
-    return { state }
-  })
-
   // speckit:phase-revoke — revoke approval, mark downstream stale
-  reg(api, 'foundry:phase-revoke', async (payload: unknown) => {
-    const { featureDir, phase, note } = payload as {
-      featureDir: string
-      phase: PhaseId
-      note?: string
-    }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    let state = await readPilotState(featureDir)
-    if (!state) state = createPilotState(featureDir)
-    const ps = state.phases[phase]
-    if (!ps) return { error: `Unknown phase: ${phase}` }
-    ps.status = 'awaiting_review'
-    ps.approvedAt = null
-    ps.approvedBy = null
-    ps.approvedHash = null
-    // Mark all downstream approved phases as stale
-    const idx = PHASE_ORDER.indexOf(phase)
-    for (let i = idx + 1; i < PHASE_ORDER.length; i++) {
-      const downstream = state.phases[PHASE_ORDER[i]]
-      if (downstream && downstream.status === 'approved') {
-        downstream.status = 'stale'
-      }
-    }
-    await writePilotState(featureDir, state)
-    await appendHistory(featureDir, {
-      ts: new Date().toISOString(),
-      actor: 'user',
-      action: 'revoked',
-      phase,
-      note,
-    })
-    api.window.broadcast('foundry:state-changed', { state })
-    return { state }
-  })
-
   // speckit:artifact-read — read current file + last approved (via git) for diff.
   // When `commit` is given, `current` is that revision's content (git show <commit>:path).
-  reg(api, 'foundry:artifact-read', async (payload: unknown) => {
-    const { filePath, featureDir, repoRoot, commit } = payload as {
-      filePath: string
-      featureDir?: string
-      repoRoot?: string
-      commit?: string
-    }
-    if (!filePath) return { error: 'filePath required' }
-    // Resolved against the run's worktree: the recorded path names the main
-    // checkout, and that is not where the phase wrote it.
-    const state = featureDir ? await readPilotState(featureDir) : null
-    const resolved =
-      featureDir === undefined
-        ? filePath
-        : resolveArtifactPath({ featureDir, worktreePath: state?.worktreePath }, filePath)
-    const cwd = state?.worktreePath || repoRoot || featureDir || path.dirname(resolved)
-    const { exec } = await import('node:child_process')
-    const { promisify } = await import('node:util')
-    const execAsync = promisify(exec)
-    const relPath = path.relative(cwd, resolved)
-
-    let current: string | null = null
-    if (commit) {
-      // Read a specific historical revision of the file.
-      try {
-        const result = await execAsync(`git show ${commit}:${relPath}`, { cwd })
-        current = result.stdout
-      } catch {
-        current = null
-      }
-    } else {
-      try {
-        current = await fs.promises.readFile(resolved, 'utf-8')
-      } catch {
-        current = null
-      }
-    }
-
-    // Try to get approved (HEAD) version from git
-    let approved: string | null = null
-    try {
-      const result = await execAsync(`git show HEAD:${relPath}`, { cwd })
-      approved = result.stdout
-    } catch {
-      approved = null
-    }
-    return { current, approved }
-  })
-
   // speckit:history-load — read and parse history.jsonl
-  reg(api, 'foundry:history-load', async (payload: unknown) => {
-    const { featureDir } = payload as { featureDir: string }
-    if (!featureDir) return { error: 'featureDir required' }
-    const entries = await readHistory(featureDir)
-    return { entries }
-  })
-
   // speckit:phase-skip — mark a phase as intentionally skipped
-  reg(api, 'foundry:phase-skip', async (payload: unknown) => {
-    const { featureDir, phase, note } = payload as {
-      featureDir: string
-      phase: PhaseId
-      note?: string
-    }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    let state = await readPilotState(featureDir)
-    if (!state) state = createPilotState(featureDir)
-    const ps = state.phases[phase]
-    if (!ps) return { error: `Unknown phase: ${phase}` }
-    ps.status = 'skipped'
-    ps.approvedAt = null
-    ps.approvedBy = null
-    ps.approvedHash = null
-    // A skip has to advance the card the way an approval does. Setting the
-    // status alone left it at a gate with nothing following it: the next phase
-    // stayed locked and no runner ever started.
-    const nextAfterSkip = PHASE_ORDER[PHASE_ORDER.indexOf(phase) + 1]
-    const followingSkip = nextAfterSkip ? state.phases[nextAfterSkip] : undefined
-    if (followingSkip && followingSkip.status === 'locked') followingSkip.status = 'ready'
-    state.stage = deriveStage(state.phases, state.run)
-    await writePilotState(featureDir, state)
-    await appendHistory(featureDir, {
-      ts: new Date().toISOString(),
-      actor: 'user',
-      action: 'skipped',
-      phase,
-      note,
-    })
-    api.window.broadcast('foundry:state-changed', { state })
-    return { state }
-  })
-
   // speckit:phase-unskip — restore a skipped phase back to ready
-  reg(api, 'foundry:phase-unskip', async (payload: unknown) => {
-    const { featureDir, phase, note } = payload as {
-      featureDir: string
-      phase: PhaseId
-      note?: string
-    }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    let state = await readPilotState(featureDir)
-    if (!state) state = createPilotState(featureDir)
-    const ps = state.phases[phase]
-    if (!ps) return { error: `Unknown phase: ${phase}` }
-    ps.status = 'ready'
-    await writePilotState(featureDir, state)
-    await appendHistory(featureDir, {
-      ts: new Date().toISOString(),
-      actor: 'user',
-      action: 'unskipped',
-      phase,
-      note,
-    })
-    api.window.broadcast('foundry:state-changed', { state })
-    return { state }
-  })
-
   // speckit:file-write — write any file within the project (markdown edits)
-  reg(api, 'foundry:file-write', async (payload: unknown) => {
-    const { filePath, content } = payload as { filePath: string; content: string }
-    if (!filePath || content === undefined) return { error: 'filePath and content required' }
-    try {
-      await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
-      await fs.promises.writeFile(filePath, content, 'utf-8')
-      return { ok: true }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // speckit:ticket-list — the operator's assigned issues, from the
   // application's single tracker connection.
   //
   // This extension used to own two API clients and two credentials. It now
   // owns neither: core connects, core caches, and this asks (ExtensionAPI
   // v2.2.0). The board's own behaviour is unchanged.
-  reg(api, 'foundry:ticket-list', async () => {
-    try {
-      const { issues, failures } = await api.issues.listMine()
-
-      // The board turns a ticket into a card, and the card's scope is the
-      // ticket's description — so the description has to be here. A summary
-      // does not carry one (the picker has no use for it), which is why each
-      // is fetched. Core caches per issue, so a board reopened inside the TTL
-      // makes no requests at all, and one that cannot be fetched degrades to
-      // an empty scope rather than failing the whole list.
-      const tickets: Ticket[] = await Promise.all(
-        issues.map(async (issue) => {
-          const full = await api.issues.get(issue.tracker, issue.id).catch(() => null)
-          return {
-            source: issue.tracker,
-            key: issue.key,
-            title: issue.title,
-            sourceUrl: issue.url,
-            body: full?.description ?? '',
-            bodyFormat: 'markdown' as const,
-            acceptanceCriteria: [],
-            branchName: issue.branchName,
-            completed: issue.state.type === 'completed',
-          }
-        })
-      )
-
-      // A tracker that could not be reached is said out loud rather than
-      // showing as "nothing assigned to you", which is what an empty list from
-      // a failed fetch used to look like.
-      for (const failure of failures) {
-        if (failure.error === 'not-connected') continue
-        api.notifications.showToast(
-          'warning',
-          `Could not reach ${failure.tracker}: ${failure.error}`,
-          'fetchTicketsFailed'
-        )
-      }
-      return { tickets }
-    } catch (err) {
-      api.notifications.showToast(
-        'error',
-        `Could not fetch tickets: ${String(err)}`,
-        'fetchTicketsFailed'
-      )
-      return { error: String(err) }
-    }
-  })
-
   // speckit:credentials-set and speckit:credentials-status are gone.
   //
   // Tracker credentials are the application's now, entered once in
@@ -2293,520 +984,16 @@ export function activate(api: ExtensionAPI): void {
   // The board's own route is card-create then card-handoff; this is the
   // one-step entry a tracker or the remote bridge uses, and what the e2e drives
   // to prove a phase really opens a terminal.
-  reg(api, 'foundry:dispatch', async (payload: unknown) => {
-    const { ticket, workspacePath, autonomyLevel, baseBranch, mode } = payload as {
-      ticket: TicketRef
-      workspacePath: string
-      autonomyLevel?: 'guided' | 'standard' | 'fast'
-      baseBranch?: string
-      mode?: RunMode
-    }
-    if (!ticket || !workspacePath) return { error: 'ticket and workspacePath required' }
-
-    try {
-      // Determine next sequential feature number
-      const specsDir = path.join(workspacePath, 'specs')
-      await fs.promises.mkdir(specsDir, { recursive: true })
-      const existing = await fs.promises.readdir(specsDir).catch(() => [])
-      const nums = existing
-        .map((d) => parseInt(d.split('-')[0] ?? '0', 10))
-        .filter((n) => !isNaN(n))
-      const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1
-      const slug = ticket.key.toLowerCase().replace(/[^a-z0-9]/g, '-')
-      const featureDirName = `${String(nextNum).padStart(3, '0')}-${slug}`
-      const featureDir = path.join(specsDir, featureDirName)
-      await fs.promises.mkdir(featureDir, { recursive: true })
-
-      // Write ticket reference file (shared format with the card-handoff path)
-      const dispatchCard = createDefaultBrief(ticket.title, ticket.source)
-      await fs.promises.writeFile(
-        path.join(featureDir, 'ticket.md'),
-        buildTicketMarkdown(dispatchCard, ticket),
-        'utf-8'
-      )
-
-      const branchName = await resolveBranchName(api, featureDir, workspacePath, ticket)
-      // Respect the core app's worktree location setting (workspace override →
-      // global → <repo>/.worktrees) instead of a private directory.
-      const worktreeRoot = api.settings.resolveWorktreeBaseDir(workspacePath)
-      const worktreePath = path.join(worktreeRoot, slug)
-
-      // Create initial state v3 (constitution ready, active run, ticket-seeded card)
-      const state = createInitialState(featureDir, {
-        card: dispatchCard,
-        ticket,
-        mode: mode ?? 'speckit',
-        run: {
-          status: 'running',
-          startedAt: new Date().toISOString(),
-          completedAt: null,
-          autonomyLevel: autonomyLevel ?? 'standard',
-        },
-        queuePosition: 'active',
-        worktreePath,
-        branchName,
-        // Recorded here too: dispatch can hit the gate below and queue, and
-        // whatever starts it later reads this to know what to measure against.
-        baseBranch: baseBranch ?? null,
-      })
-
-      // Through the one writer, which names its temp file uniquely: two
-      // overlapping writes to a fixed `.tmp` race, and the loser's rename
-      // throws ENOENT.
-      await writePilotState(featureDir, state)
-
-      // Create git worktree branching from baseBranch (or HEAD if not specified),
-      // reusing the branch if it already exists.
-      const worktreeArgs = ['worktree', 'add', worktreePath]
-      if (await branchExists(api, workspacePath, branchName)) {
-        worktreeArgs.push(branchName)
-      } else {
-        worktreeArgs.push('-b', branchName)
-        if (baseBranch) worktreeArgs.push(baseBranch)
-      }
-      const worktreeResult = await api.shell.exec({
-        command: 'git',
-        args: worktreeArgs,
-        cwd: workspacePath,
-      })
-      if (worktreeResult.exitCode !== 0) {
-        return {
-          error: `Could not create worktree: ${worktreeResult.stderr || worktreeResult.stdout}`,
-        }
-      }
-
-      // Copy ticket.md into the worktree so phase prompts can reference it by relative path
-      await fs.promises.copyFile(
-        path.join(featureDir, 'ticket.md'),
-        path.join(worktreePath, 'ticket.md')
-      )
-
-      // Prime phases (honor skip-Constitution) and start at the first runnable phase
-      primePhasesForRun(state)
-      state.stage = deriveStage(state.phases, state.run)
-      await writePilotState(featureDir, state)
-
-      // Dispatch provisions the card and then runs it. The gate is checked here
-      // too — a card taken in from a tracker is still an agent starting while
-      // diffs wait, and refusing after the worktree exists would waste it.
-      const gate = supervision?.backpressure.check()
-      if (gate !== undefined && !gate.allowed) {
-        state.queuePosition = 'pending'
-        await writePilotState(featureDir, state)
-        api.window.broadcast('foundry:state-changed', { state })
-        return { featureDir, queued: true, reason: gate.reason, backpressure: gate }
-      }
-
-      await startRunAt(
-        api,
-        featureDir,
-        worktreePath,
-        firstRunnablePhase(state),
-        state.mode,
-        state.card.title,
-        baseBranch
-      )
-
-      api.window.broadcast('foundry:dispatch-started', { featureDir, branchName, worktreePath })
-      api.window.broadcast('foundry:state-changed', { state })
-      return { featureDir, queued: false }
-    } catch (err) {
-      api.notifications.showToast('error', `Dispatch failed: ${String(err)}`, 'dispatchFailed')
-      return { error: String(err) }
-    }
-  })
-
   // speckit:run-cancel — stop runner, optionally remove worktree+branch, update state
-  reg(api, 'foundry:run-cancel', async (payload: unknown) => {
-    const { featureDir, workspacePath, deleteWorktree } = payload as {
-      featureDir: string
-      workspacePath: string
-      deleteWorktree?: boolean
-    }
-    if (!featureDir) return { error: 'featureDir required' }
-
-    try {
-      const handle = activeRunnerHandles.get(featureDir)
-      if (handle) {
-        handle.stop()
-        activeRunnerHandles.delete(featureDir)
-      }
-
-      const state = await readPilotState(featureDir)
-      if (deleteWorktree && state?.worktreePath) {
-        const cwd = workspacePath ?? path.dirname(path.dirname(featureDir))
-        await api.shell
-          .exec({
-            command: 'git',
-            args: ['worktree', 'remove', state.worktreePath, '--force'],
-            cwd,
-          })
-          .catch(() => {})
-        if (state.branchName) {
-          await api.shell
-            .exec({ command: 'git', args: ['branch', '-D', state.branchName], cwd })
-            .catch(() => {})
-        }
-
-        // Remove the corresponding workspace project (matched by branch name)
-        if (state.branchName) {
-          const workspace = api.workspace.list().find((w) => w.folderPath === workspacePath)
-          if (workspace) {
-            const project = api.workspace
-              .listProjects(workspace.id)
-              .find((p) => p.name === state.branchName)
-            if (project) {
-              api.workspace.deleteProject(project.id)
-              api.window.broadcast('workspace:project-removed', { id: project.id })
-            }
-          }
-        }
-      }
-
-      if (state) {
-        state.run = state.run
-          ? { ...state.run, status: 'cancelled', completedAt: new Date().toISOString() }
-          : null
-        state.queuePosition = null
-        await writePilotState(featureDir, state)
-        await appendHistory(featureDir, {
-          ts: new Date().toISOString(),
-          actor: 'user',
-          action: 'run_cancelled',
-          phase: 'constitution',
-        })
-        api.window.broadcast('foundry:state-changed', { state })
-        if (workspacePath) await advanceQueue(api, workspacePath)
-        return { ok: true, state }
-      }
-
-      if (workspacePath) await advanceQueue(api, workspacePath)
-      return { ok: true }
-    } catch (err) {
-      api.notifications.showToast('error', `Cancel failed: ${String(err)}`, 'cancelFailed')
-      return { error: String(err) }
-    }
-  })
-
   // speckit:card-reset — wipe a card's entire run so it can start over. Stops the
   // runner, removes the worktree + branch, deletes .pilot logs/history/self-review,
   // and resets phases/run to the initial state. The card brief, ticket, mode, and
   // settings are preserved so the card can be re-dispatched cleanly.
-  reg(api, 'foundry:card-reset', async (payload: unknown) => {
-    const { featureDir, workspacePath } = payload as {
-      featureDir: string
-      workspacePath?: string
-    }
-    if (!featureDir) return { error: 'featureDir required' }
-
-    try {
-      const handle = activeRunnerHandles.get(featureDir)
-      if (handle) {
-        handle.stop()
-        activeRunnerHandles.delete(featureDir)
-      }
-
-      const prev = await readPilotState(featureDir)
-      const cwd = workspacePath ?? path.dirname(path.dirname(featureDir))
-
-      // Tear down the worktree + branch (best-effort; a manually deleted worktree
-      // must not block the reset).
-      if (prev?.worktreePath) {
-        await api.shell
-          .exec({ command: 'git', args: ['worktree', 'remove', prev.worktreePath, '--force'], cwd })
-          .catch(() => {})
-      }
-      if (prev?.branchName) {
-        await api.shell
-          .exec({ command: 'git', args: ['branch', '-D', prev.branchName], cwd })
-          .catch(() => {})
-        // Drop the mirrored workspace project (matched by branch name).
-        const workspace = workspacePath
-          ? api.workspace.list().find((w) => w.folderPath === workspacePath)
-          : undefined
-        if (workspace) {
-          const project = api.workspace
-            .listProjects(workspace.id)
-            .find((p) => p.name === prev.branchName)
-          if (project) {
-            api.workspace.deleteProject(project.id)
-            api.window.broadcast('workspace:project-removed', { id: project.id })
-          }
-        }
-      }
-
-      // Wipe the run history: logs, history.jsonl, self-review, pending comments.
-      const pilotDir = path.join(featureDir, '.pilot')
-      await fs.promises
-        .rm(path.join(pilotDir, 'logs'), { recursive: true, force: true })
-        .catch(() => {})
-      for (const f of ['history.jsonl', 'self-review.json', 'comments.jsonl']) {
-        await fs.promises.rm(path.join(pilotDir, f), { force: true }).catch(() => {})
-      }
-
-      // Rebuild a fresh initial state, preserving the card brief, ticket, and mode.
-      const card = (await readCard(featureDir)) ?? prev?.card
-      const state = createInitialState(featureDir, {
-        card: card ?? undefined,
-        ticket: prev?.ticket ?? null,
-        mode: prev?.mode ?? 'speckit',
-      })
-      await writePilotState(featureDir, state)
-      await appendHistory(featureDir, {
-        ts: new Date().toISOString(),
-        actor: 'user',
-        action: 'reset',
-        phase: firstRunnablePhase(state),
-      })
-      api.window.broadcast('foundry:state-changed', { state })
-      if (workspacePath) await advanceQueue(api, workspacePath)
-      return { ok: true, state }
-    } catch (err) {
-      api.notifications.showToast('error', `Reset failed: ${String(err)}`, 'resetFailed')
-      return { error: String(err) }
-    }
-  })
-
   // speckit:run-reply — answer the model's question from the run console by
   // resuming the last Claude session with the user's text. Output streams back
   // into the same phase console.
-  reg(api, 'foundry:run-reply', async (payload: unknown) => {
-    const { featureDir, text } = payload as { featureDir?: string; text?: string }
-    if (!featureDir || !text || !text.trim()) return { error: 'featureDir and text required' }
-
-    // A supervised run is a terminal with claude in it: the reply is typed
-    // there. Falling through to the headless path below would kill the session
-    // the operator is watching and start a second, invisible agent.
-    const live = supervision?.runs
-      .live()
-      .find((run) => run.featureDir === featureDir && run.state !== 'finished')
-    if (live !== undefined && supervisedRunner !== null) {
-      const sent = supervisedRunner.send(live.sessionId, text.trim())
-      if (sent) {
-        supervision?.feed.post({
-          at: Date.now(),
-          sessionId: live.sessionId,
-          author: 'console',
-          summary: `replied: ${text.trim()}`,
-        })
-        return { ok: true }
-      }
-    }
-
-    const sessionId = phaseSessionIds.get(featureDir)
-    if (!sessionId) {
-      return { error: 'No active conversation to reply to yet — run a phase first.' }
-    }
-    const state = await readPilotState(featureDir)
-    if (!state) return { error: 'No pilot state found' }
-    const worktreePath = await ensureWorktreePath(api, featureDir, state)
-
-    // Reply against whichever phase is live (running or awaiting review).
-    const phase =
-      PHASE_ORDER.find((p) => {
-        const s = state.phases[p]?.status
-        return s === 'running' || s === 'awaiting_review'
-      }) ?? firstRunnablePhase(state)
-
-    // Echo the user's message into the console so the exchange reads as a chat.
-    api.window.broadcast('foundry:run-output', {
-      featureDir,
-      phase,
-      line: `🧑 ${text}`,
-      ts: new Date().toISOString(),
-    })
-
-    // Stop any still-running phase process before resuming the conversation.
-    const existing = activeRunnerHandles.get(featureDir)
-    if (existing) {
-      existing.stop()
-      activeRunnerHandles.delete(featureDir)
-    }
-
-    const runner = createAgentRunner(api)
-    const handle = runner.startPhaseRunner({
-      featureDir,
-      worktreePath,
-      phaseCommand: text,
-      phase,
-      resumeSessionId: sessionId,
-      model: defaultModel(api),
-      ...makePhaseCallbacks(api, featureDir, phase),
-    })
-    activeRunnerHandles.set(featureDir, handle)
-    return { ok: true }
-  })
-
   // speckit:open-pr — run gh pr create, write prUrl to state, comment on ticket
-  reg(api, 'foundry:open-pr', async (payload: unknown) => {
-    const { featureDir, workspacePath, title, baseBranch } = payload as {
-      featureDir: string
-      workspacePath: string
-      title: string
-      baseBranch?: string
-    }
-    if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
-
-    try {
-      const state = await readPilotState(featureDir)
-      if (!state) return { error: 'No pilot state found' }
-      const worktreePath = state.worktreePath
-      if (!worktreePath) return { error: 'No worktree path in state' }
-
-      // Verify gh auth
-      const authCheck = await api.shell.exec({
-        command: 'gh',
-        args: ['auth', 'status'],
-        cwd: worktreePath,
-      })
-      if (authCheck.exitCode !== 0) return { error: 'gh auth not configured' }
-
-      // Build PR body with traceability block
-      const ticketUrl = state.ticket?.sourceUrl ?? ''
-      const specRelPath = path.relative(workspacePath, path.join(featureDir, 'spec.md'))
-      const planRelPath = path.relative(workspacePath, path.join(featureDir, 'plan.md'))
-      const prBody = [
-        `<!-- Ticket: ${ticketUrl} -->`,
-        `<!-- Spec: ${specRelPath} -->`,
-        `<!-- Plan: ${planRelPath} -->`,
-        '',
-        state.ticket ? `**Ticket:** [${state.ticket.key}](${ticketUrl})` : '',
-        `**Spec:** [${specRelPath}](${specRelPath})`,
-        `**Plan:** [${planRelPath}](${planRelPath})`,
-      ]
-        .filter(Boolean)
-        .join('\n')
-
-      const result = await api.shell.exec({
-        command: 'gh',
-        args: ['pr', 'create', '--title', title, '--body', prBody, '--base', baseBranch ?? 'main'],
-        cwd: worktreePath,
-      })
-
-      if (result.exitCode !== 0) return { error: result.stderr || 'gh pr create failed' }
-
-      const prUrl = result.stdout.trim()
-      state.prUrl = prUrl
-      await writePilotState(featureDir, state)
-      await appendHistory(featureDir, {
-        ts: new Date().toISOString(),
-        actor: 'user',
-        action: 'pr_opened',
-        phase: 'open-pr',
-        note: prUrl,
-      })
-
-      // Write back to the tracker, if the operator asked for it.
-      //
-      // Off by default now (FR-034a): this used to fire whenever the setting
-      // happened to be on, through an empty catch, so nobody — including us —
-      // could tell a comment that posted from one that never had.
-      if (state.settings.writeStatusBackOnPrOpen && state.ticket) {
-        const ticket = state.ticket
-        try {
-          await api.issues.comment(ticket.source, ticket.key, `PR opened: ${prUrl}`)
-        } catch (err) {
-          api.notifications.showToast(
-            'warning',
-            `PR opened, but could not comment on ${ticket.key}: ${String(err)}`,
-            'trackerWriteBackFailed'
-          )
-        }
-      }
-
-      // Remove worktree
-      await api.shell
-        .exec({
-          command: 'git',
-          args: ['worktree', 'remove', worktreePath, '--force'],
-          cwd: workspacePath,
-        })
-        .catch(() => {})
-
-      // Run completed — free the slot and start any queued card
-      state.run = state.run
-        ? { ...state.run, status: 'completed', completedAt: new Date().toISOString() }
-        : state.run
-      state.queuePosition = null
-      await writePilotState(featureDir, state)
-
-      api.window.broadcast('foundry:state-changed', { state })
-      await advanceQueue(api, workspacePath)
-      return { prUrl }
-    } catch (err) {
-      api.notifications.showToast('error', `Open PR failed: ${String(err)}`, 'openPrFailed')
-      return { error: String(err) }
-    }
-  })
-
   // speckit:checkin-decision — batch check-in: continue/pause/split
-  reg(api, 'foundry:checkin-decision', async (payload: unknown) => {
-    const { featureDir, decision, batchIndex } = payload as {
-      featureDir?: string
-      decision: 'continue' | 'pause' | 'split'
-      batchIndex?: number
-    }
-    if (!featureDir) return { error: 'featureDir required' }
-
-    try {
-      const handle = activeRunnerHandles.get(featureDir)
-      if (handle) {
-        handle.stop()
-        activeRunnerHandles.delete(featureDir)
-      }
-
-      const state = await readPilotState(featureDir)
-      if (!state) return { error: 'No pilot state found' }
-
-      if (decision === 'continue') {
-        const nextBatch = (batchIndex ?? 0) + 1
-        const worktreePath = await ensureWorktreePath(api, featureDir, state)
-        const runner = createAgentRunner(api)
-        const newHandle = runner.startPhaseRunner({
-          featureDir,
-          worktreePath,
-          phaseCommand: `Continue implementation batch ${nextBatch}`,
-          phase: 'implement',
-          batchIndex: nextBatch,
-          model: defaultModel(api),
-          ...makePhaseCallbacks(api, featureDir, 'implement', nextBatch),
-        })
-        activeRunnerHandles.set(featureDir, newHandle)
-        return { ok: true }
-      }
-
-      if (decision === 'pause') {
-        const ps = state.phases['implement']
-        if (ps) ps.batchIndex = batchIndex ?? null
-        await writePilotState(featureDir, state)
-        api.window.broadcast('foundry:state-changed', { state })
-        return { ok: true }
-      }
-
-      if (decision === 'split') {
-        const ps = state.phases['implement']
-        if (ps) {
-          ps.status = 'approved'
-          ps.batchIndex = batchIndex ?? null
-        }
-        await writePilotState(featureDir, state)
-        await appendHistory(featureDir, {
-          ts: new Date().toISOString(),
-          actor: 'user',
-          action: 'approved',
-          phase: 'implement',
-          note: `split at batch ${batchIndex}`,
-        })
-        api.window.broadcast('foundry:state-changed', { state })
-        return { ok: true }
-      }
-
-      return { error: 'Unknown decision' }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // speckit:self-review-read — read .pilot/self-review.json
   reg(api, 'foundry:self-review-read', async (payload: unknown) => {
     const { featureDir } = payload as { featureDir?: string }
@@ -2823,72 +1010,7 @@ export function activate(api: ExtensionAPI): void {
   })
 
   // speckit:phase-request-changes — store feedback, set phase to ready, re-run with note
-  reg(api, 'foundry:phase-request-changes', async (payload: unknown) => {
-    const { featureDir, phase, note } = payload as {
-      featureDir: string
-      phase: PhaseId
-      note: string
-    }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    try {
-      let state = await readPilotState(featureDir)
-      if (!state) state = createPilotState(featureDir)
-      const ps = state.phases[phase]
-      if (!ps) return { error: `Unknown phase: ${phase}` }
-      ps.feedback = note
-      ps.status = 'ready'
-      await writePilotState(featureDir, state)
-      await appendHistory(featureDir, {
-        ts: new Date().toISOString(),
-        actor: 'user',
-        action: 'request_changes',
-        phase,
-        note,
-      })
-      const worktreePath = await ensureWorktreePath(api, featureDir, state)
-      const runner = createAgentRunner(api)
-      const handle = runner.startPhaseRunner({
-        featureDir,
-        worktreePath,
-        phaseCommand: phaseCommandFor(phase, state.mode, cardTitleOf(state), worktreePath),
-        phase,
-        feedbackNote: note,
-        model: defaultModel(api),
-        ...makePhaseCallbacks(api, featureDir, phase),
-      })
-      activeRunnerHandles.set(featureDir, handle)
-      api.window.broadcast('foundry:state-changed', { state })
-      return { state }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // speckit:phase-comment — append an audit note without triggering re-run
-  reg(api, 'foundry:phase-comment', async (payload: unknown) => {
-    const { featureDir, phase, note } = payload as {
-      featureDir: string
-      phase: PhaseId
-      note: string
-    }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    try {
-      const state = await readPilotState(featureDir)
-      if (!state) return { error: 'No pilot state found' }
-      await appendHistory(featureDir, {
-        ts: new Date().toISOString(),
-        actor: 'user',
-        action: 'comment',
-        phase,
-        note,
-      })
-      api.window.broadcast('foundry:state-changed', { state })
-      return { ok: true, state }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // Track terminal sessions for the session-list IPC
   if (api.terminal?.onSessionCreate) {
     disposables.push(

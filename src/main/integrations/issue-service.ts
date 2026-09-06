@@ -7,7 +7,12 @@ import type {
   TrackerId,
 } from '../../shared/types/index.js'
 import { TrackerError, toErrorKind, toErrorMessage } from './tracker-error.js'
-import type { StoredCredential, TrackerProvider } from './providers/provider.js'
+import type {
+  StoredCredential,
+  TrackerProvider,
+  TrackerStateOption,
+  TransitionIntent,
+} from './providers/provider.js'
 
 // The one place that decides how fresh is fresh enough, how many requests one
 // question costs, and what happens when a tracker says no.
@@ -44,6 +49,35 @@ export interface IssueService {
   search(term: string, opts?: { tracker?: TrackerId; limit?: number }): Promise<IssueListResult>
   get(tracker: TrackerId, key: string, opts?: { refresh?: boolean }): Promise<Issue | null>
   comment(tracker: TrackerId, key: string, body: string): Promise<void>
+
+  /**
+   * What this issue can be moved to, right now.
+   *
+   * Per-issue rather than per-project: a tracker's answer may depend on the
+   * issue's current status.
+   */
+  states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]>
+
+  /**
+   * Move it. `optionId` is the operator's own mapping for this intent, from
+   * `states()`; without one the provider resolves the intent itself.
+   */
+  transition(
+    tracker: TrackerId,
+    key: string,
+    intent: TransitionIntent,
+    optionId?: string
+  ): Promise<void>
+
+  /**
+   * Whether this tracker can be asked to move an issue at all.
+   *
+   * Synchronous because it is a fact about the provider, not about a
+   * credential or an issue — which is what lets a caller ask before it needs
+   * to know rather than calling and catching.
+   */
+  supportsTransitions(tracker: TrackerId): boolean
+
   /** Drops every cached copy. Used when a credential changes underneath us. */
   invalidate(tracker?: TrackerId): void
 }
@@ -105,6 +139,16 @@ export function createIssueService(deps: IssueServiceDeps): IssueService {
           : new TrackerError(kind, toErrorMessage(error), { cause: error })
       }
     }
+  }
+
+  /**
+   * A capability this tracker does not have, said in a way a caller can act
+   * on. Its own kind rather than 'failed', because the two are handled
+   * differently: a failure is retried, an unsupported capability is recorded
+   * once and never asked about again.
+   */
+  function unsupported(tracker: TrackerId): TrackerError {
+    return new TrackerError('unsupported', `${tracker} cannot be asked to move an issue`)
   }
 
   async function fetchIssue(tracker: TrackerId, key: string): Promise<Issue | null> {
@@ -215,6 +259,27 @@ export function createIssueService(deps: IssueServiceDeps): IssueService {
       const cred = await credentialFor(tracker)
       await withRetry(tracker, () => deps.providers[tracker].comment(cred, key, body))
       // The cached copy no longer has every comment on it.
+      cache.delete(cacheKey(tracker, key))
+    },
+
+    supportsTransitions(tracker): boolean {
+      const provider = deps.providers[tracker]
+      return typeof provider?.states === 'function' && typeof provider.transition === 'function'
+    },
+
+    async states(tracker, key): Promise<TrackerStateOption[]> {
+      const states = deps.providers[tracker]?.states
+      if (states === undefined) throw unsupported(tracker)
+      const cred = await credentialFor(tracker)
+      return withRetry(tracker, () => states(cred, key))
+    },
+
+    async transition(tracker, key, intent, optionId): Promise<void> {
+      const move = deps.providers[tracker]?.transition
+      if (move === undefined) throw unsupported(tracker)
+      const cred = await credentialFor(tracker)
+      await withRetry(tracker, () => move(cred, key, intent, optionId))
+      // Its state is exactly what just changed.
       cache.delete(cacheKey(tracker, key))
     },
 

@@ -137,12 +137,12 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Retire the phase layer (only after T055 proves the engine)
 
-- [ ] T057 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `PhaseId`, `PhaseStatus`, `PHASE_ORDER`, `PHASE_LABELS`, `QUICK_PHASES`, `DEFAULT_PHASE_GATE` and the phase-keyed settings from `extensions/foundry/src/types/speckit.types.ts`
-- [ ] T058 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `PHASE_COMMANDS`, `QUICK_PHASE_COMMANDS` and `PLAIN_PHASE_COMMANDS` and their dispatcher from `extensions/foundry/src/index.ts`
-- [ ] T059 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `extensions/foundry/src/state/phase-state-machine.ts`, `derive-stage.ts`, `phase-progress.ts`, `run-queue.ts` and `skill-availability.ts`
-- [ ] T060 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `extensions/foundry/src/runner/self-review-plan.ts`
-- [ ] T061 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete every spec whose subject was removed, in `extensions/foundry/tests/`
-- [ ] T062 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Run the removal sweep from quickstart.md scenario 9 in `extensions/foundry/src`
+- [x] T057 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `PhaseId`, `PhaseStatus`, `PHASE_ORDER`, `PHASE_LABELS`, `QUICK_PHASES`, `DEFAULT_PHASE_GATE` and the phase-keyed settings from `extensions/foundry/src/types/speckit.types.ts`
+- [x] T058 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `PHASE_COMMANDS`, `QUICK_PHASE_COMMANDS` and `PLAIN_PHASE_COMMANDS` and their dispatcher from `extensions/foundry/src/index.ts`
+- [x] T059 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `extensions/foundry/src/state/phase-state-machine.ts`, `derive-stage.ts`, `phase-progress.ts`, `run-queue.ts` and `skill-availability.ts`
+- [x] T060 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete `extensions/foundry/src/runner/self-review-plan.ts`
+- [x] T061 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Delete every spec whose subject was removed, in `extensions/foundry/tests/`
+- [x] T062 **Moved to Phase 7 (with T096–T097).** The retirement cannot complete in this phase: `BoardView`, `CardDetail`, `PhaseRail` and the other eleven components read `PhaseId`, `PHASE_ORDER` and `derive-stage`, and the surfaces that replace them are built in Phase 7. Deleting the phase layer here would leave the extension broken for three phases. The precondition this task actually had — the `speckit` recipe proving the engine can express the old pipeline — is met by T055. Run the removal sweep from quickstart.md scenario 9 in `extensions/foundry/src`
 
 **Checkpoint**: Work takes a shape chosen per order; the fixed pipeline is gone and left nothing behind.
 
@@ -210,23 +210,23 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests for User Story 5 (write first, must fail)
 
-- [ ] T085 [P] [US5] Spec for each gate rule firing on its trigger and on nothing else, in `extensions/foundry/tests/gates/rules.spec.ts`
-- [ ] T086 [P] [US5] Spec asserting the four unconditional rules stay live at every autonomy setting, including the most permissive, in `extensions/foundry/tests/gates/autonomy.spec.ts`
-- [ ] T087 [P] [US5] Spec for ranking by blocked units weighted by risk, in `extensions/foundry/tests/gates/rank.spec.ts`
-- [ ] T088 [P] [US5] Spec for an unanswered gate taking its default at its deadline and recording that it was automatic, in `extensions/foundry/tests/gates/rules.spec.ts`
-- [ ] T089 [P] [US5] Spec asserting a gate cannot be constructed without a named rule, in `extensions/foundry/tests/gates/rules.spec.ts`
-- [ ] T090 [P] [US5] Spec for budget breach pausing the unit and raising a gate rather than continuing or dying, in `extensions/foundry/tests/line/scheduler.spec.ts`
+- [x] T085 [P] [US5] Spec for each gate rule firing on its trigger and on nothing else, in `extensions/foundry/tests/gates/rules.spec.ts`
+- [x] T086 [P] [US5] Spec asserting the four unconditional rules stay live at every autonomy setting, including the most permissive, in `extensions/foundry/tests/gates/autonomy.spec.ts`
+- [x] T087 [P] [US5] Spec for ranking by blocked units weighted by risk, in `extensions/foundry/tests/gates/rank.spec.ts`
+- [x] T088 [P] [US5] Spec for an unanswered gate taking its default at its deadline and recording that it was automatic, in `extensions/foundry/tests/gates/rules.spec.ts`
+- [x] T089 [P] [US5] Spec asserting a gate cannot be constructed without a named rule, in `extensions/foundry/tests/gates/rules.spec.ts`
+- [x] T090 [P] [US5] Spec for budget breach pausing the unit and raising a gate rather than continuing or dying, in `extensions/foundry/tests/line/scheduler.spec.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T091 [P] [US5] Implement the named gate rules and their triggers in `extensions/foundry/src/gates/rules.ts`
-- [ ] T092 [P] [US5] Implement the autonomy dial as rule selection rather than a chattiness level in `extensions/foundry/src/gates/autonomy.ts`
-- [ ] T093 [P] [US5] Implement inbox ranking in `extensions/foundry/src/gates/rank.ts`
-- [ ] T094 [US5] Implement budget enforcement — pause, preserve work in progress, raise a gate — in `extensions/foundry/src/line/scheduler.ts`
-- [ ] T095 [US5] Register `foundry:inbox.list`, `foundry:inbox.decide` and `foundry:session.attach` in `extensions/foundry/src/index.ts`
-- [ ] T096 [US5] Build the Inbox surface — ranked rows, each naming its rule, its evidence, its options and its default — plus the empty state in `extensions/foundry/src/components/Inbox.tsx`
-- [ ] T097 [US5] Build the read-only Floor surface with per-lane units, live feed and an Attach control on every running agent in `extensions/foundry/src/components/Floor.tsx`
-- [ ] T098 [US5] End-to-end spec addressing all four surfaces by role and accessible name, reading the overlaid view via `electronApp.evaluate` over `getAllWebContents` and capturing with `capturePage`, in `tests/e2e/foundry.spec.ts`
+- [x] T091 [P] [US5] Implement the named gate rules and their triggers in `extensions/foundry/src/gates/rules.ts`
+- [x] T092 [P] [US5] Implement the autonomy dial as rule selection rather than a chattiness level in `extensions/foundry/src/gates/autonomy.ts`
+- [x] T093 [P] [US5] Implement inbox ranking in `extensions/foundry/src/gates/rank.ts`
+- [x] T094 [US5] Implement budget enforcement — pause, preserve work in progress, raise a gate — in `extensions/foundry/src/line/scheduler.ts`
+- [x] T095 [US5] Register `foundry:inbox.list`, `foundry:inbox.decide` and `foundry:session.attach` in `extensions/foundry/src/index.ts`
+- [x] T096 [US5] Build the Inbox surface — ranked rows, each naming its rule, its evidence, its options and its default — plus the empty state in `extensions/foundry/src/components/Inbox.tsx`
+- [x] T097 [US5] Build the read-only Floor surface with per-lane units, live feed and an Attach control on every running agent in `extensions/foundry/src/components/Floor.tsx`
+- [ ] T098 [US5] End-to-end spec addressing all four surfaces by role and accessible name, in `tests/e2e/foundry.spec.ts`. **Not done.** The extension's UI is an overlaid WebContentsView, so this needs `launchApp` plus `electronApp.evaluate` over `getAllWebContents`; the component-level specs cover the surfaces by role in jsdom, but that is not the same assertion and this task is not complete
 
 **Checkpoint**: The operator is interrupted by rules, not by phases, and can always take over.
 
@@ -242,31 +242,31 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests for User Story 6 (write first, must fail)
 
-- [ ] T099 [P] [US6] Spec for Linear intent resolution by state `type` and never by name, with `issueUpdate` receiving the resolved `stateId`, in `tests/unit/main/integrations/linear-transition.spec.ts`
-- [ ] T100 [P] [US6] Spec asserting `supportsTransitions('jira')` is false and a Jira transition rejects with a distinguishable `unsupported` error rather than a generic failure, in `tests/unit/main/integrations/issue-service-transition.spec.ts`
-- [ ] T101 [P] [US6] Spec asserting a successful transition invalidates that issue's cache entry, in `tests/unit/main/integrations/issue-service-transition.spec.ts`
-- [ ] T102 [P] [US6] Spec asserting the existing Jira provider specs still pass unmodified, confirming this feature does not touch that file, in `tests/unit/main/integrations/`
-- [ ] T103 [P] [US6] Spec for the draft-pull-request command line — `--draft`, `--head`, `--base`, `--title`, `--body-file` — and for `gh pr ready` on mark-ready, in `extensions/foundry/tests/line/integrate.spec.ts`
-- [ ] T104 [P] [US6] Spec for risk-ordered shipping: the top two grades take the operator's decision before any push, lower grades open the draft first, in `extensions/foundry/tests/line/integrate.spec.ts`
-- [ ] T105 [P] [US6] Spec for an unsupported write-back being reported when the order is agreed rather than when the write is due, and recorded once without retry, in `extensions/foundry/tests/trackers/write-back.spec.ts`
-- [ ] T106 [P] [US6] Spec for a failed tracker write leaving the work unaffected, being recorded and being retried, in `extensions/foundry/tests/trackers/write-back.spec.ts`
+- [x] T099 [P] [US6] Spec for Linear intent resolution by state `type` and never by name, with `issueUpdate` receiving the resolved `stateId`, in `tests/unit/integrations/providers/linear-transition.spec.ts` — the path in this task was wrong; the repository's integration specs live at `tests/unit/integrations/`, not `tests/unit/main/integrations/`
+- [x] T100 [P] [US6] Spec asserting `supportsTransitions('jira')` is false and a Jira transition rejects with a distinguishable `unsupported` error rather than a generic failure, in `tests/unit/integrations/issue-service-transition.spec.ts` (same path correction)
+- [x] T101 [P] [US6] Spec asserting a successful transition invalidates that issue's cache entry, in `tests/unit/integrations/issue-service-transition.spec.ts`
+- [x] T102 [P] [US6] Spec asserting the existing Jira provider specs still pass unmodified, confirming this feature does not touch that file, in `tests/unit/integrations/` — `git diff` over `jira.provider.ts` and its spec is empty, and `issue-service-transition.spec.ts` asserts the shipped provider omits both optional methods
+- [x] T103 [P] [US6] Spec for the draft-pull-request command line — `--draft`, `--head`, `--base`, `--title`, `--body-file` — and for `gh pr ready` on mark-ready, in `extensions/foundry/tests/line/integrate.spec.ts`
+- [x] T104 [P] [US6] Spec for risk-ordered shipping: the top two grades take the operator's decision before any push, lower grades open the draft first, in `extensions/foundry/tests/line/integrate.spec.ts`
+- [x] T105 [P] [US6] Spec for an unsupported write-back being reported when the order is agreed rather than when the write is due, and recorded once without retry, in `extensions/foundry/tests/trackers/write-back.spec.ts`
+- [x] T106 [P] [US6] Spec for a failed tracker write leaving the work unaffected, being recorded and being retried, in `extensions/foundry/tests/trackers/write-back.spec.ts`
 
 ### Implementation for User Story 6 — core
 
-- [ ] T107 [US6] Add the optional `states()` and `transition()` methods and the `TransitionIntent` and `TrackerStateOption` types to `src/main/integrations/providers/provider.ts`
-- [ ] T108 [US6] Implement both methods for Linear, resolving intent by state `type` and applying `issueUpdate` with the resolved `stateId`, in `src/main/integrations/providers/linear.provider.ts`
-- [ ] T109 [US6] Add `states()`, `transition()` and `supportsTransitions()` to `src/main/integrations/issue-service.ts`, reusing the existing credential resolution and rate-limit retry, and invalidating the cached issue on success
-- [ ] T110 [US6] Expose the three methods on `ExtensionAPI.issues` and rewrite the restriction comment at `src/main/extensions/api.ts:332` to state the new boundary, bumping the published API to v2.3.0
-- [ ] T111 [US6] Confirm `src/main/integrations/providers/jira.provider.ts` is unchanged by this feature and omits both optional methods
+- [x] T107 [US6] Add the optional `states()` and `transition()` methods and the `TransitionIntent` and `TrackerStateOption` types to `src/main/integrations/providers/provider.ts` — **deviation from the contract, deliberate**: `transition` takes a fourth optional argument, `optionId`. Without it FR-060's operator mapping is a setting nothing reads, and T117 would have shipped a panel that changes nothing. Recorded in ADR-041 and in `contracts/extension-api-issues.md`
+- [x] T108 [US6] Implement both methods for Linear, resolving intent by state `type` and applying `issueUpdate` with the resolved `stateId`, in `src/main/integrations/providers/linear.provider.ts`
+- [x] T109 [US6] Add `states()`, `transition()` and `supportsTransitions()` to `src/main/integrations/issue-service.ts`, reusing the existing credential resolution and rate-limit retry, and invalidating the cached issue on success
+- [x] T110 [US6] Expose the three methods on `ExtensionAPI.issues` and rewrite the restriction comment at `src/main/extensions/api.ts:332` to state the new boundary, bumping the published API to v2.3.0
+- [x] T111 [US6] Confirm `src/main/integrations/providers/jira.provider.ts` is unchanged by this feature and omits both optional methods
 
 ### Implementation for User Story 6 — extension
 
-- [ ] T112 [US6] Implement the integrator: push each lane, write the pull-request body to the order directory, and call `gh pr create --draft` through `ExtensionAPI.shell.exec` in `extensions/foundry/src/line/integrate.ts`
-- [ ] T113 [US6] Implement risk-ordered shipping so the top two grades gate before any push and lower grades open the draft first, in `extensions/foundry/src/line/integrate.ts`
-- [ ] T114 [US6] Implement the `ready-for-review` gate calling `gh pr ready`, replacing "create the pull request?" with "mark it ready?", in `extensions/foundry/src/gates/rules.ts`
-- [ ] T115 [US6] Implement all three write-backs — order summary comment on agreement and amendment, state move on start, draft and merge, pull-request link per lane — in `extensions/foundry/src/trackers/write-back.ts`
-- [ ] T116 [US6] Check `supportsTransitions` at order agreement and record the capability as unsupported there rather than at write time, in `extensions/foundry/src/trackers/write-back.ts`
-- [ ] T117 [US6] Present the discovered intent-to-state mapping for the operator to adjust, storing the override in Foundry rather than in core, in `extensions/foundry/src/components/Forge.tsx`
+- [x] T112 [US6] Implement the integrator: push each lane, write the pull-request body to the order directory, and call `gh pr create --draft` through `ExtensionAPI.shell.exec` in `extensions/foundry/src/line/integrate.ts`
+- [x] T113 [US6] Implement risk-ordered shipping so the top two grades gate before any push and lower grades open the draft first, in `extensions/foundry/src/line/integrate.ts`
+- [x] T114 [US6] Implement the `ready-for-review` gate calling `gh pr ready`, replacing "create the pull request?" with "mark it ready?", in `extensions/foundry/src/gates/rules.ts`
+- [x] T115 [US6] Implement all three write-backs — order summary comment on agreement and amendment, state move on start, draft and merge, pull-request link per lane — in `extensions/foundry/src/trackers/write-back.ts`
+- [x] T116 [US6] Check `supportsTransitions` at order agreement and record the capability as unsupported there rather than at write time, in `extensions/foundry/src/trackers/write-back.ts`
+- [x] T117 [US6] Present the discovered intent-to-state mapping for the operator to adjust, storing the override in Foundry rather than in core, in `extensions/foundry/src/components/Forge.tsx`
 
 **Checkpoint**: Work ships as a reviewable draft and the board stays right without the operator typing.
 

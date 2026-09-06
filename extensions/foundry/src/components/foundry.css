@@ -3288,6 +3288,28 @@
   color: var(--tm-text-secondary);
 }
 
+/* One intent per row: what it means, and which state it maps to. */
+.fdry-map {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-map select {
+  flex: 0 1 55%;
+  min-width: 0;
+  padding: 4px 6px;
+  font: inherit;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
 .fdry-doc {
   background: var(--tm-bg-card);
   border: 1px solid var(--tm-border);
@@ -3650,4 +3672,315 @@
   font-size: 11.5px;
   color: var(--tm-text-secondary);
   white-space: nowrap;
+}
+
+/* ─── Foundry: the inbox ─────────────────────────────────────────
+   Severity reads as a stripe and a position, never as a coloured
+   icon — icons stay flat and inherit currentColor. */
+
+.fdry-nothing {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-nothing svg {
+  width: 22px;
+  height: 22px;
+  opacity: 0.6;
+}
+
+.fdry-nothing p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-nothing small {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fdry-gate {
+  display: grid;
+  grid-template-columns: 3px 1fr auto;
+  gap: 0 14px;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+
+.fdry-gate-stripe {
+  background: var(--tm-text-muted);
+}
+
+.fdry-gate.is-p0 .fdry-gate-stripe {
+  background: var(--tm-danger);
+}
+
+.fdry-gate.is-warn .fdry-gate-stripe {
+  background: var(--tm-warning);
+}
+
+.fdry-gate.is-ok .fdry-gate-stripe {
+  background: var(--tm-success);
+}
+
+.fdry-gate.is-info .fdry-gate-stripe {
+  background: var(--tm-accent);
+}
+
+.fdry-gate-main {
+  padding: 11px 0 11px 2px;
+  min-width: 0;
+}
+
+.fdry-gate-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.fdry-gate-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-gate-rule {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-accent);
+  background: var(--tm-bg-elevated);
+  padding: 1px 7px;
+  border-radius: var(--tm-radius-xs);
+}
+
+.fdry-gate-head b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fdry-gate-why {
+  margin: 0;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+}
+
+.fdry-gate-meta {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-gate-meta span {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  padding: 1px 7px;
+}
+
+.fdry-gate-default {
+  border-style: dashed !important;
+}
+
+.fdry-gate-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 12px 11px 0;
+}
+
+.fdry-gate-actions button {
+  appearance: none;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fdry-gate-actions button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-queue-foot {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tm-border);
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-queue-foot b {
+  color: var(--tm-text-secondary);
+}
+
+/* ─── Foundry: the floor ─────────────────────────────────────────── */
+
+.fdry-lane {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-lane:last-of-type {
+  border-bottom: 0;
+}
+
+.fdry-lane-name {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-lane-name b {
+  display: block;
+  color: var(--tm-text-secondary);
+  font-weight: 500;
+}
+
+.fdry-units {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fdry-unit {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+}
+
+.fdry-unit::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tm-text-muted);
+  flex: none;
+}
+
+.fdry-unit u {
+  text-decoration: none;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-unit.is-passed::before {
+  background: var(--tm-success);
+}
+
+.fdry-unit.is-running::before,
+.fdry-unit.is-verifying::before {
+  background: var(--tm-accent);
+}
+
+.fdry-unit.is-failed::before {
+  background: var(--tm-danger);
+}
+
+.fdry-unit.is-blocked,
+.fdry-unit.is-skipped {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.fdry-unit-attach {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+}
+
+.fdry-unit-attach svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ─── Foundry: settings ──────────────────────────────────────────── */
+
+.fdry-settings {
+  padding: 16px;
+  color: var(--tm-text-primary);
+  max-width: 620px;
+}
+
+.fdry-models {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fdry-models button {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  padding: 9px 12px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fdry-models button.is-on {
+  border-color: var(--tm-accent);
+}
+
+.fdry-models b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.fdry-models small {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
 }

@@ -19,12 +19,49 @@ export interface FakeLinearIssue {
   assignee: Promise<{ name: string; email: string } | null>
   labels: () => Promise<{ nodes: { name: string }[] }>
   comments: () => Promise<{ nodes: FakeLinearComment[] }>
+  team?: Promise<FakeLinearTeam | null>
 }
 
 export interface FakeLinearComment {
   body: string
   createdAt: string
   user: Promise<{ name: string } | null>
+}
+
+/** One row of a team's workflow, as `team.states()` returns it. */
+export interface FakeLinearState {
+  id: string
+  name: string
+  type: string
+  position: number
+}
+
+export interface FakeLinearTeam {
+  id: string
+  states: () => Promise<{ nodes: FakeLinearState[] }>
+}
+
+/**
+ * A team whose workflow has two `started` states, which is the shape that
+ * makes intent resolution interesting: Linear has no review type, so "In
+ * Review" is only distinguishable from "In Progress" by where it sits.
+ */
+export function makeTeam(over: Partial<FakeLinearTeam> = {}): FakeLinearTeam {
+  return {
+    id: 'team-tav',
+    states: () =>
+      Promise.resolve({
+        nodes: [
+          { id: 'st-backlog', name: 'Backlog', type: 'backlog', position: 0 },
+          { id: 'st-todo', name: 'Todo', type: 'unstarted', position: 1 },
+          { id: 'st-progress', name: 'In Progress', type: 'started', position: 2 },
+          { id: 'st-review', name: 'In Review', type: 'started', position: 3 },
+          { id: 'st-done', name: 'Done', type: 'completed', position: 4 },
+          { id: 'st-cancelled', name: 'Cancelled', type: 'canceled', position: 5 },
+        ],
+      }),
+    ...over,
+  }
 }
 
 export const VIEWER = { name: 'Andrew', email: 'andrew.tavares87@gmail.com' }
@@ -52,6 +89,7 @@ export function makeIssue(over: Partial<FakeLinearIssue> = {}): FakeLinearIssue 
     assignee: Promise.resolve({ name: 'Andrew', email: 'andrew.tavares87@gmail.com' }),
     labels: () => Promise.resolve({ nodes: [{ name: 'Improvement' }] }),
     comments: () => Promise.resolve({ nodes: [makeComment()] }),
+    team: Promise.resolve(makeTeam()),
     ...over,
   }
 }

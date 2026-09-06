@@ -40,6 +40,23 @@ Two independent reasons, and the first stands even though only one provider impl
 
 So `setState(stateId)` could never be implemented for Jira, and matching on state name is wrong for both — Linear's own guidance says use `type`, and Jira workflows are renamed freely. The Jira detail is recorded here not because it is being built, but because it is the evidence that the signature must not be Linear-shaped.
 
+## Amendment, 2026-09-06 (during implementation)
+
+`transition` takes a fourth, optional argument: `optionId`, one of the ids
+`states()` returned.
+
+The contract as first written could not satisfy its own caller obligation 4.
+It said the operator's intent-to-state mapping is stored by Foundry, and it
+gave Foundry no way to apply it: `transition(tracker, key, intent)` carries the
+intent and nothing else, so the provider's own resolution always wins and the
+stored override changes nothing. That would have shipped a mapping panel that
+does not map — a setting wired to nothing, which reads as working.
+
+`optionId` is the narrowest fix. Absent, the provider resolves the intent
+itself, which is the common path. Present, it is used, and an id this workflow
+does not have is refused rather than fallen back on: moving an issue somewhere
+the operator did not choose is worse than not moving it.
+
 ## The addition
 
 ### `TrackerProvider` (`src/main/integrations/providers/provider.ts`)
@@ -73,17 +90,23 @@ interface TrackerProvider {
   states?(cred: StoredCredential, key: string): Promise<TrackerStateOption[]>
 
   /**
-   * Move the issue. Resolves the intent against `states()` and applies it.
-   * Rejects when no available option satisfies the intent — the caller decides
+   * Move the issue. Resolves the intent against `states()` and applies it,
+   * unless `optionId` names one of those options — the operator's own mapping.
+   * Rejects when nothing available satisfies the intent — the caller decides
    * whether that matters.
    */
-  transition?(cred: StoredCredential, key: string, intent: TransitionIntent): Promise<void>
+  transition?(
+    cred: StoredCredential,
+    key: string,
+    intent: TransitionIntent,
+    optionId?: string
+  ): Promise<void>
 }
 ```
 
 **Implemented by**: `linear.provider.ts`. **Omitted by**: `jira.provider.ts`, which is unchanged by this feature.
 
-**Linear implementation**: `states()` reads the issue's team states and maps Linear's `type` — `unstarted`/`backlog` → null, `started` → `started`, `completed` → `done` — with `in_review` matched against a `started` state whose name the operator has mapped, since Linear has no distinct review type. `transition()` calls `issueUpdate` with the resolved `stateId`.
+**Linear implementation** (as built): `states()` reads the issue's team states and maps Linear's `type` — `backlog`/`unstarted`/`canceled` → null, `completed` → `done` — and resolves the two started intents by the tracker's own ordering rather than by name: the first `started` state by `position` is `started`, and the last `started` state is `in_review` **when there is more than one**. A workflow with a single started state offers no review position at all, and the intent resolves to nothing rather than to something approximate. The operator's override, when they set one, is passed as `optionId` and wins. `transition()` calls `issueUpdate(id, { stateId })` with the resolved state, addressing the issue by its UUID.
 
 **Jira**: not implemented. The shape above is what a future Jira implementation would satisfy — `states()` a direct read of the transitions endpoint, `available` true for whatever it returns and false by omission; `transition()` posting the resolved transition id — recorded so that adding it later is a filled-in optional method rather than a redesign.
 
@@ -93,7 +116,12 @@ Three methods, wrapped in the existing credential resolution and rate-limit retr
 
 ```typescript
 states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]>
-transition(tracker: TrackerId, key: string, intent: TransitionIntent): Promise<void>
+transition(
+  tracker: TrackerId,
+  key: string,
+  intent: TransitionIntent,
+  optionId?: string
+): Promise<void>
 /** Whether this tracker can be asked to move an issue at all. Synchronous: it is a provider fact. */
 supportsTransitions(tracker: TrackerId): boolean
 ```
@@ -110,7 +138,12 @@ issues: {
   states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]>
 
   /** Move it. Rejects when no available option satisfies the intent. */
-  transition(tracker: TrackerId, key: string, intent: TransitionIntent): Promise<void>
+  transition(
+    tracker: TrackerId,
+    key: string,
+    intent: TransitionIntent,
+    optionId?: string
+  ): Promise<void>
 
   /** Whether this tracker supports being moved at all. Ask before you need to know. */
   supportsTransitions(tracker: TrackerId): boolean

@@ -345,3 +345,216 @@ describe('channel edge cases', () => {
     expect(r.order.id).toBeTruthy()
   })
 })
+
+// The write-back seams. Everything below builds its own channel set, because
+// what is being asserted is what the seams are handed and when.
+
+const NOW = '2026-09-06T10:00:00.000Z'
+
+/** An order that will pass all six checks, so `commit: true` actually agrees. */
+async function agreeable(): Promise<WorkOrder> {
+  const seed = (await channels().create({
+    source: { kind: 'typed', text: 'rows are clipped at the right edge' },
+    repoPaths: [repo],
+  })) as OrderView
+  const done: WorkOrder = {
+    ...seed.order,
+    id: 'WO-1',
+    // Seeded as typed and then pointed at an issue, because seeding from a
+    // tracker needs a reader and what is under test here is the write-back.
+    source: {
+      kind: 'tracker',
+      tracker: 'linear',
+      key: 'TAV-42',
+      url: 'https://linear.app/tav/issue/TAV-42',
+    },
+    intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
+    risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    acceptance: [
+      {
+        id: 'AC-1',
+        statement: 'a full-width row renders its final glyph',
+        priority: 'P1',
+        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+        unverifiable: null,
+      },
+    ],
+    plan: {
+      ...seed.order.plan,
+      units: [
+        {
+          id: 'U-1',
+          title: 'widen',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: ['src/a.css'],
+          verify: [],
+        },
+      ],
+    },
+    redTeam: seed.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
+  }
+  return done
+}
+
+describe('the capability check at agreement (FR-059a)', () => {
+  it('asks what the tracker can do when the order is agreed, not when a write is due', async () => {
+    const capability = vi.fn(async () => ({
+      transitions: 'unsupported' as const,
+      states: [],
+      unreachable: [],
+    }))
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels({ store, now: () => NOW, capability })
+
+    const result = (await channels.compile({ id: 'WO-1', commit: true })) as {
+      capability?: { transitions: string }
+    }
+    expect(capability).toHaveBeenCalled()
+    expect(result.capability?.transitions).toBe('unsupported')
+  })
+
+  it('asks nothing when the order is only being checked, not handed off', async () => {
+    const capability = vi.fn(async () => ({
+      transitions: 'supported' as const,
+      states: [],
+      unreachable: [],
+    }))
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels({ store, now: () => NOW, capability })
+
+    await channels.compile({ id: 'WO-1', commit: false })
+    expect(capability).not.toHaveBeenCalled()
+  })
+
+  it('agrees the order even when the tracker cannot be reached', async () => {
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels({
+      store,
+      now: () => NOW,
+      capability: async () => Promise.reject(new Error('offline')),
+    })
+
+    const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
+    expect(result.order.status).toBe('agreed')
+  })
+
+  it('agrees the order even when the summary comment fails', async () => {
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels({
+      store,
+      now: () => NOW,
+      onAgreed: async () => Promise.reject(new Error('rate limited')),
+    })
+
+    const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
+    expect(result.order.status).toBe('agreed')
+    expect((await store.load('WO-1'))?.status).toBe('agreed')
+  })
+
+  it('writes the agreed order back to the issue', async () => {
+    const onAgreed = vi.fn(async () => undefined)
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    await createForgeChannels({ store, now: () => NOW, onAgreed }).compile({
+      id: 'WO-1',
+      commit: true,
+    })
+    expect(onAgreed).toHaveBeenCalledWith(expect.objectContaining({ status: 'agreed' }))
+  })
+})
+
+describe('the intent-to-state mapping (FR-060)', () => {
+  it('offers the tracker states and the mapping as it stands', async () => {
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels({
+      store,
+      now: () => NOW,
+      capability: async () => ({
+        transitions: 'supported' as const,
+        states: [
+          { id: 'st-review', name: 'In Review', intent: 'in_review' as const, available: true },
+        ],
+        unreachable: [],
+      }),
+    })
+
+    const result = (await channels.states({ id: 'WO-1' })) as {
+      capability: { states: { id: string }[] }
+      mapping: Record<string, string | null>
+    }
+    expect(result.capability.states[0].id).toBe('st-review')
+    expect(result.mapping.in_review).toBeNull()
+  })
+
+  it('reports no issue when the host has no tracker connection at all', async () => {
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const result = (await createForgeChannels({ store, now: () => NOW }).states({
+      id: 'WO-1',
+    })) as { capability: { transitions: string } }
+    expect(result.capability.transitions).toBe('no_issue')
+  })
+
+  it('reports the tracker own failure rather than pretending it has no states', async () => {
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const result = (await createForgeChannels({
+      store,
+      now: () => NOW,
+      capability: async () => Promise.reject(new Error('offline')),
+    }).states({ id: 'WO-1' })) as { error: string }
+    expect(result.error).toBe('offline')
+  })
+
+  it('stores the operator override and keeps it', async () => {
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels({ store, now: () => NOW })
+
+    await channels.mapState({ id: 'WO-1', intent: 'in_review', optionId: 'st-progress' })
+    expect((await store.load('WO-1'))?.stateMapping.in_review).toBe('st-progress')
+  })
+
+  it('puts an intent back to whatever the tracker resolves', async () => {
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels({ store, now: () => NOW })
+
+    await channels.mapState({ id: 'WO-1', intent: 'done', optionId: 'st-done' })
+    await channels.mapState({ id: 'WO-1', intent: 'done', optionId: null })
+    expect((await store.load('WO-1'))?.stateMapping.done).toBeNull()
+  })
+
+  it('refuses an intent that is not one of the three', async () => {
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    expect(
+      await createForgeChannels({ store, now: () => NOW }).mapState({
+        id: 'WO-1',
+        intent: 'shipped',
+        optionId: 'x',
+      })
+    ).toEqual({ error: 'Malformed request.' })
+  })
+
+  it('reports an order it cannot find', async () => {
+    const channels = createForgeChannels({ store: createOrderStore(root), now: () => NOW })
+    expect(await channels.mapState({ id: 'WO-nope', intent: 'done', optionId: null })).toEqual({
+      error: 'No order WO-nope.',
+    })
+    expect(await channels.states({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
+  })
+
+  it('rejects a malformed states request', async () => {
+    const channels = createForgeChannels({ store: createOrderStore(root), now: () => NOW })
+    expect(await channels.states({ nope: true })).toEqual({ error: 'Malformed request.' })
+  })
+})

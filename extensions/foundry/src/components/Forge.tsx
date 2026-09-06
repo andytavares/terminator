@@ -5,6 +5,8 @@ import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
 import { surfacedQuestions } from '../forge/interview.js'
 import { liveAssumptions } from '../forge/assumptions.js'
+import type { StateMapping, TransitionIntent } from '../order/schema.js'
+import type { CapabilityReport } from '../trackers/write-back.js'
 
 // The Forge.
 //
@@ -18,6 +20,21 @@ export interface OrderView {
   compile: CompileResult
   changed?: string[]
   unavailableChecks?: string[]
+}
+
+interface StatesView {
+  capability?: CapabilityReport
+  mapping?: StateMapping
+  error?: string
+}
+
+const INTENTS: readonly TransitionIntent[] = ['started', 'in_review', 'done']
+
+/** What each intent means in plain terms — the tracker's words are its own. */
+const INTENT_LABELS: Record<TransitionIntent, string> = {
+  started: 'When work starts',
+  in_review: 'When the draft opens',
+  done: 'When it merges',
 }
 
 const CHECK_LABELS: Record<CheckId, string> = {
@@ -45,6 +62,7 @@ export function Forge({ orderId, onAttach }: ForgeProps): JSX.Element {
   const [view, setView] = useState<OrderView | null>(null)
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
+  const [states, setStates] = useState<StatesView | null>(null)
 
   const refresh = useCallback(async () => {
     const next = (await invoke('foundry:order.compile', { id: orderId, commit: false })) as
@@ -57,6 +75,32 @@ export function Forge({ orderId, onAttach }: ForgeProps): JSX.Element {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  // Read once, not on every redraw: this is a request to the tracker, and
+  // polling it would spend the operator's rate limit on a panel that does not
+  // change.
+  useEffect(() => {
+    let live = true
+    void (async () => {
+      const next = (await invoke('foundry:order.states', { id: orderId })) as StatesView
+      if (live) setStates(next)
+    })()
+    return () => {
+      live = false
+    }
+  }, [orderId])
+
+  const mapIntent = useCallback(
+    async (intent: TransitionIntent, optionId: string | null) => {
+      const next = (await invoke('foundry:order.mapState', { id: orderId, intent, optionId })) as {
+        mapping?: StateMapping
+      }
+      if (next.mapping !== undefined) {
+        setStates((current) => (current === null ? current : { ...current, mapping: next.mapping }))
+      }
+    },
+    [orderId]
+  )
 
   const turn = useCallback(
     async (payload: Record<string, unknown>) => {
@@ -156,6 +200,50 @@ export function Forge({ orderId, onAttach }: ForgeProps): JSX.Element {
                 </div>
               </div>
             ))}
+          </section>
+        ) : null}
+
+        {states?.capability !== undefined && states.capability.transitions !== 'no_issue' ? (
+          <section className="fdry-panel">
+            <h2 className="fdry-panel-h">Tracker write-back</h2>
+            {states.capability.transitions === 'unsupported' ? (
+              <p className="fdry-note">
+                {order.source.tracker} cannot be asked to move an issue, so {order.source.key} will
+                not change state. The summary comment and the pull request links still go across.
+              </p>
+            ) : (
+              <>
+                <p className="fdry-note">
+                  Which of {order.source.tracker}&rsquo;s own states each moment means. Left alone,
+                  the tracker resolves it.
+                </p>
+                {INTENTS.map((intent) => (
+                  <label key={intent} className="fdry-map">
+                    <span>{INTENT_LABELS[intent]}</span>
+                    <select
+                      value={states.mapping?.[intent] ?? ''}
+                      onChange={(event) =>
+                        void mapIntent(
+                          intent,
+                          event.target.value === '' ? null : event.target.value
+                        )
+                      }
+                    >
+                      <option value="">
+                        {states.capability?.unreachable.includes(intent) === true
+                          ? 'nowhere to go — skipped'
+                          : 'let the tracker decide'}
+                      </option>
+                      {states.capability?.states.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </>
+            )}
           </section>
         ) : null}
 

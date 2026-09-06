@@ -138,7 +138,9 @@ import type {
   TrackerConnection,
   TrackerId,
 } from '../../shared/types/index.js'
+import type { TrackerStateOption, TransitionIntent } from '../integrations/providers/provider.js'
 export type { Issue, IssueLink, IssueListResult, IssueSummary, TrackerConnection, TrackerId }
+export type { TrackerStateOption, TransitionIntent }
 
 export interface PtyManagerAPI {
   /** @deprecated since v1.4.0 — use spawnSession() plus onData()/onExit(). */
@@ -325,9 +327,14 @@ export interface ExtensionAPI {
    * Issue trackers, through the application's single connection (v2.2.0).
    *
    * An extension never holds a tracker credential and never contacts a tracker
-   * itself — it asks here, the same way it asks for a shell or a PTY. There is
-   * deliberately no way to create or edit an issue, or to change any field of
-   * one: `comment` is the only write, and FR-034 says so.
+   * itself — it asks here, the same way it asks for a shell or a PTY.
+   *
+   * Two writes, and only two: a comment, and the issue's own position in its
+   * own workflow (v2.3.0, ADR-041). There is deliberately no way to create an
+   * issue, to delete one, or to change any other field of one — not the
+   * title, not the assignee, not a label. `transition` is narrow by
+   * construction: it takes an intent, not a field, and an intent the tracker
+   * cannot satisfy is refused rather than approximated.
    */
   issues: {
     /** Connected trackers and whose account each credential proved to be. Never a secret. */
@@ -340,6 +347,31 @@ export interface ExtensionAPI {
     get(tracker: TrackerId, key: string, opts?: { refresh?: boolean }): Promise<Issue | null>
     /** Comment on an issue. Rejects on failure — it must not be swallowed. */
     comment(tracker: TrackerId, key: string, body: string): Promise<void>
+    /**
+     * What this issue can be moved to (v2.3.0). Per-issue: a tracker's answer
+     * may depend on the issue's current status.
+     */
+    states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]>
+    /**
+     * Move it (v2.3.0). `optionId` is the operator's own mapping for this
+     * intent, taken from `states()`; without one the tracker resolves the
+     * intent itself. Rejects when nothing available satisfies it.
+     */
+    transition(
+      tracker: TrackerId,
+      key: string,
+      intent: TransitionIntent,
+      optionId?: string
+    ): Promise<void>
+    /**
+     * Whether this tracker supports being moved at all (v2.3.0).
+     *
+     * Ask before you need to know. Synchronous, because it is a fact about
+     * the tracker rather than about an issue — an extension that has to call
+     * and catch to find out has already committed to a plan that may not
+     * work.
+     */
+    supportsTransitions(tracker: TrackerId): boolean
     /** The issue attached to a project, or null. Synchronous: it is local state. */
     linkFor(projectId: string): IssueLink | null
     /** Fires when any project's link is set, replaced, cleared or garbage-collected. */
@@ -904,6 +936,22 @@ export function createExtensionAPI(
         // Deliberately not caught here: an extension that swallows a failed
         // write is exactly the defect this feature exists to remove.
         await getIssueService().comment(tracker, key, body)
+      },
+      async states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]> {
+        return getIssueService().states(tracker, key)
+      },
+      async transition(
+        tracker: TrackerId,
+        key: string,
+        intent: TransitionIntent,
+        optionId?: string
+      ): Promise<void> {
+        // Uncaught for the same reason as comment: the caller decides whether
+        // a refused move matters, and it cannot decide what it never hears.
+        await getIssueService().transition(tracker, key, intent, optionId)
+      },
+      supportsTransitions(tracker: TrackerId): boolean {
+        return getIssueService().supportsTransitions(tracker)
       },
       linkFor(projectId: string): IssueLink | null {
         return getIssueLink(projectId)

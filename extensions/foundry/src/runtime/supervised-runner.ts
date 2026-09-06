@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
-import type { PhaseId } from '../types/speckit.types.js'
 import { buildLaunchSpec, shellQuote } from './claude-launch.js'
 import { installHookScript } from './hook-script.js'
 import type { ControlServer } from './control-server.js'
@@ -13,6 +12,14 @@ import {
 } from './permission-bridge.js'
 import { countTurns } from './transcript-tailer.js'
 import type { WatchedRun } from './stall-watcher.js'
+
+/**
+ * Which step of the run this is — a run-graph node id.
+ *
+ * It was one of ten fixed phase names. It is a string now because the shape of
+ * work is chosen per order, so the set of steps is not knowable here.
+ */
+export type StepLabel = string
 
 // Running a phase where the operator can see it.
 //
@@ -47,7 +54,7 @@ export interface StartSupervisedRunOptions {
   branch: string
   /** What to tell the agent: a `/speckit-*` command, or a reply to it. */
   prompt: string
-  phase: PhaseId
+  phase: StepLabel
   /** Resume an existing conversation rather than starting one. */
   resumeSessionId?: string
   /** What `--model` gets. Empty or absent leaves the flag off entirely. */
@@ -106,7 +113,7 @@ export interface SupervisedRunner {
    */
   continueRun(
     sessionId: string,
-    options: { prompt: string; phase: PhaseId } & PhaseCallbacks
+    options: { prompt: string; phase: StepLabel } & PhaseCallbacks
   ): SupervisedRun | null
   /** The card's open conversation, if it still has one. */
   liveSessionFor(featureDir: string): string | null
@@ -180,7 +187,7 @@ interface Running {
    * those closures captured before this record existed — a permission raised
    * during `plan` must not be reported against `specify`.
    */
-  readonly phase: { current: PhaseCallbacks & { id: PhaseId } }
+  readonly phase: { current: PhaseCallbacks & { id: StepLabel } }
 }
 
 export interface SupervisedRunnerOptions {

@@ -9,9 +9,9 @@ import type { CheckName } from '../verify/toolchain-probe.js'
 //
 // An unmet requirement means the recipe is **not offered**, with the reason
 // available — never silently rewritten into something else. That silent
-// rewrite is what `PLAIN_PHASE_COMMANDS` does today, and it is one of the
-// things this feature exists to delete: a pipeline that quietly becomes a
-// different pipeline is a pipeline you cannot reason about.
+// rewrite is what the retired plain-prose fallback table did: a pipeline that
+// quietly becomes a different pipeline is one you cannot reason about, and
+// deleting it was half the point of this feature.
 
 export interface RequirementCheck {
   readonly met: boolean

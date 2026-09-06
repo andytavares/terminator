@@ -21,6 +21,7 @@ import type { WorkOrder } from '../order/schema.js'
 
 const StartPayload = z.object({ id: z.string(), recipe: z.string().optional() })
 const ObservePayload = z.object({ id: z.string() })
+const AttachPayload = z.object({ orderId: z.string(), nodeId: z.string() })
 
 export interface RunDeps {
   readonly store: OrderStore
@@ -34,6 +35,8 @@ export interface RunChannels {
   observe(payload: unknown): Promise<unknown>
   /** Which shapes of work this order could actually take, and why not. */
   recipes(payload: unknown): Promise<unknown>
+  /** The live session behind a running agent, so a surface can go to it. */
+  attach(payload: unknown): Promise<unknown>
 }
 
 function graphPath(dataRoot: string, orderId: string): string {
@@ -170,5 +173,27 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return { recipes: offered, proposed: proposeRecipe(order) }
   }
 
-  return { start, observe, recipes }
+  /**
+   * Where the agent actually is.
+   *
+   * The backstop: however good the structured view gets, there are moments
+   * when the only useful thing is to be in the session typing at it. One
+   * action, from any surface.
+   */
+  async function attach(raw: unknown): Promise<unknown> {
+    const parsed = AttachPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const graph = await loadGraph(parsed.data.orderId)
+    if (graph === null) return { error: `No run for ${parsed.data.orderId}.` }
+
+    const node = graph.nodes.find((n) => n.id === parsed.data.nodeId)
+    if (node === undefined) return { error: `No step ${parsed.data.nodeId}.` }
+    if (node.sessionId === null) {
+      return { error: `${node.id} has no session yet — it is ${node.state}.` }
+    }
+    return { terminalSessionId: node.sessionId, nodeId: node.id }
+  }
+
+  return { start, observe, recipes, attach }
 }

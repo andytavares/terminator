@@ -251,3 +251,79 @@ describe('the records location', () => {
     expect((await store.load('WO-1'))?.status).toBe('agreed')
   })
 })
+
+describe('attaching to a running agent', () => {
+  it('returns the live session behind a node', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    // The scheduler stamps a session when it starts a node; simulate that.
+    const graphPath = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+    const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8')) as {
+      nodes: { id: string; sessionId: string | null }[]
+    }
+    graph.nodes[0].sessionId = 'sess-42'
+    fs.writeFileSync(graphPath, JSON.stringify(graph))
+
+    const r = (await channels().attach({ orderId: 'WO-1', nodeId: graph.nodes[0].id })) as {
+      terminalSessionId: string
+    }
+    expect(r.terminalSessionId).toBe('sess-42')
+  })
+
+  it('says why rather than pretending, when a node has no session yet', async () => {
+    await store.save(order())
+    const started = (await channels().start({ id: 'WO-1' })) as {
+      graph: { nodes: { id: string }[] }
+    }
+    const r = (await channels().attach({
+      orderId: 'WO-1',
+      nodeId: started.graph.nodes[0].id,
+    })) as { error: string }
+    expect(r.error).toMatch(/no session yet/)
+  })
+
+  it('reports a node that is not in the run', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().attach({ orderId: 'WO-1', nodeId: 'nope' })) as { error: string }
+    expect(r.error).toBe('No step nope.')
+  })
+
+  it('reports an order with no run', async () => {
+    const r = (await channels().attach({ orderId: 'WO-nope', nodeId: 'x' })) as { error: string }
+    expect(r.error).toBe('No run for WO-nope.')
+  })
+
+  it('rejects a malformed request', async () => {
+    expect(await channels().attach({ nope: true })).toEqual({ error: 'Malformed request.' })
+  })
+})
+
+describe('offering shapes of work', () => {
+  it('rejects a malformed request', async () => {
+    expect(await channels().recipes({ nope: true })).toEqual({ error: 'Malformed request.' })
+  })
+
+  it('reports an order it cannot find', async () => {
+    expect(await channels().recipes({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
+  })
+
+  it('marks a malformed operator recipe as unavailable rather than hiding it', async () => {
+    await store.save(order())
+    fs.mkdirSync(path.join(dataRoot, 'recipes'), { recursive: true })
+    fs.writeFileSync(path.join(dataRoot, 'recipes', 'broken.yaml'), 'id: [unclosed\n')
+    const r = (await channels().recipes({ id: 'WO-1' })) as {
+      recipes: { name: string; available: boolean }[]
+    }
+    expect(r.recipes.find((x) => x.name === 'broken')?.available).toBe(false)
+  })
+
+  it('observes with the order own budgets rather than a guessed default', async () => {
+    await store.save(
+      order({ budgets: { agents: 1, wallClockMinutes: 5, filesTouched: 2, tokens: null } })
+    )
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as { ready: string[] }
+    expect(r.ready.length).toBeLessThanOrEqual(2)
+  })
+})

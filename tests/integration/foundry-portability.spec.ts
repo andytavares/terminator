@@ -49,7 +49,13 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  for (const dir of [repo, dataRoot]) fs.rmSync(dir, { recursive: true, force: true })
+  // `maxRetries` because removing a git working tree on macOS intermittently
+  // reports ENOTEMPTY while the filesystem catches up. Node retries the
+  // unlink itself; without it this teardown is flaky rather than the test
+  // being wrong.
+  for (const dir of [repo, dataRoot]) {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
+  }
 })
 
 describe('Foundry in a repository it has never seen', () => {

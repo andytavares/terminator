@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Plus, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Forge } from './Forge.js'
+import { Floor } from './Floor.js'
 
 // The way into the Forge: what orders exist, and a way to seed another.
 //
@@ -63,6 +64,7 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
   }, [idea, repoRoot, refresh])
 
   if (open !== null) {
+    const running = rows.find((row) => row.id === open)?.status === 'running'
     return (
       <div className="fdry-shell">
         <button
@@ -75,7 +77,9 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
         >
           All orders
         </button>
-        <Forge orderId={open} />
+        {/* An order that is running is watched on the Floor; one that is still
+            being agreed is worked on in the Forge. */}
+        {running ? <Floor orderId={open} /> : <Forge orderId={open} />}
       </div>
     )
   }

@@ -187,6 +187,21 @@ const RedTeamFindingSchema = z
     message: 'An accepted red-team finding must carry the reason it was accepted.',
   })
 
+/**
+ * Which of the tracker's own states each intent means, when the operator has
+ * said (FR-060).
+ *
+ * Stored here rather than in core: "in review" is not a fact about a tracker,
+ * it is a decision about which of their states means that, and it is the
+ * operator's decision. Null is "let the tracker resolve it", which is the
+ * right default and not the same as an empty string.
+ */
+const StateMappingSchema = z.object({
+  started: z.string().nullable().default(null),
+  in_review: z.string().nullable().default(null),
+  done: z.string().nullable().default(null),
+})
+
 const ProvenanceSchema = z.object({
   forgeSession: z.string().nullable().default(null),
   decisions: z.array(z.string()).default([]),
@@ -200,6 +215,7 @@ export const WorkOrderSchema = z.object({
   status: z.enum(['draft', 'agreed', 'running', 'shipped', 'cancelled']),
   source: SourceSchema,
   writeBack: z.array(WriteBackSchema).default([]),
+  stateMapping: StateMappingSchema.default({ started: null, in_review: null, done: null }),
   recipe: z.string().nullable().default(null),
   recipeOverriddenBy: z.literal('operator').nullable().default(null),
   intent: IntentSchema,
@@ -228,6 +244,8 @@ export type Assumption = z.infer<typeof AssumptionSchema>
 export type OpenQuestion = z.infer<typeof OpenQuestionSchema>
 export type RedTeamFinding = z.infer<typeof RedTeamFindingSchema>
 export type WriteBack = z.infer<typeof WriteBackSchema>
+export type StateMapping = z.infer<typeof StateMappingSchema>
+export type TransitionIntent = z.infer<typeof TransitionIntentSchema>
 
 /**
  * Read an order, or refuse it.
@@ -285,6 +303,7 @@ export function draftOrder(input: DraftOrderInput): WorkOrder {
     status: 'draft',
     source: input.source,
     writeBack: [],
+    stateMapping: { started: null, in_review: null, done: null },
     recipe: null,
     recipeOverriddenBy: null,
     intent: { problem: '', outcome: '', nonGoals: [] },

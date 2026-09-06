@@ -6,7 +6,9 @@ import { strikeAssumption } from '../forge/assumptions.js'
 import { applyFindings } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
-import type { WorkOrder } from '../order/schema.js'
+import { TransitionIntentSchema } from '../order/schema.js'
+import type { TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
+import type { CapabilityReport } from '../trackers/write-back.js'
 
 // The Forge's three channels.
 //
@@ -35,10 +37,31 @@ const TurnPayload = z.object({
 
 const CompilePayload = z.object({ id: z.string(), commit: z.boolean().default(false) })
 
+const MapStatePayload = z.object({
+  id: z.string(),
+  intent: TransitionIntentSchema,
+  // Null puts the intent back to whatever the tracker resolves it to.
+  optionId: z.string().nullable(),
+})
+
+const StatesPayload = z.object({ id: z.string() })
+
 export interface ForgeDeps {
   readonly store: OrderStore
   readonly now: () => string
   readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
+  /** Which write-backs a new order starts with (FR-062), from configuration. */
+  readonly writeBackDefault?: readonly WriteBack[]
+  /**
+   * What the source tracker can be asked to do, and the states it offers.
+   *
+   * Consulted when the order is agreed rather than when a write is due
+   * (FR-059a): an order whose issue will never move is something the operator
+   * should know before the run, not find in the ledger afterwards.
+   */
+  readonly capability?: (order: WorkOrder) => Promise<CapabilityReport>
+  /** The agreement write-back. Its failure never fails the agreement. */
+  readonly onAgreed?: (order: WorkOrder) => Promise<void>
 }
 
 export interface ForgeChannels {
@@ -46,6 +69,10 @@ export interface ForgeChannels {
   turn(payload: unknown): Promise<unknown>
   compile(payload: unknown): Promise<unknown>
   list(): Promise<unknown>
+  /** The candidate states, for the operator to map intents against. */
+  states(payload: unknown): Promise<unknown>
+  /** Record which state one intent means for this order. */
+  mapState(payload: unknown): Promise<unknown>
 }
 
 /** The order plus its checks — what every Forge channel hands back. */
@@ -92,7 +119,10 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     // The adversarial pass runs on the first draft, not only at the end: a
     // finding the operator sees now is cheaper than one that reopens an order
     // they thought was settled.
-    const attacked = applyFindings(seeded.order, deps.now())
+    const attacked = applyFindings(
+      { ...seeded.order, writeBack: [...(deps.writeBackDefault ?? [])] },
+      deps.now()
+    )
     await deps.store.save(attacked)
     await deps.store.record({
       at: deps.now(),
@@ -178,7 +208,69 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       reason: 'all six checks pass',
       evidence: [],
     })
-    return { compile: compileOrder(agreed.order), order: agreed.order }
+
+    // Both of these are about the tracker, and neither may unmake an
+    // agreement that has already been recorded (FR-063).
+    let capability: CapabilityReport | undefined
+    try {
+      capability = await deps.capability?.(agreed.order)
+    } catch {
+      capability = undefined
+    }
+    try {
+      await deps.onAgreed?.(agreed.order)
+    } catch {
+      // Recorded by the write-back itself; the order is agreed regardless.
+    }
+
+    return { compile: compileOrder(agreed.order), order: agreed.order, capability }
+  }
+
+  /**
+   * What the tracker offers, for the mapping panel.
+   *
+   * Its own channel rather than part of `compile` because compile is polled
+   * and this is a network read: asking the tracker every time the document
+   * redraws would spend the operator's rate limit on nothing.
+   */
+  async function states(raw: unknown): Promise<unknown> {
+    const parsed = StatesPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    const order = await deps.store.load(parsed.data.id)
+    if (order === null) return { error: `No order ${parsed.data.id}.` }
+    if (deps.capability === undefined) {
+      return { capability: { transitions: 'no_issue', states: [], unreachable: [] } }
+    }
+    try {
+      return { capability: await deps.capability(order), mapping: order.stateMapping }
+    } catch (error) {
+      return { error: (error as Error).message }
+    }
+  }
+
+  async function mapState(raw: unknown): Promise<unknown> {
+    const parsed = MapStatePayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    const { id, intent, optionId } = parsed.data
+
+    const order = await deps.store.load(id)
+    if (order === null) return { error: `No order ${id}.` }
+
+    const next: WorkOrder = {
+      ...order,
+      stateMapping: { ...order.stateMapping, [intent as TransitionIntent]: optionId },
+    }
+    await deps.store.save(next)
+    await deps.store.record({
+      at: deps.now(),
+      orderId: id,
+      actor: 'operator',
+      action: 'writeback.mapped',
+      subject: intent,
+      reason: optionId === null ? 'back to whatever the tracker resolves' : optionId,
+      evidence: [],
+    })
+    return { ok: true, mapping: next.stateMapping }
   }
 
   /** Every order, newest first, each with where its checks stand. */
@@ -196,5 +288,5 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     }
   }
 
-  return { create, turn, compile, list }
+  return { create, turn, compile, list, states, mapState }
 }
