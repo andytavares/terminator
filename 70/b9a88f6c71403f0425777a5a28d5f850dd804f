@@ -1,0 +1,54 @@
+extensions/foundry/rules/patch-coverage.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-11
+extensions/foundry/rules/reachability.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-10
+extensions/foundry/rules/render-not-call.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-10
+extensions/foundry/rules/exit-code-not-count.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-10
+extensions/foundry/tests/verify/inspection-triggers.spec.ts
+  s_357c91d2b54b02::t_0641dbd0bd9aa5 1-128
+specs/037-foundry-software-factory/tasks.md
+  s_357c91d2b54b02::t_affbee5fd4ef1f 159-165,169-175
+extensions/foundry/rules/every-consumer.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-10
+extensions/foundry/src/verify/rules.ts
+  s_357c91d2b54b02::t_b083bd0d324b88 1-82
+extensions/foundry/rules/no-stubs.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-10
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_357c91d2b54b02::t_9f0babe6ca42d6 1-257
+extensions/foundry/src/verify/verdict.ts
+  s_357c91d2b54b02::t_6ea7a907ea10eb 1-159
+extensions/foundry/rules/docs-in-pr.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-10
+extensions/foundry/tests/verify/verdict.spec.ts
+  s_357c91d2b54b02::t_428b75c66cf7f2 1-229
+extensions/foundry/rules/screenshot-the-app.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-11
+extensions/foundry/src/verify/inspection-triggers.ts
+  s_357c91d2b54b02::t_5e0f126160efa0 1-97
+  s_357c91d2b54b02::t_07aa6589a11f18 98-100
+extensions/foundry/src/verify/ladder.ts
+  s_357c91d2b54b02::t_e5a80d2d41b074 1-205
+extensions/foundry/rules/delete-unreachable.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-10
+extensions/foundry/rules/flat-icons.yaml
+  s_357c91d2b54b02::t_109abafa1b7df0 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "70b9a88f6c71403f0425777a5a28d5f850dd804f",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
