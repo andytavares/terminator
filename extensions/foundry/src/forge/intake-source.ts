@@ -41,6 +41,15 @@ export interface SeedDeps {
     tracker: 'linear' | 'jira',
     key: string
   ) => { id: string; title: string } | null
+  /**
+   * What was already decided about these files (FR-077).
+   *
+   * Read before the operator is asked anything, like everything else in
+   * Scout's pack: a question the record could have answered is a defect in
+   * intake rather than a question. Absent, and an empty answer, both mean
+   * "nothing on file" — which is the common case and costs nothing.
+   */
+  readonly priorArtFor?: (paths: readonly string[]) => Promise<string[]>
 }
 
 export type SeedInput =
@@ -51,6 +60,18 @@ export type SeedResult =
   | { order: WorkOrder; unavailableChecks: CheckName[] }
   | { existing: { id: string; title: string } }
   | { error: string }
+
+/**
+ * File paths named in a sentence.
+ *
+ * Deliberately crude — something with a slash and an extension. An idea that
+ * names no file gets no prior art, which is better than a fuzzy match that
+ * dredges up decisions about something else and presents them as relevant.
+ */
+export function pathsNamedIn(text: string): string[] {
+  const matches = text.match(/[A-Za-z0-9_.@/-]+\.[A-Za-z0-9]{1,6}\b/g) ?? []
+  return [...new Set(matches.filter((token) => token.includes('/')))]
+}
 
 /** Whatever the repository says about itself. Absence is a normal answer. */
 export function houseDocsIn(repoPath: string): string[] {
@@ -121,10 +142,23 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
   const toolchain = probeToolchain(input.repoPaths[0])
   const houseDocs = input.repoPaths.flatMap((repoPath) => houseDocsIn(repoPath))
 
+  // What was already decided about the files this idea names. A failure to
+  // read the record is not a failure to seed an order: the draft is what the
+  // operator asked for, and prior art is a courtesy on top of it.
+  const named = pathsNamedIn(problem)
+  let priorArt: string[] = []
+  if (named.length > 0) {
+    try {
+      priorArt = [...((await deps.priorArtFor?.(named)) ?? [])]
+    } catch {
+      priorArt = []
+    }
+  }
+
   const seeded: WorkOrder = {
     ...order,
     intent: { ...order.intent, problem },
-    context: { ...order.context, toolchain, houseDocs },
+    context: { ...order.context, toolchain, houseDocs, priorArt },
     plan: {
       ...order.plan,
       // The tracker's own branch name where there is one, rather than an

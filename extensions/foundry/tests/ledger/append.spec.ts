@@ -132,3 +132,61 @@ describe('queryEntries', () => {
     expect(r[0].subject).toBe('U-1')
   })
 })
+
+describe('every decision is attributable (FR-078)', () => {
+  it('keeps all four of who, what, about what and why', async () => {
+    await appendEntry(
+      file,
+      entry({
+        actor: 'operator',
+        action: 'gate.decided',
+        subject: 'G-1',
+        reason: 'risk.p0 -> send_back: the token comparison is not constant time',
+      })
+    )
+    const [written] = await readEntries(file)
+    expect(written).toMatchObject({
+      actor: 'operator',
+      action: 'gate.decided',
+      subject: 'G-1',
+      reason: 'risk.p0 -> send_back: the token comparison is not constant time',
+    })
+  })
+
+  it('distinguishes a decision the operator took from one a rule took', async () => {
+    await appendEntry(file, entry({ actor: 'operator', subject: 'G-1' }))
+    await appendEntry(file, entry({ actor: 'rule:budget.exceeded', subject: 'G-2' }))
+    await appendEntry(file, entry({ actor: 'role:verifier', subject: 'G-3' }))
+
+    const actors = (await readEntries(file)).map((e) => e.actor)
+    expect(actors).toEqual(['operator', 'rule:budget.exceeded', 'role:verifier'])
+  })
+
+  it('carries the evidence a decision was taken on', async () => {
+    await appendEntry(
+      file,
+      entry({
+        evidence: [
+          { kind: 'exit_code', exitCode: 1 },
+          { kind: 'diff', path: 'src/a.ts' },
+        ],
+      })
+    )
+    const [written] = await readEntries(file)
+    expect(written.evidence).toHaveLength(2)
+    expect(written.evidence[0]).toMatchObject({ kind: 'exit_code', exitCode: 1 })
+  })
+
+  it('accepts an entry with no reason but keeps the field, so the gap is visible', async () => {
+    // A reason is not structurally required — the curator skips what has none
+    // rather than the ledger refusing to record that something happened.
+    await appendEntry(file, entry({ reason: '' }))
+    expect((await readEntries(file))[0].reason).toBe('')
+  })
+
+  it('keeps the order every entry belongs to, so one order can be read alone', async () => {
+    await appendEntry(file, entry({ orderId: 'WO-1', subject: 'a' }))
+    await appendEntry(file, entry({ orderId: 'WO-2', subject: 'b' }))
+    expect((await queryEntries(file, { orderId: 'WO-2' })).map((e) => e.subject)).toEqual(['b'])
+  })
+})

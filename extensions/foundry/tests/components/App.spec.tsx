@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { App } from '../../src/renderer/App.js'
 
-// Two surfaces and a way into settings. The board, the card drawer, the phase
+// Three surfaces and a way into settings. The board, the card drawer, the phase
 // rail and the ticket importer are gone with the pipeline underneath them, so
 // what is left to assert here is small — which is the point.
 
@@ -13,6 +13,9 @@ const mockBridgeInvoke = vi.fn(async (channel: string) => {
   if (channel === 'foundry:order.list') return { orders: [] }
   if (channel === 'foundry:models-list') {
     return { models: [{ id: '', label: 'Inherit', floating: true }], selected: '' }
+  }
+  if (channel === 'foundry:ledger.query') {
+    return { entries: [], total: 0, actors: [], actions: [], orders: [] }
   }
   if (channel === 'foundry:inbox.list') {
     return {
@@ -85,6 +88,28 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     await waitFor(() => screen.getByRole('button', { name: /back/i }))
     bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
+    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+  })
+})
+
+describe('the Ledger surface', () => {
+  it('is reachable from its own tab', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
+    await waitFor(() => expect(screen.getByText('Nothing recorded yet.')).toBeTruthy())
+  })
+
+  it('is not home — the inbox is', async () => {
+    render(<App />)
+    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('comes back to the inbox', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
+    await waitFor(() => screen.getByText('Nothing recorded yet.'))
+    fireEvent.click(screen.getByRole('button', { name: 'Inbox' }))
     await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
   })
 })

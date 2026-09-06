@@ -2,20 +2,28 @@ import React, { useEffect, useState } from 'react'
 import { Settings, ArrowLeft } from 'lucide-react'
 import { Inbox } from '../components/Inbox.js'
 import { Orders } from '../components/Orders.js'
+import { Ledger } from '../components/Ledger.js'
 import { SettingsView } from '../components/SettingsView.js'
 
-// Two surfaces, and a way into settings.
+// Three surfaces, and a way into settings.
 //
 // The inbox is home because it is the one surface the operator is required to
 // visit: everything a rule raises reaches them there, ranked by how much work
 // it unblocks. The Forge is where an idea becomes an agreed order, and where
-// an order that is already running is watched.
+// an order that is already running is watched. The Ledger is the record, and
+// the only place the factory ever argues back — on request.
 //
 // What used to be here — a board, a card drawer, a phase rail, a new-card
 // dialog and a ticket importer — went with the pipeline underneath it. A board
 // is a place to notice things; an inbox is a place things come to.
 
-type Surface = 'inbox' | 'forge'
+type Surface = 'inbox' | 'forge' | 'ledger'
+
+const SURFACES: readonly { id: Surface; label: string }[] = [
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'forge', label: 'Forge' },
+  { id: 'ledger', label: 'Ledger' },
+]
 
 export function App(): JSX.Element {
   const [repoRoot, setRepoRoot] = useState<string | null>(
@@ -38,22 +46,17 @@ export function App(): JSX.Element {
       <header className="sk-appbar">
         <span className="sk-appbar__title">Foundry</span>
         <nav className="fdry-tabs" aria-label="Foundry surfaces">
-          <button
-            type="button"
-            className={surface === 'inbox' ? 'is-on' : ''}
-            aria-pressed={surface === 'inbox'}
-            onClick={() => setSurface('inbox')}
-          >
-            Inbox
-          </button>
-          <button
-            type="button"
-            className={surface === 'forge' ? 'is-on' : ''}
-            aria-pressed={surface === 'forge'}
-            onClick={() => setSurface('forge')}
-          >
-            Forge
-          </button>
+          {SURFACES.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={surface === tab.id ? 'is-on' : ''}
+              aria-pressed={surface === tab.id}
+              onClick={() => setSurface(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </nav>
         <button
           aria-label="Settings"
@@ -75,6 +78,8 @@ export function App(): JSX.Element {
           </div>
         ) : surface === 'inbox' ? (
           <Inbox />
+        ) : surface === 'ledger' ? (
+          <Ledger />
         ) : (
           <Orders repoRoot={repoRoot} />
         )}

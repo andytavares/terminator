@@ -52,6 +52,8 @@ export interface ForgeDeps {
   readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
   /** Which write-backs a new order starts with (FR-062), from configuration. */
   readonly writeBackDefault?: readonly WriteBack[]
+  /** Past decisions about the files a new idea names (FR-077). */
+  readonly priorArtFor?: (paths: readonly string[]) => Promise<string[]>
   /**
    * What the source tracker can be asked to do, and the states it offers.
    *
@@ -100,6 +102,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       now: deps.now,
       newId: () => newOrderId(new Date(deps.now())),
       readIssue: deps.readIssue,
+      priorArtFor: deps.priorArtFor,
       existingOrderFor: () => null,
     })
 

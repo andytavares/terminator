@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { seedOrder, houseDocsIn, newOrderId } from '../../src/forge/intake-source.js'
+import { seedOrder, houseDocsIn, newOrderId, pathsNamedIn } from '../../src/forge/intake-source.js'
 import type { SeedDeps } from '../../src/forge/intake-source.js'
 
 // Scout runs before the operator is asked anything (FR-002). By the time a
@@ -199,5 +199,65 @@ describe('newOrderId', () => {
   it('is shaped so it sorts by date and cannot collide by accident', () => {
     const id = newOrderId(new Date('2026-09-13T00:00:00Z'), () => 0.5)
     expect(id).toMatch(/^WO-0913-[0-9a-f]{3}$/)
+  })
+})
+
+const NOW = '2026-09-06T10:00:00.000Z'
+
+describe('prior art (FR-077)', () => {
+  it('names the files an idea mentions', () => {
+    expect(pathsNamedIn('the timeout in src/auth/session.ts is hardcoded')).toEqual([
+      'src/auth/session.ts',
+    ])
+  })
+
+  it('names nothing for an idea with no file in it', () => {
+    expect(pathsNamedIn('the login is slow')).toEqual([])
+  })
+
+  it('ignores a bare word with a dot but no path', () => {
+    expect(pathsNamedIn('it fails on node.js')).toEqual([])
+  })
+
+  it('asks the record about those files, before any question could be asked', async () => {
+    const priorArtFor = vi.fn(async () => ['2026-08-01 operator: review.rejected — no'])
+    const result = await seedOrder(
+      { kind: 'typed', text: 'the timeout in src/auth/session.ts is hardcoded', repoPaths: [repo] },
+      { now: () => NOW, newId: () => 'WO-1', priorArtFor }
+    )
+    expect(priorArtFor).toHaveBeenCalledWith(['src/auth/session.ts'])
+    expect('order' in result && result.order.context.priorArt).toEqual([
+      '2026-08-01 operator: review.rejected — no',
+    ])
+  })
+
+  it('asks nothing when the idea names no file', async () => {
+    const priorArtFor = vi.fn(async () => [])
+    await seedOrder(
+      { kind: 'typed', text: 'the login is slow', repoPaths: [repo] },
+      { now: () => NOW, newId: () => 'WO-1', priorArtFor }
+    )
+    expect(priorArtFor).not.toHaveBeenCalled()
+  })
+
+  it('seeds the order anyway when the record cannot be read', async () => {
+    const result = await seedOrder(
+      { kind: 'typed', text: 'src/a.ts is wrong', repoPaths: [repo] },
+      {
+        now: () => NOW,
+        newId: () => 'WO-1',
+        priorArtFor: async () => Promise.reject(new Error('unreadable')),
+      }
+    )
+    expect('order' in result).toBe(true)
+    expect('order' in result && result.order.context.priorArt).toEqual([])
+  })
+
+  it('carries no prior art when nothing supplies it', async () => {
+    const result = await seedOrder(
+      { kind: 'typed', text: 'src/a.ts is wrong', repoPaths: [repo] },
+      { now: () => NOW, newId: () => 'WO-1' }
+    )
+    expect('order' in result && result.order.context.priorArt).toEqual([])
   })
 })

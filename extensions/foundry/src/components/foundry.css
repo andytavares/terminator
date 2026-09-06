@@ -3288,6 +3288,92 @@
   color: var(--tm-text-secondary);
 }
 
+/* The record. Read-only apart from one button. */
+.fdry-ledger-bar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.fdry-ledger-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-ledger-bar select {
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
+.fdry-propose {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fdry-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.fdry-ledger th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--tm-text-secondary);
+  border-bottom: 1px solid var(--tm-border);
+  padding: 6px 10px 6px 0;
+  white-space: nowrap;
+}
+
+.fdry-ledger td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--tm-border);
+  vertical-align: top;
+}
+
+/* Who decided is the column the eye goes to, so it is the one that is chipped. */
+.fdry-actor {
+  padding: 1px 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  white-space: nowrap;
+}
+
+.fdry-actor.is-operator {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent-text);
+}
+
+.fdry-proposal {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-citations {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-proposal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 /* Merge order: one repository per row, in the order they land. */
 .fdry-merge {
   margin: 0;

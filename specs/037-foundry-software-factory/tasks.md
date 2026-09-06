@@ -304,18 +304,18 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 
 ### Tests for User Story 8 (write first, must fail)
 
-- [ ] T126 [P] [US8] Spec asserting every operator and rule decision is appended with actor, action, subject and reason, in `extensions/foundry/tests/ledger/append.spec.ts`
-- [ ] T127 [P] [US8] Spec for the curator detecting repeated rejections and citing the specific ledger entries each proposal derives from, in `extensions/foundry/tests/ledger/curator.spec.ts`
-- [ ] T128 [P] [US8] Spec asserting no proposal is produced unprompted, in `extensions/foundry/tests/ledger/curator.spec.ts`
-- [ ] T129 [P] [US8] Spec asserting an accepted rule applies to later work with `origin: curator:<ids>`, a rejected one is never proposed again, and removal is recorded, in `extensions/foundry/tests/verify/rules.spec.ts`
+- [x] T126 [P] [US8] Spec asserting every operator and rule decision is appended with actor, action, subject and reason, in `extensions/foundry/tests/ledger/append.spec.ts`
+- [x] T127 [P] [US8] Spec for the curator detecting repeated rejections and citing the specific ledger entries each proposal derives from, in `extensions/foundry/tests/ledger/curator.spec.ts`
+- [x] T128 [P] [US8] Spec asserting no proposal is produced unprompted, in `extensions/foundry/tests/ledger/curator.spec.ts`
+- [x] T129 [P] [US8] Spec asserting an accepted rule applies to later work with `origin: curator:<ids>`, a rejected one is never proposed again, and removal is recorded, in `extensions/foundry/tests/verify/rules.spec.ts`
 
 ### Implementation for User Story 8
 
-- [ ] T130 [US8] Implement repetition detection and proposal generation with citations in `extensions/foundry/src/ledger/curator.ts`
-- [ ] T131 [US8] Write accepted rules to the data root with their derivation recorded, and honour removal, in `extensions/foundry/src/verify/rules.ts`
-- [ ] T132 [US8] Register `foundry:ledger.query` and `foundry:rules.propose` in `extensions/foundry/src/index.ts`
-- [ ] T133 [US8] Build the Ledger surface with filtering by order, actor and action in `extensions/foundry/src/components/Ledger.tsx`
-- [ ] T134 [US8] Supply past decisions affecting the same files as prior art when a new order's context is gathered, in `extensions/foundry/src/forge/intake-source.ts`
+- [x] T130 [US8] Implement repetition detection and proposal generation with citations in `extensions/foundry/src/ledger/curator.ts`
+- [x] T131 [US8] Write accepted rules to the data root with their derivation recorded, and honour removal, in `extensions/foundry/src/verify/rules.ts`
+- [x] T132 [US8] Register `foundry:ledger.query`, `foundry:rules.propose` and `foundry:rules.decide` in `extensions/foundry/src/index.ts` — a third channel, because a proposal the operator can see and cannot act on is not a feature; the channel logic lives in `src/ipc/ledger-channels.ts`
+- [x] T133 [US8] Build the Ledger surface with filtering by order, actor and action in `extensions/foundry/src/components/Ledger.tsx`
+- [x] T134 [US8] Supply past decisions affecting the same files as prior art when a new order's context is gathered, in `extensions/foundry/src/forge/intake-source.ts`
 
 **Checkpoint**: The factory learns from rejections instead of repeating them.
 

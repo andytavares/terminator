@@ -13,6 +13,8 @@ import {
 import { createForgeChannels } from './ipc/forge-channels.js'
 import { createRunChannels } from './ipc/run-channels.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
+import { createLedgerChannels } from './ipc/ledger-channels.js'
+import { rulesFor } from './verify/rules.js'
 import { createGateStore } from './gates/store.js'
 import { createOrderStore } from './order/store.js'
 import { markReady, readPulls } from './line/integrate.js'
@@ -20,7 +22,8 @@ import type { IntegrateDeps } from './line/integrate.js'
 import { checkCapability, writeBack } from './trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
 import type { WorkOrder, WriteBack } from './order/schema.js'
-import { resolveDataRoot, untrackedNotice } from './data-root.js'
+import { resolveDataRoot, untrackedNotice, ledgerPath } from './data-root.js'
+import { queryEntries } from './ledger/append.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
 import { createPendingPermissions } from './runtime/pending-permissions.js'
@@ -467,6 +470,25 @@ function issuesPortFor(api: ExtensionAPI): IssuesPort | null {
   }
 }
 
+/**
+ * What the record already says about these files (FR-077).
+ *
+ * One line per past decision, newest first and bounded — the point is to tell
+ * the Architect "this was decided before", not to hand it the whole ledger.
+ */
+async function priorArtFor(root: string, paths: readonly string[]): Promise<string[]> {
+  const orders = await createOrderStore(root).list()
+  const entries = (
+    await Promise.all(orders.map((order) => queryEntries(ledgerPath(root, order.id))))
+  ).flat()
+
+  return entries
+    .filter((entry) => paths.some((p) => entry.subject.includes(p) || entry.reason.includes(p)))
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 10)
+    .map((entry) => `${entry.at.slice(0, 10)} ${entry.actor}: ${entry.action} — ${entry.reason}`)
+}
+
 /** Which write-backs a new order starts with, from the operator's settings. */
 function defaultWriteBack(api: ExtensionAPI): WriteBack[] {
   const on = (key: string): boolean => api.settings?.get<boolean>(key) ?? true
@@ -558,6 +580,7 @@ export function activate(api: ExtensionAPI): void {
     store: createOrderStore(foundryDataRoot),
     now: () => new Date().toISOString(),
     writeBackDefault: defaultWriteBack(api),
+    priorArtFor: (paths) => priorArtFor(foundryDataRoot, paths),
     // FR-059a: asked when the order is agreed, so an issue that will never
     // move is known before the run rather than after it.
     capability:
@@ -656,6 +679,33 @@ export function activate(api: ExtensionAPI): void {
   })
   reg(api, 'foundry:inbox.list', () => inbox.list())
   reg(api, 'foundry:inbox.decide', (payload) => inbox.decide(payload))
+
+  // ── The record ─────────────────────────────────────────────────────────
+  //
+  // Every decision, by whom or by what rule, and why. The one place the
+  // factory ever argues back — and only when asked: `rules.propose` is a
+  // channel the operator's own button reaches, never a subscription and never
+  // anything the append path can trigger.
+  const ledger = createLedgerChannels({
+    store: createOrderStore(foundryDataRoot),
+    dataRoot: foundryDataRoot,
+    existingRuleIds: () =>
+      rulesFor(
+        {
+          dataRoot: foundryDataRoot,
+          repoPaths: (api.workspace?.list() ?? []).map((workspace) => workspace.folderPath),
+          builtInDir: path.resolve(__dirname, '..'),
+        },
+        {
+          repoPaths: (api.workspace?.list() ?? []).map((workspace) => workspace.folderPath),
+          houseDocs: [],
+        }
+      ).rules.map((rule) => rule.id),
+    now: () => new Date().toISOString(),
+  })
+  reg(api, 'foundry:ledger.query', (payload) => ledger.query(payload))
+  reg(api, 'foundry:rules.propose', (payload) => ledger.proposeRules(payload))
+  reg(api, 'foundry:rules.decide', (payload) => ledger.decideProposal(payload))
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands
