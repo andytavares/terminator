@@ -1,0 +1,38 @@
+extensions/foundry/tests/line/run-graph.spec.ts
+  s_357c91d2b54b02::t_03f643f317d697 363,372,381
+  s_357c91d2b54b02::t_74b5f90961a14c 9,359-362,364-371,373-380,382-408
+  s_357c91d2b54b02::t_436c82ade844f4 409
+specs/037-foundry-software-factory/data-model.md
+  s_357c91d2b54b02::t_9cf6aab4efb5c0 249-259
+extensions/foundry/src/ipc/inbox-channels.ts
+  s_357c91d2b54b02::t_9cf6aab4efb5c0 82
+  s_357c91d2b54b02::t_acb2177273a7ce 73-81,83
+extensions/foundry/src/line/executor.ts
+  s_357c91d2b54b02::t_912e20b5ad6cca 225-237,251-254,332,357-362,364
+  s_357c91d2b54b02::t_4ce98960b47096 11
+  s_357c91d2b54b02::t_6381404da2f117 363
+extensions/foundry/tests/line/executor.spec.ts
+  s_357c91d2b54b02::t_a2b4abfa85dcdd 1082-1151,1158-1173
+  s_357c91d2b54b02::t_9cf6aab4efb5c0 1152-1157
+extensions/foundry/src/line/run-graph.ts
+  s_357c91d2b54b02::t_6381404da2f117 159-173
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_357c91d2b54b02::t_73368d56fd508a 21-24,32,120-166
+  s_357c91d2b54b02::t_0791941ae0b28b 167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "b02faec70a9caca1dbe2bddb61846941322cfb8a",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
