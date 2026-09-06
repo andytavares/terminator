@@ -95,12 +95,12 @@ Extension work lives under `extensions/foundry/` (renamed from `extensions/speck
 - [x] T031 [P] [US1] Implement intake source resolution, including reuse of the existing tracker connection for issue seeding, in `extensions/foundry/src/forge/intake-source.ts`
 - [x] T032 [US1] Implement the interview protocol — Scout before any question, question budget of three, ranked with a recommended answer — in `extensions/foundry/src/forge/interview.ts`
 - [x] T033 [US1] Implement assumptions and targeted redraft on strike in `extensions/foundry/src/forge/assumptions.ts`
-- [ ] T034 [US1] Implement the adversarial pass, started without the intake transcript and without a resumed session, in `extensions/foundry/src/forge/red-team.ts`
+- [x] T034 [US1] Implement the adversarial pass, started without the intake transcript and without a resumed session, in `extensions/foundry/src/forge/red-team.ts`
 - [x] T035 [US1] Implement amendment returning the order to draft and recording what changed in `extensions/foundry/src/order/amend.ts`
-- [ ] T036 [P] [US1] Implement the human rendering of an order, regenerated on every change and never hand-edited, in `extensions/foundry/src/order/render.ts`
-- [ ] T037 [US1] Register `foundry:order.create`, `foundry:order.turn` and `foundry:order.compile` per contracts/ipc-channels.md in `extensions/foundry/src/index.ts`
-- [ ] T038 [US1] Build the Forge surface — live order document, convergence checklist, at most three questions, strikeable assumptions, coverage matrix — in `extensions/foundry/src/components/Forge.tsx`
-- [ ] T039 [US1] Style the Forge surface using only `--tm-*` tokens and flat `lucide-react` icons in `extensions/foundry/src/components/foundry.css`
+- [x] T036 [P] [US1] Implement the human rendering of an order, regenerated on every change and never hand-edited, in `extensions/foundry/src/order/render.ts`
+- [x] T037 [US1] Register `foundry:order.create`, `foundry:order.turn` and `foundry:order.compile` per contracts/ipc-channels.md in `extensions/foundry/src/index.ts`
+- [x] T038 [US1] Build the Forge surface — live order document, convergence checklist, at most three questions, strikeable assumptions, coverage matrix — in `extensions/foundry/src/components/Forge.tsx`
+- [x] T039 [US1] Style the Forge surface using only `--tm-*` tokens and flat `lucide-react` icons in `extensions/foundry/src/components/foundry.css`
 
 **Checkpoint**: An order can be agreed, and cannot be agreed while incomplete. Useful on its own even if the work is then done by hand.
 

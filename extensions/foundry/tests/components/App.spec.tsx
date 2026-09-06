@@ -9,6 +9,12 @@ const mockTicketList = vi.fn()
 const mockPilotState = vi.fn()
 const mockOnStateChanged = vi.fn().mockReturnValue(vi.fn())
 
+// The Forge is the home surface now, and it asks the extension bridge for the
+// list of orders on mount.
+const mockBridgeInvoke = vi.fn(async (channel: string) =>
+  channel === 'foundry:order.list' ? { orders: [] } : {}
+)
+
 vi.mock('../../src/types/electron.js', () => ({
   getSpeckitAPI: () => ({
     cardList: mockCardList,
@@ -63,6 +69,16 @@ function card() {
   }
 }
 
+/**
+ * The Forge is the home surface, so a test about the board opens it first.
+ * The board is legacy while the pipeline underneath is being retired; it is
+ * still reachable and still has to work.
+ */
+function renderBoard(): void {
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Board' }))
+}
+
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -79,7 +95,7 @@ describe('App', () => {
           bridgeHandlers[event] = handler
           return vi.fn()
         }),
-        invoke: vi.fn(),
+        invoke: mockBridgeInvoke,
       },
       workspace: { list: workspaceList },
       project: { create: projectCreate },
@@ -87,14 +103,19 @@ describe('App', () => {
     window.history.replaceState({}, '', '/?repoRoot=/repo')
   })
 
-  it('renders the board as the home surface', async () => {
+  it('renders the Forge as the home surface', async () => {
     render(<App />)
-    expect(screen.getByText('SpecKit Pilot')).toBeTruthy()
+    expect(screen.getByText('Foundry')).toBeTruthy()
+    await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
+  })
+
+  it('reaches the board from its own tab, while the pipeline is still being retired', async () => {
+    renderBoard()
     await waitFor(() => expect(screen.getByText(/create your first card/i)).toBeTruthy())
   })
 
   it('opens the New card modal, creates a card, and cancels', async () => {
-    render(<App />)
+    renderBoard()
     await waitFor(() => screen.getByText(/new card/i))
     fireEvent.click(screen.getByText(/new card/i))
     expect(screen.getByRole('dialog', { name: 'New card' })).toBeTruthy()
@@ -122,7 +143,7 @@ describe('App', () => {
         { source: 'linear', key: 'TAV-2', title: 'Second', sourceUrl: 'https://l/TAV-2' },
       ],
     })
-    render(<App />)
+    renderBoard()
     await waitFor(() => expect(mockCardCreate).toHaveBeenCalledTimes(2))
     expect(mockCardCreate).toHaveBeenCalledWith(
       expect.objectContaining({ ticket: expect.objectContaining({ key: 'TAV-1' }) })
@@ -136,13 +157,13 @@ describe('App', () => {
     mockTicketList.mockResolvedValue({
       tickets: [{ source: 'linear', key: 'TAV-1', title: 'First', sourceUrl: 'https://l/TAV-1' }],
     })
-    render(<App />)
+    renderBoard()
     await waitFor(() => expect(mockTicketList).toHaveBeenCalled())
     expect(mockCardCreate).not.toHaveBeenCalled()
   })
 
   it('re-runs the reconcile when Import ticket is clicked', async () => {
-    render(<App />)
+    renderBoard()
     await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(1))
     fireEvent.click(screen.getByText(/import ticket/i))
     await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(2))
@@ -150,7 +171,7 @@ describe('App', () => {
 
   it('still renders the board when the ticket fetch fails', async () => {
     mockTicketList.mockResolvedValue({ error: 'no creds' })
-    render(<App />)
+    renderBoard()
     await waitFor(() => expect(screen.getByText(/create your first card/i)).toBeTruthy())
     expect(mockCardCreate).not.toHaveBeenCalled()
   })
@@ -162,7 +183,7 @@ describe('App', () => {
         resolveTickets = resolve
       })
     )
-    render(<App />)
+    renderBoard()
     const button = screen.getByRole('button', { name: /importing/i })
     expect(button.hasAttribute('disabled')).toBe(true)
     expect(button.getAttribute('aria-busy')).toBe('true')
@@ -172,14 +193,14 @@ describe('App', () => {
 
   it('skips auto-load when no workspace is open', async () => {
     window.history.replaceState({}, '', '/')
-    render(<App />)
-    await waitFor(() => screen.getByText('SpecKit Pilot'))
+    renderBoard()
+    await waitFor(() => screen.getByText('Foundry'))
     expect(mockTicketList).not.toHaveBeenCalled()
   })
 
   it('recovers the Import button when a reconcile call rejects', async () => {
     mockTicketList.mockRejectedValue(new Error('boom'))
-    render(<App />)
+    renderBoard()
     // The rejection is swallowed; the button returns to its idle, enabled state.
     await waitFor(() => {
       const button = screen.getByRole('button', { name: /import ticket/i })
@@ -189,7 +210,7 @@ describe('App', () => {
   })
 
   it('re-runs the reconcile for a new workspace after workspace:changed', async () => {
-    render(<App />)
+    renderBoard()
     await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(1))
     bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
     await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(2))
@@ -197,7 +218,7 @@ describe('App', () => {
   })
 
   it('shows settings and returns to the board', async () => {
-    render(<App />)
+    renderBoard()
     await waitFor(() => screen.getByLabelText('Settings'))
     fireEvent.click(screen.getByLabelText('Settings'))
     const back = await screen.findByText(/back to board/i)
@@ -207,7 +228,7 @@ describe('App', () => {
 
   it('opens a card detail drawer and closes it', async () => {
     mockCardList.mockResolvedValue({ cards: [card()] })
-    render(<App />)
+    renderBoard()
     await waitFor(() => screen.getByText('Card A'))
     fireEvent.click(screen.getByText('Card A'))
     await waitFor(() => screen.getByRole('dialog', { name: 'Card detail' }))
@@ -216,8 +237,8 @@ describe('App', () => {
   })
 
   it('mirrors a dispatched worktree into the workspace project list', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByText('SpecKit Pilot'))
+    renderBoard()
+    await waitFor(() => screen.getByText('Foundry'))
     bridgeHandlers['foundry:dispatch-started']({
       featureDir: '/repo/specs/016-a',
       branchName: 'feature/a',
@@ -232,7 +253,7 @@ describe('App', () => {
 
   it('closes the open card drawer on workspace change', async () => {
     mockCardList.mockResolvedValue({ cards: [card()] })
-    render(<App />)
+    renderBoard()
     await waitFor(() => screen.getByText('Card A'))
     fireEvent.click(screen.getByText('Card A'))
     await waitFor(() => screen.getByRole('dialog', { name: 'Card detail' }))

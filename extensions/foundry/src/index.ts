@@ -143,6 +143,9 @@ import {
   setRunSupervision,
   setSupervisedRunner,
 } from './runner/agent-runner.js'
+import { createForgeChannels } from './ipc/forge-channels.js'
+import { createOrderStore } from './order/store.js'
+import { resolveDataRoot } from './data-root.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
 import { createPendingPermissions } from './runtime/pending-permissions.js'
@@ -319,6 +322,36 @@ function makePhaseCallbacks(
 }
 
 /** Where the chosen model lives, on the side of the bridge that launches runs. */
+/**
+ * Where Foundry keeps its records, resolved once at activation.
+ *
+ * Empty means beside the working directory, which leaves an untracked
+ * directory behind — Foundry says so once and never edits a `.gitignore`,
+ * because that would be writing into a repository the order did not ask to
+ * change. A configured absolute path takes every order, which is the only
+ * workable answer once an order spans repositories.
+ */
+function resolveFoundryDataRoot(api: ExtensionAPI): string {
+  // Every read here is optional. Activation is called synchronously by the
+  // host and must not throw because one capability is absent — a host that
+  // has no workspace yet is a normal state, not a reason to fail to load.
+  let configured = ''
+  let workdir = process.cwd()
+  try {
+    configured = api.settings?.get<string>('terminator.foundry.dataDir') ?? ''
+    workdir = api.workspace?.list()[0]?.folderPath ?? process.cwd()
+  } catch {
+    // Leave the defaults.
+  }
+  try {
+    return resolveDataRoot(configured, workdir).root
+  } catch {
+    // A relative path was configured, which is ambiguous once an order spans
+    // repositories. Fall back to the default rather than refusing to activate.
+    return resolveDataRoot('', workdir).root
+  }
+}
+
 const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
 
 /**
@@ -1151,6 +1184,38 @@ export function activate(api: ExtensionAPI): void {
   // which is the whole thing this replaced.
   runtimeStarting = startSupervisionRuntime(api)
   void runtimeStarting
+
+  // ── The Forge ──────────────────────────────────────────────────────────
+  //
+  // An idea or a tracker issue in, a compilable work order out. The three
+  // channels are built over a store, a clock and a way to read an issue, so
+  // the whole intake path is exercisable without an Electron host.
+  //
+  // The data root is resolved once here and handed down as an absolute path:
+  // an order can span repositories, so "the working directory" is ambiguous
+  // and two writers resolving it independently could disagree.
+  const forge = createForgeChannels({
+    store: createOrderStore(resolveFoundryDataRoot(api)),
+    now: () => new Date().toISOString(),
+    readIssue: async (tracker, key) => {
+      // Through the application's own tracker connection. This extension never
+      // holds a credential and never contacts a tracker itself. A host with no
+      // tracker connected answers "no issue" rather than throwing.
+      const issue = await api.issues?.get(tracker, key)
+      if (issue === null || issue === undefined) return null
+      return {
+        key: issue.key,
+        title: issue.title,
+        description: issue.description ?? '',
+        url: issue.url ?? '',
+        branchName: (issue as { branchName?: string | null }).branchName ?? null,
+      }
+    },
+  })
+  reg(api, 'foundry:order.create', (payload) => forge.create(payload))
+  reg(api, 'foundry:order.turn', (payload) => forge.turn(payload))
+  reg(api, 'foundry:order.compile', (payload) => forge.compile(payload))
+  reg(api, 'foundry:order.list', () => forge.list())
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands

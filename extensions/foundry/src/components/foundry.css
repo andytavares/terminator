@@ -3120,3 +3120,534 @@
   width: 15px;
   height: 15px;
 }
+
+/* ─── Foundry: the Forge ──────────────────────────────────────────
+   Styled only against --tm-* tokens, which are the sole place those
+   names are defined and which carry both themes. A colour that is not
+   a token here renders unstyled, so there are none. Icons are flat and
+   inherit currentColor; state is carried by shape and position. */
+
+.fdry-forge {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  align-items: start;
+  color: var(--tm-text-primary);
+}
+
+@media (max-width: 860px) {
+  .fdry-forge {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fdry-empty {
+  padding: 32px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-rail {
+  display: grid;
+  gap: 12px;
+  position: sticky;
+  top: 16px;
+}
+
+.fdry-panel {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: 12px 14px;
+}
+
+.fdry-panel-h {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tm-text-muted);
+  margin: 0 0 10px;
+}
+
+.fdry-check {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-check b {
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
+
+.fdry-check small {
+  display: block;
+  margin-top: 2px;
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.fdry-check-mark svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-check.is-pass .fdry-check-mark {
+  color: var(--tm-success);
+}
+
+.fdry-check.is-fail .fdry-check-mark {
+  color: var(--tm-danger);
+}
+
+.fdry-compile {
+  appearance: none;
+  margin-top: 12px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fdry-compile:not(:disabled) {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-compile:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.fdry-compile svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-question {
+  border-top: 1px solid var(--tm-border);
+  padding: 9px 0;
+  font-size: 12.5px;
+}
+
+.fdry-question b {
+  display: block;
+  color: var(--tm-text-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.fdry-question p {
+  margin: 0 0 6px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+
+.fdry-options {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.fdry-options button {
+  appearance: none;
+  border: 1px solid var(--tm-border-strong);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  border-radius: var(--tm-radius-xs);
+  padding: 3px 9px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.fdry-options button.is-recommended {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent);
+}
+
+.fdry-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-doc {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.fdry-doc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fdry-doc-head h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.fdry-src,
+.fdry-id {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-src {
+  color: var(--tm-accent);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-xs);
+  padding: 1px 6px;
+}
+
+.fdry-attach {
+  appearance: none;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  border-radius: var(--tm-radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fdry-attach svg {
+  width: 12px;
+  height: 12px;
+}
+
+.fdry-doc-sub {
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  margin: 4px 0 14px;
+}
+
+.fdry-field {
+  border-top: 1px solid var(--tm-border);
+  padding-top: 10px;
+  margin-top: 12px;
+}
+
+.fdry-field p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fdry-ac {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12.5px;
+}
+
+.fdry-ac:last-child {
+  border-bottom: 0;
+}
+
+.fdry-ac-id {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-ac.is-gap .fdry-ac-id,
+.fdry-ac.is-gap .fdry-verify {
+  color: var(--tm-danger);
+}
+
+.fdry-verify {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-scroll {
+  overflow-x: auto;
+}
+
+.fdry-matrix {
+  border-collapse: collapse;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.fdry-matrix th,
+.fdry-matrix td {
+  border: 1px solid var(--tm-border);
+  padding: 4px 8px;
+  text-align: center;
+  color: var(--tm-text-muted);
+  white-space: nowrap;
+}
+
+.fdry-matrix th {
+  background: var(--tm-bg-elevated);
+}
+
+.fdry-matrix .fdry-matrix-row {
+  text-align: left;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-matrix .is-hit {
+  color: var(--tm-success);
+}
+
+.fdry-matrix .is-gap {
+  color: var(--tm-danger);
+}
+
+.fdry-assume {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fdry-assume button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  border: 1px solid var(--tm-border-strong);
+  background: transparent;
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-assume button svg {
+  width: 10px;
+  height: 10px;
+  opacity: 0.6;
+}
+
+.fdry-finding {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+  padding: 5px 0;
+}
+
+.fdry-finding svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin-top: 3px;
+  color: var(--tm-warning);
+}
+
+.fdry-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.fdry-input input {
+  flex: 1;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 8px 12px;
+  color: var(--tm-text-primary);
+  font-size: 12.5px;
+}
+
+.fdry-input button {
+  appearance: none;
+  border: 1px solid var(--tm-accent);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  border-radius: var(--tm-radius-sm);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fdry-input button:disabled {
+  background: var(--tm-bg-elevated);
+  border-color: var(--tm-border-strong);
+  color: var(--tm-text-muted);
+  cursor: not-allowed;
+}
+
+/* ─── Foundry: orders list and shell ─────────────────────────────── */
+
+.fdry-tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.fdry-tabs button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: var(--tm-radius-sm);
+  cursor: pointer;
+}
+
+.fdry-tabs button.is-on {
+  background: var(--tm-bg-card);
+  color: var(--tm-text-primary);
+}
+
+.fdry-shell {
+  padding: 16px;
+  height: 100%;
+  overflow: auto;
+  color: var(--tm-text-primary);
+}
+
+.fdry-back {
+  appearance: none;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  padding: 4px 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.fdry-seed {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.fdry-seed input {
+  flex: 1;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 8px 12px;
+  color: var(--tm-text-primary);
+  font-size: 13px;
+}
+
+.fdry-seed button {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--tm-accent);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  border-radius: var(--tm-radius-sm);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fdry-seed button:disabled {
+  background: var(--tm-bg-elevated);
+  border-color: var(--tm-border-strong);
+  color: var(--tm-text-muted);
+  cursor: not-allowed;
+}
+
+.fdry-seed button svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-problem {
+  color: var(--tm-danger);
+  font-size: 12.5px;
+  margin: 0 0 12px;
+}
+
+.fdry-orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fdry-orders button {
+  appearance: none;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: 11px 14px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.fdry-orders button:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-order-mark svg {
+  width: 15px;
+  height: 15px;
+}
+
+.fdry-orders li:has(.fdry-order-state:not(:empty)) .fdry-order-mark {
+  color: var(--tm-text-muted);
+}
+
+.fdry-order-main b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.fdry-order-main small {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-order-state {
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+}

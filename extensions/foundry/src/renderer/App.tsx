@@ -5,17 +5,23 @@ import { CardDetail } from '../components/CardDetail.js'
 import { CardBriefEditor } from '../components/CardBriefEditor.js'
 import { KnowledgeSearch } from '../components/KnowledgeSearch.js'
 import { SettingsView } from '../components/SettingsView.js'
+import { Orders } from '../components/Orders.js'
 import { Dialog } from '@terminator/extension-ui'
 import { getSpeckitAPI } from '../types/electron.js'
 import { reconcileAssignedTickets } from '../state/reconcile-tickets.js'
 
 type Overlay = 'none' | 'new-card' | 'settings'
 
+// The Forge is the new way in; the board is what it is replacing. Both are
+// reachable while the pipeline underneath is still being retired.
+type Surface = 'forge' | 'board'
+
 export function App(): JSX.Element {
   const [repoRoot, setRepoRoot] = useState<string | null>(
     new URLSearchParams(window.location.search).get('repoRoot')
   )
   const [overlay, setOverlay] = useState<Overlay>('none')
+  const [surface, setSurface] = useState<Surface>('forge')
   const [openCardDir, setOpenCardDir] = useState<string | null>(null)
   // Keep the latest repoRoot readable from the dispatch-started listener, which
   // is subscribed once — without this it captures a stale (often null) repoRoot
@@ -108,7 +114,25 @@ export function App(): JSX.Element {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <header className="sk-appbar">
-        <span className="sk-appbar__title">SpecKit Pilot</span>
+        <span className="sk-appbar__title">Foundry</span>
+        <nav className="fdry-tabs" aria-label="Foundry surfaces">
+          <button
+            type="button"
+            className={surface === 'forge' ? 'is-on' : ''}
+            aria-pressed={surface === 'forge'}
+            onClick={() => setSurface('forge')}
+          >
+            Forge
+          </button>
+          <button
+            type="button"
+            className={surface === 'board' ? 'is-on' : ''}
+            aria-pressed={surface === 'board'}
+            onClick={() => setSurface('board')}
+          >
+            Board
+          </button>
+        </nav>
         <div className="sk-appbar__search">
           {repoRoot && <KnowledgeSearch repoRoot={repoRoot} />}
         </div>
@@ -143,6 +167,8 @@ export function App(): JSX.Element {
             </button>
             <SettingsView />
           </div>
+        ) : surface === 'forge' ? (
+          <Orders repoRoot={repoRoot} />
         ) : (
           <BoardView repoRoot={workspacePath} onOpenCard={(dir) => setOpenCardDir(dir)} />
         )}
