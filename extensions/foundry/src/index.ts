@@ -1,4 +1,4 @@
-import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
+import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { app } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -196,44 +196,6 @@ function defaultModel(api: ExtensionAPI): string {
   return typeof value === 'string' ? value : 'opus'
 }
 
-// Every notification kind this extension ever raises, so the user can
-// independently choose its delivery target(s) (system/in-app/toast) in this
-// extension's own settings — core never knows these keys exist (Extension Isolation).
-const NOTIFICATION_KEYS: { key: string; label: string }[] = [
-  { key: 'startQueuedCardFailed', label: 'Could not start queued card' },
-  { key: 'createCardFailed', label: 'Could not create card' },
-  { key: 'moveCardFailed', label: 'Could not move card' },
-  { key: 'handoffFailed', label: 'Handoff failed' },
-  { key: 'fetchTicketsFailed', label: 'Could not fetch tickets' },
-  { key: 'saveCredentialsFailed', label: 'Could not save credentials' },
-  { key: 'dispatchFailed', label: 'Dispatch failed' },
-  { key: 'cancelFailed', label: 'Cancel failed' },
-  { key: 'resetFailed', label: 'Reset failed' },
-  { key: 'openPrFailed', label: 'Open PR failed' },
-]
-
-function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
-  const properties: Record<string, SettingDefinition> = {}
-  for (const { key, label } of NOTIFICATION_KEYS) {
-    properties[`terminator.foundry.notify.${key}.system`] = {
-      type: 'boolean',
-      label: `${label} → System notification`,
-      default: true,
-    }
-    properties[`terminator.foundry.notify.${key}.center`] = {
-      type: 'boolean',
-      label: `${label} → In-app notification center`,
-      default: true,
-    }
-    properties[`terminator.foundry.notify.${key}.toast`] = {
-      type: 'boolean',
-      label: `${label} → Toast`,
-      default: true,
-    }
-  }
-  return properties
-}
-
 // The loopback endpoint the agents' hooks answer on, and the runner that owns
 // their terminals. Started once for the extension rather than per run: a port
 // per agent would be a port per card.
@@ -317,12 +279,12 @@ function notify(
       return api.notifications.createNotification({
         type: 'warning',
         title: message,
-        key: `speckit.permission.${event.sessionId}`,
+        key: `foundry.permission.${event.sessionId}`,
         actions,
         onClick,
       })
     case 'indicator':
-      api.notifications.showToast('warning', message, `speckit.${event.kind}.${event.sessionId}`)
+      api.notifications.showToast('warning', message, `foundry.${event.kind}.${event.sessionId}`)
       return null
     case 'digest':
       // Already in the feed. Interrupting for it is how a feed gets muted.
@@ -459,7 +421,7 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     api.notifications.showToast(
       'error',
       'Supervision could not start — phases will run unsupervised, approving their own tool calls',
-      'speckit.runtime.unavailable'
+      'foundry.runtime.unavailable'
     )
     return null
   }
@@ -511,6 +473,42 @@ function defaultWriteBack(api: ExtensionAPI): WriteBack[] {
   if (on('terminator.foundry.writeBack.status')) enabled.push('status')
   if (on('terminator.foundry.writeBack.prLink')) enabled.push('pr_link')
   return enabled
+}
+
+/**
+ * The budgets a new order starts with, from settings (FR-030).
+ *
+ * Read at seed time rather than at run time: the order carries its own agreed
+ * budgets, and changing the setting later must not silently re-price work the
+ * operator already agreed to.
+ */
+function defaultBudgets(api: ExtensionAPI): {
+  agents: number
+  wallClockMinutes: number
+  filesTouched: number
+} {
+  const num = (key: string, fallback: number): number => {
+    const value = api.settings?.get<number>(key)
+    return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? value : fallback
+  }
+  return {
+    agents: num('terminator.foundry.budgets.agents', 3),
+    wallClockMinutes: num('terminator.foundry.budgets.wallClockMinutes', 45),
+    filesTouched: num('terminator.foundry.budgets.filesTouched', 25),
+  }
+}
+
+/** The operator's critical paths, one glob per line (FR-043). Never inferred. */
+function declaredCriticalPaths(api: ExtensionAPI): string[] {
+  const raw = api.settings?.get<string>('terminator.foundry.criticalPaths') ?? ''
+  return [
+    ...new Set(
+      raw
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line !== '')
+    ),
+  ]
 }
 
 function writeBackDepsFor(
@@ -1085,7 +1083,9 @@ export function activate(api: ExtensionAPI): void {
   const forge = createForgeChannels({
     store: createLiveOrderStore(dataRoot),
     now: () => new Date().toISOString(),
-    writeBackDefault: defaultWriteBack(api),
+    writeBackDefault: () => defaultWriteBack(api),
+    budgetDefaults: () => defaultBudgets(api),
+    criticalPaths: () => declaredCriticalPaths(api),
     priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
     // The redraft lands here, when the architect's turn ends — minutes after
     // the channel that started it answered.
@@ -1659,12 +1659,6 @@ export function activate(api: ExtensionAPI): void {
           label: 'Untracked records notice has been shown',
           default: false,
         },
-        'terminator.foundry.enabled': {
-          type: 'boolean',
-          label: 'Enable Foundry',
-          default: true,
-          workspaceScoped: true,
-        },
         'terminator.foundry.stallShadowMode': {
           type: 'boolean',
           label: 'Record stalls without surfacing them',
@@ -1672,17 +1666,6 @@ export function activate(api: ExtensionAPI): void {
             'On by default. A stall detector that cries wolf gets turned off, and then the real stalls go unreported too — judge a week of recorded firings before turning this off.',
           default: true,
         },
-        'terminator.foundry.maxConcurrentRuns': {
-          type: 'number',
-          label: 'Maximum cards running in parallel',
-          default: 3,
-        },
-        'terminator.foundry.logRetentionDays': {
-          type: 'number',
-          label: 'Days to keep persisted step logs',
-          default: 30,
-        },
-        ...buildNotificationSettingProperties(),
       },
     })
   )

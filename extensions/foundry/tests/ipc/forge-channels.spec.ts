@@ -813,3 +813,60 @@ describe('turning a write-back off for one order (FR-062)', () => {
     })
   })
 })
+
+// A setting that reaches nothing is a control the operator can move while the
+// factory ignores it. Both of these were registered and read by nobody: every
+// order got 3 agents / 45 minutes / 25 files regardless, and a critical path
+// the operator declared never made it onto an order's risk.
+
+describe('what configuration a new order starts with', () => {
+  async function seeded(deps: Partial<Parameters<typeof createForgeChannels>[0]>) {
+    const c = createForgeChannels({ store, now: () => NOW, ...deps })
+    return (await c.create({
+      source: { kind: 'typed', text: 'change the session refresh' },
+      repoPaths: [repo],
+    })) as OrderView
+  }
+
+  it('takes the budgets the operator configured (FR-030)', async () => {
+    const r = await seeded({
+      budgetDefaults: () => ({ agents: 1, wallClockMinutes: 10, filesTouched: 4 }),
+    })
+    expect(r.order.budgets).toMatchObject({ agents: 1, wallClockMinutes: 10, filesTouched: 4 })
+  })
+
+  it('falls back to the schema defaults when nothing is configured', async () => {
+    const r = await seeded({})
+    expect(r.order.budgets).toMatchObject({ agents: 3, wallClockMinutes: 45, filesTouched: 25 })
+  })
+
+  it('reads the budgets on every order, not once when the extension started', async () => {
+    let agents = 1
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      budgetDefaults: () => ({ agents, wallClockMinutes: 45, filesTouched: 25 }),
+    })
+    const first = (await c.create({
+      source: { kind: 'typed', text: 'first' },
+      repoPaths: [repo],
+    })) as OrderView
+    agents = 5
+    const second = (await c.create({
+      source: { kind: 'typed', text: 'second' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(first.order.budgets.agents).toBe(1)
+    expect(second.order.budgets.agents).toBe(5)
+  })
+
+  it("carries the operator's declared critical paths onto the order's risk (FR-043)", async () => {
+    const r = await seeded({ criticalPaths: () => ['src/main/auth/**', 'src/main/billing/**'] })
+    expect(r.order.risk.criticalPaths).toEqual(['src/main/auth/**', 'src/main/billing/**'])
+  })
+
+  it('declares none when the operator declared none — never inferred', async () => {
+    const r = await seeded({})
+    expect(r.order.risk.criticalPaths).toEqual([])
+  })
+})

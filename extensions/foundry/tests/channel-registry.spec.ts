@@ -35,6 +35,33 @@ function registered(): string[] {
   return [...src.matchAll(/reg\(api,\s*'([^']+)'/g)].map((m) => m[1])
 }
 
+/** Every setting key the extension declares to the host. */
+function declaredSettings(): string[] {
+  return [...new Set([...src.matchAll(/'(terminator\.foundry\.[^']+)':\s*\{/g)].map((m) => m[1]))]
+}
+
+// A setting nothing reads is a control the operator can move while the factory
+// ignores it. Thirty-three of them shipped: ten notification kinds carried over
+// from the retired extension ("Could not start queued card"), three budgets,
+// the critical-path list, a duplicate concurrency limit and a log retention
+// nothing pruned. Every one had a label, a default and a place in the settings
+// panel, and none of them did anything.
+describe('the settings surface', () => {
+  it('reads every setting it registers', () => {
+    const unread = declaredSettings().filter((key) => {
+      // The declaration itself is `'key': {`; a read is the same string
+      // anywhere else — `settings.get('key')` or `settings.set('key', …)`.
+      const occurrences = src.split(`'${key}'`).length - 1
+      return occurrences < 2
+    })
+    expect(unread, `registered but read by nothing: ${unread.join(', ')}`).toEqual([])
+  })
+
+  it('declares something at all, so this test cannot pass by finding nothing', () => {
+    expect(declaredSettings().length).toBeGreaterThan(5)
+  })
+})
+
 describe('the channel registry', () => {
   it('registers every channel exactly once', () => {
     const names = registered()

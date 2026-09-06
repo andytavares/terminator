@@ -254,18 +254,24 @@ Refused for any id not in `foundry:rules.inForce`.
 
 ## Settings
 
-Registered via `api.settings.register`; not channels, but part of the surface.
+Registered via `api.settings.register`; not channels, but part of the surface. **Every key here is read by the extension** — a setting nothing reads is a control the operator can move while the factory ignores it, and `channel-registry.spec.ts` now fails on one.
 
-| Key                                           | Type                                     | Default                                           |
-| --------------------------------------------- | ---------------------------------------- | ------------------------------------------------- |
-| `terminator.foundry.dataDir`                  | string                                   | `""` — empty means `<workdir>/.foundry/` (FR-074) |
-| `terminator.foundry.autoOpenDraftPr`          | boolean                                  | `true` (FR-053)                                   |
-| `terminator.foundry.autonomy`                 | `escorted` \| `standard` \| `lights-out` | `standard`                                        |
-| `terminator.foundry.budgets.agents`           | number                                   | `3`                                               |
-| `terminator.foundry.budgets.wallClockMinutes` | number                                   | `45`                                              |
-| `terminator.foundry.budgets.filesTouched`     | number                                   | `25`                                              |
-| `terminator.foundry.writeBack`                | string[]                                 | all three (FR-062)                                |
-| `terminator.foundry.criticalPaths`            | Record&lt;repo, string[]&gt;             | `{}` — operator-declared, never inferred          |
+| Key                                           | Type                                         | Default                                                                               |
+| --------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `terminator.foundry.dataDir`                  | string                                       | `""` — empty means `<workdir>/.foundry/` (FR-074)                                     |
+| `terminator.foundry.autoOpenDraftPr`          | boolean                                      | `true` (FR-053)                                                                       |
+| `terminator.foundry.autonomy`                 | `escorted` \| `standard` \| `lights-out`     | `standard`                                                                            |
+| `terminator.foundry.budgets.agents`           | number                                       | `3` — seeded onto every new order (FR-030)                                            |
+| `terminator.foundry.budgets.wallClockMinutes` | number                                       | `45` — seeded onto every new order                                                    |
+| `terminator.foundry.budgets.filesTouched`     | number                                       | `25` — seeded onto every new order                                                    |
+| `terminator.foundry.writeBack.summaryComment` | boolean                                      | `true` (FR-062)                                                                       |
+| `terminator.foundry.writeBack.status`         | boolean                                      | `true` (FR-062)                                                                       |
+| `terminator.foundry.writeBack.prLink`         | boolean                                      | `true` (FR-062)                                                                       |
+| `terminator.foundry.criticalPaths`            | string — one glob per line, workspace-scoped | `""` — operator-declared, never inferred (FR-043); seeded onto every new order's risk |
+| `terminator.foundry.stallShadowMode`          | boolean                                      | `true` — record stalls without surfacing them                                         |
+| `terminator.foundry.untrackedNoticeSeen`      | boolean                                      | `false` — written by the extension, not shown                                         |
+
+The budgets and the critical-path list are read **when an order is seeded**, not when it runs: the order carries its own agreed budgets, and changing a setting afterwards must not silently re-price work the operator already agreed to.
 
 ---
 

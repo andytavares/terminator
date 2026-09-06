@@ -77,8 +77,29 @@ export interface ForgeDeps {
   readonly store: OrderStore
   readonly now: () => string
   readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
-  /** Which write-backs a new order starts with (FR-062), from configuration. */
-  readonly writeBackDefault?: readonly WriteBack[]
+  /**
+   * Which write-backs a new order starts with (FR-062), from configuration.
+   *
+   * A function, like the other two below: these channels are built once when
+   * the extension activates, and a value read then is the value the operator
+   * had at start-up rather than the one they have now.
+   */
+  readonly writeBackDefault?: () => readonly WriteBack[]
+  /**
+   * The budgets a new order starts with (FR-030), from configuration.
+   *
+   * A default, not a ceiling: the architect may propose different ones and the
+   * operator may change them. Absent, the schema's own defaults stand — which
+   * is what happened for every order before this was wired, and is why an
+   * operator who set the agent limit to 1 still got three.
+   */
+  readonly budgetDefaults?: () => { agents: number; wallClockMinutes: number; filesTouched: number }
+  /**
+   * The paths the operator declared critical (FR-043). Workspace-scoped and
+   * operator-declared: Foundry never infers this list, and an order that
+   * cannot see it grades a change to a critical path as if it were ordinary.
+   */
+  readonly criticalPaths?: () => readonly string[]
   /** Past decisions about the files a new idea names (FR-077). */
   readonly priorArtFor?: (paths: readonly string[]) => Promise<string[]>
   /**
@@ -167,10 +188,20 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     // The adversarial pass runs on the first draft, not only at the end: a
     // finding the operator sees now is cheaper than one that reopens an order
     // they thought was settled.
-    const attacked = applyFindings(
-      { ...seeded.order, writeBack: [...(deps.writeBackDefault ?? [])] },
-      deps.now()
-    )
+    const configured: WorkOrder = {
+      ...seeded.order,
+      writeBack: [...(deps.writeBackDefault?.() ?? [])],
+      budgets: {
+        ...seeded.order.budgets,
+        ...(deps.budgetDefaults?.() ?? {}),
+      },
+      risk: {
+        ...seeded.order.risk,
+        criticalPaths: [...(deps.criticalPaths?.() ?? [])],
+      },
+    }
+
+    const attacked = applyFindings(configured, deps.now())
     await deps.store.save(attacked)
     await deps.store.record({
       at: deps.now(),
