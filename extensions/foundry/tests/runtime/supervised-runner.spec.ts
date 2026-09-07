@@ -629,3 +629,48 @@ describe('launching with a brief longer than a terminal line', () => {
     expect(afterHeredoc.slice(firstEnd)).toContain('exec ')
   })
 })
+
+// A fresh agent must not inherit another session's identity.
+//
+// Terminator launched from a Claude Code terminal passes its whole environment
+// down. The agent came up carrying the *parent's* bridge session, messaging
+// socket and session id, joined that bridge, and sat at `lastSequenceNum: 0`
+// waiting for instructions only the parent could send. It produced no turn at
+// all, and from the console it looked exactly like an agent thinking. Four
+// live runs died on it.
+describe('the parent session it must not inherit', () => {
+  const IDENTITY = [
+    'CLAUDE_CODE_BRIDGE_SESSION_ID',
+    'CLAUDE_CODE_MESSAGING_SOCKET',
+    'CLAUDE_CODE_MESSAGING_TOKEN',
+    'CLAUDE_CODE_SESSION_ID',
+    'CLAUDE_CODE_CHILD_SESSION',
+    'CLAUDE_PID',
+    'CLAUDECODE',
+  ]
+
+  it.each(IDENTITY)('unsets %s before the agent starts', async (name) => {
+    await runner().start(start)
+    const body = launchScriptBody()
+    const line = body.split('\n').find((l) => l.startsWith('unset '))
+    expect(line, 'no unset line in the launch script').toBeDefined()
+    expect(line?.split(/\s+/)).toContain(name)
+  })
+
+  it('unsets them before anything else runs, not after', async () => {
+    await runner().start(start)
+    const body = launchScriptBody()
+    expect(body.indexOf('unset ')).toBeLessThan(body.indexOf('exec '))
+    expect(body.indexOf('unset ')).toBeLessThan(body.indexOf('SPECIFY_FEATURE='))
+  })
+
+  it('still forces session persistence, which is the other half of the same problem', async () => {
+    await runner().start(start)
+    expect(launchScriptBody()).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
+  })
+
+  it('keeps the session id it was given, which is not inherited but chosen', async () => {
+    const run = await runner().start(start)
+    expect(launchScriptBody()).toContain(`--session-id ${run?.sessionId}`)
+  })
+})

@@ -201,6 +201,24 @@ export interface SupervisedRunnerOptions {
   now?: () => number
 }
 
+/**
+ * The parent Claude Code session's own variables.
+ *
+ * Identity and transport, never preferences: an agent that inherits these is
+ * an agent talking on somebody else's channel.
+ */
+const INHERITED_SESSION_VARS = [
+  'CLAUDE_CODE_BRIDGE_SESSION_ID',
+  'CLAUDE_CODE_MESSAGING_SOCKET',
+  'CLAUDE_CODE_MESSAGING_TOKEN',
+  'CLAUDE_CODE_SESSION_ID',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CLAUDE_CODE_CHILD_SESSION',
+  'CLAUDE_CODE_EXECPATH',
+  'CLAUDE_PID',
+  'CLAUDECODE',
+] as const
+
 export function createSupervisedRunner(options: SupervisedRunnerOptions): SupervisedRunner {
   const { api, control, stateDir } = options
   const now = options.now ?? Date.now
@@ -228,6 +246,20 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       [
         '#!/bin/sh',
         '# Written by Terminator. One per session; overwritten on every start.',
+        // A fresh agent must not inherit another session's identity.
+        //
+        // Terminator launched from a Claude Code terminal passes its whole
+        // environment down — Electron inherits the shell, the pty inherits
+        // Electron, `claude` inherits the pty — so the agent came up carrying
+        // the *parent's* bridge session, messaging socket and session id. It
+        // joined that bridge, sat at `lastSequenceNum: 0` waiting for
+        // instructions only the parent could send, and produced no turn at
+        // all. From the console it looked exactly like an agent thinking.
+        //
+        // `CLAUDE_CODE_CHILD_SESSION` was already known about and worked
+        // around with FORCE_SESSION_PERSISTENCE below; these are the rest of
+        // the same family.
+        `unset ${INHERITED_SESSION_VARS.join(' ')}`,
         parts.exports,
         // A quoted heredoc: nothing in the brief is expanded or run.
         "cat <<'TERMINATOR_LAUNCH'",

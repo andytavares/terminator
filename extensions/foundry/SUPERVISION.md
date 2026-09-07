@@ -144,6 +144,29 @@ without a prompt. Three things about how:
   operator's own configuration is something they should be able to find, even
   though it is the answer they would have given the dialog themselves.
 
+## A fresh agent, not the parent's session
+
+Terminator launched from a Claude Code terminal passes its whole environment
+down: Electron inherits the shell, the pty inherits Electron, and `claude`
+inherits the pty. So an agent came up carrying the **parent's** identity —
+`CLAUDE_CODE_BRIDGE_SESSION_ID`, `CLAUDE_CODE_MESSAGING_SOCKET` and
+`CLAUDE_CODE_MESSAGING_TOKEN`, `CLAUDE_CODE_SESSION_ID`.
+
+It then did exactly what those variables told it to: joined the parent's bridge
+session, sat at `lastSequenceNum: 0`, and waited for instructions only the
+parent could send. No turn, no tool call, no output — five open connections to
+the API and 0% CPU. From the console it was indistinguishable from an agent
+thinking hard. Four live runs died on it before the transcript's
+`bridge-session` line gave it away.
+
+`CLAUDE_CODE_CHILD_SESSION` was already known about, and worked around with
+`CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1` so that a nested session still writes
+a transcript. That was one of a family, found because it broke something
+visible. The launch script now unsets the rest before `exec`.
+
+Identity and transport only. A preference such as `CLAUDE_EFFORT` is the
+operator's and is left alone.
+
 ## The launch is a file, not a typed line
 
 A terminal in canonical mode silently drops or corrupts anything past
