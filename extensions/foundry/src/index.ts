@@ -856,6 +856,10 @@ async function executeRun(
     // this file, so without it the Floor shows the graph the run started with
     // for the whole of the run.
     persist: (graph) => writeRunGraph(root, graph),
+    // Lets the budget be re-read while agents are in flight. Without it the
+    // wall-clock budget can only fire between waves, which is every case
+    // except the one it exists for: an agent that never comes back.
+    wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   })
 
   await writeRunGraph(root, outcome.graph)

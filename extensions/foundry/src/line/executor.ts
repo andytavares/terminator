@@ -108,6 +108,17 @@ export interface ExecutorDeps {
   readonly persist?: (graph: RunGraph) => Promise<void>
 
   /**
+   * Wait, interruptibly. Injected so a test can drive the clock.
+   *
+   * Used only to re-read the budget while agents are in flight — see
+   * `waveOrBreach`.
+   */
+  readonly wait?: (ms: number) => Promise<void>
+
+  /** How often to re-read the budget while a wave is running. */
+  readonly budgetPollMs?: number
+
+  /**
    * The session a role may carry on in, when it may.
    *
    * A recipe is one conversation per lane, not one agent per node: a fresh
@@ -285,15 +296,57 @@ export async function execute(
   let halted = false
   let stalled = false
 
+  /** The budget, read against what is happening right now. */
+  function currentBreach(): ReturnType<typeof budgetBreach> {
+    const observed = deps.observe?.() ?? { elapsedMinutes: 0, filesTouched: 0 }
+    return budgetBreach(budgets, {
+      ...observed,
+      agents: current.nodes.filter((n) => n.state === 'running').length,
+    })
+  }
+
+  /**
+   * Wait for the wave, or for the budget to be exceeded while it runs.
+   *
+   * Checking budgets only *between* waves means a single agent that never
+   * returns is the one case the check cannot catch — and it is the case the
+   * budget exists for. FR-030 asks for a pause when the budget is exceeded,
+   * not for one when the wave that exceeded it happens to end.
+   *
+   * The agents are not killed: their terminals are still there and their work
+   * is still in the worktree, which is what "preserving work in progress"
+   * means. The run stops asking for more.
+   */
+  async function waveOrBreach<T>(
+    wave: Promise<T[]>
+  ): Promise<{ results: T[] } | { breach: NonNullable<ReturnType<typeof budgetBreach>> }> {
+    const pollMs = deps.budgetPollMs ?? 15_000
+    const wait = deps.wait
+    if (wait === undefined) return { results: await wave }
+
+    let settled = false
+    const done = wave.then((results) => {
+      settled = true
+      return results
+    })
+
+    for (;;) {
+      const raced = await Promise.race([
+        done.then((results) => ({ results })),
+        wait(pollMs).then(() => null),
+      ])
+      if (raced !== null) return raced
+      if (settled) return { results: await done }
+      const breach = currentBreach()
+      if (breach !== null) return { breach }
+    }
+  }
+
   while (!isComplete(current) && !halted) {
     // Budgets are part of the agreement, not advice. Checked before a wave
     // rather than after, so a breach stops the next agent instead of being
     // discovered once it has spent its turn.
-    const observed = deps.observe?.() ?? { elapsedMinutes: 0, filesTouched: 0 }
-    const breach = budgetBreach(budgets, {
-      ...observed,
-      agents: current.nodes.filter((n) => n.state === 'running').length,
-    })
+    const breach = currentBreach()
     if (breach !== null) {
       halted = await raise('budget.exceeded', {
         summary: `${order.title} has gone past its ${breach.kind.replace('_', ' ')} budget`,
@@ -364,7 +417,7 @@ export async function execute(
     const started = startReady(current, budgets, deps.now())
     await advance(started.graph)
 
-    const results = await Promise.all(
+    const wave = Promise.all(
       started.started
         .map((id) => current.nodes.find((n) => n.id === id))
         .filter((n): n is RunNode => n !== undefined && n.kind !== 'gate')
@@ -404,6 +457,21 @@ export async function execute(
           return { node, result }
         })
     )
+
+    const waved = await waveOrBreach(wave)
+    if ('breach' in waved) {
+      const { breach } = waved
+      halted = await raise('budget.exceeded', {
+        summary: `${order.title} has gone past its ${breach.kind.replace('_', ' ')} budget`,
+        why:
+          `The order budgets ${breach.limit} and this run is at ${breach.actual}. ` +
+          `Its agents are still in their terminals — nothing was thrown away.`,
+      })
+      // Even where the rule is silenced, a run past its budget stops asking
+      // for more. The budget is part of what was agreed, not a preference.
+      break
+    }
+    const { results } = waved
 
     for (const { node, result } of results) {
       await advance(withNode(current, node.id, { sessionId: result.sessionId }))

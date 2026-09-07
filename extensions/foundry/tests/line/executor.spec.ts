@@ -1240,3 +1240,87 @@ describe('writing the graph down as it changes', () => {
     expect(outcome.complete).toBe(true)
   })
 })
+
+// The budget was read between waves, and the loop then parked on the wave. So
+// the one case a wall-clock budget exists for — an agent that never comes
+// back — is the one case it could not catch. A live run sat forty minutes past
+// a twenty-minute budget with nothing to show for it.
+describe('a budget exceeded while agents are still running', () => {
+  /** A wave that never finishes, which is what a hung agent looks like. */
+  const hangs = () => new Promise<StartedRun>(() => {})
+
+  function clock() {
+    let minutes = 0
+    return {
+      observe: () => ({ elapsedMinutes: minutes, filesTouched: 0 }),
+      wait: async (_ms: number) => {
+        minutes += 10
+      },
+      budgetPollMs: 1,
+    }
+  }
+
+  it('stops the run rather than waiting for the wave that will not end', async () => {
+    const o = order([unit('U-1')], {
+      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(hangs as never),
+      autonomy: 'escorted',
+      ...clock(),
+    })
+    expect(outcome.gates.map((g) => g.rule)).toContain('budget.exceeded')
+  })
+
+  it('says the agents were not thrown away, because they were not', async () => {
+    const o = order([unit('U-1')], {
+      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(hangs as never),
+      autonomy: 'escorted',
+      ...clock(),
+    })
+    const gate = outcome.gates.find((g) => g.rule === 'budget.exceeded')
+    expect(gate?.why).toContain('still in their terminals')
+  })
+
+  it('stops even where the setting silences the rule — a budget is not a preference', async () => {
+    const o = order([unit('U-1')], {
+      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(hangs as never),
+      autonomy: 'lights-out',
+      ...clock(),
+    })
+    // `budget.exceeded` is unconditional, so it is raised at every setting —
+    // and the run is over either way.
+    expect(outcome.shippable).toBe(false)
+    expect(outcome.complete).toBe(false)
+  })
+
+  it('leaves a wave that finishes inside its budget completely alone', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      observe: () => ({ elapsedMinutes: 1, filesTouched: 1 }),
+      wait: async () => undefined,
+      budgetPollMs: 1,
+    })
+    expect(outcome.complete).toBe(true)
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('budget.exceeded')
+  })
+
+  it('still works with no clock injected at all, which is every existing caller', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.complete).toBe(true)
+  })
+})
