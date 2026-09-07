@@ -6,6 +6,7 @@ import * as path from 'node:path'
 import { shipOrder, markReady } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
+import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
@@ -177,8 +178,23 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
           raised.push(gate)
           return 'hold'
         },
+        // The real writer, not a spy. `integrateDepsFor` filed every shipping
+        // entry under `orderId: subject`, and `ship.draft_opened`'s subject is
+        // the pull request URL — so the entry that says the Line did its job
+        // went to `orders/https:/github.com/owner/repo/pull/8/ledger.jsonl`
+        // and the order's own ledger never mentioned the draft. A spy for
+        // `record` cannot see that: it is handed the arguments, not the file.
         record: async (action, subject, reason) => {
           recorded.push(`${action} ${subject} ${reason}`)
+          await createOrderStore(dataRoot).record({
+            at: new Date().toISOString(),
+            orderId: order().id,
+            actor: 'rule:ship',
+            action,
+            subject,
+            reason,
+            evidence: [],
+          })
         },
         raiseGate: async (gate) => {
           raised.push(gate)
@@ -260,4 +276,27 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
     // Put it back, so the repository does not accumulate review requests.
     await exec({ command: 'gh', args: ['pr', 'ready', pull.url, '--undo'], cwd: LIVE })
   }, 120_000)
+
+  it("records the draft in the order's own ledger, and nowhere else", async () => {
+    // The entry that says the Line did the thing it exists to do. Its subject
+    // is the pull request URL, and filing by subject built a directory tree
+    // out of one:
+    //
+    //   orders/https:/github.com/owner/repo/pull/8/ledger.jsonl
+    //
+    // while the order's ledger said nothing about the draft it had opened.
+    const ledger = path.join(dataRoot, 'orders', order().id, 'ledger.jsonl')
+    expect(fs.existsSync(ledger), 'the order has no ledger').toBe(true)
+    const actions = fs
+      .readFileSync(ledger, 'utf8')
+      .split('\n')
+      .filter((line) => line.trim() !== '')
+      .map((line) => JSON.parse(line) as { action: string })
+      .map((entry) => entry.action)
+    expect(actions).toContain('ship.draft_opened')
+
+    // And no order directory named after anything but an order.
+    const orders = fs.readdirSync(path.join(dataRoot, 'orders'))
+    expect(orders, 'a ledger was filed somewhere that is not an order').toEqual([order().id])
+  })
 })
