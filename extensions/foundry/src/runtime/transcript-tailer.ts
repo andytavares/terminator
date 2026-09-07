@@ -1,0 +1,348 @@
+import { closeSync, openSync, readFileSync, readSync, statSync } from 'fs'
+
+/**
+ * What the agent has been doing, read from its own record.
+ *
+ * Declared here rather than shared with the application: the transcript's
+ * per-line shape is not a published contract, so anything parsing it is
+ * coupled to the runtime and belongs behind this boundary.
+ */
+export interface ToolActivity {
+  readonly kind: 'tool_started' | 'tool_finished'
+  readonly toolName: string
+  readonly callId: string
+  /** A shell call in flight is never silence, however long it runs. */
+  readonly isShell: boolean
+  /**
+   * The file the call touched, when it names one.
+   *
+   * What the loop signal is made of: eight tool calls against one file is a
+   * different failure from going quiet, and without this the signal had
+   * nothing to count.
+   */
+  readonly path: string | null
+  readonly at: number
+}
+
+// Reads the agent's own durable activity record. This is what keeps a session's
+// state current when the driver process is gone (FR-006) and what lets state be
+// rebuilt after a console restart (FR-009).
+//
+// The path always comes from hook input and is never computed (research.md R3).
+// The per-line JSONL schema is not a published contract, so every line is read
+// defensively: pull the handful of fields we need, ignore everything else, and
+// never fail a session because one line did not parse.
+
+const SHELL_TOOLS = new Set(['Bash', 'BashOutput', 'KillShell'])
+
+interface ToolUseBlock {
+  type?: unknown
+  id?: unknown
+  name?: unknown
+  input?: unknown
+  tool_use_id?: unknown
+}
+
+function blocksOf(entry: Record<string, unknown>): ToolUseBlock[] {
+  const message = entry.message
+  if (typeof message !== 'object' || message === null) return []
+  const content = (message as Record<string, unknown>).content
+  return Array.isArray(content) ? (content as ToolUseBlock[]) : []
+}
+
+function epochOf(entry: Record<string, unknown>): number | null {
+  const raw = entry.timestamp
+  if (typeof raw !== 'string') return null
+  const parsed = Date.parse(raw)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+function eventsFromEntry(entry: Record<string, unknown>): ToolActivity[] {
+  const at = epochOf(entry)
+  if (at === null) return []
+
+  const events: ToolActivity[] = []
+  for (const block of blocksOf(entry)) {
+    if (block.type === 'tool_use') {
+      const callId = typeof block.id === 'string' ? block.id : null
+      // Without an id the call can never be paired with its result, so the
+      // long-command exemption could not close it. Better to skip it.
+      if (callId === null) continue
+      const toolName = typeof block.name === 'string' ? block.name : 'unknown'
+      const input = block.input
+      const named =
+        typeof input === 'object' && input !== null
+          ? ((input as Record<string, unknown>).file_path ??
+            (input as Record<string, unknown>).notebook_path)
+          : null
+      events.push({
+        kind: 'tool_started',
+        toolName,
+        callId,
+        isShell: SHELL_TOOLS.has(toolName),
+        path: typeof named === 'string' ? named : null,
+        at,
+      })
+    } else if (block.type === 'tool_result') {
+      const callId = typeof block.tool_use_id === 'string' ? block.tool_use_id : null
+      if (callId === null) continue
+      events.push({ kind: 'tool_finished', toolName: '', callId, isShell: false, path: null, at })
+    }
+  }
+  return events
+}
+
+/**
+ * Reads the whole transcript and returns the supervision-relevant events in it.
+ * Cheap enough to re-read: a session's transcript is bounded by its own run.
+ */
+/**
+ * How much of the tail to read.
+ *
+ * The stall detector asks what happened recently; it has never needed the
+ * beginning. Reading the whole file put an unbounded synchronous read on the
+ * main thread every thirty seconds per run, and a multi-hour transcript is not
+ * small.
+ */
+const MAX_TAIL_BYTES = 256 * 1024
+
+/**
+ * The tail of the file, as whole lines.
+ *
+ * Null when there is nothing to read. Reading from an offset lands mid-line, so
+ * the first fragment is dropped — it is not JSON, and it is not a torn write
+ * worth reporting.
+ */
+/**
+ * How big the transcript is right now, so a caller can mark where it stands.
+ *
+ * Zero for a file that does not exist yet — a conversation being started
+ * rather than continued.
+ */
+export function transcriptSize(transcriptPath: string): number {
+  try {
+    const stat = statSync(transcriptPath)
+    return stat.isFile() ? stat.size : 0
+  } catch {
+    return 0
+  }
+}
+
+/** Every line written after `fromByte`, bounded like every other read here. */
+function linesFrom(transcriptPath: string, fromByte: number): string[] | null {
+  try {
+    const stat = statSync(transcriptPath)
+    if (!stat.isFile()) return null
+    // A transcript that shrank was replaced; anything remembered about it is
+    // about a different file, so read it whole rather than from a stale mark.
+    const start = fromByte > stat.size ? 0 : fromByte
+    const length = Math.min(stat.size - start, MAX_TAIL_BYTES)
+    if (length <= 0) return []
+
+    const handle = openSync(transcriptPath, 'r')
+    try {
+      const buffer = Buffer.alloc(length)
+      const read = readSync(handle, buffer, 0, length, start)
+      return buffer.subarray(0, read).toString('utf-8').split('\n')
+    } finally {
+      closeSync(handle)
+    }
+  } catch {
+    return null
+  }
+}
+
+function tailLines(transcriptPath: string): string[] | null {
+  try {
+    const stat = statSync(transcriptPath)
+    if (!stat.isFile()) return null
+    if (stat.size <= MAX_TAIL_BYTES) return readFileSync(transcriptPath, 'utf-8').split('\n')
+
+    const handle = openSync(transcriptPath, 'r')
+    try {
+      const buffer = Buffer.alloc(MAX_TAIL_BYTES)
+      const read = readSync(handle, buffer, 0, MAX_TAIL_BYTES, stat.size - MAX_TAIL_BYTES)
+      const lines = buffer.subarray(0, read).toString('utf-8').split('\n')
+      lines.shift()
+      return lines
+    } finally {
+      closeSync(handle)
+    }
+  } catch {
+    // Not written yet, removed, or not a file. None of those is an error the
+    // operator needs to see — the session simply has no durable record yet.
+    return null
+  }
+}
+
+export function readTranscript(transcriptPath: string): ToolActivity[] {
+  const lines = tailLines(transcriptPath)
+  if (lines === null) return []
+
+  const events: ToolActivity[] = []
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === '') continue
+    let entry: unknown
+    try {
+      entry = JSON.parse(trimmed)
+    } catch {
+      // Torn or corrupt line — skip it, keep reading.
+      continue
+    }
+    if (typeof entry !== 'object' || entry === null) continue
+    events.push(...eventsFromEntry(entry as Record<string, unknown>))
+  }
+  return events
+}
+
+/**
+ * How many turns the agent has taken, counted from its own record.
+ *
+ * Under an in-process runtime this arrived in a `result` message along with
+ * the cost and the context window. A terminal has no such message, and the
+ * transcript carries neither cost nor context — so this is what is honestly
+ * available, and the surfaces say nothing rather than showing a confident
+ * $0.00 that means "not measured".
+ */
+/**
+ * How many turns the agent has taken.
+ *
+ * Counted over the tail, like everything else here: the number is shown on a
+ * card and used to decide a turn ended, and neither is worth an unbounded
+ * synchronous read of a multi-hour transcript on the main thread. A run past
+ * the bound under-reports rather than freezing the window.
+ */
+export function countTurns(transcriptPath: string): number {
+  const lines = tailLines(transcriptPath)
+  if (lines === null) return 0
+
+  let turns = 0
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === '') continue
+    try {
+      const entry = JSON.parse(trimmed) as { type?: unknown; isSidechain?: unknown }
+      // A sidechain is a subagent's own conversation, not a turn of this one.
+      if (entry.type === 'assistant' && entry.isSidechain !== true) turns += 1
+    } catch {
+      // Torn or corrupt line — skip it, keep counting.
+    }
+  }
+  return turns
+}
+
+/**
+ * How a command a rung asked for actually came out.
+ *
+ * A `run` rung is a command, and FR-037 says its verdict comes from the exit
+ * status — never from what anything printed, and never from the agent's own
+ * account of how it went (FR-033). The agent runs it inside the supervised
+ * session, which is what makes its output visible and its tool calls
+ * hook-gated; the *result* of that tool call is the runtime's own record, and
+ * that is what this reads.
+ *
+ * `null` when the command was never run. That is "not measured", which is the
+ * one thing it must never be confused with a pass: an agent that decided not
+ * to run the tests has not passed them.
+ */
+export function rungExitCode(
+  transcriptPath: string,
+  command: string,
+  /**
+   * Where this node's own turn begins, as a byte offset into the transcript.
+   *
+   * A lane is one conversation, so every node after the first resumes it and
+   * they all write to the same file. Reading the whole thing answered a rung
+   * with somebody else's tool call: on a live run the architect ran `npm test`
+   * while scouting, and asking this for the `test` rung returned the
+   * architect's result — from before the change existed, produced by the very
+   * session whose work was under test. That is FR-033 again, one layer down.
+   *
+   * Zero reads everything, which is right for a conversation that starts here.
+   */
+  fromByte = 0
+): number | null {
+  const lines = fromByte > 0 ? linesFrom(transcriptPath, fromByte) : tailLines(transcriptPath)
+  if (lines === null) return null
+
+  const wanted = command.trim()
+  if (wanted === '') return null
+
+  // The call ids of every shell invocation that ran this command, in order.
+  const calls: string[] = []
+  const results = new Map<string, boolean>()
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === '') continue
+    let entry: { message?: { content?: unknown } }
+    try {
+      entry = JSON.parse(trimmed) as { message?: { content?: unknown } }
+    } catch {
+      continue
+    }
+    const content = entry.message?.content
+    if (!Array.isArray(content)) continue
+
+    for (const raw of content) {
+      const block = raw as {
+        type?: unknown
+        name?: unknown
+        id?: unknown
+        input?: { command?: unknown }
+        tool_use_id?: unknown
+        is_error?: unknown
+      }
+      if (block.type === 'tool_use' && SHELL_TOOLS.has(String(block.name))) {
+        const ran = block.input?.command
+        if (typeof ran === 'string' && ran.includes(wanted) && typeof block.id === 'string') {
+          calls.push(block.id)
+        }
+      } else if (block.type === 'tool_result' && typeof block.tool_use_id === 'string') {
+        results.set(block.tool_use_id, block.is_error === true)
+      }
+    }
+  }
+
+  // The last time it was run is the answer: a rung the agent retried is judged
+  // on the attempt it finished with.
+  for (let i = calls.length - 1; i >= 0; i -= 1) {
+    const errored = results.get(calls[i])
+    if (errored !== undefined) return errored ? 1 : 0
+  }
+  return null
+}
+
+/**
+ * A rung's exit status, once the transcript has caught up.
+ *
+ * The turn ending and the transcript being written are not the same instant:
+ * the end arrives on the `Stop` hook, and the records it is about are flushed
+ * after it. Reading immediately raced them and lost — a live run whose rungs
+ * both ran and both exited 0 shipped saying "Not measured here: Lint, The
+ * unit's own tests", and the same `rungExitCode` answers 0 for both against
+ * the finished file.
+ *
+ * Bounded, and it still answers `null` at the end of it. "We could not see it"
+ * is a real answer, which the ladder reads as not measured; waiting forever for
+ * a better one is not.
+ */
+export async function settledRungExitCode(
+  transcriptPath: string,
+  command: string,
+  fromByte = 0,
+  options: { withinMs?: number; pollMs?: number; wait?: (ms: number) => Promise<void> } = {}
+): Promise<number | null> {
+  const withinMs = options.withinMs ?? 5_000
+  const pollMs = options.pollMs ?? 250
+  const wait = options.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
+
+  const deadline = Date.now() + withinMs
+  for (;;) {
+    const measured = rungExitCode(transcriptPath, command, fromByte)
+    if (measured !== null) return measured
+    if (Date.now() >= deadline) return null
+    await wait(pollMs)
+  }
+}

@@ -612,9 +612,45 @@ const off = api.issues.onLinkChange((id, next) => {
 **Identity is the pair `(tracker, key)`, never the key alone.** Two trackers can both have a
 `TAV-42` and they are different issues.
 
-**There is deliberately no way to create or edit an issue**, or to change any field of one.
-`comment` is the entire write surface, and a test asserts the shape of that surface so it stays
-that way.
+**Two writes, and only two**: a comment, and the issue's own position in its own workflow.
+There is deliberately no way to create an issue, to delete one, or to change any other field of
+one — not the title, not the assignee, not a label. A test asserts the shape of that surface, so
+widening it takes a deliberate edit to a file whose purpose is to make widening conspicuous.
+
+#### Moving an issue along its workflow _(v2.3.0)_
+
+```typescript
+// Ask first. Synchronous, because it is a fact about the tracker rather than
+// about an issue — you can plan around it instead of calling and catching.
+if (api.issues.supportsTransitions('linear')) {
+  // What this issue could be moved to, right now. Per-issue: a tracker's
+  // answer may depend on the issue's current status.
+  const options = await api.issues.states('linear', 'TAV-42')
+
+  // Move it. The third argument is an intent — `started`, `in_review` or
+  // `done` — and the tracker decides which of its own states that means.
+  await api.issues.transition('linear', 'TAV-42', 'in_review')
+
+  // …unless you pass the operator's own choice, from `states()`.
+  await api.issues.transition('linear', 'TAV-42', 'in_review', options[1].id)
+}
+```
+
+**Why an intent and not a state id.** "In review" is not a fact about a tracker; it is a decision
+about which of their states means that. Keeping the resolution behind an intent puts it in one
+place instead of in every caller — and it is the only signature both shipped trackers can satisfy,
+since Linear sets a target state directly and Jira can only perform a transition available from
+the issue's current status.
+
+**Only Linear implements it.** `supportsTransitions('jira')` is `false`, and `states` / `transition`
+reject with the distinguishable kind `unsupported` rather than a generic failure. Handle the two
+differently: retry a failure, record an unsupported capability once and stop asking.
+
+**Never emulate what the tracker cannot do.** A tracker that cannot move an issue does not get a
+comment saying it moved.
+
+See [ADR 041](adr/041-an-extension-may-move-an-issue.md) for the whole decision, including what
+was deliberately not added.
 
 **Types** — `Issue`, `IssueSummary`, `IssueLink`, `IssueListResult`, `TrackerConnection`,
 `TrackerId` — are exported from the API module. Do not re-declare them locally.
@@ -665,7 +701,7 @@ without a reload.
 
 ---
 
-> **A note on version numbers.** The markers in this document (v1.1.0 … v2.2.0) are the API's own
+> **A note on version numbers.** The markers in this document (v1.1.0 … v2.3.0) are the API's own
 > release series. The annotations in `src/main/extensions/api.ts` still use an older v1.x series
 > for some of the same members. The two disagree; this document is the one to follow. Reconciling
 > them is a separate cleanup and was deliberately not folded into the v2.2.0 work.

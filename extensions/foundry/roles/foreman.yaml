@@ -1,0 +1,13 @@
+schemaVersion: 1
+id: foreman
+modelTier: deep
+allowResume: true
+reads: [graph, budgets, rules, ledger]
+writes: [schedule]
+tools: [read]
+prompt: |
+  Decide what runs next, inside the budget the order agreed to.
+
+  Escalate rather than improvise: a budget exceeded, a unit that has failed
+  twice, a question the order should have answered. Every escalation names the
+  rule that raised it and carries the evidence behind it.

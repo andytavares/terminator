@@ -24,27 +24,27 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-const SPECKIT_SEARCH = 'input[aria-label="Search workspace knowledge"]'
+const FOUNDRY_IDEA = 'input[aria-label="Describe what you want built or fixed"]'
 
-/** Run script inside the SpecKit extension view and return its result. */
-function inSpecKit<T>(script: string): Promise<T> {
+/** Run script inside the Foundry extension view and return its result. */
+function inFoundry<T>(script: string): Promise<T> {
   return handle.app.evaluate(async ({ webContents }, src) => {
     const view = webContents
       .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('speckit'))
-    if (!view) throw new Error('the SpecKit view is not loaded')
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
     return view.executeJavaScript(src) as Promise<unknown>
   }, script) as Promise<T>
 }
 
-/** Sends Escape into SpecKit's own view, bypassing the host page. */
+/** Sends Escape into Foundry's own view, bypassing the host page. */
 async function pressEscape(times: number, gapMs = 100): Promise<void> {
   await handle.app.evaluate(
     async ({ webContents }, { count, gap }) => {
       const view = webContents
         .getAllWebContents()
-        .find((wc) => !wc.isDestroyed() && wc.getURL().includes('speckit'))
-      if (!view) throw new Error('the SpecKit view is not loaded')
+        .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+      if (!view) throw new Error('the Foundry view is not loaded')
       for (let i = 0; i < count; i++) {
         view.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
         view.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
@@ -82,12 +82,12 @@ function extensionShowing(): Promise<boolean> {
 
 /**
  * Idempotent: the workspace tab button toggles, so clicking it when the view is
- * already up closes it. Each test asks for "SpecKit is on screen", not "click
- * the SpecKit button".
+ * already up closes it. Each test asks for "Foundry is on screen", not "click
+ * the Foundry button".
  */
-async function openSpecKit(): Promise<void> {
+async function openFoundry(): Promise<void> {
   if (await extensionShowing()) return
-  const button = handle.page.locator('button[aria-label="SpecKit"]')
+  const button = handle.page.locator('button[aria-label="Foundry"]')
   await expect(button).toBeVisible({ timeout: 15000 })
   await button.click()
   await expect.poll(extensionShowing, { timeout: 20000 }).toBe(true)
@@ -96,16 +96,33 @@ async function openSpecKit(): Promise<void> {
 
 /** Move focus off any text field, so the text-field guard is not what is being tested. */
 function blurEverything(): Promise<void> {
-  return inSpecKit(`(() => {
+  return inFoundry(`(() => {
     const el = document.activeElement
     if (el && typeof el.blur === 'function') el.blur()
     return true
   })()`)
 }
 
-async function focusSearchAndType(value: string): Promise<string> {
-  return inSpecKit<string>(`(() => {
-    const el = document.querySelector(${JSON.stringify(SPECKIT_SEARCH)})
+/**
+ * Put the Forge on screen.
+ *
+ * The inbox is home, and the text field this spec needs is on the Forge — so
+ * "open Foundry" is not enough to reach a text field any more.
+ */
+async function openForge(): Promise<void> {
+  await inFoundry(`(function () {
+    var all = document.querySelectorAll('button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').trim() === 'Forge') { all[i].click(); return true }
+    }
+    return false
+  })()`)
+  await handle.page.waitForTimeout(600)
+}
+
+async function focusIdeaAndType(value: string): Promise<string> {
+  return inFoundry<string>(`(() => {
+    const el = document.querySelector(${JSON.stringify(FOUNDRY_IDEA)})
     if (!el) return 'no input'
     el.focus()
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
@@ -115,9 +132,9 @@ async function focusSearchAndType(value: string): Promise<string> {
   })()`)
 }
 
-function searchValue(): Promise<string> {
-  return inSpecKit<string>(`(() => {
-    const el = document.querySelector(${JSON.stringify(SPECKIT_SEARCH)})
+function ideaValue(): Promise<string> {
+  return inFoundry<string>(`(() => {
+    const el = document.querySelector(${JSON.stringify(FOUNDRY_IDEA)})
     return el ? el.value : '<gone>'
   })()`)
 }
@@ -128,12 +145,13 @@ function searchValue(): Promise<string> {
  * preload, which runs in an isolated world.
  */
 function setModalDepth(depth: number): Promise<void> {
-  return inSpecKit(`(() => { window.electronAPI.ui.setModalDepth(${depth}); return true })()`)
+  return inFoundry(`(() => { window.electronAPI.ui.setModalDepth(${depth}); return true })()`)
 }
 
 test('Escape twice in a text field keeps the extension open and the draft intact', async () => {
-  await openSpecKit()
-  expect(await focusSearchAndType('my unsaved draft')).toBe('my unsaved draft')
+  await openFoundry()
+  await openForge()
+  expect(await focusIdeaAndType('my unsaved draft')).toBe('my unsaved draft')
 
   await pressEscape(2)
   await handle.page.waitForTimeout(1000)
@@ -141,11 +159,11 @@ test('Escape twice in a text field keeps the extension open and the draft intact
   // The defect: before the guard, both of these failed — the extension closed
   // and the text went with it.
   expect(await extensionShowing()).toBe(true)
-  expect(await searchValue()).toBe('my unsaved draft')
+  expect(await ideaValue()).toBe('my unsaved draft')
 })
 
 test('Escape twice while a dialog is open does not exit the extension', async () => {
-  await openSpecKit()
+  await openFoundry()
   await blurEverything()
   await setModalDepth(1)
 
@@ -157,7 +175,7 @@ test('Escape twice while a dialog is open does not exit the extension', async ()
 })
 
 test('Escape twice with nested dialogs open does not exit the extension', async () => {
-  await openSpecKit()
+  await openFoundry()
   await blurEverything()
   await setModalDepth(3)
 
@@ -169,7 +187,7 @@ test('Escape twice with nested dialogs open does not exit the extension', async 
 })
 
 test('the exit gesture still works once nothing has claimed the key', async () => {
-  await openSpecKit()
+  await openFoundry()
   // Neither a text field nor a terminal, and nothing open — the one case where
   // the gesture is supposed to fire.
   await blurEverything()
@@ -185,7 +203,7 @@ test('the exit gesture still works once nothing has claimed the key', async () =
 })
 
 test('two Escapes further apart than the gesture window never pair', async () => {
-  await openSpecKit()
+  await openFoundry()
   await blurEverything()
 
   await pressEscape(1)

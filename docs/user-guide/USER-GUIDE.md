@@ -21,7 +21,7 @@ An end-to-end reference for every feature and extension in Terminator — an ext
 13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
 14. [Extensions Overview](#14-extensions-overview)
 15. [Extension: Git Integration](#15-extension-git-integration)
-16. [Extension: SpecKit Pilot](#16-extension-speckit-pilot)
+16. [Extension: Foundry](#16-extension-foundry)
 17. [Extension: Notepad](#17-extension-notepad)
 18. [Extension: Task Vault](#18-extension-task-vault)
 19. [Extension: Remote Control](#19-extension-remote-control)
@@ -71,7 +71,7 @@ The window is divided into three zones:
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                                                                                                                                                        |
 | **Main sidebar** | A compact row of app icons at the top (Overview, Notes, Remote Control, Task Vault, Git Changes, and the notification bell), then search with the Filter and Display menus, then every repo with its branches. Terminals are not listed here — they are tabs above the terminal, and cards on the board. |
-| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, SpecKit, Git).                                                                                                                                                                                                |
+| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, Foundry, Git).                                                                                                                                                                                                |
 
 The **status bar** at the bottom of the window shows live CPU, Memory, and Network figures when the global metrics bar is enabled in Settings.
 
@@ -336,12 +336,12 @@ Terminator **never changes a field on an issue** — not its state, not its assi
 only thing it can write is a comment, and only in two places:
 
 - **You press Comment** in the issue panel.
-- **A pull request opens** for a SpecKit Pilot card whose issue is attached — and this is
+- **A pull request opens** for a Foundry order whose issue is attached — and this is
   **off by default**.
 
 > **Behaviour change.** That pull-request comment used to fire whenever its setting happened to be
 > on, and its failures were discarded silently — so nobody could tell a comment that posted from
-> one that never had. It is now off unless you turn it on, in the SpecKit Pilot settings, and when
+> one that never had. It is now off unless you turn it on, in the Foundry settings, and when
 > it fails you are told. **If you were relying on it, switch it back on.**
 
 ---
@@ -406,7 +406,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 
 ### Leaving an extension
 
-Press `Esc` twice in quick succession (within half a second) inside any extension — Notes, Task Vault, Git Integration, SpecKit Pilot, Remote Control — and Terminator returns you to the terminal session you were last in. Extension sidebar panels close in place; full-screen extension tabs close and reveal the terminal behind them.
+Press `Esc` twice in quick succession (within half a second) inside any extension — Notes, Task Vault, Git Integration, Foundry, Remote Control — and Terminator returns you to the terminal session you were last in. Extension sidebar panels close in place; full-screen extension tabs close and reveal the terminal behind them.
 
 It takes two presses because extensions use a single `Esc` for their own dismissals — closing a dropdown, cancelling a rename, dismissing a dialog. The first press still goes to the extension, so nothing is stolen; the second is what leaves. `Esc` inside a terminal always goes to the shell and never exits anything.
 
@@ -421,7 +421,7 @@ Terminator ships five built-in extensions:
 | Extension           | What it adds                                                                                            |
 | ------------------- | ------------------------------------------------------------------------------------------------------- |
 | **Git Integration** | Live git status sidebar, staging/committing, PR creation, MergeFlow conflict resolver, Code Reviews tab |
-| **SpecKit Pilot**   | Autonomous ticket-to-PR pipeline with 10 phases, Linear/Jira integration                                |
+| **Foundry**         | A software factory: an idea becomes a work order that compiles, then a draft pull request               |
 | **Notepad**         | Markdown notes, live preview, diagrams, tags, folders, full-text search                                 |
 | **Task Vault**      | GTD+BuJo+PARA productivity vault with kanban, recurring tasks, weekly review                            |
 | **Remote Control**  | Local HTTP/WebSocket server + optional ngrok tunnel for browser-based terminal access                   |
@@ -507,107 +507,184 @@ Features:
 
 ---
 
-## 16. Extension: SpecKit Pilot
+## 16. Extension: Foundry
 
-![SpecKit tab](screenshots/08-speckit-tab.png)
+![The Foundry inbox](screenshots/08-foundry-tab.png)
 
-SpecKit Pilot automates the full ticket-to-PR lifecycle across a **10-phase pipeline**:
+Foundry is a **software factory**. You give it an idea — typed in, or a Linear
+or Jira issue — and it converges that into a **work order** you can read and
+argue with. When the order compiles, it is handed to an orchestration that does
+the work, manages the agents, checks the result and opens a draft pull request.
 
-```
-Constitution → Specify → Clarify → Plan → Checklist → Tasks → Analyze → Implement → Self-review → Open PR
-```
+It replaces SpecKit Pilot's board and its ten-phase pipeline. The headline
+difference is how often it interrupts you: a one-line change used to cost nine
+decisions — eight phase approvals and a merge — and now costs **nought to two**,
+because nothing stops unless a **named rule** fires.
 
-Each phase runs Claude Code **in a terminal you can see**, in the card's own
-worktree project — it appears in the sidebar, you can read it, and you can type
-into it at any time without the pilot losing track. **Human approval gates**
-protect every phase boundary, and every tool call the agent makes is held until
-somebody decides.
+### Opening Foundry
 
-For small changes you can flip a card to **Quick fix** at hand-off, which skips the upfront spec/analysis phases and runs a short pipeline instead:
+Click the **Foundry** tab in the content area tab bar. Three surfaces, and the
+one you land on is the inbox.
 
-```
-Plan → Implement → Self-review → Open PR
-```
+### Inbox — the only surface you have to visit
 
-Each run happens in the card's own git **worktree** on a dedicated branch (the Linear-suggested branch name when the card came from a Linear ticket, otherwise `<git-username>/<ticket-key>-<kebab-title>`), so the base branch is never touched. If a run goes sideways, **Reset / start over** on the card removes the worktree + branch, wipes the run history, and returns the card to a clean, re-dispatchable state (the brief and ticket are kept).
+One queue, always sorted by how much work each decision unblocks. Every row
+says:
 
-### Opening SpecKit Pilot
+- **which rule raised it** — `risk.p0`, `budget.exceeded`, `destructive`,
+  `ready-for-review`, and five more;
+- **why it fired**, and the evidence it looked at;
+- **what each option does**, on the button itself;
+- **what happens if you ignore it**, and whether it will wait for ever.
 
-Click the **SpecKit** tab in the content area tab bar.
+When nothing has fired, it says "Nothing needs you" and tells you what is
+building, what is converging, and how many decisions were taken by rule while
+you were away.
 
-### Reading the board
+**The autonomy dial** (Settings → Foundry) decides which rules are live.
+Four are live at every setting — the highest risk grade, an exceeded budget,
+anything destructive, and marking a pull request ready — so **lights-out** will
+open a draft without you and still will not merge anything.
 
-Each card tells you where it is and what happens next, in words:
+### Forge — where an idea becomes an order
 
-- A **progress bar** with `7 of 10`, rather than ten numbered circles that required you to have
-  memorised that phase 4 is Plan.
-- A **next-step line** that distinguishes waiting on you from waiting on the machine:
-  `Running implement`, `Review plan`, `Next: tasks`, `Plan failed`, or `Done`. Hover the bar to
-  see which phases are finished.
+Describe what you want built or fixed. Before you are asked anything, Foundry
+reads the repository: its manifests, its real commands, its house documents
+(`CLAUDE.md`, `AGENTS.md`, a constitution, `CONTRIBUTING.md`), and any past
+decision about a file your idea names. A question that survives that is one the
+code genuinely could not answer.
 
-The supervision tabs above the board — **Running**, **Stuck**, **To review**, **Activity**,
-**History** — stay visible even when everything is quiet, so an empty panel is never confused
-with one that failed to load.
+The document is the subject; the conversation sits behind it. On the left rail:
 
-### Supervising what is running
+- **Six checks**, and it will not hand off until all six pass — no open
+  questions, every acceptance criterion falsifiable, coverage complete in both
+  directions, risk graded against _this_ plan, adversarial findings resolved,
+  budgets set. Each failure names the specific criterion, unit or question
+  responsible.
+- **At most three questions**, ever. Everything else Foundry decided is a
+  **strikeable assumption** — click it to strike it, and the parts of the
+  document that depended on it are redrawn.
+- **"Not measurable here"**, when the repository has no command for a check.
+  Those report **"not measured"** rather than passing. A green you did not earn
+  is worse than a gap you can see — and the three rungs that were never
+  commands (independent verification, the security inspection, your own
+  decision) say where they were decided instead of counting as gaps.
 
-Above the board are two panels that answer "does anything need me?".
+**Draft the plan** is the first thing to press. Foundry seeds a draft with your
+problem statement and what it read in the repository; the architect turns that
+into criteria, units, a risk grade and budgets. It runs in a terminal you can
+watch, and it can only _propose_ — it cannot mark its own work agreed. Type into
+the box at the bottom to tell it what is wrong, and it redrafts.
 
-**Waiting on you** lists every tool call an agent is holding. Allow it, deny it,
-answer it in words, or hand it back to the terminal to deal with there. Nothing
-in that run moves until you do — after five minutes it is handed back
-automatically rather than left hanging.
+**Attach**, in the order's header, takes you into the terminal the architect
+is working in — the same conversation, whether it is still running or you came
+back to it after a restart.
 
-**Supervision** has four sections:
+**Red team** findings appear alongside; each is either **Fixed** or **Accepted**,
+and accepting one costs a written reason. Nothing hands off while one is open.
 
-| Section    | Answers                                                                 |
-| ---------- | ----------------------------------------------------------------------- |
-| **Runs**   | what is running, what state it is in, how long, how much it has changed |
-| **Stalls** | what stopped making progress without asking for anything                |
-| **Review** | what is finished and waiting on you, worst risk first                   |
-| **Feed**   | what happened, and a roll-up of what happened since you last looked     |
+**Shape of work** offers the shapes this repository can actually support — one
+that cannot run here says which requirement it does not meet rather than
+quietly disappearing. Foundry proposes one and says why it chose it ("2 units
+of work", "graded P1, which is above the direct shape's ceiling"). Pick a
+different one in a click; the override is recorded alongside the proposal it
+replaced.
 
-Every run offers the same six actions: go to its **Terminal**, read its
-**Transcript**, **Interrupt** it (ends the turn, keeps the session, so your next
-message lands), **Redirect** it, **Stop** it, or **Discard** it — which ends it
-and removes its worktree and branch.
+![A work order in the Forge, with its convergence checks and the shape of work](screenshots/08b-foundry-forge.png)
 
-The **command palette** (`Cmd+P`) carries every live run and every diff waiting
-on review, blocked ones first. Choosing one takes you straight there.
+**Compile & hand off** agrees the order and starts the work. If the order is
+seeded from a tracker issue, a **Tracker write-back** panel lets you say which
+of _your_ workflow states each moment means — when work starts, when the draft
+opens, when it merges. Left alone, the tracker decides.
 
-### Review, and why a fourth agent gets refused
+### Floor — watching a run
 
-A finished turn with changes is graded by what it touched — **P0** for auth,
-payments, secrets, migrations or a public API, down to **P3** for a lockfile
-bump — and the grade is always shown with the reason for it. You accept or
-reject **hunk by hunk**, not file by file, because one file routinely holds both
-the change you asked for and the one you did not.
+The run graph by repository, what is ready, what is blocked and why. When an
+order spans several repositories there is a **merge order** section naming the
+files the lanes share and which lane must land first.
 
-With **three diffs unreviewed, a new run is refused** and says so. Overriding is
-one click and is recorded with how deep the queue was at the time.
+Two things you can do without leaving:
 
-Stall detection ships in **shadow mode**: stalls are recorded and shown, never
-notified, until you have judged a week of them against your own read. Turn it off
-in Settings once the thresholds have earned it.
+- **Waiting on you** lists every tool call an agent is holding — allow it, deny
+  it, or hand it back to the terminal to answer where the agent is. Nothing in
+  that run moves until you do.
+- Every piece of work is named by what it is — the role and the unit it is
+  building, not the identifier the run graph uses internally — and **Blocked**
+  says what each one is waiting on in the same words.
+- **Watch** a unit to read its transcript, and **Redirect**, **Interrupt** or
+  **Stop** it. The terminal is always there as the backstop: the agent runs in
+  a real terminal in its own worktree project, and you can go and type at it.
 
-### Workflow
+### When it refuses to start another one
 
-1. Connect your Linear or Jira account in Settings → SpecKit Pilot (credentials stored in the main-process secrets store, never exposed to the renderer).
-2. Your assigned tickets load onto the board automatically when SpecKit Pilot opens (deduped, so reopening never creates duplicates); use **Import ticket** to refresh on demand. Open a card and click **Start** to run it.
-3. SpecKit creates a feature directory and begins running phases automatically.
-4. At each phase boundary a gate appears — review the output and click **Approve** or **Request Changes**.
-5. The **Implement** phase streams live batch check-in banners showing progress.
-6. The **Self-review** gate runs `format + lint + coverage + /google-review` and summarises the quality report.
-7. The **Open PR** gate prompts for a PR title before pushing.
+Three finished pieces of work waiting for your review, and starting a fourth is
+refused — with the count and the limit, and **Start anyway** next to it. The
+constraint being modelled is your own capacity to read a diff, which does not
+grow with the number of orders.
 
-Each SpecKit-mode phase invokes the project's native SpecKit skill (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, …) rather than a freeform prompt, so artifacts land in the right feature directory and the agent doesn't wander. This requires the SpecKit Claude skills to be installed (`.claude/skills/speckit-*`, via the `specify` CLI) and reachable in the run's worktree.
+Overriding is one click, and what you chose to ignore is recorded with it: the
+order's ledger gets `backpressure.overridden` naming the depth at that moment.
+The debt is visible afterwards rather than only felt.
 
-**Answering the agent.** If a phase asks a question (e.g. during
-`/speckit-clarify`), answer it in the **Waiting on you** panel, or open the run's
-terminal and answer it where the agent is — both work, and the pilot follows
-either.
+### Autonomy — how much it asks you
 
-State is persisted to `.pilot/state.json` inside each feature directory; audit log in `.pilot/history.json`.
+Three settings, differing in which rules stop the line. Four things ask at
+every one of them, including the most permissive: before anything is merged,
+before a destructive action, when a budget is exceeded, and when the change
+turns out to carry real risk.
+
+Everything else depends on where the dial is. At **escorted** every action an
+agent takes waits for you. At **standard** and **lights-out** ordinary work
+inside the unit's own worktree is taken automatically and recorded — editing
+the files the unit was given, running the project's tests — and what reaches
+you is what the rules actually wanted a person for.
+
+"Destructive" is read generously: `rm`, a hard reset, `git clean`, a force
+push, deleting a branch, and anything the check cannot parse. A command it
+cannot read is treated as destructive rather than assumed safe.
+
+### Ledger — the record, and the one place it argues back
+
+Every decision, who or what rule took it, what it was about and why, filtered
+by order, by who decided, and by action. The filters only offer values that
+actually occur.
+
+One button: **What do I keep rejecting?** Foundry reads the record and, when
+the same reason has turned work away three times, proposes a rule — citing the
+specific entries it derived from. Accept it and it applies to later work in
+every repository; decline it and it is never offered again. It proposes nothing
+until you press the button.
+
+Below that, **Checks you accepted** lists the rules you put there — never the
+ones that ship with Foundry, and never a rule a repository carries, because
+neither is yours to delete. **Remove this check** takes one back out, and the
+removal is kept with its reason so the same proposal is not offered back to you
+next week.
+
+![The Ledger, with a check the operator accepted](screenshots/08c-foundry-ledger.png)
+
+### Shipping
+
+Work ends in a **draft pull request** without being asked, carrying a written
+summary, the verdict for every criterion (including the ones nothing could
+check) and any inspection findings. The decision you are then offered is
+whether to **mark it ready** — never whether to create it.
+
+For an order graded at either of the two highest risk levels, your decision is
+taken **before** anything reaches the remote. For everything lower the draft
+opens first, so review happens on a real change.
+
+### Where Foundry keeps its things
+
+**It writes nothing into the repositories it works on** — no scaffolding, no
+configuration, not even a `.gitignore` entry. Its own records go wherever you
+point **Settings → Foundry → Where Foundry keeps its records**; leave it empty
+and they go to `<workdir>/.foundry/`, which leaves an untracked directory in
+each repository you run an order in. Foundry says so once and never edits your
+ignore file.
+
+A repository _may_ carry its own `.foundry/recipes/…`, `.foundry/roles/…` or
+`.foundry/rules/…` and those win. None is ever required to.
 
 ---
 

@@ -1,0 +1,37 @@
+schemaVersion: 1
+id: direct
+description: A small, low-risk change. Plan it, build it, prove it, ship it.
+requires: []
+steps:
+  - id: plan
+    kind: agent
+    role: architect
+  - id: build
+    kind: fanout
+    over: plan.units
+    after: [plan]
+    step: { kind: agent, role: builder }
+  - id: verify
+    kind: fanout
+    over: plan.units
+    after: [build]
+    step: { kind: agent, role: verifier, context: fresh }
+  - id: inspect
+    kind: agent
+    role: inspector
+    when: risk.triggers is not empty
+    after: [verify]
+  - id: document
+    kind: agent
+    role: scribe
+    after: [verify]
+  - id: integrate
+    kind: join
+    order: lane.ord
+    after: [inspect, document]
+  - id: ship
+    kind: gate
+    rule: ready-for-review
+    options: [mark_ready, hold]
+    defaultIfIgnored: hold
+    after: [integrate]

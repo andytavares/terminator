@@ -217,6 +217,12 @@ export type TrackerErrorKind =
   | 'unavailable'
   | 'not-found'
   | 'failed'
+  /**
+   * The tracker cannot be asked to do this at all — not today, not on retry.
+   * Distinct from 'failed' because a caller retries a failure and records an
+   * unsupported capability once (037 FR-063).
+   */
+  | 'unsupported'
 
 /**
  * How "my issues" is defined, per tracker. Tracker-shaped rather than

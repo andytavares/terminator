@@ -1,0 +1,19 @@
+schemaVersion: 1
+id: spike
+description: A question, not a change. Time-boxed, throwaway, opens no pull request.
+requires: []
+steps:
+  - id: scout
+    kind: agent
+    role: scout
+  - id: investigate
+    kind: agent
+    role: architect
+    after: [scout]
+  - id: findings
+    kind: agent
+    role: scribe
+    after: [investigate]
+  # Deliberately no integrate and no ship. A spike that opened a pull request
+  # would be a change, and this shape exists for the case where the answer is
+  # the deliverable.

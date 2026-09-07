@@ -1,0 +1,10 @@
+schemaVersion: 1
+id: no-stubs
+scope: universal
+rung: L3
+asserts: >
+  No TODO, no "not yet implemented", no function that throws instead of doing
+  the thing, and no permanently empty collection feeding a surface that can
+  therefore never show anything.
+appliesWhen: always
+origin: built-in

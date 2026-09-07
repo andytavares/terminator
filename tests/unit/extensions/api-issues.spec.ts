@@ -8,6 +8,9 @@ const service = vi.hoisted(() => ({
   search: vi.fn(),
   get: vi.fn(),
   comment: vi.fn(),
+  states: vi.fn(),
+  transition: vi.fn(),
+  supportsTransitions: vi.fn(),
 }))
 const store = vi.hoisted(() => ({
   listConnections: vi.fn(),
@@ -100,21 +103,65 @@ describe('api.issues — delegation', () => {
   })
 })
 
+describe('api.issues — workflow moves (v2.3.0)', () => {
+  it('asks the tracker what a move could mean before making one', async () => {
+    service.states.mockResolvedValue([
+      { id: 'st-review', name: 'In Review', intent: 'in_review', available: true },
+    ])
+    const api = await makeApi()
+    await expect(api.issues.states('linear', 'TAV-42')).resolves.toHaveLength(1)
+    expect(service.states).toHaveBeenCalledWith('linear', 'TAV-42')
+  })
+
+  it('carries the intent and the operator own mapping through unchanged', async () => {
+    service.transition.mockResolvedValue(undefined)
+    const api = await makeApi()
+    await api.issues.transition('linear', 'TAV-42', 'in_review', 'st-progress')
+    expect(service.transition).toHaveBeenCalledWith('linear', 'TAV-42', 'in_review', 'st-progress')
+  })
+
+  it('rejects a failed move rather than swallowing it', async () => {
+    service.transition.mockRejectedValue(new Error('Linear refused'))
+    const api = await makeApi()
+    await expect(api.issues.transition('linear', 'TAV-42', 'done')).rejects.toThrow(
+      'Linear refused'
+    )
+  })
+
+  it('answers whether a tracker supports moves at all, without calling one', async () => {
+    service.supportsTransitions.mockReturnValue(false)
+    const api = await makeApi()
+    expect(api.issues.supportsTransitions('jira')).toBe(false)
+    expect(service.transition).not.toHaveBeenCalled()
+  })
+})
+
 describe('api.issues — the surface itself (FR-034)', () => {
   it('exposes exactly the sanctioned operations', async () => {
     const api = await makeApi()
     expect(Object.keys(api.issues).sort()).toEqual(
-      ['comment', 'connections', 'get', 'linkFor', 'listMine', 'onLinkChange', 'search'].sort()
+      [
+        'comment',
+        'connections',
+        'get',
+        'linkFor',
+        'listMine',
+        'onLinkChange',
+        'search',
+        'states',
+        'supportsTransitions',
+        'transition',
+      ].sort()
     )
   })
 
-  it('offers no way to create, edit or transition an issue', async () => {
+  it('offers no way to create or delete an issue, or to set any field of one', async () => {
     const api = await makeApi()
-    const forbidden = /^(create|update|set|assign|transition|close|move|delete|archive)/i
+    // `transition` is the one sanctioned exception, and it is not a field
+    // write: it takes an intent, and refuses one the tracker cannot satisfy.
+    const forbidden = /^(create|update|set(?!ting)|assign|close|move|delete|archive|label)/i
     for (const method of Object.keys(api.issues)) {
-      // linkFor/listMine/onLinkChange are reads or subscriptions; nothing here
-      // may write to a tracker except comment.
-      expect(forbidden.test(method), `api.issues.${method} looks like a mutation`).toBe(false)
+      expect(forbidden.test(method), `api.issues.${method} looks like a field write`).toBe(false)
     }
   })
 })

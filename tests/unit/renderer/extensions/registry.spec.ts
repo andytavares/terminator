@@ -362,7 +362,7 @@ describe('useExtensionRegistry', () => {
     })
 
     it('clears an active workspace tab', () => {
-      useExtensionRegistry.getState().setActiveWorkspaceTab('speckit-pilot')
+      useExtensionRegistry.getState().setActiveWorkspaceTab('foundry')
       expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
       expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
     })
@@ -376,7 +376,7 @@ describe('useExtensionRegistry', () => {
     it('clears every full-screen surface in a single call', () => {
       useExtensionRegistry.setState({
         activeGlobalTabId: 'notepad',
-        activeWorkspaceTabId: 'speckit-pilot',
+        activeWorkspaceTabId: 'foundry',
         activeProjectTabId: 'git-integration',
       })
       expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)

@@ -136,7 +136,9 @@ test('every focusable control in an extension view shows a focus ring', async ()
  */
 const SURFACES: { id: string; label: string; part: string; open: string }[] = [
   { id: 'terminator.notepad', label: 'Notes', part: 'notepad', open: 'new note' },
-  { id: 'terminator.speckit-pilot', label: 'SpecKit', part: 'speckit', open: 'new card' },
+  // Foundry opens on the inbox, which has no text field; the Forge is where
+  // an idea is typed, so that tab is the control to press first.
+  { id: 'terminator.foundry', label: 'Foundry', part: 'foundry', open: 'forge' },
   // Each extension opens on an empty state, so the field to type into has to
   // be brought up first — which is also the path a person takes.
   { id: 'terminator.task-vault', label: 'Task Vault', part: 'task-vault', open: 'add task' },

@@ -1,0 +1,9 @@
+schemaVersion: 1
+id: flat-icons
+scope: project
+rung: L0
+asserts: >
+  Icons are flat and inherit the current text colour. No colour on an icon
+  class, no inline colour style, and opacity — not hue — carries state.
+appliesWhen: 'house_doc: .specify/memory/constitution.md'
+origin: built-in

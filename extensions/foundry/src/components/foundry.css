@@ -1,0 +1,1665 @@
+/* Foundry — the extension's own stylesheet.
+   Every colour comes from a --tm-* token; the only literals are the two
+   brand colours, which identify a product and must not shift with the theme. */
+
+/* ── Action buttons ──────────────────────────────────────────── */
+
+.sk-btn {
+  padding: 5px 12px;
+  border-radius: var(--tm-radius-xs);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.sk-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── The application chrome the extension inherits ─── */
+.sk-appbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--tm-border);
+  background: var(--tm-bg-surface);
+  flex-shrink: 0;
+}
+.sk-appbar__title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.sk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+  cursor: pointer;
+}
+.sk-btn:hover {
+  background: var(--tm-bg-card-hover);
+}
+.sk-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Knowledge search */
+
+.sk-settings-wrap {
+  padding: 10px;
+  height: 100%;
+  overflow: auto;
+}
+
+/* Chat reply row under the run console. */
+
+.sk-console-reply .sk-btn {
+  flex: none;
+}
+
+/* Principle XII: icons inherit currentColor and are sized here rather than by a
+   size prop on the component. */
+.sk-appbar .sk-btn svg,
+.sk-board__toolbar .sk-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ─── Foundry: the Forge ──────────────────────────────────────────
+   Styled only against --tm-* tokens, which are the sole place those
+   names are defined and which carry both themes. A colour that is not
+   a token here renders unstyled, so there are none. Icons are flat and
+   inherit currentColor; state is carried by shape and position. */
+
+.fdry-forge {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  align-items: start;
+  color: var(--tm-text-primary);
+}
+
+@media (max-width: 860px) {
+  .fdry-forge {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fdry-empty {
+  padding: 32px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-rail {
+  display: grid;
+  gap: 12px;
+  position: sticky;
+  top: 16px;
+  align-content: start;
+}
+
+/* On a wide screen the rail's panels sit beside each other rather than in one
+   tall stack.
+
+   The rail was 260px whatever the window, so three panels stacked past the
+   bottom of the screen and the order beside them — which is text, and does not
+   want 1300px of line length — left the right-hand two thirds empty. Scrolling
+   past dead space. Two columns roughly halves the rail's height, which is what
+   decides whether any of this needs scrolling at all. */
+@media (min-width: 1200px) {
+  .fdry-forge {
+    grid-template-columns: minmax(520px, 0.95fr) minmax(0, 1.05fr);
+  }
+
+  .fdry-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+@media (min-width: 1700px) {
+  .fdry-forge {
+    grid-template-columns: minmax(780px, 1fr) minmax(0, 1fr);
+  }
+
+  .fdry-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.fdry-panel {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: 12px 14px;
+}
+
+.fdry-panel-h {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tm-text-muted);
+  margin: 0 0 10px;
+}
+
+.fdry-check {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-check b {
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
+
+.fdry-check small {
+  display: block;
+  margin-top: 2px;
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.fdry-check-mark svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-check.is-pass .fdry-check-mark {
+  color: var(--tm-success);
+}
+
+.fdry-check.is-fail .fdry-check-mark {
+  color: var(--tm-danger);
+}
+
+.fdry-compile {
+  appearance: none;
+  margin-top: 12px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fdry-compile:not(:disabled) {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-compile:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.fdry-compile svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-question {
+  border-top: 1px solid var(--tm-border);
+  padding: 9px 0;
+  font-size: 12.5px;
+}
+
+.fdry-question b {
+  display: block;
+  color: var(--tm-text-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.fdry-question p {
+  margin: 0 0 6px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+
+.fdry-options {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.fdry-options button {
+  appearance: none;
+  border: 1px solid var(--tm-border-strong);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  border-radius: var(--tm-radius-xs);
+  padding: 3px 9px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.fdry-options button.is-recommended {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent);
+}
+
+.fdry-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tm-text-secondary);
+}
+
+/* A held tool call. The one thing on this surface that is not read-only. */
+.fdry-ask {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-ask-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--tm-warning);
+}
+
+.fdry-ask-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.fdry-ask-main small {
+  color: var(--tm-text-secondary);
+}
+
+.fdry-ask-detail {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
+  padding: 6px 8px;
+  font-size: 11px;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fdry-ask-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.fdry-transcript {
+  margin: 0 0 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fdry-redirect {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.fdry-redirect input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
+/* A finding, and the two ways to clear it. Showing them without a way to
+   clear them is what blocked the compile gate for ever. */
+.fdry-finding-actions {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.fdry-accept {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.fdry-accept input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
+/* Just redrawn. Striking an assumption redraws only what depended on it
+   (FR-007), and a redraw the operator cannot see is one they cannot check. */
+.fdry-field.is-redrawn {
+  border-left: 2px solid var(--tm-accent);
+  padding-left: 10px;
+}
+
+/* The action that has to happen before the six checks mean anything: until
+   the architect has run they are a list of everything missing. */
+.fdry-converge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tm-on-accent);
+  background: var(--tm-accent);
+  border: 1px solid var(--tm-accent);
+  border-radius: var(--tm-radius-sm);
+  cursor: pointer;
+}
+
+.fdry-converge:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* One shape of work per row. An unavailable one is shown, not hidden, with
+   the requirement it does not meet — "why is that not on offer" should be
+   answerable without reading a YAML file. */
+.fdry-recipe {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px 8px;
+  text-align: left;
+  font: inherit;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  cursor: pointer;
+}
+
+.fdry-recipe:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fdry-recipe.is-on {
+  border-color: var(--tm-accent);
+}
+
+.fdry-recipe small {
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-recipe-mark {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tm-accent-text);
+}
+
+/* Finished work nobody has looked at. Worst risk first, so the queue's order
+   and the eye's order are the same. */
+.fdry-review-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+}
+
+.fdry-review-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fdry-review-main small {
+  color: var(--tm-text-secondary);
+}
+
+.fdry-grade {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Only the two that warrant stopping take colour. A list where every row is
+   coloured is a list where none of them stand out. */
+.fdry-grade.is-p0 {
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
+}
+
+.fdry-grade.is-p1 {
+  border-color: var(--tm-warning);
+  color: var(--tm-warning);
+}
+
+.fdry-hunk-file {
+  margin-top: 10px;
+}
+
+.fdry-hunk-file > code {
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-hunk {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  overflow: hidden;
+}
+
+/* The border says which way it was decided, rather than a wash of colour over
+   the diff itself — which is the thing being read. */
+.fdry-hunk.is-accept {
+  border-color: var(--tm-success);
+}
+
+.fdry-hunk.is-reject {
+  border-color: var(--tm-danger);
+}
+
+.fdry-hunk pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  font-size: 11px;
+  line-height: 1.45;
+  background: var(--tm-bg-input);
+  white-space: pre;
+}
+
+.fdry-hunk-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  padding: 6px;
+}
+
+/* Quiet has to be explicable: which rules this setting is not asking about. */
+.fdry-silenced {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+/* A mute you cannot find is a mute you never undo, so each one is a control. */
+.fdry-unmute {
+  appearance: none;
+  margin: 0 4px;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  cursor: pointer;
+}
+
+/* What happened while you were away. */
+.fdry-feed-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+}
+
+/* The author is a margin note, not a status: the pill treatment belongs to
+   run state and review grade, which are the things worth spotting. */
+.fdry-feed-author {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-feed-summary {
+  flex: 1;
+  min-width: 0;
+}
+
+.fdry-scope {
+  color: var(--tm-warning);
+}
+
+/* The record. Read-only apart from one button. */
+.fdry-ledger-bar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.fdry-ledger-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-ledger-bar select {
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
+/* Sized explicitly, like everything else here. The shared extension stylesheet
+   sets `body`'s family, colour and background and no size, so anything that
+   forgets one renders at the browser's 16px — beside labels and a table at
+   11-12px, which is exactly how this shipped. */
+.fdry-propose {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-propose svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.fdry-ledger th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--tm-text-secondary);
+  border-bottom: 1px solid var(--tm-border);
+  padding: 6px 10px 6px 0;
+  white-space: nowrap;
+}
+
+.fdry-ledger td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--tm-border);
+  vertical-align: top;
+}
+
+/* Who decided is the column the eye goes to, so it is the one that is chipped. */
+.fdry-actor {
+  padding: 1px 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  white-space: nowrap;
+}
+
+.fdry-actor.is-operator {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent-text);
+}
+
+.fdry-proposal {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+/* The rule separates one proposal from the next; under the last one it read as
+   a stray line with nothing below it. */
+.fdry-proposal:last-of-type {
+  border-bottom: none;
+}
+
+.fdry-citations {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-proposal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* These had no rule at all, so Accept, Never-propose and Remove rendered as
+   bare text with an icon beside it — no border, no ground, nothing that reads
+   as pressable. Same treatment as the gate's actions, which is the other place
+   a decision is taken. */
+.fdry-proposal-actions button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fdry-proposal-actions button:hover {
+  color: var(--tm-text-primary);
+}
+
+.fdry-proposal-actions button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-proposal-actions button svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Merge order: one repository per row, in the order they land. */
+.fdry-merge {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-merge li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fdry-merge small {
+  color: var(--tm-text-secondary);
+}
+
+/* Held is the state worth spotting, so it is the only one that takes colour. */
+.fdry-merge li.is-held .fdry-hold {
+  color: var(--tm-warning);
+}
+
+.fdry-role {
+  padding: 1px 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-writebacks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.fdry-writeback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
+/* One intent per row: what it means, and which state it maps to. */
+.fdry-map {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-map select {
+  /* Room to read the option, and an ellipsis rather than a cut when there is
+     not. At 55% the longest option — "let the tracker decide" — was sliced
+     mid-word in a panel with space to spare beside it. */
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+  padding: 4px 6px;
+  font: inherit;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
+.fdry-doc {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.fdry-doc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fdry-doc-head h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.fdry-src,
+.fdry-id {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-src {
+  color: var(--tm-accent);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-xs);
+  padding: 1px 6px;
+}
+
+.fdry-attach {
+  appearance: none;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  border-radius: var(--tm-radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fdry-attach svg {
+  width: 12px;
+  height: 12px;
+}
+
+.fdry-doc-sub {
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  margin: 4px 0 14px;
+}
+
+.fdry-field {
+  border-top: 1px solid var(--tm-border);
+  padding-top: 10px;
+  margin-top: 12px;
+}
+
+.fdry-field p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fdry-ac {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12.5px;
+}
+
+.fdry-ac:last-child {
+  border-bottom: 0;
+}
+
+.fdry-ac-id {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-ac.is-gap .fdry-ac-id,
+.fdry-ac.is-gap .fdry-verify {
+  color: var(--tm-danger);
+}
+
+.fdry-verify {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-scroll {
+  overflow-x: auto;
+}
+
+.fdry-matrix {
+  border-collapse: collapse;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.fdry-matrix th,
+.fdry-matrix td {
+  border: 1px solid var(--tm-border);
+  padding: 4px 8px;
+  text-align: center;
+  color: var(--tm-text-muted);
+  white-space: nowrap;
+}
+
+.fdry-matrix th {
+  background: var(--tm-bg-elevated);
+}
+
+.fdry-matrix .fdry-matrix-row {
+  text-align: left;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-matrix .is-hit {
+  color: var(--tm-success);
+}
+
+.fdry-matrix .is-gap {
+  color: var(--tm-danger);
+}
+
+.fdry-assume {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fdry-assume button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  border: 1px solid var(--tm-border-strong);
+  background: transparent;
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-assume button svg {
+  width: 10px;
+  height: 10px;
+  opacity: 0.6;
+}
+
+.fdry-finding {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+  padding: 5px 0;
+}
+
+.fdry-finding svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin-top: 3px;
+  color: var(--tm-warning);
+}
+
+.fdry-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.fdry-input input {
+  flex: 1;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 8px 12px;
+  color: var(--tm-text-primary);
+  font-size: 12.5px;
+}
+
+.fdry-input button {
+  appearance: none;
+  border: 1px solid var(--tm-accent);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  border-radius: var(--tm-radius-sm);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fdry-input button:disabled {
+  background: var(--tm-bg-elevated);
+  border-color: var(--tm-border-strong);
+  color: var(--tm-text-muted);
+  cursor: not-allowed;
+}
+
+/* ─── Foundry: orders list and shell ─────────────────────────────── */
+
+.fdry-tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.fdry-tabs button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: var(--tm-radius-sm);
+  cursor: pointer;
+}
+
+.fdry-tabs button.is-on {
+  background: var(--tm-bg-card);
+  color: var(--tm-text-primary);
+}
+
+.fdry-shell {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  height: 100%;
+  overflow: auto;
+  color: var(--tm-text-primary);
+}
+
+.fdry-back {
+  appearance: none;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  padding: 4px 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.fdry-seed {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.fdry-seed input {
+  flex: 1;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 8px 12px;
+  color: var(--tm-text-primary);
+  font-size: 13px;
+}
+
+.fdry-seed button {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--tm-accent);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  border-radius: var(--tm-radius-sm);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fdry-seed button:disabled {
+  background: var(--tm-bg-elevated);
+  border-color: var(--tm-border-strong);
+  color: var(--tm-text-muted);
+  cursor: not-allowed;
+}
+
+.fdry-seed button svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* A segmented control, in the same language as the buttons beside it.
+   After `.fdry-seed button`, and scoped through the group, because that rule
+   paints the accent on every button in the row: at equal specificity it won on
+   source order and coloured the *unselected* half blue while the selected half
+   went quiet. Exactly backwards, and visible the moment anyone looked. */
+.fdry-seed .fdry-seed-from {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  overflow: hidden;
+  background: var(--tm-bg-input);
+}
+
+.fdry-seed .fdry-seed-from button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  padding: 7px 14px;
+  font-size: 12.5px;
+}
+
+.fdry-seed .fdry-seed-from button + button {
+  border-left: 1px solid var(--tm-border-strong);
+}
+
+.fdry-seed .fdry-seed-from button[aria-pressed='true'] {
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.fdry-seed .fdry-seed-from button:disabled {
+  background: transparent;
+  color: var(--tm-text-muted);
+  cursor: not-allowed;
+}
+
+/* Your tickets, listed. */
+.fdry-discard {
+  float: right;
+  font-size: 12px;
+  color: var(--tm-text-muted);
+  padding: 4px 8px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
+.fdry-discard:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+  border-color: var(--tm-border-strong);
+}
+
+/* A ticket's own words, in the shape they were written. */
+.fdry-md {
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+  line-height: 1.5;
+}
+
+.fdry-md > * {
+  margin: 0 0 6px;
+}
+
+.fdry-md > *:last-child {
+  margin-bottom: 0;
+}
+
+.fdry-md-label {
+  margin: 10px 0 2px;
+  color: var(--tm-text-primary);
+  font-size: 12.5px;
+}
+
+.fdry-md-label:first-child {
+  margin-top: 0;
+}
+
+/* One weight for every heading level: a ticket's `#` is its author's habit,
+   not a statement about this panel's hierarchy. */
+.fdry-md-h {
+  color: var(--tm-text-primary);
+  font-weight: 600;
+  font-size: 12.5px;
+  margin-top: 8px;
+}
+
+.fdry-md ul,
+.fdry-md ol {
+  padding-left: 18px;
+}
+
+.fdry-md li {
+  margin: 2px 0;
+}
+
+.fdry-md-task {
+  list-style: none;
+  margin-left: -18px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.fdry-md code {
+  font-family: var(--tm-font-mono);
+  font-size: 11.5px;
+  background: var(--tm-bg-input);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.fdry-md pre {
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  padding: 8px 10px;
+  overflow-x: auto;
+}
+
+.fdry-md pre code {
+  background: none;
+  padding: 0;
+}
+
+.fdry-md a {
+  color: var(--tm-accent-text, var(--tm-text-primary));
+  text-decoration: underline;
+}
+
+.fdry-tickets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fdry-tickets button {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  text-align: left;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-subtle);
+  border-radius: var(--tm-radius-sm);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-tickets button:hover:not(:disabled) {
+  border-color: var(--tm-border-strong);
+}
+
+.fdry-ticket-key {
+  flex: 0 0 auto;
+  font-family: var(--tm-font-mono);
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-ticket-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fdry-ticket-status {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-problem {
+  color: var(--tm-danger);
+  font-size: 12.5px;
+  margin: 0 0 12px;
+}
+
+.fdry-orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fdry-orders button {
+  appearance: none;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: 11px 14px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.fdry-orders button:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-order-mark svg {
+  width: 15px;
+  height: 15px;
+}
+
+.fdry-orders li:has(.fdry-order-state:not(:empty)) .fdry-order-mark {
+  color: var(--tm-text-muted);
+}
+
+.fdry-order-main b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.fdry-order-main small {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-order-state {
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+}
+
+/* ─── Foundry: the inbox ─────────────────────────────────────────
+   Severity reads as a stripe and a position, never as a coloured
+   icon — icons stay flat and inherit currentColor. */
+
+.fdry-nothing {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-nothing svg {
+  width: 22px;
+  height: 22px;
+  opacity: 0.6;
+}
+
+.fdry-nothing p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-nothing small {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fdry-gate {
+  display: grid;
+  grid-template-columns: 3px 1fr auto;
+  gap: 0 14px;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+
+.fdry-gate-stripe {
+  background: var(--tm-text-muted);
+}
+
+.fdry-gate.is-p0 .fdry-gate-stripe {
+  background: var(--tm-danger);
+}
+
+.fdry-gate.is-warn .fdry-gate-stripe {
+  background: var(--tm-warning);
+}
+
+.fdry-gate.is-ok .fdry-gate-stripe {
+  background: var(--tm-success);
+}
+
+.fdry-gate.is-info .fdry-gate-stripe {
+  background: var(--tm-accent);
+}
+
+.fdry-gate-main {
+  padding: 11px 0 11px 2px;
+  min-width: 0;
+}
+
+.fdry-gate-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.fdry-gate-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-gate-rule {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-accent);
+  background: var(--tm-bg-elevated);
+  padding: 1px 7px;
+  border-radius: var(--tm-radius-xs);
+}
+
+.fdry-gate-head b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fdry-gate-why {
+  margin: 0;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+}
+
+.fdry-gate-meta {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-gate-meta span {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  padding: 1px 7px;
+}
+
+.fdry-gate-default {
+  border-style: dashed !important;
+}
+
+.fdry-gate-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 12px 11px 0;
+}
+
+.fdry-gate-actions button {
+  appearance: none;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fdry-gate-actions button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+/* Pushed to the bottom of the surface rather than left floating under a
+   short empty state, which read as a stray line halfway down the panel. */
+.fdry-queue-foot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--tm-border);
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-queue-foot b {
+  color: var(--tm-text-secondary);
+}
+
+/* ─── Foundry: the floor ─────────────────────────────────────────── */
+
+.fdry-lane {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-lane:last-of-type {
+  border-bottom: 0;
+}
+
+.fdry-lane-name {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-lane-name b {
+  display: block;
+  color: var(--tm-text-secondary);
+  font-weight: 500;
+}
+
+.fdry-units {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fdry-unit {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+}
+
+.fdry-unit::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tm-text-muted);
+  flex: none;
+}
+
+.fdry-unit u {
+  text-decoration: none;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-unit.is-passed::before {
+  background: var(--tm-success);
+}
+
+.fdry-unit.is-running::before,
+.fdry-unit.is-verifying::before {
+  background: var(--tm-accent);
+}
+
+.fdry-unit.is-failed::before {
+  background: var(--tm-danger);
+}
+
+.fdry-unit.is-blocked,
+.fdry-unit.is-skipped {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.fdry-unit-attach {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+}
+
+.fdry-unit-attach svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ─── Foundry: settings ──────────────────────────────────────────── */
+
+.fdry-settings {
+  padding: 16px;
+  color: var(--tm-text-primary);
+  max-width: 620px;
+}
+
+.fdry-models {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fdry-models button {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  padding: 9px 12px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fdry-models button.is-on {
+  border-color: var(--tm-accent);
+}
+
+.fdry-models b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.fdry-models small {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}

@@ -9,7 +9,13 @@ import type {
   TrackerAccount,
 } from '../../../shared/types/index.js'
 import { TrackerError, toErrorMessage } from '../tracker-error.js'
-import type { StoredCredential, TrackerProvider, VerifiedAccount } from './provider.js'
+import type {
+  StoredCredential,
+  TrackerProvider,
+  TrackerStateOption,
+  TransitionIntent,
+  VerifiedAccount,
+} from './provider.js'
 
 // Linear, through the official SDK.
 //
@@ -27,6 +33,7 @@ interface LinearLike {
   searchIssues(vars?: unknown): unknown
   issue(id: string): unknown
   createComment(input: { issueId: string; body: string }): unknown
+  updateIssue(id: string, input: { stateId: string }): unknown
 }
 
 export type LinearClientFactory = (apiKey: string) => LinearLike
@@ -105,6 +112,13 @@ async function run<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 
+interface RawState {
+  id: string
+  name: string
+  type: string
+  position: number
+}
+
 interface RawIssue {
   id: string
   identifier: string
@@ -117,6 +131,7 @@ interface RawIssue {
   assignee: unknown
   labels?: () => unknown
   comments?: () => unknown
+  team?: unknown
 }
 
 async function toSummary(raw: RawIssue): Promise<IssueSummary> {
@@ -176,6 +191,66 @@ async function toIssue(raw: RawIssue): Promise<Issue> {
     updatedAt: String(raw.updatedAt ?? ''),
     comments,
   }
+}
+
+/**
+ * Which intent each of a team's states satisfies.
+ *
+ * By `type`, never by name — that is Linear's own guidance and the reason it
+ * matters is mundane: a team renames "In Progress" to "Building" and a
+ * name-matching integration stops moving anything, silently.
+ *
+ * Linear has no review type, so `in_review` is the *later* of the started
+ * states by position — Linear orders states within a type group by position,
+ * so a second started state is a later stage of the same work. Where a team
+ * has one started state there is no review position, and the intent resolves
+ * to nothing rather than to something approximate. The operator can override
+ * any of this; `transition` takes the option they chose.
+ */
+function withIntents(states: readonly RawState[]): TrackerStateOption[] {
+  const ordered = [...states].sort((a, b) => a.position - b.position)
+  const started = ordered.filter((state) => state.type === 'started')
+  const startedId = started[0]?.id
+  // Only when there is somewhere later to go; one started state is not a
+  // review state wearing a different hat.
+  const reviewId = started.length > 1 ? started[started.length - 1].id : undefined
+
+  return ordered.map((state) => ({
+    id: state.id,
+    name: state.name,
+    intent: intentFor(state, startedId, reviewId),
+    // Linear accepts a move to any of a team's states from any other, so
+    // there is no "not from here" to report.
+    available: true,
+  }))
+}
+
+function intentFor(
+  state: RawState,
+  startedId: string | undefined,
+  reviewId: string | undefined
+): TransitionIntent | null {
+  if (state.id === reviewId) return 'in_review'
+  if (state.id === startedId) return 'started'
+  if (state.type === 'completed') return 'done'
+  return null
+}
+
+function toRawStates(nodes: readonly unknown[]): RawState[] {
+  return nodes.flatMap((node, index) => {
+    const raw = node as { id?: unknown; name?: unknown; type?: unknown; position?: unknown }
+    if (typeof raw.id !== 'string' || typeof raw.type !== 'string') return []
+    return [
+      {
+        id: raw.id,
+        name: typeof raw.name === 'string' ? raw.name : raw.id,
+        type: raw.type,
+        // Position is what orders the workflow; without it the fallback keeps
+        // the tracker's own order rather than collapsing everything to zero.
+        position: typeof raw.position === 'number' ? raw.position : index,
+      },
+    ]
+  })
 }
 
 export function createLinearProvider(
@@ -255,6 +330,63 @@ export function createLinearProvider(
         } | null
         if (result?.success !== true) {
           throw new TrackerError('failed', `Linear refused the comment on ${key}`)
+        }
+      })
+    },
+
+    async states(cred, key): Promise<TrackerStateOption[]> {
+      const client = clientFor(cred)
+      return run(async () => {
+        const raw = (await client.issue(key)) as RawIssue | null
+        if (raw === null || raw === undefined) {
+          throw new TrackerError('not-found', `Issue ${key} not found`)
+        }
+        const team = (await Promise.resolve(raw.team)) as {
+          states?: () => unknown
+        } | null
+        if (team === null || team === undefined || typeof team.states !== 'function') return []
+        const connection = (await team.states()) as { nodes?: unknown[] } | null
+        return withIntents(toRawStates(connection?.nodes ?? []))
+      })
+    },
+
+    async transition(cred, key, intent, optionId): Promise<void> {
+      const client = clientFor(cred)
+      return run(async () => {
+        const raw = (await client.issue(key)) as RawIssue | null
+        if (raw === null || raw === undefined) {
+          throw new TrackerError('not-found', `Issue ${key} not found`)
+        }
+        const team = (await Promise.resolve(raw.team)) as { states?: () => unknown } | null
+        const connection =
+          team !== null && team !== undefined && typeof team.states === 'function'
+            ? ((await team.states()) as { nodes?: unknown[] } | null)
+            : null
+        const options = withIntents(toRawStates(connection?.nodes ?? []))
+
+        // The operator's own mapping wins over the type rule, which is the
+        // whole point of presenting it to them. An override naming a state
+        // this workflow does not have is refused rather than fallen back on:
+        // moving somewhere they did not choose is worse than not moving.
+        const chosen =
+          optionId === undefined
+            ? options.find((option) => option.intent === intent && option.available)
+            : options.find((option) => option.id === optionId && option.available)
+
+        if (chosen === undefined) {
+          throw new TrackerError(
+            'not-found',
+            optionId === undefined
+              ? `No available Linear state on ${key} satisfies "${intent}"`
+              : `Linear state ${optionId} is not available on ${key}`
+          )
+        }
+
+        const result = (await client.updateIssue(raw.id, { stateId: chosen.id })) as {
+          success?: boolean
+        } | null
+        if (result?.success !== true) {
+          throw new TrackerError('failed', `Linear refused the move of ${key} to ${chosen.name}`)
         }
       })
     },
