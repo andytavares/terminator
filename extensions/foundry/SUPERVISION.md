@@ -107,6 +107,14 @@ What changed, and why each:
 general flag rule without also catching every case-insensitive read, and `awk`
 redirects from inside its program text, where no flag check can see it.
 
+**And refusals are said out loud.** A decision the ladder takes on its own
+raises no prompt — that is the point of it — but a _refusal_ now posts to the
+feed. An allow is one of hundreds and would drown it; a refusal is the reason
+the agent is about to do something else, or nothing at all. It was invisible,
+and that is why finding the five above took five live runs and five readings of
+a transcript: on the console, an agent being turned down and an agent that had
+gone quiet looked exactly the same.
+
 ## Trusting the folder, or the agent never starts
 
 Claude Code shows a workspace trust dialog for a directory it has not seen, and

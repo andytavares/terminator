@@ -62,6 +62,8 @@ export interface StartSupervisedRunOptions {
   model?: string
   /** Decides without asking when the autonomy ladder allows it. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
+  /** The ladder refused something without asking. Only refusals are reported. */
+  onAutoDenied?: (toolName: string, reason: string) => void
   onPending: (pending: PendingPermission) => void
   onResolved: (requestId: string, decision: PermissionOutcome) => void
   /**
@@ -95,6 +97,8 @@ export interface StartSupervisedRunOptions {
 export interface PhaseCallbacks {
   onPending: (pending: PendingPermission) => void
   onResolved: (requestId: string, decision: PermissionOutcome) => void
+  /** The ladder refused something without asking. Only refusals are reported. */
+  onAutoDenied?: (toolName: string, reason: string) => void
   onTurnEnd?: (turns: number) => void
   onEnd?: (exitCode: number) => void
 }
@@ -267,6 +271,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         sessionId,
         now,
         autoDecide: start.autoDecide,
+        onAutoDenied: (toolName, reason) => phase.current.onAutoDenied?.(toolName, reason),
         onPending: (pending) => {
           // Held on a person, so the detector must not call it stuck.
           const run = running.get(sessionId)

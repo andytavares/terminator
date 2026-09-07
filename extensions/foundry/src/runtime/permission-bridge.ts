@@ -65,6 +65,14 @@ export interface PermissionBridgeOptions {
   /** The autonomy ladder. Returns null to abstain and let the operator decide. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   /**
+   * The ladder refused something, without asking anybody.
+   *
+   * Only refusals: an allow is one of hundreds and would drown the feed, while
+   * a refusal is the reason the agent is about to do something else — or
+   * nothing at all, which is what it did.
+   */
+  onAutoDenied?: (toolName: string, reason: string) => void
+  /**
    * How long to hold a tool call before handing the decision back to the
    * terminal.
    *
@@ -228,7 +236,7 @@ function renderInput(record: Record<string, unknown>): string | null {
 }
 
 export function createPermissionBridge(options: PermissionBridgeOptions): PermissionBridge {
-  const { onPending, onResolved, now, autoDecide } = options
+  const { onPending, onResolved, now, autoDecide, onAutoDenied } = options
   const sessionId = options.sessionId
   const askAfterMs = options.askAfterMs ?? DEFAULT_ASK_AFTER_MS
   // The original input is held alongside the resolver: an `allow` must return
@@ -274,6 +282,13 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
       if (auto !== null) {
         // Resolved by the autonomy ladder — the operator is never interrupted,
         // and no prompt is raised for a surface to display.
+        //
+        // A *refusal* is said out loud, though. An allow is one of hundreds and
+        // would drown the feed; a denial is the reason an agent is about to do
+        // something else, or nothing, and it was invisible: four live runs died
+        // on refused commands and the console showed an agent that had simply
+        // gone quiet. Reading its transcript was the only way to find out.
+        if (!auto.allow) onAutoDenied?.(toolName, auto.reason ?? 'no reason given')
         return Promise.resolve(toResult(auto, input))
       }
 

@@ -455,3 +455,49 @@ describe('answering something that is no longer waiting', () => {
     await held
   })
 })
+
+// A refusal taken by the ladder raised no prompt and posted nothing, so an
+// agent being turned down looked exactly like one that had gone quiet. Four
+// live runs died on refused commands, and reading the transcript was the only
+// way to find out why any of them stopped.
+describe('a refusal the ladder took on its own', () => {
+  function ladder(over: Record<string, unknown>) {
+    return createPermissionBridge({
+      sessionId: 's1',
+      now: () => 1_000,
+      onPending: () => undefined,
+      onResolved: () => undefined,
+      ...over,
+    } as never)
+  }
+
+  it('is reported, so the console can say why the agent changed course', async () => {
+    const denied: { tool: string; reason: string }[] = []
+    const b = ladder({
+      autoDecide: () => ({ allow: false, reason: 'rm is not on the read-only list' }),
+      onAutoDenied: (tool: string, reason: string) => denied.push({ tool, reason }),
+    })
+    await b.canUseTool('Bash', { command: 'rm -rf x' })
+    expect(denied).toEqual([{ tool: 'Bash', reason: 'rm is not on the read-only list' }])
+  })
+
+  it('is not reported for an allow, which would be one of hundreds', async () => {
+    const denied: string[] = []
+    const b = ladder({
+      autoDecide: () => ({ allow: true, reason: 'standard takes ordinary work' }),
+      onAutoDenied: (tool: string) => denied.push(tool),
+    })
+    await b.canUseTool('Edit', { file_path: '/wt/a.ts' })
+    expect(denied).toEqual([])
+  })
+
+  it('says something even where the refusal carried no reason', async () => {
+    const denied: string[] = []
+    const b = ladder({
+      autoDecide: () => ({ allow: false }),
+      onAutoDenied: (_tool: string, reason: string) => denied.push(reason),
+    })
+    await b.canUseTool('Bash', { command: 'rm -rf x' })
+    expect(denied).toEqual(['no reason given'])
+  })
+})

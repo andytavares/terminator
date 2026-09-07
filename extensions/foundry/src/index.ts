@@ -774,6 +774,16 @@ async function executeRun(
           onPending: (pending) =>
             notePending(api, { ...pending, featureDir }, { id: order.id, root }),
           onResolved: (requestId) => noteResolved(requestId),
+          // Refusals reach the console. An agent being turned down looks
+          // exactly like one that has gone quiet, and reading its transcript
+          // was the only way to tell them apart.
+          onAutoDenied: (tool, reason) =>
+            supervision?.feed.post({
+              at: Date.now(),
+              sessionId,
+              author: 'console',
+              summary: `refused ${tool}: ${reason}`,
+            }),
           // Set here as well as after `start` resolves, so a turn that ends
           // before the promise settles still names the right session rather
           // than the placeholder.
@@ -1133,6 +1143,13 @@ async function convergeOnce(
         // — it is the Forge working.
         onPending: (pending) => notePending(api, { ...pending, featureDir }),
         onResolved: (requestId) => noteResolved(requestId),
+        onAutoDenied: (tool, reason) =>
+          supervision?.feed.post({
+            at: Date.now(),
+            sessionId: intakeSessions.get(order.id) ?? order.id,
+            author: 'console',
+            summary: `refused ${tool}: ${reason}`,
+          }),
         onRegistered: (run) => {
           rememberSession(run.sessionId)
           answer({ ok: true, sessionId: run.sessionId })
