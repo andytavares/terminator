@@ -156,6 +156,24 @@ describe('what a read-only role is told, on the intake path', () => {
   })
 })
 
+// A refusal was posted to the console and a *question* was not, so an agent
+// waiting on one looked exactly like an agent that had gone quiet — which is
+// what it then became. Watched live: a builder redirected its test output to a
+// scratch file outside the checkout, FR-050 asked about it, nobody was there,
+// the bridge handed the call back to the terminal's own prompt five minutes
+// later, and the run sat until the wall-clock budget ended it half an hour on.
+// Nothing anywhere said a question had been asked.
+describe('a question nobody is there to answer', () => {
+  it('says an agent is waiting on one', () => {
+    expect(src).toContain('asked about ${pending.toolName}')
+  })
+
+  it('says when it went to the terminal prompt instead, which is where it stops', () => {
+    expect(src).toContain("outcome === 'handback'")
+    expect(src).toContain('an agent waits there')
+  })
+})
+
 // The stall detector is timely and nothing consumes it. Measured on a live run:
 // the builder fell silent at 07:27:08, the detector fired at 07:34:21, and the
 // run waited until the wall-clock budget stopped it at 07:52:10 — eighteen

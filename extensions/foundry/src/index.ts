@@ -988,9 +988,39 @@ async function executeRun(
               autonomy: autonomyFor(api),
               worktreePath: checkout.path,
             }),
-          onPending: (pending) =>
-            notePending(api, { ...pending, featureDir }, { id: order.id, root }),
-          onResolved: (requestId) => noteResolved(requestId),
+          onPending: (pending) => {
+            // Asks reach the console as well as the inbox. A refusal is posted
+            // here and a *question* was not, so an agent waiting on one looked
+            // exactly like an agent that had gone quiet — which is what it
+            // then became. Watched live: a builder redirected its test output
+            // to a scratch file outside the checkout, FR-050 asked about it,
+            // nobody was there, the bridge handed the call back to the
+            // terminal's own prompt five minutes later, and the run sat until
+            // the wall-clock budget ended it half an hour on. Nothing anywhere
+            // said a question had been asked.
+            supervision?.feed.post({
+              at: Date.now(),
+              sessionId: pending.sessionId,
+              author: 'console',
+              summary: `asked about ${pending.toolName}: waiting for a decision`,
+            })
+            notePending(api, { ...pending, featureDir }, { id: order.id, root })
+          },
+          onResolved: (requestId, outcome) => {
+            // A hand-back is not an answer. The runtime puts its own prompt in
+            // the terminal instead, which an unattended run never reaches — so
+            // this is the moment the agent stops, and it should say so.
+            if (outcome === 'handback') {
+              supervision?.feed.post({
+                at: Date.now(),
+                sessionId,
+                author: 'console',
+                summary:
+                  'nobody answered, so the question went to the prompt in the terminal — an agent waits there',
+              })
+            }
+            noteResolved(requestId)
+          },
           // Refusals reach the console. An agent being turned down looks
           // exactly like one that has gone quiet, and reading its transcript
           // was the only way to tell them apart.
