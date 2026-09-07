@@ -1,6 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { draftOrder } from '../order/schema.js'
+import { acceptanceFromTicket } from './acceptance-from-ticket.js'
 import type { OrderSource, WorkOrder } from '../order/schema.js'
 import { probeToolchain, unavailableChecks } from '../verify/toolchain-probe.js'
 import type { CheckName } from '../verify/toolchain-probe.js'
@@ -158,6 +159,12 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
   const seeded: WorkOrder = {
     ...order,
     intent: { ...order.intent, problem },
+    // What the ticket already said done looks like. Not the architect's job
+    // done for it — coverage still runs both ways, so a criterion no unit
+    // satisfies fails the compile exactly as before. What this stops is an
+    // order seeded from a ticket with a heading called "Acceptance Criteria"
+    // opening with "No criteria yet".
+    acceptance: acceptanceFromTicket(problem),
     context: { ...order.context, toolchain, houseDocs, priorArt },
     plan: {
       ...order.plan,

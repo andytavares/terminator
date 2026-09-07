@@ -870,3 +870,75 @@ describe('what configuration a new order starts with', () => {
     expect(r.order.risk.criticalPaths).toEqual([])
   })
 })
+
+// A ticket that states its acceptance criteria, taken at its word. The
+// description arrived whole in `intent.problem` and nothing read it, so an
+// order seeded from a ticket with a heading literally called "Acceptance
+// Criteria" opened saying "No criteria yet" to the person who had just
+// written them.
+describe('an order seeded from a ticket that states its criteria', () => {
+  const DESCRIPTION = [
+    '# Summary',
+    'Make all text in the application red',
+    '',
+    '# Acceptance Criteria',
+    '- [ ] All text in the application is red',
+    '- [ ] The heading is red too',
+  ].join('\n')
+
+  const issue = () =>
+    vi.fn(async () => ({
+      key: 'TAV-14',
+      title: 'Make all text in the application red',
+      description: DESCRIPTION,
+      url: 'https://linear.app/x/TAV-14',
+      branchName: null,
+    }))
+
+  it('starts from the criteria the ticket already stated', async () => {
+    const r = (await channels(issue()).create({
+      source: { kind: 'tracker', tracker: 'linear', key: 'TAV-14' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(r.order.acceptance.map((c) => c.statement)).toEqual([
+      'All text in the application is red',
+      'The heading is red too',
+    ])
+  })
+
+  it('still needs a plan, because coverage runs both ways', async () => {
+    // The point of the guard: lifting criteria must not let an order hand off
+    // without the architect. A criterion no unit satisfies fails the compile
+    // exactly as an order with no criteria at all did.
+    const r = (await channels(issue()).create({
+      source: { kind: 'tracker', tracker: 'linear', key: 'TAV-14' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(r.compile.ok).toBe(false)
+    expect(r.order.plan.units).toEqual([])
+  })
+
+  it('keeps the description whole as well, so nothing is lost in the lifting', async () => {
+    const r = (await channels(issue()).create({
+      source: { kind: 'tracker', tracker: 'linear', key: 'TAV-14' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(r.order.intent.problem).toContain('# Dev Hints'.slice(0, 1))
+    expect(r.order.intent.problem).toContain('# Summary')
+  })
+
+  it('takes nothing from a ticket that states nothing', async () => {
+    const bare = vi.fn(async () => ({
+      key: 'TAV-15',
+      title: 'Something',
+      description: 'Just do the thing.',
+      url: '',
+      branchName: null,
+    }))
+    const r = (await channels(bare).create({
+      source: { kind: 'tracker', tracker: 'linear', key: 'TAV-15' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(r.order.acceptance).toEqual([])
+  })
+})

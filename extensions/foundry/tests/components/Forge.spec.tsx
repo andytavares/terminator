@@ -327,7 +327,11 @@ describe('drafting the plan', () => {
   it('offers the action, because nothing else writes the criteria', async () => {
     mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
     await waitFor(() => expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy())
-    expect(screen.getByText(/Nothing writes them but the architect/)).toBeTruthy()
+    // This order came from a ticket, and a ticket that names its criteria has
+    // them lifted at intake. Saying "no criteria yet" to somebody who had just
+    // written a heading called "Acceptance Criteria" read as the tool ignoring
+    // the ticket, so it says which ticket it looked in.
+    expect(screen.getByText(/Nothing under an acceptance heading in TAV-42/)).toBeTruthy()
   })
 
   it('asks the architect for one', async () => {
