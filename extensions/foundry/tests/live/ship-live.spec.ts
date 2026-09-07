@@ -3,7 +3,7 @@ import { execFile, execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { shipOrder } from '../../src/line/integrate.js'
+import { shipOrder, markReady } from '../../src/line/integrate.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -212,4 +212,42 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
     // eslint-disable-next-line no-console
     console.log(`live pull request: ${pull.url}`)
   }, 180_000)
+
+  it('turns the draft into a review request when the operator says so', async () => {
+    // The last `gh` path with no live cover. `markReady` is what the
+    // "mark it ready?" decision runs, and it is the only thing in the whole
+    // feature that stops being a draft.
+    const opened = await exec({
+      command: 'gh',
+      args: ['pr', 'list', '--head', branch, '--json', 'url,number', '--limit', '1'],
+      cwd: LIVE,
+    })
+    const [pull] = JSON.parse(opened.stdout) as { url: string; number: number }[]
+    expect(pull, 'the previous case did not leave a pull request to mark').toBeDefined()
+
+    await markReady(
+      { url: pull.url, cwd: LIVE },
+      {
+        exec,
+        root: dataRoot,
+        now: () => new Date().toISOString(),
+        autoOpen: true,
+        decide: async () => 'approve',
+        record: async () => undefined,
+      }
+    )
+
+    const after = await exec({
+      command: 'gh',
+      args: ['pr', 'view', pull.url, '--json', 'isDraft,state'],
+      cwd: LIVE,
+    })
+    expect(after.exitCode, after.stderr).toBe(0)
+    const state = JSON.parse(after.stdout) as { isDraft: boolean; state: string }
+    expect(state.isDraft, 'gh pr ready did not take it out of draft').toBe(false)
+    expect(state.state).toBe('OPEN')
+
+    // Put it back, so the repository does not accumulate review requests.
+    await exec({ command: 'gh', args: ['pr', 'ready', pull.url, '--undo'], cwd: LIVE })
+  }, 120_000)
 })
