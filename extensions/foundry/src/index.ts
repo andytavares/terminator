@@ -27,7 +27,7 @@ import type { RunGraph, RunNode } from './line/run-graph.js'
 import type { Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
 import { readShell } from './runtime/shell-split.js'
-import { decideByAutonomy } from './runtime/autonomy-policy.js'
+import { decideTool } from './runtime/tool-decision.js'
 import { ensureTrusted } from './runtime/workspace-trust.js'
 import type { LedgerEntry } from './ledger/append.js'
 import type { IntegrateDeps } from './line/integrate.js'
@@ -884,58 +884,22 @@ async function executeRun(
           // — a scribe that decided to edit source rather than documentation
           // is refused by the first if it has no checkout, and by neither if
           // the only check were "may this role write at all".
-          autoDecide: (tool, toolInput) => {
-            if (input.readOnly) {
-              // A role that declared `run_tests` may run the project's own
-              // commands, and only those, matched exactly. The verifier's whole
-              // job is a verdict from an exit status (FR-033), and the
-              // read-only policy refuses `npm test` like any other unknown
-              // binary — so the role vocabulary said one thing and the gate did
-              // another.
-              if (input.mayUseTool('run_tests') && isProbedCommand(order, tool, toolInput)) {
-                return { allow: true, reason: "the project's own command, which this role may run" }
-              }
-              // Tools the operator has said only read. The policy refuses any
-              // tool it has not been taught about, which is right — an MCP
-              // server's tools are named by somebody else and a name is not a
-              // contract, so `mcp__…__save_issue` and `mcp__…__query_docs` are
-              // indistinguishable to it.
-              //
-              // But that refusal has a cost, watched live: an architect tried
-              // to check a technique against the documentation, was refused,
-              // and wrote "Environment is read-only for execution and MCP, so
-              // I could not pull Node docs. That shapes what I can claim."
-              // Foundry does not guess which of them read; the operator says.
-              if (readOnlyTools(api).includes(tool)) {
-                return { allow: true, reason: 'the operator listed this as a tool that only reads' }
-              }
-              const decision = decideReadOnly(tool, toolInput)
-              // Both ways, never abstaining. A read-only role exists to decide
-              // without a person — that is the whole reason the policy reads
-              // the command rather than the tool. Returning `null` on an
-              // *allowed* command sent it to the operator anyway, where it sat
-              // for the five-minute hold before falling back to the terminal.
-              // Six tool calls was half an hour of waiting, and the console
-              // showed an agent thinking.
-              return { allow: decision.allow, reason: decision.reason }
-            }
-            if (input.role !== null && !input.mayUseTool(tool)) {
-              return {
-                allow: false,
-                reason: `the ${input.role} role does not use ${tool}; its role file lists what it does`,
-              }
-            }
-            // FR-029's automatic half. Without it every ordinary edit went to
-            // the operator at every setting, so no run finished unattended and
-            // "lights-out" named something the factory could not do.
-            const taken = decideByAutonomy({
-              toolName: tool,
+          // Composed in `runtime/tool-decision.ts`, where it can be tested:
+          // every live failure of this feature that was not a stall came from
+          // this decision, and the tests that mention `autoDecide` all pass a
+          // stub, so they covered the bridge and never the decision.
+          autoDecide: (tool, toolInput) =>
+            decideTool({
+              tool,
               input: toolInput,
+              readOnly: input.readOnly,
+              role: input.role,
+              mayUseTool: input.mayUseTool,
+              isProbed: (name, given) => isProbedCommand(order, name, given),
+              readOnlyTools: readOnlyTools(api),
               autonomy: autonomyFor(api),
               worktreePath: checkout.path,
-            })
-            return taken === null ? null : { allow: taken.allow, reason: taken.reason }
-          },
+            }),
           onPending: (pending) =>
             notePending(api, { ...pending, featureDir }, { id: order.id, root }),
           onResolved: (requestId) => noteResolved(requestId),

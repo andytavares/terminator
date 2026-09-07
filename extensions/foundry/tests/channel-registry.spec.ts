@@ -132,7 +132,12 @@ describe('what ends a node', () => {
 //
 // Only the running application can show this, so what stops it coming back is
 // the shape of the source.
-describe('what a read-only role is told', () => {
+// The Line's decision is `runtime/tool-decision.ts` now, with a spec that
+// exercises it rather than grepping for it — these assertions existed only
+// because it was inline in `activate` and nothing could reach it. What is left
+// here is intake's own path, which is still inline and much simpler: read-only,
+// plus the one file the architect is allowed to write.
+describe('what a read-only role is told, on the intake path', () => {
   it('never abstains on a command its own policy allowed', () => {
     expect(src, 'an allowed read-only command is being sent to the operator').not.toMatch(
       /decision\.allow \? null/
@@ -143,7 +148,11 @@ describe('what a read-only role is told', () => {
     const answers = [
       ...src.matchAll(/return \{ allow: decision\.allow, reason: decision\.reason \}/g),
     ]
-    expect(answers.length, 'the read-only paths do not return their own decision').toBe(2)
+    expect(answers.length, 'the intake path does not return its own decision').toBe(1)
+  })
+
+  it('hands the run path to the function that can be tested', () => {
+    expect(src).toContain('decideTool({')
   })
 })
 
@@ -156,8 +165,8 @@ describe('what a read-only role is told', () => {
 // docs. That shapes what I can claim." So the operator names them, and Foundry
 // still infers nothing.
 describe('tools the operator says only read', () => {
-  it('is consulted before the policy refuses an unknown tool', () => {
-    expect(src).toContain('readOnlyTools(api).includes(tool)')
+  it('is passed to the decision, so it can be consulted at all', () => {
+    expect(src).toContain('readOnlyTools: readOnlyTools(api)')
   })
 
   it('is a declared setting, so there is somewhere to declare it', () => {
@@ -178,8 +187,9 @@ describe('tools the operator says only read', () => {
 // did another, and a live architect burned three turns discovering it.
 describe("running the project's own commands", () => {
   it('lets a role that declared run_tests run them', () => {
-    expect(src).toContain("input.mayUseTool('run_tests')")
-    expect(src).toContain('isProbedCommand(order, tool, toolInput)')
+    // The rule itself lives in `tool-decision.ts` and is exercised there; what
+    // this file can still say is that the run path is wired to ask.
+    expect(src).toContain('isProbed: (name, given) => isProbedCommand(order, name, given)')
   })
 
   it('matches them exactly, rather than by prefix', () => {
