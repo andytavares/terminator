@@ -1,3 +1,6 @@
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync } from 'fs'
 import { tmpdir, homedir } from 'os'
@@ -63,6 +66,35 @@ describe('transcriptPathFor', () => {
 
   it('names the file after the session, so it is known before the run exists', () => {
     expect(transcriptPathFor('/a', 'the-session', '/home/me')).toMatch(/the-session\.jsonl$/)
+  })
+
+  // The runtime encodes the directory the *process* is in, and macOS hands out
+  // two names for the same one. A worktree under `/var/folders/…` is
+  // `/private/var/folders/…` to the process that chdir'd into it, so this
+  // predicted a path nobody was writing — and every reader of it opened
+  // nothing. The ladder reported rungs that had just run and exited 0 as "not
+  // measured", and the stall detector, which reads transcripts and nothing
+  // else, saw an agent that had never said a word.
+  it('encodes the directory as the process sees it, not as it was handed to us', () => {
+    const real = fs.mkdtempSync(path.join(os.tmpdir(), 'transcript-real-'))
+    const link = path.join(path.dirname(real), `link-${path.basename(real)}`)
+    fs.symlinkSync(real, link)
+    try {
+      expect(transcriptPathFor(link, 'sid', '/home/me')).toBe(
+        transcriptPathFor(fs.realpathSync(link), 'sid', '/home/me')
+      )
+    } finally {
+      fs.unlinkSync(link)
+      fs.rmSync(real, { recursive: true, force: true })
+    }
+  })
+
+  it('uses the name it was given when there is nothing there to resolve', () => {
+    // A worktree about to be cut. The unresolved name is the best answer
+    // available, and it is right wherever the two agree.
+    expect(transcriptPathFor('/a/not/here/yet', 'sid', '/home/me')).toBe(
+      '/home/me/.claude/projects/-a-not-here-yet/sid.jsonl'
+    )
   })
 })
 
