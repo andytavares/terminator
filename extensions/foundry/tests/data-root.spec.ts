@@ -5,6 +5,7 @@ import * as path from 'node:path'
 import {
   resolveDataRoot,
   RelativeDataDirError,
+  OrderIdEscapesRootError,
   orderDir,
   unitDir,
   laneDir,
@@ -111,5 +112,35 @@ describe('ensureWritable', () => {
     const r = await ensureWritable(file)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toMatch(/not a directory/i)
+  })
+})
+
+// This took whatever it was given and built the directories to match. A live
+// run filed its `ship.draft_opened` entry by the entry's *subject* — a pull
+// request URL — and produced
+// `orders/https:/github.com/owner/repo/pull/8/ledger.jsonl`, while the order's
+// own ledger never mentioned the draft it had just opened. The caller was
+// wrong and is fixed; the shape is refused as well, because a silent misfile
+// is how it went unnoticed: the write succeeded and nothing said where it went.
+describe('an order id that does not name an order', () => {
+  it('refuses a URL, which is what a live run passed it', () => {
+    expect(() => orderDir('/data', 'https://github.com/owner/repo/pull/8')).toThrow(
+      OrderIdEscapesRootError
+    )
+  })
+
+  it('refuses a traversal', () => {
+    expect(() => orderDir('/data', '../elsewhere')).toThrow(OrderIdEscapesRootError)
+    expect(() => orderDir('/data', 'a/b')).toThrow(OrderIdEscapesRootError)
+  })
+
+  it('refuses an absolute path, which would ignore the root entirely', () => {
+    expect(() => orderDir('/data', '/etc')).toThrow(OrderIdEscapesRootError)
+  })
+
+  it('accepts the ids that actually exist', () => {
+    expect(orderDir('/data', 'WO-1')).toBe(path.join('/data', 'orders', 'WO-1'))
+    expect(orderDir('/data', 'TEAM-123')).toBe(path.join('/data', 'orders', 'TEAM-123'))
+    expect(orderDir('/data', 'WO-LIVE-RUN')).toBe(path.join('/data', 'orders', 'WO-LIVE-RUN'))
   })
 })

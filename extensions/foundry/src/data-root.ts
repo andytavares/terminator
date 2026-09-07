@@ -47,8 +47,38 @@ export function resolveDataRoot(setting: string | undefined, workdir: string): D
   return { root: configured, usingDefault: false }
 }
 
+/** An order id that does not name a directory under `orders/`. */
+export class OrderIdEscapesRootError extends Error {
+  readonly code = 'ORDER_ID_ESCAPES_ROOT'
+  constructor(orderId: string) {
+    super(
+      `"${orderId}" does not name an order: an order's records live in one directory directly under the data root, and this would be somewhere else.`
+    )
+    this.name = 'OrderIdEscapesRootError'
+  }
+}
+
+/**
+ * Where one order's records live.
+ *
+ * Guarded, because this took whatever it was given and built the directories
+ * to match. A live run filed its `ship.draft_opened` entry by the entry's
+ * *subject* — a pull request URL — and produced
+ * `orders/https:/github.com/owner/repo/pull/8/ledger.jsonl`, while the order's
+ * own ledger never mentioned the draft it had just opened.
+ *
+ * The caller was wrong and is fixed. This refuses the shape as well, because a
+ * silent misfile is how that went unnoticed: the entry was written, the write
+ * succeeded, and nothing anywhere said it had gone to the wrong place.
+ *
+ * The check is "one segment, directly under `orders/`", so it cannot refuse an
+ * id that was already working — those all resolve there by construction.
+ */
 export function orderDir(root: string, orderId: string): string {
-  return path.join(root, 'orders', orderId)
+  const orders = path.resolve(root, 'orders')
+  const target = path.resolve(orders, orderId)
+  if (path.dirname(target) !== orders) throw new OrderIdEscapesRootError(orderId)
+  return target
 }
 
 /**
