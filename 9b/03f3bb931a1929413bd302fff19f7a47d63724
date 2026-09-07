@@ -1,0 +1,40 @@
+tests/e2e/live/full-run.spec.ts
+  s_357c91d2b54b02::t_7641ac00d3a07a 1-227
+extensions/foundry/tests/runtime/autonomy-policy.spec.ts
+  s_357c91d2b54b02::t_5776619da02307 1-156
+docs/user-guide/USER-GUIDE.md
+  s_357c91d2b54b02::t_9dc5ceed7e5fab 618-634
+extensions/foundry/tests/live/linear-transition-live.spec.ts
+  s_357c91d2b54b02::t_24927740d6fc23 55
+  s_357c91d2b54b02::t_af2cf4cd75429e 1-54,56-117
+extensions/foundry/src/line/executor.ts
+  s_357c91d2b54b02::t_5e66292eab7734 100-109,225-237,326,346,359,365,409,475,486
+extensions/foundry/tests/line/executor.spec.ts
+  s_357c91d2b54b02::t_d46075016c5c43 1188-1242
+playwright.config.ts
+  s_357c91d2b54b02::t_e8d9e17dc9e42c 9-15
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_349a93a8a3c199 855-858
+  s_357c91d2b54b02::t_f1357959df87af 27,714-723
+  s_357c91d2b54b02::t_59c03ce73458c1 192-199,800,1269
+extensions/foundry/SUPERVISION.md
+  s_357c91d2b54b02::t_0dd45ce9ae5a18 247-269
+extensions/foundry/src/runtime/autonomy-policy.ts
+  s_357c91d2b54b02::t_550c2823fd2943 1-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "9b03f3bb931a1929413bd302fff19f7a47d63724",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
