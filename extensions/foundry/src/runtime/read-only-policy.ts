@@ -24,6 +24,11 @@ const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'NotebookRead',
   'TodoWrite',
   'Task',
+  // Loading a tool's schema is not using it. Refusing this took a reviewer's
+  // ability to reach anything deferred — watched on a live run — and granted
+  // nothing in exchange: every tool it surfaces still meets this policy when
+  // the agent actually calls it.
+  'ToolSearch',
 ])
 
 /**

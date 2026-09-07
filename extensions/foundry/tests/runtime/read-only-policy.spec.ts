@@ -392,3 +392,19 @@ describe('git branch, listing and writing', () => {
     expect(allowed('git remote add origin x').allow).toBe(false)
   })
 })
+
+// Deny-by-default for an unknown tool is the right posture and stays. But
+// loading a tool's schema is not using it: refusing this took a reviewer's
+// ability to reach anything deferred — watched on a live run — and granted
+// nothing, because every tool it surfaces meets this same policy when the
+// agent actually calls it.
+describe('finding a tool, as opposed to using one', () => {
+  it("lets a review load a deferred tool's schema", () => {
+    expect(decideReadOnly('ToolSearch', { query: 'select:Read' }).allow).toBe(true)
+  })
+
+  it('still refuses a tool it has not been taught about', () => {
+    expect(decideReadOnly('mcp__whatever__save', {}).allow).toBe(false)
+    expect(decideReadOnly('Write', { file_path: '/x' }).allow).toBe(false)
+  })
+})
