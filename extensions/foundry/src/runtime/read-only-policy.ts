@@ -45,6 +45,8 @@ const READ_ONLY_BINARIES: ReadonlySet<string> = new Set([
   'stat',
   'diff',
   'pwd',
+  // Changes where the shell is looking, not what is in it.
+  'cd',
   'echo',
   'basename',
   'dirname',
@@ -238,9 +240,27 @@ function writesWithDashO(binary: string): boolean {
   return binary !== 'find'
 }
 
+/**
+ * A leading `NAME=value` is an environment prefix, not the command.
+ *
+ * `GIT_PAGER=cat git log` is a reader setting one variable for one command,
+ * and taking `GIT_PAGER=cat` as the binary refuses it for not being on a list
+ * it could never be on. Stripped, so the command underneath is what gets
+ * checked — and `FOO=bar rm x` is still refused, on the `rm`.
+ */
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
+
 /** One command, with no joiners left in it. */
 function decideSegment(segment: string): PolicyDecision {
-  const words = segment.split(/\s+/)
+  const words = segment.split(/\s+/).filter((word, index, all) => {
+    if (!ASSIGNMENT.test(word)) return true
+    // Only a *leading* run of them: a `KEY=value` argument in the middle
+    // belongs to the command and is none of this function's business.
+    return all.slice(0, index).some((earlier) => !ASSIGNMENT.test(earlier))
+  })
+  if (words.length === 0) {
+    return { allow: true, reason: 'setting a variable changes nothing' }
+  }
   const binary = words[0]
 
   const flags = writesWithDashO(binary) ? [...WRITING_FLAGS, /^-o$/] : WRITING_FLAGS

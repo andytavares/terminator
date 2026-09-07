@@ -316,3 +316,31 @@ describe('throwing output away', () => {
     expect(allowed('ls 2>/dev/null && rm file').allow).toBe(false)
   })
 })
+
+// Two more the live architect walked into, both ordinary reader shapes.
+describe('moving around and setting a variable', () => {
+  const allowed = (command: string) => decideReadOnly('Bash', { command })
+
+  it('lets a reader change directory, which changes nothing in the repository', () => {
+    expect(allowed('cd /repo && git log --oneline -5').allow).toBe(true)
+  })
+
+  it('reads past a leading environment assignment to the command underneath', () => {
+    expect(allowed('GIT_PAGER=cat git log').allow).toBe(true)
+    expect(allowed('B=/repo cat package.json').allow).toBe(true)
+  })
+
+  it('still refuses the command underneath when it writes', () => {
+    expect(allowed('FOO=bar rm -rf x').allow).toBe(false)
+    expect(allowed('GIT_PAGER=cat git push').allow).toBe(false)
+  })
+
+  it('treats a bare assignment as changing nothing', () => {
+    expect(allowed('B=/repo').allow).toBe(true)
+  })
+
+  it('leaves an argument that merely looks like one alone', () => {
+    // `--define X=1` is the command's business, not this function's.
+    expect(allowed('grep --define X=1 pattern file').allow).toBe(true)
+  })
+})
