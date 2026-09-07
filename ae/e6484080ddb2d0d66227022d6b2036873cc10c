@@ -1,0 +1,22 @@
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_09c7583901af51 717-732,745,1206,1619
+  s_357c91d2b54b02::t_33cd1cd4c553c1 314-337,1098-1109
+extensions/foundry/tests/channel-registry.spec.ts
+  s_357c91d2b54b02::t_cd65a19b00c243 159-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "aee6484080ddb2d0d66227022d6b2036873cc10c",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
