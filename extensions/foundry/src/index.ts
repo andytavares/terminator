@@ -19,11 +19,12 @@ import type { ShellExec } from './line/integrate.js'
 import { ensureCheckouts } from './line/worktree.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
-import { execute } from './line/executor.js'
-import type { StartedRun } from './line/executor.js'
+import { execute, opensPullRequest } from './line/executor.js'
+import type { RunOutcome, StartedRun } from './line/executor.js'
 import type { RunGraph, RunNode } from './line/run-graph.js'
 import type { Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
+import { readShell } from './runtime/shell-split.js'
 import { decideByAutonomy } from './runtime/autonomy-policy.js'
 import { ensureTrusted } from './runtime/workspace-trust.js'
 import type { LedgerEntry } from './ledger/append.js'
@@ -242,10 +243,54 @@ function isProbedCommand(order: WorkOrder, tool: string, input: unknown): boolea
       ? (input as { command?: unknown }).command
       : undefined
   if (typeof command !== 'string') return false
-  const asked = command.trim()
-  return Object.values(order.context.toolchain).some(
-    (found) => found !== null && found.command.trim() === asked
+
+  const probed = new Set(
+    Object.values(order.context.toolchain)
+      .filter((found) => found !== null)
+      .map((found) => found.command.trim())
   )
+  if (probed.size === 0) return false
+
+  // Per segment, because a verdict from an exit status is the whole point and
+  // an exit status is something you have to ask for. Watched live: a verifier
+  // ran `npm test; echo "EXIT=$?"` — the plainest way there is to capture what
+  // FR-033 says the verdict must come from — and a whole-command match refused
+  // it, naming `npm` as not being on the review's list.
+  //
+  // One segment has to be a command this project actually declared, and every
+  // other segment has to stand on its own under the read-only policy. So
+  // `npm test; echo "EXIT=$?"` is allowed and `npm test; rm -rf .` is not.
+  const segments = readShell(command).segments
+  return (
+    segments.some((segment) => probed.has(segment)) &&
+    segments.every(
+      (segment) => probed.has(segment) || decideReadOnly('Bash', { command: segment }).allow
+    )
+  )
+}
+
+/**
+ * Why a finished run did not open anything, in one sentence.
+ *
+ * Read off the outcome in the order `shippable` itself checks, so the sentence
+ * names the first thing that actually stopped it rather than the last thing
+ * that happens to be false.
+ */
+function whyNotShipped(recipe: Recipe, outcome: RunOutcome): string {
+  if (!opensPullRequest(recipe)) {
+    return `the "${recipe.id}" shape opens nothing — it is a question, not a change`
+  }
+  if (!outcome.complete) return 'not every node finished'
+  if (outcome.gates.length > 0) {
+    return `held by ${outcome.gates.map((gate) => gate.rule).join(', ')}`
+  }
+  if (outcome.ladder === null) return 'the climb never ran, so nothing has been verified'
+  if (!outcome.ladder.ok) {
+    return outcome.ladder.stoppedAt === null
+      ? `the climb could not measure ${outcome.ladder.unmeasured.join(', ')}`
+      : `the climb stopped at ${outcome.ladder.stoppedAt}`
+  }
+  return 'it was not shippable, and this build cannot say which check said so'
 }
 
 /** The autonomy dial, read wherever it is needed rather than copied. */
@@ -1033,7 +1078,23 @@ async function executeRun(
   // Work that is finished and waiting on nobody ships, without being asked
   // (FR-053). Work that is waiting on somebody does not — the run halts, the
   // inbox has the question, and answering it resumes from here.
-  if (!outcome.shippable) return
+  if (!outcome.shippable) {
+    // Out loud. A run that finishes every node and then quietly does not ship
+    // is indistinguishable, from every surface, from one that shipped — the
+    // graph is all green either way, and the only way to find out was to go
+    // and look at GitHub. Watched on a live run: every node passed, nothing
+    // was pushed, and nothing anywhere said why.
+    await store.record({
+      at: new Date().toISOString(),
+      orderId: order.id,
+      actor: 'rule:line',
+      action: 'ship.refused',
+      subject: order.id,
+      reason: whyNotShipped(recipe, outcome),
+      evidence: [],
+    })
+    return
+  }
 
   // Shipped against the grade the change turned out to deserve, not the one
   // the plan predicted — which is the whole reason the executor regrades.

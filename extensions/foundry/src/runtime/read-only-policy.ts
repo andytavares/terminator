@@ -10,6 +10,8 @@
 // for `git diff` and Bash can write. So the decision has to be made on the
 // command, not on the tool.
 
+import { readShell } from './shell-split.js'
+
 export interface PolicyDecision {
   readonly allow: boolean
   /** Why, in words the agent reads and a person can act on. */
@@ -105,37 +107,19 @@ const READ_ONLY_GIT: ReadonlySet<string> = new Set([
 // or a bare name.
 
 /**
- * Anything that chains, redirects or substitutes.
+ * Chaining, redirection and substitution are read by `shell-split.ts`.
  *
- * This is the load-bearing check. Without it an allowlist is theatre: `git diff`
- * passes, and so does `git diff; rm -rf .`, `git diff > file` and
- * `git diff $(rm -rf .)`. A review never needs any of them, so the whole class
- * is refused rather than parsed.
+ * That is the load-bearing check, and without it an allowlist is theatre:
+ * `git diff` passes, and so does `git diff; rm -rf .`, `git diff > file` and
+ * `git diff $(rm -rf .)`. Newlines count as joiners too, and they were the
+ * original hole — a shell runs each line of `git diff\nrm -rf .` in turn while
+ * a check that only looked for `;` saw the first word and allowed it.
  *
- * Newlines included, and they were the hole: a shell runs each line of
- * `git diff\nrm -rf .` in turn, while a check that only looked for `;` saw the
- * first word, said "git diff", and allowed it.
+ * It lives there rather than here because the autonomy policy needs the same
+ * reading, and because doing it with a regular expression over the raw text
+ * cannot see quoting: `grep -E "TTL|15 \\* 60" .` was split into four commands
+ * and refused for a fragment of its own pattern.
  */
-/**
- * What no amount of per-segment checking can make safe.
- *
- * Redirection writes a file whatever is on the left of it, and a command
- * substitution runs a command this policy would have to parse out of the
- * middle of an argument. Both are refused outright.
- */
-const IRREDEEMABLE = /[><`]|\$\(/
-
-/**
- * The operators that join one command to another.
- *
- * Newlines included, and they were the hole the original check existed for: a
- * shell runs each line of `git diff\nrm -rf .` in turn, while a check that only
- * looked at the first word saw "git diff" and allowed it. The answer is not to
- * refuse every compound — a reader composing two reads, `find . | head -50`, is
- * the most ordinary thing in the world, and refusing it left an architect with
- * nothing it could run. The answer is to check *every* segment.
- */
-const JOINERS = /\|\||&&|[;|&\n\r]/
 
 /**
  * Flags that make a reading command write or execute.
@@ -205,7 +189,15 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
   // redirection is still refused by the test below.
   const withoutDiscards = command.replace(/(?:\d?>>?|&>)\s*\/dev\/null(?=\s|$)/g, ' ')
 
-  if (IRREDEEMABLE.test(withoutDiscards)) {
+  // Read with quoting respected, because a quoted string is where an agent's
+  // most ordinary command puts its punctuation. Matching `[><`|;&]` against the
+  // raw text split `grep -E "TTL|15 \* 60|process\.env" .` into four commands
+  // and refused the review with "15 is not on the review's read-only list" — a
+  // fragment of a regex reported as a binary. Watched live; the verifier tried
+  // three more spellings and gave up.
+  const reading = readShell(withoutDiscards)
+
+  if (reading.redirects || reading.substitutes) {
     return {
       allow: false,
       reason: 'a review may not redirect output or run a command inside another',
@@ -215,10 +207,7 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
   // Every segment, not the first one. Each has to read on its own, so the whole
   // reads — and a joined command whose second half writes is refused by the
   // half that writes rather than being missed because the first half was fine.
-  const segments = withoutDiscards
-    .split(JOINERS)
-    .map((segment) => segment.trim())
-    .filter((segment) => segment !== '')
+  const segments = reading.segments
   if (segments.length === 0) {
     return { allow: false, reason: 'a Bash call with no command cannot be checked' }
   }

@@ -160,8 +160,23 @@ describe("running the project's own commands", () => {
   it('matches them exactly, rather than by prefix', () => {
     const fn = src.slice(src.indexOf('function isProbedCommand'))
     const body = fn.slice(0, fn.indexOf('\n}'))
-    expect(body).toContain('found.command.trim() === asked')
+    // Exact set membership, per segment. A prefix match would let
+    // `npm test; rm -rf .` in on the strength of its first two words, which is
+    // the whole reason this assertion exists.
+    expect(body).toContain('probed.has(segment)')
     expect(body).not.toMatch(/startsWith|includes\(asked\)/)
+  })
+
+  it('reads a joined command per segment, so capturing an exit status is allowed', () => {
+    // A verdict from an exit status is the verifier's job, and an exit status
+    // is something you have to ask for: `npm test; echo "EXIT=$?"`. A
+    // whole-command match refused that, naming `npm` as not on the list.
+    const fn = src.slice(src.indexOf('function isProbedCommand'))
+    const body = fn.slice(0, fn.indexOf('\n}'))
+    expect(body).toContain('readShell(command).segments')
+    // And every other segment still has to stand on its own, or
+    // `npm test; rm -rf .` rides in behind the one that was declared.
+    expect(body).toContain("decideReadOnly('Bash', { command: segment }).allow")
   })
 
   it('only ever considers a shell call', () => {

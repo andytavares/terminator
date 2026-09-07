@@ -1,5 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { readShell, redirectTargets } from './shell-split.js'
 import type { PolicyDecision } from './read-only-policy.js'
 import type { Autonomy } from '../gates/autonomy.js'
 
@@ -61,45 +62,8 @@ const DESTRUCTIVE_FLAGS: ReadonlyArray<RegExp> = [
   /^--prune$/,
 ]
 
-/**
- * A command built inside another, which cannot be read off the text.
- *
- * Backticks and `$(…)` only: whatever they expand to is not in front of us, so
- * the honest answer is to ask.
- */
-const OPAQUE = /[`]|\$\(/
-
-/**
- * The operators that join one command to another.
- *
- * This used to be a blanket refusal of every compound command, on the same
- * reasoning the read-only policy started from: reading `git status` off the
- * front of `git status; rm -rf .` reads the wrong command. But refusing the
- * whole shape does not stop at the dangerous ones — `pwd && git status` and
- * `npm test 2>&1 | tail -20` are the ordinary sentences every agent writes,
- * and each of them was classified as destroying work and sent to an operator.
- * At *every* setting, lights-out included.
- *
- * That is why builders sat doing nothing while the graph said `running`: the
- * automatic half of FR-029 existed and almost nothing reached it. The answer
- * is the one the read-only policy already arrived at — judge every segment.
- */
-const JOINERS = /\|\||&&|[;|&\n\r]/
-
 /** Output thrown away, and stderr folded into stdout. Neither writes. */
 const DISCARDS = /(?:\d?>>?|&>)\s*\/dev\/null(?=\s|$)|2>&1/g
-
-/** Where a segment redirects to, if anywhere. A redirect is a write. */
-function redirectTargets(command: string): string[] {
-  const targets: string[] = []
-  const pattern = /(?:\d?>>?|&>)\s*("[^"]*"|'[^']*'|[^\s;|&]+)/g
-  let match: RegExpExecArray | null = pattern.exec(command)
-  while (match !== null) {
-    targets.push(match[1].replace(/^["']|["']$/g, ''))
-    match = pattern.exec(command)
-  }
-  return targets
-}
 
 /** The tools that name a path, and the field each names it in. */
 const PATH_FIELDS = ['file_path', 'path', 'notebook_path'] as const
@@ -130,18 +94,18 @@ export function isDestructive(toolName: string, input: unknown): boolean {
   const command = commandOf(input)
   if (command.trim() === '') return false
 
-  const readable = command.replace(DISCARDS, ' ')
-  // Unparseable is treated as destructive rather than assumed safe.
-  if (OPAQUE.test(readable)) return true
+  // Read with quoting respected: the punctuation inside a quoted argument
+  // belongs to the argument. Splitting the raw text turned an agent's
+  // `grep -E "a|b" .` into two commands and judged a fragment of the regex.
+  const reading = readShell(command.replace(DISCARDS, ' '))
+
+  // A command built inside another cannot be read at all, so it asks.
+  if (reading.substitutes) return true
 
   // Every segment, not the first one — and not the whole shape. A joined
   // command whose second half destroys is caught by that half; one whose two
   // halves both read is ordinary work.
-  return readable
-    .split(JOINERS)
-    .map((segment) => segment.trim())
-    .filter((segment) => segment !== '')
-    .some(destructiveSegment)
+  return reading.segments.some(destructiveSegment)
 }
 
 /** `FOO=bar cmd` is `cmd`; without this the binary reads as the assignment. */

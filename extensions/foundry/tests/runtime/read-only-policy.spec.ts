@@ -408,3 +408,35 @@ describe('finding a tool, as opposed to using one', () => {
     expect(decideReadOnly('Write', { file_path: '/x' }).allow).toBe(false)
   })
 })
+
+// The punctuation inside a quoted argument belongs to the argument. Matching
+// `[><`|;&]` against raw text split a verifier's `grep -E "TTL|15 \* 60" .`
+// into four commands and refused the review with "15 is not on the review's
+// read-only list" — a fragment of its own regex, named as a binary. It tried
+// three more spellings and gave up.
+describe('a command whose arguments contain punctuation', () => {
+  it('reads an alternation regex as one command', () => {
+    const decision = decideReadOnly('Bash', {
+      command: 'grep -rn --exclude-dir=.git -E "TTL|15 \\* 60|900000|process\\.env" .',
+    })
+    expect(decision.allow).toBe(true)
+  })
+
+  it('does not call a quoted angle bracket a redirection', () => {
+    expect(decideReadOnly('Bash', { command: 'grep "a>b" src' }).allow).toBe(true)
+  })
+
+  it('does not call a quoted dollar-paren a command substitution', () => {
+    expect(decideReadOnly('Bash', { command: "grep '$(x)' src" }).allow).toBe(true)
+  })
+
+  it('still refuses a real redirection and a real substitution', () => {
+    expect(decideReadOnly('Bash', { command: 'cat x > y' }).allow).toBe(false)
+    expect(decideReadOnly('Bash', { command: 'echo $(rm -rf x)' }).allow).toBe(false)
+    expect(decideReadOnly('Bash', { command: 'echo `rm -rf x`' }).allow).toBe(false)
+  })
+
+  it('still refuses a writing command hiding behind a quoted one', () => {
+    expect(decideReadOnly('Bash', { command: 'grep "a|b" . ; rm -rf .' }).allow).toBe(false)
+  })
+})

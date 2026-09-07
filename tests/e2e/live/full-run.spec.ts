@@ -173,15 +173,36 @@ test('an agent takes an order to a draft pull request', async () => {
   expect(started.started, 'nothing was there to run it').toBe(true)
 
   // Poll the graph rather than the clock. A settled node is one nothing is
-  // waiting on any more; the run is over when every node is settled or the
-  // budget stops it.
+  // waiting on any more — but a settled *graph* is not a finished run, and
+  // reading it as one is what this test used to do.
+  //
+  // The climb and the shipping both happen after the last node leaves the
+  // graph: the ladder runs over the finished work, and only then does the run
+  // push its branch and open the draft. Breaking on a settled graph declared
+  // the run over at that moment, asserted against GitHub while the ladder was
+  // still climbing, and then closed the application — killing the very step
+  // the test is named after. It reported "nothing was opened", which was true
+  // and told nobody anything.
+  //
+  // So the run is over when it has said so: a draft on the ledger, or a gate
+  // holding it, or the deadline.
   const SETTLED = new Set(['passed', 'failed', 'skipped', 'blocked'])
+  const ledgerFile = join(repo, '.foundry', 'orders', ORDER, 'ledger.jsonl')
+  const gatesFile = join(repo, '.foundry', 'orders', ORDER, 'gates.json')
+  const finished = (): string | null => {
+    const ledger = existsSync(ledgerFile) ? readFileSync(ledgerFile, 'utf8') : ''
+    if (ledger.includes('ship.draft_opened')) return 'a draft is on the ledger'
+    if (ledger.includes('ship.refused')) return 'shipping was refused, and said so'
+    if (existsSync(gatesFile)) return 'a gate is holding it'
+    return null
+  }
   // Longer than the order's own budget, deliberately. When the two were the
   // same the test gave up at the moment the budget would have stopped the run,
   // so the gate that exists for exactly this case was never seen.
   const deadline = Date.now() + 30 * 60_000
   let last: Observed = {}
   let previous = ''
+  let settledSince: number | null = null
 
   while (Date.now() < deadline) {
     last = (await foundry('foundry:run.observe', { id: ORDER })) as Observed
@@ -192,7 +213,26 @@ test('an agent takes an order to a draft pull request', async () => {
       console.log(`[${new Date().toISOString().slice(11, 19)}] ${line}`)
       previous = line
     }
-    if (nodes.length > 0 && nodes.every((n) => SETTLED.has(n.state))) break
+    const over = finished()
+    if (over !== null) {
+      // eslint-disable-next-line no-console
+      console.log(`[run over] ${over}`)
+      break
+    }
+    // A settled graph with nothing on the ledger yet means the tail is still
+    // working — the climb, then the push and the draft. Keep waiting.
+    if (nodes.length > 0 && nodes.every((n) => SETTLED.has(n.state)) && settledSince === null) {
+      settledSince = Date.now()
+      // eslint-disable-next-line no-console
+      console.log('[graph settled] waiting on the climb and the draft')
+    }
+    // The tail is not unbounded: an hour of ladder is a hung rung, not a slow
+    // one, and the test should say which.
+    if (settledSince !== null && Date.now() - settledSince > 15 * 60_000) {
+      // eslint-disable-next-line no-console
+      console.log('[gave up] the graph settled 15 minutes ago and nothing shipped')
+      break
+    }
     await handle.page.waitForTimeout(10_000)
   }
 
