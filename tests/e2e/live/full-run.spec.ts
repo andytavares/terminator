@@ -68,6 +68,25 @@ test.beforeAll(async () => {
   await handle.page.waitForTimeout(3000)
   await handle.page.locator('button[aria-label="Foundry"]').click()
   await handle.page.waitForTimeout(3000)
+
+  // This run is unattended, so it says so.
+  //
+  // The default is `standard`, which asks about the risky things — right when
+  // somebody is at the console, and a dead end when nobody is: the question
+  // goes to the inbox, five minutes later to the runtime's own prompt in the
+  // terminal, and the agent stands there until the budget ends the run. A live
+  // run lost half an hour that way, to a builder redirecting its test output to
+  // a scratch file. Nothing here can answer a question, and pretending
+  // otherwise tests a situation this test is not in.
+  await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (view === undefined) throw new Error('the Foundry view is not loaded')
+    await view.executeJavaScript(
+      "window.electronAPI.extension.updateSetting('terminator.foundry.autonomy', 'lights-out')"
+    )
+  })
 })
 
 test.afterAll(async () => {
