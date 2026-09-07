@@ -1611,6 +1611,48 @@ export function activate(api: ExtensionAPI): void {
       }
     },
   })
+  // Your tickets, so a ticket can be picked rather than typed from memory.
+  //
+  // The Forge has always taken a tracker key, and the only way to give it one
+  // was to know it already. The host lists and searches issues — `listMine`
+  // and `search` have been there the whole time — and nothing here asked.
+  // Importing work is the front door of a tool that does work, and it did not
+  // have one.
+  reg(api, 'foundry:issues.mine', async (payload) => {
+    const issues = api.issues
+    if (issues === undefined) return { connected: [], issues: [] }
+    const term =
+      typeof (payload as { term?: unknown })?.term === 'string'
+        ? ((payload as { term: string }).term ?? '').trim()
+        : ''
+    try {
+      const connected = await issues.connections()
+      // Nothing connected is a real answer and not an error: the surface says
+      // so rather than showing an empty list that looks like "no tickets".
+      if (connected.length === 0) return { connected: [], issues: [] }
+      const found =
+        term === ''
+          ? await issues.listMine({ limit: 50 })
+          : await issues.search(term, { limit: 50 })
+      return {
+        connected: connected.map((c) => ({
+          tracker: String(c.tracker),
+          account: String(c.account ?? ''),
+        })),
+        issues: (found.issues ?? []).map((issue) => ({
+          tracker: String(issue.tracker),
+          key: String(issue.key),
+          title: String(issue.title ?? ''),
+          status: String((issue as { status?: unknown }).status ?? ''),
+        })),
+        failures: (found.failures ?? []).map((f) =>
+          String((f as { message?: unknown }).message ?? f)
+        ),
+      }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Could not read your tickets.' }
+    }
+  })
   reg(api, 'foundry:order.create', (payload) => forge.create(payload))
   reg(api, 'foundry:order.turn', (payload) => forge.turn(payload))
   reg(api, 'foundry:order.compile', (payload) => forge.compile(payload))

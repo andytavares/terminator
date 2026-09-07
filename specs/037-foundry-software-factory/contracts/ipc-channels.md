@@ -12,6 +12,36 @@ Entity shapes referenced below are defined in [data-model.md](../data-model.md) 
 
 ---
 
+## `foundry:issues.mine`
+
+Your tickets, so one can be picked rather than remembered. `order.create` has
+always accepted a tracker key and there was no way in the interface to give it
+one — importing work is the front door of a tool that does work, and it did not
+have one. The host has listed and searched issues the whole time; nothing here
+asked.
+
+**Payload**:
+
+```typescript
+{ term?: string }   // empty lists your own; otherwise a full-text search
+```
+
+**Reply**:
+
+```typescript
+{
+  connected: { tracker: string; account: string }[]  // empty when none is connected
+  issues: { tracker: string; key: string; title: string; status: string }[]
+  failures?: string[]                                // per-tracker, reported not thrown
+}
+| { error: string }
+```
+
+No tracker connected is a real answer and not an error: the surface says so
+rather than showing an empty list, which reads as "you have no tickets".
+
+---
+
 ## `foundry:order.create`
 
 Seed a new work order and return the first complete draft. Scout runs before this resolves — the operator never sees an empty shell (FR-002, FR-003).

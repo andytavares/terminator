@@ -588,11 +588,22 @@
   border-radius: var(--tm-radius-sm);
 }
 
+/* Sized explicitly, like everything else here. The shared extension stylesheet
+   sets `body`'s family, colour and background and no size, so anything that
+   forgets one renders at the browser's 16px — beside labels and a table at
+   11-12px, which is exactly how this shipped. */
 .fdry-propose {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-propose svg {
+  width: 13px;
+  height: 13px;
 }
 
 .fdry-ledger {
@@ -1064,6 +1075,92 @@
 .fdry-seed button svg {
   width: 13px;
   height: 13px;
+}
+
+/* A segmented control, in the same language as the buttons beside it.
+   After `.fdry-seed button`, and scoped through the group, because that rule
+   paints the accent on every button in the row: at equal specificity it won on
+   source order and coloured the *unselected* half blue while the selected half
+   went quiet. Exactly backwards, and visible the moment anyone looked. */
+.fdry-seed .fdry-seed-from {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  overflow: hidden;
+  background: var(--tm-bg-input);
+}
+
+.fdry-seed .fdry-seed-from button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  padding: 7px 14px;
+  font-size: 12.5px;
+}
+
+.fdry-seed .fdry-seed-from button + button {
+  border-left: 1px solid var(--tm-border-strong);
+}
+
+.fdry-seed .fdry-seed-from button[aria-pressed='true'] {
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.fdry-seed .fdry-seed-from button:disabled {
+  background: transparent;
+  color: var(--tm-text-muted);
+  cursor: not-allowed;
+}
+
+/* Your tickets, listed. */
+.fdry-tickets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fdry-tickets button {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  text-align: left;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-subtle);
+  border-radius: var(--tm-radius-sm);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-tickets button:hover:not(:disabled) {
+  border-color: var(--tm-border-strong);
+}
+
+.fdry-ticket-key {
+  flex: 0 0 auto;
+  font-family: var(--tm-font-mono);
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-ticket-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fdry-ticket-status {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--tm-text-muted);
 }
 
 .fdry-problem {
