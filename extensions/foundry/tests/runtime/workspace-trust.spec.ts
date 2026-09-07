@@ -117,3 +117,48 @@ describe('isTrusted', () => {
     expect(isTrusted(REPO, home)).toBe(false)
   })
 })
+
+// macOS hands out two paths for the same directory — `/var/folders/…` and
+// `/private/var/folders/…` — and this config is keyed by string. Trusting only
+// the name we happened to be given leaves the agent at the dialog whenever the
+// runtime resolves the other one, which is a coin flip nobody would ever debug.
+describe('a directory with two names', () => {
+  it('trusts both the path it was given and the one it resolves to', () => {
+    const real = fs.mkdtempSync(path.join(home, 'real-'))
+    const link = path.join(home, 'link')
+    fs.symlinkSync(real, link)
+    writeConfig({ projects: {} })
+
+    expect(ensureTrusted(link, home)).toEqual({ changed: true })
+    const projects = readConfig().projects as unknown as Record<string, { [k: string]: unknown }>
+    expect(projects[link]?.hasTrustDialogAccepted).toBe(true)
+    expect(projects[fs.realpathSync(link)]?.hasTrustDialogAccepted).toBe(true)
+  })
+
+  it('reads either name as trusted', () => {
+    const real = fs.mkdtempSync(path.join(home, 'real-'))
+    const link = path.join(home, 'link')
+    fs.symlinkSync(real, link)
+    writeConfig({ projects: { [fs.realpathSync(link)]: { hasTrustDialogAccepted: true } } })
+    expect(isTrusted(link, home)).toBe(true)
+  })
+
+  it('does not rewrite the file when both names are already trusted', () => {
+    const real = fs.mkdtempSync(path.join(home, 'real-'))
+    const link = path.join(home, 'link')
+    fs.symlinkSync(real, link)
+    writeConfig({
+      projects: {
+        [link]: { hasTrustDialogAccepted: true },
+        [fs.realpathSync(link)]: { hasTrustDialogAccepted: true },
+      },
+    })
+    expect(ensureTrusted(link, home)).toEqual({ changed: false, reason: 'already trusted' })
+  })
+
+  it('writes one entry for a path that is already its own real name', () => {
+    writeConfig({ projects: {} })
+    ensureTrusted(REPO, home)
+    expect(Object.keys(readConfig().projects)).toEqual([REPO])
+  })
+})

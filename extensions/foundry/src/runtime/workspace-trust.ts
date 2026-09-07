@@ -41,10 +41,28 @@ function read(file: string): ClaudeConfig | null {
   }
 }
 
-/** Whether this repository is already trusted. */
+/**
+ * The path with every symlink resolved, or the path itself.
+ *
+ * On macOS a temporary directory is both `/var/folders/…` and
+ * `/private/var/folders/…`, and these are different strings to a config keyed
+ * by string.
+ */
+function realPath(target: string): string {
+  try {
+    return fs.realpathSync(target)
+  } catch {
+    return target
+  }
+}
+
+/** Whether this repository is already trusted, under either name for it. */
 export function isTrusted(repoRoot: string, home = os.homedir()): boolean {
   const config = read(claudeConfigPath(home))
-  return config?.projects?.[repoRoot]?.hasTrustDialogAccepted === true
+  const projects = config?.projects ?? {}
+  return [repoRoot, realPath(repoRoot)].some(
+    (each) => projects[each]?.hasTrustDialogAccepted === true
+  )
 }
 
 export type TrustResult =
@@ -68,15 +86,24 @@ export function ensureTrusted(repoRoot: string, home = os.homedir()): TrustResul
   const config = read(file)
   if (config === null) return { changed: false, reason: 'no config to amend' }
 
+  // Trust is keyed by the path as a string, and macOS hands out two for the
+  // same directory — `/var/folders/…` and `/private/var/folders/…`. Trusting
+  // only the one we were given leaves the agent at the dialog whenever the
+  // runtime resolves the other, which is a coin flip nobody would ever debug.
+  const paths = [...new Set([repoRoot, realPath(repoRoot)])]
   const projects = config.projects ?? {}
-  const existing = projects[repoRoot] ?? {}
-  if (existing.hasTrustDialogAccepted === true) {
+  if (paths.every((each) => projects[each]?.hasTrustDialogAccepted === true)) {
     return { changed: false, reason: 'already trusted' }
   }
 
   const next: ClaudeConfig = {
     ...config,
-    projects: { ...projects, [repoRoot]: { ...existing, hasTrustDialogAccepted: true } },
+    projects: {
+      ...projects,
+      ...Object.fromEntries(
+        paths.map((each) => [each, { ...(projects[each] ?? {}), hasTrustDialogAccepted: true }])
+      ),
+    },
   }
 
   const temporary = `${file}.foundry-${process.pid}.tmp`
