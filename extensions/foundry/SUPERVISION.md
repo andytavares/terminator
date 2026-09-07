@@ -234,6 +234,27 @@ tab, so a card ended up with five _transcripts_ and five agents that had each
 read the repository from scratch. Resuming fixed that half — the expensive
 half. Tab-per-node is what is left of it.
 
+**A resumed role is told what it may do.** The turn before a builder's may have
+been a read-only role spending it being refused, and the model reads that
+history as its own standing permissions. Watched on two live runs: an architect
+concluded _"Read-only session, so no writes"_, and the builder that resumed it
+opened with _"Checking whether the sandbox is writable this turn."_ On the first
+of those the builder never wrote at all, while the graph recorded the unit as
+built. The hook cannot fix this — it refuses what a role may not do and has no
+way to correct a role that wrongly believes it may do nothing — so a brief for a
+writing role continuing someone else's conversation says the permissions changed.
+
+**A rung reads only its own turn.** One conversation per lane means one
+transcript for the architect, the builder, the verifier and all eight ladder
+rungs. `rungExitCode` scanned the whole file for the last shell call matching
+the rung's command, so a rung was answered by whoever ran that command last: run
+against a real transcript from a live run, asking it for `npm test` returns the
+_architect's_ result — from before the change existed, produced by the session
+whose work the rung exists to check. Every run now carries the byte offset its
+own turn starts at, taken before a keystroke reaches the terminal, and the rung
+reads past it only. A command this turn never ran is "not measured" rather than
+another session's pass.
+
 One thing follows from the session outliving the node, and it is handled rather
 than assumed: **a node is measured from the diff it inherited.** The
 conversation carries every earlier node's changes, so "a turn that changed
@@ -416,16 +437,33 @@ FR-029 says every action is held against a decision — _automatic where the
 autonomy setting allows it_, and by asking where it does not. `src/runtime/autonomy-policy.ts`
 is the automatic half:
 
-|                                                                                                                                            |                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
-| **Destructive** — `rm`, `git reset --hard`, `git clean -fd`, a force push, a `-D` branch delete, anything with a shell metacharacter in it | **asks, at every setting** (FR-050) |
-| **Writes outside the unit's own checkout**                                                                                                 | **asks, at every setting**          |
-| Anything else, at `escorted`                                                                                                               | asks                                |
-| Anything else, at `standard` or `lights-out`                                                                                               | taken, and recorded                 |
+|                                                                                                                                    |                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **Destructive** — `rm`, `git reset --hard`, `git clean -fd`, a force push, a `-D` branch delete, or a command built inside another | **asks, at every setting** (FR-050) |
+| **Writes outside the unit's own checkout**, including a shell redirection to a path outside it                                     | **asks, at every setting**          |
+| Anything else, at `escorted`                                                                                                       | asks                                |
+| Anything else, at `standard` or `lights-out`                                                                                       | taken, and recorded                 |
 
-A command it cannot parse is treated as destructive rather than assumed safe:
-reading `git status` off the front of `git status; rm -rf .` is reading the
-wrong command, and that is the hole the read-only policy already documents.
+**Every segment is judged, rather than every compound refused** — the same
+correction the read-only policy needed, and for the same reason. Reading
+`git status` off the front of `git status; rm -rf .` reads the wrong command,
+so the answer is to read _all_ of it: a joined command whose second half
+destroys is caught by that half.
+
+Refusing the shape instead does not stop at the dangerous ones.
+`pwd && git rev-parse --abbrev-ref HEAD && git status --short` and
+`npm test 2>&1 | tail -20` are the ordinary sentences every agent writes, and
+each was called destruction and sent to the operator at every setting,
+lights-out included. Watched live: a builder's first two tool calls were held,
+and it sat there while the graph said `running` and the worktree stayed clean.
+
+`$(…)` and backticks still ask, because what they expand to is not in front of
+the policy to read.
+
+A redirection is a write of the file it names, and it names that file in the
+command rather than in a tool's path field. While every command containing `>`
+was destructive, that was covered by accident; it is read properly now, so
+`> /etc/hosts` asks and `> notes.txt` and `2>/dev/null` do not.
 
 This half was missing, and it is not a small thing: without it a builder's
 first `Edit` went to the operator at every setting, so no run could finish

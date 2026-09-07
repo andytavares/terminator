@@ -917,6 +917,16 @@ surfaced at once.
   and never created (ADR-042).
 - **Verdicts** are three-valued: `pass`, `fail`, `not_measured`. Coercing the
   third to a boolean anywhere turns "we did not check" into "it is fine".
+- **Only a checking party stamps a verdict.** A role that may write is the one
+  that did the work, and its turn ending says nothing about whether the criteria
+  its unit claims are met — that claim is what verification exists to test. The
+  executor used to write a verdict for every node with a unit, so a builder
+  finishing recorded `pass` on every criterion off its own exit code, labelled
+  `verifier`; `makeVerdict`'s structural guard was satisfied by passing
+  `<sessionId>-verify` as the checking session, one suffix away from the working
+  one. The checker is its own session now, held against the recorded session that
+  produced the work, and absence reads as "not measured" in both the ladder and
+  the pull-request body.
 - **The ladder** (`verify/ladder.ts`) stops at the first failure, so a run does
   not spend an inspection budget on a change that does not compile.
 - **Gates** (`gates/rules.ts`) are raised by nine named rules, never by phase
