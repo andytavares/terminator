@@ -1,0 +1,34 @@
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_44a98d8b043dc2 1614-1646
+  s_357c91d2b54b02::t_f367ee43a59139 1647-1655
+tests/e2e/foundry-typography.spec.ts
+  s_357c91d2b54b02::t_2233cb7c922b6e 1-103
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_357c91d2b54b02::t_4735d02d804b9b 15-44
+extensions/foundry/src/components/Orders.tsx
+  s_357c91d2b54b02::t_3c5107d4dbafe9 40-44,106,108,189-198,212
+  s_357c91d2b54b02::t_cd64cf61d30e00 12-18,45-47,61-105,126
+  s_357c91d2b54b02::t_97cbbf9a84a86b 199-211,213-225,229-255,258
+  s_357c91d2b54b02::t_6d3800ee666bfe 171-188
+  s_357c91d2b54b02::t_16d869490ebfa1 259
+extensions/foundry/src/components/foundry.css
+  s_357c91d2b54b02::t_d124c2dbd3c548 591-594,600-606
+  s_357c91d2b54b02::t_a9cf6ce64936eb 1080-1164
+  s_357c91d2b54b02::t_52fb4b8420ff68 1165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "8514b77590a793e217642e5951b03e78f32637f9",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
