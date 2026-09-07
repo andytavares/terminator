@@ -725,6 +725,12 @@ async function executeRun(
           onPending: (pending) =>
             notePending(api, { ...pending, featureDir }, { id: order.id, root }),
           onResolved: (requestId) => noteResolved(requestId),
+          // Set here as well as after `start` resolves, so a turn that ends
+          // before the promise settles still names the right session rather
+          // than the placeholder.
+          onRegistered: (run) => {
+            sessionId = run.sessionId
+          },
           onEnd: (exitCode) => {
             // Off the live list and into the record, so a finished unit stops
             // holding a review slot and the next wave can start.
@@ -734,6 +740,17 @@ async function executeRun(
           },
           onTurnEnd: (turns) => {
             void supervision?.finishTurn(sessionId, turns, Date.now())
+            // The node is over when the *turn* is over, not when the process
+            // is. A supervised session sits at its prompt after answering —
+            // that is the whole point of running it in a terminal you can
+            // type into — so waiting for `onEnd` waits for something that
+            // never happens, and the Line could not complete a single agent
+            // node. Intake has always got this right; this is the same rule.
+            //
+            // Zero because the turn ended, not because the work was good:
+            // whether it was is the verifier's to say and the ladder's to
+            // measure, never the producing agent's (FR-033).
+            finish(0)
           },
         })
         .then((run) => {

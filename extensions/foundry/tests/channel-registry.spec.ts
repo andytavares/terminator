@@ -91,3 +91,35 @@ describe('the channel registry', () => {
     }
   })
 })
+
+// A node is over when its *turn* is over, not when its process is.
+//
+// A supervised session sits at its prompt after answering — that is the point
+// of running it in a terminal you can type into — so a `runNode` that resolves
+// only on `onEnd` waits for something that never happens. The Line could not
+// complete a single agent node, while intake, which has always treated a turn
+// end as the answer, worked fine.
+//
+// Nothing below the application can see this: every unit test hands the
+// executor a `run` that resolves. The live e2e is what proves it, and this is
+// what stops it being undone between live runs.
+describe('what ends a node', () => {
+  it('resolves the Line on a turn ending, not only on the process exiting', () => {
+    const turnEnd = src.slice(src.indexOf('onTurnEnd: (turns) =>'))
+    const body = turnEnd.slice(0, turnEnd.indexOf('\n          },'))
+    expect(body, 'the Line waits for onEnd, which a live session never reaches').toContain(
+      'finish('
+    )
+  })
+
+  it('still resolves on the process exiting, for the runs that do exit', () => {
+    expect(src).toMatch(/onEnd: \(exitCode\) => \{[\s\S]{0,400}?finish\(exitCode\)/)
+  })
+
+  it('takes the turn end as "it stopped", never as "it was right"', () => {
+    // FR-033: the producing agent's own account is not evidence. A turn that
+    // ended is not a unit that passed — the verifier and the ladder say that.
+    const turnEnd = src.slice(src.indexOf('onTurnEnd: (turns) =>'))
+    expect(turnEnd.slice(0, 900)).toMatch(/verifier|ladder|FR-033/)
+  })
+})
