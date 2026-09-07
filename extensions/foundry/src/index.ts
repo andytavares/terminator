@@ -311,6 +311,30 @@ function readOnlyTools(api: ExtensionAPI): string[] {
     .filter((line) => line !== '')
 }
 
+/**
+ * A rung's exit status, once the transcript has caught up.
+ *
+ * The turn end and the transcript are not the same instant: the end arrives on
+ * the `Stop` hook and the records are flushed after it. Polls for a couple of
+ * seconds and then answers whatever it has — including `null`, which the
+ * ladder reads as "not measured" and which stays a real answer rather than
+ * becoming a pass.
+ */
+async function settledExitCode(
+  transcriptPath: string,
+  command: string,
+  started: { transcriptFrom?: number }
+): Promise<number | null> {
+  const from = started.transcriptFrom ?? 0
+  const deadline = Date.now() + 5_000
+  for (;;) {
+    const measured = rungExitCode(transcriptPath, command, from)
+    if (measured !== null) return measured
+    if (Date.now() >= deadline) return null
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+}
+
 /** The autonomy dial, read wherever it is needed rather than copied. */
 function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' {
   return (
@@ -690,7 +714,22 @@ function writeBackDepsFor(
   }
 }
 
-function integrateDepsFor(api: ExtensionAPI, root: string): IntegrateDeps {
+/**
+ * @param orderId Which order's ledger these entries belong in.
+ *
+ * Not `subject`, which is what this used. A shipping entry's subject is
+ * whatever the entry is about — the order for `ship.ready_asked`, and the
+ * **pull request URL** for `ship.draft_opened`. Filing by subject sent the most
+ * important entry the feature writes to a ledger named after a URL, and built
+ * the directories to match:
+ *
+ *   .foundry/orders/https:/github.com/owner/repo/pull/8/ledger.jsonl
+ *
+ * So a live run opened a real draft and its own ledger never said so — the
+ * evidence for the one thing the Line exists to do, filed under a path made of
+ * somebody else's text.
+ */
+function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): IntegrateDeps {
   return {
     exec: (options) => api.shell.exec(options),
     root,
@@ -703,7 +742,7 @@ function integrateDepsFor(api: ExtensionAPI, root: string): IntegrateDeps {
     record: async (action, subject, reason) => {
       await createOrderStore(root).record({
         at: new Date().toISOString(),
-        orderId: subject,
+        orderId,
         actor: 'rule:ship',
         action,
         subject,
@@ -1056,7 +1095,18 @@ async function executeRun(
       // live run that was the architect's `npm test`, from before the change
       // existed — the producing session's own result, standing in for the
       // check (FR-033).
-      const measured = rungExitCode(run.transcriptPath, step.command, started.transcriptFrom ?? 0)
+      //
+      // Read with a short wait, because the turn ending and the transcript
+      // being written are not the same instant. The turn end arrives on the
+      // `Stop` hook; the records it is about are flushed by the runtime a
+      // moment later. Reading immediately raced them and lost: a live run
+      // whose rungs both ran and both exited 0 shipped saying "Not measured
+      // here: Lint, The unit's own tests" — and asked against the finished
+      // file, the same function answers 0 for both.
+      //
+      // Bounded, and it still reports `null` at the end of it. "We could not
+      // see it" is a real answer; waiting forever for one is not.
+      const measured = await settledExitCode(run.transcriptPath, step.command, started)
       // `null` is "the agent never ran it", which the ladder reads as not
       // measured. Reading it as a pass is the failure the whole ladder exists
       // to prevent.
@@ -1153,7 +1203,7 @@ async function executeRun(
       ),
     },
     {
-      ...integrateDepsFor(api, root),
+      ...integrateDepsFor(api, root, order.id),
       // The shipping decision, where the grade calls for one, is the operator's
       // and reaches them through the inbox like every other.
       decide: async (gate) => {
@@ -1566,7 +1616,7 @@ export function activate(api: ExtensionAPI): void {
     act: async (gate, option) => {
       if (gate.rule === 'ready-for-review') {
         if (option !== 'mark_ready') return
-        const deps = integrateDepsFor(api, dataRoot())
+        const deps = integrateDepsFor(api, dataRoot(), gate.orderId)
         for (const pull of await readPulls(dataRoot(), gate.orderId)) {
           await markReady(pull, deps)
         }

@@ -156,6 +156,29 @@ describe('what a read-only role is told, on the intake path', () => {
   })
 })
 
+// A shipping entry's subject is whatever the entry is about: the order for
+// `ship.ready_asked`, and the pull request **URL** for `ship.draft_opened`.
+// Filing the entry by its subject sent the most important record the feature
+// writes to a ledger named after a URL, and built the directories to match —
+// watched on a live run that opened a real draft:
+//
+//   .foundry/orders/https:/github.com/owner/repo/pull/8/ledger.jsonl
+//
+// The order's own ledger never mentioned the draft it had just opened.
+describe('which ledger a shipping entry goes in', () => {
+  it('files by the order, not by whatever the entry is about', () => {
+    const fn = src.slice(src.indexOf('function integrateDepsFor'))
+    const body = fn.slice(0, fn.indexOf('\n}'))
+    expect(body).toContain('orderId,')
+    expect(body).not.toContain('orderId: subject')
+  })
+
+  it('is told which order, at both call sites', () => {
+    expect(src).toContain('integrateDepsFor(api, root, order.id)')
+    expect(src).toContain('integrateDepsFor(api, dataRoot(), gate.orderId)')
+  })
+})
+
 // The read-only policy refuses any tool it has not been taught about, which is
 // right: an MCP server's tools are named by somebody else, and
 // `mcp__x__get_thing` and `mcp__x__delete_thing` are the same shape to anything
