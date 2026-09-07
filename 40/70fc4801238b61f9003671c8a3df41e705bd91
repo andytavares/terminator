@@ -1,0 +1,22 @@
+extensions/foundry/src/runtime/read-only-policy.ts
+  s_357c91d2b54b02::t_322c0c6ae6ea59 27-31
+extensions/foundry/tests/runtime/read-only-policy.spec.ts
+  s_357c91d2b54b02::t_031fe0242b73bf 402
+  s_357c91d2b54b02::t_322c0c6ae6ea59 395-401,403-410
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "4070fc4801238b61f9003671c8a3df41e705bd91",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
