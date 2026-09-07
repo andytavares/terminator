@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
 import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
@@ -160,6 +160,22 @@ describe('starting a supervised run', () => {
   it('resumes an existing conversation rather than starting a second one', async () => {
     const run = await runner().start({ ...start, resumeSessionId: 'earlier-session' })
     expect(run?.sessionId).toBe('earlier-session')
+  })
+
+  // A lane is one conversation, so the transcript a resumed node reads already
+  // holds every earlier node's tool calls. Without a mark of where its own
+  // turn begins, a rung answered with the architect's `npm test` — run on the
+  // tree as it was before the change existed.
+  it('marks where its own turn starts in a transcript it did not begin', async () => {
+    const r = runner()
+    const first = await r.start(start)
+    expect(first?.transcriptFrom).toBe(0)
+
+    mkdirSync(dirname(first?.transcriptPath ?? ''), { recursive: true })
+    writeFileSync(first?.transcriptPath ?? '', 'x'.repeat(512))
+
+    const second = await r.start({ ...start, resumeSessionId: first?.sessionId })
+    expect(second?.transcriptFrom).toBe(512)
   })
 
   it('starts nothing when the worktree cannot be made a project', async () => {

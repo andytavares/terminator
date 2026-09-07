@@ -734,11 +734,15 @@ async function executeRun(
     return new Promise<StartedRun>((resolve) => {
       const lane = input.node.lane ?? 1
       let sessionId = `${input.node.id}-unstarted`
+      // Where this node's turn begins in the lane's transcript. Every node
+      // after the first resumes that conversation, so without the mark a rung
+      // reads an earlier node's tool calls as its own.
+      let transcriptFrom = 0
       let settled = false
       const finish = (exitCode: number | null): void => {
         if (settled) return
         settled = true
-        resolve({ sessionId, exitCode })
+        resolve({ sessionId, exitCode, transcriptFrom })
       }
 
       // Claude Code shows its workspace trust dialog for a directory it has
@@ -825,6 +829,7 @@ async function executeRun(
           // than the placeholder.
           onRegistered: (run) => {
             sessionId = run.sessionId
+            transcriptFrom = run.transcriptFrom
           },
           onEnd: (exitCode) => {
             // Off the live list and into the record, so a finished unit stops
@@ -854,6 +859,7 @@ async function executeRun(
             return
           }
           sessionId = run.sessionId
+          transcriptFrom = run.transcriptFrom
           // The lane's open conversation, for the next node that may carry it
           // on. A role that may not resume is never offered it — the registry
           // refuses, structurally.
@@ -952,7 +958,12 @@ async function executeRun(
       // The turn end is only what tells us to go and look.
       const run = supervision?.runs.get(started.sessionId) ?? null
       if (run === null) return started.exitCode
-      const measured = rungExitCode(run.transcriptPath, step.command)
+      // From this rung's own turn only. A lane is one conversation: read the
+      // whole transcript and the answer is whatever an earlier node ran. On a
+      // live run that was the architect's `npm test`, from before the change
+      // existed — the producing session's own result, standing in for the
+      // check (FR-033).
+      const measured = rungExitCode(run.transcriptPath, step.command, started.transcriptFrom ?? 0)
       // `null` is "the agent never ran it", which the ladder reads as not
       // measured. Reading it as a pass is the failure the whole ladder exists
       // to prevent.

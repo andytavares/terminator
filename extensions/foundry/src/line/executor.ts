@@ -43,6 +43,14 @@ export interface StartedRun {
   readonly sessionId: string
   /** Null when the run produced no exit status — "not measured", not a failure. */
   readonly exitCode: number | null
+  /**
+   * Where this node's own turn starts in the lane's transcript, in bytes.
+   *
+   * A lane is one conversation and every node after the first resumes it, so
+   * a reader with no mark answers with whatever an earlier node happened to
+   * run. Absent for a caller that keeps no transcript.
+   */
+  readonly transcriptFrom?: number
 }
 
 export interface ExecutorDeps {

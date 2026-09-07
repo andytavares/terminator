@@ -349,6 +349,51 @@ describe('rungExitCode', () => {
     expect(rungExitCode(file, 'npm test')).toBeNull()
   })
 
+  // A lane is one conversation: the architect, the builder, the verifier and
+  // every rung resume the same session and write to the same transcript. With
+  // no mark, a rung answered with whoever ran the command last — on a live run
+  // that was the architect's `npm test` while scouting, on the tree as it was
+  // before the change existed, produced by the session whose work was under
+  // test. FR-033, one layer below the verdicts.
+  describe('a transcript shared with the nodes that came before', () => {
+    const shared = () =>
+      write(
+        call('earlier', 'npm test'),
+        result('earlier', false),
+        call('mine', 'npm run lint'),
+        result('mine', true)
+      )
+
+    it("reads an earlier node's run of the command when given no mark", () => {
+      expect(rungExitCode(shared(), 'npm test')).toBe(0)
+    })
+
+    it('does not, once told where its own turn begins', () => {
+      const file = shared()
+      const beforeMine = fs
+        .readFileSync(file, 'utf8')
+        .indexOf('{"type":"assistant","message":{"content":[{"type":"tool_use","id":"mine"')
+      expect(beforeMine).toBeGreaterThan(0)
+      // The command it did not run is not measured, rather than another
+      // session's pass.
+      expect(rungExitCode(file, 'npm test', beforeMine)).toBeNull()
+      // And the one it did run still reads.
+      expect(rungExitCode(file, 'npm run lint', beforeMine)).toBe(1)
+    })
+
+    it('reads the whole file for a mark of zero, which is a fresh conversation', () => {
+      expect(rungExitCode(shared(), 'npm test', 0)).toBe(0)
+    })
+
+    it('falls back to the whole file when the mark is past the end', () => {
+      // The transcript was replaced; a mark from the old one describes a
+      // different file, and trusting it would report "not measured" for
+      // everything.
+      const file = shared()
+      expect(rungExitCode(file, 'npm test', 10_000_000)).toBe(0)
+    })
+  })
+
   it('is not measured when it was started and never came back', () => {
     const file = write(call('t1', 'npm test'))
     expect(rungExitCode(file, 'npm test')).toBeNull()

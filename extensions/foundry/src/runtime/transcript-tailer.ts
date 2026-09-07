@@ -113,6 +113,45 @@ const MAX_TAIL_BYTES = 256 * 1024
  * the first fragment is dropped — it is not JSON, and it is not a torn write
  * worth reporting.
  */
+/**
+ * How big the transcript is right now, so a caller can mark where it stands.
+ *
+ * Zero for a file that does not exist yet — a conversation being started
+ * rather than continued.
+ */
+export function transcriptSize(transcriptPath: string): number {
+  try {
+    const stat = statSync(transcriptPath)
+    return stat.isFile() ? stat.size : 0
+  } catch {
+    return 0
+  }
+}
+
+/** Every line written after `fromByte`, bounded like every other read here. */
+function linesFrom(transcriptPath: string, fromByte: number): string[] | null {
+  try {
+    const stat = statSync(transcriptPath)
+    if (!stat.isFile()) return null
+    // A transcript that shrank was replaced; anything remembered about it is
+    // about a different file, so read it whole rather than from a stale mark.
+    const start = fromByte > stat.size ? 0 : fromByte
+    const length = Math.min(stat.size - start, MAX_TAIL_BYTES)
+    if (length <= 0) return []
+
+    const handle = openSync(transcriptPath, 'r')
+    try {
+      const buffer = Buffer.alloc(length)
+      const read = readSync(handle, buffer, 0, length, start)
+      return buffer.subarray(0, read).toString('utf-8').split('\n')
+    } finally {
+      closeSync(handle)
+    }
+  } catch {
+    return null
+  }
+}
+
 function tailLines(transcriptPath: string): string[] | null {
   try {
     const stat = statSync(transcriptPath)
@@ -207,8 +246,24 @@ export function countTurns(transcriptPath: string): number {
  * one thing it must never be confused with a pass: an agent that decided not
  * to run the tests has not passed them.
  */
-export function rungExitCode(transcriptPath: string, command: string): number | null {
-  const lines = tailLines(transcriptPath)
+export function rungExitCode(
+  transcriptPath: string,
+  command: string,
+  /**
+   * Where this node's own turn begins, as a byte offset into the transcript.
+   *
+   * A lane is one conversation, so every node after the first resumes it and
+   * they all write to the same file. Reading the whole thing answered a rung
+   * with somebody else's tool call: on a live run the architect ran `npm test`
+   * while scouting, and asking this for the `test` rung returned the
+   * architect's result — from before the change existed, produced by the very
+   * session whose work was under test. That is FR-033 again, one layer down.
+   *
+   * Zero reads everything, which is right for a conversation that starts here.
+   */
+  fromByte = 0
+): number | null {
+  const lines = fromByte > 0 ? linesFrom(transcriptPath, fromByte) : tailLines(transcriptPath)
   if (lines === null) return null
 
   const wanted = command.trim()

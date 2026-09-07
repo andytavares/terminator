@@ -11,7 +11,7 @@ import {
   type PermissionDecision,
   type PermissionOutcome,
 } from './permission-bridge.js'
-import { countTurns } from './transcript-tailer.js'
+import { countTurns, transcriptSize } from './transcript-tailer.js'
 import type { WatchedRun } from './stall-watcher.js'
 
 /**
@@ -45,6 +45,15 @@ export interface SupervisedRun {
   readonly terminalSessionId: string
   /** Where the runtime writes its record, known before it exists. */
   readonly transcriptPath: string
+  /**
+   * How big that transcript was when this run was launched, in bytes.
+   *
+   * Zero for a new conversation. For a resumed one it marks everything the
+   * earlier nodes of this lane wrote: read past it and a rung answers with
+   * their tool calls rather than its own. A live run's `test` rung found the
+   * architect's `npm test`, from before the change existed.
+   */
+  readonly transcriptFrom: number
 }
 
 export interface StartSupervisedRunOptions {
@@ -397,6 +406,11 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         phase,
       })
 
+      // Before a keystroke reaches the terminal: everything already in this
+      // file belongs to the nodes that came before this one in the lane's
+      // conversation, and reading past it attributes their work to this node.
+      const transcriptFrom = transcriptSize(spec.transcriptPath)
+
       // Registered before a single keystroke reaches the terminal: the launch
       // command is written below, and a hook or turn-end arriving before the
       // caller had added the run would hit an empty registry and be dropped.
@@ -404,6 +418,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         sessionId,
         terminalSessionId,
         transcriptPath: spec.transcriptPath,
+        transcriptFrom,
       })
 
       // Typed, exactly as a person would. The skills read these to find the
@@ -439,7 +454,12 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(launchScript)}\r`
       )
 
-      return { sessionId, terminalSessionId, transcriptPath: spec.transcriptPath }
+      return {
+        sessionId,
+        terminalSessionId,
+        transcriptPath: spec.transcriptPath,
+        transcriptFrom,
+      }
     },
 
     continueRun(sessionId, next): SupervisedRun | null {
@@ -466,6 +486,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         sessionId,
         terminalSessionId: run.terminalSessionId,
         transcriptPath: run.transcriptPath,
+        transcriptFrom: transcriptSize(run.transcriptPath),
       }
     },
 
