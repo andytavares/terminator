@@ -17,6 +17,8 @@ import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { markReady, readPulls, shipOrder } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
 import { ensureCheckouts } from './line/worktree.js'
+import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
+import type { RunCommand } from './runtime/diff-metrics.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
@@ -735,6 +737,14 @@ async function executeRun(
   graph: RunGraph
 ): Promise<void> {
   const exec: ShellExec = (options) => api.shell.exec(options)
+  // `diff-metrics` speaks in bare command and args; the core allowlist admits
+  // `git` and `gh` and nothing else, so anything past those is refused here
+  // rather than attempted.
+  const diffCommand: RunCommand = async (command, args, cwd) => {
+    if (command !== 'git' && command !== 'gh') return { ok: false, stdout: '' }
+    const result = await exec({ command, args, cwd })
+    return { ok: result.exitCode === 0, stdout: result.stdout }
+  }
   const startedAt = Date.now()
   // Every checkout before any agent starts: a run that provisions lane 2 half
   // way through and fails has already spent lane 1's agent budget.
@@ -1054,6 +1064,23 @@ async function executeRun(
     // this file, so without it the Floor shows the graph the run started with
     // for the whole of the run.
     persist: (graph) => writeRunGraph(root, graph),
+    // What the work actually changed, so the regrade answers for the change
+    // rather than for the plan that predicted it. Without this the executor
+    // was handed the units' own `touches` list and a hardcoded zero lines, so
+    // a builder that went outside what it declared was invisible to the check
+    // that exists to notice, and nothing could ever grade worse than planned.
+    observedChange: async () => {
+      const files: string[] = []
+      let linesChanged = 0
+      for (const checkout of checkouts.values()) {
+        const base = order.context.repos.find((repo) => repo.name === checkout.repo)?.baseBranch
+        const against = base === undefined || base === '' ? 'main' : base
+        files.push(...(await readChangedFiles(checkout.path, against, diffCommand)))
+        const summary = await readDiffSummary(checkout.path, against, diffCommand)
+        linesChanged += summary.added + summary.removed
+      }
+      return { changedFiles: files, linesChanged }
+    },
     // Lets the budget be re-read while agents are in flight. Without it the
     // wall-clock budget can only fire between waves, which is every case
     // except the one it exists for: an agent that never comes back.

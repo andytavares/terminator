@@ -440,6 +440,49 @@ describe('the resume rule', () => {
   })
 })
 
+// The regrade and the inspection answer for "the change the work turned out to
+// be" — and they were handed `plan.units.flatMap(touches)`, the files the plan
+// *predicted*, with `linesChanged` hardcoded to zero. So a builder that went
+// outside what its unit declared was invisible to precisely the check that
+// exists to notice it, and nothing could ever grade worse than it was planned
+// as. The comment above the regrade already said it must not read the plan.
+describe('what the change turned out to be', () => {
+  it('grades a file the plan never mentioned', async () => {
+    const events: ExecutorEvent[] = []
+    const o = order([unit('U-1', { touches: ['src/harmless.ts'] })])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(ok, events),
+      observedChange: async () => ({
+        // The unit said it would touch one innocuous file and the agent went
+        // and edited authentication.
+        changedFiles: ['src/auth/session.ts'],
+        linesChanged: 40,
+      }),
+    })
+    const inspection = events.find((e) => e.type === 'inspection')
+    expect(inspection).toMatchObject({ required: true })
+  })
+
+  it('keeps what the plan declared as well, rather than swapping one for the other', async () => {
+    const events: ExecutorEvent[] = []
+    const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(ok, events),
+      // Git could not be read. An empty answer means "unknown", and reading it
+      // as "nothing touched authentication" is how a P0 quietly grades P3.
+      observedChange: async () => ({ changedFiles: [], linesChanged: 0 }),
+    })
+    expect(events.find((e) => e.type === 'inspection')).toMatchObject({ required: true })
+  })
+
+  it('falls back to the declaration when nothing can tell it what changed', async () => {
+    const events: ExecutorEvent[] = []
+    const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok, events))
+    expect(events.find((e) => e.type === 'inspection')).toMatchObject({ required: true })
+  })
+})
+
 describe('executor edge cases', () => {
   it('runs a plain shell step with its command as the prompt', async () => {
     const run = vi.fn(ok)

@@ -143,6 +143,26 @@ export interface ExecutorDeps {
    * fix what it reports" never arrives carrying the builder's identity.
    */
   readonly sessionFor?: (lane: number, role: string | null) => string | undefined
+
+  /**
+   * What the working copies actually changed.
+   *
+   * The regrade and the inspection are supposed to answer for the change the
+   * work turned out to be, and they were handed `plan.units.flatMap(touches)`
+   * — the files the plan *predicted*, with `linesChanged` hardcoded to zero.
+   * So a builder that went outside what its unit declared was invisible to
+   * precisely the check that exists to notice, and no change could ever be
+   * graded worse than it was planned as. The comment above the regrade already
+   * said it must not read the plan; the code read the plan.
+   *
+   * Absent, the executor falls back to the declaration and nothing is worse
+   * than it was. Present, the two are combined rather than swapped: an empty
+   * answer from git means "unknown", not "nothing touched authentication".
+   */
+  readonly observedChange?: () => Promise<{
+    readonly changedFiles: readonly string[]
+    readonly linesChanged: number
+  }>
 }
 
 export type ExecutorEvent =
@@ -633,11 +653,16 @@ export async function execute(
 
   // The accumulated change, not any single unit — which is what stops a unit
   // finishing early from skipping the inspection.
-  const touched = [...new Set(order.plan.units.flatMap((u) => u.touches))]
+  const declared = order.plan.units.flatMap((u) => u.touches)
+  // What the plan said, plus what the work did. Combined rather than swapped,
+  // because git reporting nothing means it could not be read — and reading
+  // that as "nothing touched authentication" is how a P0 quietly grades P3.
+  const seen = deps.observedChange === undefined ? null : await deps.observedChange()
+  const touched = [...new Set([...declared, ...(seen?.changedFiles ?? [])])]
   const summary = summarise(verdicts)
   const observed = {
     changedFiles: touched,
-    linesChanged: 0,
+    linesChanged: seen?.linesChanged ?? 0,
     checkState: (summary.ok ? 'passing' : 'failing') as 'passing' | 'failing',
   }
   const inspection = inspectionFor(order, observed)
