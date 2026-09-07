@@ -100,7 +100,18 @@ export interface ExecutorDeps {
   readonly runStep?: (step: LadderStep) => Promise<number | null>
 
   /** Minutes elapsed and files touched, for the budget rules. */
-  readonly observe?: () => { elapsedMinutes: number; filesTouched: number }
+  /**
+   * What the run has spent so far, read against the world rather than the plan.
+   *
+   * May answer asynchronously, because counting the files a run has touched
+   * means asking git. It used to be handed `plan.units.flatMap(touches).size`
+   * — the files the plan *predicted* — so the files-touched budget measured
+   * the plan and could not be exceeded by an agent going wide, which is the
+   * only thing a files-touched budget is for.
+   */
+  readonly observe?: () =>
+    | { elapsedMinutes: number; filesTouched: number }
+    | Promise<{ elapsedMinutes: number; filesTouched: number }>
 
   /** Write a line to the order's record. */
   readonly record?: (action: string, subject: string, reason: string) => Promise<void>
@@ -335,8 +346,8 @@ export async function execute(
   let stalled = false
 
   /** The budget, read against what is happening right now. */
-  function currentBreach(): ReturnType<typeof budgetBreach> {
-    const observed = deps.observe?.() ?? { elapsedMinutes: 0, filesTouched: 0 }
+  async function currentBreach(): Promise<ReturnType<typeof budgetBreach>> {
+    const observed = (await deps.observe?.()) ?? { elapsedMinutes: 0, filesTouched: 0 }
     return budgetBreach(budgets, {
       ...observed,
       agents: current.nodes.filter((n) => n.state === 'running').length,
@@ -375,7 +386,7 @@ export async function execute(
       ])
       if (raced !== null) return raced
       if (settled) return { results: await done }
-      const breach = currentBreach()
+      const breach = await currentBreach()
       if (breach !== null) return { breach }
     }
   }
@@ -384,7 +395,7 @@ export async function execute(
     // Budgets are part of the agreement, not advice. Checked before a wave
     // rather than after, so a breach stops the next agent instead of being
     // discovered once it has spent its turn.
-    const breach = currentBreach()
+    const breach = await currentBreach()
     if (breach !== null) {
       halted = await raise('budget.exceeded', {
         summary: `${order.title} has gone past its ${breach.kind.replace('_', ' ')} budget`,

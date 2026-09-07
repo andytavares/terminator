@@ -750,6 +750,34 @@ async function executeRun(
   // way through and fails has already spent lane 1's agent budget.
   const checkouts = await ensureCheckouts(order, { exec, root })
 
+  /**
+   * What the working copies have actually changed, against their base.
+   *
+   * Two callers with the same question: the regrade, which asks once at the
+   * end, and the files-touched budget, which asks on every poll. Cached for a
+   * few seconds so the second one does not run `git diff` every fifteen.
+   */
+  let lastChange: { at: number; value: { changedFiles: string[]; linesChanged: number } } | null =
+    null
+  const readObservedChange = async (): Promise<{
+    changedFiles: string[]
+    linesChanged: number
+  }> => {
+    if (lastChange !== null && Date.now() - lastChange.at < 5_000) return lastChange.value
+    const changedFiles: string[] = []
+    let linesChanged = 0
+    for (const checkout of checkouts.values()) {
+      const declared = order.context.repos.find((repo) => repo.name === checkout.repo)?.baseBranch
+      const against = declared === undefined || declared === '' ? 'main' : declared
+      changedFiles.push(...(await readChangedFiles(checkout.path, against, diffCommand)))
+      const summary = await readDiffSummary(checkout.path, against, diffCommand)
+      linesChanged += summary.added + summary.removed
+    }
+    const value = { changedFiles, linesChanged }
+    lastChange = { at: Date.now(), value }
+    return value
+  }
+
   const workspaceId = api.workspace?.list()[0]?.id ?? ''
   const store = createOrderStore(root)
   const featureDir = orderDir(root, order.id)
@@ -1040,13 +1068,17 @@ async function executeRun(
       // to prevent.
       return measured
     },
-    observe: () => ({
+    observe: async () => ({
       // Fractional on purpose. Rounded, a run at 19:31 reported "20" and a
       // twenty-minute budget could only be exceeded at 20:30 — so a run whose
       // deadline was the budget never saw the gate at all. The gate rounds it
       // for the sentence it prints; the comparison is exact.
       elapsedMinutes: (Date.now() - startedAt) / 60_000,
-      filesTouched: new Set(order.plan.units.flatMap((u) => u.touches)).size,
+      // Counted from the working copies, not from `plan.units.flatMap(touches)`
+      // — which is the files the plan predicted, so the budget measured the
+      // plan and could never be exceeded by an agent going wide. That is the
+      // only thing a files-touched budget is for.
+      filesTouched: new Set((await readObservedChange()).changedFiles).size,
     }),
     onEvent: (event) => {
       if (event.type !== 'verdict') return
@@ -1069,18 +1101,7 @@ async function executeRun(
     // was handed the units' own `touches` list and a hardcoded zero lines, so
     // a builder that went outside what it declared was invisible to the check
     // that exists to notice, and nothing could ever grade worse than planned.
-    observedChange: async () => {
-      const files: string[] = []
-      let linesChanged = 0
-      for (const checkout of checkouts.values()) {
-        const base = order.context.repos.find((repo) => repo.name === checkout.repo)?.baseBranch
-        const against = base === undefined || base === '' ? 'main' : base
-        files.push(...(await readChangedFiles(checkout.path, against, diffCommand)))
-        const summary = await readDiffSummary(checkout.path, against, diffCommand)
-        linesChanged += summary.added + summary.removed
-      }
-      return { changedFiles: files, linesChanged }
-    },
+    observedChange: readObservedChange,
     // Lets the budget be re-read while agents are in flight. Without it the
     // wall-clock budget can only fire between waves, which is every case
     // except the one it exists for: an agent that never comes back.

@@ -483,6 +483,57 @@ describe('what the change turned out to be', () => {
   })
 })
 
+// The files-touched budget was handed `plan.units.flatMap(touches).size` — the
+// files the plan predicted — so it measured the plan and could never be
+// exceeded by an agent going wide, which is the only thing it is for.
+describe('the files-touched budget', () => {
+  it('is exceeded by the files the work actually touched', async () => {
+    const raised: Gate[] = []
+    const o = order([unit('U-1', { touches: ['src/one.ts'] })], {
+      budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 2, tokens: null },
+    })
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(ok),
+      observe: async () => ({ elapsedMinutes: 1, filesTouched: 9 }),
+      raise: async (gate: Gate) => {
+        raised.push(gate)
+      },
+    })
+    expect(raised.map((g) => g.rule)).toContain('budget.exceeded')
+  })
+
+  it('is not exceeded by a plan that merely declared a lot', async () => {
+    const raised: Gate[] = []
+    const o = order([unit('U-1', { touches: ['a.ts', 'b.ts', 'c.ts', 'd.ts'] })], {
+      budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 2, tokens: null },
+    })
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(ok),
+      // The work touched one file. What the plan wrote down is not spending.
+      observe: async () => ({ elapsedMinutes: 1, filesTouched: 1 }),
+      raise: async (gate: Gate) => {
+        raised.push(gate)
+      },
+    })
+    expect(raised.map((g) => g.rule)).not.toContain('budget.exceeded')
+  })
+
+  it('still takes a synchronous answer, which is all a test needs', async () => {
+    const raised: Gate[] = []
+    const o = order([unit('U-1')], {
+      budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 1, tokens: null },
+    })
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(ok),
+      observe: () => ({ elapsedMinutes: 1, filesTouched: 5 }),
+      raise: async (gate: Gate) => {
+        raised.push(gate)
+      },
+    })
+    expect(raised.map((g) => g.rule)).toContain('budget.exceeded')
+  })
+})
+
 describe('executor edge cases', () => {
   it('runs a plain shell step with its command as the prompt', async () => {
     const run = vi.fn(ok)
