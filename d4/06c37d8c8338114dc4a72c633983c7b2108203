@@ -1,0 +1,40 @@
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_c07c7df4c1fc1c 1355-1357,1360
+  s_357c91d2b54b02::t_f20cee06c469d2 1358-1359
+extensions/foundry/src/ipc/run-channels.ts
+  s_357c91d2b54b02::t_17345d2761a174 24-29,53-67,170-193
+  s_357c91d2b54b02::t_cb1b480779afad 194
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_357c91d2b54b02::t_aa2a49cc18a55d 717,727
+  s_357c91d2b54b02::t_666b10c1e86dd2 660-716,718-726,728-736
+docs/user-guide/USER-GUIDE.md
+  s_357c91d2b54b02::t_aa2a49cc18a55d 618-628
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_357c91d2b54b02::t_2dba4d4a00932b 662-666,674-675,677-678,683-685,687-694,696-715
+  s_357c91d2b54b02::t_e0e7e052b620db 217-223,667-673,676,686,695
+  s_357c91d2b54b02::t_6047fa202ef45b 679-682
+extensions/foundry/SUPERVISION.md
+  s_357c91d2b54b02::t_3543e64a52e903 281-284,287-290
+  s_357c91d2b54b02::t_2c855136ce2f16 291
+extensions/foundry/src/components/Forge.tsx
+  s_357c91d2b54b02::t_5bcc5e3847dbb8 257-260
+  s_357c91d2b54b02::t_91930dc6b86146 362-374
+  s_357c91d2b54b02::t_da23b13216c173 106-107
+  s_357c91d2b54b02::t_709427af8e9d98 261-270,272-293,295-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "d406c37d8c8338114dc4a72c633983c7b2108203",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
