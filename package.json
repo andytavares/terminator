@@ -20,6 +20,7 @@
     "build": "npm run clean && npm run build:extensions && npm run build:remote && electron-vite build",
     "preview": "electron-vite preview",
     "test": "vitest run --coverage",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage --reporter=verbose --reporter=junit \"--outputFile.junit=test-report.junit.xml\"",

@@ -1,0 +1,215 @@
+import { describe, it, expect, beforeAll } from 'vitest'
+import { execFile, execFileSync } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { shipOrder } from '../../src/line/integrate.js'
+import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
+import { draftOrder } from '../../src/order/schema.js'
+import type { WorkOrder } from '../../src/order/schema.js'
+import type { Gate } from '../../src/gates/rules.js'
+
+// The one thing the whole suite could never prove: that `git push` and
+// `gh pr create --draft` do what this code believes they do.
+//
+// Every other test mocks `exec` and asserts the argv. That checks the command
+// this code *builds*; it cannot check that GitHub accepts it. This runs the
+// real binaries against a real remote and reads the pull request back.
+//
+// Excluded from the default run — it needs `gh` authenticated and a repository
+// on GitHub. `FOUNDRY_LIVE_REPO` points at a checkout with a remote.
+
+const LIVE = process.env.FOUNDRY_LIVE_REPO ?? ''
+
+/**
+ * The same shape the core shell executor hands the extension: an exit code and
+ * the two streams, never a throw.
+ */
+const exec: ShellExec = ({ command, args, cwd }) =>
+  new Promise<ExecResult>((resolve) => {
+    execFile(command, args, { cwd, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
+      const code = error === null ? 0 : typeof error.code === 'number' ? error.code : 1
+      resolve({ exitCode: code, stdout, stderr, timedOut: false })
+    })
+  })
+
+function git(...args: string[]): void {
+  const env = { ...process.env }
+  delete env.GIT_DIR
+  delete env.GIT_INDEX_FILE
+  delete env.GIT_WORK_TREE
+  execFileSync('git', args, { cwd: LIVE, env, stdio: 'pipe' })
+}
+
+let dataRoot: string
+let branch: string
+
+function order(): WorkOrder {
+  const base = draftOrder({
+    id: 'WO-LIVE-1',
+    title: 'Read the session TTL from configuration',
+    source: { kind: 'typed', tracker: null, key: null, url: null },
+    repoPaths: [LIVE],
+    now: new Date().toISOString(),
+  })
+  return {
+    ...base,
+    status: 'running',
+    recipe: 'direct',
+    intent: {
+      problem: 'The session TTL is hardcoded, so it cannot differ per environment.',
+      outcome: 'The TTL is read from an environment variable, with the current value as default.',
+      nonGoals: ['Changing how expiry is computed'],
+    },
+    acceptance: [
+      {
+        id: 'AC-1',
+        statement: 'A token past its TTL is reported expired.',
+        priority: 'P1',
+        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+        unverifiable: null,
+      },
+    ],
+    // P2: below the gated grades, so the draft opens before the decision — the
+    // path that actually reaches GitHub.
+    risk: { grade: 'P2', triggers: [], blastRadius: ['src/session.js'], criticalPaths: [] },
+    plan: {
+      ...base.plan,
+      units: [
+        {
+          id: 'U-1',
+          title: 'read TTL_MS from the environment',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: ['src/session.js'],
+          verify: [],
+        },
+      ],
+      lanes: base.plan.lanes.map((lane) => ({ ...lane, branch })),
+    },
+  }
+}
+
+describe.skipIf(LIVE === '')('shipping, for real', () => {
+  beforeAll(() => {
+    dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-'))
+    branch = `foundry/live-${Date.now().toString(36)}`
+
+    // A real change on a real branch, which is what a builder would have left
+    // behind in its worktree. From `main` every time, so a re-run does not
+    // build on the previous one's branch and find nothing to commit.
+    git('checkout', 'main')
+    git('reset', '--hard', 'origin/main')
+    git('checkout', '-B', branch)
+    const file = path.join(LIVE, 'src', 'session.js')
+    fs.writeFileSync(
+      file,
+      [
+        '/** Milliseconds a session token is good for. */',
+        `export const TTL_MS = Number(process.env.SESSION_TTL_MS ?? 15 * 60 * 1000) // ${branch}`,
+        '',
+        'export function isExpired(issuedAt, now) {',
+        '  return now - issuedAt >= TTL_MS',
+        '}',
+        '',
+      ].join('\n')
+    )
+    git('add', '-A')
+    git('commit', '-m', 'read the session TTL from the environment')
+  })
+
+  it('pushes the branch and opens a draft pull request GitHub can show back', async () => {
+    const raised: Gate[] = []
+    const recorded: string[] = []
+
+    const result = await shipOrder(
+      order(),
+      {
+        verdicts: [
+          {
+            criterionId: 'AC-1',
+            nodeId: 'n-verify',
+            result: 'pass',
+            reason: '',
+            command: 'npm test',
+            exitCode: 0,
+            producedBy: { role: 'verifier', sessionId: 'sess-verifier' },
+            at: new Date().toISOString(),
+          },
+        ],
+        findings: [],
+        ladder: {
+          steps: [
+            { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0 },
+            { rung: 'L1', name: "The unit's own tests", result: 'pass', reason: '', exitCode: 0 },
+            {
+              rung: 'L3',
+              name: 'Independent verification',
+              result: 'elsewhere',
+              reason: 'by the verifier on each unit — see the criteria table',
+              exitCode: null,
+            },
+          ],
+          stoppedAt: null,
+          unmeasured: [],
+          ok: true,
+        },
+        rulesInForce: ['exit-code-not-count (L2)'],
+      },
+      {
+        exec,
+        root: dataRoot,
+        now: () => new Date().toISOString(),
+        autoOpen: true,
+        decide: async (gate) => {
+          raised.push(gate)
+          return 'hold'
+        },
+        record: async (action, subject, reason) => {
+          recorded.push(`${action} ${subject} ${reason}`)
+        },
+        raiseGate: async (gate) => {
+          raised.push(gate)
+        },
+      }
+    )
+
+    expect(result.pulls, `shipOrder reported: ${JSON.stringify(result)}`).toHaveLength(1)
+    const pull = result.pulls[0]
+    expect(pull.url).toMatch(/^https:\/\/github\.com\/andytavares\/foundry-live-check\/pull\/\d+$/)
+
+    // Read it back from GitHub rather than trusting what the command printed.
+    const view = await exec({
+      command: 'gh',
+      args: ['pr', 'view', pull.url, '--json', 'isDraft,title,body,headRefName,state'],
+      cwd: LIVE,
+    })
+    expect(view.exitCode, view.stderr).toBe(0)
+    const pr = JSON.parse(view.stdout) as {
+      isDraft: boolean
+      title: string
+      body: string
+      headRefName: string
+      state: string
+    }
+
+    // A draft, never a review request (FR-053).
+    expect(pr.isDraft).toBe(true)
+    expect(pr.state).toBe('OPEN')
+    expect(pr.headRefName).toBe(branch)
+    // The body GitHub stored is the one written to the order directory.
+    expect(pr.body).toContain('AC-1')
+    expect(pr.body).toContain('Read the session TTL from configuration')
+    expect(fs.readFileSync(pull.bodyPath, 'utf8')).toBe(pr.body)
+
+    // And the decision the operator is finally offered is "mark it ready?",
+    // raised only once the draft exists.
+    expect(raised.map((g) => g.rule)).toContain('ready-for-review')
+
+    // Left for the reader of the test output.
+    // eslint-disable-next-line no-console
+    console.log(`live pull request: ${pull.url}`)
+  }, 180_000)
+})

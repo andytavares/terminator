@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import { raiseGate } from '../gates/rules.js'
 import { laneViews, mayMergeLane } from '../order/lanes.js'
+import { branchFor } from './worktree.js'
 import type { Gate } from '../gates/rules.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
@@ -395,7 +396,14 @@ export async function shipOrder(
   shipment: Shipment,
   deps: IntegrateDeps
 ): Promise<ShipOutcome> {
-  const repos = [...order.context.repos].sort((a, b) => a.lane - b.lane)
+  // The branch each lane is actually on, asked of the same function the
+  // checkout asked. `context.repos[].headBranch` is initialised empty and
+  // written by nothing, so reading it raw pushed `HEAD:` and asked for a pull
+  // request with `--head ''` — which every mocked-exec test accepted as a
+  // fine argument list, and which the first real `git` refused outright.
+  const repos = [...order.context.repos]
+    .sort((a, b) => a.lane - b.lane)
+    .map((repo) => ({ ...repo, headBranch: branchFor(order, repo.lane) }))
   const bodyPaths: string[] = []
 
   for (const repo of repos) {

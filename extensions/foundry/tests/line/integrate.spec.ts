@@ -790,3 +790,66 @@ describe('the rungs decided somewhere else', () => {
     expect(body).not.toContain('not measured — by the verifier')
   })
 })
+
+// `context.repos[].headBranch` is initialised empty by `draftOrder` and
+// written by nothing. Reading it raw pushed `HEAD:` and asked GitHub for a
+// pull request with `--head ''`. Every test above accepted that, because every
+// fixture here sets the field by hand — the argv was checked and the branch
+// was never real. A live run against GitHub refused it on the first try:
+// `fatal: invalid refspec 'HEAD:'`.
+describe('the branch shipping actually pushes', () => {
+  function withNoHeadBranch(over: Partial<WorkOrder> = {}): WorkOrder {
+    const o = order()
+    return {
+      ...o,
+      context: {
+        ...o.context,
+        repos: o.context.repos.map((repo) => ({ ...repo, headBranch: '' })),
+      },
+      ...over,
+    }
+  }
+
+  /** What `branchFor` derives for this order when nothing declared one. */
+  const DERIVED = 'foundry/wo-1'
+
+  it('is the one the checkout cut, not an empty field nobody filled', async () => {
+    const d = deps()
+    await shipOrder(withNoHeadBranch(), { verdicts: [verdict()], findings: [] }, d)
+    const [push] = callsTo(d.exec, 'git')
+    expect(push.args).toEqual(['push', '--set-upstream', 'origin', `HEAD:${DERIVED}`])
+  })
+
+  it('never asks git to push to nothing', async () => {
+    const d = deps()
+    await shipOrder(withNoHeadBranch(), { verdicts: [verdict()], findings: [] }, d)
+    for (const call of callsTo(d.exec, 'git')) {
+      expect(call.args).not.toContain('HEAD:')
+    }
+  })
+
+  it('opens the pull request on that same branch', async () => {
+    const d = deps()
+    await shipOrder(withNoHeadBranch(), { verdicts: [verdict()], findings: [] }, d)
+    const [create] = callsTo(d.exec, 'gh', 'create')
+    expect(create.args[create.args.indexOf('--head') + 1]).toBe(DERIVED)
+  })
+
+  it("prefers the lane's declared branch, which is the tracker's own name", async () => {
+    const o = withNoHeadBranch()
+    const d = deps()
+    await shipOrder(
+      {
+        ...o,
+        plan: {
+          ...o.plan,
+          lanes: o.plan.lanes.map((lane) => ({ ...lane, branch: 'andy/tav-42-session-ttl' })),
+        },
+      },
+      { verdicts: [verdict()], findings: [] },
+      d
+    )
+    const [push] = callsTo(d.exec, 'git')
+    expect(push.args).toContain('HEAD:andy/tav-42-session-ttl')
+  })
+})

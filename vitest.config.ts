@@ -35,8 +35,17 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           include: NODE_INCLUDE,
-          // `.ts` specs under renderer-remote need the DOM — run them in the jsdom project instead.
-          exclude: [...configDefaults.exclude, 'tests/unit/renderer-remote/**/*.spec.ts'],
+          exclude: [
+            ...configDefaults.exclude,
+            // `.ts` specs under renderer-remote need the DOM — run them in the
+            // jsdom project instead.
+            'tests/unit/renderer-remote/**/*.spec.ts',
+            // Live specs talk to a real remote and need `gh` authenticated.
+            // Run deliberately: `npm run test:live`. Left in the default run
+            // they would report "skipped", and a skip in a green suite is a
+            // check nobody notices is missing.
+            'extensions/*/tests/live/**',
+          ],
         },
       },
       {
@@ -62,6 +71,7 @@ export default defineConfig({
       ],
       exclude: [
         'vitest.config.ts',
+        'vitest.live.config.ts',
         'playwright.config.ts',
         'packages/*/vite.config.ts',
         'src/renderer/index.tsx',
