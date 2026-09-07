@@ -463,6 +463,33 @@ describe('what the change turned out to be', () => {
     expect(inspection).toMatchObject({ required: true })
   })
 
+  it('fires the outside-the-blast-radius trigger, which could not fire before', async () => {
+    // The trigger compares what changed against what the order declared. While
+    // both sides were the plan, it could only fire on an order inconsistent
+    // with itself — never on an agent that quietly grew past what was assessed,
+    // which is the case the comment above it names.
+    const events: ExecutorEvent[] = []
+    const o = order([unit('U-1', { touches: ['src/session.ts'] })], {
+      risk: {
+        grade: 'P2',
+        triggers: [],
+        blastRadius: ['src/session.ts'],
+        criticalPaths: [],
+      },
+    })
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(ok, events),
+      observedChange: async () => ({
+        changedFiles: ['src/session.ts', 'src/billing/invoice.ts'],
+        linesChanged: 12,
+      }),
+    })
+    expect(events.find((e) => e.type === 'inspection')).toMatchObject({
+      required: true,
+      triggers: expect.arrayContaining(['outside_blast_radius']),
+    })
+  })
+
   it('keeps what the plan declared as well, rather than swapping one for the other', async () => {
     const events: ExecutorEvent[] = []
     const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
