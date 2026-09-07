@@ -1,0 +1,19 @@
+tests/e2e/live/full-run.spec.ts
+  s_357c91d2b54b02::t_0e5a038b8d1ee6 26-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "2df3b156e900e3af30ea9a501f3842d2a2cbc2ab",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
