@@ -70,9 +70,13 @@ says. That part was right from the start. What was wrong is that the list was
 tuned for a reviewer, and it is also what governs the architect and the scout,
 whose entire job is reading a repository.
 
-The difference matters because **this path denies; it never asks**. A binary
+The difference matters because **this path decides; it never asks**. A binary
 left off the list is not "the agent can ask for it", it is "the agent cannot do
-it". Four live runs in a row died on that, each on a different command, and the
+it" — and one that is _on_ the list is allowed outright, not sent to the
+operator. It answered `null` on an allowed command for a while, which abstains,
+and an abstention is a held tool call: five minutes on the inbox before it
+falls back to the terminal. Six reads was half an hour of waiting, with the
+console showing an agent thinking. Four live runs in a row died on that, each on a different command, and the
 architect said so itself before giving up: _"Bash is restricted to single
 commands here. Working within that."_
 

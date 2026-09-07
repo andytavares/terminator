@@ -123,3 +123,26 @@ describe('what ends a node', () => {
     expect(turnEnd.slice(0, 900)).toMatch(/verifier|ladder|FR-033/)
   })
 })
+
+// A read-only role exists to decide without a person — that is why the policy
+// reads the command rather than the tool. Returning `null` for an *allowed*
+// command abstains, and an abstention is a held tool call: five minutes on the
+// inbox before it falls back to the terminal. Six calls was half an hour of
+// waiting while the console showed an agent thinking.
+//
+// Only the running application can show this, so what stops it coming back is
+// the shape of the source.
+describe('what a read-only role is told', () => {
+  it('never abstains on a command its own policy allowed', () => {
+    expect(src, 'an allowed read-only command is being sent to the operator').not.toMatch(
+      /decision\.allow \? null/
+    )
+  })
+
+  it('answers with the policy decision, both ways', () => {
+    const answers = [
+      ...src.matchAll(/return \{ allow: decision\.allow, reason: decision\.reason \}/g),
+    ]
+    expect(answers.length, 'the read-only paths do not return their own decision').toBe(2)
+  })
+})

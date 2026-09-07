@@ -752,7 +752,14 @@ async function executeRun(
           autoDecide: (tool, toolInput) => {
             if (input.readOnly) {
               const decision = decideReadOnly(tool, toolInput)
-              return decision.allow ? null : { allow: false, reason: decision.reason }
+              // Both ways, never abstaining. A read-only role exists to decide
+              // without a person — that is the whole reason the policy reads
+              // the command rather than the tool. Returning `null` on an
+              // *allowed* command sent it to the operator anyway, where it sat
+              // for the five-minute hold before falling back to the terminal.
+              // Six tool calls was half an hour of waiting, and the console
+              // showed an agent thinking.
+              return { allow: decision.allow, reason: decision.reason }
             }
             if (input.role !== null && !input.mayUseTool(tool)) {
               return {
@@ -1141,7 +1148,10 @@ async function convergeOnce(
           const target = (toolInput as { file_path?: unknown } | null)?.file_path
           if (typeof target === 'string' && target === plan.proposalPath) return { allow: true }
           const decision = decideReadOnly(tool, toolInput)
-          return decision.allow ? null : { allow: false, reason: decision.reason }
+          // Both ways, never abstaining — see the run path above. An allowed
+          // read held for five minutes is the same as a refused one, from the
+          // agent's side.
+          return { allow: decision.allow, reason: decision.reason }
         },
         // Intake is where questions belong, so one asked here is not a defect
         // — it is the Forge working.
