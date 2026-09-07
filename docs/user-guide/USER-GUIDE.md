@@ -615,6 +615,23 @@ Two things you can do without leaving:
   **Stop** it. The terminal is always there as the backstop: the agent runs in
   a real terminal in its own worktree project, and you can go and type at it.
 
+### Autonomy — how much it asks you
+
+Three settings, differing in which rules stop the line. Four things ask at
+every one of them, including the most permissive: before anything is merged,
+before a destructive action, when a budget is exceeded, and when the change
+turns out to carry real risk.
+
+Everything else depends on where the dial is. At **escorted** every action an
+agent takes waits for you. At **standard** and **lights-out** ordinary work
+inside the unit's own worktree is taken automatically and recorded — editing
+the files the unit was given, running the project's tests — and what reaches
+you is what the rules actually wanted a person for.
+
+"Destructive" is read generously: `rm`, a hard reset, `git clean`, a force
+push, deleting a branch, and anything the check cannot parse. A command it
+cannot read is treated as destructive rather than assumed safe.
+
 ### Ledger — the record, and the one place it argues back
 
 Every decision, who or what rule took it, what it was about and why, filtered

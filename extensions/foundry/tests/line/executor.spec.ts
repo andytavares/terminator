@@ -1185,3 +1185,58 @@ steps:
     expect(resumed.some((s) => s.resumeSessionId === 'sess-lane-1')).toBe(true)
   })
 })
+
+// The graph on disk is what `run.observe` reads, and it used to be written
+// once when the run started and once when it ended. For the whole of a run the
+// Floor therefore showed every node `waiting` while agents were working in
+// their worktrees — the one surface whose purpose is watching a run, showing
+// the snapshot it began with. A live run is what made it obvious.
+describe('writing the graph down as it changes', () => {
+  it('persists every state the run passes through, not only the last', async () => {
+    const seen: string[][] = []
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      persist: async (graph) => {
+        seen.push(graph.nodes.map((n) => `${n.id}=${n.state}`))
+      },
+    })
+
+    expect(seen.length).toBeGreaterThan(1)
+    // The first write is not already the finished graph.
+    expect(seen[0].some((s) => s.endsWith('=waiting') || s.endsWith('=ready'))).toBe(true)
+    // And the last one is.
+    expect(seen[seen.length - 1].every((s) => !s.endsWith('=waiting'))).toBe(true)
+  })
+
+  it('records a node as running before it records it as passed', async () => {
+    const order_ = order([unit('U-1')])
+    const states: string[] = []
+    await execute(order_, recipe(), buildRunGraph(order_, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      persist: async (graph) => {
+        const node = graph.nodes.find((n) => n.id === 'build:U-1')
+        if (node !== undefined && states[states.length - 1] !== node.state) states.push(node.state)
+      },
+    })
+    expect(states).toContain('running')
+    expect(states.indexOf('running')).toBeLessThan(states.indexOf('passed'))
+  })
+
+  it('carries on when the graph cannot be written — a run is not a report', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      persist: async () => {
+        throw new Error('the disk is full')
+      },
+    })
+    expect(outcome.complete).toBe(true)
+  })
+})

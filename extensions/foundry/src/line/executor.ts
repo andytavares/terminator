@@ -98,6 +98,16 @@ export interface ExecutorDeps {
   readonly record?: (action: string, subject: string, reason: string) => Promise<void>
 
   /**
+   * Write the graph down, as it changes.
+   *
+   * The graph on disk is what `run.observe` reads, and it was written once
+   * when the run started and once when it ended — so for the whole of a run
+   * the Floor showed every node `waiting` while agents were working in their
+   * worktrees, and a crash left a record saying nothing had started.
+   */
+  readonly persist?: (graph: RunGraph) => Promise<void>
+
+  /**
    * The session a role may carry on in, when it may.
    *
    * A recipe is one conversation per lane, not one agent per node: a fresh
@@ -213,6 +223,19 @@ export async function execute(
   let gateSeq = 0
 
   /**
+   * Move to the next state of the graph, and say so.
+   *
+   * Every reassignment of `current` goes through here, so there is one place
+   * that can be wrong rather than fifteen.
+   */
+  async function advance(next: RunGraph): Promise<void> {
+    current = next
+    // Never fatal: a run that cannot write its graph down is still a run, and
+    // failing it here would turn a reporting problem into a lost agent.
+    await deps.persist?.(current).catch(() => undefined)
+  }
+
+  /**
    * Raise one, if this autonomy setting is asking about it.
    *
    * Returns true when the run must stop. A rule this setting silences raises
@@ -300,7 +323,7 @@ export async function execute(
     // nothing to do, which is what it used to be.
     const joins = ready.filter((node) => node.kind === 'join')
     if (joins.length > 0) {
-      for (const join of joins) current = markPassed(current, join.id, deps.now())
+      for (const join of joins) await advance(markPassed(current, join.id, deps.now()))
       continue
     }
 
@@ -320,7 +343,7 @@ export async function execute(
       // ready?" asked before there is anything to mark is a question with no
       // answer. So it passes, and the tail takes it from here.
       if (declared === 'ready-for-review') {
-        current = markPassed(current, blocking.id, deps.now())
+        await advance(markPassed(current, blocking.id, deps.now()))
         continue
       }
 
@@ -333,13 +356,13 @@ export async function execute(
       })
       // A silenced checkpoint is a checkpoint that does not stop anything —
       // but the node still has to leave the graph, or the wave loops on it.
-      current = markPassed(current, blocking.id, deps.now())
+      await advance(markPassed(current, blocking.id, deps.now()))
       if (halted) break
       continue
     }
 
     const started = startReady(current, budgets, deps.now())
-    current = started.graph
+    await advance(started.graph)
 
     const results = await Promise.all(
       started.started
@@ -383,7 +406,7 @@ export async function execute(
     )
 
     for (const { node, result } of results) {
-      current = withNode(current, node.id, { sessionId: result.sessionId })
+      await advance(withNode(current, node.id, { sessionId: result.sessionId }))
       deps.onEvent?.({ type: 'started', nodeId: node.id, sessionId: result.sessionId })
 
       // The verdict comes from the exit status. Whatever the run printed is
@@ -449,7 +472,7 @@ export async function execute(
       const passed = promised ? unmet.length === 0 : result.exitCode === 0
 
       if (passed) {
-        current = markPassed(current, node.id, deps.now())
+        await advance(markPassed(current, node.id, deps.now()))
         deps.onEvent?.({ type: 'passed', nodeId: node.id })
       } else {
         if (unmet.length > 0) {
@@ -460,7 +483,7 @@ export async function execute(
           )
         }
         const failure = markFailed(current, node.id, deps.now())
-        current = failure.graph
+        await advance(failure.graph)
         deps.onEvent?.({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
 
         if (failure.needsDecision) {

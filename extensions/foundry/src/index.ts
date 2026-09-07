@@ -24,6 +24,7 @@ import type { StartedRun } from './line/executor.js'
 import type { RunGraph, RunNode } from './line/run-graph.js'
 import type { Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
+import { decideByAutonomy } from './runtime/autonomy-policy.js'
 import type { IntegrateDeps } from './line/integrate.js'
 import { checkCapability, writeBack } from './trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
@@ -188,6 +189,14 @@ const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
  * `--model`", so the run follows the operator's own Claude Code configuration.
  * Only an unset setting falls through to the default.
  */
+/** The autonomy dial, read wherever it is needed rather than copied. */
+function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' {
+  return (
+    api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
+    'standard'
+  )
+}
+
 function defaultModel(api: ExtensionAPI): string {
   const value = api.settings.get<string>(MODEL_SETTING_KEY)
   // An alias, not a pinned id: `--model opus` resolves to the latest of that
@@ -702,7 +711,16 @@ async function executeRun(
                 reason: `the ${input.role} role does not use ${tool}; its role file lists what it does`,
               }
             }
-            return null
+            // FR-029's automatic half. Without it every ordinary edit went to
+            // the operator at every setting, so no run finished unattended and
+            // "lights-out" named something the factory could not do.
+            const taken = decideByAutonomy({
+              toolName: tool,
+              input: toolInput,
+              autonomy: autonomyFor(api),
+              worktreePath: checkout.path,
+            })
+            return taken === null ? null : { allow: taken.allow, reason: taken.reason }
           },
           onPending: (pending) =>
             notePending(api, { ...pending, featureDir }, { id: order.id, root }),
@@ -779,9 +797,7 @@ async function executeRun(
         evidence: [],
       })
     },
-    autonomy:
-      api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
-      'standard',
+    autonomy: autonomyFor(api),
     // Loaded once, so what an agent is told the house rules are and what the
     // change is judged against are the same list.
     rules: houseRules,
@@ -836,6 +852,10 @@ async function executeRun(
         evidence: [...event.verdict.evidence],
       })
     },
+    // Written on every change rather than only at the end. `run.observe` reads
+    // this file, so without it the Floor shows the graph the run started with
+    // for the whole of the run.
+    persist: (graph) => writeRunGraph(root, graph),
   })
 
   await writeRunGraph(root, outcome.graph)
@@ -1246,9 +1266,7 @@ export function activate(api: ExtensionAPI): void {
   const inbox = createInboxChannels({
     gates: createLiveGateStore(dataRoot),
     orders: createLiveOrderStore(dataRoot),
-    autonomy: () =>
-      api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
-      'standard',
+    autonomy: () => autonomyFor(api),
     now: () => new Date().toISOString(),
     record: async (orderId, action, subject, reason) => {
       await createOrderStore(dataRoot()).record({

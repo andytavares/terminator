@@ -244,6 +244,29 @@ phase routinely asked twenty-five times. Under `auto` the runtime's own
 classifier answers those instead, so the questions that reach you are the ones
 the ladder actually wanted a person for.
 
+### What the ladder takes for itself
+
+FR-029 says every action is held against a decision — _automatic where the
+autonomy setting allows it_, and by asking where it does not. `src/runtime/autonomy-policy.ts`
+is the automatic half:
+
+|                                                                                                                                            |                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| **Destructive** — `rm`, `git reset --hard`, `git clean -fd`, a force push, a `-D` branch delete, anything with a shell metacharacter in it | **asks, at every setting** (FR-050) |
+| **Writes outside the unit's own checkout**                                                                                                 | **asks, at every setting**          |
+| Anything else, at `escorted`                                                                                                               | asks                                |
+| Anything else, at `standard` or `lights-out`                                                                                               | taken, and recorded                 |
+
+A command it cannot parse is treated as destructive rather than assumed safe:
+reading `git status` off the front of `git status; rm -rf .` is reading the
+wrong command, and that is the hole the read-only policy already documents.
+
+This half was missing, and it is not a small thing: without it a builder's
+first `Edit` went to the operator at every setting, so no run could finish
+unattended and "lights-out" named something the factory could not do. A live
+run sat for half an hour with a clean worktree and an agent waiting on a click
+nobody was there to make.
+
 **The model is an alias, not a pinned id.** `--model opus` is documented as
 resolving to the latest of that family, so the default cannot go a generation
 stale sitting in the source — which is exactly what the pinned `claude-opus-4-6`
