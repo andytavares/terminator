@@ -17,10 +17,12 @@ import { execFileSync } from 'node:child_process'
 // element on them, not the two a screenshot happened to include.
 
 let handle: AppHandle
+let repoPath: string
 
 test.beforeAll(async () => {
   test.setTimeout(120_000)
   const repo = mkdtempSync(join(tmpdir(), 'fdry-type-'))
+  repoPath = repo
   execFileSync('git', ['init', '-q', repo])
   execFileSync('git', ['-C', repo, 'commit', '-q', '--allow-empty', '-m', 'initial'])
   handle = await launchApp()
@@ -66,7 +68,9 @@ function oversized(): Promise<Oversized[]> {
       }
       if (own.trim() === '') continue
       var size = parseFloat(getComputedStyle(el).fontSize)
-      if (size >= 15) {
+      // 16 and up: the untouched browser default. A rule that deliberately
+      // asks for 15 has made a choice; a rule that forgot has not.
+      if (size >= 16) {
         out.push({
           tag: el.tagName.toLowerCase(),
           cls: String(el.className || ''),
@@ -89,6 +93,33 @@ function clickByName(name: string): Promise<boolean> {
     return false
   })()`)
 }
+
+/** Does the view need scrolling, and by how much. */
+function overflow(): Promise<{ scroll: number; view: number }> {
+  return inFoundry<{ scroll: number; view: number }>(
+    '({ scroll: document.documentElement.scrollHeight, view: window.innerHeight })'
+  )
+}
+
+test('an order fits the view it is shown in', async () => {
+  // The rail was 260px whatever the window, so three stacked panels ran past
+  // the bottom while the order beside them — text, which does not want 1300px
+  // of line length — left the right-hand two thirds empty. Scrolling past dead
+  // space, on a screen with room for all of it.
+  await inFoundry(`window.electronAPI.extensionBridge.invoke('foundry:order.create', {
+    source: { kind: 'typed', text: 'Read the session TTL from the environment' },
+    repoPaths: [${'' + JSON.stringify(repoPath) + ''}],
+  })`)
+  await handle.page.waitForTimeout(4000)
+  await clickByName('Forge')
+  await handle.page.waitForTimeout(1500)
+  const before = await overflow()
+  // eslint-disable-next-line no-console
+  console.log(`scrollHeight ${before.scroll} vs viewport ${before.view}`)
+  expect(before.scroll, 'the Forge needs scrolling to show one order').toBeLessThanOrEqual(
+    before.view + 8
+  )
+})
 
 test('no text on any Foundry surface renders at the browser default size', async () => {
   const found: Oversized[] = []

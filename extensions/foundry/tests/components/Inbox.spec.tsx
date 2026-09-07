@@ -169,17 +169,29 @@ describe('nothing needs you', () => {
 })
 
 describe('quiet has to be explicable', () => {
-  it('says which rules this setting is not asking about', async () => {
+  // In words, not ids. This read "not asking about: unit.boundary" — a
+  // sentence about this extension's internals, shown to the person using it,
+  // on the screen whose whole job is to be reassuring when there is nothing
+  // to do. The test asserted the ids, so it held the jargon in place.
+  it('says what this setting decides for you, in words', async () => {
     mount({ autonomy: 'lights-out', silenced: ['unit.boundary', 'new-dependency'] })
-    await waitFor(() => expect(screen.getByText(/not asking about/)).toBeTruthy())
-    expect(screen.getByText(/unit.boundary, new-dependency/)).toBeTruthy()
+    await waitFor(() => expect(screen.getByText(/decides these for you/)).toBeTruthy())
+    expect(screen.getByText(/each unit of work as it finishes/)).toBeTruthy()
+    expect(screen.getByText(/a new third-party dependency/)).toBeTruthy()
     expect(screen.getByText('lights-out')).toBeTruthy()
+  })
+
+  it('never shows a rule id to the operator', async () => {
+    mount({ autonomy: 'lights-out', silenced: ['unit.boundary', 'new-dependency'] })
+    await waitFor(() => screen.getByText('Nothing needs you.'))
+    expect(document.body.textContent).not.toContain('unit.boundary')
+    expect(document.body.textContent).not.toContain('new-dependency')
   })
 
   it('says nothing when every rule is live', async () => {
     mount({ autonomy: 'escorted', silenced: [] })
     await waitFor(() => screen.getByText('Nothing needs you.'))
-    expect(screen.queryByText(/not asking about/)).toBeNull()
+    expect(screen.queryByText(/decides these for you/)).toBeNull()
   })
 })
 

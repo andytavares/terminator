@@ -1,3 +1,4 @@
+import { ruleInWords } from '../gates/rules.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
@@ -134,7 +135,8 @@ export function Inbox(): JSX.Element {
           <p>Nothing needs you.</p>
           {(view.silenced?.length ?? 0) > 0 ? (
             <small className="fdry-silenced">
-              On <b>{view.autonomy}</b>, not asking about: {view.silenced?.join(', ')}
+              On <b>{view.autonomy}</b> it decides these for you:{' '}
+              {view.silenced?.map((rule) => ruleInWords(rule)).join('; ')}.
             </small>
           ) : null}
           {digest !== null && digest.entryCount > 0 ? (

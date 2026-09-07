@@ -21,6 +21,31 @@ export const GATE_RULES = [
 
 export type GateRuleId = (typeof GATE_RULES)[number]
 
+/**
+ * What each rule is, in words somebody who did not write it can read.
+ *
+ * The Inbox printed the ids: "On standard, not asking about: unit.boundary".
+ * That is a sentence about the internals of this extension shown to the person
+ * using it, on the screen whose whole job is to be reassuring when there is
+ * nothing to do.
+ */
+const RULE_IN_WORDS: Record<GateRuleId, string> = {
+  'risk.p0': 'changes that turn out to be riskier than planned',
+  'budget.exceeded': 'a run going past its time or agent budget',
+  destructive: 'anything that destroys work rather than changing it',
+  'ready-for-review': 'whether a draft is ready for review',
+  'verify.repeat-fail': 'work that keeps failing its checks',
+  'critical-path': 'edits to a path you marked critical',
+  'new-dependency': 'a new third-party dependency',
+  'forge-defect': 'an order that contradicts itself',
+  'unit.boundary': 'each unit of work as it finishes',
+}
+
+/** One rule, in plain words. Falls back to the id rather than inventing one. */
+export function ruleInWords(rule: string): string {
+  return RULE_IN_WORDS[rule as GateRuleId] ?? rule
+}
+
 export interface GateOption {
   readonly id: string
   readonly label: string

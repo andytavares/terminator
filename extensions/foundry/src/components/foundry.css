@@ -107,6 +107,36 @@
   gap: 12px;
   position: sticky;
   top: 16px;
+  align-content: start;
+}
+
+/* On a wide screen the rail's panels sit beside each other rather than in one
+   tall stack.
+
+   The rail was 260px whatever the window, so three panels stacked past the
+   bottom of the screen and the order beside them — which is text, and does not
+   want 1300px of line length — left the right-hand two thirds empty. Scrolling
+   past dead space. Two columns roughly halves the rail's height, which is what
+   decides whether any of this needs scrolling at all. */
+@media (min-width: 1200px) {
+  .fdry-forge {
+    grid-template-columns: minmax(520px, 0.95fr) minmax(0, 1.05fr);
+  }
+
+  .fdry-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+@media (min-width: 1700px) {
+  .fdry-forge {
+    grid-template-columns: minmax(780px, 1fr) minmax(0, 1fr);
+  }
+
+  .fdry-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .fdry-panel {
@@ -388,10 +418,10 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 1px;
   width: 100%;
-  margin-top: 6px;
-  padding: 6px 8px;
+  margin-top: 4px;
+  padding: 5px 8px;
   text-align: left;
   font: inherit;
   color: var(--tm-text-primary);
