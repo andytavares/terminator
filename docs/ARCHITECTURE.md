@@ -955,6 +955,16 @@ it ready — never whether to create it. For the two highest risk grades the
 operator decides before anything reaches the remote; for everything lower the
 draft opens first, so review happens on a real change.
 
+**Every command runs in the lane's worktree**, derived per lane by
+`checkoutPath` exactly as the branch is derived by `branchFor`. Both were once
+read raw off `context.repos[]`, which holds the _repository_ and a `headBranch`
+that nothing writes — so shipping pushed `HEAD:` (refused outright by the first
+real `git`) and then, once that was fixed, pushed the repository's `main` to the
+head branch, putting the branch on the remote at the commit it was cut from.
+GitHub answered the pull request with "No commits between main and
+<branch>". Both are derived now, and `markReady` follows the path the draft was
+opened from.
+
 Three write-backs to the source issue: the agreed order as a comment, the
 workflow state (`ExtensionAPI.issues.transition`, v2.3.0, ADR-041), and the
 pull request links. A tracker write never affects the work: a failure is
