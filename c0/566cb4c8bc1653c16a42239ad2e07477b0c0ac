@@ -1,0 +1,36 @@
+extensions/foundry/tests/line/integrate.spec.ts
+  s_357c91d2b54b02::t_d5067b095e4b35 801,809,813-815,819-820,826-828,834-835,852-853
+  s_357c91d2b54b02::t_a01d5020d6b542 793-800,802-808,810-812,816-818,821-825,829-833,836-851,854-855
+package.json
+  s_357c91d2b54b02::t_e6d445725bace8 23
+scripts/check-patch-coverage.cjs
+  s_357c91d2b54b02::t_e0080236269730 43
+extensions/foundry/src/line/integrate.ts
+  s_357c91d2b54b02::t_c286b4fbbc6bf3 6
+  s_357c91d2b54b02::t_60bb51061df8e0 399-406
+vitest.config.ts
+  s_357c91d2b54b02::t_c8bd5c39666cd1 38-48
+  s_357c91d2b54b02::t_e0080236269730 74
+vitest.live.config.ts
+  s_357c91d2b54b02::t_78e02f4026d8be 1-22
+extensions/foundry/tests/live/ship-live.spec.ts
+  s_357c91d2b54b02::t_f7adf1a8f3df54 101-104,111
+  s_357c91d2b54b02::t_39faddc0dae567 2
+  s_357c91d2b54b02::t_3df082d3003bb1 1,3-100,105-110,112-215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "c0566cb4c8bc1653c16a42239ad2e07477b0c0ac",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
