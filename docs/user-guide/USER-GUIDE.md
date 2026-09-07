@@ -615,6 +615,17 @@ Two things you can do without leaving:
   **Stop** it. The terminal is always there as the backstop: the agent runs in
   a real terminal in its own worktree project, and you can go and type at it.
 
+### When it refuses to start another one
+
+Three finished pieces of work waiting for your review, and starting a fourth is
+refused — with the count and the limit, and **Start anyway** next to it. The
+constraint being modelled is your own capacity to read a diff, which does not
+grow with the number of orders.
+
+Overriding is one click, and what you chose to ignore is recorded with it: the
+order's ledger gets `backpressure.overridden` naming the depth at that moment.
+The debt is visible afterwards rather than only felt.
+
 ### Autonomy — how much it asks you
 
 Three settings, differing in which rules stop the line. Four things ask at

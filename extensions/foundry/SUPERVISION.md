@@ -278,9 +278,16 @@ evidence nobody has.
 depth. The constraint is one person's capacity to review, which does not scale
 with the number of cards.
 
-The refusal appears on the card, with **Start anyway** next to it. Overriding is
-one click and is **recorded with the queue depth at the moment it was ignored** (`foundry-runtime/backpressure-overrides.jsonl`), so a backlog
+The refusal appears in the Forge, with **Start anyway** next to it. Overriding
+is one click and is recorded twice — in the order's own ledger as
+`backpressure.overridden`, and in `foundry-runtime/backpressure-overrides.jsonl`
+— both carrying **the queue depth at the moment it was ignored**, so the debt
 built by overriding is visible afterwards rather than only felt.
+
+`run.start` is what asks. It did not, for the whole of this feature's first
+life: the gate was built, the Floor showed its verdict, and nothing consulted
+it — so runs began regardless and the override had nothing to override. This
+section described the behaviour anyway.
 
 ## Review steps, and multi-repository cards
 

@@ -214,7 +214,13 @@ function mountForStart(over: Record<string, unknown> = {}) {
         }
       )
     }
-    if (channel === 'foundry:run.start') return over.start ?? { ok: true }
+    if (channel === 'foundry:run.start') {
+      // A function when the answer depends on the payload — the override sends
+      // `force: true` and must get a different reply from the refusal.
+      return typeof over.start === 'function'
+        ? (over.start as (p: unknown) => unknown)(payload)
+        : (over.start ?? { ok: true })
+    }
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -651,5 +657,59 @@ describe('attaching to the architect', () => {
     await waitFor(() => screen.getByRole('button', { name: /Attach/ }))
     fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
     await waitFor(() => expect(screen.getByText(/no longer has a terminal/)).toBeTruthy())
+  })
+})
+
+// The one refusal the operator can answer: it is about their own review queue,
+// not about the order. `SUPERVISION.md` has always promised "**Start anyway**
+// next to it", and there was no such control.
+describe('a start held back by the review queue', () => {
+  const refuse = (payload: unknown) =>
+    (payload as { force?: boolean }).force === true
+      ? { ok: true }
+      : {
+          error: '3 finished sessions are waiting for review, and the limit is 3.',
+          backpressure: { unreviewed: 3, limit: 3 },
+        }
+
+  it('says why the run did not start', async () => {
+    mountForStart({ start: refuse })
+    await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    // Twice on purpose: once as the refusal, once on the override that answers
+    // it. The message is what matters here.
+    await waitFor(() => expect(screen.getAllByText(/waiting for review/).length).toBeGreaterThan(0))
+    expect(screen.getByText(/the run did not start/)).toBeTruthy()
+  })
+
+  it('offers the override, naming what is waiting', async () => {
+    mountForStart({ start: refuse })
+    await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Start anyway — 3 waiting/ })).toBeTruthy()
+    )
+  })
+
+  it('starts it when the operator takes the override', async () => {
+    mountForStart({ start: refuse })
+    await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    await waitFor(() => screen.getByRole('button', { name: /Start anyway/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Start anyway/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:run.start',
+        expect.objectContaining({ force: true })
+      )
+    )
+  })
+
+  it('offers no override for a refusal that is not about the queue', async () => {
+    mountForStart({ start: { error: 'this repository has no test command' } })
+    await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    await waitFor(() => screen.getByText(/no test command/))
+    expect(screen.queryByRole('button', { name: /Start anyway/ })).toBeNull()
   })
 })

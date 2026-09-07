@@ -657,3 +657,80 @@ describe('what the Floor is told to call each node', () => {
     for (const name of named) expect(Object.values(view.labels)).toContain(name)
   })
 })
+
+// The constraint is one person's capacity to review, and it does not scale
+// with the number of orders. The gate was built, the Floor showed its verdict,
+// and `run.start` never asked it — so runs began regardless and
+// `BackpressureGate.override` had nothing to override.
+describe('too much waiting to be reviewed (FR-053, FR-054)', () => {
+  const full = () => ({
+    allowed: false,
+    unreviewed: 3,
+    limit: 3,
+    reason: '3 finished sessions are waiting for review, and the limit is 3.',
+  })
+  const room = () => ({ allowed: true, unreviewed: 0, limit: 3, reason: null })
+
+  function withGate(
+    backpressure: () => ReturnType<typeof full>,
+    noteOverride?: (orderId: string) => void
+  ) {
+    return createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      backpressure,
+      noteOverride,
+    })
+  }
+
+  it('refuses the start, with the reason and the depth', async () => {
+    await store.save(order())
+    const r = (await withGate(full).start({ id: 'WO-1' })) as {
+      error: string
+      backpressure: { unreviewed: number; limit: number }
+    }
+    expect(r.error).toMatch(/waiting for review/)
+    expect(r.backpressure).toMatchObject({ unreviewed: 3, limit: 3 })
+  })
+
+  it('cuts nothing when it refuses', async () => {
+    await store.save(order())
+    await withGate(full).start({ id: 'WO-1' })
+    expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(false)
+    expect((await store.load('WO-1'))?.status).toBe('agreed')
+  })
+
+  it('starts anyway when the operator says so', async () => {
+    await store.save(order())
+    const r = (await withGate(full).start({ id: 'WO-1', force: true })) as { error?: string }
+    expect(r.error).toBeUndefined()
+    expect((await store.load('WO-1'))?.status).toBe('running')
+  })
+
+  it('records what the operator chose to ignore, at the moment they ignored it', async () => {
+    await store.save(order())
+    const overridden: string[] = []
+    await withGate(full, (id) => overridden.push(id)).start({ id: 'WO-1', force: true })
+    expect(overridden).toEqual(['WO-1'])
+    const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
+    expect(ledger).toContain('backpressure.overridden')
+    expect(ledger).toContain('3 waiting to be reviewed')
+  })
+
+  it('records nothing when there was nothing to override', async () => {
+    await store.save(order())
+    const overridden: string[] = []
+    await withGate(room, (id) => overridden.push(id)).start({ id: 'WO-1', force: true })
+    expect(overridden).toEqual([])
+    const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
+    expect(ledger).not.toContain('backpressure.overridden')
+  })
+
+  it('never refuses a run because there is no runtime to ask', async () => {
+    await store.save(order())
+    const r = (await channels().start({ id: 'WO-1' })) as { error?: string }
+    expect(r.error).toBeUndefined()
+  })
+})

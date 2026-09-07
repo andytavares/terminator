@@ -1352,6 +1352,12 @@ export function activate(api: ExtensionAPI): void {
     store: createLiveOrderStore(dataRoot),
     dataRoot,
     sources: () => resolveSources(api, dataRoot()),
+    // One person's capacity to review is the constraint, and it does not scale
+    // with the number of orders. No runtime means nobody to ask, which is not
+    // a reason to refuse a run.
+    backpressure: () =>
+      supervision?.backpressure.check() ?? { allowed: true, unreviewed: 0, limit: 0, reason: null },
+    noteOverride: (orderId) => supervision?.backpressure.override(orderId, Date.now()),
     now: () => new Date().toISOString(),
     execute: (order, recipe, graph) => executeRun(api, dataRoot(), order, recipe, graph),
   })

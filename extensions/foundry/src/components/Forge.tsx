@@ -103,6 +103,8 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
+  /** Set when a start was refused for backpressure, which the operator may override. */
+  const [heldBack, setHeldBack] = useState<{ unreviewed: number; limit: number } | null>(null)
   const [states, setStates] = useState<StatesView | null>(null)
   /** What the last turn moved, so the operator can see the redraw (FR-007). */
   const [moved, setMoved] = useState<string[]>([])
@@ -252,38 +254,47 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
    * agreeing is a decision and is recorded; starting can fail on a recipe this
    * repository cannot support, and that must not un-agree what was agreed.
    */
-  const handOff = useCallback(async () => {
-    setBusy(true)
-    setProblem(null)
-    try {
-      const next = (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
-        | OrderView
-        | { error: string }
-      if ('error' in next) {
-        setProblem(next.error)
-        return
-      }
-      setView(next)
-      if (next.order.status !== 'agreed') return
+  const handOff = useCallback(
+    async (force = false) => {
+      setBusy(true)
+      setProblem(null)
+      try {
+        const next = (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
+          | OrderView
+          | { error: string }
+        if ('error' in next) {
+          setProblem(next.error)
+          return
+        }
+        setView(next)
+        if (next.order.status !== 'agreed') return
 
-      const started = (await invoke('foundry:run.start', {
-        id: orderId,
-        // Only when the operator picked one. Absent means the proposal
-        // stands, and the ledger records which of the two it was.
-        ...(chosen === null ? {} : { recipe: chosen }),
-      })) as {
-        error?: string
-        order?: { status: string }
+        const started = (await invoke('foundry:run.start', {
+          id: orderId,
+          // Only when the operator picked one. Absent means the proposal
+          // stands, and the ledger records which of the two it was.
+          ...(chosen === null ? {} : { recipe: chosen }),
+          ...(force ? { force: true } : {}),
+        })) as {
+          error?: string
+          order?: { status: string }
+          backpressure?: { unreviewed: number; limit: number }
+        }
+        if (started.error !== undefined) {
+          setProblem(`The order is agreed, but the run did not start: ${started.error}`)
+          // A refusal for backpressure is the one the operator can answer: it is
+          // about their own review queue, not about the order.
+          setHeldBack(started.backpressure ?? null)
+          return
+        }
+        setHeldBack(null)
+        onStarted?.(orderId)
+      } finally {
+        setBusy(false)
       }
-      if (started.error !== undefined) {
-        setProblem(`The order is agreed, but the run did not start: ${started.error}`)
-        return
-      }
-      onStarted?.(orderId)
-    } finally {
-      setBusy(false)
-    }
-  }, [orderId, onStarted, chosen])
+    },
+    [orderId, onStarted, chosen]
+  )
 
   if (view === null) {
     return <div className="fdry-empty">Loading the order…</div>
@@ -348,6 +359,19 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 : `Blocked by ${compile.failures.length}`}
           </button>
           {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
+          {/* The one refusal the operator can answer: it is about their own
+              review queue, not about the order. Overriding is one click, and
+              the depth they ignored goes in the record (FR-054). */}
+          {heldBack !== null ? (
+            <button
+              type="button"
+              className="fdry-compile"
+              disabled={busy}
+              onClick={() => void handOff(true)}
+            >
+              <Play aria-hidden="true" /> Start anyway — {heldBack.unreviewed} waiting for review
+            </button>
+          ) : null}
         </section>
 
         {/* The shape of work. Proposed rather than chosen — a proposal nobody

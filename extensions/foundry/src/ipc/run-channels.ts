@@ -21,7 +21,12 @@ import type { WorkOrder } from '../order/schema.js'
 // through because a directory could not be created has already spent agent
 // time, and the message arrives attached to the wrong thing.
 
-const StartPayload = z.object({ id: z.string(), recipe: z.string().optional() })
+const StartPayload = z.object({
+  id: z.string(),
+  recipe: z.string().optional(),
+  /** The operator's "Start anyway", against a backpressure refusal (FR-054). */
+  force: z.boolean().optional(),
+})
 const ObservePayload = z.object({ id: z.string(), retry: z.array(z.string()).optional() })
 const AttachPayload = z.object({ orderId: z.string(), nodeId: z.string() })
 
@@ -45,6 +50,21 @@ export interface RunDeps {
    * graph and says so, rather than reporting a run that never began.
    */
   readonly execute?: (order: WorkOrder, recipe: Recipe, graph: RunGraph) => Promise<void>
+  /**
+   * Whether there is room to start another agent (FR-053).
+   *
+   * The constraint is one person's capacity to review, which does not scale
+   * with the number of orders. Absent means no runtime to ask, which is not a
+   * reason to refuse a run.
+   */
+  readonly backpressure?: () => {
+    allowed: boolean
+    unreviewed: number
+    limit: number
+    reason: string | null
+  }
+  /** Record that the operator started anyway, with the depth they ignored. */
+  readonly noteOverride?: (orderId: string) => void
 }
 
 export interface RunChannels {
@@ -146,6 +166,31 @@ export function createRunChannels(deps: RunDeps): RunChannels {
 
     const writable = await ensureWritable(deps.dataRoot())
     if (!writable.ok) return { error: writable.reason }
+
+    // Refused before anything is cut, with the reason and the depth — and
+    // overridable, which is the half that did not exist: the gate was built,
+    // the Floor showed its verdict, and `run.start` never asked it, so runs
+    // began regardless and the override had nothing to override.
+    const room = deps.backpressure?.() ?? null
+    if (room !== null && !room.allowed && parsed.data.force !== true) {
+      return {
+        error: room.reason ?? 'There is too much waiting to be reviewed.',
+        backpressure: room,
+      }
+    }
+    if (room !== null && !room.allowed) {
+      deps.noteOverride?.(order.id)
+      await deps.store.record({
+        at: deps.now(),
+        orderId: order.id,
+        actor: 'operator',
+        action: 'backpressure.overridden',
+        subject: order.id,
+        // What they chose to ignore, at the moment they ignored it.
+        reason: `started anyway with ${room.unreviewed} waiting to be reviewed (limit ${room.limit})`,
+        evidence: [],
+      })
+    }
 
     const chosenByOperator = parsed.data.recipe !== undefined
     const proposal = proposeRecipe(order)
