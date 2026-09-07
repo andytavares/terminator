@@ -1,0 +1,23 @@
+extensions/foundry/tests/runtime/autonomy-policy.spec.ts
+  s_357c91d2b54b02::t_a42f7d910da87a 226
+  s_357c91d2b54b02::t_43714beca176b0 209-225,227-246
+  s_357c91d2b54b02::t_27e96e91fb23f9 1-4
+extensions/foundry/src/runtime/autonomy-policy.ts
+  s_357c91d2b54b02::t_767d0012015f92 1,184-190,193-196,209-233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "e1a1ae9e133eed3a0bbc57bae975b41555c88cf5",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
