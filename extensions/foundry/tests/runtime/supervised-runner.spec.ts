@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
@@ -56,6 +56,21 @@ function runner() {
   })
 }
 
+/**
+ * What the terminal was actually asked to run.
+ *
+ * The launch is a file now, not a typed line — a terminal in canonical mode
+ * mangles anything past 1024 bytes on one line, and a brief is always longer.
+ * These assertions belong on the script's contents rather than on the
+ * keystrokes.
+ */
+function launchScriptBody(): string {
+  const typed = written.map((w) => w.data).join('')
+  const match = /([^'\s]*\/launch\/[\w-]+\.sh)/.exec(typed)
+  if (match === null) throw new Error(`no launch script was typed: ${typed}`)
+  return readFileSync(match[1], 'utf8')
+}
+
 const start = {
   featureDir: '/repo/specs/021-thing',
   worktreePath: '/wt/feat-thing',
@@ -105,9 +120,9 @@ describe('starting a supervised run', () => {
     })
   })
 
-  it('types the launch command, under a session id it chose itself', async () => {
+  it('launches under a session id it chose itself', async () => {
     const run = await runner().start(start)
-    const command = written.map((w) => w.data).join('')
+    const command = launchScriptBody()
     expect(command).toContain(`--session-id ${run?.sessionId}`)
     expect(command).toContain('/speckit-implement')
   })
@@ -115,15 +130,16 @@ describe('starting a supervised run', () => {
   it('never bypasses permissions — that is the whole point of the change', async () => {
     await runner().start(start)
     expect(written.map((w) => w.data).join('')).not.toContain('bypassPermissions')
+    expect(launchScriptBody()).not.toContain('bypassPermissions')
   })
 
   it('points the skills at the card, so they work whatever the branch is called', async () => {
     await runner().start(start)
-    const typed = written.map((w) => w.data).join('')
     // Quoted: it goes into the operator's shell, and a slug is not guaranteed
     // to be a bare word.
-    expect(typed).toContain("SPECIFY_FEATURE='021-thing'")
-    expect(typed).toContain("SPECIFY_FEATURE_DIRECTORY='specs/021-thing'")
+    const body = launchScriptBody()
+    expect(body).toContain("SPECIFY_FEATURE='021-thing'")
+    expect(body).toContain("SPECIFY_FEATURE_DIRECTORY='specs/021-thing'")
   })
 
   it('knows where the transcript will be before the process exists', async () => {
@@ -323,9 +339,7 @@ describe('the environment the agent runs in', () => {
     // console itself was started from a Claude Code session, the stall
     // detector, the turn count and the card's console all read empty forever.
     await runner().start(start)
-    expect(written.map((w) => w.data).join('\n')).toContain(
-      'CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1'
-    )
+    expect(launchScriptBody()).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
   })
 })
 
@@ -558,5 +572,70 @@ describe('acting on a session that is not there', () => {
     exitListener?.(0)
     expect(() => exitListener?.(0)).not.toThrow()
     expect(supervised.terminalFor(run!.sessionId)).toBeNull()
+  })
+})
+
+// A terminal in canonical mode silently mangles anything past `MAX_CANON` on
+// one line — 1024 bytes on macOS. A brief is a role prompt plus a whole work
+// order, which is always longer, and it was typed at the shell prompt. A live
+// run's agent came up with a fragment of the order repeated fifteen times and
+// the rest cut off mid-word, and nothing could see it: the terminal shows the
+// first line correctly, the agent starts, and it does the wrong work or none.
+describe('launching with a brief longer than a terminal line', () => {
+  /** The canonical-mode line limit this is all about. */
+  const MAX_CANON = 1024
+
+  const longPrompt = [
+    'Turn intent and context into criteria and a plan.',
+    '',
+    '# Read the session TTL from the environment',
+    '',
+    'x'.repeat(4000),
+  ].join('\n')
+
+  it('never types a line the terminal cannot carry', async () => {
+    await runner().start({ ...start, prompt: longPrompt })
+    for (const { data } of written) {
+      for (const line of data.split(/\r|\n/)) {
+        expect(line.length, `typed ${line.length} bytes: ${line.slice(0, 60)}…`).toBeLessThan(
+          MAX_CANON
+        )
+      }
+    }
+  })
+
+  it('puts the whole brief in a file the terminal runs instead', async () => {
+    await runner().start({ ...start, prompt: longPrompt })
+    const body = launchScriptBody()
+    expect(body).toContain(longPrompt.slice(0, 48))
+    // Intact, not truncated: the tail of the brief is there too.
+    expect(body).toContain('x'.repeat(4000))
+  })
+
+  it('still shows the whole command in the terminal, which is the point of a terminal', async () => {
+    await runner().start({ ...start, prompt: longPrompt })
+    const body = launchScriptBody()
+    // A quoted heredoc, so the brief is echoed rather than expanded or run.
+    expect(body).toContain("cat <<'TERMINATOR_LAUNCH'")
+    expect(body).toMatch(/claude --session-id/)
+    expect(body).toContain('exec ')
+  })
+
+  it('carries the environment the skills read, as it always did', async () => {
+    await runner().start({ ...start, prompt: longPrompt })
+    const body = launchScriptBody()
+    expect(body).toContain('SPECIFY_FEATURE=')
+    expect(body).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
+  })
+
+  it('never lets the brief out of the quoted heredoc, so nothing in it is run', async () => {
+    await runner().start({ ...start, prompt: 'plan it\nTERMINATOR_LAUNCH\nrm -rf /' })
+    const body = launchScriptBody()
+    // The brief reaches the script as a single shell-quoted argument, so a line
+    // that looks like the terminator is inside quotes rather than ending it.
+    const afterHeredoc = body.slice(body.indexOf("cat <<'TERMINATOR_LAUNCH'"))
+    const firstEnd = afterHeredoc.indexOf('\nTERMINATOR_LAUNCH\n')
+    expect(firstEnd).toBeGreaterThan(0)
+    expect(afterHeredoc.slice(firstEnd)).toContain('exec ')
   })
 })

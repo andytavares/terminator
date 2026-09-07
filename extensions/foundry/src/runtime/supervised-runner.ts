@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import { buildLaunchSpec, shellQuote } from './claude-launch.js'
@@ -204,6 +205,40 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
   const hookScriptPath = installHookScript(stateDir)
   const running = new Map<string, Running>()
 
+  /**
+   * The launch, as a file the terminal runs rather than a line it is typed.
+   *
+   * `MAX_CANON` is the reason: a terminal in canonical mode silently mangles
+   * anything past 1024 bytes on one line, and a brief — a role prompt plus a
+   * whole work order — is always longer. The `cat` echo is deliberate: the
+   * whole command still appears in the terminal, so what an agent was told is
+   * readable there, which is the point of running it in a terminal at all.
+   */
+  function writeLaunchScript(
+    sessionId: string,
+    parts: { exports: string; command: string }
+  ): string {
+    const dir = path.join(stateDir, 'launch')
+    fs.mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, `${sessionId}.sh`)
+    fs.writeFileSync(
+      file,
+      [
+        '#!/bin/sh',
+        '# Written by Terminator. One per session; overwritten on every start.',
+        parts.exports,
+        // A quoted heredoc: nothing in the brief is expanded or run.
+        "cat <<'TERMINATOR_LAUNCH'",
+        parts.command,
+        'TERMINATOR_LAUNCH',
+        `exec ${parts.command}`,
+        '',
+      ].join('\n'),
+      { mode: 0o700 }
+    )
+    return file
+  }
+
   function end(sessionId: string): void {
     const run = running.get(sessionId)
     if (run === undefined) return
@@ -347,11 +382,27 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // from a Claude Code session, its agents write no transcript and the
       // stall detector, the turn count and the card's console all read empty
       // forever. Documented as the override for exactly this case.
+      //
+      // Through a file, not typed. A terminal in canonical mode drops or
+      // corrupts anything past `MAX_CANON` on one line — 1024 bytes on macOS —
+      // and a brief is a role prompt plus a whole work order, which is always
+      // more than that. Typing it produced a command line with a fragment of
+      // the order repeated fifteen times and the rest cut off mid-word, so
+      // every agent this runtime has ever launched was handed a mangled brief.
+      // Nothing could see it: the terminal shows the first line correctly, the
+      // agent starts, and it simply does the wrong work or none at all.
+      //
+      // The script echoes itself first, so the terminal still shows the whole
+      // command — the operator can read exactly what is running, which is the
+      // point of running it in a terminal at all.
+      const launchScript = writeLaunchScript(sessionId, {
+        exports: `export SPECIFY_FEATURE=${shellQuote(featureSlug)} SPECIFY_FEATURE_DIRECTORY=${shellQuote(path.join('specs', featureSlug))} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1`,
+        command: spec.command,
+      })
       api.pty.write(
         terminalSessionId,
-        `export SPECIFY_FEATURE=${shellQuote(featureSlug)} SPECIFY_FEATURE_DIRECTORY=${shellQuote(path.join('specs', featureSlug))} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1\r`
+        `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(launchScript)}\r`
       )
-      api.pty.write(terminalSessionId, `${spec.command}\r`)
 
       return { sessionId, terminalSessionId, transcriptPath: spec.transcriptPath }
     },
