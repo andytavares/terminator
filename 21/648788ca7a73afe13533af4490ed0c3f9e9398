@@ -1,0 +1,25 @@
+extensions/foundry/tests/runtime/transcript-tailer.spec.ts
+  s_357c91d2b54b02::t_fd3ec610e4198c 2,5,7,322,338,343,348,353,358,368,373,386
+  s_357c91d2b54b02::t_07ef5130eea73b 315-321,323-337,339-342,344-347,349-352,354-357,359-367,369-372,374-385,387-401
+extensions/foundry/src/runtime/transcript-tailer.ts
+  s_357c91d2b54b02::t_f540e3ab4f0d94 195-260
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_17008adb8311e1 44
+  s_357c91d2b54b02::t_4883bab1b3ff26 855-865
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "21648788ca7a73afe13533af4490ed0c3f9e9398",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
