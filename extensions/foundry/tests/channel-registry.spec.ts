@@ -146,3 +146,26 @@ describe('what a read-only role is told', () => {
     expect(answers.length, 'the read-only paths do not return their own decision').toBe(2)
   })
 })
+
+// The verifier's whole job is a verdict from an exit status (FR-033), and its
+// role file declares `run_tests`. The read-only policy refused `npm test` like
+// any other unknown binary — so the role vocabulary said one thing and the gate
+// did another, and a live architect burned three turns discovering it.
+describe("running the project's own commands", () => {
+  it('lets a role that declared run_tests run them', () => {
+    expect(src).toContain("input.mayUseTool('run_tests')")
+    expect(src).toContain('isProbedCommand(order, tool, toolInput)')
+  })
+
+  it('matches them exactly, rather than by prefix', () => {
+    const fn = src.slice(src.indexOf('function isProbedCommand'))
+    const body = fn.slice(0, fn.indexOf('\n}'))
+    expect(body).toContain('found.command.trim() === asked')
+    expect(body).not.toMatch(/startsWith|includes\(asked\)/)
+  })
+
+  it('only ever considers a shell call', () => {
+    const fn = src.slice(src.indexOf('function isProbedCommand'))
+    expect(fn.slice(0, fn.indexOf('\n}'))).toContain("tool !== 'Bash'")
+  })
+})

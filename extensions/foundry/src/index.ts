@@ -228,6 +228,26 @@ function trustRepository(
     .catch(() => undefined)
 }
 
+/**
+ * Whether this is one of the commands the toolchain probe actually found.
+ *
+ * Exactly, after trimming — not a prefix, not with arguments appended. The
+ * point is that a role which may run the project's tests may run *the project's
+ * tests*, not anything beginning with the same word.
+ */
+function isProbedCommand(order: WorkOrder, tool: string, input: unknown): boolean {
+  if (tool !== 'Bash') return false
+  const command =
+    typeof input === 'object' && input !== null
+      ? (input as { command?: unknown }).command
+      : undefined
+  if (typeof command !== 'string') return false
+  const asked = command.trim()
+  return Object.values(order.context.toolchain).some(
+    (found) => found !== null && found.command.trim() === asked
+  )
+}
+
 /** The autonomy dial, read wherever it is needed rather than copied. */
 function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' {
   return (
@@ -751,6 +771,15 @@ async function executeRun(
           // the only check were "may this role write at all".
           autoDecide: (tool, toolInput) => {
             if (input.readOnly) {
+              // A role that declared `run_tests` may run the project's own
+              // commands, and only those, matched exactly. The verifier's whole
+              // job is a verdict from an exit status (FR-033), and the
+              // read-only policy refuses `npm test` like any other unknown
+              // binary — so the role vocabulary said one thing and the gate did
+              // another.
+              if (input.mayUseTool('run_tests') && isProbedCommand(order, tool, toolInput)) {
+                return { allow: true, reason: "the project's own command, which this role may run" }
+              }
               const decision = decideReadOnly(tool, toolInput)
               // Both ways, never abstaining. A read-only role exists to decide
               // without a person — that is the whole reason the policy reads

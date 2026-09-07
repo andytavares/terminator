@@ -52,7 +52,7 @@ function unitSection(order: WorkOrder, unit: PlanUnit): string[] {
   ]
 }
 
-function contextSection(order: WorkOrder): string[] {
+function contextSection(order: WorkOrder, role: Role | null): string[] {
   const lines = ['## The repository', '']
   for (const repo of order.context.repos) {
     lines.push(`- \`${repo.name}\` — base \`${repo.baseBranch}\``)
@@ -61,11 +61,19 @@ function contextSection(order: WorkOrder): string[] {
     .filter(([, found]) => found !== null)
     .map(([name, found]) => `${name}: \`${(found as { command: string }).command}\``)
 
+  // A role that may not run them is told so, rather than invited to. The
+  // architect was handed "use these; do not invent others" and then refused
+  // `npm test` by the policy, so it spent three turns on an instruction the
+  // factory would never have let it follow.
+  const mayRun = role === null || role.tools.includes('run_tests')
+
   lines.push(
     '',
     commands.length === 0
       ? 'No commands were found in this repository. Do not invent one — a check that cannot run reports "not measured", and inventing a command turns that into a false pass.'
-      : `Commands found here: ${commands.join(' · ')}. Use these; do not invent others.`
+      : mayRun
+        ? `Commands found here: ${commands.join(' · ')}. Use these; do not invent others.`
+        : `Commands found here: ${commands.join(' · ')}. These are run for you, on the verification ladder — you may not run them yourself, and you do not need to.`
   )
   if (order.context.houseDocs.length > 0) {
     lines.push(
@@ -161,7 +169,7 @@ export function brief(input: BriefInput): string {
   }
 
   if (reads.has('context') || reads.has('conventions')) {
-    sections.push('', ...contextSection(order))
+    sections.push('', ...contextSection(order, role ?? null))
   }
   if (reads.has('rules')) sections.push('', ...rulesSection(rules))
   if (reads.has('order')) sections.push('', '---', '', renderOrder(order))

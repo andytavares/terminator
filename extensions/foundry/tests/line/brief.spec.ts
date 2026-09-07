@@ -143,9 +143,21 @@ describe('what each role may read is declared, not assumed', () => {
 
 describe('the repository, for a role that reads it', () => {
   it('names the real commands and forbids inventing others', () => {
-    const text = brief({ order: order(), role: role(), unit: unit(), rules: [] })
+    const runs = role({ tools: ['read', 'edit', 'run_tests'] })
+    const text = brief({ order: order(), role: runs, unit: unit(), rules: [] })
     expect(text).toContain('npm test')
     expect(text).toContain('do not invent others')
+  })
+
+  // The architect was handed "use these; do not invent others" and then refused
+  // `npm test` by the read-only policy. It tried three times and spent its
+  // turns on an instruction the factory would never have let it follow.
+  it('tells a role that may not run them that they are run for it', () => {
+    const reads = role({ tools: ['read', 'search'] })
+    const text = brief({ order: order(), role: reads, unit: unit(), rules: [] })
+    expect(text).toContain('npm test')
+    expect(text).toContain('run for you')
+    expect(text).not.toContain('do not invent others')
   })
 
   it('says so when there are none, rather than leaving the agent to guess', () => {
