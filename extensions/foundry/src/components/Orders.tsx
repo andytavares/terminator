@@ -142,6 +142,38 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
         >
           All orders
         </button>
+        {/* Discard, because an order made by mistake had no way out: the
+            `cancelled` status has been in the schema from the start and
+            nothing ever set it, so the list only ever grew. Marked, not
+            deleted — the records are the point. A running order is refused by
+            the channel and says why. */}
+        {running ? null : (
+          <button
+            type="button"
+            className="fdry-discard"
+            disabled={busy}
+            onClick={() => {
+              void (async () => {
+                setBusy(true)
+                try {
+                  const r = (await invoke('foundry:order.cancel', { id: open })) as {
+                    error?: string
+                  }
+                  if (r.error !== undefined) {
+                    setProblem(r.error)
+                    return
+                  }
+                  setOpen(null)
+                  await refresh()
+                } finally {
+                  setBusy(false)
+                }
+              })()
+            }}
+          >
+            Discard this order
+          </button>
+        )}
         {/* An order that is running is watched on the Floor; one that is still
             being agreed is worked on in the Forge. */}
         {running ? (

@@ -217,6 +217,18 @@ html, body {
   background: var(--tm-bg-base);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
+  /* The product's size, not the browser's.
+
+     This set a family, a colour and a background and no size, so anything that
+     forgot one landed on 16px beside a product drawn at 11-13px. Not a rare
+     mistake: an extension's every heading, every bold span inside a button,
+     every label whose rule happened to omit it. One view read as three type
+     scales at once, and every instance had to be found by eye.
+
+     A default that is right is the fix; a rule that wants larger still says
+     so. */
+  font-size: 13px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 #app { width: 100%; height: 100%; display: flex; flex-direction: column; }

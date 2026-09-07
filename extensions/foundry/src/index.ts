@@ -1661,6 +1661,7 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:order.mapState', (payload) => forge.mapState(payload))
   reg(api, 'foundry:order.converge', (payload) => forge.converge(payload))
   reg(api, 'foundry:order.writeBack', (payload) => forge.setWriteBack(payload))
+  reg(api, 'foundry:order.cancel', (payload) => forge.cancel(payload))
 
   // ── The Line ───────────────────────────────────────────────────────────
   //

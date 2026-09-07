@@ -12,6 +12,31 @@ Entity shapes referenced below are defined in [data-model.md](../data-model.md) 
 
 ---
 
+## `foundry:order.cancel`
+
+Discard an order that should not have been made. `cancelled` has been in the
+order schema from the start and nothing ever set it, so an order made by
+mistake stayed on the list for good and there was no way to start again.
+
+**Payload**:
+
+```typescript
+{ id: string; reason?: string }
+```
+
+**Reply**: the order view, as every Forge channel returns — or `{ error }`.
+
+Marked, not deleted: the records are the point of this thing, and a discarded
+order is part of what happened. It leaves the list, which is what needs doing
+rather than what was ever asked for, and `order.cancelled` goes on the ledger.
+
+A **running** order is refused, with the reason. Its agents are in their
+terminals with work in their worktrees, and throwing that away silently is the
+opposite of what every budget and gate here exists to do — stop it at its gate
+first.
+
+---
+
 ## `foundry:issues.mine`
 
 Your tickets, so one can be picked rather than remembered. `order.create` has

@@ -34,6 +34,11 @@ const CreatePayload = z.object({
   repoPaths: z.array(z.string()),
 })
 
+const CancelPayload = z.object({
+  id: z.string(),
+  reason: z.string().optional(),
+})
+
 const TurnPayload = z.object({
   id: z.string(),
   message: z.string().optional(),
@@ -141,6 +146,8 @@ export interface ForgeChannels {
   mapState(payload: unknown): Promise<unknown>
   /** Turn each write-back on or off for this order (FR-062). */
   setWriteBack(payload: unknown): Promise<unknown>
+  /** Discard an order that should not have been made. */
+  cancel(payload: unknown): Promise<unknown>
 }
 
 /** The order plus its checks — what every Forge channel hands back. */
@@ -436,17 +443,60 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
   }
 
   /** Every order, newest first, each with where its checks stand. */
+  /**
+   * Discard an order.
+   *
+   * `cancelled` has been in the schema since the beginning and nothing ever
+   * set it: an order made by mistake stayed on the list for good, and there
+   * was no way to start again. Marked rather than deleted — the records are
+   * the point of this thing, and a discarded order is part of what happened.
+   *
+   * A running one is refused. Its agents are in their terminals with work in
+   * their worktrees, and throwing that away silently is the opposite of what
+   * every budget and gate here is for; stop it at its gate first.
+   */
+  async function cancel(raw: unknown): Promise<unknown> {
+    const parsed = CancelPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const order = await deps.store.load(parsed.data.id)
+    if (order === null) return { error: `No order ${parsed.data.id}.` }
+    if (order.status === 'running') {
+      return {
+        error: `${order.id} is running. Stop it at its gate before discarding it — its agents still have work in their worktrees.`,
+      }
+    }
+    if (order.status === 'cancelled') return view(order)
+
+    const next: WorkOrder = { ...order, status: 'cancelled' as const }
+    await deps.store.save(next)
+    await deps.store.record({
+      at: deps.now(),
+      orderId: order.id,
+      actor: 'operator',
+      action: 'order.cancelled',
+      subject: order.id,
+      reason: parsed.data.reason ?? 'Discarded by the operator.',
+      evidence: [],
+    })
+    return view(next)
+  }
+
   async function list(): Promise<unknown> {
     const orders = await deps.store.list()
     return {
-      orders: orders.map((order) => ({
-        id: order.id,
-        title: order.title,
-        status: order.status,
-        risk: order.risk.grade,
-        source: order.source,
-        failures: compileOrder(order).failures.length,
-      })),
+      // A discarded order stays in the records and leaves the list; the list is
+      // what needs doing, not what was ever asked for.
+      orders: orders
+        .filter((order) => order.status !== 'cancelled')
+        .map((order) => ({
+          id: order.id,
+          title: order.title,
+          status: order.status,
+          risk: order.risk.grade,
+          source: order.source,
+          failures: compileOrder(order).failures.length,
+        })),
     }
   }
 
@@ -482,5 +532,5 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     return view(next, ['writeBack'])
   }
 
-  return { create, turn, compile, list, states, mapState, converge, setWriteBack }
+  return { create, turn, compile, list, states, mapState, converge, setWriteBack, cancel }
 }
