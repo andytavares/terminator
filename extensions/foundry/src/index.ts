@@ -295,6 +295,22 @@ function whyNotShipped(recipe: Recipe, outcome: RunOutcome): string {
   return 'it was not shippable, and this build cannot say which check said so'
 }
 
+/**
+ * Tools the operator has declared read-only, beyond the ones the policy knows.
+ *
+ * Never inferred. `mcp__server__get_thing` and `mcp__server__delete_thing` are
+ * the same shape to anything reading names, so guessing from one would be
+ * guessing about writes — and the whole point of the read-only policy is that
+ * a review cannot change what it is reviewing.
+ */
+function readOnlyTools(api: ExtensionAPI): string[] {
+  const raw = api.settings?.get<string>('terminator.foundry.readOnlyTools') ?? ''
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+}
+
 /** The autonomy dial, read wherever it is needed rather than copied. */
 function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' {
   return (
@@ -878,6 +894,20 @@ async function executeRun(
               // another.
               if (input.mayUseTool('run_tests') && isProbedCommand(order, tool, toolInput)) {
                 return { allow: true, reason: "the project's own command, which this role may run" }
+              }
+              // Tools the operator has said only read. The policy refuses any
+              // tool it has not been taught about, which is right — an MCP
+              // server's tools are named by somebody else and a name is not a
+              // contract, so `mcp__…__save_issue` and `mcp__…__query_docs` are
+              // indistinguishable to it.
+              //
+              // But that refusal has a cost, watched live: an architect tried
+              // to check a technique against the documentation, was refused,
+              // and wrote "Environment is read-only for execution and MCP, so
+              // I could not pull Node docs. That shapes what I can claim."
+              // Foundry does not guess which of them read; the operator says.
+              if (readOnlyTools(api).includes(tool)) {
+                return { allow: true, reason: 'the operator listed this as a tool that only reads' }
               }
               const decision = decideReadOnly(tool, toolInput)
               // Both ways, never abstaining. A read-only role exists to decide
@@ -2015,6 +2045,16 @@ export function activate(api: ExtensionAPI): void {
         },
         // Operator-declared, never inferred. Per-repository lists live in
         // config.yaml under the data root; this is the workspace-wide list.
+        // Named by the operator, never inferred: an MCP server's tools are
+        // named by somebody else, and a name is not a contract about writing.
+        'terminator.foundry.readOnlyTools': {
+          type: 'string',
+          label: 'Tools a review may also use, one per line',
+          description:
+            'The read-only policy refuses any tool it has not been taught about. List the ones you know only read — a documentation lookup, for instance. Foundry never infers this list.',
+          default: '',
+          workspaceScoped: true,
+        },
         'terminator.foundry.criticalPaths': {
           type: 'string',
           label: 'Critical paths, one glob per line',

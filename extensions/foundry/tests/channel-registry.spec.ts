@@ -147,6 +147,31 @@ describe('what a read-only role is told', () => {
   })
 })
 
+// The read-only policy refuses any tool it has not been taught about, which is
+// right: an MCP server's tools are named by somebody else, and
+// `mcp__x__get_thing` and `mcp__x__delete_thing` are the same shape to anything
+// reading names. The cost is real, though — watched live, an architect tried to
+// check a technique against the documentation, was refused, and wrote
+// "Environment is read-only for execution and MCP, so I could not pull Node
+// docs. That shapes what I can claim." So the operator names them, and Foundry
+// still infers nothing.
+describe('tools the operator says only read', () => {
+  it('is consulted before the policy refuses an unknown tool', () => {
+    expect(src).toContain('readOnlyTools(api).includes(tool)')
+  })
+
+  it('is a declared setting, so there is somewhere to declare it', () => {
+    expect(src).toContain("'terminator.foundry.readOnlyTools'")
+  })
+
+  it('reads the list rather than guessing from a name', () => {
+    const fn = src.slice(src.indexOf('function readOnlyTools'))
+    const body = fn.slice(0, fn.indexOf('\n}'))
+    expect(body).toContain("get<string>('terminator.foundry.readOnlyTools')")
+    expect(body).not.toMatch(/startsWith\('mcp__'\)|includes\('get_'\)|\/read|search\//)
+  })
+})
+
 // The verifier's whole job is a verdict from an exit status (FR-033), and its
 // role file declares `run_tests`. The read-only policy refused `npm test` like
 // any other unknown binary — so the role vocabulary said one thing and the gate
