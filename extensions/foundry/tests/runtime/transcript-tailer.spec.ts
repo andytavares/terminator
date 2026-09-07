@@ -4,7 +4,12 @@ import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'fs'
 import { tmpdir } from 'os'
 import * as path from 'path'
 import { join } from 'path'
-import { readTranscript, countTurns, rungExitCode } from '../../src/runtime/transcript-tailer.js'
+import {
+  readTranscript,
+  countTurns,
+  rungExitCode,
+  settledRungExitCode,
+} from '../../src/runtime/transcript-tailer.js'
 
 // The tailer opens the path the runtime handed us (research.md R3) and never
 // computes one. The per-line JSONL schema is NOT a published contract, so it
@@ -442,5 +447,68 @@ describe('rungExitCode', () => {
       ].join('\n')
     )
     expect(rungExitCode(file, 'npm test')).toBe(0)
+  })
+})
+
+// The turn ending and the transcript being written are not the same instant:
+// the end arrives on the `Stop` hook and the records it is about are flushed
+// after it. Reading immediately raced them and lost — a live run whose rungs
+// both ran and both exited 0 shipped saying "Not measured here: Lint, The
+// unit's own tests", and `rungExitCode` answers 0 for both against the same
+// file once it is finished.
+describe('settledRungExitCode', () => {
+  function write(file: string, ...entries: unknown[]): void {
+    fs.writeFileSync(file, entries.map((e) => JSON.stringify(e)).join('\n'))
+  }
+  const call = (id: string, command: string) => ({
+    type: 'assistant',
+    message: { content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] },
+  })
+  const result = (id: string, isError: boolean) => ({
+    type: 'user',
+    message: { content: [{ type: 'tool_result', tool_use_id: id, is_error: isError }] },
+  })
+
+  it('answers at once when the record is already there', async () => {
+    const file = path.join(dir, 'settled-a.jsonl')
+    write(file, call('t1', 'npm test'), result('t1', false))
+    expect(await settledRungExitCode(file, 'npm test')).toBe(0)
+  })
+
+  it('waits for a record the runtime has not flushed yet', async () => {
+    const file = path.join(dir, 'settled-b.jsonl')
+    write(file, call('t1', 'ls'), result('t1', false))
+    let polls = 0
+    const measured = await settledRungExitCode(file, 'npm test', 0, {
+      withinMs: 10_000,
+      pollMs: 1,
+      wait: async () => {
+        polls += 1
+        // The runtime catches up on the third look, as it does in the world.
+        if (polls === 3) write(file, call('t2', 'npm test; echo done'), result('t2', true))
+      },
+    })
+    expect(measured).toBe(1)
+    expect(polls).toBeGreaterThan(0)
+  })
+
+  it('gives up and says not measured, rather than waiting for ever', async () => {
+    const file = path.join(dir, 'settled-c.jsonl')
+    write(file, call('t1', 'ls'), result('t1', false))
+    let polls = 0
+    const started = Date.now()
+    const measured = await settledRungExitCode(file, 'npm test', 0, {
+      withinMs: 60,
+      pollMs: 10,
+      wait: async (ms) => {
+        polls += 1
+        await new Promise((resolve) => setTimeout(resolve, ms))
+      },
+    })
+    expect(measured).toBeNull()
+    // It polled, and it stopped: a real clock, so a wrapper that never gave up
+    // would hang this test rather than pass it.
+    expect(polls).toBeGreaterThan(0)
+    expect(Date.now() - started).toBeLessThan(5_000)
   })
 })

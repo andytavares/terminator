@@ -46,7 +46,7 @@ import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/di
 import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
-import { rungExitCode } from './runtime/transcript-tailer.js'
+import { settledRungExitCode } from './runtime/transcript-tailer.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
 /** One hunk as a surface renders it: the change, and what was decided. */
@@ -309,30 +309,6 @@ function readOnlyTools(api: ExtensionAPI): string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line !== '')
-}
-
-/**
- * A rung's exit status, once the transcript has caught up.
- *
- * The turn end and the transcript are not the same instant: the end arrives on
- * the `Stop` hook and the records are flushed after it. Polls for a couple of
- * seconds and then answers whatever it has — including `null`, which the
- * ladder reads as "not measured" and which stays a real answer rather than
- * becoming a pass.
- */
-async function settledExitCode(
-  transcriptPath: string,
-  command: string,
-  started: { transcriptFrom?: number }
-): Promise<number | null> {
-  const from = started.transcriptFrom ?? 0
-  const deadline = Date.now() + 5_000
-  for (;;) {
-    const measured = rungExitCode(transcriptPath, command, from)
-    if (measured !== null) return measured
-    if (Date.now() >= deadline) return null
-    await new Promise((resolve) => setTimeout(resolve, 250))
-  }
 }
 
 /**
@@ -1185,7 +1161,11 @@ async function executeRun(
       //
       // Bounded, and it still reports `null` at the end of it. "We could not
       // see it" is a real answer; waiting forever for one is not.
-      const measured = await settledExitCode(run.transcriptPath, step.command, started)
+      const measured = await settledRungExitCode(
+        run.transcriptPath,
+        step.command,
+        started.transcriptFrom ?? 0
+      )
       // `null` is "the agent never ran it", which the ladder reads as not
       // measured. Reading it as a pass is the failure the whole ladder exists
       // to prevent.

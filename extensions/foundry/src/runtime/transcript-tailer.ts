@@ -313,3 +313,36 @@ export function rungExitCode(
   }
   return null
 }
+
+/**
+ * A rung's exit status, once the transcript has caught up.
+ *
+ * The turn ending and the transcript being written are not the same instant:
+ * the end arrives on the `Stop` hook, and the records it is about are flushed
+ * after it. Reading immediately raced them and lost — a live run whose rungs
+ * both ran and both exited 0 shipped saying "Not measured here: Lint, The
+ * unit's own tests", and the same `rungExitCode` answers 0 for both against
+ * the finished file.
+ *
+ * Bounded, and it still answers `null` at the end of it. "We could not see it"
+ * is a real answer, which the ladder reads as not measured; waiting forever for
+ * a better one is not.
+ */
+export async function settledRungExitCode(
+  transcriptPath: string,
+  command: string,
+  fromByte = 0,
+  options: { withinMs?: number; pollMs?: number; wait?: (ms: number) => Promise<void> } = {}
+): Promise<number | null> {
+  const withinMs = options.withinMs ?? 5_000
+  const pollMs = options.pollMs ?? 250
+  const wait = options.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
+
+  const deadline = Date.now() + withinMs
+  for (;;) {
+    const measured = rungExitCode(transcriptPath, command, fromByte)
+    if (measured !== null) return measured
+    if (Date.now() >= deadline) return null
+    await wait(pollMs)
+  }
+}
