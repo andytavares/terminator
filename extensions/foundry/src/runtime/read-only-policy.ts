@@ -90,9 +90,14 @@ const READ_ONLY_GIT: ReadonlySet<string> = new Set([
   'describe',
 ])
 
-// Also deliberately absent: `config` writes the repository's configuration,
-// `branch -D` deletes branches, and `remote add` rewrites where a push goes.
-// All three read with no arguments and destroy with one.
+// Also deliberately absent: `config` writes the repository's configuration and
+// `remote add` rewrites where a push goes. Both read with no arguments and
+// write with one, and the one is a *positional* — `git config x y`,
+// `git remote add …` — which no flag rule can see.
+//
+// `branch` is listed separately below, because its reading form is one an
+// agent reaches for constantly and its writing forms are all visible: a flag,
+// or a bare name.
 
 /**
  * Anything that chains, redirects or substitutes.
@@ -213,20 +218,38 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
     return { allow: false, reason: 'a Bash call with no command cannot be checked' }
   }
 
+  let last: PolicyDecision | null = null
   for (const segment of segments) {
     const decision = decideSegment(segment)
     if (!decision.allow) return decision
+    last = decision
   }
 
   return {
     allow: true,
+    // One command keeps its own words — `git branch is only listing here` says
+    // more than `git only reads`, and the reason is what the agent is told.
     reason:
       segments.length === 1
-        ? `${segments[0].split(/\s+/)[0]} only reads`
+        ? (last?.reason ?? 'it only reads')
         : `every one of these ${segments.length} commands only reads`,
   }
 }
 
+/**
+ * `git branch`, when it is only listing.
+ *
+ * Listing is `git branch`, `-a`, `-r`, `-v`, `--list`, `--format=…` — every
+ * argument a flag. Writing is either a flag this refuses, or a bare name:
+ * `git branch newname` creates a ref, and nothing about it looks like a flag.
+ * So the rule is "flags only, and none of the writing ones".
+ */
+const BRANCH_WRITING =
+  /^(-d|-D|--delete|-m|-M|--move|-c|-C|--copy|-f|--force|--edit-description|-u|--set-upstream-to|--unset-upstream)$/
+
+function branchOnlyLists(args: readonly string[]): boolean {
+  return args.every((arg) => arg.startsWith('-') && !BRANCH_WRITING.test(arg))
+}
 /**
  * `-o` writes on most things and means "or" on `find`.
  *
@@ -274,6 +297,14 @@ function decideSegment(segment: string): PolicyDecision {
 
   if (binary === 'git') {
     const subcommand = words[1] ?? ''
+    if (subcommand === 'branch') {
+      return branchOnlyLists(words.slice(2))
+        ? { allow: true, reason: 'git branch is only listing here' }
+        : {
+            allow: false,
+            reason: 'git branch writes a ref unless every argument is a listing flag',
+          }
+    }
     return READ_ONLY_GIT.has(subcommand)
       ? { allow: true, reason: `git ${subcommand} only reads` }
       : { allow: false, reason: `git ${subcommand || '(none)'} is not a read-only git command` }

@@ -344,3 +344,51 @@ describe('moving around and setting a variable', () => {
     expect(allowed('grep --define X=1 pattern file').allow).toBe(true)
   })
 })
+
+// `git branch -a` is a pure read that an agent reaches for constantly, and it
+// was refused because `git branch -D` deletes. Every writing form of `branch`
+// is visible — a flag, or a bare name — so it can be told apart.
+describe('git branch, listing and writing', () => {
+  const allowed = (command: string) => decideReadOnly('Bash', { command })
+
+  it.each([
+    'git branch',
+    'git branch -a',
+    'git branch -r',
+    'git branch -v -a',
+    "git branch -a --format='%(refname)'",
+    'git branch --list',
+  ])('allows `%s`, which only lists', (command) => {
+    const d = allowed(command)
+    expect(d.allow, `${command}: ${d.reason}`).toBe(true)
+  })
+
+  it.each([
+    'git branch -d topic',
+    'git branch -D main',
+    'git branch --delete topic',
+    'git branch -m old new',
+    'git branch -M main',
+    'git branch -c a b',
+    'git branch -f main HEAD',
+    'git branch --set-upstream-to origin/main',
+  ])('refuses `%s`, which writes a ref', (command) => {
+    expect(allowed(command).allow, `${command} was allowed`).toBe(false)
+  })
+
+  it('refuses a bare name, which creates a branch and looks like nothing', () => {
+    expect(allowed('git branch newthing').allow).toBe(false)
+    expect(allowed('git branch -a newthing').allow).toBe(false)
+  })
+
+  it('says which it was, so the agent can act on the reason', () => {
+    expect(allowed('git branch newthing').reason).toMatch(/writes a ref/)
+    expect(allowed('git branch -a').reason).toMatch(/only listing/)
+  })
+
+  it('leaves the other git subcommands exactly as they were', () => {
+    expect(allowed('git status').allow).toBe(true)
+    expect(allowed('git config user.name x').allow).toBe(false)
+    expect(allowed('git remote add origin x').allow).toBe(false)
+  })
+})

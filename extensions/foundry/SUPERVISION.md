@@ -98,8 +98,13 @@ What changed, and why each:
 - **Bare `-i` is no longer refused.** It was there for in-place editing, and it
   is also how `grep`, `rg` and `diff` all spell "ignore case". Nothing on the
   list writes with it; the tools that do are not on the list at all.
-- **`pwd`, `echo`, `basename`, `dirname`, `realpath`, `sort`, `uniq`, `cut`,
-  `tr`, `du` and `tree` are on it**, because they cannot change anything.
+- **`pwd`, `echo`, `cd`, `basename`, `dirname`, `realpath`, `sort`, `uniq`,
+  `cut`, `tr`, `du` and `tree` are on it**, because they cannot change
+  anything, and a leading `NAME=value` is read past to the command underneath.
+- **`git branch` is allowed when it is only listing.** Every writing form is
+  visible — a flag this refuses, or a bare name, since `git branch newthing`
+  creates a ref and looks like nothing. `config` and `remote` stay off: they
+  write through a _positional_, which no flag rule can see.
 - **Discarding output is not writing.** `2>/dev/null` is the first thing any
   reader reaches for — it was the architect's opening command on four runs
   running — and it was refused along with every other redirection. Only
