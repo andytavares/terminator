@@ -31,6 +31,25 @@ function git(...args: string[]): void {
   execFileSync('git', args, { cwd: repo, env })
 }
 
+/**
+ * The launch script the terminal was told to run, and what is in it.
+ *
+ * The launch is a file rather than a typed line — a terminal in canonical mode
+ * mangles anything past 1024 bytes, and a brief is always longer. So "what is
+ * this agent running" is answered by reading that file, not by scraping a
+ * screen the agent has since scrolled past.
+ */
+function launchScriptFor(terminalText: string): string {
+  // xterm hard-wraps, so the path arrives with newlines through the middle of
+  // it. Whitespace comes out before matching; the quotes are what delimit it.
+  const unwrapped = terminalText.replace(/\s+/g, '')
+  const match = /'([^']*\/launch\/[\w-]+\.sh)'/.exec(unwrapped)
+  if (match === null) {
+    throw new Error(`no launch script in the terminal: ${unwrapped.slice(0, 300)}`)
+  }
+  return readFileSync(match[1], 'utf8')
+}
+
 test.beforeAll(async () => {
   // Loading every bundled extension takes longer than the default hook budget.
   test.setTimeout(180_000)
@@ -348,8 +367,17 @@ test('intake launches the architect against the draft, read-only, in the reposit
   await project.first().click()
 
   const screen = page.locator('.xterm-screen')
-  await expect(screen).toContainText('claude --session-id', { timeout: 60_000 })
-  await expect(screen).not.toContainText('bypassPermissions')
+  // The script's own path is what is typed, and it is short enough to survive.
+  await expect(screen).toContainText('/launch/', { timeout: 60_000 })
+  const launched = launchScriptFor((await screen.first().innerText()) ?? '')
+  expect(launched).toContain('claude --session-id')
+  // Never the thing this replaced: an invisible agent approving its own calls.
+  expect(launched).not.toContain('bypassPermissions')
+  // A relative settings path resolves against the worktree, where it does not
+  // exist, and the run dies on "Settings file not found".
+  expect(launched).toMatch(/--settings '\//)
+  // And it does not carry the parent Claude Code session in with it.
+  expect(launched).toMatch(/^unset .*CLAUDE_CODE_BRIDGE_SESSION_ID/m)
 
   // Intake runs in the repository itself — no worktree is cut for a plan that
   // may never be agreed.
@@ -449,17 +477,27 @@ test('a run cuts a worktree and launches a supervised agent in a visible termina
   // until the tab mounted rather than printed before anything was listening.
   await project.first().click()
   const screen = page.locator('.xterm-screen')
-  await expect(screen).toContainText('claude --session-id', { timeout: 60_000 })
+  // The script's path is what is typed; the brief is far too long for a line.
+  await expect(screen).toContainText('/launch/', { timeout: 60_000 })
+  const launched = launchScriptFor((await screen.first().innerText()) ?? '')
+  expect(launched).toContain('claude --session-id')
 
   // Never the thing this replaced: an invisible agent approving its own tool
   // calls.
-  await expect(screen).not.toContainText('bypassPermissions')
+  expect(launched).not.toContain('bypassPermissions')
 
   // A relative settings path resolves against the worktree, where it does not
   // exist, and the run dies on "Settings file not found" while the graph still
   // says running.
-  await expect(screen).toContainText("--settings '/")
+  expect(launched).toMatch(/--settings '\//)
   await expect(screen).not.toContainText('Settings file not found')
+
+  // And it does not carry the parent Claude Code session in with it, which is
+  // how an agent ends up waiting on somebody else's bridge for ever.
+  expect(launched).toMatch(/^unset .*CLAUDE_CODE_BRIDGE_SESSION_ID/m)
+
+  // The whole brief reached it, rather than the first kilobyte of it.
+  expect(launched.length).toBeGreaterThan(1024)
 
   // The agent was told what to build, not merely who it is.
   const snapshot = (await foundry('foundry:supervision-snapshot')) as {
