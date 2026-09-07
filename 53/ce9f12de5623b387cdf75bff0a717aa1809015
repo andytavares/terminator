@@ -1,0 +1,32 @@
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_357c91d2b54b02::t_3e979daaf50792 873-944
+extensions/foundry/src/components/Forge.tsx
+  s_357c91d2b54b02::t_61d8d88e13b330 570-572
+extensions/foundry/src/forge/acceptance-from-ticket.ts
+  s_357c91d2b54b02::t_15751c272a21b0 18-19
+  s_357c91d2b54b02::t_0cdfe4468e35c4 1-17,20-69
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_357c91d2b54b02::t_9a67f4e3897a3d 330-334
+extensions/foundry/tests/forge/acceptance-from-ticket.spec.ts
+  s_357c91d2b54b02::t_15751c272a21b0 55-60,62-65
+  s_357c91d2b54b02::t_cec675e6693d2c 1-54,61,66-90
+extensions/foundry/src/forge/intake-source.ts
+  s_357c91d2b54b02::t_999201d45ba87f 162-167
+  s_357c91d2b54b02::t_b018e8c26046f2 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "53ce9f12de5623b387cdf75bff0a717aa1809015",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
