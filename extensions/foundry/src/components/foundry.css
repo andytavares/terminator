@@ -1164,6 +1164,83 @@
   border-color: var(--tm-border-strong);
 }
 
+/* A ticket's own words, in the shape they were written. */
+.fdry-md {
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+  line-height: 1.5;
+}
+
+.fdry-md > * {
+  margin: 0 0 6px;
+}
+
+.fdry-md > *:last-child {
+  margin-bottom: 0;
+}
+
+.fdry-md-label {
+  margin: 10px 0 2px;
+  color: var(--tm-text-primary);
+  font-size: 12.5px;
+}
+
+.fdry-md-label:first-child {
+  margin-top: 0;
+}
+
+/* One weight for every heading level: a ticket's `#` is its author's habit,
+   not a statement about this panel's hierarchy. */
+.fdry-md-h {
+  color: var(--tm-text-primary);
+  font-weight: 600;
+  font-size: 12.5px;
+  margin-top: 8px;
+}
+
+.fdry-md ul,
+.fdry-md ol {
+  padding-left: 18px;
+}
+
+.fdry-md li {
+  margin: 2px 0;
+}
+
+.fdry-md-task {
+  list-style: none;
+  margin-left: -18px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.fdry-md code {
+  font-family: var(--tm-font-mono);
+  font-size: 11.5px;
+  background: var(--tm-bg-input);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.fdry-md pre {
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  padding: 8px 10px;
+  overflow-x: auto;
+}
+
+.fdry-md pre code {
+  background: none;
+  padding: 0;
+}
+
+.fdry-md a {
+  color: var(--tm-accent-text, var(--tm-text-primary));
+  text-decoration: underline;
+}
+
 .fdry-tickets {
   list-style: none;
   margin: 0;

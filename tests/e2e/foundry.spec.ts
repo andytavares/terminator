@@ -1,6 +1,14 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
@@ -38,16 +46,24 @@ function git(...args: string[]): void {
  * mangles anything past 1024 bytes, and a brief is always longer. So "what is
  * this agent running" is answered by reading that file, not by scraping a
  * screen the agent has since scrolled past.
+ *
+ * Which this used to do anyway: it looked for the typed line in the terminal's
+ * visible text. The script's first act is to `cat` itself so the operator can
+ * read the whole command, and a brief is thousands of characters — so on a
+ * shorter terminal the echo pushes the line that started it out of view. Green
+ * on a developer's machine, red on CI, and about nothing that had gone wrong.
+ *
+ * Read from where it is written instead. One session per launch, one file per
+ * session, newest last.
  */
-function launchScriptFor(terminalText: string): string {
-  // xterm hard-wraps, so the path arrives with newlines through the middle of
-  // it. Whitespace comes out before matching; the quotes are what delimit it.
-  const unwrapped = terminalText.replace(/\s+/g, '')
-  const match = /'([^']*\/launch\/[\w-]+\.sh)'/.exec(unwrapped)
-  if (match === null) {
-    throw new Error(`no launch script in the terminal: ${unwrapped.slice(0, 300)}`)
-  }
-  return readFileSync(match[1], 'utf8')
+function launchScript(): string {
+  const dir = join(handle.userDataDir, 'foundry-runtime', 'launch')
+  const scripts = readdirSync(dir)
+    .filter((name) => name.endsWith('.sh'))
+    .map((name) => join(dir, name))
+    .sort((a, b) => statSync(a).mtimeMs - statSync(b).mtimeMs)
+  if (scripts.length === 0) throw new Error(`no launch script was written in ${dir}`)
+  return readFileSync(scripts[scripts.length - 1], 'utf8')
 }
 
 test.beforeAll(async () => {
@@ -369,7 +385,7 @@ test('intake launches the architect against the draft, read-only, in the reposit
   const screen = page.locator('.xterm-screen')
   // The script's own path is what is typed, and it is short enough to survive.
   await expect(screen).toContainText('/launch/', { timeout: 60_000 })
-  const launched = launchScriptFor((await screen.first().innerText()) ?? '')
+  const launched = launchScript()
   expect(launched).toContain('claude --session-id')
   // Never the thing this replaced: an invisible agent approving its own calls.
   expect(launched).not.toContain('bypassPermissions')
@@ -479,7 +495,7 @@ test('a run cuts a worktree and launches a supervised agent in a visible termina
   const screen = page.locator('.xterm-screen')
   // The script's path is what is typed; the brief is far too long for a line.
   await expect(screen).toContainText('/launch/', { timeout: 60_000 })
-  const launched = launchScriptFor((await screen.first().innerText()) ?? '')
+  const launched = launchScript()
   expect(launched).toContain('claude --session-id')
 
   // Never the thing this replaced: an invisible agent approving its own tool

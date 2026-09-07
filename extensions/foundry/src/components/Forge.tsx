@@ -1,3 +1,4 @@
+import { Markdown } from './Markdown.js'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, X, CircleDot, Terminal, Play, Wand } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
@@ -547,12 +548,19 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
 
         <section className={`fdry-field ${moved.includes('intent') ? 'is-redrawn' : ''}`}>
           <h2 className="fdry-panel-h">Intent</h2>
-          <p>
-            <b>Problem.</b> {order.intent.problem || 'not stated yet'}
+          {/* A tracker's description is markdown, and it was rendered inside a
+              `<p>` — which collapses every newline, so a ticket's headings and
+              acceptance list arrived as one unbroken line. */}
+          <p className="fdry-md-label">
+            <b>Problem.</b>
+            {order.intent.problem === '' ? ' not stated yet' : null}
           </p>
-          <p>
-            <b>Outcome.</b> {order.intent.outcome || 'not stated yet'}
+          <Markdown text={order.intent.problem} />
+          <p className="fdry-md-label">
+            <b>Outcome.</b>
+            {order.intent.outcome === '' ? ' not stated yet' : null}
           </p>
+          <Markdown text={order.intent.outcome} />
         </section>
 
         <section className={`fdry-field ${moved.includes('acceptance') ? 'is-redrawn' : ''}`}>
