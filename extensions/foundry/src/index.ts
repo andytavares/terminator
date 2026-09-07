@@ -335,6 +335,39 @@ async function settledExitCode(
   }
 }
 
+/**
+ * A stall, written where the order's history is read.
+ *
+ * The feature directory *is* the order directory, so its basename is the order
+ * id — and `orderDir` refuses anything that is not one, so a firing for a run
+ * that is not an order's writes nothing rather than inventing a place for it.
+ */
+async function recordStall(
+  featureDir: string,
+  firing: { sessionId: string; signal: string; firedAt: number }
+): Promise<void> {
+  const orderId = path.basename(featureDir)
+  const root = path.dirname(path.dirname(featureDir))
+  try {
+    orderDir(root, orderId)
+  } catch {
+    return
+  }
+  try {
+    await createOrderStore(root).record({
+      at: new Date(firing.firedAt).toISOString(),
+      orderId,
+      actor: 'rule:line',
+      action: 'run.stalled',
+      subject: firing.sessionId,
+      reason: `An agent stopped making progress (${firing.signal}). Its terminal is still there and its work is still in the worktree; nothing was thrown away.`,
+      evidence: [],
+    })
+  } catch {
+    // A stall that cannot be recorded is still a stall. The console has it.
+  }
+}
+
 /** The autonomy dial, read wherever it is needed rather than copied. */
 function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' {
   return (
@@ -537,6 +570,22 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
         stallFirings.unshift({ firing, featureDir, shadow })
         if (stallFirings.length > MAX_STALL_FIRINGS) stallFirings.length = MAX_STALL_FIRINGS
         supervision?.runs.setState(firing.sessionId, 'stalled', firing.firedAt)
+
+        // On the order's own record as well as the console's.
+        //
+        // The detector is timely and nothing consumes it. Measured on a live
+        // run: the builder fell silent at 07:27:08, this fired at 07:34:21,
+        // and the run went on waiting until the wall-clock budget stopped it
+        // at 07:52:10 — eighteen minutes after the console already knew. The
+        // executor is not told, and shadow mode is on by default, so those
+        // eighteen minutes left no trace anywhere an operator reads afterwards:
+        // the ledger said "budget exceeded", which is true and explains nothing.
+        //
+        // This does not stop the run — doing that needs a gate rule, which is a
+        // decision about FR-049 rather than a fix. It makes the silence
+        // legible, which is the part that was simply missing.
+        void recordStall(featureDir, firing)
+
         // Attributed to the pilot, not the agent: the agent did not say this,
         // and a feed that blurs the two is one you stop trusting.
         const entry = supervision?.feed.post({

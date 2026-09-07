@@ -156,6 +156,33 @@ describe('what a read-only role is told, on the intake path', () => {
   })
 })
 
+// The stall detector is timely and nothing consumes it. Measured on a live run:
+// the builder fell silent at 07:27:08, the detector fired at 07:34:21, and the
+// run waited until the wall-clock budget stopped it at 07:52:10 — eighteen
+// minutes after the console already knew. The executor is not told and shadow
+// mode is on by default, so those eighteen minutes left no trace anywhere an
+// operator reads afterwards: the ledger said "budget exceeded", which is true
+// and explains nothing.
+describe('a stall, where the order is read', () => {
+  it('goes on the order ledger and not only the console feed', () => {
+    expect(src).toContain('void recordStall(featureDir, firing)')
+    const fn = src.slice(src.indexOf('async function recordStall'))
+    const body = fn.slice(0, fn.indexOf('\n}'))
+    expect(body).toContain("action: 'run.stalled'")
+  })
+
+  it('refuses to invent a place for a firing that is not an order', () => {
+    const fn = src.slice(src.indexOf('async function recordStall'))
+    const body = fn.slice(0, fn.indexOf('\n}'))
+    expect(body).toContain('orderDir(root, orderId)')
+  })
+
+  it('says the work is still there, because it is', () => {
+    const fn = src.slice(src.indexOf('async function recordStall'))
+    expect(fn.slice(0, fn.indexOf('\n}'))).toContain('nothing was thrown away')
+  })
+})
+
 // A shipping entry's subject is whatever the entry is about: the order for
 // `ship.ready_asked`, and the pull request **URL** for `ship.draft_opened`.
 // Filing the entry by its subject sent the most important record the feature
