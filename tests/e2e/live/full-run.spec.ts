@@ -120,7 +120,14 @@ function writeOrder(): void {
           },
         ],
         risk: { grade: 'P2', triggers: [], blastRadius: ['src/session.js'], criticalPaths: [] },
-        budgets: { agents: 1, wallClockMinutes: 20, filesTouched: 4, tokens: null },
+        // Room for the whole pipeline plus the climb. At twenty minutes the
+        // budget was the thing under test: four agents and eight rungs is
+        // fifteen minutes on a good run, so a slow builder gated it rather
+        // than shipping. That the budget gate fires correctly is proven — a
+        // live run raised it, halted, left its agents in their terminals and
+        // wrote "not every node finished" — and it is not what this test is
+        // named after.
+        budgets: { agents: 1, wallClockMinutes: 30, filesTouched: 4, tokens: null },
         plan: {
           units: [
             {
@@ -162,7 +169,7 @@ test('an agent takes an order to a draft pull request', async () => {
   // order's budget. At 25 minutes against a 30-minute deadline the loop could
   // never reach its own end, so the run was killed by Playwright rather than
   // reported by the test — and "timed out" says nothing about what happened.
-  test.setTimeout(2_100_000)
+  test.setTimeout(3_000_000)
   writeOrder()
 
   const started = (await foundry('foundry:run.start', { id: ORDER })) as {
@@ -199,7 +206,7 @@ test('an agent takes an order to a draft pull request', async () => {
   // Longer than the order's own budget, deliberately. When the two were the
   // same the test gave up at the moment the budget would have stopped the run,
   // so the gate that exists for exactly this case was never seen.
-  const deadline = Date.now() + 30 * 60_000
+  const deadline = Date.now() + 45 * 60_000
   let last: Observed = {}
   let previous = ''
   let settledSince: number | null = null

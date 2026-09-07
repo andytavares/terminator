@@ -99,8 +99,11 @@ export function isDestructive(toolName: string, input: unknown): boolean {
   // `grep -E "a|b" .` into two commands and judged a fragment of the regex.
   const reading = readShell(command.replace(DISCARDS, ' '))
 
-  // A command built inside another cannot be read at all, so it asks.
-  if (reading.substitutes) return true
+  // A substitution that could not be read to the end. The ones that can be
+  // read are judged below like any other command — `$(pwd)` is `pwd` — because
+  // refusing the shape refused `cd "$(pwd)"`, which a live builder ran as its
+  // second command and then waited eighteen minutes for an operator.
+  if (reading.unreadable) return true
 
   // Every segment, not the first one — and not the whole shape. A joined
   // command whose second half destroys is caught by that half; one whose two

@@ -440,3 +440,43 @@ describe('a command whose arguments contain punctuation', () => {
     expect(decideReadOnly('Bash', { command: 'grep "a|b" . ; rm -rf .' }).allow).toBe(false)
   })
 })
+
+// `git` takes options of its own before the subcommand. Reading the word after
+// `git` gave `-C`, which is on no list, so `git -C . status` — an ordinary
+// thing for an agent to write — was refused outright.
+describe('git, with git of its own options', () => {
+  it('finds the subcommand past the global options', () => {
+    expect(decideReadOnly('Bash', { command: 'git -C . status' }).allow).toBe(true)
+    expect(decideReadOnly('Bash', { command: 'git --no-pager log --oneline' }).allow).toBe(true)
+    expect(decideReadOnly('Bash', { command: 'git -c user.name=x diff' }).allow).toBe(true)
+    expect(decideReadOnly('Bash', { command: 'git --git-dir=/x/.git log' }).allow).toBe(true)
+  })
+
+  it('still judges the subcommand it finds', () => {
+    expect(decideReadOnly('Bash', { command: 'git -C . push' }).allow).toBe(false)
+    expect(decideReadOnly('Bash', { command: 'git -C /x branch -D main' }).allow).toBe(false)
+    expect(decideReadOnly('Bash', { command: 'git -C /x branch -a' }).allow).toBe(true)
+  })
+
+  it('does not step over a flag it has never heard of', () => {
+    // Skipping unknown flags would walk past whatever they are, and land on a
+    // word that is not the subcommand at all.
+    expect(decideReadOnly('Bash', { command: 'git --weird status' }).allow).toBe(false)
+  })
+})
+
+// The contents of a substitution are text this can read, so they are judged
+// like any other command instead of the whole shape being refused.
+describe('a command inside another', () => {
+  it('allows one whose contents only read', () => {
+    expect(decideReadOnly('Bash', { command: 'cd "$(pwd)" && cat x' }).allow).toBe(true)
+  })
+
+  it('refuses one whose contents do not', () => {
+    expect(decideReadOnly('Bash', { command: 'echo $(rm -rf x)' }).allow).toBe(false)
+  })
+
+  it('refuses one it cannot read to the end', () => {
+    expect(decideReadOnly('Bash', { command: 'echo $(' }).allow).toBe(false)
+  })
+})

@@ -197,10 +197,13 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
   // three more spellings and gave up.
   const reading = readShell(withoutDiscards)
 
-  if (reading.redirects || reading.substitutes) {
+  if (reading.redirects) {
+    return { allow: false, reason: 'a review may not redirect output' }
+  }
+  if (reading.unreadable) {
     return {
       allow: false,
-      reason: 'a review may not redirect output or run a command inside another',
+      reason: 'a review may not run a command this cannot read to the end',
     }
   }
 
@@ -228,6 +231,49 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
         ? (last?.reason ?? 'it only reads')
         : `every one of these ${segments.length} commands only reads`,
   }
+}
+
+/**
+ * Where the subcommand actually starts.
+ *
+ * `git` takes options of its own before it: `git -C <path> status` and
+ * `git --no-pager log` are both ordinary, and reading the word after `git`
+ * gave `-C`, which is on no list and so refused the whole command. Only the
+ * global options git actually has are skipped — anything else stops the walk,
+ * so an unknown flag is judged rather than stepped over.
+ */
+const GIT_GLOBAL_WITH_VALUE: ReadonlySet<string> = new Set([
+  '-C',
+  '-c',
+  '--git-dir',
+  '--work-tree',
+  '--namespace',
+  '--exec-path',
+])
+const GIT_GLOBAL_ALONE: ReadonlySet<string> = new Set([
+  '--no-pager',
+  '--paginate',
+  '--bare',
+  '--literal-pathspecs',
+  '--no-optional-locks',
+])
+
+function gitSubcommandAt(words: readonly string[]): number {
+  let at = 1
+  while (at < words.length) {
+    const word = words[at]
+    if (GIT_GLOBAL_WITH_VALUE.has(word)) {
+      at += 2
+      continue
+    }
+    // The `--opt=value` spelling carries its own value.
+    if (GIT_GLOBAL_ALONE.has(word) || /^--(?:git-dir|work-tree|namespace|exec-path)=/.test(word)) {
+      at += 1
+      continue
+    }
+    return at
+  }
+  return at
 }
 
 /**
@@ -290,9 +336,10 @@ function decideSegment(segment: string): PolicyDecision {
   }
 
   if (binary === 'git') {
-    const subcommand = words[1] ?? ''
+    const at = gitSubcommandAt(words)
+    const subcommand = words[at] ?? ''
     if (subcommand === 'branch') {
-      return branchOnlyLists(words.slice(2))
+      return branchOnlyLists(words.slice(at + 1))
         ? { allow: true, reason: 'git branch is only listing here' }
         : {
             allow: false,

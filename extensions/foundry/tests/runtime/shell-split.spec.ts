@@ -42,16 +42,38 @@ describe('readShell', () => {
     expect(readShell("echo 'x < y'").redirects).toBe(false)
   })
 
-  it('reports a command built inside another', () => {
-    expect(readShell('echo $(rm -rf x)').substitutes).toBe(true)
-    expect(readShell('echo `date`').substitutes).toBe(true)
-    // Double quotes expand, so this one counts.
-    expect(readShell('echo "today is $(date)"').substitutes).toBe(true)
+  // A substitution's contents are right there in the text, so they are read
+  // and returned as commands rather than refused as a shape. Refusing the
+  // shape cost a live run: the builder's second command was
+  // `cd "$(pwd)" && cat -n src/session.js`, which was called destruction and
+  // sent to an operator who was not there. It sat for eighteen minutes and
+  // the run died on its budget.
+  it('reads what a substitution contains, as a command of its own', () => {
+    expect(readShell('echo $(rm -rf x)').segments).toEqual(['echo $(rm -rf x)', 'rm -rf x'])
+    expect(readShell('echo `date`').segments).toEqual(['echo `date`', 'date'])
   })
 
-  it('does not, inside single quotes, where a shell expands nothing', () => {
-    expect(readShell("echo '$(rm -rf x)'").substitutes).toBe(false)
-    expect(readShell("grep '`x`' .").substitutes).toBe(false)
+  it('reads one inside double quotes, which do expand', () => {
+    expect(readShell('cd "$(pwd)"').segments).toEqual(['cd "$(pwd)"', 'pwd'])
+  })
+
+  it('reads a nested one all the way down', () => {
+    expect(readShell('cat "$(dirname $(pwd))/x"').segments).toEqual([
+      'cat "$(dirname $(pwd))/x"',
+      'dirname $(pwd)',
+      'pwd',
+    ])
+  })
+
+  it('leaves one inside single quotes as text, because a shell expands nothing there', () => {
+    expect(readShell("echo '$(rm -rf x)'").segments).toEqual(["echo '$(rm -rf x)'"])
+    expect(readShell("grep '`x`' .").segments).toEqual(["grep '`x`' ."])
+  })
+
+  it('says so when it cannot read one to the end, rather than guessing', () => {
+    expect(readShell('echo $(').unreadable).toBe(true)
+    expect(readShell('echo `x').unreadable).toBe(true)
+    expect(readShell('echo $(pwd)').unreadable).toBe(false)
   })
 
   it('reads an escaped quote without losing track of the quoting', () => {

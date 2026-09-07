@@ -25,12 +25,20 @@ export interface ShellReading {
   /** A redirection outside quotes: this writes a file, whatever is to its left. */
   readonly redirects: boolean
   /**
-   * A command built inside another — `$(…)` or backticks.
+   * A substitution this could not read to the end — an unbalanced `$(` or a
+   * backtick with no partner.
    *
-   * Not inside single quotes, where a shell expands nothing. Inside double
-   * quotes it does expand, so that counts.
+   * A substitution it *can* read is not reported here at all: its contents are
+   * returned as segments like any other command, because they are right there
+   * in the text. `$(pwd)` is `pwd`, and `$(rm -rf /)` is `rm -rf /`, and the
+   * caller's own rules decide each on its merits.
+   *
+   * Refusing the whole shape instead is what a live run cost: a builder's
+   * second command was `cd "$(pwd)" && cat -n src/session.js`, which was
+   * called destruction and sent to an operator who was not there. It sat for
+   * eighteen minutes and the run died on its budget.
    */
-  readonly substitutes: boolean
+  readonly unreadable: boolean
 }
 
 /** The operators that end one command and begin another. */
@@ -38,10 +46,61 @@ const JOINER = new Set([';', '|', '&', '\n', '\r'])
 
 export function readShell(command: string): ShellReading {
   const segments: string[] = []
+  const nested: string[] = []
   let current = ''
   let redirects = false
-  let substitutes = false
+  let unreadable = false
   let quote: "'" | '"' | null = null
+
+  /**
+   * The text inside a substitution that opens at `from`, and where it ends.
+   *
+   * Nesting counts, so `$(dirname $(pwd))` is read whole rather than stopping
+   * at the first `)`. An unbalanced one returns null and is reported as
+   * unreadable rather than guessed at.
+   */
+  const substitution = (from: number): { inner: string; end: number } | null => {
+    const backtick = command[from] === '`'
+    if (backtick) {
+      for (let j = from + 1; j < command.length; j += 1) {
+        if (command[j] === '\\') {
+          j += 1
+          continue
+        }
+        if (command[j] === '`') return { inner: command.slice(from + 1, j), end: j }
+      }
+      return null
+    }
+    // Past the `$(` itself, so the opening parenthesis is not counted as one
+    // more level of nesting than there is.
+    let depth = 0
+    for (let j = from + 2; j < command.length; j += 1) {
+      if (command[j] === '\\') {
+        j += 1
+        continue
+      }
+      if (command[j] === '(') depth += 1
+      else if (command[j] === ')') {
+        if (depth === 0) return { inner: command.slice(from + 2, j), end: j }
+        depth -= 1
+      }
+    }
+    return null
+  }
+
+  /** Read what a substitution contains, and judge it like anything else. */
+  const readInside = (at: number): number | null => {
+    const found = substitution(at)
+    if (found === null) {
+      unreadable = true
+      return null
+    }
+    const inside = readShell(found.inner)
+    nested.push(...inside.segments)
+    if (inside.redirects) redirects = true
+    if (inside.unreadable) unreadable = true
+    return found.end
+  }
 
   for (let i = 0; i < command.length; i += 1) {
     const char = command[i]
@@ -56,8 +115,15 @@ export function readShell(command: string): ShellReading {
     }
 
     if (quote !== null) {
+      // Double quotes expand, so a substitution inside them is a real command.
+      // Single quotes expand nothing, so what is in them is only ever text.
       if (quote === '"' && (char === '`' || (char === '$' && command[i + 1] === '('))) {
-        substitutes = true
+        const end = readInside(i)
+        if (end !== null) {
+          current += command.slice(i, end + 1)
+          i = end
+          continue
+        }
       }
       if (char === quote) quote = null
       current += char
@@ -71,7 +137,12 @@ export function readShell(command: string): ShellReading {
     }
 
     if (char === '`' || (char === '$' && command[i + 1] === '(')) {
-      substitutes = true
+      const end = readInside(i)
+      if (end !== null) {
+        current += command.slice(i, end + 1)
+        i = end
+        continue
+      }
       current += char
       continue
     }
@@ -107,9 +178,13 @@ export function readShell(command: string): ShellReading {
 
   segments.push(current)
   return {
-    segments: segments.map((segment) => segment.trim()).filter((segment) => segment !== ''),
+    // The commands inside substitutions stand alongside the ones that contain
+    // them: each is a command the shell will really run.
+    segments: [...segments, ...nested]
+      .map((segment) => segment.trim())
+      .filter((segment) => segment !== ''),
     redirects,
-    substitutes,
+    unreadable,
   }
 }
 
