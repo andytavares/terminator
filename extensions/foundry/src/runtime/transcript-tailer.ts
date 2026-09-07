@@ -192,3 +192,69 @@ export function countTurns(transcriptPath: string): number {
   }
   return turns
 }
+
+/**
+ * How a command a rung asked for actually came out.
+ *
+ * A `run` rung is a command, and FR-037 says its verdict comes from the exit
+ * status — never from what anything printed, and never from the agent's own
+ * account of how it went (FR-033). The agent runs it inside the supervised
+ * session, which is what makes its output visible and its tool calls
+ * hook-gated; the *result* of that tool call is the runtime's own record, and
+ * that is what this reads.
+ *
+ * `null` when the command was never run. That is "not measured", which is the
+ * one thing it must never be confused with a pass: an agent that decided not
+ * to run the tests has not passed them.
+ */
+export function rungExitCode(transcriptPath: string, command: string): number | null {
+  const lines = tailLines(transcriptPath)
+  if (lines === null) return null
+
+  const wanted = command.trim()
+  if (wanted === '') return null
+
+  // The call ids of every shell invocation that ran this command, in order.
+  const calls: string[] = []
+  const results = new Map<string, boolean>()
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === '') continue
+    let entry: { message?: { content?: unknown } }
+    try {
+      entry = JSON.parse(trimmed) as { message?: { content?: unknown } }
+    } catch {
+      continue
+    }
+    const content = entry.message?.content
+    if (!Array.isArray(content)) continue
+
+    for (const raw of content) {
+      const block = raw as {
+        type?: unknown
+        name?: unknown
+        id?: unknown
+        input?: { command?: unknown }
+        tool_use_id?: unknown
+        is_error?: unknown
+      }
+      if (block.type === 'tool_use' && SHELL_TOOLS.has(String(block.name))) {
+        const ran = block.input?.command
+        if (typeof ran === 'string' && ran.includes(wanted) && typeof block.id === 'string') {
+          calls.push(block.id)
+        }
+      } else if (block.type === 'tool_result' && typeof block.tool_use_id === 'string') {
+        results.set(block.tool_use_id, block.is_error === true)
+      }
+    }
+  }
+
+  // The last time it was run is the answer: a rung the agent retried is judged
+  // on the attempt it finished with.
+  for (let i = calls.length - 1; i >= 0; i -= 1) {
+    const errored = results.get(calls[i])
+    if (errored !== undefined) return errored ? 1 : 0
+  }
+  return null
+}

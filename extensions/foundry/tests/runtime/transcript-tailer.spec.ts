@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import * as fs from 'fs'
 import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'fs'
 import { tmpdir } from 'os'
+import * as path from 'path'
 import { join } from 'path'
-import { readTranscript, countTurns } from '../../src/runtime/transcript-tailer.js'
+import { readTranscript, countTurns, rungExitCode } from '../../src/runtime/transcript-tailer.js'
 
 // The tailer opens the path the runtime handed us (research.md R3) and never
 // computes one. The per-line JSONL schema is NOT a published contract, so it
@@ -308,5 +310,92 @@ describe('a transcript too big to read whole', () => {
     writeFileSync(path, `${filler}\n${good}\n`)
 
     expect(readTranscript(path).map((event) => event.callId)).toEqual(['ok'])
+  })
+})
+
+// A `run` rung is a command, and FR-037 says its verdict is the exit status.
+// The agent runs it inside the supervised session — that is what makes its
+// output visible and its tool calls hook-gated — so the exit status has to
+// come back from the runtime's own record of that tool call, never from the
+// agent's account of how it went (FR-033).
+describe('rungExitCode', () => {
+  function write(...entries: unknown[]): string {
+    const file = path.join(dir, `rung-${Math.random().toString(36).slice(2)}.jsonl`)
+    fs.writeFileSync(file, entries.map((e) => JSON.stringify(e)).join('\n'))
+    return file
+  }
+
+  const call = (id: string, command: string) => ({
+    type: 'assistant',
+    message: { content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] },
+  })
+  const result = (id: string, isError: boolean) => ({
+    type: 'user',
+    message: { content: [{ type: 'tool_result', tool_use_id: id, is_error: isError }] },
+  })
+
+  it('is zero when the command the rung asked for succeeded', () => {
+    const file = write(call('t1', 'npm test'), result('t1', false))
+    expect(rungExitCode(file, 'npm test')).toBe(0)
+  })
+
+  it('is non-zero when it failed', () => {
+    const file = write(call('t1', 'npm test'), result('t1', true))
+    expect(rungExitCode(file, 'npm test')).toBe(1)
+  })
+
+  it('is not measured when the agent never ran it — never a pass', () => {
+    const file = write(call('t1', 'ls'), result('t1', false))
+    expect(rungExitCode(file, 'npm test')).toBeNull()
+  })
+
+  it('is not measured when it was started and never came back', () => {
+    const file = write(call('t1', 'npm test'))
+    expect(rungExitCode(file, 'npm test')).toBeNull()
+  })
+
+  it('takes the attempt it finished with, when the agent retried', () => {
+    const file = write(
+      call('t1', 'npm test'),
+      result('t1', true),
+      call('t2', 'npm test'),
+      result('t2', false)
+    )
+    expect(rungExitCode(file, 'npm test')).toBe(0)
+  })
+
+  it('matches a command the agent wrapped in something longer', () => {
+    const file = write(call('t1', 'cd /repo && npm test 2>&1'), result('t1', false))
+    expect(rungExitCode(file, 'npm test')).toBe(0)
+  })
+
+  it('ignores what the agent said about it', () => {
+    const file = write(call('t1', 'npm test'), result('t1', true), {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'All tests pass!' }] },
+    })
+    expect(rungExitCode(file, 'npm test')).toBe(1)
+  })
+
+  it('is not measured for a transcript that is not there', () => {
+    expect(rungExitCode(path.join(dir, 'nope.jsonl'), 'npm test')).toBeNull()
+  })
+
+  it('is not measured when the rung had no command to run', () => {
+    const file = write(call('t1', 'npm test'), result('t1', false))
+    expect(rungExitCode(file, '   ')).toBeNull()
+  })
+
+  it('survives a torn line rather than losing the answer', () => {
+    const file = path.join(dir, 'torn.jsonl')
+    fs.writeFileSync(
+      file,
+      [
+        '{"type":"assistant","message":{"content":[{"broken',
+        JSON.stringify(call('t1', 'npm test')),
+        JSON.stringify(result('t1', false)),
+      ].join('\n')
+    )
+    expect(rungExitCode(file, 'npm test')).toBe(0)
   })
 })

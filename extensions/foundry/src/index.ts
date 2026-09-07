@@ -41,6 +41,7 @@ import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/di
 import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
+import { rungExitCode } from './runtime/transcript-tailer.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
 /** One hunk as a surface renders it: the change, and what was decided. */
@@ -851,7 +852,17 @@ async function executeRun(
         resumeSessionId: laneSessions.get(lane),
         readOnly: false,
       })
-      return started.exitCode
+
+      // The rung's verdict is the command's exit status, never the agent's
+      // turn ending (FR-037) and never its account of how it went (FR-033).
+      // The turn end is only what tells us to go and look.
+      const run = supervision?.runs.get(started.sessionId) ?? null
+      if (run === null) return started.exitCode
+      const measured = rungExitCode(run.transcriptPath, step.command)
+      // `null` is "the agent never ran it", which the ladder reads as not
+      // measured. Reading it as a pass is the failure the whole ladder exists
+      // to prevent.
+      return measured
     },
     observe: () => ({
       elapsedMinutes: Math.round((Date.now() - startedAt) / 60_000),
