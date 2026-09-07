@@ -12,6 +12,7 @@ import type { Recipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { ResumeForbiddenError, createRoleRegistry } from '../../src/line/roles.js'
+import { makeVerdict, SelfVerificationError } from '../../src/verify/verdict.js'
 
 // The executor is where the scheduler, the roles and a session finally meet.
 // Each of those was testable alone and none of them did anything on its own,
@@ -58,6 +59,31 @@ steps:
     rule: unit.boundary
     defaultIfIgnored: hold
     after: [build]
+`
+
+/**
+ * A shape that checks its own work, which is what the real ones do.
+ *
+ * RECIPE builds and stops. Every verdict assertion below used to run against
+ * it, and passed — because the executor stamped a verdict the moment the
+ * *builder* finished, off the builder's own exit code. A live run caught it:
+ * the verifier read the file, found the change had never been made, and found
+ * a `pass` already in the ledger for the criterion it was there to judge.
+ * A verdict needs a checking party, so a test about verdicts needs one too.
+ */
+const CHECKED = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: verify
+    kind: fanout
+    over: plan.units
+    after: [build]
+    step: { kind: agent, role: verifier, context: fresh }
 `
 
 function recipe(text = RECIPE): Recipe {
@@ -211,29 +237,71 @@ describe('execute', () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
       o,
-      recipe(),
-      buildRunGraph(o, recipe()),
-      deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
+      recipe(CHECKED),
+      buildRunGraph(o, recipe(CHECKED)),
+      deps(async (i) => ({
+        sessionId: `s-${i.node.id}`,
+        exitCode: i.node.id.startsWith('verify') ? 1 : 0,
+      }))
     )
     expect(outcome.verdicts[0].result).toBe('fail')
   })
 
-  it('never lets the working session produce its own verdict', async () => {
+  // FR-032/FR-033. The builder's turn ending is the *claim* under test, and
+  // for the whole of this feature's life it was also the verdict on that
+  // claim: every node with a unit stamped `pass` on every criterion the unit
+  // said it satisfied, from the builder's own exit code, labelled `verifier`.
+  it('stamps no verdict when nothing has checked the work', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok))
+    // RECIPE builds and stops. An unchecked criterion is "not measured" by
+    // absence — which is what both the ladder and the pull request body read.
+    expect(outcome.verdicts).toEqual([])
+  })
+
+  it('never lets the working session produce its own verdict', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(ok))
     expect(outcome.verdicts.length).toBeGreaterThan(0)
     for (const verdict of outcome.verdicts) {
+      expect(verdict.producedBy.role).toBe('verifier')
+      expect(verdict.producedBy.sessionId).toBe('sess-verify:U-1')
       expect(verdict.producedBy.sessionId).not.toBe('sess-build:U-1')
     }
+  })
+
+  // The independence has to be a fact, not a naming convention. `makeVerdict`
+  // refuses a verdict whose checking session is the working session — and the
+  // executor used to satisfy that guard by handing it `<session>-verify`, a
+  // string one suffix away from the session it was checking. The guard saw two
+  // parties where there was one. It is held against the *builder's* recorded
+  // session now, so the refusal can actually fire.
+  it('holds the checker against the session that did the work', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(ok))
+    expect(outcome.verdicts).toHaveLength(1)
+    expect(() =>
+      makeVerdict({
+        ...outcome.verdicts[0],
+        nodeSessionId: 'sess-verify:U-1',
+        producedBy: { role: 'verifier', sessionId: 'sess-verify:U-1' },
+      })
+    ).toThrow(SelfVerificationError)
   })
 
   it('reports a run with no exit status as not measured, not as a failure', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(
       o,
-      recipe(),
-      buildRunGraph(o, recipe()),
-      deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: null }))
+      recipe(CHECKED),
+      buildRunGraph(o, recipe(CHECKED)),
+      // The build lands; it is the *check* that never reported an exit, which
+      // is the case this is about. A build with no exit never passes, so the
+      // verify node it gates would not run at all.
+      deps(async (i) => ({
+        sessionId: `s-${i.node.id}`,
+        exitCode: i.node.id.startsWith('verify') ? null : 0,
+      }))
     )
     expect(outcome.verdicts[0].result).toBe('not_measured')
   })
@@ -293,7 +361,7 @@ describe('execute', () => {
   it('reports every event a surface needs to follow along', async () => {
     const events: ExecutorEvent[] = []
     const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok, events))
+    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(ok, events))
     const kinds = events.map((e) => e.type)
     expect(kinds).toContain('started')
     expect(kinds).toContain('verdict')
@@ -428,7 +496,7 @@ steps:
         },
       ],
     })
-    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(ok))
+    const outcome = await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(ok))
     expect(outcome.verdicts.map((v) => v.criterionId).sort()).toEqual(['AC-1', 'AC-2'])
   })
 })

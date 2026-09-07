@@ -227,6 +227,8 @@ export async function execute(
   const rules = deps.rules ?? []
   const autonomy: Autonomy = deps.autonomy ?? 'escorted'
   const verdicts: Verdict[] = []
+  /** unit id → the session that did the work, so a checker is never it. */
+  const producedUnit = new Map<string, string>()
   const awaitingDecision: string[] = []
   const gates: Gate[] = []
 
@@ -454,7 +456,7 @@ export async function execute(
             modelTier: (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep',
             mayUseTool: (tool) => roleId === null || roles.mayUseTool(roleId, tool),
           })
-          return { node, result }
+          return { node, result, roleId, readOnly }
         })
     )
 
@@ -473,13 +475,35 @@ export async function execute(
     }
     const { results } = waved
 
-    for (const { node, result } of results) {
+    for (const { node, result, roleId, readOnly } of results) {
       await advance(withNode(current, node.id, { sessionId: result.sessionId }))
       deps.onEvent?.({ type: 'started', nodeId: node.id, sessionId: result.sessionId })
 
+      // Who produced the work on this unit, so the party checking it can be
+      // held against them rather than against itself.
+      if (node.unitId !== null && !readOnly) producedUnit.set(node.unitId, result.sessionId)
+
       // The verdict comes from the exit status. Whatever the run printed is
       // evidence, never the decision.
-      if (node.unitId !== null) {
+      //
+      // **Only from a checking party.** A role that may write is the one that
+      // did the work, and its turn ending says nothing whatever about whether
+      // the criteria its unit claims are met — that claim is precisely what
+      // verification exists to test. This block used to run for every node
+      // with a unit, so a builder finishing stamped `pass` on every criterion
+      // the unit `satisfies`, off its own exit code, labelled `verifier`.
+      //
+      // `makeVerdict` has a structural guard against exactly that, and this
+      // caller walked around it: passing `${sessionId}-verify` as the checking
+      // session is a string that differs from the working one by a suffix, so
+      // the guard sees two sessions where there is one. The independence is
+      // real now — the checker's own session, held against the builder's.
+      //
+      // Found by a live run: a verifier read the file, saw the change had
+      // never been made, and then found a `pass` already in the ledger for the
+      // criterion it was there to judge, stamped at the millisecond the
+      // builder's turn ended.
+      if (node.unitId !== null && readOnly) {
         const criteria = order.plan.units.find((u) => u.id === node.unitId)?.satisfies ?? []
         for (const criterionId of criteria) {
           const verdict = verdictFromExit({
@@ -487,9 +511,10 @@ export async function execute(
             criterionId,
             command: `${node.role ?? node.stepId} on ${node.unitId}`,
             exitCode: result.exitCode,
-            // The checking party is never the working session.
-            nodeSessionId: result.sessionId,
-            producedBy: { role: 'verifier', sessionId: `${result.sessionId}-verify` },
+            // The session that produced the work being checked — not this
+            // one. Where the two are the same session, `makeVerdict` refuses.
+            nodeSessionId: producedUnit.get(node.unitId) ?? null,
+            producedBy: { role: roleId ?? node.stepId, sessionId: result.sessionId },
             at: deps.now(),
           })
           verdicts.push(verdict)
