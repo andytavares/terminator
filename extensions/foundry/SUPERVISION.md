@@ -520,12 +520,28 @@ FR-029 says every action is held against a decision — _automatic where the
 autonomy setting allows it_, and by asking where it does not. `src/runtime/autonomy-policy.ts`
 is the automatic half:
 
-|                                                                                                                                    |                                     |
-| ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **Destructive** — `rm`, `git reset --hard`, `git clean -fd`, a force push, a `-D` branch delete, or a command built inside another | **asks, at every setting** (FR-050) |
-| **Writes outside the unit's own checkout**, including a shell redirection to a path outside it                                     | **asks, at every setting**          |
-| Anything else, at `escorted`                                                                                                       | asks                                |
-| Anything else, at `standard` or `lights-out`                                                                                       | taken, and recorded                 |
+|                                                                                                                                    |                              |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| **Destructive** — `rm`, `git reset --hard`, `git clean -fd`, a force push, a `-D` branch delete, or a command built inside another | **never automatic** (FR-050) |
+| **Writes outside the unit's own checkout**, including a shell redirection to a path outside it                                     | **never automatic**          |
+| Anything else, at `escorted`                                                                                                       | asks                         |
+| Anything else, at `standard` or `lights-out`                                                                                       | taken, and recorded          |
+
+**Never automatic means asked where somebody can answer, and refused where
+nobody can.** At `escorted` and `standard` these two hold the call and ask. At
+`lights-out` there is by definition nobody to ask, and a held call becomes a
+half-hour of silence: the question goes to the operator, five minutes later to
+the runtime's own prompt in the terminal, and the agent stands at that prompt
+until the wall-clock budget ends the run. Watched live — the builder redirected
+its test output to a scratch file, which is outside the checkout and so worth a
+question, and thirty minutes later the order had shipped nothing.
+
+So at `lights-out` the same two are **refused, with the reason**, and the agent
+does the work another way. Nothing became more permissive: the action does not
+happen either way, and that is the property to hold on to. What changed is that
+the agent is told, instead of left standing at a prompt nobody will ever reach.
+The reason names the alternative — "write inside the worktree instead" — because
+a refusal an agent cannot act on wastes the turn it was given to adapt.
 
 **Every segment is judged, rather than every compound refused** — the same
 correction the read-only policy needed, and for the same reason. Reading

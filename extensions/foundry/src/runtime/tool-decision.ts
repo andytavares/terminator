@@ -1,6 +1,6 @@
 import type { PolicyDecision } from './read-only-policy.js'
 import { decideReadOnly } from './read-only-policy.js'
-import { decideByAutonomy } from './autonomy-policy.js'
+import { decideByAutonomy, isDestructive, writesOutside } from './autonomy-policy.js'
 import type { Autonomy } from '../gates/autonomy.js'
 
 // What happens when an agent asks to use a tool.
@@ -98,5 +98,41 @@ export function decideTool(request: ToolRequest): PolicyDecision | null {
     autonomy: request.autonomy,
     worktreePath: request.worktreePath,
   })
-  return taken === null ? null : { allow: taken.allow, reason: taken.reason }
+  if (taken !== null) return { allow: taken.allow, reason: taken.reason }
+
+  // At `lights-out` a question has nobody to answer it, so it is a refusal
+  // rather than a wait.
+  //
+  // Asking is right whenever somebody is there. When nobody is, the held call
+  // goes to the operator, then five minutes later to the runtime's own prompt
+  // in the terminal, and the agent stands at that prompt until the wall-clock
+  // budget ends the run. Measured on a live run: the builder redirected its
+  // test output to a scratch file, which is outside the checkout and so worth
+  // a question, and thirty minutes later the order had shipped nothing.
+  //
+  // **Nothing becomes more permissive.** The action is refused, exactly as an
+  // unanswered question refused it — the difference is that the agent is told,
+  // and told why, so it can do the same work another way. They do: the
+  // read-only roles work around this policy's refusals all day.
+  if (request.autonomy === 'lights-out') {
+    return { allow: false, reason: whyRefusedUnattended(request) }
+  }
+  return null
+}
+
+/**
+ * Why a question became a refusal, in words an agent can act on.
+ *
+ * Not "denied": a reason an agent cannot do anything with wastes the turn it
+ * was given to adapt.
+ */
+function whyRefusedUnattended(request: ToolRequest): string {
+  const nobody = 'and nobody is here to be asked — this run is unattended'
+  if (isDestructive(request.tool, request.input)) {
+    return `this destroys work rather than changing it, ${nobody}. Nothing unattended approves that. Do the work another way, or leave it for a person.`
+  }
+  if (writesOutside(request.tool, request.input, request.worktreePath)) {
+    return `this writes outside the checkout this unit was given, ${nobody}. Write inside the worktree instead — a scratch file belongs there too.`
+  }
+  return `this needs a decision, ${nobody}. Do the work another way, or leave it for a person.`
 }

@@ -2073,7 +2073,7 @@ export function activate(api: ExtensionAPI): void {
           type: 'enum',
           label: 'Autonomy',
           description:
-            'Which rules are allowed to stop for you. Risk, budget, destructive actions and the merge decision are live at every setting.',
+            'Which rules are allowed to stop for you. Risk, budget, destructive actions and the merge decision are live at every setting — at lights-out they refuse rather than wait, because nobody is there to answer.',
           options: ['escorted', 'standard', 'lights-out'],
           default: 'standard',
         },

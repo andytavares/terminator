@@ -118,10 +118,14 @@ describe('a role that writes', () => {
     }
   })
 
-  it('asks about a destructive action at every setting, lights-out included', () => {
+  it('never takes a destructive action, at any setting', () => {
+    // The rule is "never automatically", not "always by asking". Where somebody
+    // can be asked, it asks; where nobody can — `lights-out` — it refuses and
+    // says why. The action does not happen either way, which is the whole point.
+    expect(decideTool(request({ input: { command: 'git reset --hard' } }))).toBeNull()
     expect(
-      decideTool(request({ input: { command: 'git reset --hard' }, autonomy: 'lights-out' }))
-    ).toBeNull()
+      decideTool(request({ input: { command: 'git reset --hard' }, autonomy: 'lights-out' }))?.allow
+    ).toBe(false)
   })
 
   it('asks about a write outside its own checkout', () => {
@@ -182,5 +186,74 @@ describe('the order the four checks run in', () => {
       })
     )
     expect(decision?.allow).toBe(false)
+  })
+})
+
+// At `lights-out` a question has nobody to answer it. Asking is right whenever
+// somebody is there; when nobody is, the held call goes to the operator, then
+// five minutes later to the runtime's own prompt in the terminal, and the agent
+// stands at that prompt until the wall-clock budget ends the run. Measured on a
+// live run: the builder redirected its test output to a scratch file — outside
+// the checkout, and so worth a question — and thirty minutes later the order
+// had shipped nothing.
+describe('a question with nobody to answer it', () => {
+  const unattended = (over: Partial<ToolRequest> = {}) =>
+    decideTool(request({ autonomy: 'lights-out', ...over }))
+
+  it('refuses instead of waiting, for a write outside the checkout', () => {
+    const decision = unattended({ tool: 'Edit', input: { file_path: '/etc/hosts' } })
+    expect(decision).not.toBeNull()
+    expect(decision?.allow).toBe(false)
+  })
+
+  it('refuses instead of waiting, for something destructive', () => {
+    const decision = unattended({ input: { command: 'git reset --hard' } })
+    expect(decision?.allow).toBe(false)
+  })
+
+  it('says why, in words the agent can act on', () => {
+    // A reason an agent cannot do anything with wastes the turn it was given
+    // to adapt. This one names the alternative.
+    const decision = unattended({
+      input: { command: 'npm test > /tmp/scratch/out.log' },
+    })
+    expect(decision?.reason).toContain('unattended')
+    expect(decision?.reason).toContain('inside the worktree')
+  })
+
+  it('is exactly as strict as the wait it replaces — nothing new is allowed', () => {
+    // The whole safety argument in one assertion: everything that used to be
+    // held is now refused, and nothing that used to be held is now permitted.
+    const held = [
+      { tool: 'Edit', input: { file_path: '/etc/hosts' } },
+      { tool: 'Bash', input: { command: 'git reset --hard' } },
+      { tool: 'Bash', input: { command: 'rm -rf build' } },
+      { tool: 'Bash', input: { command: 'echo $(' } },
+      { tool: 'Bash', input: { command: 'npm test > /tmp/out.log' } },
+    ]
+    for (const call of held) {
+      expect(
+        decideTool(request({ ...call, autonomy: 'standard' })),
+        JSON.stringify(call)
+      ).toBeNull()
+      const unattendedDecision = decideTool(request({ ...call, autonomy: 'lights-out' }))
+      expect(unattendedDecision?.allow, JSON.stringify(call)).toBe(false)
+    }
+  })
+
+  it('still asks when somebody is there to be asked', () => {
+    for (const autonomy of ['standard', 'escorted'] as const) {
+      expect(
+        decideTool(request({ tool: 'Edit', input: { file_path: '/etc/hosts' }, autonomy })),
+        autonomy
+      ).toBeNull()
+    }
+  })
+
+  it('leaves ordinary work alone — it was never a question', () => {
+    expect(
+      unattended({ tool: 'Edit', input: { file_path: '/work/checkout/src/a.ts' } })?.allow
+    ).toBe(true)
+    expect(unattended({ input: { command: 'npm test 2>&1 | tail -20' } })?.allow).toBe(true)
   })
 })
