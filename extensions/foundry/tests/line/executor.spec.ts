@@ -226,40 +226,39 @@ describe('execute', () => {
     expect(run.mock.calls.every((c) => c[0].readOnly)).toBe(false)
   })
 
-  // A lane is one conversation. A builder that resumes the architect's turn
-  // inherits a history of read-only refusals and reads them as its own
-  // permissions — on one live run it never wrote at all, while the graph
-  // recorded the unit as built.
-  it('tells a writing role that resumes a conversation that it may write', async () => {
-    const run = vi.fn(ok)
-    const o = order([unit('U-1')])
-    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
-      ...deps(run),
-      sessionFor: () => 'sess-lane-1',
+  // A lane is one conversation, and the conversation carries who the agent has
+  // been as well as what it has read. Three live runs died on that: forty turns
+  // of being the architect outweighed the builder's brief, and the last one
+  // ended with the builder writing its own recap — "I've handed over the work
+  // order with criteria and two units, and I'm waiting on your sign-off plus
+  // write access to implement." Still the architect, waiting to be approved,
+  // while the graph said the unit was being built and the worktree stayed
+  // clean.
+  describe('a change of role', () => {
+    it("starts a fresh conversation rather than inheriting the last role's", async () => {
+      const run = vi.fn(ok)
+      const o = order([unit('U-1')])
+      await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
+        ...deps(run),
+        sessionFor: () => 'sess-architect',
+      })
+      for (const call of run.mock.calls) {
+        expect(call[0].resumeSessionId, call[0].node.id).toBeUndefined()
+      }
     })
-    const build = run.mock.calls.find((c) => c[0].node.id.startsWith('build'))
-    expect(build?.[0].resumeSessionId).toBe('sess-lane-1')
-    expect(build?.[0].prompt).toContain('does not describe what you are allowed to do')
-  })
 
-  it('says none of that to a role that is not resuming anything', async () => {
-    const run = vi.fn(ok)
-    const o = order([unit('U-1')])
-    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
-    expect(run.mock.calls[0][0].prompt).not.toContain(
-      'does not describe what you are allowed to do'
-    )
-  })
-
-  it('says none of it to a checking role, which is not there to write', async () => {
-    const run = vi.fn(ok)
-    const o = order([unit('U-1')])
-    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
-      ...deps(run),
-      sessionFor: () => 'sess-lane-1',
+    it('resumes where the role is carrying on its own work, which is where the saving was', async () => {
+      const run = vi.fn(ok)
+      // Two units for one builder: the second keeps everything the first
+      // learned about this repository.
+      const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
+      await execute(o, recipe(), buildRunGraph(o, recipe()), {
+        ...deps(run),
+        sessionFor: () => 'sess-builder',
+      })
+      const second = run.mock.calls.find((c) => c[0].node.id.includes('U-2'))
+      expect(second?.[0].resumeSessionId).toBe('sess-builder')
     })
-    const verify = run.mock.calls.find((c) => c[0].node.id.startsWith('verify'))
-    expect(verify?.[0].prompt).not.toContain('does not describe what you are allowed to do')
   })
 
   it('gives each run the role prompt rather than an empty instruction', async () => {
@@ -792,14 +791,29 @@ describe('raising a gate where nobody can see it', () => {
 describe('one conversation per lane', () => {
   it('carries a resumable role on in the session the lane already has', async () => {
     const run = vi.fn(ok)
-    const o = order([unit('U-1')])
+    // Two units for the one role. The builder declares `allowResume: true`, so
+    // its second unit continues where its first left off rather than being a
+    // fresh agent that has read nothing.
+    const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
     await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(run),
       sessionFor: () => 'sess-lane-1',
     })
-    // The builder declares `allowResume: true`, so it is offered the lane's
-    // open conversation rather than a fresh agent that has read nothing.
-    expect(run.mock.calls[0][0].resumeSessionId).toBe('sess-lane-1')
+    const second = run.mock.calls.find((c) => c[0].node.id.includes('U-2'))
+    expect(second?.[0].resumeSessionId).toBe('sess-lane-1')
+  })
+
+  it('starts the lane rather than resuming a conversation nothing here opened', () => {
+    // The first node of a lane has no earlier role to continue, and a session
+    // this run cannot account for belongs to a role it cannot name.
+    const run = vi.fn(ok)
+    const o = order([unit('U-1')])
+    return execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(run),
+      sessionFor: () => 'sess-from-somewhere',
+    }).then(() => {
+      expect(run.mock.calls[0][0].resumeSessionId).toBeUndefined()
+    })
   })
 
   it('never offers one to a role that may not resume', async () => {
@@ -1273,7 +1287,9 @@ steps:
         return ok(input)
       }
     )
-    const o = order([unit('U-1')])
+    // Two units, so the builder has a second node of its own role to resume
+    // into — which is the case the step's `context: fresh` has to override.
+    const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
     const r = recipe(FRESH)
     await execute(o, r, buildRunGraph(o, r), {
       ...deps(run as never),

@@ -211,11 +211,41 @@ that limit.
 
 ## One conversation per lane
 
-A lane keeps **one Claude session**, and every node in it resumes that session
-rather than starting a new conversation: the executor hands `start` a
-`resumeSessionId` and the launch becomes `claude --resume <id>`. So the builder
-that follows the architect has the architect's reading behind it, which is the
-property that matters.
+A lane keeps **one Claude session per role**. A role continuing its own work
+resumes it — the executor hands `start` a `resumeSessionId` and the launch
+becomes `claude --resume <id>` — so a builder taking a second unit in the lane
+keeps everything it learned taking the first.
+
+**A change of role starts a fresh conversation.** It used to resume across the
+boundary too, on the reasoning that the builder should have the architect's
+reading behind it. What it also had was the architect's _identity_: a context
+window carries who the agent has been, not only what it read, and forty turns
+of being the architect outweigh a paragraph of brief saying the next turn is
+the builder's.
+
+Three live runs died on it, each further along than the last. The clearest is
+the third, where the builder wrote its own recap:
+
+> Goal is making `TTL_MS` in `src/session.js` read `SESSION_TTL_MS` from the
+> environment … **I've handed over the work order with criteria and two units,
+> and I'm waiting on your sign-off plus write access to implement.**
+
+Still the architect, waiting to be approved, while the graph said the unit was
+being built and the worktree stayed clean. The run before it opened with
+"Checking whether the sandbox is writable this turn"; the one before that
+concluded "Read-only session, so no writes" and never wrote at all — and the
+graph recorded that unit as built.
+
+A brief that says "you may write now" does not fix this, and one was tried:
+the problem is not what the agent believes it is permitted to do, it is who it
+believes it is. `context: fresh` already says this for the verifier, and the
+evidence is that it is not a verifier quirk. What the architect produced is
+carried by the **work order**, which is the artefact that exists for exactly
+that, rather than by a context window that carries its posture along with it.
+
+The resume is offered on a positive match — the lane's last role was this
+role — rather than on the absence of a mismatch, because a session this run
+cannot account for belongs to a role it cannot name.
 
 **It does not keep one terminal.** `start` opens a tab per node, so a
 four-node lane leaves four tabs on the same worktree — same conversation, four

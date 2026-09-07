@@ -28,22 +28,6 @@ export interface BriefInput {
   readonly rules: readonly Rule[]
   /** For a `run` step: the command, which is the whole instruction. */
   readonly command?: string
-  /**
-   * This role writes, and it is taking over a conversation someone else was
-   * having.
-   *
-   * A lane is one conversation, and the turn before this one may have been a
-   * read-only role that spent it being refused. The model reads that history
-   * as its own standing permissions. Watched twice on live runs: an architect
-   * concluded "Read-only session, so no writes", and the builder that resumed
-   * it opened its turn with "Checking whether the sandbox is writable this
-   * turn" — and in the first of those runs it never wrote at all, while the
-   * graph recorded the unit as built.
-   *
-   * The hook cannot fix this. It refuses what a role may not do; it has no way
-   * to correct a role that wrongly believes it may do nothing.
-   */
-  readonly writingAfterAnother?: boolean
 }
 
 function unitSection(order: WorkOrder, unit: PlanUnit): string[] {
@@ -145,21 +129,6 @@ export function brief(input: BriefInput): string {
 
   const reads = new Set<string>(role?.reads ?? [])
   const sections: string[] = [role?.prompt.trim() ?? '']
-
-  // Said before anything else, because it corrects what the conversation above
-  // it taught. See `writingAfterAnother`.
-  if (input.writingAfterAnother === true) {
-    sections.push(
-      '',
-      '## What you may do, this turn',
-      '',
-      'You are continuing a conversation another role was having, and what it',
-      'was allowed to do does not describe what you are allowed to do. This',
-      'turn writes: edit the files in this worktree directly. If a tool call is',
-      'refused you will be told so in the result — until then, assume nothing',
-      'above restricts you.'
-    )
-  }
 
   sections.push(
     '',

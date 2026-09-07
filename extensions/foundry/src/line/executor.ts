@@ -202,9 +202,7 @@ function promptFor(
   recipe: Recipe,
   node: RunNode,
   roles: RoleRegistry,
-  rules: readonly Rule[],
-  /** Taking over a conversation, as a role that writes. */
-  writingAfterAnother = false
+  rules: readonly Rule[]
 ): string {
   const step = stepFor(recipe, node)
   if (step === undefined) return ''
@@ -215,7 +213,6 @@ function promptFor(
       node.unitId === null ? null : (order.plan.units.find((u) => u.id === node.unitId) ?? null),
     rules,
     command: step.kind === 'run' ? (step.command ?? '') : undefined,
-    writingAfterAnother,
   })
 }
 
@@ -240,6 +237,8 @@ export async function execute(
   const verdicts: Verdict[] = []
   /** unit id → the session that did the work, so a checker is never it. */
   const producedUnit = new Map<string, string>()
+  /** lane → the role whose conversation is open there. */
+  const lastRoleInLane = new Map<number, string | null>()
   const awaitingDecision: string[] = []
   const gates: Gate[] = []
 
@@ -450,25 +449,44 @@ export async function execute(
           // file forbids resuming, so a recipe asking it of any other role got
           // a resumed session anyway.
           const wantsFresh = wantsFreshContext(recipe, node)
-          const offered = wantsFresh ? undefined : deps.sessionFor?.(node.lane ?? 1)
+          // And never across a change of role.
+          //
+          // The conversation carries who the agent has been, not only what it
+          // has read, and forty turns of being the architect outweigh a
+          // paragraph saying the next turn is the builder's. Three live runs
+          // died on it. The last one ended with the builder writing its own
+          // recap: "I've handed over the work order with criteria and two
+          // units, and I'm waiting on your sign-off plus write access to
+          // implement." It was still the architect, waiting to be approved,
+          // while the graph said the unit was being built.
+          //
+          // This is what `context: fresh` already says for the verifier, and
+          // the evidence is that it is not a verifier quirk — it is what a
+          // change of role needs. What the architect produced is carried by
+          // the work order, which is the artefact for exactly that, rather
+          // than by a context window that also carries its posture.
+          //
+          // A role continuing its own work still resumes, which is where the
+          // saving was: a builder taking a second unit in the same lane keeps
+          // everything it learned taking the first.
+          // A positive match, not the absence of a mismatch: a session this
+          // run cannot account for belongs to a role it cannot name, and that
+          // is precisely the case worth refusing.
+          const sameRole =
+            lastRoleInLane.has(node.lane ?? 1) && lastRoleInLane.get(node.lane ?? 1) === roleId
+          const offered = wantsFresh || !sameRole ? undefined : deps.sessionFor?.(node.lane ?? 1)
           const resumeSessionId =
             roleId !== null && offered !== undefined && roles.mayResume(roleId)
               ? offered
               : undefined
           if (roleId !== null) roles.assertResumable(roleId, resumeSessionId)
+          lastRoleInLane.set(node.lane ?? 1, roleId)
           const readOnly = roleId !== null && !roles.mayWrite(roleId)
 
           const result = await deps.run({
             node,
             role: roleId,
-            prompt: promptFor(
-              order,
-              recipe,
-              node,
-              roles,
-              rules,
-              resumeSessionId !== undefined && !readOnly
-            ),
+            prompt: promptFor(order, recipe, node, roles, rules),
             resumeSessionId,
             readOnly,
             modelTier: (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep',
