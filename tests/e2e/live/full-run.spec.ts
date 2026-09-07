@@ -23,7 +23,13 @@ const REMOTE = process.env.LIVE_REMOTE ?? ''
 
 let handle: AppHandle
 let repo: string
-const ORDER = 'WO-LIVE-RUN'
+// Unique per run, because the branch a lane works on is derived from the order
+// id — so a fixed id means every run pushes to the branch the last one left
+// behind, and the second one is refused as a non-fast-forward. Which is the
+// right refusal: the remote holds a commit this worktree was not cut from, and
+// forcing past that is destruction, not shipping. A live run reached the push
+// and was turned down for exactly this, correctly.
+const ORDER = `WO-LIVE-${Date.now().toString(36).toUpperCase()}`
 
 function git(...args: string[]): string {
   const env = { ...process.env }
