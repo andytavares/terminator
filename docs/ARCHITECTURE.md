@@ -927,6 +927,16 @@ surfaced at once.
   one. The checker is its own session now, held against the recorded session that
   produced the work, and absence reads as "not measured" in both the ladder and
   the pull-request body.
+- **The regrade and the budgets read the world, not the plan.** `inspectionFor`
+  and `regrade` answer for "the change the work turned out to be", and the
+  files-touched budget exists to catch an agent going wide — and all three were
+  handed `plan.units.flatMap(u => u.touches)`, the files the plan _predicted_,
+  with `linesChanged` hardcoded to zero. So no change could grade worse than it
+  was planned as, the `outside_blast_radius` trigger could only fire on an order
+  inconsistent with itself, and the files-touched budget was a constant. They
+  read the working copies now, through the `readChangedFiles` and
+  `readDiffSummary` that were already written and already correct and that the
+  Line had never asked anything.
 - **The ladder** (`verify/ladder.ts`) stops at the first failure, so a run does
   not spend an inspection budget on a change that does not compile.
 - **Gates** (`gates/rules.ts`) are raised by nine named rules, never by phase

@@ -88,7 +88,20 @@ What changed, and why each:
   refused `find . | head -50`. Now a joined command is allowed exactly when
   every part of it reads, which is the same safety property and names the
   offending part when it fails: `ls && rm file` is refused, and the reason says
-  `rm`. Redirection and `$(…)` stay refused outright.
+  `rm`. Redirection stays refused outright; a substitution is read rather than
+  refused, so `cd "$(pwd)"` is allowed and `echo $(rm -rf x)` is not.
+- **Segments are found with the quoting respected.** Matching `[><`|;&]`against the raw text split a verifier's`grep -rn -E "TTL|15 \* 60|process\.env" .`into four commands and refused
+the review with "15 is not on the review's read-only list" — a fragment of
+its own regex, reported as a binary. It tried three more spellings and gave
+up.`2>&1`had the same shape, its`&` read as a joiner.
+- **`git` has options of its own before the subcommand.** Reading the word
+  straight after `git` made `git -C . status` a subcommand called `-C`, which
+  is on no list, so the whole command was refused. Only git's real global
+  options are stepped over — an unknown flag is still judged.
+- **A role that declared `run_tests` may capture an exit status.** A verdict
+  from an exit status is what FR-033 asks the verifier for, and an exit status
+  is something you have to ask for: `npm test; echo "EXIT=$?"`. The allowance
+  is per segment, so that is admitted while `npm test; rm -rf .` is not.
 - **`find` is on the list**, with every way it writes — `-delete`, `-exec`,
   `-execdir`, `-ok`, `-okdir`, `-fprint*`, `-fls` — in the flag list, which is
   checked across the whole argument list rather than the first word.
@@ -487,8 +500,24 @@ each was called destruction and sent to the operator at every setting,
 lights-out included. Watched live: a builder's first two tool calls were held,
 and it sat there while the graph said `running` and the worktree stayed clean.
 
-`$(…)` and backticks still ask, because what they expand to is not in front of
-the policy to read.
+**A substitution is read, not refused.** `$(…)` and backticks were treated as
+unreadable — "whatever they expand to is not in front of us". The result is
+not; the command is, right there in the text. So their contents are read and
+judged as commands of their own, nesting included: `cd "$(pwd)"` is ordinary
+work, `echo $(rm -rf /)` asks because `rm -rf /` does, and single quotes stay
+text because a shell expands nothing inside them. Only one that cannot be read
+to the end — an unbalanced `$(` — is refused outright, which is the single case
+the old rule was right about.
+
+Refusing the shape cost a live run: the builder's second command was
+`cd "$(pwd)" && cat -n src/session.js`, it was called destruction and sent to
+an operator who was not there, and it sat for eighteen minutes until the
+wall-clock budget stopped the run with an empty worktree.
+
+Both policies read commands through `runtime/shell-split.ts`, which tracks
+quoting and escaping and nothing else. It is not a shell parser and must not
+grow into one — it exists so that punctuation inside an argument stops being
+read as punctuation belonging to the shell.
 
 A redirection is a write of the file it names, and it names that file in the
 command rather than in a tool's path field. While every command containing `>`
