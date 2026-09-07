@@ -1,0 +1,24 @@
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_853d9221670e32 755-762,1151-1154
+extensions/foundry/tests/channel-registry.spec.ts
+  s_357c91d2b54b02::t_363f5417defb97 126-146
+  s_357c91d2b54b02::t_b7dcbcb0c42842 147-148
+extensions/foundry/SUPERVISION.md
+  s_357c91d2b54b02::t_9f29e954bc5f90 73,75-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "c453756689894511d5531aefeaa79203a3517731",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
