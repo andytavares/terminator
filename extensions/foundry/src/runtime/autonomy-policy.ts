@@ -61,12 +61,44 @@ const DESTRUCTIVE_FLAGS: ReadonlyArray<RegExp> = [
 ]
 
 /**
- * Anything that could be a shell doing something other than the first word.
+ * A command built inside another, which cannot be read off the text.
  *
- * The same reasoning as the read-only policy: a check that reads `git status`
- * off the front of `git status; rm -rf .` has read the wrong command.
+ * Backticks and `$(…)` only: whatever they expand to is not in front of us, so
+ * the honest answer is to ask.
  */
-const COMPOUND = /[;&|><`\n\r]|\$\(/
+const OPAQUE = /[`]|\$\(/
+
+/**
+ * The operators that join one command to another.
+ *
+ * This used to be a blanket refusal of every compound command, on the same
+ * reasoning the read-only policy started from: reading `git status` off the
+ * front of `git status; rm -rf .` reads the wrong command. But refusing the
+ * whole shape does not stop at the dangerous ones — `pwd && git status` and
+ * `npm test 2>&1 | tail -20` are the ordinary sentences every agent writes,
+ * and each of them was classified as destroying work and sent to an operator.
+ * At *every* setting, lights-out included.
+ *
+ * That is why builders sat doing nothing while the graph said `running`: the
+ * automatic half of FR-029 existed and almost nothing reached it. The answer
+ * is the one the read-only policy already arrived at — judge every segment.
+ */
+const JOINERS = /\|\||&&|[;|&\n\r]/
+
+/** Output thrown away, and stderr folded into stdout. Neither writes. */
+const DISCARDS = /(?:\d?>>?|&>)\s*\/dev\/null(?=\s|$)|2>&1/g
+
+/** Where a segment redirects to, if anywhere. A redirect is a write. */
+function redirectTargets(command: string): string[] {
+  const targets: string[] = []
+  const pattern = /(?:\d?>>?|&>)\s*("[^"]*"|'[^']*'|[^\s;|&]+)/g
+  let match: RegExpExecArray | null = pattern.exec(command)
+  while (match !== null) {
+    targets.push(match[1].replace(/^["']|["']$/g, ''))
+    match = pattern.exec(command)
+  }
+  return targets
+}
 
 /** The tools that name a path, and the field each names it in. */
 const PATH_FIELDS = ['file_path', 'path', 'notebook_path'] as const
@@ -96,10 +128,32 @@ export function isDestructive(toolName: string, input: unknown): boolean {
   if (toolName !== 'Bash') return false
   const command = commandOf(input)
   if (command.trim() === '') return false
-  // Unparseable is treated as destructive rather than assumed safe.
-  if (COMPOUND.test(command)) return true
 
-  const words = command.trim().split(/\s+/)
+  const readable = command.replace(DISCARDS, ' ')
+  // Unparseable is treated as destructive rather than assumed safe.
+  if (OPAQUE.test(readable)) return true
+
+  // Every segment, not the first one — and not the whole shape. A joined
+  // command whose second half destroys is caught by that half; one whose two
+  // halves both read is ordinary work.
+  return readable
+    .split(JOINERS)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment !== '')
+    .some(destructiveSegment)
+}
+
+/** `FOO=bar cmd` is `cmd`; without this the binary reads as the assignment. */
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
+
+/** One command, with nothing joined to it. */
+function destructiveSegment(segment: string): boolean {
+  // A redirection is a write of the file it names, which `writesOutside`
+  // judges. What is in front of it is judged here, on its own words.
+  const bare = segment.replace(/(?:\d?>>?|&>)\s*("[^"]*"|'[^']*'|[^\s]+)/g, ' ').trim()
+  const words = bare.split(/\s+/).filter((word) => word !== '')
+  while (words.length > 0 && ASSIGNMENT.test(words[0])) words.shift()
+  if (words.length === 0) return false
   const binary = path.basename(words[0] ?? '')
   if (DESTRUCTIVE_BINARIES.has(binary)) return true
 
@@ -126,11 +180,21 @@ export function isDestructive(toolName: string, input: unknown): boolean {
  */
 export function writesOutside(toolName: string, input: unknown, worktreePath: string): boolean {
   if (worktreePath.trim() === '') return false
-  const named = pathOf(input)
-  if (named === '' || !path.isAbsolute(named)) return false
   const root = path.resolve(worktreePath)
-  const target = path.resolve(named)
-  return target !== root && !target.startsWith(`${root}${path.sep}`)
+  const outside = (named: string): boolean => {
+    if (named === '' || !path.isAbsolute(named)) return false
+    const target = path.resolve(named)
+    return target !== root && !target.startsWith(`${root}${path.sep}`)
+  }
+
+  // A shell redirection is a write too, and it names its file in the command
+  // rather than in a field. This used to be covered by accident, because every
+  // command containing `>` was called destructive; the redirect has to be read
+  // properly now that ordinary compound commands are not.
+  if (toolName === 'Bash') {
+    return redirectTargets(commandOf(input).replace(DISCARDS, ' ')).some(outside)
+  }
+  return outside(pathOf(input))
 }
 
 export interface AutonomyInput {

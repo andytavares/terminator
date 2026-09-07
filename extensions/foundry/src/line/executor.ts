@@ -202,7 +202,9 @@ function promptFor(
   recipe: Recipe,
   node: RunNode,
   roles: RoleRegistry,
-  rules: readonly Rule[]
+  rules: readonly Rule[],
+  /** Taking over a conversation, as a role that writes. */
+  writingAfterAnother = false
 ): string {
   const step = stepFor(recipe, node)
   if (step === undefined) return ''
@@ -213,6 +215,7 @@ function promptFor(
       node.unitId === null ? null : (order.plan.units.find((u) => u.id === node.unitId) ?? null),
     rules,
     command: step.kind === 'run' ? (step.command ?? '') : undefined,
+    writingAfterAnother,
   })
 }
 
@@ -458,7 +461,14 @@ export async function execute(
           const result = await deps.run({
             node,
             role: roleId,
-            prompt: promptFor(order, recipe, node, roles, rules),
+            prompt: promptFor(
+              order,
+              recipe,
+              node,
+              roles,
+              rules,
+              resumeSessionId !== undefined && !readOnly
+            ),
             resumeSessionId,
             readOnly,
             modelTier: (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep',

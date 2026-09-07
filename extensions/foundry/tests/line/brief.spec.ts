@@ -288,3 +288,43 @@ describe('a unit with nothing declared', () => {
     expect(text).toContain('satisfies no criterion')
   })
 })
+
+// A lane is one conversation, so a writing role takes over a terminal whose
+// history may be a read-only role's turn — an architect that spent it being
+// refused and concluded "Read-only session, so no writes". The model reads
+// that as its own standing permissions. On the live run where it happened the
+// builder wrote nothing at all, and the graph recorded the unit as built.
+//
+// Not something the hook can fix: it refuses what a role may not do, and has
+// no way to correct a role that wrongly believes it may do nothing.
+describe("taking over someone else's conversation", () => {
+  it("tells a writing role that the last turn's limits are not its own", () => {
+    const text = brief({
+      order: order(),
+      role: role(),
+      unit: unit(),
+      rules: [],
+      writingAfterAnother: true,
+    })
+    expect(text).toContain('does not describe what you are allowed to do')
+    expect(text).toContain('This\nturn writes')
+  })
+
+  it('says none of it to a conversation this role began', () => {
+    const text = brief({ order: order(), role: role(), unit: unit(), rules: [] })
+    expect(text).not.toContain('does not describe what you are allowed to do')
+  })
+
+  it('leaves a bare command alone — a rung is not a conversation', () => {
+    const text = brief({
+      order: order(),
+      role: null,
+      unit: null,
+      rules: [],
+      command: 'npm test',
+      writingAfterAnother: true,
+    })
+    expect(text).not.toContain('does not describe what you are allowed to do')
+    expect(text).toContain('npm test')
+  })
+})

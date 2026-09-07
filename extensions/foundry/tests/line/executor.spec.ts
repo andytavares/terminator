@@ -226,6 +226,42 @@ describe('execute', () => {
     expect(run.mock.calls.every((c) => c[0].readOnly)).toBe(false)
   })
 
+  // A lane is one conversation. A builder that resumes the architect's turn
+  // inherits a history of read-only refusals and reads them as its own
+  // permissions — on one live run it never wrote at all, while the graph
+  // recorded the unit as built.
+  it('tells a writing role that resumes a conversation that it may write', async () => {
+    const run = vi.fn(ok)
+    const o = order([unit('U-1')])
+    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
+      ...deps(run),
+      sessionFor: () => 'sess-lane-1',
+    })
+    const build = run.mock.calls.find((c) => c[0].node.id.startsWith('build'))
+    expect(build?.[0].resumeSessionId).toBe('sess-lane-1')
+    expect(build?.[0].prompt).toContain('does not describe what you are allowed to do')
+  })
+
+  it('says none of that to a role that is not resuming anything', async () => {
+    const run = vi.fn(ok)
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
+    expect(run.mock.calls[0][0].prompt).not.toContain(
+      'does not describe what you are allowed to do'
+    )
+  })
+
+  it('says none of it to a checking role, which is not there to write', async () => {
+    const run = vi.fn(ok)
+    const o = order([unit('U-1')])
+    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
+      ...deps(run),
+      sessionFor: () => 'sess-lane-1',
+    })
+    const verify = run.mock.calls.find((c) => c[0].node.id.startsWith('verify'))
+    expect(verify?.[0].prompt).not.toContain('does not describe what you are allowed to do')
+  })
+
   it('gives each run the role prompt rather than an empty instruction', async () => {
     const run = vi.fn(ok)
     const o = order()
