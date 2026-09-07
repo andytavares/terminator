@@ -129,12 +129,20 @@ export interface ExecutorDeps {
   /**
    * The session a role may carry on in, when it may.
    *
-   * A recipe is one conversation per lane, not one agent per node: a fresh
-   * agent for every step is five terminals and five agents that have each read
-   * the repository from scratch, which is what `continueRun` exists to avoid.
-   * A role with `allowResume: false` is never offered one, structurally.
+   * A recipe is one conversation per role per lane, not one agent per node: a
+   * fresh agent for every step is a terminal per step and an agent that has
+   * read the repository from scratch, which is what `continueRun` exists to
+   * avoid. A role with `allowResume: false` is never offered one, structurally.
+   *
+   * **Keyed by role as well as lane, and that is the whole guard.** A node can
+   * only be offered the conversation its own role has been having, so a change
+   * of role has nothing to resume: the context window carries who the agent
+   * has been, not only what it read, and a builder that inherited forty turns
+   * of being the architect stayed the architect. A `null` role — a bare
+   * command, a ladder rung — has its own, so a rung told "run this and do not
+   * fix what it reports" never arrives carrying the builder's identity.
    */
-  readonly sessionFor?: (lane: number) => string | undefined
+  readonly sessionFor?: (lane: number, role: string | null) => string | undefined
 }
 
 export type ExecutorEvent =
@@ -237,8 +245,6 @@ export async function execute(
   const verdicts: Verdict[] = []
   /** unit id → the session that did the work, so a checker is never it. */
   const producedUnit = new Map<string, string>()
-  /** lane → the role whose conversation is open there. */
-  const lastRoleInLane = new Map<number, string | null>()
   const awaitingDecision: string[] = []
   const gates: Gate[] = []
 
@@ -468,19 +474,14 @@ export async function execute(
           //
           // A role continuing its own work still resumes, which is where the
           // saving was: a builder taking a second unit in the same lane keeps
-          // everything it learned taking the first.
-          // A positive match, not the absence of a mismatch: a session this
-          // run cannot account for belongs to a role it cannot name, and that
-          // is precisely the case worth refusing.
-          const sameRole =
-            lastRoleInLane.has(node.lane ?? 1) && lastRoleInLane.get(node.lane ?? 1) === roleId
-          const offered = wantsFresh || !sameRole ? undefined : deps.sessionFor?.(node.lane ?? 1)
+          // everything it learned taking the first. `sessionFor` keys on the
+          // role, so across a boundary there is simply nothing to offer.
+          const offered = wantsFresh ? undefined : deps.sessionFor?.(node.lane ?? 1, roleId)
           const resumeSessionId =
             roleId !== null && offered !== undefined && roles.mayResume(roleId)
               ? offered
               : undefined
           if (roleId !== null) roles.assertResumable(roleId, resumeSessionId)
-          lastRoleInLane.set(node.lane ?? 1, roleId)
           const readOnly = roleId !== null && !roles.mayWrite(roleId)
 
           const result = await deps.run({

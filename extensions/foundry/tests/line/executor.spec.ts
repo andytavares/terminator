@@ -238,10 +238,14 @@ describe('execute', () => {
     it("starts a fresh conversation rather than inheriting the last role's", async () => {
       const run = vi.fn(ok)
       const o = order([unit('U-1')])
+      // The architect has a conversation open in this lane. Nothing else does,
+      // which is exactly what the real map looks like at this point.
+      const open = new Map([['1:architect', 'sess-architect']])
       await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
         ...deps(run),
-        sessionFor: () => 'sess-architect',
+        sessionFor: (lane, role) => open.get(`${lane}:${role ?? 'command'}`),
       })
+      expect(run.mock.calls.length).toBeGreaterThan(0)
       for (const call of run.mock.calls) {
         expect(call[0].resumeSessionId, call[0].node.id).toBeUndefined()
       }
@@ -254,7 +258,7 @@ describe('execute', () => {
       const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
       await execute(o, recipe(), buildRunGraph(o, recipe()), {
         ...deps(run),
-        sessionFor: () => 'sess-builder',
+        sessionFor: (_lane, role) => (role === 'builder' ? 'sess-builder' : undefined),
       })
       const second = run.mock.calls.find((c) => c[0].node.id.includes('U-2'))
       expect(second?.[0].resumeSessionId).toBe('sess-builder')
@@ -797,23 +801,27 @@ describe('one conversation per lane', () => {
     const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
     await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(run),
-      sessionFor: () => 'sess-lane-1',
+      sessionFor: (_lane, role) => (role === 'builder' ? 'sess-lane-1' : undefined),
     })
     const second = run.mock.calls.find((c) => c[0].node.id.includes('U-2'))
     expect(second?.[0].resumeSessionId).toBe('sess-lane-1')
   })
 
-  it('starts the lane rather than resuming a conversation nothing here opened', () => {
-    // The first node of a lane has no earlier role to continue, and a session
-    // this run cannot account for belongs to a role it cannot name.
+  it("asks for its own role's conversation, not the lane's last one", async () => {
+    // The role is half the key, so a node cannot be handed a conversation that
+    // belonged to somebody else — there is nothing under its own name to give.
     const run = vi.fn(ok)
+    const asked: (string | null)[] = []
     const o = order([unit('U-1')])
-    return execute(o, recipe(), buildRunGraph(o, recipe()), {
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(run),
-      sessionFor: () => 'sess-from-somewhere',
-    }).then(() => {
-      expect(run.mock.calls[0][0].resumeSessionId).toBeUndefined()
+      sessionFor: (_lane, role) => {
+        asked.push(role)
+        return role === 'architect' ? 'sess-architect' : undefined
+      },
     })
+    expect(asked).toContain('builder')
+    expect(run.mock.calls[0][0].resumeSessionId).toBeUndefined()
   })
 
   it('never offers one to a role that may not resume', async () => {
@@ -829,7 +837,7 @@ steps:
     const o = order([])
     await execute(o, recipe(verifying), buildRunGraph(o, recipe(verifying)), {
       ...deps(run),
-      sessionFor: () => 'sess-lane-1',
+      sessionFor: (_lane, role) => (role === 'builder' ? 'sess-lane-1' : undefined),
       runStep: async () => 0,
     })
     // The verifier's fresh context is the whole point of it; being offered the
@@ -1295,7 +1303,7 @@ steps:
       ...deps(run as never),
       // The builder may resume, and one is on offer for its lane. The step is
       // the only thing that should stop it being taken.
-      sessionFor: () => 'sess-lane-1',
+      sessionFor: (_lane, role) => (role === 'builder' ? 'sess-lane-1' : undefined),
     })
     const fresh = seen.filter((s) => s.node.includes('recheck'))
     expect(fresh.length).toBeGreaterThan(0)

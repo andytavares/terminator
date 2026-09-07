@@ -699,10 +699,22 @@ async function executeRun(
   const store = createOrderStore(root)
   const featureDir = orderDir(root, order.id)
 
-  // One conversation per lane. A fresh agent per node is a terminal per node
-  // and an agent that has read nothing — the failure `continueRun` exists to
-  // avoid.
-  const laneSessions = new Map<number, string>()
+  // One conversation per role, per lane. A fresh agent per node is a terminal
+  // per node and an agent that has read nothing — the failure `continueRun`
+  // exists to avoid — but a conversation carried across a change of role
+  // carries the last role's identity with it, which broke three live runs.
+  // The executor decides; this only remembers what is open.
+  const conversations = new Map<string, string>()
+  /**
+   * Lane and role together, because the role is the guard.
+   *
+   * A node can only ever be offered the conversation its own role has been
+   * having. A bare command — a recipe's `run` step, a ladder rung — has no
+   * role and gets its own, so eight rungs are still one conversation rather
+   * than eight fresh agents each re-reading the repository to run one command,
+   * and none of them arrives carrying the builder's identity.
+   */
+  const conversation = (lane: number, role: string | null): string => `${lane}:${role ?? 'command'}`
 
   /**
    * One node, from launch to the end of its turn.
@@ -862,8 +874,9 @@ async function executeRun(
           transcriptFrom = run.transcriptFrom
           // The lane's open conversation, for the next node that may carry it
           // on. A role that may not resume is never offered it — the registry
-          // refuses, structurally.
-          laneSessions.set(lane, run.sessionId)
+          // refuses, structurally — and neither is a role that is not the one
+          // whose conversation this is.
+          conversations.set(conversation(lane, input.role), run.sessionId)
           // On the register, which is what the stall detector, the review
           // queue and the backpressure gate all read from. Without this the
           // agent is running and every one of them sees an idle factory —
@@ -903,7 +916,7 @@ async function executeRun(
     now: () => new Date().toISOString(),
     sources,
     run: runNode,
-    sessionFor: (lane) => laneSessions.get(lane),
+    sessionFor: (lane, role) => conversations.get(conversation(lane, role)),
     record: async (action, subject, reason) => {
       await store.record({
         at: new Date().toISOString(),
@@ -946,10 +959,13 @@ async function executeRun(
         modelTier: 'deep',
         mayUseTool: () => true,
         prompt: `Run this exactly, and report its exit status. Do not fix what it reports.\n\n\`\`\`\n${step.command}\n\`\`\``,
-        // In the lane's own conversation. Eight rungs used to be eight fresh
-        // agents and eight terminals, each re-reading the repository to run
-        // one command.
-        resumeSessionId: laneSessions.get(lane),
+        // In the ladder's own conversation, not the lane's. Eight rungs would
+        // otherwise be eight fresh agents and eight terminals, each re-reading
+        // the repository to run one command — but resuming the *role's*
+        // conversation hands a bare command to whoever spoke last, and a rung
+        // told "do not fix what it reports" should not arrive carrying the
+        // builder's identity.
+        resumeSessionId: conversations.get(conversation(lane, null)),
         readOnly: false,
       })
 
