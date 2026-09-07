@@ -93,7 +93,26 @@ const READ_ONLY_GIT: ReadonlySet<string> = new Set([
  * `git diff\nrm -rf .` in turn, while a check that only looked for `;` saw the
  * first word, said "git diff", and allowed it.
  */
-const COMPOUND = /[;&|><`\n\r]|\$\(/
+/**
+ * What no amount of per-segment checking can make safe.
+ *
+ * Redirection writes a file whatever is on the left of it, and a command
+ * substitution runs a command this policy would have to parse out of the
+ * middle of an argument. Both are refused outright.
+ */
+const IRREDEEMABLE = /[><`]|\$\(/
+
+/**
+ * The operators that join one command to another.
+ *
+ * Newlines included, and they were the hole the original check existed for: a
+ * shell runs each line of `git diff\nrm -rf .` in turn, while a check that only
+ * looked at the first word saw "git diff" and allowed it. The answer is not to
+ * refuse every compound — a reader composing two reads, `find . | head -50`, is
+ * the most ordinary thing in the world, and refusing it left an architect with
+ * nothing it could run. The answer is to check *every* segment.
+ */
+const JOINERS = /\|\||&&|[;|&\n\r]/
 
 /**
  * Flags that make a reading command write or execute.
@@ -157,14 +176,41 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
     return { allow: false, reason: 'a Bash call with no command cannot be checked' }
   }
 
-  if (COMPOUND.test(command)) {
+  if (IRREDEEMABLE.test(command)) {
     return {
       allow: false,
-      reason: 'a review may only run a single command with no redirection or chaining',
+      reason: 'a review may not redirect output or run a command inside another',
     }
   }
 
-  const words = command.trim().split(/\s+/)
+  // Every segment, not the first one. Each has to read on its own, so the whole
+  // reads — and a joined command whose second half writes is refused by the
+  // half that writes rather than being missed because the first half was fine.
+  const segments = command
+    .split(JOINERS)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment !== '')
+  if (segments.length === 0) {
+    return { allow: false, reason: 'a Bash call with no command cannot be checked' }
+  }
+
+  for (const segment of segments) {
+    const decision = decideSegment(segment)
+    if (!decision.allow) return decision
+  }
+
+  return {
+    allow: true,
+    reason:
+      segments.length === 1
+        ? `${segments[0].split(/\s+/)[0]} only reads`
+        : `every one of these ${segments.length} commands only reads`,
+  }
+}
+
+/** One command, with no joiners left in it. */
+function decideSegment(segment: string): PolicyDecision {
+  const words = segment.split(/\s+/)
   const binary = words[0]
 
   const writing = words.slice(1).find((word) => WRITING_FLAGS.some((flag) => flag.test(word)))

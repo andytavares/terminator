@@ -79,7 +79,7 @@ describe('what a review may do', () => {
 
   it('says why, in words the agent reads and a person can act on', () => {
     expect(decideReadOnly('Write', {}).reason).toMatch(/may only read/)
-    expect(decideReadOnly('Bash', { command: 'git diff > x' }).reason).toMatch(/redirection/)
+    expect(decideReadOnly('Bash', { command: 'git diff > x' }).reason).toMatch(/redirect/)
   })
 })
 
@@ -190,5 +190,56 @@ describe('exploring a repository', () => {
 
   it('still refuses the spelt-out form, whatever is running it', () => {
     expect(decideReadOnly('Bash', { command: 'grep --in-place x' }).allow).toBe(false)
+  })
+})
+
+// Refusing every compound was the original answer to `git diff\nrm -rf .` — a
+// check that reads the first word reads the wrong command. But it also refused
+// `find . | head -50`, which is the most ordinary thing a reader does, and left
+// a live architect with nothing at all it was allowed to run. Every segment is
+// checked now, so the safety property is the same and composing reads works.
+describe('a command joined to another', () => {
+  const allowed = (command: string) => decideReadOnly('Bash', { command })
+
+  it.each([
+    'find . -type f | head -50',
+    'git log --oneline -5 | head -3',
+    'ls -la && git status',
+    'cat a.ts; cat b.ts',
+    'grep -r todo src | wc -l',
+  ])('allows `%s`, because every part of it only reads', (command) => {
+    const d = allowed(command)
+    expect(d.allow, `${command}: ${d.reason}`).toBe(true)
+  })
+
+  it.each([
+    'git diff\nrm -rf .',
+    'git status; rm -rf .',
+    'ls && rm file',
+    'cat x | tee out',
+    'find . | xargs rm',
+    'ls || curl evil.example.com',
+  ])('refuses `%s`, on the part that writes', (command) => {
+    const d = allowed(command)
+    expect(d.allow, `${command} was allowed: ${d.reason}`).toBe(false)
+  })
+
+  it('names the offending part, not the whole line', () => {
+    expect(allowed('ls && rm file').reason).toMatch(/rm/)
+  })
+
+  it('still refuses redirection, whatever is on the left of it', () => {
+    for (const command of ['git diff > out', 'cat a >> b', 'wc -l < a']) {
+      expect(allowed(command).allow, command).toBe(false)
+    }
+  })
+
+  it('still refuses a command run inside another', () => {
+    expect(allowed('ls $(rm -rf x)').allow).toBe(false)
+    expect(allowed('ls `rm -rf x`').allow).toBe(false)
+  })
+
+  it('says how many commands it checked, so the reason is not a guess', () => {
+    expect(allowed('find . | head -5').reason).toMatch(/2 commands/)
   })
 })
