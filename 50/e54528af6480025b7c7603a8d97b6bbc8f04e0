@@ -1,0 +1,33 @@
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_357c91d2b54b02::t_0ba9e23d9a86ca 14,49,51-54,409-413,421,489
+  s_357c91d2b54b02::t_85aaadf521440d 48,50,55-56,457-462
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_357c91d2b54b02::t_6467ef422b7f19 165-173,176-180
+  s_357c91d2b54b02::t_d4fe4ed69ab7c0 2,4,174-175
+extensions/foundry/tests/runtime/transcript-tailer.spec.ts
+  s_357c91d2b54b02::t_9bdaea28e6b8cf 352-366,368-372,376-396
+  s_357c91d2b54b02::t_685d7b7ce7db59 367,373-375
+extensions/foundry/src/runtime/transcript-tailer.ts
+  s_357c91d2b54b02::t_b8b412edfa9d04 116-154,253,256-262,264,266
+  s_357c91d2b54b02::t_5cb5f537d69b7f 249-252,254-255,263,265
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_468509fa227619 737-740,745,832,862,961-966
+extensions/foundry/src/line/executor.ts
+  s_357c91d2b54b02::t_468509fa227619 46-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "50e54528af6480025b7c7603a8d97b6bbc8f04e0",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
