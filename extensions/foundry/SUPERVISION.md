@@ -474,6 +474,46 @@ phase routinely asked twenty-five times. Under `auto` the runtime's own
 classifier answers those instead, so the questions that reach you are the ones
 the ladder actually wanted a person for.
 
+### An "ask" has no unattended resolution
+
+This is worth knowing before turning `lights-out` on, because for a whole
+session it looked like Claude Code hanging at random.
+
+When the ladder abstains, the call is held and the operator is asked. If nobody
+answers within five minutes the bridge **hands the call back** — which means
+Claude Code puts its own prompt in the terminal instead. That is the right
+answer when somebody is at the console. When nobody is, the agent waits at that
+prompt for ever, and only the wall-clock budget ends the run.
+
+Measured on a live run:
+
+|           |                                                                  |
+| --------- | ---------------------------------------------------------------- |
+| 09:11:49  | the builder runs `npm test > /tmp/claude-501/…`                  |
+|           | a redirect outside the checkout, so FR-050 asks                  |
+| ~09:16:49 | nobody answers; the call is handed back to the terminal's prompt |
+| 09:19:17  | the stall detector notices silence                               |
+| 09:41     | the wall-clock budget ends the run                               |
+
+**How to recognise it in a transcript**: a held call is a `tool_use` record with
+no `tool_result` after it. The agent never ran the tool; it is waiting to be
+allowed to.
+
+Agents redirect scratch output to their own `/tmp/claude-501/<session>/`
+constantly — Claude Code's own instructions tell them to — so this fires on
+ordinary behaviour rather than on anything alarming.
+
+The question it raises is open on purpose: whether an "ask" should instead be a
+**denial with a reason** at `lights-out`, where by definition nobody is coming.
+Denying keeps FR-050's intent exactly — the action is still not taken — and lets
+the agent adapt, which agents demonstrably do all day against the read-only
+policy. It changes what FR-029 and FR-050 mean, so it is a decision to take on
+purpose rather than a fix.
+
+What has changed is that the silence is legible: the console says when a
+question is asked, and says again when it is handed back to the terminal, which
+is the moment the agent stops.
+
 ### What the ladder takes for itself
 
 FR-029 says every action is held against a decision — _automatic where the
