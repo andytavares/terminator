@@ -1,0 +1,28 @@
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_cb9c447f39b8df 28-29,195-205,207-230,724-733,1111
+  s_357c91d2b54b02::t_136d3643439a71 206
+  s_357c91d2b54b02::t_da96bb40e94b5f 1112
+extensions/foundry/tests/runtime/workspace-trust.spec.ts
+  s_357c91d2b54b02::t_7bb02fbea0eedb 1-119
+extensions/foundry/src/runtime/workspace-trust.ts
+  s_357c91d2b54b02::t_7b20ea1f2a99e3 1-95
+extensions/foundry/SUPERVISION.md
+  s_357c91d2b54b02::t_4c80764cce33de 94-126
+  s_357c91d2b54b02::t_15eeff422b6277 65-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "d5b54969f0bf8b09908ae87193c479d98993850a",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
