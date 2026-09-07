@@ -1,3 +1,4 @@
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { PolicyDecision } from './read-only-policy.js'
 import type { Autonomy } from '../gates/autonomy.js'
@@ -180,11 +181,19 @@ function destructiveSegment(segment: string): boolean {
  */
 export function writesOutside(toolName: string, input: unknown, worktreePath: string): boolean {
   if (worktreePath.trim() === '') return false
-  const root = path.resolve(worktreePath)
+  // Both names for the directory. macOS hands out `/var/folders/…` and
+  // `/private/var/folders/…` for the same place, and `path.resolve` does not
+  // follow symlinks — so a checkout known by one name and a file written under
+  // the other read as different directories, and every ordinary edit inside
+  // the unit's own worktree would ask at every setting. The same coin flip
+  // that left agents sitting at the trust dialog.
+  const roots = [...new Set([path.resolve(worktreePath), realPath(worktreePath)])]
   const outside = (named: string): boolean => {
     if (named === '' || !path.isAbsolute(named)) return false
-    const target = path.resolve(named)
-    return target !== root && !target.startsWith(`${root}${path.sep}`)
+    const targets = [...new Set([path.resolve(named), realPath(named)])]
+    return !targets.some((target) =>
+      roots.some((root) => target === root || target.startsWith(`${root}${path.sep}`))
+    )
   }
 
   // A shell redirection is a write too, and it names its file in the command
@@ -195,6 +204,31 @@ export function writesOutside(toolName: string, input: unknown, worktreePath: st
     return redirectTargets(commandOf(input).replace(DISCARDS, ' ')).some(outside)
   }
   return outside(pathOf(input))
+}
+
+/**
+ * The path with every symlink resolved, or the path itself.
+ *
+ * A file being written may not exist yet, so this resolves the deepest part
+ * that does and puts the rest back on — `realpathSync` of a missing file
+ * throws, and treating that as "unresolvable" would put every new file the
+ * builder creates back outside the checkout.
+ */
+function realPath(target: string): string {
+  const absolute = path.resolve(target)
+  let head = absolute
+  const tail: string[] = []
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync(head), ...tail)
+    } catch {
+      const parent = path.dirname(head)
+      // The root, and nothing along the way resolved.
+      if (parent === head) return absolute
+      tail.unshift(path.basename(head))
+      head = parent
+    }
+  }
 }
 
 export interface AutonomyInput {

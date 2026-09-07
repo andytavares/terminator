@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import {
   decideByAutonomy,
   isDestructive,
@@ -200,6 +203,44 @@ describe('a write outside the checkout (FR-050)', () => {
 
     it('says nothing about a shell command that redirects nowhere', () => {
       expect(writesOutside('Bash', bash('npm test'), '/work/checkout')).toBe(false)
+    })
+  })
+
+  // macOS hands out `/var/folders/…` and `/private/var/folders/…` for the same
+  // directory, and `path.resolve` does not follow symlinks. A checkout known by
+  // one name and a file written under the other read as different places, so
+  // every ordinary edit inside the unit's own worktree asked — at every
+  // setting. The same coin flip that left agents sitting at the trust dialog.
+  describe('a directory with two names', () => {
+    let checkout: string
+
+    beforeEach(() => {
+      checkout = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-outside-'))
+      fs.mkdirSync(path.join(checkout, 'src'))
+    })
+
+    afterEach(() => {
+      fs.rmSync(checkout, { recursive: true, force: true })
+    })
+
+    it("takes a file under the checkout's other name", () => {
+      const other = fs.realpathSync(checkout)
+      expect(other).not.toBe(checkout)
+      expect(writesOutside('Edit', { file_path: path.join(other, 'src/a.ts') }, checkout)).toBe(
+        false
+      )
+    })
+
+    it('takes a file that does not exist yet, which is most of what a builder writes', () => {
+      const other = fs.realpathSync(checkout)
+      expect(
+        writesOutside('Edit', { file_path: path.join(other, 'deep/er/new.ts') }, checkout)
+      ).toBe(false)
+    })
+
+    it('still asks about a path that is genuinely elsewhere', () => {
+      expect(writesOutside('Edit', { file_path: '/etc/hosts' }, checkout)).toBe(true)
+      expect(writesOutside('Edit', { file_path: `${checkout}-other/x.ts` }, checkout)).toBe(true)
     })
   })
 
