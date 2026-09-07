@@ -177,29 +177,41 @@ runner types may reach `MAX_CANON`.
 TUI reads in raw mode rather than canonical — a different discipline, without
 that limit.
 
-## One conversation per card
+## One conversation per lane
 
-A card gets **one** terminal, one Claude session and one `claude` process, and
-every phase runs in it. `specify` opens it; `plan`, `tasks` and `implement` are
-typed into the same prompt the agent is already sitting at, via
-`SupervisedRunner.continueRun`.
+A lane keeps **one Claude session**, and every node in it resumes that session
+rather than starting a new conversation: the executor hands `start` a
+`resumeSessionId` and the launch becomes `claude --resume <id>`. So the builder
+that follows the architect has the architect's reading behind it, which is the
+property that matters.
 
-Before this, each phase minted its own session id and called `openTerminalTab`
-again. A single card ended up with five tabs, five transcripts and five agents
-that had each read the spec from scratch — and because a terminal agent never
-exits on its own, the four finished ones sat in the run list looking stalled.
+**It does not keep one terminal.** `start` opens a tab per node, so a
+four-node lane leaves four tabs on the same worktree — same conversation, four
+windows onto it. `SupervisedRunner.continueRun` is the mechanism that would fix
+that, by typing the next node's brief into the prompt the agent is already
+sitting at, and **nothing calls it**. It is built and tested and unused, and
+this section claimed its behaviour as though it were live.
 
-Two things follow from the session outliving the phase, and both are handled
-rather than assumed:
+Wiring it is the obvious next move and is deliberately not done here: it types
+a multi-kilobyte brief into a running TUI, and the last thing that typed a
+brief anywhere corrupted every launch this runtime ever made. That is worth
+proving on purpose rather than assuming, in a change of its own.
 
-- **Phase callbacks are rebound, not captured.** `continueRun` swaps them so a
-  permission raised during `plan` is not reported against `specify`, and
-  `runs.notePhase` renames the run so the list does not still say `specify` for
-  a card three phases in.
-- **A phase is measured from the diff it inherited.** The conversation carries
-  every earlier phase's changes, so "a turn that changed something ended the
-  phase" would be true before the agent had read its prompt. The runner records
-  the diff as it stood when the phase began and compares against that.
+Before any of this, each phase minted its own session id as well as its own
+tab, so a card ended up with five _transcripts_ and five agents that had each
+read the repository from scratch. Resuming fixed that half — the expensive
+half. Tab-per-node is what is left of it.
+
+One thing follows from the session outliving the node, and it is handled rather
+than assumed: **a node is measured from the diff it inherited.** The
+conversation carries every earlier node's changes, so "a turn that changed
+something ended the node" would be true before the agent had read its prompt.
+The runner records the diff as it stood when the node began and compares
+against that.
+
+(`runs.notePhase`, which renamed a run as it moved between phases, has no
+caller either — a node's own `start` names it. It is on the list of twelve
+methods this feature ships without using.)
 
 When the session is gone — the tab was closed, the console restarted —
 `continueRun` returns null and the caller opens a fresh conversation with
