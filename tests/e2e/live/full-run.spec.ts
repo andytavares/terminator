@@ -324,4 +324,30 @@ test('an agent takes an order to a draft pull request', async () => {
 
   // And the order says so too, which is what the operator reads.
   expect(ledger).toContain('ship.draft_opened')
+
+  // And the climb measured what this repository actually has.
+  //
+  // The test passed for a run whose ship message read "Not measured here:
+  // Format, Lint, The unit's own tests, …" — while the ladder's own transcript
+  // showed both rungs running and both exiting 0. `transcriptPathFor` was
+  // predicting `-var-folders-…` for a file the runtime writes at
+  // `-private-var-folders-…`, so every reader of it opened nothing. A green
+  // test that lets the ladder report a check it did run as unmeasured is a
+  // test that would let it report one it never ran as passed.
+  const shipped = ledger
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line) as { action: string; reason: string })
+    .find((entry) => entry.action === 'ship.ready_asked')
+  expect(shipped, 'nothing asked whether to mark it ready').toBeDefined()
+  // eslint-disable-next-line no-console
+  console.log(`ship said: ${shipped?.reason}`)
+  // These two are the ones this repository declares a command for; the rest
+  // genuinely have none and are unmeasured for a real reason.
+  expect(shipped?.reason, 'the ladder did not measure a rung it ran').not.toMatch(
+    /Not measured here:[^.]*\bLint\b/
+  )
+  expect(shipped?.reason, 'the ladder did not measure a rung it ran').not.toMatch(
+    /Not measured here:[^.]*unit's own tests/
+  )
 })
