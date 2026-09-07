@@ -20,6 +20,10 @@ import { join } from 'path'
 // thing happens if the hook outlives its configured timeout, so a slow answer
 // degrades to the prompt beside it rather than to a decision nobody made.
 //
+// "Nothing is blocked forever" needed the request itself to be bounded, which
+// it was not: a console that accepted the connection and never answered left
+// the hook waiting on its outer timeout, and that timeout is twelve hours.
+//
 // The output shape below was established by running claude 2.1.220, not by
 // reading the reference, and it differs from the published examples in two
 // ways that both fail *silently* — the tool simply proceeds as though no hook
@@ -45,11 +49,24 @@ function answer(text) {
   process.exit(0)
 }
 
+// Bounded, because "nothing is blocked forever" was not true of an
+// unanswered request. The console answers within five minutes — it hands a
+// held call back to the terminal itself at that point — so ten is a bound
+// that only fires when the console has genuinely stopped answering, and when
+// it does this degrades exactly the way every other failure here does: to
+// \`ask\`, and the operator's own prompt in the terminal beside it.
+//
+// Without it the only limit was the hook's own timeout, which is twelve hours
+// on the tool call: one lost answer and the agent sits in silence for half a
+// day, which no surface reports and only the wall-clock budget ends.
+const ANSWER_WITHIN_MS = Number(process.env.TERMINATOR_HOOK_ANSWER_MS || '600000')
+
 function post(body) {
   return fetch(url, {
     method: 'POST',
     headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(ANSWER_WITHIN_MS),
   })
 }
 

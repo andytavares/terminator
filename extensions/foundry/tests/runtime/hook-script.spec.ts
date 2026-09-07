@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { execFile } from 'child_process'
+import { createServer } from 'node:http'
 import { installHookScript, HOOK_SCRIPT_NAME } from '../../src/runtime/hook-script.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
 
@@ -31,12 +32,17 @@ const HOOK_INPUT = JSON.stringify({
   tool_input: { command: 'rm -rf /' },
 })
 
-function run(script: string, args: string[], stdin: string): Promise<string> {
+function run(
+  script: string,
+  args: string[],
+  stdin: string,
+  env: Record<string, string> = {}
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       process.execPath,
       [script, ...args],
-      { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } },
+      { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ...env } },
       (error, stdout) => (error ? reject(error) : resolve(stdout))
     )
     child.stdin?.end(stdin)
@@ -252,5 +258,36 @@ describe('the hook script reporting a lifecycle event', () => {
         STOP_INPUT
       )
     ).resolves.toBe('')
+  })
+})
+
+// "Nothing is approved silently and nothing is blocked forever" is this
+// script's stated contract, and the second half needed the request itself to
+// be bounded. It was not: a console that accepted the connection and never
+// answered left the hook waiting on its outer timeout, which is twelve hours
+// on a tool call. One lost answer and the agent sits in silence for half a
+// day, which no surface reports and only the wall-clock budget ends.
+describe('a console that accepts and never answers', () => {
+  it('asks, rather than waiting for its twelve-hour timeout', async () => {
+    const deaf = createServer(() => {
+      // Accepted, and deliberately never answered.
+    })
+    await new Promise<void>((resolve) => deaf.listen(0, '127.0.0.1', resolve))
+    const port = (deaf.address() as { port: number }).port
+
+    try {
+      const script = installHookScript(directory)
+      const started = Date.now()
+      const out = await run(
+        script,
+        [`http://127.0.0.1:${port}/pretooluse`, 'token', 'session-1'],
+        HOOK_INPUT,
+        { TERMINATOR_HOOK_ANSWER_MS: '1200' }
+      )
+      expect(JSON.parse(out).hookSpecificOutput.permissionDecision).toBe('ask')
+      expect(Date.now() - started).toBeLessThan(20_000)
+    } finally {
+      await new Promise<void>((resolve) => deaf.close(() => resolve()))
+    }
   })
 })
