@@ -186,7 +186,14 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
     return { allow: false, reason: 'a Bash call with no command cannot be checked' }
   }
 
-  if (IRREDEEMABLE.test(command)) {
+  // Discarding output is not writing. `2>/dev/null` is the first thing any
+  // reader reaches for, and refusing it cost four live runs before this: the
+  // architect's opening command every time was `… 2>/dev/null`. Only
+  // `/dev/null` is stripped, and only as a whole path, so every other
+  // redirection is still refused by the test below.
+  const withoutDiscards = command.replace(/(?:\d?>>?|&>)\s*\/dev\/null(?=\s|$)/g, ' ')
+
+  if (IRREDEEMABLE.test(withoutDiscards)) {
     return {
       allow: false,
       reason: 'a review may not redirect output or run a command inside another',
@@ -196,7 +203,7 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
   // Every segment, not the first one. Each has to read on its own, so the whole
   // reads — and a joined command whose second half writes is refused by the
   // half that writes rather than being missed because the first half was fine.
-  const segments = command
+  const segments = withoutDiscards
     .split(JOINERS)
     .map((segment) => segment.trim())
     .filter((segment) => segment !== '')

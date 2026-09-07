@@ -282,3 +282,37 @@ describe('the flags and binaries a reader actually reaches for', () => {
     expect(allowed('find . -name x -o -delete').allow).toBe(false)
   })
 })
+
+// Discarding output is not writing. `2>/dev/null` is the first thing any
+// reader reaches for, and it was refused with every other redirection — the
+// live architect's opening command was `… 2>/dev/null` four runs running.
+describe('throwing output away', () => {
+  const allowed = (command: string) => decideReadOnly('Bash', { command })
+
+  it.each([
+    'cat package.json 2>/dev/null',
+    'cat package.json 2> /dev/null',
+    'ls -la >/dev/null',
+    'git status &>/dev/null',
+    'find . -type f 2>/dev/null | head -20',
+    'ls && cat package.json 2>/dev/null && git log --oneline -5',
+  ])('allows `%s`', (command) => {
+    const d = allowed(command)
+    expect(d.allow, `${command}: ${d.reason}`).toBe(true)
+  })
+
+  it.each([
+    'cat a > /dev/nullish',
+    'cat a > /dev/null/file',
+    'git diff 2>/tmp/out',
+    'ls > out.txt',
+    'cat a >> b',
+  ])('still refuses `%s`, which writes somewhere real', (command) => {
+    expect(allowed(command).allow, `${command} was allowed`).toBe(false)
+  })
+
+  it('does not let a discard hide a command that writes', () => {
+    expect(allowed('rm -rf x 2>/dev/null').allow).toBe(false)
+    expect(allowed('ls 2>/dev/null && rm file').allow).toBe(false)
+  })
+})

@@ -62,6 +62,51 @@ discarded diff holding a review slot would gate the next run on reviewing
 something that no longer
 exists.
 
+## What a read-only role may actually run
+
+The read-only policy decides on the _command_, not the tool, because restricting
+tools does not work — an agent with Bash can write whatever `--disallowedTools`
+says. That part was right from the start. What was wrong is that the list was
+tuned for a reviewer, and it is also what governs the architect and the scout,
+whose entire job is reading a repository.
+
+The difference matters because **this path denies; it never asks**. A binary
+left off the list is not "the agent can ask for it", it is "the agent cannot do
+it". Four live runs in a row died on that, each on a different command, and the
+architect said so itself before giving up: _"Bash is restricted to single
+commands here. Working within that."_
+
+What changed, and why each:
+
+- **Every segment is checked, rather than every compound refused.** The original
+  rule existed for a real hole — a shell runs each line of `git diff\nrm -rf .`
+  in turn, and reading the first word reads the wrong command. But it also
+  refused `find . | head -50`. Now a joined command is allowed exactly when
+  every part of it reads, which is the same safety property and names the
+  offending part when it fails: `ls && rm file` is refused, and the reason says
+  `rm`. Redirection and `$(…)` stay refused outright.
+- **`find` is on the list**, with every way it writes — `-delete`, `-exec`,
+  `-execdir`, `-ok`, `-okdir`, `-fprint*`, `-fls` — in the flag list, which is
+  checked across the whole argument list rather than the first word.
+- **`-o` is the one flag whose meaning depends on its binary.** `sort -o file`
+  writes; `find . -name a -o -name b` is an "or". It is refused for everything
+  except `find`.
+- **Bare `-i` is no longer refused.** It was there for in-place editing, and it
+  is also how `grep`, `rg` and `diff` all spell "ignore case". Nothing on the
+  list writes with it; the tools that do are not on the list at all.
+- **`pwd`, `echo`, `basename`, `dirname`, `realpath`, `sort`, `uniq`, `cut`,
+  `tr`, `du` and `tree` are on it**, because they cannot change anything.
+- **Discarding output is not writing.** `2>/dev/null` is the first thing any
+  reader reaches for — it was the architect's opening command on four runs
+  running — and it was refused along with every other redirection. Only
+  `/dev/null` is exempt, and only as a whole path: `> /dev/nullish` and
+  `> /dev/null/file` are still refused, and a discard cannot hide a command
+  that writes, because the command is still checked without it.
+
+`sed` and `awk` stay off, and now say why: `sed -i` cannot be caught by a
+general flag rule without also catching every case-insensitive read, and `awk`
+redirects from inside its program text, where no flag check can see it.
+
 ## Trusting the folder, or the agent never starts
 
 Claude Code shows a workspace trust dialog for a directory it has not seen, and
