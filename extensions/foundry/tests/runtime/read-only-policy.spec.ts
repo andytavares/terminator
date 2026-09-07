@@ -136,3 +136,59 @@ describe('the ways this was bypassable', () => {
     expect(decideReadOnly('Bash', { command }).allow).toBe(true)
   })
 })
+
+// A reading agent has to be able to read. This path *denies*; it never asks —
+// so a binary left off the allowlist is not "the agent can ask for it", it is
+// "the agent cannot do it". A live run showed an architect, whose entire job is
+// reading a repository, try three times and give up with nothing left it was
+// allowed to run.
+describe('exploring a repository', () => {
+  it('lets a reader list the files', () => {
+    const d = decideReadOnly('Bash', { command: "find . -type f -not -path './.git/*'" })
+    expect(d.allow, d.reason).toBe(true)
+  })
+
+  it('lets it look for things by name', () => {
+    expect(decideReadOnly('Bash', { command: "find src -name '*.ts'" }).allow).toBe(true)
+  })
+
+  it.each([
+    'find . -delete',
+    'find . -name x -exec rm {} ;',
+    'find . -execdir rm {} ;',
+    'find . -ok rm {} ;',
+    'find . -okdir rm {} ;',
+    'find . -fprint /tmp/out',
+    'find . -fprintf /tmp/out %p',
+    'find . -fls /tmp/out',
+  ])('refuses `%s`, which is how find writes', (command) => {
+    const d = decideReadOnly('Bash', { command })
+    expect(d.allow, `${command} was allowed: ${d.reason}`).toBe(false)
+  })
+
+  it('refuses a writing flag wherever it appears in the arguments', () => {
+    expect(decideReadOnly('Bash', { command: "find . -type f -name '*.ts' -delete" }).allow).toBe(
+      false
+    )
+  })
+
+  it('still refuses the ones that cannot be told apart by a flag', () => {
+    // `sed -i` collides with how half the reading tools spell
+    // case-insensitive, and awk redirects from inside its program text.
+    expect(decideReadOnly('Bash', { command: "sed -n '1,20p' file" }).allow).toBe(false)
+    expect(decideReadOnly('Bash', { command: "awk '{print}' file" }).allow).toBe(false)
+  })
+
+  it('lets grep be case-insensitive, which is what -i means on everything here', () => {
+    // `-i` was refused globally, for in-place editing. It is also how `grep`,
+    // `rg` and `diff` spell "ignore case", and nothing on the allowlist writes
+    // with it — the tools that do are not on the allowlist at all.
+    expect(decideReadOnly('Bash', { command: 'grep -i todo src' }).allow).toBe(true)
+    expect(decideReadOnly('Bash', { command: 'rg -i todo' }).allow).toBe(true)
+    expect(decideReadOnly('Bash', { command: 'diff -i a b' }).allow).toBe(true)
+  })
+
+  it('still refuses the spelt-out form, whatever is running it', () => {
+    expect(decideReadOnly('Bash', { command: 'grep --in-place x' }).allow).toBe(false)
+  })
+})

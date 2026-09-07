@@ -44,12 +44,26 @@ const READ_ONLY_BINARIES: ReadonlySet<string> = new Set([
   'file',
   'stat',
   'diff',
+  // `find` reads by default and writes with a flag, and every one of those
+  // flags is named in `WRITING_FLAGS` below — which is checked against the
+  // whole argument list rather than the first word, so it cannot be slipped
+  // past by ordering.
+  //
+  // It was absent, on the reasoning that a review which needs it can ask. That
+  // reasoning was written for a reviewer. It is wrong for a reader: this path
+  // *denies*, it never asks, so an architect whose entire job is reading a
+  // repository could not explore one. A live run showed it trying three times
+  // and giving up — "Bash is restricted to single commands here" — with
+  // nothing left it was allowed to run.
+  'find',
 ])
 
-// Deliberately absent, having once been here: `sed` (`-i` edits in place),
-// `find` (`-delete`, `-exec`) and `awk` (its own redirection). Each reads by
-// default and writes with one flag, which an allowlist matched on the first
-// word cannot tell apart. A review that needs them can ask.
+// Deliberately absent, having once been here: `sed` (`-i` edits in place) and
+// `awk` (its own redirection, inside the program text where no flag check can
+// see it). Each reads by default and writes with one flag or one character,
+// which an allowlist matched on the first word cannot tell apart. `sed -i`
+// cannot be caught by a general flag rule either, because `-i` is how half the
+// reading tools spell "case-insensitive".
 
 /** The git sub-commands that only read. `git checkout` and friends are not here. */
 const READ_ONLY_GIT: ReadonlySet<string> = new Set([
@@ -105,8 +119,22 @@ const WRITING_FLAGS: ReadonlyArray<RegExp> = [
   // `--exec`/`-exec` on anything that takes it.
   /^--?exec(=|$)/,
   // In-place editing, wherever it turns up.
+  //
+  // `--in-place` only: bare `-i` is how `grep`, `rg` and `diff` all spell
+  // "ignore case", and it meant a reading agent could not search
+  // case-insensitively. Nothing on the allowlist writes with `-i` — the tools
+  // that do, `sed` and `perl`, are not on it at all, and are refused by the
+  // allowlist itself rather than by a flag.
   /^--in-place(=|$)/,
-  /^-i$/,
+  // `find`'s own ways of writing or executing. `-exec` is covered above.
+  /^-delete$/,
+  /^-execdir$/,
+  /^-ok$/,
+  /^-okdir$/,
+  /^-fls$/,
+  /^-fprint$/,
+  /^-fprint0$/,
+  /^-fprintf$/,
 ]
 
 export function decideReadOnly(toolName: string, input: unknown): PolicyDecision {
