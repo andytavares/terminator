@@ -567,8 +567,9 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
           <h2 className="fdry-panel-h">Acceptance &amp; how it is proven</h2>
           {order.acceptance.length === 0 ? (
             <p className="fdry-note">
-              No criteria yet. Nothing writes them but the architect — press &ldquo;Draft the
-              plan&rdquo;.
+              {order.source.kind === 'tracker'
+                ? `Nothing under an acceptance heading in ${order.source.key ?? 'the ticket'}. Press “Draft the plan” and the architect will write the criteria from what it does say.`
+                : 'No criteria yet. Nothing writes them but the architect — press “Draft the plan”.'}
             </p>
           ) : (
             order.acceptance.map((criterion) => {
