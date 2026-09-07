@@ -44,6 +44,17 @@ const READ_ONLY_BINARIES: ReadonlySet<string> = new Set([
   'file',
   'stat',
   'diff',
+  'pwd',
+  'echo',
+  'basename',
+  'dirname',
+  'realpath',
+  'sort',
+  'uniq',
+  'cut',
+  'tr',
+  'du',
+  'tree',
   // `find` reads by default and writes with a flag, and every one of those
   // flags is named in `WRITING_FLAGS` below — which is checked against the
   // whole argument list rather than the first word, so it cannot be slipped
@@ -128,9 +139,8 @@ const JOINERS = /\|\||&&|[;|&\n\r]/
  * ordering.
  */
 const WRITING_FLAGS: ReadonlyArray<RegExp> = [
-  // `--output=x`, `--output x`, `-o x`.
+  // `--output=x`, `--output x`. `-o` is separate, below: it collides.
   /^--output(=|$)/,
-  /^-o$/,
   // ripgrep: runs a program per file, and picks the program by glob.
   /^--pre(=|$)/,
   /^--pre-glob(=|$)/,
@@ -208,12 +218,26 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
   }
 }
 
+/**
+ * `-o` writes on most things and means "or" on `find`.
+ *
+ * `sort -o file` and `cc -o binary` really do write, so it cannot simply be
+ * dropped; `find . -name a -o -name b` is a reader's bread and butter, so it
+ * cannot simply be kept. It is the one flag whose meaning depends on what is
+ * running it, and saying that here is cheaper than a table of every tool's
+ * option grammar.
+ */
+function writesWithDashO(binary: string): boolean {
+  return binary !== 'find'
+}
+
 /** One command, with no joiners left in it. */
 function decideSegment(segment: string): PolicyDecision {
   const words = segment.split(/\s+/)
   const binary = words[0]
 
-  const writing = words.slice(1).find((word) => WRITING_FLAGS.some((flag) => flag.test(word)))
+  const flags = writesWithDashO(binary) ? [...WRITING_FLAGS, /^-o$/] : WRITING_FLAGS
+  const writing = words.slice(1).find((word) => flags.some((flag) => flag.test(word)))
   if (writing !== undefined) {
     return {
       allow: false,

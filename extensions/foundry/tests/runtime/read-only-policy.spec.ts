@@ -243,3 +243,42 @@ describe('a command joined to another', () => {
     expect(allowed('find . | head -5').reason).toMatch(/2 commands/)
   })
 })
+
+// `-o` was refused for every binary, for `--output`. It is also how `find`
+// spells "or", so `find . -path ./node_modules -prune -o -type f -print` — the
+// exact command the live architect reached for — was refused. And `pwd` and
+// `echo`, which cannot change anything at all, were not on the list.
+describe('the flags and binaries a reader actually reaches for', () => {
+  const allowed = (command: string) => decideReadOnly('Bash', { command })
+
+  it("lets find use -o, which is how find spells 'or'", () => {
+    const d = allowed('find . -path ./node_modules -prune -o -type f -print')
+    expect(d.allow, d.reason).toBe(true)
+  })
+
+  it('still refuses -o where it really does write a file', () => {
+    expect(allowed('sort -o out.txt in.txt').allow).toBe(false)
+    expect(allowed('grep -o pattern file').allow).toBe(false)
+  })
+
+  it('allows the commands that cannot change anything', () => {
+    for (const command of ['pwd', 'echo hello', 'basename /a/b', 'dirname /a/b', 'realpath .']) {
+      expect(allowed(command).allow, command).toBe(true)
+    }
+  })
+
+  it('allows the ones a reader pipes into', () => {
+    for (const command of ['sort', 'uniq -c', 'cut -d, -f1', 'tr a b', 'wc -l']) {
+      expect(allowed(command).allow, command).toBe(true)
+    }
+  })
+
+  it('allows the whole thing the live architect was refused', () => {
+    const d = allowed('find . -path ./node_modules -prune -o -type f -print | head -100')
+    expect(d.allow, d.reason).toBe(true)
+  })
+
+  it('still refuses find when it is asked to write', () => {
+    expect(allowed('find . -name x -o -delete').allow).toBe(false)
+  })
+})
