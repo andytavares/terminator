@@ -1,0 +1,35 @@
+extensions/foundry/src/runtime/review/hunk-decisions.ts
+  s_357c91d2b54b02::t_27041a567c7185 57
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_357c91d2b54b02::t_27041a567c7185 123
+tests/e2e/live/full-run.spec.ts
+  s_357c91d2b54b02::t_d7b6deef200511 227-245
+extensions/foundry/src/runtime/pending-permissions.ts
+  s_357c91d2b54b02::t_27041a567c7185 23
+extensions/foundry/src/runtime/run-registry.ts
+  s_357c91d2b54b02::t_27041a567c7185 96-100,108-112
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_357c91d2b54b02::t_27041a567c7185 273
+  s_357c91d2b54b02::t_81bf3e5cc3f6f4 250,259,358
+extensions/foundry/tests/runtime/run-registry.spec.ts
+  s_357c91d2b54b02::t_d9cdb9739e87c9 159-160
+extensions/foundry/tests/runtime/supervision.spec.ts
+  s_357c91d2b54b02::t_d23e9ba71acb7a 303-308
+  s_357c91d2b54b02::t_d9cdb9739e87c9 291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "d3a13d68c9574624ca9bc23b9c8b767afef2f547",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
