@@ -11,6 +11,7 @@ import {
   PushRefusedError,
 } from '../../src/line/integrate.js'
 import type { IntegrateDeps } from '../../src/line/integrate.js'
+import { checkoutPath } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeVerdict } from '../../src/verify/verdict.js'
@@ -143,10 +144,22 @@ describe('the command line', () => {
     expect(fs.readFileSync(file, 'utf8')).toContain('AC-1')
   })
 
-  it('runs in the repository it is opening the pull request for', async () => {
+  // In the lane's *worktree*, not the repository. `context.repos[].path` is
+  // where `main` is checked out; the work is in the worktree the checkout cut.
+  // Pushing `HEAD:<branch>` from the repository pushes `main`, so the branch
+  // reached the remote at the commit it was cut from and GitHub answered the
+  // pull request with "No commits between main and foundry/wo-live-run".
+  // Watched on a live run that had done everything else right — the builder's
+  // commit was sitting in the worktree the push never looked at.
+  it("runs in the lane's worktree, which is where the work is", async () => {
     const d = deps()
     await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
-    expect(callsTo(d.exec, 'gh', 'create')[0].cwd).toBe('/repos/app')
+    const expected = checkoutPath(root, order(), 'app')
+    const pushes = callsTo(d.exec, 'git').filter((call) => call.args[0] === 'push')
+    expect(pushes).toHaveLength(1)
+    expect(pushes[0].cwd).toBe(expected)
+    expect(callsTo(d.exec, 'gh', 'create')[0].cwd).toBe(expected)
+    expect(expected).not.toBe('/repos/app')
   })
 
   it('pushes the branch before asking gh to open anything', async () => {
@@ -369,7 +382,7 @@ describe('remembering what was opened', () => {
     const remembered = await readPulls(root, 'WO-1')
     expect(remembered[0]).toMatchObject({
       url: 'https://github.com/tav/app/pull/7',
-      cwd: '/repos/app',
+      cwd: checkoutPath(root, order(), 'app'),
     })
   })
 
@@ -563,8 +576,8 @@ describe('one order across several repositories (FR-067, FR-068)', () => {
     const d = multiDeps()
     await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
     expect(callsTo(d.exec, 'gh', 'create').map((c) => c.cwd)).toEqual([
-      '/repos/proto',
-      '/repos/cli',
+      checkoutPath(root, twoLanes(), 'proto'),
+      checkoutPath(root, twoLanes(), 'cli'),
     ])
   })
 

@@ -4,6 +4,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { shipOrder, markReady } from '../../src/line/integrate.js'
+import { checkoutPath } from '../../src/line/worktree.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -34,11 +35,15 @@ const exec: ShellExec = ({ command, args, cwd }) =>
   })
 
 function git(...args: string[]): void {
+  gitIn(LIVE, ...args)
+}
+
+function gitIn(cwd: string, ...args: string[]): void {
   const env = { ...process.env }
   delete env.GIT_DIR
   delete env.GIT_INDEX_FILE
   delete env.GIT_WORK_TREE
-  execFileSync('git', args, { cwd: LIVE, env, stdio: 'pipe' })
+  execFileSync('git', args, { cwd, env, stdio: 'pipe' })
 }
 
 let dataRoot: string
@@ -97,13 +102,18 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
     dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-'))
     branch = `foundry/live-${Date.now().toString(36)}`
 
-    // A real change on a real branch, which is what a builder would have left
-    // behind in its worktree. From `main` every time, so a re-run does not
-    // build on the previous one's branch and find nothing to commit.
-    git('checkout', 'main')
-    git('reset', '--hard', 'origin/main')
-    git('checkout', '-B', branch)
-    const file = path.join(LIVE, 'src', 'session.js')
+    // A real change on a real branch **in a real worktree**, because that is
+    // where a builder leaves it — and where shipping has to look for it. This
+    // used to commit in the repository itself, which is the shape the bug had:
+    // `shipOrder` pushed `HEAD:<branch>` from `context.repos[].path`, where
+    // `main` is checked out, so the branch reached the remote at the commit it
+    // was cut from and GitHub said "No commits between main and <branch>". The
+    // test passed throughout, because it had put the work where the bug looked.
+    git('fetch', 'origin')
+    const worktree = checkoutPath(dataRoot, order(), order().context.repos[0].name)
+    fs.mkdirSync(path.dirname(worktree), { recursive: true })
+    git('worktree', 'add', '-b', branch, worktree, 'origin/main')
+    const file = path.join(worktree, 'src', 'session.js')
     fs.writeFileSync(
       file,
       [
@@ -116,8 +126,8 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
         '',
       ].join('\n')
     )
-    git('add', '-A')
-    git('commit', '-m', 'read the session TTL from the environment')
+    gitIn(worktree, 'add', '-A')
+    gitIn(worktree, 'commit', '-m', 'read the session TTL from the environment')
   })
 
   it('pushes the branch and opens a draft pull request GitHub can show back', async () => {

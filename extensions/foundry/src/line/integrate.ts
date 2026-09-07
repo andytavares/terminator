@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import { raiseGate } from '../gates/rules.js'
 import { laneViews, mayMergeLane } from '../order/lanes.js'
-import { branchFor } from './worktree.js'
+import { branchFor, checkoutPath } from './worktree.js'
 import type { Gate } from '../gates/rules.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
@@ -401,9 +401,22 @@ export async function shipOrder(
   // written by nothing, so reading it raw pushed `HEAD:` and asked for a pull
   // request with `--head ''` — which every mocked-exec test accepted as a
   // fine argument list, and which the first real `git` refused outright.
+  //
+  // And the *path* the same way, for the same reason one layer down.
+  // `context.repos[].path` is the repository, where `main` is checked out; the
+  // work is in the lane's worktree. Pushing `HEAD:<branch>` from the repository
+  // pushes `main` — so the branch reached the remote at exactly the commit it
+  // was cut from, and GitHub answered the pull request with "No commits between
+  // main and foundry/wo-live-run". Watched on a live run that had done
+  // everything else right: the builder's commit was sitting in the worktree the
+  // push never looked at.
   const repos = [...order.context.repos]
     .sort((a, b) => a.lane - b.lane)
-    .map((repo) => ({ ...repo, headBranch: branchFor(order, repo.lane) }))
+    .map((repo) => ({
+      ...repo,
+      headBranch: branchFor(order, repo.lane),
+      path: checkoutPath(deps.root, order, repo.name),
+    }))
   const bodyPaths: string[] = []
 
   for (const repo of repos) {
