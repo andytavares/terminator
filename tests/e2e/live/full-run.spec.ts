@@ -158,7 +158,11 @@ interface Observed {
 }
 
 test('an agent takes an order to a draft pull request', async () => {
-  test.setTimeout(1_500_000)
+  // Longer than the polling deadline below, which is itself longer than the
+  // order's budget. At 25 minutes against a 30-minute deadline the loop could
+  // never reach its own end, so the run was killed by Playwright rather than
+  // reported by the test — and "timed out" says nothing about what happened.
+  test.setTimeout(2_100_000)
   writeOrder()
 
   const started = (await foundry('foundry:run.start', { id: ORDER })) as {
