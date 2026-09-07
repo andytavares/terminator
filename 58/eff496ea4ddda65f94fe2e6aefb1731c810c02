@@ -1,0 +1,36 @@
+extensions/foundry/src/ipc/forge-channels.ts
+  s_357c91d2b54b02::t_39d07fd71bd452 37-41,149-150,446-484,488-492
+  s_357c91d2b54b02::t_6465691051ac36 535
+  s_357c91d2b54b02::t_7d661f4319513d 493-499
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_357c91d2b54b02::t_d7597e27eee550 15-39
+extensions/foundry/src/components/foundry.css
+  s_357c91d2b54b02::t_4fb99aecb9ec7f 1123-1136
+  s_357c91d2b54b02::t_616ec95136d768 767-770,772
+extensions/foundry/src/components/Orders.tsx
+  s_357c91d2b54b02::t_4fb99aecb9ec7f 145-176
+extensions/remote-control/src/server/remote-server.ts
+  s_357c91d2b54b02::t_463a5298b0c272 220-223,227-231
+  s_357c91d2b54b02::t_b914f158f7dae1 224-226
+extensions/foundry/src/index.ts
+  s_357c91d2b54b02::t_6465691051ac36 1664
+src/main/extensions/extension-view-host.ts
+  s_357c91d2b54b02::t_463a5298b0c272 215-218,222-226
+  s_357c91d2b54b02::t_b914f158f7dae1 219-221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "58eff496ea4ddda65f94fe2e6aefb1731c810c02",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
