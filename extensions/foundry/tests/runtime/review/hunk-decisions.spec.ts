@@ -34,16 +34,6 @@ describe('deciding hunk by hunk', () => {
     expect(set.isFullReject()).toBe(false)
   })
 
-  it('groups decisions by file, which is how a review is read', () => {
-    const set = createDecisionSet([hunk('h1', 'src/a.ts'), hunk('h2', 'src/b.ts')])
-    set.decide('h1', 'accept')
-    set.decide('h2', 'reject')
-    expect(set.byFile()).toEqual([
-      { file: 'src/a.ts', accepted: ['h1'], rejected: [] },
-      { file: 'src/b.ts', accepted: [], rejected: ['h2'] },
-    ])
-  })
-
   it('has nothing to complete when there were no hunks at all', () => {
     const set = createDecisionSet([])
     expect(set.isComplete()).toBe(true)

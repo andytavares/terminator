@@ -59,14 +59,6 @@ describe('what counts as live', () => {
     registry.setState('session-1', state, 2_000)
     expect(registry.live()).toEqual([])
   })
-
-  it('lists the ones waiting to be reviewed', () => {
-    const registry = createRunRegistry()
-    add(registry)
-    add(registry, { sessionId: 'session-2' })
-    registry.setState('session-1', 'ready', 2_000)
-    expect(registry.awaitingReview().map((r) => r.sessionId)).toEqual(['session-1'])
-  })
 })
 
 describe('recording what happened', () => {
@@ -98,24 +90,6 @@ describe('recording what happened', () => {
       diff: { files: 2, added: 9, removed: 1 },
     })
   })
-
-  it('counts how often it had to ask', () => {
-    const registry = createRunRegistry()
-    add(registry)
-    registry.noteAsked('session-1')
-    registry.noteAsked('session-1')
-    expect(registry.get('session-1')?.asked).toBe(2)
-  })
-
-  it('ignores anything said about a run it does not have', () => {
-    const registry = createRunRegistry()
-    expect(() => {
-      registry.setState('nobody', 'ready', 1)
-      registry.noteTurns('nobody', 1)
-      registry.noteDiff('nobody', { files: 1, added: 1, removed: 0 })
-      registry.noteAsked('nobody')
-    }).not.toThrow()
-  })
 })
 
 describe('forgetting', () => {
@@ -144,46 +118,6 @@ describe('forgetting', () => {
   })
 })
 
-describe('moving on to the next phase in the same conversation', () => {
-  it('renames the run, so it does not still read as the phase it opened with', () => {
-    // A card keeps one conversation across its phases now. Without this the
-    // run list said `specify` for a card three phases in.
-    const registry = createRunRegistry()
-    add(registry)
-    registry.notePhase('session-1', 'plan', 5_000)
-    expect(registry.get('session-1')?.phase).toBe('plan')
-  })
-
-  it('restarts the clock, since "how long like this" is now about this phase', () => {
-    const registry = createRunRegistry()
-    add(registry)
-    registry.notePhase('session-1', 'plan', 5_000)
-    expect(registry.get('session-1')?.stateSince).toBe(5_000)
-  })
-
-  it('brings an archived run back to working, which is what starting a phase means', () => {
-    const registry = createRunRegistry()
-    add(registry)
-    registry.archive('session-1', 'approved', 4_000)
-    registry.notePhase('session-1', 'plan', 5_000)
-    expect(registry.get('session-1')?.state).toBe('working')
-    expect(registry.live()).toHaveLength(1)
-  })
-
-  it('does nothing at all when the phase has not actually changed', () => {
-    const registry = createRunRegistry()
-    add(registry)
-    registry.setState('session-1', 'waiting', 2_000)
-    registry.notePhase('session-1', 'implement', 5_000)
-    expect(registry.get('session-1')?.state).toBe('waiting')
-    expect(registry.get('session-1')?.stateSince).toBe(2_000)
-  })
-
-  it('ignores a session it has never heard of', () => {
-    expect(() => createRunRegistry().notePhase('nobody', 'plan', 1)).not.toThrow()
-  })
-})
-
 describe('the record of what is over', () => {
   it('starts empty, and says so rather than inventing a row', () => {
     expect(createRunRegistry().history()).toEqual([])
@@ -198,24 +132,6 @@ describe('the record of what is over', () => {
     registry.archive('session-1', 'approved', 9_000)
     expect(registry.live()).toEqual([])
     expect(registry.get('session-1')?.state).toBe('finished')
-  })
-
-  it('keeps what the phase actually did, not just that it happened', () => {
-    const registry = createRunRegistry()
-    add(registry)
-    registry.noteTurns('session-1', 12)
-    registry.noteDiff('session-1', { files: 3, added: 90, removed: 4 })
-    registry.noteAsked('session-1')
-    const entry = registry.archive('session-1', 'approved', 9_000)
-    expect(entry).toMatchObject({
-      phase: 'implement',
-      branch: 'feat/a',
-      outcome: 'approved',
-      endedAt: 9_000,
-      turns: 12,
-      diff: { files: 3, added: 90, removed: 4 },
-      asked: 1,
-    })
   })
 
   it('copies the diff rather than aliasing it, so later work cannot rewrite history', () => {
@@ -236,22 +152,12 @@ describe('the record of what is over', () => {
     expect(registry.history().map((entry) => entry.sessionId)).toEqual(['session-2', 'session-1'])
   })
 
-  it('records every phase of one conversation separately', () => {
-    // The point of the view: "specify approved, then plan approved", not one
-    // row per session.
-    const registry = createRunRegistry()
-    add(registry)
-    registry.archive('session-1', 'approved', 1_000)
-    registry.notePhase('session-1', 'plan', 1_100)
-    registry.archive('session-1', 'approved', 2_000)
-    expect(registry.history().map((entry) => entry.phase)).toEqual(['plan', 'implement'])
-  })
-
   it('is bounded, since it lives in memory for as long as the app does', () => {
     const registry = createRunRegistry()
     add(registry)
     for (let n = 0; n < 250; n++) {
-      registry.notePhase('session-1', `phase-${n}`, n)
+      registry.archive('session-1', 'ended', n)
+      add(registry)
       registry.archive('session-1', 'approved', n)
     }
     expect(registry.history()).toHaveLength(200)

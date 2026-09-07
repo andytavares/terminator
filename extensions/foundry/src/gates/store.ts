@@ -12,7 +12,6 @@ import type { Gate } from './rules.js'
 export interface GateStore {
   save(gate: Gate): Promise<void>
   list(): Promise<Gate[]>
-  forOrder(orderId: string): Promise<Gate[]>
   get(id: string): Promise<Gate | null>
 }
 
@@ -36,7 +35,6 @@ export function createLiveGateStore(root: () => string): GateStore {
   return {
     save: (gate) => createGateStore(root()).save(gate),
     list: () => createGateStore(root()).list(),
-    forOrder: (orderId) => createGateStore(root()).forOrder(orderId),
     get: (id) => createGateStore(root()).get(id),
   }
 }
@@ -50,13 +48,7 @@ export function createGateStore(root: string): GateStore {
     }
   }
 
-  async function forOrder(orderId: string): Promise<Gate[]> {
-    return read(root, orderId)
-  }
-
   return {
-    forOrder,
-
     async save(gate) {
       const existing = await read(root, gate.orderId)
       const next = existing.some((g) => g.id === gate.id)

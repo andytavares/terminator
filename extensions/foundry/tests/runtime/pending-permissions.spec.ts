@@ -57,13 +57,6 @@ describe('holding what is waiting on the operator', () => {
     expect(createPendingPermissions().sessionFor('req-1')).toBeNull()
   })
 
-  it('shows only one card’s requests when asked for them', () => {
-    const pending = createPendingPermissions()
-    pending.add(ask({ requestId: 'a' }))
-    pending.add(ask({ requestId: 'b', featureDir: '/repo/specs/022-other' }))
-    expect(pending.forCard('/repo/specs/021-thing').map((a) => a.requestId)).toEqual(['a'])
-  })
-
   it('drops a card’s requests when its run ends', () => {
     const pending = createPendingPermissions()
     pending.add(ask({ requestId: 'a' }))

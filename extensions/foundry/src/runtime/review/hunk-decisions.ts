@@ -54,9 +54,7 @@ export interface DecisionSet {
    * needs and exactly what a reviewer cannot use: an undecided hunk is the one
    * still needing a decision, and it would never appear.
    */
-  list(): ReviewableHunk[]
-  byFile(): FileDecisions[]
-  /** Every hunk decided, so the review can be completed. */
+  list(): ReviewableHunk[] /** Every hunk decided, so the review can be completed. */
   isComplete(): boolean
   /** All rejected: the branch keeps nothing and the session is discarded, not merged. */
   isFullReject(): boolean
@@ -76,18 +74,6 @@ export function createDecisionSet(hunks: readonly Hunk[]): DecisionSet {
 
     list(): ReviewableHunk[] {
       return hunks.map((hunk) => ({ hunk, decision: decisions.get(hunk.id) ?? null }))
-    },
-
-    byFile(): FileDecisions[] {
-      const files = new Map<string, FileDecisions>()
-      for (const hunk of hunks) {
-        const entry = files.get(hunk.file) ?? { file: hunk.file, accepted: [], rejected: [] }
-        const decision = decisions.get(hunk.id)
-        if (decision === 'accept') entry.accepted.push(hunk.id)
-        else if (decision === 'reject') entry.rejected.push(hunk.id)
-        files.set(hunk.file, entry)
-      }
-      return [...files.values()].sort((a, b) => a.file.localeCompare(b.file))
     },
 
     isComplete(): boolean {

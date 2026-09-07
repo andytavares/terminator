@@ -392,16 +392,6 @@ async function askPermission(sessionId: string): Promise<void> {
 }
 
 describe('running the next phase in the conversation that is already open', () => {
-  it('finds the card its open session, so a phase need not start a new one', async () => {
-    const supervised = runner()
-    const run = await supervised.start(start)
-    expect(supervised.liveSessionFor(start.featureDir)).toBe(run?.sessionId)
-  })
-
-  it('has no session for a card that has never run', () => {
-    expect(runner().liveSessionFor('/repo/specs/999-nothing')).toBeNull()
-  })
-
   it('opens no second terminal, which is where the tab-per-phase sprawl came from', async () => {
     const supervised = runner()
     const run = await supervised.start(start)

@@ -224,4 +224,23 @@ test('an agent takes an order to a draft pull request', async () => {
   // eslint-disable-next-line no-console
   console.log(`ledger:\n${ledger}`)
   expect(ledger).toContain('run.started')
+
+  // The thing this test is named after. Read back from GitHub rather than
+  // from the ledger, because the ledger records what the code believed.
+  const branch = execFileSync('git', ['branch', '--show-current'], { cwd: worktree })
+    .toString()
+    .trim()
+  const listed = execFileSync(
+    'gh',
+    ['pr', 'list', '--head', branch, '--json', 'url,isDraft,headRefName'],
+    { cwd: repo }
+  ).toString()
+  // eslint-disable-next-line no-console
+  console.log(`pull requests on ${branch}: ${listed}`)
+  const pulls = JSON.parse(listed) as { url: string; isDraft: boolean }[]
+  expect(pulls, `nothing was opened on ${branch}`).toHaveLength(1)
+  expect(pulls[0].isDraft, 'it was opened, but not as a draft (FR-053)').toBe(true)
+
+  // And the order says so too, which is what the operator reads.
+  expect(ledger).toContain('ship.draft_opened')
 })

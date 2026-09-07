@@ -120,9 +120,7 @@ export interface SupervisedRunner {
     sessionId: string,
     options: { prompt: string; phase: StepLabel } & PhaseCallbacks
   ): SupervisedRun | null
-  /** The card's open conversation, if it still has one. */
-  liveSessionFor(featureDir: string): string | null
-  /**
+  /** The card's open conversation, if it still has one. */ /**
    * Answers a tool call the operator was asked about.
    *
    * False when it was no longer waiting — already answered, handed back, or the
@@ -437,13 +435,6 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         terminalSessionId: run.terminalSessionId,
         transcriptPath: run.transcriptPath,
       }
-    },
-
-    liveSessionFor(featureDir): string | null {
-      for (const [sessionId, run] of running) {
-        if (run.featureDir === featureDir) return sessionId
-      }
-      return null
     },
 
     resolve(sessionId, requestId, decision): boolean {

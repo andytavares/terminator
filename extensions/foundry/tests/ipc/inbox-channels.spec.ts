@@ -247,7 +247,7 @@ describe('createGateStore', () => {
     const store = createGateStore(root)
     await store.save(gate())
     await store.save({ ...gate(), summary: 'changed' })
-    const all = await store.forOrder('WO-1')
+    const all = (await store.list()).filter((g) => g.orderId === 'WO-1')
     expect(all).toHaveLength(1)
     expect(all[0].summary).toBe('changed')
   })
@@ -256,7 +256,7 @@ describe('createGateStore', () => {
     const store = createGateStore(root)
     await store.save(gate({ id: 'G-1', orderId: 'WO-1' }))
     await store.save(gate({ id: 'G-2', orderId: 'WO-2' }))
-    expect(await store.forOrder('WO-1')).toHaveLength(1)
+    expect((await store.list()).filter((g) => g.orderId === 'WO-1')).toHaveLength(1)
     expect(await store.list()).toHaveLength(2)
   })
 
@@ -270,7 +270,7 @@ describe('createGateStore', () => {
 
 describe('the gate store on disk', () => {
   it('finds nothing for an order with no gates', async () => {
-    expect(await createGateStore(root).forOrder('WO-none')).toEqual([])
+    expect((await createGateStore(root).list()).filter((g) => g.orderId === 'WO-none')).toEqual([])
   })
 
   it('is null for a gate id nobody raised', async () => {
@@ -355,7 +355,7 @@ describe('a gate store whose root follows the workspace', () => {
 
     // And the reads go through the same resolver as the writes.
     expect((await store.get('G-b'))?.id).toBe('G-b')
-    expect(await store.forOrder('WO-1')).toHaveLength(1)
+    expect((await store.list()).filter((g) => g.orderId === 'WO-1')).toHaveLength(1)
     expect(await store.list()).toHaveLength(1)
 
     for (const dir of [a, b]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })

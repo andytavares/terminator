@@ -20,10 +20,7 @@ export interface PendingPermissions {
   /** Removes one, answered or handed back. */
   remove(requestId: string): void
   /** Everything outstanding, oldest first — the order they must be answered in. */
-  list(): PendingAsk[]
-  /** Everything outstanding for one card. */
-  forCard(featureDir: string): PendingAsk[]
-  /** The run a request belongs to, so the answer is sent to the right one. */
+  list(): PendingAsk[] /** The run a request belongs to, so the answer is sent to the right one. */
   sessionFor(requestId: string): string | null
   /** Drops a whole card's requests, when its run ends. */
   forgetCard(featureDir: string): void
@@ -46,10 +43,6 @@ export function createPendingPermissions(): PendingPermissions {
 
     list(): PendingAsk[] {
       return [...asks.values()]
-    },
-
-    forCard(featureDir: string): PendingAsk[] {
-      return [...asks.values()].filter((ask) => ask.featureDir === featureDir)
     },
 
     sessionFor(requestId: string): string | null {

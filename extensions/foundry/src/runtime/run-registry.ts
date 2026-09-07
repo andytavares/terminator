@@ -93,9 +93,11 @@ export interface RunRegistry {
   list(): Run[]
   /** Everything still consuming time — what "3 running" counts. */
   live(): Run[]
-  /** Finished with changes nobody has looked at yet. */
-  awaitingReview(): Run[]
-  setState(sessionId: string, state: RunState, at: number): void
+  /** Finished with changes nobody has looked at yet. */ setState(
+    sessionId: string,
+    state: RunState,
+    at: number
+  ): void
   /**
    * The card has moved on to the next phase in the same conversation.
    *
@@ -103,12 +105,11 @@ export interface RunRegistry {
    * a card three phases in still reads `specify` — and `stateSince`, which is
    * how the stall detector and the panel both measure "how long like this",
    * would still be counting from the first phase's start.
-   */
-  notePhase(sessionId: string, phase: string, at: number): void
-  noteTurns(sessionId: string, turns: number): void
-  noteDiff(sessionId: string, diff: DiffSummary): void
-  noteAsked(sessionId: string): void
-  /** Takes it off the register — reviewed, discarded, or the card removed. */
+   */ noteTurns(sessionId: string, turns: number): void
+  noteDiff(
+    sessionId: string,
+    diff: DiffSummary
+  ): void /** Takes it off the register — reviewed, discarded, or the card removed. */
   forget(sessionId: string): void
   forgetCard(featureDir: string): void
 }
@@ -173,24 +174,12 @@ export function createRunRegistry(): RunRegistry {
       return [...runs.values()].filter((run) => LIVE.has(run.state))
     },
 
-    awaitingReview(): Run[] {
-      return [...runs.values()].filter((run) => run.state === 'ready')
-    },
-
     setState(sessionId, state, at): void {
       const run = runs.get(sessionId)
       // Recorded only on a change: `stateSince` is how long it has been like
       // this, and rewriting it every tick would make everything look new.
       if (run === undefined || run.state === state) return
       run.state = state
-      run.stateSince = at
-    },
-
-    notePhase(sessionId, phase, at): void {
-      const run = runs.get(sessionId)
-      if (run === undefined || run.phase === phase) return
-      run.phase = phase
-      run.state = 'working'
       run.stateSince = at
     },
 
@@ -202,11 +191,6 @@ export function createRunRegistry(): RunRegistry {
     noteDiff(sessionId, diff): void {
       const run = runs.get(sessionId)
       if (run !== undefined) run.diff = diff
-    },
-
-    noteAsked(sessionId): void {
-      const run = runs.get(sessionId)
-      if (run !== undefined) run.asked += 1
     },
 
     forget(sessionId): void {
