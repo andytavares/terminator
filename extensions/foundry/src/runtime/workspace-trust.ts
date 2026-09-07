@@ -56,15 +56,6 @@ function realPath(target: string): string {
   }
 }
 
-/** Whether this repository is already trusted, under either name for it. */
-export function isTrusted(repoRoot: string, home = os.homedir()): boolean {
-  const config = read(claudeConfigPath(home))
-  const projects = config?.projects ?? {}
-  return [repoRoot, realPath(repoRoot)].some(
-    (each) => projects[each]?.hasTrustDialogAccepted === true
-  )
-}
-
 export type TrustResult =
   | { changed: true }
   | { changed: false; reason: 'already trusted' | 'no config to amend' | 'could not write' }

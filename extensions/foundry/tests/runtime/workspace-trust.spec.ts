@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { ensureTrusted, isTrusted, claudeConfigPath } from '../../src/runtime/workspace-trust.js'
+import { ensureTrusted, claudeConfigPath } from '../../src/runtime/workspace-trust.js'
 
 // Claude Code shows its workspace trust dialog for a directory it has not
 // seen, "in interactive sessions only" — and Foundry runs interactively on
@@ -34,7 +34,13 @@ describe('ensureTrusted', () => {
   it('trusts a repository Claude Code has never seen', () => {
     writeConfig({ projects: {} })
     expect(ensureTrusted(REPO, home)).toEqual({ changed: true })
-    expect(isTrusted(REPO, home)).toBe(true)
+    const entry = readConfig().projects[REPO] as unknown as Record<string, unknown>
+    expect(entry.hasTrustDialogAccepted).toBe(true)
+  })
+
+  it('trusts one whose entry exists and says no', () => {
+    writeConfig({ projects: { [REPO]: { hasTrustDialogAccepted: false } } })
+    expect(ensureTrusted(REPO, home)).toEqual({ changed: true })
   })
 
   it('leaves an already-trusted one alone, so a run does not rewrite the file every time', () => {
@@ -92,29 +98,14 @@ describe('ensureTrusted', () => {
   it('adds a projects map to a config that has none', () => {
     writeConfig({ numStartups: 1 })
     expect(ensureTrusted(REPO, home)).toEqual({ changed: true })
-    expect(isTrusted(REPO, home)).toBe(true)
+    const entry = readConfig().projects[REPO] as unknown as Record<string, unknown>
+    expect(entry.hasTrustDialogAccepted).toBe(true)
   })
 
   it('leaves no temporary file behind', () => {
     writeConfig({ projects: {} })
     ensureTrusted(REPO, home)
     expect(fs.readdirSync(home).filter((f) => f.includes('tmp'))).toEqual([])
-  })
-})
-
-describe('isTrusted', () => {
-  it('is false with no config at all, rather than throwing', () => {
-    expect(isTrusted(REPO, home)).toBe(false)
-  })
-
-  it('is false for a project the config does not mention', () => {
-    writeConfig({ projects: { '/repos/other': { hasTrustDialogAccepted: true } } })
-    expect(isTrusted(REPO, home)).toBe(false)
-  })
-
-  it('is false where the entry exists and the answer was no', () => {
-    writeConfig({ projects: { [REPO]: { hasTrustDialogAccepted: false } } })
-    expect(isTrusted(REPO, home)).toBe(false)
   })
 })
 
@@ -135,12 +126,14 @@ describe('a directory with two names', () => {
     expect(projects[fs.realpathSync(link)]?.hasTrustDialogAccepted).toBe(true)
   })
 
-  it('reads either name as trusted', () => {
+  it('adds the name it was given when only the resolved one is trusted', () => {
     const real = fs.mkdtempSync(path.join(home, 'real-'))
     const link = path.join(home, 'link')
     fs.symlinkSync(real, link)
     writeConfig({ projects: { [fs.realpathSync(link)]: { hasTrustDialogAccepted: true } } })
-    expect(isTrusted(link, home)).toBe(true)
+    expect(ensureTrusted(link, home)).toEqual({ changed: true })
+    const projects = readConfig().projects as unknown as Record<string, { [k: string]: unknown }>
+    expect(projects[link]?.hasTrustDialogAccepted).toBe(true)
   })
 
   it('does not rewrite the file when both names are already trusted', () => {
