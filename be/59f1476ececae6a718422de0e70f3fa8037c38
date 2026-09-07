@@ -1,0 +1,23 @@
+extensions/foundry/SUPERVISION.md
+  s_357c91d2b54b02::t_e2e19c2a2fe48f 237-239,242-251,253-257
+  s_357c91d2b54b02::t_95de6134185558 240-241,252,440-441,443-445,450
+  s_357c91d2b54b02::t_922256b6eacdfc 442,446-449,451-466
+docs/ARCHITECTURE.md
+  s_357c91d2b54b02::t_95de6134185558 920-929
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "be59f1476ececae6a718422de0e70f3fa8037c38",
+  "prompts": {},
+  "sessions": {
+    "s_357c91d2b54b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97cd4261-aedb-42ef-9c49-f448e584f2bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
