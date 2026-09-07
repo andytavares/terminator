@@ -25,6 +25,8 @@ import type { RunGraph, RunNode } from './line/run-graph.js'
 import type { Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
 import { decideByAutonomy } from './runtime/autonomy-policy.js'
+import { ensureTrusted } from './runtime/workspace-trust.js'
+import type { LedgerEntry } from './ledger/append.js'
 import type { IntegrateDeps } from './line/integrate.js'
 import { checkCapability, writeBack } from './trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
@@ -190,6 +192,42 @@ const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
  * `--model`", so the run follows the operator's own Claude Code configuration.
  * Only an unset setting falls through to the default.
  */
+/**
+ * Make sure the repository an agent is about to work in is trusted, and say so.
+ *
+ * Recorded rather than done quietly: amending the operator's own Claude Code
+ * configuration is a thing they should be able to find in the ledger, even
+ * though it is the answer they would have given the dialog themselves.
+ */
+function trustRepository(
+  api: ExtensionAPI,
+  repoRoot: string,
+  orderId: string,
+  store: { record: (entry: LedgerEntry) => Promise<void> }
+): void {
+  const result = ensureTrusted(repoRoot)
+  if (!result.changed) {
+    if (result.reason === 'could not write') {
+      api.log.error(
+        `Foundry could not mark ${repoRoot} trusted; its agents will stop at the trust dialog.`
+      )
+    }
+    return
+  }
+  void store
+    .record({
+      at: new Date().toISOString(),
+      orderId,
+      actor: 'rule:line',
+      action: 'workspace.trusted',
+      subject: repoRoot,
+      reason:
+        'Claude Code shows its trust dialog for a directory it has not seen, and an agent waiting at one never starts.',
+      evidence: [],
+    })
+    .catch(() => undefined)
+}
+
 /** The autonomy dial, read wherever it is needed rather than copied. */
 function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' {
   return (
@@ -683,6 +721,16 @@ async function executeRun(
         resolve({ sessionId, exitCode })
       }
 
+      // Claude Code shows its workspace trust dialog for a directory it has
+      // not seen, in interactive sessions only — and this is an interactive
+      // session by design. Without this the agent comes up, sits at that
+      // dialog, and never starts: the process is running, the register has it,
+      // the graph says `running`, and nothing happens for ever.
+      //
+      // Keyed to the repository rather than the worktree, because that is what
+      // the documentation says trust is keyed to for a worktree.
+      trustRepository(api, checkout.origin, order.id, store)
+
       void runner
         .start({
           featureDir,
@@ -1059,6 +1107,8 @@ async function convergeOnce(
       )
       answer({ ok: false, reason: 'The architect ended before it started.' })
     }
+
+    trustRepository(api, plan.cwd, order.id, createOrderStore(root))
 
     void runner
       .start({

@@ -62,6 +62,68 @@ discarded diff holding a review slot would gate the next run on reviewing
 something that no longer
 exists.
 
+## Trusting the folder, or the agent never starts
+
+Claude Code shows a workspace trust dialog for a directory it has not seen, and
+its documentation is explicit that the dialog "appears in interactive sessions
+only and is bypassed in non-interactive `claude -p` or SDK runs". Foundry runs
+interactively on purpose — an agent in a terminal you can go and type at is the
+whole design — so every launch meets that dialog.
+
+An agent sitting at it looks exactly like one hard at work: the process is up,
+the run register holds it, the graph says `running`, the stall detector counts
+its silence as thinking. It has simply never started. The live run that found
+this had an agent at 0% CPU with no transcript at all.
+
+`runtime/workspace-trust.ts` sets `projects["<repo>"].hasTrustDialogAccepted` in
+`~/.claude.json`, which is the mechanism the documentation names for granting it
+without a prompt. Three things about how:
+
+- **Keyed to the repository, not the worktree.** "Trust is keyed to the git
+  repository root (or main checkout root in worktrees)" — an entry for the
+  worktree path would do nothing at all.
+- **Additive, and never creating.** It sets one boolean on one project entry and
+  leaves every other key and every other project alone. It will not create
+  `~/.claude.json`: a machine with no Claude Code configuration is one where a
+  run was never going to work, and inventing the operator's config file is not
+  this extension's business.
+- **Recorded.** `workspace.trusted` goes in the ledger, because amending the
+  operator's own configuration is something they should be able to find, even
+  though it is the answer they would have given the dialog themselves.
+
+## The launch is a file, not a typed line
+
+A terminal in canonical mode silently drops or corrupts anything past
+`MAX_CANON` on a single line — **1024 bytes on macOS**. The launch is
+`claude … <the whole brief>`, and a brief is a role prompt plus a work order,
+which is always longer than that. Typed, it arrived like this — read off a live
+agent's own argv:
+
+```
+# Read the session TTL from the environment\n\nWork ordeWork ordeWork orde
+…×15… WorkTL_MS reads SESSION_TTL_MS …
+```
+
+A fragment of the order repeated fifteen times, then cut off mid-word. **Every
+agent this runtime launched was handed a brief like that**, and nothing could
+see it: the terminal renders the first line correctly, so an assertion that
+`claude --session-id` is visible passes; the process starts, so the run
+register, the stall detector and the run graph all report it running. It simply
+does the wrong work — or, in the run that found this, sits at 0% CPU with no
+transcript at all for half an hour.
+
+So the launch is written to `<stateDir>/launch/<session>.sh` and the terminal is
+told to run that file. The script `cat`s itself through a quoted heredoc before
+`exec`, so the whole command still appears in the terminal and what an agent was
+told is readable there — which is the point of running it in a terminal at all.
+
+The guard is the one that matters rather than the one that is easy: no line the
+runner types may reach `MAX_CANON`.
+
+`continueRun` still types, because by then the agent owns the terminal and its
+TUI reads in raw mode rather than canonical — a different discipline, without
+that limit.
+
 ## One conversation per card
 
 A card gets **one** terminal, one Claude session and one `claude` process, and
