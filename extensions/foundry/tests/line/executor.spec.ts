@@ -1324,3 +1324,70 @@ describe('a budget exceeded while agents are still running', () => {
     expect(outcome.complete).toBe(true)
   })
 })
+
+// The budget is compared exactly, not against a rounded number of minutes. It
+// was `Math.round`ed, so a run at 19:31 reported "20" and a twenty-minute
+// budget could only be exceeded at 20:30 — a live run whose own deadline was
+// the budget therefore never saw the gate at all.
+describe('when exactly the budget is exceeded', () => {
+  const hangs = () => new Promise<StartedRun>(() => {})
+
+  /**
+   * A clock that starts where the test says and moves on every poll.
+   *
+   * A fixed clock plus a wave that never settles is an infinite loop with no
+   * delay in it — which is a busy spin, not a test.
+   */
+  function from(minutes: number) {
+    let now = minutes
+    return {
+      observe: () => ({ elapsedMinutes: now, filesTouched: 0 }),
+      wait: async (_ms: number) => {
+        now += 0.5
+      },
+      budgetPollMs: 1,
+    }
+  }
+
+  async function runFrom(minutes: number) {
+    const o = order([unit('U-1')], {
+      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+    })
+    return execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(hangs as never),
+      autonomy: 'escorted',
+      ...from(minutes),
+    })
+  }
+
+  it('is not exceeded a second before the budget — it waits, and then it is', async () => {
+    const outcome = await runFrom(19.98)
+    const gate = outcome.gates.find((g) => g.rule === 'budget.exceeded')
+    expect(gate).toBeDefined()
+    // The first poll was under the budget, so the gate is not raised on it.
+    expect(gate?.why).toContain('at 20')
+  })
+
+  it('says the number a person would say, not the fraction it compared', async () => {
+    const outcome = await runFrom(20.4)
+    const gate = outcome.gates.find((g) => g.rule === 'budget.exceeded')
+    expect(gate?.why).toContain('at 20')
+    expect(gate?.why).not.toMatch(/20\.\d/)
+  })
+
+  it('never fires for a run comfortably inside its budget', async () => {
+    const o = order([unit('U-1')], {
+      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      observe: () => ({ elapsedMinutes: 19.98, filesTouched: 0 }),
+      wait: async () => undefined,
+      budgetPollMs: 1,
+    })
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('budget.exceeded')
+    expect(outcome.complete).toBe(true)
+  })
+})

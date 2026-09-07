@@ -350,7 +350,7 @@ export async function execute(
     if (breach !== null) {
       halted = await raise('budget.exceeded', {
         summary: `${order.title} has gone past its ${breach.kind.replace('_', ' ')} budget`,
-        why: `The order budgets ${breach.limit} and this run is at ${breach.actual}.`,
+        why: `The order budgets ${breach.limit} and this run is at ${Math.round(breach.actual)}.`,
       })
       if (halted) break
     }
@@ -464,7 +464,7 @@ export async function execute(
       halted = await raise('budget.exceeded', {
         summary: `${order.title} has gone past its ${breach.kind.replace('_', ' ')} budget`,
         why:
-          `The order budgets ${breach.limit} and this run is at ${breach.actual}. ` +
+          `The order budgets ${breach.limit} and this run is at ${Math.round(breach.actual)}. ` +
           `Its agents are still in their terminals — nothing was thrown away.`,
       })
       // Even where the rule is silenced, a run past its budget stops asking

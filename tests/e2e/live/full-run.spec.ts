@@ -172,7 +172,10 @@ test('an agent takes an order to a draft pull request', async () => {
   // waiting on any more; the run is over when every node is settled or the
   // budget stops it.
   const SETTLED = new Set(['passed', 'failed', 'skipped', 'blocked'])
-  const deadline = Date.now() + 20 * 60_000
+  // Longer than the order's own budget, deliberately. When the two were the
+  // same the test gave up at the moment the budget would have stopped the run,
+  // so the gate that exists for exactly this case was never seen.
+  const deadline = Date.now() + 30 * 60_000
   let last: Observed = {}
   let previous = ''
 
@@ -193,10 +196,20 @@ test('an agent takes an order to a draft pull request', async () => {
   // eslint-disable-next-line no-console
   console.log(`blocked: ${JSON.stringify(last.blocked ?? [])}`)
 
-  // Whatever else happened, nothing may be left running: a node still marked
-  // `running` after the budget is a run nobody can tell has stopped.
+  // A node may legitimately still be `running` — a budget breach halts the run
+  // without killing its agents, which is what "preserving work in progress"
+  // means. What may never happen is a run that stopped with nothing to say:
+  // either every node settled, or something is on the inbox explaining it.
   const stillRunning = nodes.filter((n) => n.state === 'running')
-  expect(stillRunning.map((n) => last.labels?.[n.id] ?? n.id)).toEqual([])
+  if (stillRunning.length > 0) {
+    const gatesFile = join(repo, '.foundry', 'orders', ORDER, 'gates.json')
+    expect(
+      existsSync(gatesFile),
+      `${stillRunning.length} nodes still running and no gate to explain it`
+    ).toBe(true)
+    // eslint-disable-next-line no-console
+    console.log(`gates: ${readFileSync(gatesFile, 'utf8')}`)
+  }
 
   // The agent's own work: the file the unit named actually changed.
   const worktree = join(repo, '.foundry', 'orders', ORDER, 'worktrees', 'live')

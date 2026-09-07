@@ -923,7 +923,11 @@ async function executeRun(
       return measured
     },
     observe: () => ({
-      elapsedMinutes: Math.round((Date.now() - startedAt) / 60_000),
+      // Fractional on purpose. Rounded, a run at 19:31 reported "20" and a
+      // twenty-minute budget could only be exceeded at 20:30 — so a run whose
+      // deadline was the budget never saw the gate at all. The gate rounds it
+      // for the sentence it prints; the comparison is exact.
+      elapsedMinutes: (Date.now() - startedAt) / 60_000,
       filesTouched: new Set(order.plan.units.flatMap((u) => u.touches)).size,
     }),
     onEvent: (event) => {
