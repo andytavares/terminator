@@ -259,3 +259,26 @@ describe('every shipped role is one an operator recipe could name', () => {
     }
   )
 })
+
+// Two role prompts have to agree about the same files. The architect declares
+// what a unit touches; the builder is told to write the failing test first. If
+// the architect does not count the test file, the builder writes a file nobody
+// declared — which is a risk trigger — and every order for a repository with
+// tests is held for an operator instead of shipping.
+//
+// Watched on a live run: a unit declared `src/session.js`, the builder wrote
+// `src/session.js` and `src/session.test.js` as instructed, and the order was
+// held on `outside_blast_radius`.
+describe('the architect and the builder, about the same files', () => {
+  it('tells the architect to declare the test files the builder will write', () => {
+    const roles = createRoleRegistry({
+      dataRoot: path.join(root, 'nowhere-data'),
+      repoPaths: [],
+      builtInDir: root,
+    })
+    const architect = roles.get('architect')
+    const builder = roles.get('builder')
+    expect(builder?.prompt).toContain('failing test first')
+    expect(architect?.prompt).toContain('test files')
+  })
+})

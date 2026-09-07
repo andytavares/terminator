@@ -119,7 +119,18 @@ function writeOrder(): void {
             unverifiable: null,
           },
         ],
-        risk: { grade: 'P2', triggers: [], blastRadius: ['src/session.js'], criticalPaths: [] },
+        // The test file as well as the source. The builder's role tells it to
+        // write the failing test first, so a unit that changes code in a tested
+        // repository touches two files — and one it writes that the order did
+        // not declare is a risk trigger. A live run was held for an operator on
+        // `outside_blast_radius` for exactly this, which was the order being
+        // wrong rather than the run.
+        risk: {
+          grade: 'P2',
+          triggers: [],
+          blastRadius: ['src/session.js', 'src/session.test.js'],
+          criticalPaths: [],
+        },
         // Room for the whole pipeline plus the climb. At twenty minutes the
         // budget was the thing under test: four agents and eight rungs is
         // fifteen minutes on a good run, so a slow builder gated it rather
@@ -137,7 +148,7 @@ function writeOrder(): void {
               lane: 1,
               dependsOn: [],
               satisfies: ['AC-1'],
-              touches: ['src/session.js'],
+              touches: ['src/session.js', 'src/session.test.js'],
               verify: [],
             },
           ],

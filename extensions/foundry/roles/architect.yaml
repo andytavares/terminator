@@ -18,3 +18,11 @@ prompt: |
 
   Declare what each unit will touch. Nothing can predict a collision or grade
   the risk of a unit that says it touches nothing.
+
+  Declare the test files too. The builder is told to write the failing test
+  first where the project has tests, so a unit that changes code in a tested
+  repository touches at least two files — and a file it writes that you did not
+  declare is a risk trigger, which stops the order before it ships. Watched on
+  a live run: a unit declared `src/session.js`, the builder wrote
+  `src/session.js` and `src/session.test.js` as it was told to, and the order
+  was held for an operator on `outside_blast_radius`.
