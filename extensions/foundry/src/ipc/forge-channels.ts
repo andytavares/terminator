@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { seedOrder, newOrderId } from '../forge/intake-source.js'
 import type { IssueLike } from '../forge/intake-source.js'
-import { answerQuestion } from '../forge/interview.js'
+import { answerQuestion, surfacedQuestions } from '../forge/interview.js'
 import { strikeAssumption } from '../forge/assumptions.js'
 import { applyFindings, resolveFinding, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
@@ -496,6 +496,11 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
           risk: order.risk.grade,
           source: order.source,
           failures: compileOrder(order).failures.length,
+          // Which order the tab's badge is counting. A number on the chrome
+          // that sends you to a list saying nothing about where it came from
+          // is a number you have to open every row to act on.
+          openQuestions:
+            order.status === 'draft' ? surfacedQuestions(order.openQuestions).length : 0,
         })),
     }
   }

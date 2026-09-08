@@ -526,6 +526,11 @@ because nothing stops unless a **named rule** fires.
 Click the **Foundry** tab in the content area tab bar. Three surfaces, and the
 one you land on is the inbox.
 
+**A tab carries a count when something behind it is waiting on you** — gates on
+the inbox, open questions and held tool calls on the Forge. The tab strip is
+above the scroll area, so the count is on screen whichever surface you are
+looking at, and it is the same number the surface itself will show you.
+
 ### Inbox — the only surface you have to visit
 
 One queue, always sorted by how much work each decision unblocks. Every row
@@ -554,16 +559,22 @@ reads the repository: its manifests, its real commands, its house documents
 decision about a file your idea names. A question that survives that is one the
 code genuinely could not answer.
 
-The document is the subject; the conversation sits behind it. On the left rail:
+The document is the subject; the conversation sits behind it.
+
+**Needs you** is the band across the top of the screen — **at most three
+questions**, ever, above everything else on the surface, because a question you
+have to go looking for is a question that does not get answered. The
+recommended answer is the filled button. Everything else Foundry decided is a
+**strikeable assumption** rather than a question — click it to strike it, and
+the parts of the document that depended on it are redrawn.
+
+On the left rail, under the band:
 
 - **Six checks**, and it will not hand off until all six pass — no open
   questions, every acceptance criterion falsifiable, coverage complete in both
   directions, risk graded against _this_ plan, adversarial findings resolved,
   budgets set. Each failure names the specific criterion, unit or question
   responsible.
-- **At most three questions**, ever. Everything else Foundry decided is a
-  **strikeable assumption** — click it to strike it, and the parts of the
-  document that depended on it are redrawn.
 - **"Not measurable here"**, when the repository has no command for a check.
   Those report **"not measured"** rather than passing. A green you did not earn
   is worse than a gap you can see — and the three rungs that were never
@@ -592,6 +603,10 @@ replaced.
 
 ![A work order in the Forge, with its convergence checks and the shape of work](screenshots/08b-foundry-forge.png)
 
+In the list of orders, a row that is waiting on an answer says **"N waiting on
+you"** where the others say what is blocking them — so the count on the Forge
+tab tells you which order to open.
+
 **Compile & hand off** agrees the order and starts the work. If the order is
 seeded from a tracker issue, a **Tracker write-back** panel lets you say which
 of _your_ workflow states each moment means — when work starts, when the draft
@@ -605,9 +620,11 @@ files the lanes share and which lane must land first.
 
 Two things you can do without leaving:
 
-- **Waiting on you** lists every tool call an agent is holding — allow it, deny
-  it, or hand it back to the terminal to answer where the agent is. Nothing in
-  that run moves until you do.
+- **Waiting on you** sits above the run graph and lists every tool call an
+  agent is holding — allow it, deny it, or hand it back to the terminal to
+  answer where the agent is. Nothing in that run moves until you do, and an
+  agent stopped at one looks exactly like an agent that has gone quiet, which
+  is why it is the first thing on the screen rather than the last.
 - Every piece of work is named by what it is — the role and the unit it is
   building, not the identifier the run graph uses internally — and **Blocked**
   says what each one is waiting on in the same words.
