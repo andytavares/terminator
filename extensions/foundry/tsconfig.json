@@ -1,32 +1,32 @@
 {
-  // The root typecheck references only main, renderer and shared, so extension
-  // code was never checked at all — type errors in it reached CI green. This
-  // brings the pilot's own sources under `tsc`, at the same strictness.
+  // The gate that a blank extension panel got past.
+  //
+  // `npm run typecheck:extensions` has pointed here since the script was
+  // written, and this file did not exist — so it failed with "the specified
+  // path does not exist" and nothing typechecked the extension at all. The
+  // root `tsconfig.json` is `files: []` plus project references with no
+  // `--build`, so it checks nothing either, and the components are not in any
+  // of the three referenced projects.
+  //
+  // What that cost: `RULE_ICON` in `Inbox.tsx` is `Record<GateRuleId, ...>`,
+  // a new gate rule was added without an entry, `<Icon />` got `undefined`,
+  // React threw and unmounted the tree, and every Foundry surface rendered
+  // empty. The build was green and 2,293 unit tests passed.
+  //
+  // `noEmit`: the bundles are built by esbuild and vite, never by tsc.
   "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
     "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "noEmit": true,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
-    "types": ["node"]
+    "esModuleInterop": true,
+    // The core's own sources are checked by their own project; this one only
+    // needs the Extension API's types to resolve.
+    "skipLibCheck": true
   },
-  // The whole extension, not just the runtime. The root typecheck references
-  // only main, renderer and shared, so none of this was ever checked and type
-  // errors in it reached CI green.
-  //
-  // The core's renderer declarations come along because components legitimately
-  // call core IPC through `window.electronAPI`; without them every such call is
-  // an error about a global that does exist at runtime.
-  // Sources only. The tests are deliberately outside: 36 of them build partial
-  // mocks that do not satisfy the real types (a `Uint8Array` where a `Buffer` is
-  // declared, a v2 `PilotState` in a migration test), and making them typecheck
-  // would mean rewriting mocks that are correct for what they assert.
-  "include": ["src/**/*.ts", "src/**/*.tsx", "../../src/renderer/electron.d.ts"],
-  "exclude": ["src/index.js", "dist", "node_modules"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

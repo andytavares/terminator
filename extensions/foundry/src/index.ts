@@ -845,12 +845,7 @@ function ladderNode(rung: string, name: string, lane: number): RunNode {
  * order is a decision about the order; throwing away work an agent already did
  * is a different decision, and nothing here is entitled to take it silently.
  */
-async function stopOrder(
-  api: ExtensionAPI,
-  root: string,
-  orderId: string,
-  reason: string
-): Promise<void> {
+async function stopOrder(root: string, orderId: string, reason: string): Promise<void> {
   const store = createOrderStore(root)
   const graph = await readRunGraph(root, orderId)
   const stopped: string[] = []
@@ -881,7 +876,6 @@ async function stopOrder(
         : `${reason}; stopped ${stopped.join(', ')}`,
     evidence: [],
   })
-  api.window.broadcast('foundry:run-stopped', { orderId })
 }
 
 /**
@@ -1898,7 +1892,7 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:run.stop', async (payload) => {
     const { id } = payload as { id?: unknown }
     if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
-    await stopOrder(api, dataRoot(), id, 'stopped by the operator')
+    await stopOrder(dataRoot(), id, 'stopped by the operator')
     return { ok: true }
   })
   reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
@@ -1953,7 +1947,7 @@ export function activate(api: ExtensionAPI): void {
       // cancelled and nothing did it — the run stayed `running` for ever, and
       // `order.cancel` refuses a running order and points back at this gate.
       if (option === 'stop') {
-        await stopOrder(api, dataRoot(), gate.orderId, `stopped at the ${gate.rule} gate`)
+        await stopOrder(dataRoot(), gate.orderId, `stopped at the ${gate.rule} gate`)
         return
       }
 
@@ -2511,6 +2505,10 @@ export function deactivate(): void {
   disposables.length = 0
   supervision = null
   mutes = null
+  // Or a reactivated extension never looks again at what the last session left
+  // in a records location it has already seen this process.
+  adoptedRoots.clear()
+  executingOrders.clear()
   for (const notification of raisedNotifications.values()) notification.dispose()
   raisedNotifications.clear()
   stallWatcher?.stop()
