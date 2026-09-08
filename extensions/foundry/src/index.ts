@@ -23,10 +23,12 @@ import type { RunCommand } from './runtime/diff-metrics.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
+import { createRoleRegistry } from './line/roles.js'
 import type { RunOutcome, StartedRun } from './line/executor.js'
 import type { RunGraph, RunNode } from './line/run-graph.js'
 import type { Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
+import { collectableWrites, readRungOutput } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
 import { decideTool } from './runtime/tool-decision.js'
 import { ensureTrusted } from './runtime/workspace-trust.js'
@@ -897,6 +899,10 @@ async function executeRun(
     modelTier: 'fast' | 'deep'
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
+    /** The one file this rung may write, or null when it has no artefact. */
+    outputPath?: string | null
+    /** Called as soon as the session exists, not when its turn ends. */
+    onStarted?: (sessionId: string) => void
   }): Promise<StartedRun> {
     const checkout = checkouts.get(input.node.lane ?? 1)
     // No checkout and no runner mean nothing ran. Reported with a null exit
@@ -964,6 +970,7 @@ async function executeRun(
               readOnlyTools: readOnlyTools(api),
               autonomy: autonomyFor(api),
               worktreePath: checkout.path,
+              outputPath: input.outputPath ?? null,
             }),
           onPending: (pending) => {
             // Asks reach the console as well as the inbox. A refusal is posted
@@ -1014,6 +1021,11 @@ async function executeRun(
           onRegistered: (run) => {
             sessionId = run.sessionId
             transcriptFrom = run.transcriptFrom
+            // The graph learns the session while there is still an agent in
+            // it. Before this the Floor's Watch and Attach appeared only after
+            // the turn ended, so the one moment you needed a terminal was the
+            // one moment there was no way into it.
+            input.onStarted?.(run.sessionId)
           },
           onEnd: (exitCode) => {
             // Off the live list and into the record, so a finished unit stops
@@ -1044,6 +1056,7 @@ async function executeRun(
           }
           sessionId = run.sessionId
           transcriptFrom = run.transcriptFrom
+          input.onStarted?.(run.sessionId)
           // The lane's open conversation, for the next node that may carry it
           // on. A role that may not resume is never offered it — the registry
           // refuses, structurally — and neither is a role that is not the one
@@ -1072,6 +1085,9 @@ async function executeRun(
   }
 
   const sources = resolveSources(api, root)
+  // Read once, so what a rung is told it may hand back and what is accepted
+  // from it come from the same resolution of the same role file.
+  const roleRegistry = createRoleRegistry(sources)
   const houseRules = rulesFor(sources, {
     repoPaths: sources.repoPaths,
     houseDocs: [...order.context.houseDocs],
@@ -1104,6 +1120,47 @@ async function executeRun(
     // Loaded once, so what an agent is told the house rules are and what the
     // change is judged against are the same list.
     rules: houseRules,
+    /**
+     * Take what a read-only rung wrote, put it on the order, and save it.
+     *
+     * The Forge has always had this and the Line never did: four of the
+     * standard shape's nine steps are roles whose whole product is a document,
+     * and every one of them ended its turn with the document in a terminal
+     * nobody reads. Watched on a live run — a scout's complete report of where
+     * the application picks its colours, gone; an architect's three defects in
+     * the order it was about to be built from, gone, refused on the way out by
+     * the very policy that makes the rung trustworthy.
+     */
+    collect: async ({ nodeId, role, outputPath }) => {
+      const current = (await store.load(order.id)) ?? order
+      const result = readRungOutput({
+        order: current,
+        role,
+        writes: collectableWrites(roleRegistry.get(role)),
+        outputPath,
+        at: new Date().toISOString(),
+      })
+      if (result === null) return null
+
+      // A refusal is a result too, and it is the agent's to act on rather than
+      // the operator's to decipher — so it is recorded and the rung is not
+      // credited with having filed anything.
+      if (!result.ok) {
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: `role:${role}`,
+          action: 'rung.refused',
+          subject: nodeId,
+          reason: result.reason,
+          evidence: [],
+        })
+        return null
+      }
+
+      await store.save(result.order)
+      return { order: result.order, note: result.note, defect: result.defect }
+    },
     raise: async (gate) => {
       await gates.save(gate)
       await store.record({

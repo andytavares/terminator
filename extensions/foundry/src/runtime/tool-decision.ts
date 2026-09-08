@@ -41,6 +41,16 @@ export interface ToolRequest {
   readonly autonomy: Autonomy
   /** The checkout this unit was given. Empty when there is none. */
   readonly worktreePath: string
+  /**
+   * The one file a read-only rung may write: where it hands back what it
+   * found. Null for a rung with no artefact, and for a role that may write.
+   *
+   * Matched on the tool's own `file_path`, never on a shell command — a
+   * command string cannot be read as "this writes here and nowhere else", and
+   * a policy that tried would be an allowlist with a hole in it. The rung's
+   * contract says to use Write for exactly that reason.
+   */
+  readonly outputPath: string | null
 }
 
 /**
@@ -51,6 +61,12 @@ export interface ToolRequest {
  * bypass — the read-only path in particular answers **both** ways rather than
  * abstaining, because a read-only role exists to decide without a person.
  */
+/** The file a tool call names, when it names one at all. */
+function targetOf(input: unknown): string | null {
+  const target = (input as { file_path?: unknown } | null)?.file_path
+  return typeof target === 'string' ? target : null
+}
+
 export function decideTool(request: ToolRequest): PolicyDecision | null {
   if (request.readOnly) {
     // A role that declared `run_tests` may run the project's own commands, and
@@ -68,6 +84,16 @@ export function decideTool(request: ToolRequest): PolicyDecision | null {
     // them read; the operator says.
     if (request.readOnlyTools.includes(request.tool)) {
       return { allow: true, reason: 'the operator listed this as a tool that only reads' }
+    }
+
+    // The one thing a read-only rung is allowed to change. Without it the
+    // policy refused every channel a rung invented for itself — `cat >`,
+    // `sed`, `awk`, then `Write` — so four of the standard shape's nine steps
+    // could not hand back a word of what they had worked out. Watched live: an
+    // architect lost a complete corrected order to "a review may not redirect
+    // output" while the builders it had just contradicted were starting.
+    if (request.outputPath !== null && targetOf(request.input) === request.outputPath) {
+      return { allow: true, reason: 'this is where this rung hands back what it found' }
     }
 
     const decision = decideReadOnly(request.tool, request.input)

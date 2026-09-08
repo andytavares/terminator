@@ -912,6 +912,27 @@ surfaced at once.
   `verifier` carries `allowResume: false`, and `assertResumable` refuses to
   hand it a session — a verdict from the working session is the builder marking
   its own homework with extra steps.
+- **A rung hands back what it found through a file** (`line/rung-output.ts`).
+  Four of the standard shape's nine steps are read-only roles whose whole
+  product is a document — the scout's reconnaissance, the architect's plan, the
+  red team's attack, the inspector's findings — and the Line kept none of them:
+  the brief named no destination, nothing read a rung's result past its exit
+  status, and the read-only policy refused every channel the agents invented
+  (`cat >`, `sed`, `awk`, then `Write`). Intake had always had the answer, so
+  the Line now uses it: one JSON file at `<order>/rungs/<node>.json`, its schema
+  in the brief, that one path allowed through `decideTool`, and a validated
+  read-back that is merged and then cleared. **A role may only write the
+  artefacts its own `writes:` declares** — `context`, `findings`, `plan`,
+  `acceptance` — so the channel is a permission, not an open door, and a scout
+  that decided to rewrite the plan is refused at the boundary.
+- **What a rung disagrees with is a question, not an edit.** `context` informs
+  the briefs that follow and leaves the order agreed. `findings` land where the
+  structural red-team pass puts its own and take the amendment path. `plan` and
+  `acceptance` are **reported and never applied**: the graph was compiled from
+  the agreed order before the rung ran, so replacing it would orphan work in
+  flight. Either kind of disagreement raises `forge-defect` — the rule for an
+  order that contradicts itself, which was declared, rendered in the Inbox, and
+  until now raised by nothing.
 - **Three-rung resolution** for every recipe, role and rule: the data root, the
   repository's own `.foundry/`, then the built-ins. The middle rung is honoured
   and never created (ADR-042).
@@ -946,6 +967,14 @@ surfaced at once.
   `ready-for-review` — stay live at every setting.
 - **The executor** (`line/executor.ts`) joins the scheduler, the roles and the
   supervised runner: a wave at a time, so the agent budget means something.
+- **A node carries its session while the agent is still in it.** `sessionId` was
+  written onto the node after `deps.run` resolved — which is when the turn is
+  over — so for the whole life of a rung the graph said `running` and named
+  nobody, and the Floor's Watch and Attach, which render on
+  `node.sessionId !== null`, appeared only once there was nothing left to attach
+  to. The runner reports the session the moment it registers; the result names
+  it again for a caller that reports none, and a set makes the second one a
+  no-op rather than a second start.
 
 ### Shipping (`src/line/integrate.ts`, `src/trackers/write-back.ts`)
 

@@ -96,6 +96,14 @@ prompt: |
 
 `writes: []` is likewise load-bearing: the verifier's tool allowlist contains no write tool, so a verifier that decided to fix what it found could not.
 
+### `writes:` is two things at once
+
+It answers **whether a role may touch a checkout** — only `worktree`, `integration_branch` and `docs` do, and anything else runs read-only — and it answers **what that role may hand back**. Four targets are collectable: `context`, `findings`, `plan` and `acceptance`. A rung whose role declares one is given a file at `<order>/rungs/<node>.json`, its JSON schema in the brief, and permission to write that one path and nothing else; what it writes is read back, validated against exactly the artefacts it declared, merged, and the file cleared.
+
+That is why an artefact a role produces must be declared even when it changes nothing in the repository. `inspector` carried `writes: []` and a prompt asking it for findings with a severity and a line, so every inspection ended in a terminal nobody reads; it declares `findings` now, which grants it no new permission — `findings` is not a checkout destination, so it still gets no editing tool. The verifier stays at `[]` deliberately: its verdict is an exit status (FR-033), not a document.
+
+`plan` and `acceptance` are collected but never applied. The run graph is compiled from the agreed order before any rung runs, so replacing the plan underneath work already in flight would orphan it. A rung that contests either — or that raises a finding — produces a `forge-defect` gate instead, which is the rule for an order that contradicts itself.
+
 ## Rules
 
 ```yaml

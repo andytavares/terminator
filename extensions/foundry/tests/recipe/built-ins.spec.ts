@@ -165,11 +165,6 @@ describe('built-in roles', () => {
     expect(parsed.ok && parsed.value.allowResume).toBe(false)
   })
 
-  it('gives the verifier nothing to write with, so it cannot fix what it finds', () => {
-    const parsed = parseRole(read(rolesDir, 'verifier.yaml'), 'verifier.yaml')
-    expect(parsed.ok && parsed.value.writes).toEqual([])
-  })
-
   it('forbids the red team and the inspector from resuming either', () => {
     for (const file of ['red-team.yaml', 'inspector.yaml']) {
       const parsed = parseRole(read(rolesDir, file), file)
@@ -193,11 +188,22 @@ describe('built-in roles', () => {
     }
   })
 
-  it('gives the roles that judge nothing to write at all', () => {
-    for (const file of ['verifier.yaml', 'inspector.yaml']) {
-      const parsed = parseRole(read(rolesDir, file), file)
-      expect(parsed.ok && parsed.value.writes.length).toBe(0)
-    }
+  // The verifier's verdict is an exit status, so it has nothing to hand back
+  // and declares nothing (FR-033). The inspector is not the same case: it is
+  // asked in its own prompt for findings with a severity and a line, and
+  // `writes:` is what the Line collects a rung's output by — so declaring
+  // nothing meant an inspection ended in a terminal nobody reads. Neither may
+  // touch a checkout, which is the property this pair is really about and
+  // which the test above enforces for every role.
+  it('gives the verifier nothing to hand back, because its verdict is an exit status', () => {
+    const parsed = parseRole(read(rolesDir, 'verifier.yaml'), 'verifier.yaml')
+    expect(parsed.ok && parsed.value.writes).toEqual([])
+  })
+
+  it('lets the inspector hand back the findings its prompt asks it for', () => {
+    const parsed = parseRole(read(rolesDir, 'inspector.yaml'), 'inspector.yaml')
+    expect(parsed.ok && parsed.value.writes).toEqual(['findings'])
+    expect(parsed.ok && parsed.value.tools).not.toContain('edit')
   })
 
   it('gives no role an editing tool unless it may write to a checkout', () => {
