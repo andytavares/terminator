@@ -1,0 +1,25 @@
+extensions/foundry/tsconfig.json
+  s_2774b0a66414cf::t_1e97fc03a9f8aa 2-16,18-19,21,26-29,31
+extensions/foundry/src/index.ts
+  s_2774b0a66414cf::t_e7c2b56def21bc 848,1895,1950,2508-2511
+extensions/foundry/CLAUDE.md
+  s_2774b0a66414cf::t_2578d12d8db636 61-70
+CHANGELOG.md
+  s_2774b0a66414cf::t_38e164cd30dc26 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "1765d4291cc8eeaee18f97972eb6d99cb9382f6f",
+  "prompts": {},
+  "sessions": {
+    "s_2774b0a66414cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "02b3a42a-d6e8-4bf0-b176-47820280bfa0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
