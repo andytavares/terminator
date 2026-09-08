@@ -60,6 +60,17 @@ const TurnPayload = z.object({
       reason: z.string().default(''),
     })
     .optional(),
+  /**
+   * Accept a criterion as unverifiable.
+   *
+   * The one escape from "every criterion must be provable", and the compile
+   * check has named it in its own failure text since the beginning — while
+   * nothing in the application could reach it. Only the architect's proposal
+   * could set the field, so an operator whose plan changes something a person
+   * sees, and whose architect would not write a screenshot criterion, was held
+   * at a red check with no move to make.
+   */
+  unverifiable: z.object({ criterionId: z.string(), reason: z.string().default('') }).optional(),
 })
 
 const CompilePayload = z.object({ id: z.string(), commit: z.boolean().default(false) })
@@ -269,6 +280,38 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
         evidence: [],
       })
       return view(next, ['redTeam'])
+    }
+
+    if (parsed.data.unverifiable !== undefined) {
+      const { criterionId, reason } = parsed.data.unverifiable
+      if (reason.trim() === '') {
+        // The schema refuses an empty reason too, but it would refuse it as a
+        // malformed order rather than as the thing it is: an accepted
+        // unverifiable with no reason is a shrug, and the operator is told so.
+        return { ...view(order), error: 'Accepting a criterion as unverifiable costs a reason.' }
+      }
+      if (!order.acceptance.some((criterion) => criterion.id === criterionId)) {
+        return { ...view(order), error: `No criterion ${criterionId} in this order.` }
+      }
+      const next: WorkOrder = {
+        ...order,
+        acceptance: order.acceptance.map((criterion) =>
+          criterion.id === criterionId
+            ? { ...criterion, unverifiable: { accepted: true as const, reason: reason.trim() } }
+            : criterion
+        ),
+      }
+      await deps.store.save(next)
+      await deps.store.record({
+        at: deps.now(),
+        orderId: id,
+        actor: 'operator',
+        action: 'criterion.unverifiable',
+        subject: criterionId,
+        reason: reason.trim(),
+        evidence: [],
+      })
+      return view(next, ['acceptance'])
     }
 
     if (answer !== undefined) {

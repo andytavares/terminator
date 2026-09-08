@@ -574,7 +574,19 @@ On the left rail, under the band:
   questions, every acceptance criterion falsifiable, coverage complete in both
   directions, risk graded against _this_ plan, adversarial findings resolved,
   budgets set. Each failure names the specific criterion, unit or question
-  responsible.
+  responsible, **and what to do about it**: either a button that takes you to
+  the control that clears it, or one that redrafts with the instruction the
+  architect needs. A red mark you can only stare at is not a gate, it is a wall.
+
+  The one that catches people is **criteria falsifiable** on a change somebody
+  can see: a plan that touches a `.tsx`, `.css` or `.html` file and has no
+  criterion asking for a picture of the running application fails, because a
+  command cannot say whether a thing renders. **Ask for proof** has the
+  architect add a `screenshot` criterion. If nothing here can take that picture
+  — no display, no runner — open **Acceptance** and mark the criterion
+  **"Nothing here can prove this"**. That costs a written reason, which travels
+  with the order and shows in the ledger.
+
 - **"Not measurable here"**, when the repository has no command for a check.
   Those report **"not measured"** rather than passing. A green you did not earn
   is worse than a gap you can see — and the three rungs that were never

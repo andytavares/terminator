@@ -178,6 +178,40 @@
   line-height: 1.4;
 }
 
+/* How to clear a failing check.
+
+   The five checks that were not the red team said what was wrong and stopped —
+   including `verifiable`, whose own failure text names an escape that no
+   control on this screen could reach. A red mark with no move attached is a
+   dead end the operator stares at. */
+.fdry-remedy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.fdry-remedy button {
+  appearance: none;
+  font: inherit;
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  cursor: pointer;
+}
+
+.fdry-remedy button:hover:not(:disabled) {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-remedy button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .fdry-check-mark svg {
   width: 13px;
   height: 13px;
@@ -1032,6 +1066,35 @@
   font-family: var(--tm-font-mono, ui-monospace, monospace);
   font-size: 11px;
   color: var(--tm-text-secondary);
+}
+
+/* The written escape from "every criterion must be provable", on the criterion
+   itself — the only place an operator can say which one nothing can prove. */
+.fdry-ac-excuse {
+  appearance: none;
+  /* Its own line, like the accepted reason it turns into and the form it
+     opens. Inline, it sat against the verify kind and read as part of it. */
+  display: block;
+  font: inherit;
+  font-size: 11.5px;
+  margin-top: 5px;
+  padding: 2px 9px;
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-ac-excuse:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-ac-excused {
+  margin: 5px 0 0;
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
 }
 
 .fdry-scroll {

@@ -63,6 +63,9 @@ function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
   render(<Forge orderId="WO-1" />)
 }
 
+// jsdom doesn't implement scrollIntoView
+window.HTMLElement.prototype.scrollIntoView = vi.fn()
+
 beforeEach(() => vi.clearAllMocks())
 
 describe('the tracker write-back panel', () => {
@@ -715,5 +718,172 @@ describe('a start held back by the review queue', () => {
     fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
     await waitFor(() => screen.getByText(/no test command/))
     expect(screen.queryByRole('button', { name: /Start anyway/ })).toBeNull()
+  })
+})
+
+// Every failing check names a move.
+//
+// Five of the six said what was wrong and stopped. `verifiable` was the worst
+// of them: its own failure text names an escape — accept the criterion as
+// unverifiable, in writing — that no control on this screen could reach, so an
+// operator whose plan changed something a person sees had a red mark and
+// nothing to press.
+
+/** A draft whose only failing check is the one the operator reported. */
+function orderBlockedOnPictures() {
+  return {
+    ...order(),
+    acceptance: [
+      {
+        id: 'AC-1',
+        statement: 'the row does not clip its last glyph',
+        priority: 'P1' as const,
+        verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
+        unverifiable: null,
+      },
+    ],
+    intent: { problem: 'p', outcome: 'o', nonGoals: [] },
+    risk: { grade: 'P2' as const, triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    plan: {
+      ...order().plan,
+      units: [
+        {
+          id: 'U-1',
+          title: 'redraw the row',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: ['src/components/Row.tsx'],
+          verify: [],
+        },
+      ],
+    },
+  }
+}
+
+function mountBlocked(over: Record<string, unknown> = {}) {
+  const current = { ...orderBlockedOnPictures(), ...over }
+  invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.compile') {
+      return { order: current, compile: compileOrder(current) }
+    }
+    if (channel === 'foundry:order.turn') {
+      return { order: current, compile: compileOrder(current), changed: ['acceptance'] }
+    }
+    if (channel === 'foundry:order.converge') {
+      return { order: current, compile: compileOrder(current), converging: 'sess-1' }
+    }
+    return {}
+  })
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+  }
+  render(<Forge orderId="WO-1" />)
+  return current
+}
+
+describe('a failing check says how to clear it', () => {
+  it('shows the falsifiable check failing, on the case an operator actually meets', async () => {
+    mountBlocked()
+    await waitFor(() => expect(screen.getByText(/no criterion asks for a picture/)).toBeTruthy())
+  })
+
+  it('offers to ask the architect for proof', async () => {
+    mountBlocked()
+    await waitFor(() => screen.getByRole('button', { name: 'Ask for proof' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask for proof' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        expect.objectContaining({ id: 'WO-1', message: expect.stringContaining('screenshot') })
+      )
+    )
+  })
+
+  it('offers the written escape, and takes the operator to it', async () => {
+    mountBlocked()
+    await waitFor(() => screen.getByRole('button', { name: /Or mark one unprovable/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Or mark one unprovable/ }))
+    // The heading it lands on is the one the acceptance list sits under.
+    expect(document.getElementById('fdry-acceptance')).not.toBeNull()
+  })
+
+  it('accepts a criterion as unverifiable, with a reason', async () => {
+    mountBlocked()
+    await waitFor(() => screen.getByRole('button', { name: 'Nothing here can prove this' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Nothing here can prove this' }))
+
+    const box = screen.getByLabelText('Why AC-1 cannot be proven')
+    fireEvent.change(box, { target: { value: 'there is no display in this environment' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Accept it' }))
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.turn', {
+        id: 'WO-1',
+        unverifiable: {
+          criterionId: 'AC-1',
+          reason: 'there is no display in this environment',
+        },
+      })
+    )
+  })
+
+  it('will not accept one on a blank reason — a shrug is not a decision', async () => {
+    mountBlocked()
+    await waitFor(() => screen.getByRole('button', { name: 'Nothing here can prove this' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Nothing here can prove this' }))
+    expect(screen.getByRole('button', { name: 'Accept it' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('renders the reason once it is accepted, instead of offering it again', async () => {
+    const accepted = orderBlockedOnPictures()
+    mountBlocked({
+      acceptance: [
+        {
+          ...accepted.acceptance[0],
+          unverifiable: { accepted: true as const, reason: 'no display in this environment' },
+        },
+      ],
+    })
+    await waitFor(() =>
+      expect(
+        screen.getByText(/accepted as unverifiable — no display in this environment/)
+      ).toBeTruthy()
+    )
+    expect(screen.queryByRole('button', { name: 'Nothing here can prove this' })).toBeNull()
+  })
+
+  it('sends the open questions to the band rather than to the architect', async () => {
+    mountBlocked({
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'which token?',
+          why: 'the repository does not say',
+          options: ['a', 'b'],
+          recommended: 0,
+          answer: null,
+          rank: 1,
+        },
+      ],
+    })
+    await waitFor(() => screen.getByRole('button', { name: 'Answer them' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Answer them' }))
+    expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
+  })
+
+  it('offers no remedy on a check that passes', async () => {
+    mountBlocked()
+    await waitFor(() => screen.getByText('Convergence'))
+    // Risk is graded against this plan, so its row carries no button.
+    expect(screen.queryByRole('button', { name: 'Ask for a regrade' })).toBeNull()
+  })
+
+  it('offers no remedy at all once the order has been handed off', async () => {
+    mountBlocked({ status: 'running' as const })
+    await waitFor(() => screen.getByText('Convergence'))
+    expect(screen.queryByRole('button', { name: 'Ask for proof' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Nothing here can prove this' })).toBeNull()
   })
 })
