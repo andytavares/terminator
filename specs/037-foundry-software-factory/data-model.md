@@ -315,9 +315,9 @@ Derived from `order + recipe`. Not authored, not persisted as truth — recomput
 | `rank`               | number                                                       | `blockedUnits × riskWeight` (FR-048). Derived. |
 | `decision`           | `{ option, by: 'operator' \| 'default', note?, at }` \| null |                                                |
 
-**GateRuleId** ∈ `risk.p0`, `budget.exceeded`, `destructive`, `ready-for-review`, `verify.repeat-fail`, `critical-path`, `new-dependency`, `forge-defect`, `unit.boundary`.
+**GateRuleId** ∈ `risk.p0`, `budget.exceeded`, `destructive`, `ready-for-review`, `verify.repeat-fail`, `critical-path`, `new-dependency`, `forge-defect`, `unit.boundary`, `run.interrupted`.
 
-The first four are live at every autonomy setting (FR-050). `unit.boundary` is live only at the most cautious.
+The first four are live at every autonomy setting (FR-050), and so is `run.interrupted`: every other rule asks about work, and that one says the work stopped — a dial that can silence "this run has no agents left" is a dial that lets a dead run look busy. `unit.boundary` is live only at the most cautious.
 
 ### LedgerEntry
 

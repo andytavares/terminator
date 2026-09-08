@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import React from 'react'
 import { Floor } from '../../src/components/Floor.js'
 
@@ -69,6 +69,8 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
         fullReject: live.fullReject ?? false,
       }
     }
+    if (channel === 'foundry:run.resume') return live.resume ?? { started: true, reclaimed: [] }
+    if (channel === 'foundry:run.stop') return live.stop ?? { ok: true }
     if (channel === 'foundry:review-decide-hunk') return live.decideHunk ?? { ok: true }
     if (channel === 'foundry:permission-hand-back') return live.handBack ?? { ok: true }
     if (channel === 'foundry:run-terminal') return live.terminal ?? { ok: true }
@@ -607,8 +609,23 @@ describe('why a new run would be refused', () => {
 })
 
 describe('work that stopped making progress', () => {
+  // The detector's own shape. `signal` is 'silence' or 'loop' and nothing else
+  // — a fixture that put a readable sentence in it meant this panel was only
+  // ever tested rendering words production could never send it, and what it
+  // actually drew was "s-1 — silence".
   const FIRING = {
-    firing: { sessionId: 's-1', signal: 'no tool call for 8 minutes', firedAt: 1 },
+    firing: {
+      sessionId: 's-1',
+      signal: 'silence',
+      firedAt: 1,
+      inputs: {
+        toolSilenceMs: 8 * 60_000,
+        diffSilenceMs: 8 * 60_000,
+        distinctFiles: 1,
+        netChange: 0,
+        shellInFlight: false,
+      },
+    },
     featureDir: '/d',
     shadow: true,
   }
@@ -617,6 +634,56 @@ describe('work that stopped making progress', () => {
     mount(reply(), { stalls: [FIRING] })
     await waitFor(() => expect(screen.getByText(/Stopped making progress/)).toBeTruthy())
     expect(screen.getByText(/no tool call for 8 minutes/)).toBeTruthy()
+  })
+
+  it('names the step, not the session id nobody chose', async () => {
+    mount(reply({ labels: { 'N-1': 'builder · U-1 the first bit' } }), { stalls: [FIRING] })
+    const heading = await screen.findByText(/Stopped making progress/)
+    const panel = heading.closest('section') as HTMLElement
+    expect(within(panel).getByText(/builder · U-1/)).toBeTruthy()
+    expect(within(panel).queryByText('s-1')).toBeNull()
+  })
+
+  it('says what going round in circles is, rather than printing "loop"', async () => {
+    mount(reply(), {
+      stalls: [{ ...FIRING, firing: { ...FIRING.firing, signal: 'loop' } }],
+    })
+    await waitFor(() => screen.getByText(/Stopped making progress/))
+    expect(screen.getByText(/round in circles/)).toBeTruthy()
+  })
+
+  // A panel that names a stall and offers nothing is a wall. These are the
+  // three things you actually do about one.
+  it('offers reading what it was saying', async () => {
+    mount(reply(), { stalls: [FIRING] })
+    await waitFor(() => screen.getByText(/Stopped making progress/))
+    fireEvent.click(screen.getByRole('button', { name: /Read what it was saying/ }))
+    await waitFor(() =>
+      expect(invoke.mock.calls.some((c) => c[0] === 'foundry:run-transcript')).toBe(true)
+    )
+  })
+
+  it('offers taking it over in its own terminal', async () => {
+    mount(reply(), { stalls: [FIRING] })
+    await waitFor(() => screen.getByText(/Stopped making progress/))
+    fireEvent.click(screen.getByRole('button', { name: /Take it over/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
+    )
+  })
+
+  it('offers ending it, which is the answer when it is not coming back', async () => {
+    mount(reply(), { stalls: [FIRING] })
+    await waitFor(() => screen.getByText(/Stopped making progress/))
+    fireEvent.click(screen.getByRole('button', { name: /End this agent/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:run-stop',
+        expect.objectContaining({
+          sessionId: 's-1',
+        })
+      )
+    )
   })
 
   it('says when it is only recording, so a quiet list is not read as a clean run', async () => {
@@ -827,5 +894,86 @@ describe('a hunk decision the review refused', () => {
     await waitFor(() => screen.getByText('src/auth/session.ts'))
     fireEvent.click(screen.getByRole('button', { name: 'Reject h-1' }))
     await waitFor(() => expect(screen.getByText(/no longer open/)).toBeTruthy())
+  })
+})
+
+// ── A run nothing is running ────────────────────────────────────────────
+//
+// The graph on disk says `running` and every agent's terminal died with the
+// application that started it. Before this the Floor drew the same chips it
+// draws for working agents, so the only way to find out was to come back later
+// and notice nothing had moved.
+
+describe('a run whose agents are gone', () => {
+  const ORPHANED = reply({
+    orphaned: ['N-1'],
+    labels: { 'N-1': 'builder · U-1 the first bit' },
+  })
+
+  it('says so at the top, across the width, before anything only there to be read', async () => {
+    mount(ORPHANED)
+    await waitFor(() => expect(screen.getByText(/Nothing is running this/)).toBeTruthy())
+    const band = document.querySelector('.fdry-needs-you')
+    expect(band?.textContent).toMatch(/Nothing is running this/)
+  })
+
+  it('names the steps that stopped, as a person would read them', async () => {
+    mount(ORPHANED)
+    const heading = await screen.findByText(/Nothing is running this/)
+    const band = heading.closest('section') as HTMLElement
+    expect(within(band).getByText(/builder · U-1/)).toBeTruthy()
+  })
+
+  it('says why, so it does not read as a bug in the surface', async () => {
+    mount(ORPHANED)
+    await waitFor(() => screen.getByText(/Nothing is running this/))
+    expect(screen.getByText(/does not outlive/)).toBeTruthy()
+  })
+
+  it('picks the run back up', async () => {
+    mount(ORPHANED)
+    await waitFor(() => screen.getByText(/Nothing is running this/))
+    fireEvent.click(screen.getByRole('button', { name: /Pick it back up/ }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.resume', { id: 'WO-1' }))
+  })
+
+  it('stops it, for a run that is not worth restarting', async () => {
+    mount(ORPHANED)
+    await waitFor(() => screen.getByText(/Nothing is running this/))
+    fireEvent.click(screen.getByRole('button', { name: /Stop the run/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:run.stop',
+        expect.objectContaining({
+          id: 'WO-1',
+        })
+      )
+    )
+  })
+
+  it('reports a refusal rather than looking like it worked', async () => {
+    mount(ORPHANED, { resume: { error: 'No order WO-1.' } })
+    await waitFor(() => screen.getByText(/Nothing is running this/))
+    fireEvent.click(screen.getByRole('button', { name: /Pick it back up/ }))
+    await waitFor(() => expect(screen.getByText('No order WO-1.')).toBeTruthy())
+  })
+
+  it('says nothing when every agent is where it should be', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText(/Nothing is running this/)).toBeNull()
+  })
+})
+
+describe('getting into a running agent’s terminal', () => {
+  it('actually goes there, rather than resolving an id and dropping it', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: /Attach to/ }))
+    // The terminal session the attach channel resolved, not the node's own —
+    // an agent's claude session and the tab it runs in are different ids.
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 't-1' })
+    )
   })
 })

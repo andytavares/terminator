@@ -7,6 +7,8 @@ import { buildRunGraph, nodeLabels } from '../line/run-graph.js'
 import type { RunGraph } from '../line/run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
 import { readyNodes, blockedReason, retry as retryNode } from '../line/scheduler.js'
+import { reclaim, orphanedNodes } from '../line/reclaim.js'
+import type { SessionLiveness } from '../line/reclaim.js'
 import { resolveRecipe, availableNames } from '../recipe/resolve.js'
 import type { ResolveSources } from '../recipe/resolve.js'
 import { checkRequirements } from '../recipe/requirements.js'
@@ -65,6 +67,24 @@ export interface RunDeps {
   }
   /** Record that the operator started anyway, with the depth they ignored. */
   readonly noteOverride?: (orderId: string) => void
+  /**
+   * Whether this process is still running that agent's session.
+   *
+   * Absent means there is nothing to ask, which is not "everything is fine" —
+   * it is "nothing is running anything". A run whose agents died with the last
+   * application is exactly that case, and answering it optimistically is what
+   * left a reopened run drawing "building" chips for ever.
+   */
+  readonly isLive?: SessionLiveness
+  /**
+   * Whether an executor in this process is still driving that order.
+   *
+   * The race this closes: a node is marked `running` and written down before
+   * its agent has reported a session, so for a second or two it looks exactly
+   * like a node whose agent is gone. Reclaiming it there would launch a second
+   * agent into the same worktree.
+   */
+  readonly executing?: (orderId: string) => boolean
 }
 
 export interface RunChannels {
@@ -96,6 +116,22 @@ export async function writeRunGraph(dataRoot: string, graph: RunGraph): Promise<
     `${JSON.stringify(graph, null, 2)}\n`,
     'utf8'
   )
+}
+
+/**
+ * Read one back.
+ *
+ * Here rather than beside its caller for the reason `writeRunGraph` is: two
+ * files claiming to be the run's state is worse than one, and two functions
+ * disagreeing about where that file lives is how it would happen.
+ */
+export async function readRunGraph(dataRoot: string, orderId: string): Promise<RunGraph | null> {
+  try {
+    return JSON.parse(await fs.promises.readFile(graphPath(dataRoot, orderId), 'utf8')) as RunGraph
+  } catch {
+    // A missing or unreadable graph is "no run", never a thrown surface.
+    return null
+  }
 }
 
 /** A proposed shape and the reason it fits this order (FR-014). */
@@ -138,18 +174,29 @@ export function proposeRecipe(order: WorkOrder): ProposedRecipe {
 }
 
 export function createRunChannels(deps: RunDeps): RunChannels {
+  // Nothing to ask means nothing is running it. The optimistic reading is what
+  // made a reopened run look like a working one.
+  const isLive: SessionLiveness = (sessionId) => deps.isLive?.(sessionId) ?? false
+
+  /**
+   * The nodes nothing is running, for one order.
+   *
+   * Empty while an executor in this process is driving the order, because a
+   * node marked `running` before its agent has reported a session is
+   * indistinguishable from one whose agent is gone — and only one of those is
+   * safe to restart.
+   */
+  function orphansOf(orderId: string, graph: RunGraph): string[] {
+    if (deps.executing?.(orderId) === true) return []
+    return orphanedNodes(graph, isLive).map((node) => node.id)
+  }
+
   async function saveGraph(graph: RunGraph): Promise<void> {
     await writeRunGraph(deps.dataRoot(), graph)
   }
 
   async function loadGraph(orderId: string): Promise<RunGraph | null> {
-    try {
-      return JSON.parse(
-        await fs.promises.readFile(graphPath(deps.dataRoot(), orderId), 'utf8')
-      ) as RunGraph
-    } catch {
-      return null
-    }
+    return readRunGraph(deps.dataRoot(), orderId)
   }
 
   async function start(raw: unknown): Promise<unknown> {
@@ -282,6 +329,10 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return {
       graph,
       labels,
+      // What the graph calls running and nothing is actually running. A
+      // surface that cannot tell those apart shows a dead run as a busy one,
+      // which is how an interrupted run went unnoticed for hours.
+      orphaned: orphansOf(parsed.data.id, graph),
       ready: readyNodes(graph, budgets).map((n) => n.id),
       blocked: graph.nodes
         .map((n) => ({ id: n.id, reason: blockedReason(graph, n.id, name) }))
@@ -333,14 +384,37 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const resolved = resolveRecipe(order.recipe, deps.sources())
     if (!resolved.ok) return { error: resolved.reason }
 
+    // Whatever was left mid-flight by an application that closed comes back
+    // first. Without this the scheduler has nothing to offer — it offers only
+    // `waiting` and `ready` — so a resumed run started nothing and said
+    // nothing, which reads exactly like a run that had finished.
+    const taken =
+      deps.executing?.(order.id) === true ? { graph, reclaimed: [] } : reclaim(graph, isLive)
+    if (taken.reclaimed.length > 0) {
+      await deps.store.record({
+        at: deps.now(),
+        orderId: order.id,
+        actor: 'rule:line',
+        action: 'run.reclaimed',
+        subject: order.id,
+        reason: `${taken.reclaimed.join(', ')} had no agent left and were put back in the queue`,
+        evidence: [],
+      })
+    }
+
     // Anything the operator sent back is offered again. Without this a failed
     // node stays failed and the resumed run has nothing to do — which reads
     // as "it finished" rather than "it never restarted".
-    const retried = (parsed.data.retry ?? []).reduce((g, id) => retryNode(g, id), graph)
+    const retried = (parsed.data.retry ?? []).reduce((g, id) => retryNode(g, id), taken.graph)
     await saveGraph(retried)
 
     if (deps.execute === undefined) {
-      return { graph: retried, started: false, reason: 'The supervision runtime is not available.' }
+      return {
+        graph: retried,
+        reclaimed: taken.reclaimed,
+        started: false,
+        reason: 'The supervision runtime is not available.',
+      }
     }
     void deps.execute(order, resolved.resolved.value, retried).catch(async (error: unknown) => {
       await deps.store.record({
@@ -353,7 +427,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
         evidence: [],
       })
     })
-    return { graph: retried, started: true }
+    return { graph: retried, reclaimed: taken.reclaimed, started: true }
   }
 
   async function recipes(raw: unknown): Promise<unknown> {
@@ -398,6 +472,13 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     if (node === undefined) return { error: `No step ${parsed.data.nodeId}.` }
     if (node.sessionId === null) {
       return { error: `${node.id} has no session yet — it is ${node.state}.` }
+    }
+    // A session id outlives the process that ran it, so handing one back
+    // unchecked sent the operator to a terminal that no longer exists.
+    if (!isLive(node.sessionId) && deps.executing?.(parsed.data.orderId) !== true) {
+      return {
+        error: `${node.id} has no live agent — its session ended when the application last closed. Resume the run to start it again.`,
+      }
     }
     return { terminalSessionId: node.sessionId, nodeId: node.id }
   }

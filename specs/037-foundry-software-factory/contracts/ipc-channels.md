@@ -172,6 +172,18 @@ Errors, all before any work starts: order not `agreed`; recipe unmet requirement
 
 ---
 
+## Picking a run back up
+
+An agent's terminal is a child of the application process, so quitting kills every agent while `run-graph.json` goes on saying `running`. Three things follow from that, and all three are part of the contract:
+
+- **`run.observe` carries `orphaned: string[]`** — the node ids the graph calls in flight that nothing in this process is running. A surface that cannot tell those from working agents draws a dead run as a busy one.
+- **`run.resume` reclaims before it schedules.** The scheduler offers only `waiting` and `ready` nodes, so without this a resumed run has nothing to start and reports success having done nothing. Reclaiming gives the attempt back — an interrupted attempt is not a failed one — and keeps the session id on the node, so the agent resumes its own conversation rather than starting cold.
+- **The `run.interrupted` gate is raised on first read of a records location**, by `foundry:attention` and `foundry:inbox.list`, and is live at every autonomy setting. The chrome polls `attention` from the moment the application opens, so a run the last session left behind is counted on the Inbox tab within one poll.
+
+`session.attach` refuses a session this process no longer has, rather than navigating to a terminal that does not exist.
+
+---
+
 ## `foundry:run.observe`
 
 **Direction**: main → renderer (stream, via `api.window.broadcast`)
@@ -350,16 +362,17 @@ Thirty channels serve the Floor: the live runs, their permissions, their transcr
 
 ### The run graph and the session
 
-| Channel                        | Payload                                   | Response                                                                                                        |
-| ------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `foundry:run.resume`           | `{ id: string }`                          | Restarts a run's scheduler after a gate was decided. Main-process seam: raised from the inbox, not from a view. |
-| `foundry:run-interrupt`        | `{ sessionId: string }`                   | `{ ok: boolean }`                                                                                               |
-| `foundry:run-redirect`         | `{ sessionId: string; message?: string }` | `{ ok: boolean }` — interrupts, then sends. Refuses an empty message rather than throwing.                      |
-| `foundry:run-stop`             | `{ sessionId: string; reason?: string }`  | `{ ok: boolean }` — archives the run before it leaves the live list                                             |
-| `foundry:run-terminal`         | `{ sessionId: string }`                   | `{ ok: boolean }` — focuses the window and navigates to the agent's terminal (FR-027)                           |
-| `foundry:run-transcript`       | `{ sessionId: string; limit?: number }`   | `{ lines: string[] }` — the tail, default 40                                                                    |
-| `foundry:supervision-snapshot` | `{}`                                      | `{ runs, review, backpressure: { allowed, unreviewed, limit } }`                                                |
-| `foundry:stalls-list`          | `{}`                                      | `{ firings, shadowMode: boolean }`                                                                              |
+| Channel                        | Payload                                   | Response                                                                                                                                                                                                         |
+| ------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `foundry:run.resume`           | `{ id: string; retry?: string[] }`        | `{ graph, reclaimed: string[], started: boolean } \| { error }` — reclaims every step whose agent is gone, then re-enters the executor. Called from the inbox when a gate is decided, and from the Floor's band. |
+| `foundry:run.stop`             | `{ id: string }`                          | `{ ok: true } \| { error }` — ends any live agent on the run, saying why, and cancels the order. The worktrees and their changes are left alone.                                                                 |
+| `foundry:run-interrupt`        | `{ sessionId: string }`                   | `{ ok: boolean }`                                                                                                                                                                                                |
+| `foundry:run-redirect`         | `{ sessionId: string; message?: string }` | `{ ok: boolean }` — interrupts, then sends. Refuses an empty message rather than throwing.                                                                                                                       |
+| `foundry:run-stop`             | `{ sessionId: string; reason?: string }`  | `{ ok: boolean }` — archives the run before it leaves the live list                                                                                                                                              |
+| `foundry:run-terminal`         | `{ sessionId: string }`                   | `{ ok: boolean }` — focuses the window and navigates to the agent's terminal (FR-027)                                                                                                                            |
+| `foundry:run-transcript`       | `{ sessionId: string; limit?: number }`   | `{ lines: string[] }` — the tail, default 40                                                                                                                                                                     |
+| `foundry:supervision-snapshot` | `{}`                                      | `{ runs, review, backpressure: { allowed, unreviewed, limit } }`                                                                                                                                                 |
+| `foundry:stalls-list`          | `{}`                                      | `{ firings, shadowMode: boolean }`                                                                                                                                                                               |
 
 ### Review
 

@@ -42,6 +42,14 @@ interface FloorView {
   ready: string[]
   blocked: Blocked[]
   lanes?: LaneRow[]
+  /**
+   * Steps the graph calls running that nothing is actually running.
+   *
+   * An agent's terminal is a child of the application, so quitting kills every
+   * one while the graph goes on saying `running`. Without this the chips for a
+   * dead run and a working one are the same chips.
+   */
+  orphaned?: string[]
 }
 
 /** A tool call an agent is holding at, waiting for an answer. */
@@ -117,9 +125,30 @@ interface Backpressure {
 
 /** A run that stopped making progress without asking for anything. */
 interface StallFiring {
-  firing: { sessionId: string; signal: string; firedAt: number }
+  firing: {
+    sessionId: string
+    /** The detector's own vocabulary: these two and nothing else. */
+    signal: 'silence' | 'loop'
+    firedAt: number
+    /** The values that satisfied the condition, so the row can say them. */
+    inputs?: { toolSilenceMs: number }
+  }
   featureDir: string
   shadow: boolean
+}
+
+/**
+ * What a firing means, in a sentence.
+ *
+ * The panel printed `signal` — "s-1 — silence" — which is this extension's own
+ * vocabulary shown to the person using it, beside an id they did not choose.
+ */
+function stallInWords(firing: StallFiring['firing']): string {
+  if (firing.signal === 'loop') {
+    return 'going round in circles on one file, with nothing to show for it'
+  }
+  const minutes = Math.round((firing.inputs?.toolSilenceMs ?? 0) / 60_000)
+  return `no tool call for ${minutes} minutes`
 }
 
 /** How often the live half is refetched. Slow enough to be cheap, fast
@@ -392,21 +421,96 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       const r = (await invoke('foundry:session.attach', { orderId, nodeId })) as
         | { terminalSessionId: string }
         | { error: string }
-      if ('error' in r) setProblem(r.error)
+      if ('error' in r) {
+        setProblem(r.error)
+        return
+      }
+      // And then actually go there. This resolved the session and dropped it,
+      // so the button labelled "Attach" navigated nowhere at all — the one
+      // control on a read-only surface, and it did nothing.
+      const gone = (await invoke('foundry:run-terminal', {
+        sessionId: r.terminalSessionId,
+      })) as { ok?: boolean }
+      if (gone.ok !== true) setProblem('That agent is no longer in a terminal.')
     },
     [orderId]
+  )
+
+  /**
+   * Pick the run back up, or stop it.
+   *
+   * The two answers to a run nothing is running. `run.resume` has existed and
+   * been registered the whole time with no surface calling it: the only way to
+   * restart a run was to happen to have a gate open in the inbox.
+   */
+  const [busy, setBusy] = useState(false)
+  const decideRun = useCallback(
+    async (channel: 'foundry:run.resume' | 'foundry:run.stop') => {
+      setBusy(true)
+      try {
+        const r = (await invoke(channel, { id: orderId })) as { error?: string }
+        // Said out loud. A refusal that leaves the band exactly as it was reads
+        // as a button that does nothing, which is what sent people to the
+        // terminal to find out.
+        setProblem(r.error ?? null)
+        await refresh()
+      } finally {
+        setBusy(false)
+      }
+    },
+    [orderId, refresh]
   )
 
   if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
   if (view === null) return <div className="fdry-empty">Loading the run…</div>
 
   const lanes = [...new Set(view.graph.nodes.map((n) => n.lane ?? 0))].sort((a, b) => a - b)
+  const orphaned = view.orphaned ?? []
 
   return (
     <div className="fdry-shell">
       <h2 className="fdry-panel-h">
         {view.graph.orderId} · {view.graph.recipe}
       </h2>
+
+      {/* A run nothing is running.
+
+          At the top and across the width, before the graph, because the chips
+          underneath it are describing agents that do not exist: an agent's
+          terminal is a child of the application and does not outlive it. This
+          used to be invisible — the same chips a working run draws — so the
+          only way to find out was to come back later and notice that nothing
+          had moved. */}
+      {orphaned.length > 0 ? (
+        <section className="fdry-needs-you" aria-labelledby="fdry-orphaned-h">
+          <h3 className="fdry-needs-you-h" id="fdry-orphaned-h">
+            <ShieldQuestion aria-hidden="true" />
+            Nothing is running this — {orphaned.length} {orphaned.length === 1 ? 'step' : 'steps'}
+          </h3>
+          <p className="fdry-note">
+            {orphaned.map((id) => view.labels?.[id] ?? id).join(', ')}{' '}
+            {orphaned.length === 1 ? 'was' : 'were'} still working when the application last closed,
+            and an agent&rsquo;s terminal does not outlive it.
+          </p>
+          <div className="fdry-ask-actions">
+            <button
+              type="button"
+              className="is-primary"
+              disabled={busy}
+              onClick={() => void decideRun('foundry:run.resume')}
+            >
+              Pick it back up
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void decideRun('foundry:run.stop')}
+            >
+              <Square aria-hidden="true" /> Stop the run
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {/* Held tool calls, oldest first — the order they must be answered in.
           This is the UI-first half of the promise: the terminal is the
@@ -754,12 +858,49 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             Stopped making progress — {stalls.length}
             {shadowMode ? ' (recorded, not acted on)' : ''}
           </h3>
-          {stalls.slice(-5).map((entry) => (
-            <p key={`${entry.firing.sessionId}-${entry.firing.firedAt}`} className="fdry-note">
-              <b>{entry.firing.sessionId}</b> — {entry.firing.signal}
-              {entry.shadow ? ' · shadow' : ''}
-            </p>
-          ))}
+          {stalls.slice(-5).map((entry) => {
+            const session = entry.firing.sessionId
+            // What the operator calls it. The panel printed the session id,
+            // which is a uuid nobody chose, beside this extension's own word
+            // for the signal.
+            const node = view.graph.nodes.find((n) => n.sessionId === session)
+            return (
+              <div key={`${session}-${entry.firing.firedAt}`} className="fdry-ask">
+                <div className="fdry-ask-main">
+                  <b>{node === undefined ? session : (view.labels?.[node.id] ?? node.id)}</b>
+                  <small>
+                    {stallInWords(entry.firing)}
+                    {entry.shadow ? ' · shadow' : ''}
+                  </small>
+                </div>
+                {/* A panel that names a stall and offers nothing is a wall.
+                    These are the three things you do about one, and every
+                    channel behind them already existed. */}
+                <div className="fdry-ask-actions">
+                  <button type="button" onClick={() => setWatching(session)}>
+                    <ScanEye aria-hidden="true" /> Read what it was saying
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void control('foundry:run-terminal', { sessionId: session })}
+                  >
+                    <Terminal aria-hidden="true" /> Take it over
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void control('foundry:run-stop', {
+                        sessionId: session,
+                        reason: 'stopped from the Floor: it had stopped making progress',
+                      })
+                    }
+                  >
+                    <Square aria-hidden="true" /> End this agent
+                  </button>
+                </div>
+              </div>
+            )
+          })}
           {shadowMode ? (
             <p className="fdry-note">
               Shadow mode: these are recorded and never notified, until the thresholds have earned

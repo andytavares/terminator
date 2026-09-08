@@ -5,14 +5,14 @@ import * as path from 'node:path'
 import { modelCatalog } from './state/model-catalog.js'
 
 import { createForgeChannels } from './ipc/forge-channels.js'
-import { createRunChannels, writeRunGraph } from './ipc/run-channels.js'
+import { createRunChannels, writeRunGraph, readRunGraph } from './ipc/run-channels.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
 import { createLedgerChannels } from './ipc/ledger-channels.js'
 import { rulesFor, rulesAtRung } from './verify/rules.js'
 import { availableNames, resolveRule } from './recipe/resolve.js'
 import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
-import { createLiveGateStore } from './gates/store.js'
+import { createLiveGateStore, createGateStore } from './gates/store.js'
 import { countAttention } from './gates/attention.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { markReady, readPulls, shipOrder } from './line/integrate.js'
@@ -23,6 +23,7 @@ import type { RunCommand } from './runtime/diff-metrics.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
+import { interruptedRuns, interruptedGate } from './line/adopt.js'
 import { createRoleRegistry } from './line/roles.js'
 import type { RunOutcome, StartedRun } from './line/executor.js'
 import type { RunGraph, RunNode } from './line/run-graph.js'
@@ -408,6 +409,24 @@ let paletteTimer: NodeJS.Timeout | null = null
 // start yet.
 let supervision: Supervision | null = null
 /**
+ * The orders an executor in this process is currently driving.
+ *
+ * Not decoration: a node is written down as `running` before its agent has
+ * reported a session, so for a second or two it is indistinguishable from a
+ * node whose agent is gone. Reclaiming it there would put a second agent into
+ * the same worktree. While an order is in here, nothing reclaims its nodes.
+ */
+const executingOrders = new Set<string>()
+/**
+ * Data roots already looked at for runs the last application left behind.
+ *
+ * Once per root rather than once per process: activation runs before there is
+ * a workspace, and the records location follows the workspace, so the answer
+ * to "what did the last session leave here" is per-root and changes when the
+ * operator switches.
+ */
+const adoptedRoots = new Set<string>()
+/**
  * Which runs are allowed to interrupt you.
  *
  * Muting suppresses the notification, never the entry: the feed's record stays
@@ -502,6 +521,19 @@ const MAX_STALL_FIRINGS = 200
  * off, which is worse than not shipping it. Turn it off on the evidence of the
  * firings below, not on faith.
  */
+/**
+ * Whether this process is still running that agent's session.
+ *
+ * The runner's own register, which is emptied by `end` on a `SessionEnd`, a
+ * closed tab or a dead process — and which is simply empty in a fresh
+ * application. That is the whole point: every session a previous process
+ * started is gone, and a graph that still says `running` is describing agents
+ * that no longer exist.
+ */
+function isLiveSession(sessionId: string): boolean {
+  return supervisedRunner?.terminalFor(sessionId) != null
+}
+
 function stallShadowMode(api: ExtensionAPI): boolean {
   return api.settings.get<boolean>('terminator.foundry.stallShadowMode') ?? true
 }
@@ -801,6 +833,99 @@ function ladderNode(rung: string, name: string, lane: number): RunNode {
 }
 
 /**
+ * Stop a run, and mean it.
+ *
+ * Every gate that offers "Stop here" said the order would be cancelled, and
+ * nothing did it: the decision seam returned early on `stop`, the order stayed
+ * `running` for ever, and `order.cancel` refuses a running order and tells you
+ * to stop it at its gate — the gate that did nothing. There was no way out of
+ * a run at all.
+ *
+ * The worktrees and their changes are deliberately left alone. Cancelling the
+ * order is a decision about the order; throwing away work an agent already did
+ * is a different decision, and nothing here is entitled to take it silently.
+ */
+async function stopOrder(
+  api: ExtensionAPI,
+  root: string,
+  orderId: string,
+  reason: string
+): Promise<void> {
+  const store = createOrderStore(root)
+  const graph = await readRunGraph(root, orderId)
+  const stopped: string[] = []
+  for (const node of graph?.nodes ?? []) {
+    if (node.sessionId === null || !isLiveSession(node.sessionId)) continue
+    // Told why first, so the agent's own transcript carries the reason rather
+    // than ending mid-sentence for no stated cause.
+    if (supervisedRunner?.stop(node.sessionId, reason) === true) {
+      supervision?.finish(node.sessionId, Date.now())
+      supervision?.runs.archive(node.sessionId, 'stopped', Date.now())
+      stopped.push(node.id)
+    }
+  }
+
+  const order = await store.load(orderId)
+  if (order !== null && order.status === 'running') {
+    await store.save({ ...order, status: 'cancelled' })
+  }
+  await store.record({
+    at: new Date().toISOString(),
+    orderId,
+    actor: 'operator',
+    action: 'run.stopped',
+    subject: orderId,
+    reason:
+      stopped.length === 0
+        ? `${reason}; no agent was still running`
+        : `${reason}; stopped ${stopped.join(', ')}`,
+    evidence: [],
+  })
+  api.window.broadcast('foundry:run-stopped', { orderId })
+}
+
+/**
+ * What the last application left behind, said out loud the first time this one
+ * looks at a records location.
+ *
+ * An agent's terminal is a child of the process that started it, so a run in
+ * flight when the application closed has no agents left — while its order, its
+ * graph and every surface go on saying `running`. Nothing looked, so the only
+ * way to find out was to come back hours later and notice nothing had moved.
+ *
+ * Once per records location rather than once per process: activation runs
+ * before there is a workspace, and where the records live follows the
+ * workspace.
+ */
+async function adoptInterruptedRuns(root: string): Promise<void> {
+  if (adoptedRoots.has(root)) return
+  adoptedRoots.add(root)
+
+  const store = createOrderStore(root)
+  const orders = await store.list()
+  const onDisk = await Promise.all(
+    orders.map(async (order) => ({ order, graph: await readRunGraph(root, order.id) }))
+  )
+
+  const gates = createGateStore(root)
+  const at = new Date().toISOString()
+  for (const run of interruptedRuns(onDisk, isLiveSession)) {
+    // Keyed on the order, so opening the application five times over a run
+    // nobody has answered leaves one row rather than five.
+    await gates.save(interruptedGate(run, at))
+    await store.record({
+      at,
+      orderId: run.orderId,
+      actor: 'rule:run.interrupted',
+      action: 'run.interrupted',
+      subject: run.orderId,
+      reason: `${run.stopped.join(', ')} had no agent left when the application reopened`,
+      evidence: [],
+    })
+  }
+}
+
+/**
  * Actually run a graph.
  *
  * The seam `run.start` hands the graph to, and the one place the Line's pieces
@@ -870,6 +995,12 @@ async function executeRun(
   // exists to avoid — but a conversation carried across a change of role
   // carries the last role's identity with it, which broke three live runs.
   // The executor decides; this only remembers what is open.
+  //
+  // Seeded from the graph rather than started empty. A resumed run's agents
+  // are gone but their transcripts are not — `claude --resume` picks the
+  // conversation back up — so without this a run picked back up after a
+  // restart put a cold agent that had read nothing into a worktree half full
+  // of somebody else's work.
   const conversations = new Map<string, string>()
   /**
    * Lane and role together, because the role is the guard.
@@ -881,6 +1012,11 @@ async function executeRun(
    * and none of them arrives carrying the builder's identity.
    */
   const conversation = (lane: number, role: string | null): string => `${lane}:${role ?? 'command'}`
+
+  for (const node of graph.nodes) {
+    if (node.sessionId === null || node.role === null) continue
+    conversations.set(conversation(node.lane ?? 1, node.role), node.sessionId)
+  }
 
   /**
    * One node, from launch to the end of its turn.
@@ -1738,10 +1874,33 @@ export function activate(api: ExtensionAPI): void {
       supervision?.backpressure.check() ?? { allowed: true, unreviewed: 0, limit: 0, reason: null },
     noteOverride: (orderId) => supervision?.backpressure.override(orderId, Date.now()),
     now: () => new Date().toISOString(),
-    execute: (order, recipe, graph) => executeRun(api, dataRoot(), order, recipe, graph),
+    // Marked while it runs, so nothing reclaims a node out from under an
+    // executor that is part way through starting it.
+    execute: async (order, recipe, graph) => {
+      executingOrders.add(order.id)
+      try {
+        await executeRun(api, dataRoot(), order, recipe, graph)
+      } finally {
+        executingOrders.delete(order.id)
+      }
+    },
+    isLive: isLiveSession,
+    executing: (orderId) => executingOrders.has(orderId),
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))
+  // Stop the whole order, as opposed to one agent.
+  //
+  // `foundry:run-stop` ends one session; this ends the run. The distinction is
+  // the reason a dead run could never be got rid of: the only order-level stop
+  // was a gate option that did nothing, and `order.cancel` refuses a running
+  // order and points back at that gate.
+  reg(api, 'foundry:run.stop', async (payload) => {
+    const { id } = payload as { id?: unknown }
+    if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
+    await stopOrder(api, dataRoot(), id, 'stopped by the operator')
+    return { ok: true }
+  })
   reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
   reg(api, 'foundry:run.recipes', (payload) => runs.recipes(payload))
   reg(api, 'foundry:session.attach', (payload) => runs.attach(payload))
@@ -1790,9 +1949,17 @@ export function activate(api: ExtensionAPI): void {
         return
       }
 
+      // `stop` now stops. Every gate offering it promised the order would be
+      // cancelled and nothing did it — the run stayed `running` for ever, and
+      // `order.cancel` refuses a running order and points back at this gate.
+      if (option === 'stop') {
+        await stopOrder(api, dataRoot(), gate.orderId, `stopped at the ${gate.rule} gate`)
+        return
+      }
+
       // `hold` means what it says: the run stays stopped until the operator
       // comes back to it. Everything else is a decision to carry on.
-      if (option === 'hold' || option === 'stop') return
+      if (option === 'hold') return
       await runs.resume({
         id: gate.orderId,
         // "Send back" is a retry of the node that failed; the others resume
@@ -1801,7 +1968,12 @@ export function activate(api: ExtensionAPI): void {
       })
     },
   })
-  reg(api, 'foundry:inbox.list', () => inbox.list())
+  reg(api, 'foundry:inbox.list', async () => {
+    // Before the list is composed, not after: a run the last application left
+    // in flight has to be on it the first time it is read, not the second.
+    await adoptInterruptedRuns(dataRoot())
+    return inbox.list()
+  })
   reg(api, 'foundry:inbox.decide', (payload) => inbox.decide(payload))
 
   // How much is waiting for the operator, and where.
@@ -1813,14 +1985,19 @@ export function activate(api: ExtensionAPI): void {
   // find either was to already be looking at it.
   const attentionGates = createLiveGateStore(dataRoot)
   const attentionOrders = createLiveOrderStore(dataRoot)
-  reg(api, 'foundry:attention', async () =>
-    countAttention({
+  reg(api, 'foundry:attention', async () => {
+    // The chrome polls this from the moment the application opens, which makes
+    // it the earliest place a run the last one left behind can be noticed. A
+    // dead run that announces itself in four seconds is the whole difference
+    // between this and finding out hours later that nothing had moved.
+    await adoptInterruptedRuns(dataRoot())
+    return countAttention({
       gates: await attentionGates.list(),
       autonomy: autonomyFor(api),
       orders: await attentionOrders.list(),
       pendingAsks: pendingPermissions.list().length,
     })
-  )
+  })
 
   // ── The record ─────────────────────────────────────────────────────────
   //

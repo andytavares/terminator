@@ -302,7 +302,17 @@ describe('attaching to a running agent', () => {
     graph.nodes[0].sessionId = 'sess-42'
     fs.writeFileSync(graphPath, JSON.stringify(graph))
 
-    const r = (await channels().attach({ orderId: 'WO-1', nodeId: graph.nodes[0].id })) as {
+    // Live, said out loud. A session id outlives the process that ran it, so
+    // "there is an id on the node" is not the same question as "is anything
+    // running it" — and only the second one can be attached to.
+    const withRunner = createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      isLive: (sessionId) => sessionId === 'sess-42',
+    })
+    const r = (await withRunner.attach({ orderId: 'WO-1', nodeId: graph.nodes[0].id })) as {
       terminalSessionId: string
     }
     expect(r.terminalSessionId).toBe('sess-42')
@@ -732,5 +742,132 @@ describe('too much waiting to be reviewed (FR-053, FR-054)', () => {
     await store.save(order())
     const r = (await channels().start({ id: 'WO-1' })) as { error?: string }
     expect(r.error).toBeUndefined()
+  })
+})
+
+// ── Picking a run back up after the application closed ───────────────────
+//
+// An agent's terminal is a child of this process, so quitting kills it while
+// the graph on disk goes on saying `running`. Before this, a reopened run
+// raised nothing, started nothing and drew "building" for ever, and resuming
+// it did nothing at all — the scheduler offers only `waiting` and `ready`.
+
+describe('a run whose agents are gone', () => {
+  const nothingLive = (): boolean => false
+  const everythingLive = (): boolean => true
+
+  function withRunning(): { nodeId: string } {
+    const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+    const graph = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
+    const nodeId = graph.nodes.find((n) => n.unitId === 'U-1')?.id ?? ''
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        ...graph,
+        nodes: graph.nodes.map((n) =>
+          n.id === nodeId ? { ...n, state: 'running', sessionId: 'gone', attempts: 1 } : n
+        ),
+      })
+    )
+    return { nodeId }
+  }
+
+  async function runningOrder(
+    over: Partial<Parameters<typeof createRunChannels>[0]> = {}
+  ): Promise<ReturnType<typeof createRunChannels>> {
+    await store.save(order())
+    const channels = createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      execute: vi.fn(async () => undefined) as never,
+      ...over,
+    })
+    await channels.start({ id: 'WO-1' })
+    return channels
+  }
+
+  it('resume takes the node back so the scheduler can offer it again', async () => {
+    const execute = vi.fn(async () => undefined)
+    const channels = await runningOrder({ execute: execute as never, isLive: nothingLive })
+    const { nodeId } = withRunning()
+    execute.mockClear()
+
+    await channels.resume({ id: 'WO-1' })
+    const handed = execute.mock.calls[0][2] as RunGraph
+    expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('waiting')
+  })
+
+  it('says what it took back, so the answer is not silent', async () => {
+    const channels = await runningOrder({ isLive: nothingLive })
+    const { nodeId } = withRunning()
+    expect(await channels.resume({ id: 'WO-1' })).toMatchObject({ reclaimed: [nodeId] })
+  })
+
+  it('writes the reclaimed graph down, so a reopened surface reads it too', async () => {
+    const channels = await runningOrder({ isLive: nothingLive })
+    const { nodeId } = withRunning()
+    await channels.resume({ id: 'WO-1' })
+
+    const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
+    expect(saved.nodes.find((n) => n.id === nodeId)?.state).toBe('waiting')
+  })
+
+  it('leaves a node alone whose agent is still in its terminal', async () => {
+    const execute = vi.fn(async () => undefined)
+    const channels = await runningOrder({ execute: execute as never, isLive: everythingLive })
+    const { nodeId } = withRunning()
+    execute.mockClear()
+
+    await channels.resume({ id: 'WO-1' })
+    const handed = execute.mock.calls[0][2] as RunGraph
+    expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('running')
+  })
+
+  it('never reclaims under an executor that is still running this order', async () => {
+    const execute = vi.fn(async () => undefined)
+    const channels = await runningOrder({
+      execute: execute as never,
+      isLive: nothingLive,
+      executing: () => true,
+    })
+    const { nodeId } = withRunning()
+    execute.mockClear()
+
+    const r = (await channels.resume({ id: 'WO-1' })) as { reclaimed: string[] }
+    expect(r.reclaimed).toEqual([])
+    const handed = execute.mock.calls[0][2] as RunGraph
+    expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('running')
+  })
+
+  it('observe names the nodes nothing is running, so the surface can say so', async () => {
+    const channels = await runningOrder({ isLive: nothingLive })
+    const { nodeId } = withRunning()
+    const view = (await channels.observe({ id: 'WO-1' })) as { orphaned: string[] }
+    expect(view.orphaned).toEqual([nodeId])
+  })
+
+  it('observe reports no orphans while an executor is still running the order', async () => {
+    const channels = await runningOrder({ isLive: nothingLive, executing: () => true })
+    withRunning()
+    const view = (await channels.observe({ id: 'WO-1' })) as { orphaned: string[] }
+    expect(view.orphaned).toEqual([])
+  })
+
+  it('observe says nothing is orphaned when every agent is live', async () => {
+    const channels = await runningOrder({ isLive: everythingLive })
+    withRunning()
+    const view = (await channels.observe({ id: 'WO-1' })) as { orphaned: string[] }
+    expect(view.orphaned).toEqual([])
+  })
+
+  it('refuses to attach to a session this process no longer has', async () => {
+    const channels = await runningOrder({ isLive: nothingLive })
+    const { nodeId } = withRunning()
+    expect(await channels.attach({ orderId: 'WO-1', nodeId })).toEqual({
+      error: `${nodeId} has no live agent — its session ended when the application last closed. Resume the run to start it again.`,
+    })
   })
 })

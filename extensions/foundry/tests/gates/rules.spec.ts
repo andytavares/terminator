@@ -7,6 +7,7 @@ import {
   GATE_RULES,
   UnattributedGateError,
   AlreadyDecidedError,
+  ruleInWords,
 } from '../../src/gates/rules.js'
 import type { Gate, GateRuleId } from '../../src/gates/rules.js'
 import {
@@ -211,5 +212,52 @@ describe('ranking', () => {
 
   it('summarises an empty inbox as nothing waiting', () => {
     expect(summariseInbox([])).toEqual({ waiting: 0, orders: 0, automatic: 0 })
+  })
+})
+
+// ── A run whose agents are gone ─────────────────────────────────────────
+//
+// The one rule that must never be silenced by the autonomy dial. Every other
+// rule asks about work; this one says the work stopped. Hiding it at
+// lights-out is precisely the failure it exists to end: a run that looked
+// busy for hours and had died when the application closed.
+
+describe('run.interrupted', () => {
+  it('is live at every autonomy setting', () => {
+    for (const level of AUTONOMY_LEVELS) expect(isLive('run.interrupted', level)).toBe(true)
+  })
+
+  it('is never silenced', () => {
+    for (const level of AUTONOMY_LEVELS) {
+      expect(silencedRules(level)).not.toContain('run.interrupted')
+    }
+  })
+
+  it('offers picking the run back up, and stopping it', () => {
+    const gate = raiseGate({
+      id: 'g',
+      rule: 'run.interrupted',
+      orderId: 'WO-1',
+      summary: 's',
+      why: 'w',
+      at: '2026-09-06T10:00:00.000Z',
+    })
+    expect(gate.options.map((o) => o.id)).toEqual(['resume', 'stop', 'hold'])
+  })
+
+  it('holds rather than restarting agents nobody asked for', () => {
+    const gate = raiseGate({
+      id: 'g',
+      rule: 'run.interrupted',
+      orderId: 'WO-1',
+      summary: 's',
+      why: 'w',
+      at: '2026-09-06T10:00:00.000Z',
+    })
+    expect(gate.defaultIfIgnored).toBe('hold')
+  })
+
+  it('says what it is in words somebody who did not write it can read', () => {
+    expect(ruleInWords('run.interrupted')).toMatch(/agents/)
   })
 })
