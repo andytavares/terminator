@@ -1,0 +1,70 @@
+extensions/foundry/src/line/executor.ts
+  s_54a32e8d240536::t_3d09b9646972a2 630,640-643,645,664-687,691-705
+  s_54a32e8d240536::t_7f731d1b90648b 60-69,350-354,635,688-690
+  s_54a32e8d240536::t_d7adada36f3cd7 58-59,70-83,307-308,319
+  s_54a32e8d240536::t_f9908fb151e09c 369-410
+  s_54a32e8d240536::t_54211adf5a1a93 17-18,101-118,165-180
+  s_54a32e8d240536::t_7e27934972a37b 181,355
+extensions/foundry/src/line/brief.ts
+  s_54a32e8d240536::t_9fe6b4bff1b02c 32-40
+  s_54a32e8d240536::t_74da59d8591adf 2,126,198-204
+  s_54a32e8d240536::t_ff7c2c259e16aa 205-206
+extensions/foundry/tests/line/rung-handback.spec.ts
+  s_54a32e8d240536::t_abce48ab24dc9a 1-271
+extensions/foundry/roles/inspector.yaml
+  s_54a32e8d240536::t_902d533d9f1f81 6-12
+specs/037-foundry-software-factory/contracts/recipe-role-rule.md
+  s_54a32e8d240536::t_5bc192d8d387b0 99-106
+extensions/foundry/tests/line/executor.spec.ts
+  s_54a32e8d240536::t_1f261b3edf2878 1643-1751,1753-1768,1770-1773,1789-1800,1802-1803,1805-1835,1837-1856,1858-1872,1936-1937
+  s_54a32e8d240536::t_b30ca3c07bfbc0 1804
+  s_54a32e8d240536::t_ca9fa4f720844e 1801,1836,1857,1873-1935
+  s_54a32e8d240536::t_9b402b94836834 1752,1769,1774-1788
+extensions/foundry/tests/line/rung-output.spec.ts
+  s_54a32e8d240536::t_e0f83d08f1cc47 1-4,13,311-387
+  s_54a32e8d240536::t_22bcb0d399dafe 5-12,14-136,138-140,144-201,207-208,225-293,295-310,388-389
+  s_54a32e8d240536::t_b30ca3c07bfbc0 137,141-143
+  s_54a32e8d240536::t_6c13647497184f 202-206,209-224,294
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_54a32e8d240536::t_902d533d9f1f81 191-206
+extensions/foundry/tests/runtime/tool-decision.spec.ts
+  s_54a32e8d240536::t_e2aafdcc9ffa6d 24,261-333
+  s_54a32e8d240536::t_5cf85b85957c03 334
+extensions/foundry/src/index.ts
+  s_54a32e8d240536::t_89959a305f5499 1088-1090
+  s_54a32e8d240536::t_e2bc7259286295 26
+  s_54a32e8d240536::t_10328326137820 902-905,973,1024-1028,1059
+  s_54a32e8d240536::t_1f7713cc8b1fca 31,1123-1163
+docs/ARCHITECTURE.md
+  s_54a32e8d240536::t_57be6d8aed35a6 915-935,970-977
+extensions/foundry/tests/line/brief.spec.ts
+  s_54a32e8d240536::t_e3d3c42cda19a2 344-346,352
+  s_54a32e8d240536::t_5da0249ff46063 291-343,347-351,353-357
+extensions/foundry/src/runtime/tool-decision.ts
+  s_54a32e8d240536::t_5b6131bc8f2b9b 44-53,64-69,89-96
+  s_54a32e8d240536::t_ad02f74feef6d1 97-98
+specs/037-foundry-software-factory/contracts/data-root.md
+  s_54a32e8d240536::t_4ce843a82de538 43-45,70
+extensions/foundry/src/line/rung-output.ts
+  s_54a32e8d240536::t_30afd5b989285f 1,375-378,385-434
+  s_54a32e8d240536::t_a07c1a1e2301c3 206-210
+  s_54a32e8d240536::t_b2cdc226c4b8cf 2-205,211-306,308-330,334-339,347-353,362-374,435-436
+  s_54a32e8d240536::t_0f4323b809336e 307,331-333,340-346,354-361
+  s_54a32e8d240536::t_b30ca3c07bfbc0 379-384
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "d9ddd9538a54704e984d507bfe7306e95978a606",
+  "prompts": {},
+  "sessions": {
+    "s_54a32e8d240536": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79e09c95-e1cd-4464-912b-54203faf4303",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
