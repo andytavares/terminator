@@ -25,12 +25,49 @@ const SURFACES: readonly { id: Surface; label: string }[] = [
   { id: 'ledger', label: 'Ledger' },
 ]
 
+/** What is waiting for the operator, per surface. */
+interface Attention {
+  inbox: number
+  forge: number
+}
+
+/** How often the counts are refetched. Fast enough to notice, cheap to serve. */
+const ATTENTION_POLL_MS = 4000
+
 export function App(): JSX.Element {
   const [repoRoot, setRepoRoot] = useState<string | null>(
     new URLSearchParams(window.location.search).get('repoRoot')
   )
   const [surface, setSurface] = useState<Surface>('inbox')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [waiting, setWaiting] = useState<Attention>({ inbox: 0, forge: 0 })
+
+  // The counts, on the one piece of chrome that is on screen whatever surface
+  // you are looking at. Everything Foundry holds for a person lives behind one
+  // of these three tabs, and until this existed a tab said nothing until you
+  // clicked it — so an open question or a held tool call was only ever found
+  // by somebody who went looking for it on the off chance.
+  useEffect(() => {
+    let live = true
+    const read = async (): Promise<void> => {
+      try {
+        const next = (await window.electronAPI.extensionBridge.invoke(
+          'foundry:attention',
+          {}
+        )) as Attention
+        if (live) setWaiting({ inbox: next.inbox ?? 0, forge: next.forge ?? 0 })
+      } catch {
+        // The badge is an affordance, not the queue. A failed poll leaves the
+        // last count up rather than taking the chrome down with it.
+      }
+    }
+    void read()
+    const timer = setInterval(() => void read(), ATTENTION_POLL_MS)
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
+  }, [])
 
   // Orders are per-repository, so a workspace switch resets the surfaces.
   useEffect(() => {
@@ -46,26 +83,40 @@ export function App(): JSX.Element {
       <header className="sk-appbar">
         <span className="sk-appbar__title">Foundry</span>
         <nav className="fdry-tabs" aria-label="Foundry surfaces">
-          {SURFACES.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              // Settings covers the surfaces, so while it is open none of them
-              // is the one showing. Reporting one as pressed told a screen
-              // reader "Ledger, pressed" over a settings panel.
-              className={!settingsOpen && surface === tab.id ? 'is-on' : ''}
-              aria-pressed={!settingsOpen && surface === tab.id}
-              onClick={() => {
-                // Closes settings as well as choosing: without this, clicking a
-                // tab from inside settings changed the surface underneath and
-                // did nothing anybody could see.
-                setSettingsOpen(false)
-                setSurface(tab.id)
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {SURFACES.map((tab) => {
+            const count =
+              tab.id === 'inbox' ? waiting.inbox : tab.id === 'forge' ? waiting.forge : 0
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                // Settings covers the surfaces, so while it is open none of them
+                // is the one showing. Reporting one as pressed told a screen
+                // reader "Ledger, pressed" over a settings panel.
+                className={!settingsOpen && surface === tab.id ? 'is-on' : ''}
+                aria-pressed={!settingsOpen && surface === tab.id}
+                // The count is in the accessible name, not only in a badge: a
+                // number rendered beside the label is read as a second, unrelated
+                // thing, and "Forge 2" tells a screen reader nothing about what
+                // the two are.
+                aria-label={count > 0 ? `${tab.label}, ${count} waiting on you` : undefined}
+                onClick={() => {
+                  // Closes settings as well as choosing: without this, clicking a
+                  // tab from inside settings changed the surface underneath and
+                  // did nothing anybody could see.
+                  setSettingsOpen(false)
+                  setSurface(tab.id)
+                }}
+              >
+                {tab.label}
+                {count > 0 ? (
+                  <span className="fdry-tab-count" aria-hidden="true">
+                    {count}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })}
         </nav>
         <button
           aria-label="Settings"

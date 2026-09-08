@@ -288,3 +288,70 @@ describe('a unit with nothing declared', () => {
     expect(text).toContain('satisfies no criterion')
   })
 })
+
+describe('where a rung hands back what it found', () => {
+  it('tells a read-only role the file, and that nothing else counts', () => {
+    const text = brief({
+      order: order(),
+      role: role({ id: 'scout', writes: ['context'], tools: ['read'] }),
+      unit: null,
+      rules: [],
+      outputPath: '/data/orders/WO-1/rungs/scout.json',
+    })
+    expect(text).toContain('/data/orders/WO-1/rungs/scout.json')
+    expect(text).toContain('Nothing else you do counts')
+  })
+
+  it('offers only the artefacts that role declared it writes', () => {
+    const text = brief({
+      order: order(),
+      role: role({ id: 'red-team', writes: ['findings'], tools: ['read'] }),
+      unit: null,
+      rules: [],
+      outputPath: '/rungs/challenge.json',
+    })
+    expect(text).toContain('"redTeam"')
+    expect(text).not.toContain('"entryPoints"')
+  })
+
+  it('says nothing to a role whose product is the diff', () => {
+    // The builder writes the worktree. A second channel would be two answers
+    // to the question of what the rung did.
+    const text = brief({
+      order: order(),
+      role: role(),
+      unit: unit(),
+      rules: [],
+      outputPath: '/rungs/build.json',
+    })
+    expect(text).not.toContain('What to write, and where')
+  })
+
+  it('says nothing when the caller keeps no rung output', () => {
+    const text = brief({
+      order: order(),
+      role: role({ id: 'scout', writes: ['context'], tools: ['read'] }),
+      unit: null,
+      rules: [],
+    })
+    expect(text).not.toContain('What to write, and where')
+  })
+
+  it('is the last thing an agent reads', () => {
+    // After the assumptions, which end with "stop and say so rather than
+    // working around it" — the instruction that most often produces one.
+    const text = brief({
+      order: order({
+        assumptions: [{ id: 'A-1', text: 'the token is a JWT', struck: false, affects: [] }],
+      }),
+      role: role({ id: 'scout', reads: ['context'], writes: ['context'], tools: ['read'] }),
+      unit: null,
+      rules: [],
+      outputPath: '/rungs/scout.json',
+    })
+    expect(text).toContain('Assumed, and not verified')
+    expect(text.indexOf('What to write, and where')).toBeGreaterThan(
+      text.indexOf('Assumed, and not verified')
+    )
+  })
+})

@@ -55,6 +55,13 @@ moment you most want to redirect an agent is usually before that.
 | **Redirect**   | `foundry:run-redirect`   | interrupt, then say what to do instead                          |
 | **Stop**       | `foundry:run-stop`       | says why first, so the agent's own record carries it            |
 
+And two that act on the whole order rather than one agent:
+
+| Action              | Channel              | What it does                                                                              |
+| ------------------- | -------------------- | ----------------------------------------------------------------------------------------- |
+| **Pick it back up** | `foundry:run.resume` | reclaims every step whose agent is gone, then re-enters the executor over the same graph  |
+| **Stop the run**    | `foundry:run.stop`   | ends every live agent on it, saying why, and cancels the order. Worktrees are left alone. |
+
 Discard is gone with the card model it belonged to: a run is a node in an
 order's graph, and removing its worktree and branch is `foundry:run-stop`
 followed by the ordinary cleanup. What used to be true of it still is — a
@@ -422,6 +429,57 @@ off with `terminator.foundry.stallShadowMode`.
 A firing is posted to the feed **attributed to the pilot**, never to the agent.
 The agent did not say it, and a feed that blurs the two is one you stop trusting.
 
+## A run whose agents are gone
+
+An agent runs in a terminal that is a **child of this process**. Quitting the
+application kills every one of them — while `run-graph.json` on disk goes on
+saying `running`.
+
+Nothing used to notice. The scheduler offers only `waiting` and `ready` nodes
+and `hasStalled` is false while anything is in flight, so a reopened run broke
+out of its wave loop immediately, raised no gate and started nothing. The Floor
+drew the same "building" chips it draws for a working run. `foundry:run.resume`
+existed, was registered, and was called by no surface at all — its only caller
+was the inbox's gate action, and there was no gate.
+
+Three things now hold that together.
+
+**Liveness is a question, and it is asked.** `line/reclaim.ts` takes a graph and
+"is this process still running that session" — the runner's own register, which
+is empty in a fresh application by construction. `run.observe` carries
+`orphaned: string[]`, so a surface can tell a dead run from a busy one.
+
+**Reclaiming precedes scheduling.** `run.resume` moves every orphaned node back
+to `waiting` before it re-enters the executor. The attempt is **given back** —
+the counter exists to catch an agent thrashing on the same check, and an
+application closing is not the agent's doing. The **session id stays on the
+node**, and `executeRun` seeds its lane/role conversation map from the graph, so
+a resumed step continues its own conversation through `claude --resume` rather
+than putting a cold agent that has read nothing into a half-finished worktree.
+
+**It announces itself.** The first time this application reads a records
+location, `line/adopt.ts` raises one `run.interrupted` gate per affected order.
+The rule is live at **every** autonomy setting: every other rule asks about
+work, this one says the work stopped, and a dial that can silence it is a dial
+that lets a dead run look busy until somebody checks. The gate id is derived
+from the order rather than sequenced, so reopening five times leaves one row.
+It is raised from `foundry:attention` and `foundry:inbox.list` — the chrome
+polls `attention` every four seconds from the moment the application opens, so
+the Inbox badge says so within one poll rather than hours later.
+
+Its options are **Pick it back up**, **Stop here** and **Hold**, and the default
+if nobody answers is `hold`. No deadline, ever: every other default here
+declines to act, and this one would start agents in somebody's repository
+because they were at lunch.
+
+### What this does not cover
+
+A run that halts on a **budget breach** abandons its wave with the agents still
+in their terminals. Those sessions are live, so nothing reclaims them — which is
+correct, because restarting them would put a second agent into the same
+worktree. What you get is an honest Floor: the steps read as running, because
+they are, and nothing is collecting their results. **Stop the run** ends them.
+
 ## What may interrupt you
 
 Fixed by kind, not decided per call. Automation complacency is the documented
@@ -625,7 +683,9 @@ waiting on it and sends you to the terminal.
 
 - **In memory** — the run register, the review queue, the stall firings. A run
   does not outlive the application: its terminal is a child of this process, and
-  a registry reloaded from disk would describe runs that no longer exist.
+  a registry reloaded from disk would describe runs that no longer exist. What
+  survives is the **graph**, not the sessions — see "A run whose agents are
+  gone" for how the two are reconciled when the application reopens.
 - **On disk**, under `userData/foundry-runtime/` — the feed
   (`feed.jsonl`), backpressure overrides, mute rules, and the per-session
   `--settings` files and hook script.

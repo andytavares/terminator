@@ -133,14 +133,20 @@ function inFoundry<T>(script: string): Promise<T> {
  * By role and name rather than by class, because a class is an implementation
  * detail: a refactor that changes nothing a user sees should not break this,
  * and one that renames a button should.
+ *
+ * A name may be qualified by state — a tab with something waiting behind it is
+ * "Inbox, 3 waiting on you", which is what a screen reader should hear and is
+ * not a rename. Anything after a comma is that qualifier, so the match is on
+ * the name or on the name it qualifies, and nothing looser than that.
  */
 function clickByName(role: string, name: string): Promise<boolean> {
   return inFoundry<boolean>(`(function () {
     var selector = ${JSON.stringify(role === 'button' ? 'button' : `[role="${role}"]`)}
+    var want = ${JSON.stringify(name)}
     var all = document.querySelectorAll(selector)
     for (var i = 0; i < all.length; i++) {
       var label = (all[i].getAttribute('aria-label') || all[i].textContent || '').trim()
-      if (label === ${JSON.stringify(name)}) { all[i].click(); return true }
+      if (label === want || label.indexOf(want + ', ') === 0) { all[i].click(); return true }
     }
     return false
   })()`)
@@ -168,6 +174,31 @@ test('the extension is loaded and answering', async () => {
   // would fail for a reason that has nothing to do with what it is testing.
   const orders = (await foundry('foundry:order.list')) as { orders?: unknown[] }
   expect(Array.isArray(orders.orders)).toBe(true)
+})
+
+test('the chrome says how much is waiting, from whichever surface you are on', async () => {
+  await openFoundry()
+
+  // The channel behind the badge, answering in the running application. The
+  // counts themselves depend on what the other tests in this file have left
+  // behind, so what is asserted is the shape and that it agrees with the queue
+  // the inbox itself renders — a badge that disagrees with its own surface is
+  // worse than no badge.
+  const counts = (await foundry('foundry:attention')) as {
+    inbox?: unknown
+    forge?: unknown
+    byOrder?: unknown
+  }
+  expect(typeof counts.inbox, JSON.stringify(counts)).toBe('number')
+  expect(typeof counts.forge).toBe('number')
+  expect(typeof counts.byOrder).toBe('object')
+
+  const gates = (await foundry('foundry:inbox.list')) as { gates: unknown[] }
+  expect(counts.inbox).toBe(gates.gates.length)
+
+  // And the badge is drawn from it, or not drawn when there is nothing to say.
+  const badges = await inFoundry<number>(`document.querySelectorAll('.fdry-tab-count').length`)
+  expect(badges).toBe((counts.inbox === 0 ? 0 : 1) + ((counts.forge as number) === 0 ? 0 : 1))
 })
 
 test('every surface is reachable by its accessible name and renders', async () => {

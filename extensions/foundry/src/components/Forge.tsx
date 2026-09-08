@@ -1,6 +1,6 @@
 import { Markdown } from './Markdown.js'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, X, CircleDot, Terminal, Play, Wand } from 'lucide-react'
+import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
@@ -78,6 +78,76 @@ const CHECK_LABELS: Record<CheckId, string> = {
 
 const CHECK_ORDER: CheckId[] = ['questions', 'verifiable', 'coverage', 'risk', 'redTeam', 'budgets']
 
+/**
+ * What the operator does about a failing check.
+ *
+ * Either the control that clears it is already on this screen and the row
+ * takes you to it, or the thing that has to change is the plan and the row
+ * asks the architect for it in as many words. A check that states what is
+ * wrong and stops is the state this screen was in: the red team findings were
+ * the only one of the six with any move attached, and `verifiable` was the
+ * worst of the other five — its own failure text names an escape ("accept it
+ * as unverifiable in writing") that nothing in the application could reach.
+ */
+type Remedy =
+  /** Take me to the control that clears this, elsewhere on the screen. */
+  | { readonly kind: 'goto'; readonly label: string; readonly target: string }
+  /** Redraft, carrying this instruction to the architect. */
+  | { readonly kind: 'ask'; readonly label: string; readonly message: string }
+
+const CHECK_REMEDIES: Record<CheckId, readonly Remedy[]> = {
+  questions: [{ kind: 'goto', label: 'Answer them', target: 'fdry-needs-you-h' }],
+  verifiable: [
+    {
+      kind: 'ask',
+      label: 'Ask for proof',
+      message:
+        'Every acceptance criterion needs something that can actually decide it. Give each one a command, a named test, or a rubric with named evidence — and where a unit changes a file a person looks at, add a criterion whose verify kind is "screenshot", with the target named, because a command cannot say whether it renders.',
+    },
+    { kind: 'goto', label: 'Or mark one unprovable', target: 'fdry-acceptance' },
+  ],
+  coverage: [
+    {
+      kind: 'ask',
+      label: 'Ask for the gap to be closed',
+      message:
+        'The coverage check fails. Every criterion needs a unit that builds it and every unit needs a criterion it satisfies; where lanes share a file, declare exactly one of them the producer.',
+    },
+  ],
+  risk: [
+    {
+      kind: 'ask',
+      label: 'Ask for a regrade',
+      message:
+        'The risk grade was not taken against this plan. Declare a blast radius that covers everything the plan touches, and grade the risk against it.',
+    },
+  ],
+  redTeam: [{ kind: 'goto', label: 'Clear them', target: 'fdry-redteam' }],
+  budgets: [
+    {
+      kind: 'ask',
+      label: 'Ask it to fit the budget',
+      message:
+        'The plan does not fit its budgets. Either propose budgets this plan fits, or cut the plan down to the budgets the order already has.',
+    },
+  ],
+}
+
+/**
+ * Take the operator to the control that clears a check.
+ *
+ * Focused as well as scrolled: the rail is sticky, so a failing check stays on
+ * screen while the thing that clears it is hundreds of pixels away in either
+ * direction, and a page that silently jumped would leave a keyboard user's
+ * focus behind in the rail.
+ */
+function goTo(target: string): void {
+  const element = document.getElementById(target)
+  if (element === null) return
+  element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  element.focus({ preventScroll: true })
+}
+
 function invoke(channel: string, payload: unknown): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
@@ -111,6 +181,10 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const [moved, setMoved] = useState<string[]>([])
   const [accepting, setAccepting] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  /** The criterion being accepted as unverifiable, and why. Kept apart from
+      the red team's own reason so two open forms never share a box. */
+  const [unproven, setUnproven] = useState<string | null>(null)
+  const [unprovenReason, setUnprovenReason] = useState('')
   /**
    * The architect is working, until the document says otherwise.
    *
@@ -310,6 +384,49 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
 
   return (
     <div className="fdry-forge">
+      {/* The one thing on this screen that is waiting on a person, and so the
+          first thing on it.
+
+          This was the third panel down the left rail, under six convergence
+          checks and up to six recipe cards — below the fold on any window
+          narrower than about 1200px, and on a wider one placed wherever the
+          rail's own grid happened to put it. An operator reported it took them
+          for ever to find. A question you have to go hunting for is a question
+          that does not get answered, and every unanswered one holds the whole
+          order at "no open questions" failing. */}
+      {questions.length > 0 ? (
+        <section className="fdry-needs-you" aria-labelledby="fdry-needs-you-h">
+          <h2 className="fdry-needs-you-h" id="fdry-needs-you-h" tabIndex={-1}>
+            <AlertCircle aria-hidden="true" />
+            Needs you — {questions.length}
+          </h2>
+          <div className="fdry-needs-you-list">
+            {questions.map((question) => (
+              <div key={question.id} className="fdry-question">
+                <b>{question.text}</b>
+                {question.why !== '' ? <p>{question.why}</p> : null}
+                <div className="fdry-options">
+                  {question.options.map((option, index) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={index === question.recommended ? 'is-recommended' : ''}
+                      disabled={busy}
+                      onClick={() =>
+                        void turn({ answer: { questionId: question.id, option: index } })
+                      }
+                    >
+                      {option}
+                      {index === question.recommended ? ' (recommended)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <aside className="fdry-rail">
         <section className="fdry-panel">
           <h2 className="fdry-panel-h">Convergence</h2>
@@ -324,6 +441,27 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 <span>
                   <b>{CHECK_LABELS[id]}</b>
                   {bad && failure !== undefined ? <small>{failure.detail}</small> : null}
+                  {/* Saying what is wrong is half of it. A check that names no
+                      move is one the operator stares at — which is what every
+                      one of these but the red team did. */}
+                  {bad && order.status === 'draft' ? (
+                    <span className="fdry-remedy">
+                      {CHECK_REMEDIES[id].map((remedy) => (
+                        <button
+                          key={remedy.label}
+                          type="button"
+                          disabled={busy || (remedy.kind === 'ask' && drafting)}
+                          onClick={() =>
+                            remedy.kind === 'goto'
+                              ? goTo(remedy.target)
+                              : void converge(remedy.message)
+                          }
+                        >
+                          {remedy.label}
+                        </button>
+                      ))}
+                    </span>
+                  ) : null}
                 </span>
               </div>
             )
@@ -409,34 +547,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 </button>
               )
             })}
-          </section>
-        ) : null}
-
-        {questions.length > 0 ? (
-          <section className="fdry-panel">
-            <h2 className="fdry-panel-h">Needs you — {questions.length}</h2>
-            {questions.map((question) => (
-              <div key={question.id} className="fdry-question">
-                <b>{question.text}</b>
-                {question.why !== '' ? <p>{question.why}</p> : null}
-                <div className="fdry-options">
-                  {question.options.map((option, index) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={index === question.recommended ? 'is-recommended' : ''}
-                      disabled={busy}
-                      onClick={() =>
-                        void turn({ answer: { questionId: question.id, option: index } })
-                      }
-                    >
-                      {option}
-                      {index === question.recommended ? ' (recommended)' : ''}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
           </section>
         ) : null}
 
@@ -564,7 +674,9 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
         </section>
 
         <section className={`fdry-field ${moved.includes('acceptance') ? 'is-redrawn' : ''}`}>
-          <h2 className="fdry-panel-h">Acceptance &amp; how it is proven</h2>
+          <h2 className="fdry-panel-h" id="fdry-acceptance" tabIndex={-1}>
+            Acceptance &amp; how it is proven
+          </h2>
           {order.acceptance.length === 0 ? (
             <p className="fdry-note">
               {order.source.kind === 'tracker'
@@ -574,6 +686,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
           ) : (
             order.acceptance.map((criterion) => {
               const uncovered = matrix.uncoveredCriteria.includes(criterion.id)
+              const excused = criterion.unverifiable?.accepted === true
               return (
                 <div key={criterion.id} className={`fdry-ac ${uncovered ? 'is-gap' : ''}`}>
                   <span className="fdry-ac-id">{criterion.id}</span>
@@ -583,6 +696,51 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                       {criterion.verify.kind}
                       {uncovered ? ' · no unit satisfies this' : ''}
                     </span>
+                    {/* The escape the falsifiable check has always named and
+                        nothing could reach: a criterion nothing here can prove
+                        may be accepted anyway, in writing, and the reason
+                        travels with the order. */}
+                    {excused ? (
+                      <p className="fdry-ac-excused">
+                        accepted as unverifiable — {criterion.unverifiable?.reason}
+                      </p>
+                    ) : order.status === 'draft' && unproven !== criterion.id ? (
+                      <button
+                        type="button"
+                        className="fdry-ac-excuse"
+                        disabled={busy}
+                        onClick={() => setUnproven(criterion.id)}
+                      >
+                        Nothing here can prove this
+                      </button>
+                    ) : null}
+                    {unproven === criterion.id && !excused ? (
+                      <form
+                        className="fdry-accept"
+                        onSubmit={(event) => {
+                          event.preventDefault()
+                          if (unprovenReason.trim() === '') return
+                          void turn({
+                            unverifiable: {
+                              criterionId: criterion.id,
+                              reason: unprovenReason.trim(),
+                            },
+                          })
+                          setUnproven(null)
+                          setUnprovenReason('')
+                        }}
+                      >
+                        <input
+                          aria-label={`Why ${criterion.id} cannot be proven`}
+                          placeholder="Why nothing can prove it…"
+                          value={unprovenReason}
+                          onChange={(event) => setUnprovenReason(event.target.value)}
+                        />
+                        <button type="submit" disabled={unprovenReason.trim() === ''}>
+                          Accept it
+                        </button>
+                      </form>
+                    ) : null}
                   </div>
                 </div>
               )
@@ -652,7 +810,9 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
             gate for ever. */}
         {openFindings.length > 0 ? (
           <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
-            <h2 className="fdry-panel-h">Red team — {openFindings.length} open</h2>
+            <h2 className="fdry-panel-h" id="fdry-redteam" tabIndex={-1}>
+              Red team — {openFindings.length} open
+            </h2>
             {openFindings.map((finding) => (
               <div key={finding.id} className="fdry-finding">
                 <CircleDot aria-hidden="true" />

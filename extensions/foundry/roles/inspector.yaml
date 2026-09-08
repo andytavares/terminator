@@ -3,7 +3,13 @@ id: inspector
 modelTier: deep
 allowResume: false
 reads: [diff, risk_triggers, rules]
-writes: []
+# Findings, not a checkout. It was `[]`, which read as "writes nothing" and
+# meant "hands back nothing": the Line collects a rung's output by what its
+# role declared, so an inspection that named no artefact ended in a terminal
+# nobody reads. Declaring it changes no permission — `findings` is not one of
+# the three checkout destinations, so the inspector is still refused every
+# editing tool and still cannot fix what it finds.
+writes: [findings]
 tools: [read, search]
 prompt: |
   Inspect this change for security risk. You were run because it touches

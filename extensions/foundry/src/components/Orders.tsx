@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Plus, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Plus, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
 
@@ -23,6 +23,8 @@ interface OrderRow {
   readonly risk: string
   readonly failures: number
   readonly source: { kind: string; tracker: string | null; key: string | null }
+  /** Questions this order is waiting on an answer to. */
+  readonly openQuestions?: number
 }
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
@@ -56,6 +58,12 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
 
   useEffect(() => {
     void refresh()
+    // The counts on these rows go stale the moment a question is answered in
+    // another window or a run raises one, and this list is where the tab's
+    // badge sends you — so it refetches while it is on screen rather than
+    // once, on mount.
+    const timer = setInterval(() => void refresh(), 4000)
+    return () => clearInterval(timer)
   }, [refresh])
 
   // Your tickets, listed rather than remembered. Refreshed when the picker
@@ -296,7 +304,13 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
             <li key={row.id}>
               <button type="button" onClick={() => setOpen(row.id)}>
                 <span className="fdry-order-mark" aria-hidden="true">
-                  {row.failures === 0 ? <CheckCircle2 /> : <AlertTriangle />}
+                  {(row.openQuestions ?? 0) > 0 ? (
+                    <AlertCircle />
+                  ) : row.failures === 0 ? (
+                    <CheckCircle2 />
+                  ) : (
+                    <AlertTriangle />
+                  )}
                 </span>
                 <span className="fdry-order-main">
                   <b>{row.title}</b>
@@ -305,8 +319,17 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
                     {row.source.key !== null ? ` · ${row.source.tracker} ${row.source.key}` : ''}
                   </small>
                 </span>
-                <span className="fdry-order-state">
-                  {row.failures === 0 ? 'ready to hand off' : `blocked by ${row.failures}`}
+                {/* Which order the tab badge is counting. Without this the
+                    number on the chrome sends you to a list that will not say
+                    where it came from. */}
+                <span
+                  className={`fdry-order-state${(row.openQuestions ?? 0) > 0 ? ' is-waiting' : ''}`}
+                >
+                  {(row.openQuestions ?? 0) > 0
+                    ? `${row.openQuestions} waiting on you`
+                    : row.failures === 0
+                      ? 'ready to hand off'
+                      : `blocked by ${row.failures}`}
                 </span>
               </button>
             </li>

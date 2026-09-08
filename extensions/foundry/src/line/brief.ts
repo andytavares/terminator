@@ -1,4 +1,5 @@
 import { renderOrder } from '../order/render.js'
+import { collectableWrites, rungOutputContract } from './rung-output.js'
 import type { PlanUnit, WorkOrder } from '../order/schema.js'
 import type { Role } from '../recipe/parse.js'
 import type { Rule } from '../recipe/parse.js'
@@ -28,6 +29,15 @@ export interface BriefInput {
   readonly rules: readonly Rule[]
   /** For a `run` step: the command, which is the whole instruction. */
   readonly command?: string
+  /**
+   * Where this rung writes what it found, absolute.
+   *
+   * Absent means the caller keeps no rung output, and the agent is told
+   * nothing — a destination named to somebody who will never be read from is
+   * worse than silence. Present, it is the last thing in the brief and the one
+   * path the read-only policy lets through.
+   */
+  readonly outputPath?: string
 }
 
 function unitSection(order: WorkOrder, unit: PlanUnit): string[] {
@@ -113,7 +123,7 @@ function rulesSection(rules: readonly Rule[]): string[] {
  * being enforced rather than requested.
  */
 export function brief(input: BriefInput): string {
-  const { order, role, unit, rules, command } = input
+  const { order, role, unit, rules, command, outputPath } = input
 
   // A `run` step is a command, not a conversation. Wrapping it in context
   // would invite an agent to reinterpret it.
@@ -183,6 +193,15 @@ export function brief(input: BriefInput): string {
       '',
       'If one of these turns out to be wrong, stop and say so rather than working around it.'
     )
+  }
+
+  // Last, because it is what the agent does with everything above it. The
+  // Forge has always ended its brief this way; the Line ended without one, so
+  // four of the standard shape's nine steps were told what to think about and
+  // never where to put it.
+  if (outputPath !== undefined) {
+    const contract = rungOutputContract(outputPath, collectableWrites(role ?? null))
+    if (contract !== '') sections.push(contract)
   }
 
   return sections

@@ -762,6 +762,128 @@ describe('clearing an adversarial finding — the other thing that blocked the g
   })
 })
 
+describe('accepting a criterion as unverifiable — the escape nothing could reach', () => {
+  /** A draft with one criterion whose proof is a command that does not exist. */
+  async function withCriterion() {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    const order = seed.order
+    const withAc: WorkOrder = {
+      ...order,
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'the row does not clip its last glyph',
+          priority: 'P0',
+          verify: { kind: 'screenshot', target: 'the terminal row' },
+          unverifiable: null,
+        },
+      ],
+    }
+    await store.save(withAc)
+    return withAc
+  }
+
+  it('records the acceptance on the criterion, with the reason', async () => {
+    const o = await withCriterion()
+    const r = (await channels().turn({
+      id: o.id,
+      unverifiable: { criterionId: 'AC-1', reason: 'no display in this environment' },
+    })) as OrderView
+    expect(r.order.acceptance[0].unverifiable).toEqual({
+      accepted: true,
+      reason: 'no display in this environment',
+    })
+    expect((await store.load(o.id))?.acceptance[0].unverifiable?.accepted).toBe(true)
+  })
+
+  it('says which part of the document moved, so the operator sees the redraw', async () => {
+    const o = await withCriterion()
+    const r = (await channels().turn({
+      id: o.id,
+      unverifiable: { criterionId: 'AC-1', reason: 'nothing here can run it' },
+    })) as OrderView
+    expect(r.changed).toContain('acceptance')
+  })
+
+  it('refuses one without a reason — the same shrug the finding refuses', async () => {
+    const o = await withCriterion()
+    const r = (await channels().turn({
+      id: o.id,
+      unverifiable: { criterionId: 'AC-1', reason: '   ' },
+    })) as OrderView & { error: string }
+    expect(r.error).toMatch(/costs a reason/)
+    expect(r.order.acceptance[0].unverifiable).toBeNull()
+  })
+
+  it('refuses a criterion this order does not have', async () => {
+    const o = await withCriterion()
+    const r = (await channels().turn({
+      id: o.id,
+      unverifiable: { criterionId: 'AC-9', reason: 'because' },
+    })) as OrderView & { error: string }
+    expect(r.error).toMatch(/No criterion AC-9/)
+  })
+
+  it('records who accepted it and why', async () => {
+    const o = await withCriterion()
+    await channels().turn({
+      id: o.id,
+      unverifiable: { criterionId: 'AC-1', reason: 'no display in this environment' },
+    })
+    const ledger = fs.readFileSync(path.join(root, 'orders', o.id, 'ledger.jsonl'), 'utf8')
+    expect(ledger).toContain('criterion.unverifiable')
+    expect(ledger).toContain('no display in this environment')
+  })
+
+  it('clears the falsifiable check, which is the whole point of the escape', async () => {
+    const o = await withCriterion()
+    // The failure an operator actually meets: a unit changes a file a person
+    // looks at, and no criterion asks for a picture of it. The other half of
+    // this check — a criterion with no proof at all — cannot survive the
+    // schema, so this is the one the escape has to answer.
+    const blocked: WorkOrder = {
+      ...o,
+      acceptance: [
+        { ...o.acceptance[0], verify: { kind: 'command', command: 'npm test', assert: 'ok' } },
+      ],
+      plan: {
+        ...o.plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'redraw the row',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: ['src/components/Row.tsx'],
+            verify: [],
+          },
+        ],
+      },
+    }
+    await store.save(blocked)
+
+    const before = (await channels().compile({ id: o.id, commit: false })) as {
+      compile: { failures: { check: string }[] }
+    }
+    expect(before.compile.failures.map((f) => f.check)).toContain('verifiable')
+
+    await channels().turn({
+      id: o.id,
+      unverifiable: { criterionId: 'AC-1', reason: 'there is no display in this environment' },
+    })
+
+    const after = (await channels().compile({ id: o.id, commit: false })) as {
+      compile: { failures: { check: string }[] }
+    }
+    expect(after.compile.failures.map((f) => f.check)).not.toContain('verifiable')
+  })
+})
+
 describe('turning a write-back off for one order (FR-062)', () => {
   it('keeps what the operator chose', async () => {
     const seed = (await channels().create({

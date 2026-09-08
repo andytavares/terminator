@@ -17,6 +17,7 @@ export const GATE_RULES = [
   'new-dependency',
   'forge-defect',
   'unit.boundary',
+  'run.interrupted',
 ] as const
 
 export type GateRuleId = (typeof GATE_RULES)[number]
@@ -39,6 +40,7 @@ const RULE_IN_WORDS: Record<GateRuleId, string> = {
   'new-dependency': 'a new third-party dependency',
   'forge-defect': 'an order that contradicts itself',
   'unit.boundary': 'each unit of work as it finishes',
+  'run.interrupted': 'a run whose agents are gone, so nothing is moving it',
 }
 
 /** One rule, in plain words. Falls back to the id rather than inventing one. */
@@ -170,6 +172,25 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
   },
   'unit.boundary': {
     options: [{ id: 'continue', label: 'Continue', consequence: 'The next unit starts.' }, HOLD],
+    defaultIfIgnored: 'hold',
+  },
+  'run.interrupted': {
+    options: [
+      {
+        id: 'resume',
+        label: 'Pick it back up',
+        consequence: 'Every step whose agent is gone starts again from where it stopped.',
+      },
+      {
+        id: 'stop',
+        label: 'Stop here',
+        consequence: 'The order is discarded. Its worktrees and their changes are left alone.',
+      },
+      HOLD,
+    ],
+    // Never resume on a timer. Restarting agents in somebody's repository
+    // because they did not answer is the one default that spends money and
+    // changes files without being asked.
     defaultIfIgnored: 'hold',
   },
 }

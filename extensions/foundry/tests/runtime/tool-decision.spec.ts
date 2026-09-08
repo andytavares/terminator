@@ -21,6 +21,7 @@ function request(over: Partial<ToolRequest> = {}): ToolRequest {
     readOnlyTools: [],
     autonomy: 'standard',
     worktreePath: '/work/checkout',
+    outputPath: null,
     ...over,
   }
 }
@@ -255,5 +256,79 @@ describe('a question with nobody to answer it', () => {
       unattended({ tool: 'Edit', input: { file_path: '/work/checkout/src/a.ts' } })?.allow
     ).toBe(true)
     expect(unattended({ input: { command: 'npm test 2>&1 | tail -20' } })?.allow).toBe(true)
+  })
+})
+
+// A read-only rung has one thing it is allowed to change: the file it hands
+// back what it found in. Without it the policy refused every channel the
+// agents invented — `cat >`, `sed`, `awk`, then `Write` — and a live run's
+// architect lost a complete corrected order to "a review may not redirect
+// output" while the builders it had just contradicted were starting.
+describe('where a read-only rung hands back what it found', () => {
+  const rung = (over: Partial<ToolRequest> = {}) =>
+    decideTool(
+      request({
+        readOnly: true,
+        role: 'red-team',
+        outputPath: '/data/orders/WO-1/rungs/challenge.json',
+        ...over,
+      })
+    )
+
+  it('lets the rung write its own output file', () => {
+    expect(
+      rung({ tool: 'Write', input: { file_path: '/data/orders/WO-1/rungs/challenge.json' } })
+    ).toEqual({ allow: true, reason: expect.any(String) })
+  })
+
+  it('refuses any other file, which is the whole of the permission', () => {
+    expect(
+      rung({ tool: 'Write', input: { file_path: '/data/orders/WO-1/rungs/plan.json' } })?.allow
+    ).toBe(false)
+    expect(rung({ tool: 'Write', input: { file_path: '/repo/src/index.ts' } })?.allow).toBe(false)
+  })
+
+  it('refuses a shell redirect at the same path', () => {
+    // A command string cannot be read as "this writes here and nowhere else",
+    // and a policy that tried would be an allowlist with a hole in it. The
+    // contract tells the agent to use Write for exactly this reason.
+    expect(
+      rung({
+        tool: 'Bash',
+        input: { command: 'echo {} > /data/orders/WO-1/rungs/challenge.json' },
+      })?.allow
+    ).toBe(false)
+  })
+
+  it('grants nothing to a rung with no output of its own', () => {
+    expect(
+      decideTool(
+        request({
+          readOnly: true,
+          role: 'verifier',
+          outputPath: null,
+          tool: 'Write',
+          input: { file_path: '/anything.json' },
+        })
+      )?.allow
+    ).toBe(false)
+  })
+
+  it('does not widen a role that may already write', () => {
+    // The permission is an exception to the read-only policy, not a rule of
+    // its own: a builder is judged by its role's tool list and the autonomy
+    // setting exactly as before.
+    expect(
+      decideTool(
+        request({
+          readOnly: false,
+          role: 'builder',
+          mayUseTool: () => false,
+          outputPath: '/data/orders/WO-1/rungs/build.json',
+          tool: 'Write',
+          input: { file_path: '/data/orders/WO-1/rungs/build.json' },
+        })
+      )
+    ).toEqual({ allow: false, reason: expect.stringContaining('builder') })
   })
 })

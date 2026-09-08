@@ -14,6 +14,8 @@ import type { RunGraph, RunNode } from './run-graph.js'
 import { createRoleRegistry } from './roles.js'
 import type { RoleRegistry } from './roles.js'
 import { brief } from './brief.js'
+import { collectableWrites, rungOutputPath } from './rung-output.js'
+import { orderDir } from '../data-root.js'
 import type { ResolveSources } from '../recipe/resolve.js'
 import type { Recipe, Rule } from '../recipe/parse.js'
 import type { Budgets, RiskAssessment, WorkOrder } from '../order/schema.js'
@@ -53,6 +55,32 @@ export interface StartedRun {
   readonly transcriptFrom?: number
 }
 
+/** What a rung turned out to have written, as the caller read it back. */
+export interface RungCollection {
+  /**
+   * The order with the rung's findings on it.
+   *
+   * Only the *brief* is rebuilt from this. Budgets, risk and the criteria a
+   * verdict is held against stay on the order that was agreed, because those
+   * are the agreement and a rung mid-run is not entitled to move them. What a
+   * scout read about the repository is another matter entirely: it exists to
+   * inform the builder that comes after it, and before this it reached nobody.
+   */
+  readonly order: WorkOrder
+  /** What it said it found, in one line, for the record. */
+  readonly note: string
+  /**
+   * A disagreement with the order this run is already building from.
+   *
+   * Null when the rung only reported what it read. Not null when it wanted to
+   * change the plan or the criteria, which cannot be applied under work
+   * already in flight — so it becomes a `forge-defect`, the rule for an order
+   * that contradicts itself and the one rule nothing in this build ever
+   * raised.
+   */
+  readonly defect: string | null
+}
+
 export interface ExecutorDeps {
   /** Runs one node and resolves when its turn is over. */
   readonly run: (input: {
@@ -70,6 +98,24 @@ export interface ExecutorDeps {
     modelTier: 'fast' | 'deep'
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
+    /**
+     * Where this rung writes what it found, or null when it has no artefact.
+     *
+     * The caller lets exactly this path through the read-only policy, the way
+     * intake has always done for a proposal. Null for a role whose product is
+     * the diff, and for a bare command.
+     */
+    outputPath: string | null
+    /**
+     * Called the moment the session exists, which is not when the turn ends.
+     *
+     * Without it the graph learned a node's session only once `run` resolved
+     * — after the agent had finished — so a running node named nobody and the
+     * Floor's Watch and Attach buttons, which need a session, appeared only
+     * once there was nothing left to attach to. Optional: a caller that never
+     * reports one is still named from the result.
+     */
+    onStarted?: (sessionId: string) => void
   }) => Promise<StartedRun>
   readonly now: () => string
   readonly sources: ResolveSources
@@ -115,6 +161,23 @@ export interface ExecutorDeps {
 
   /** Write a line to the order's record. */
   readonly record?: (action: string, subject: string, reason: string) => Promise<void>
+
+  /**
+   * Take what a read-only rung wrote and put it on the order.
+   *
+   * A seam rather than a store, for the reason `raise` is one: the executor
+   * knows nothing about disk, and the order is the caller's to save. Null
+   * means the rung left nothing, which is a result and is recorded as one.
+   *
+   * Absent entirely means rung output is not collected here — the ladder's own
+   * runs and every test stub — and the brief then names no destination rather
+   * than pointing an agent at a file nobody will read.
+   */
+  readonly collect?: (input: {
+    readonly nodeId: string
+    readonly role: string
+    readonly outputPath: string
+  }) => Promise<RungCollection | null>
 
   /**
    * Write the graph down, as it changes.
@@ -241,7 +304,8 @@ function promptFor(
   recipe: Recipe,
   node: RunNode,
   roles: RoleRegistry,
-  rules: readonly Rule[]
+  rules: readonly Rule[],
+  outputPath: string | null
 ): string {
   const step = stepFor(recipe, node)
   if (step === undefined) return ''
@@ -252,6 +316,7 @@ function promptFor(
       node.unitId === null ? null : (order.plan.units.find((u) => u.id === node.unitId) ?? null),
     rules,
     command: step.kind === 'run' ? (step.command ?? '') : undefined,
+    outputPath: outputPath ?? undefined,
   })
 }
 
@@ -283,6 +348,12 @@ export async function execute(
   let gateSeq = 0
 
   /**
+   * The order as later briefs see it, which is not the order the run is judged
+   * against. See `RungCollection.order`.
+   */
+  let briefed: WorkOrder = order
+
+  /**
    * Move to the next state of the graph, and say so.
    *
    * Every reassignment of `current` goes through here, so there is one place
@@ -293,6 +364,48 @@ export async function execute(
     // Never fatal: a run that cannot write its graph down is still a run, and
     // failing it here would turn a reporting problem into a lost agent.
     await deps.persist?.(current).catch(() => undefined)
+  }
+
+  /** Nodes whose session is already on the graph, so a late write is not a second start. */
+  const announced = new Set<string>()
+
+  /**
+   * Put a node's session on the graph, and say it started.
+   *
+   * Called the moment the agent exists rather than when its turn ends. Both
+   * happen: `run` reports the session as it comes up, and the result names it
+   * again for a caller that reports nothing — the set is what makes the second
+   * one a no-op instead of a second start.
+   *
+   * The Floor renders Watch and Attach on `node.sessionId !== null`, so before
+   * this a running rung had no controls at all and the only agent you could
+   * reach was one that had already finished.
+   */
+  async function noteStarted(nodeId: string, sessionId: string): Promise<void> {
+    if (announced.has(nodeId)) return
+    announced.add(nodeId)
+    await advance(withNode(current, nodeId, { sessionId }))
+    deps.onEvent?.({ type: 'started', nodeId, sessionId })
+  }
+
+  /**
+   * Where this node writes what it found, or null when it has nothing to file.
+   *
+   * Null for a role whose product is the checkout, for a bare command, and for
+   * a caller that collects nothing — an agent told to write a file nobody will
+   * read is worse off than one told nothing.
+   */
+  function outputFor(node: RunNode, roleId: string | null): string | null {
+    if (roleId === null || deps.collect === undefined) return null
+    const role = roles.get(roleId)
+    if (role === null || collectableWrites(role).length === 0) return null
+    try {
+      return rungOutputPath(orderDir(deps.sources.dataRoot, order.id), node.id)
+    } catch {
+      // A node id a recipe gave that would not sit under this order. Refusing
+      // the channel is right; failing the run over it is not.
+      return null
+    }
   }
 
   /**
@@ -514,17 +627,22 @@ export async function execute(
               : undefined
           if (roleId !== null) roles.assertResumable(roleId, resumeSessionId)
           const readOnly = roleId !== null && !roles.mayWrite(roleId)
+          const outputPath = outputFor(node, roleId)
 
           const result = await deps.run({
             node,
             role: roleId,
-            prompt: promptFor(order, recipe, node, roles, rules),
+            prompt: promptFor(briefed, recipe, node, roles, rules, outputPath),
             resumeSessionId,
             readOnly,
             modelTier: (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep',
             mayUseTool: (tool) => roleId === null || roles.mayUseTool(roleId, tool),
+            outputPath,
+            // Reported as it happens rather than waited for: this is what puts
+            // a session on a node while there is still an agent in it.
+            onStarted: (sessionId) => void noteStarted(node.id, sessionId),
           })
-          return { node, result, roleId, readOnly }
+          return { node, result, roleId, readOnly, outputPath }
         })
     )
 
@@ -543,9 +661,48 @@ export async function execute(
     }
     const { results } = waved
 
-    for (const { node, result, roleId, readOnly } of results) {
-      await advance(withNode(current, node.id, { sessionId: result.sessionId }))
-      deps.onEvent?.({ type: 'started', nodeId: node.id, sessionId: result.sessionId })
+    for (const { node, result, roleId, readOnly, outputPath } of results) {
+      // A no-op when the run already reported its session. Kept for the caller
+      // that reports none — every ladder rung, and every test stub.
+      await noteStarted(node.id, result.sessionId)
+
+      // What the rung actually produced, which for a read-only role is the
+      // whole of its work. Before this the brief named no destination and
+      // nothing read a result past its exit status, so a scout's report, an
+      // architect's plan and a red team's attack all ended in a terminal
+      // nobody read and the node passed regardless.
+      if (outputPath !== null && roleId !== null) {
+        const collected = await deps
+          .collect?.({ nodeId: node.id, role: roleId, outputPath })
+          // Never fatal, for the reason `persist` is not: a run that cannot
+          // file what a rung wrote is still a run.
+          .catch(() => null)
+
+        if (collected === null || collected === undefined) {
+          await deps.record?.(
+            'rung.wrote_nothing',
+            node.id,
+            `The ${roleId} left nothing at ${outputPath}. Its turn ended, so whatever it worked out is only in its terminal.`
+          )
+        } else {
+          // What the next rung is told. The agreement it is judged against is
+          // deliberately not this.
+          briefed = collected.order
+          await deps.record?.(
+            'rung.collected',
+            node.id,
+            collected.note === '' ? `the ${roleId} filed its result` : collected.note
+          )
+          if (collected.defect !== null) {
+            halted =
+              (await raise('forge-defect', {
+                summary: `${order.title} is contradicted by its own ${roleId}`,
+                why: collected.defect,
+                nodeId: node.id,
+              })) || halted
+          }
+        }
+      }
 
       // Who produced the work on this unit, so the party checking it can be
       // held against them rather than against itself.

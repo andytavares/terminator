@@ -15,14 +15,20 @@ export type Autonomy = (typeof AUTONOMY_LEVELS)[number]
  * Live at every setting, including the most permissive.
  *
  * Risk, budget, destruction and the merge decision. Everything else is a
- * matter of taste; these four are the difference between a factory and a
- * machine that ships whatever it happens to produce.
+ * matter of taste; these are the difference between a factory and a machine
+ * that ships whatever it happens to produce.
+ *
+ * `run.interrupted` is here for a different reason from the other four. They
+ * ask about work; it says the work stopped. A dial that can silence "your run
+ * has no agents left" is a dial that lets a dead run look like a busy one for
+ * as long as nobody goes and checks — which is the failure that put it here.
  */
 export const UNCONDITIONAL: readonly GateRuleId[] = [
   'risk.p0',
   'budget.exceeded',
   'destructive',
   'ready-for-review',
+  'run.interrupted',
 ]
 
 const STANDARD_EXTRA: readonly GateRuleId[] = [

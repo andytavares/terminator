@@ -7,6 +7,7 @@ import {
   HelpCircle,
   Gauge,
   CheckCircle2,
+  Unplug,
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
 
@@ -51,6 +52,7 @@ const RULE_ICON: Record<GateRuleId, React.ComponentType> = {
   'new-dependency': AlertTriangle,
   'forge-defect': HelpCircle,
   'unit.boundary': CheckCircle2,
+  'run.interrupted': Unplug,
 }
 
 /** Severity is carried by a stripe, so what needs attention reads at a glance. */
@@ -64,6 +66,7 @@ const RULE_TONE: Record<GateRuleId, string> = {
   'forge-defect': 'is-info',
   'unit.boundary': 'is-info',
   'ready-for-review': 'is-ok',
+  'run.interrupted': 'is-warn',
 }
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {

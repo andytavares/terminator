@@ -58,3 +58,13 @@ Declared in `extensions/foundry/package.json` only. npm workspaces hoist them. E
 `npm run build:extensions` bundles `src/index.ts` to `src/index.js` with esbuild. That output is a **build artefact**: gitignored, never edited by hand. Change the TypeScript and rebuild.
 
 Extension specs live in `tests/` and are matched by the root `vitest.config.ts`. Note that `vi.mock` cannot intercept a module esbuild has inlined — any spec that calls `activate()` must import `../../src/index.ts`, not the bundle.
+
+## Typecheck
+
+`npm run typecheck:extensions` — `tsc --noEmit` over `extensions/foundry/tsconfig.json`. **Run it.** Nothing else does.
+
+The root `tsconfig.json` is `files: []` plus project references with no `--build`, so `npm run typecheck` checks nothing; and even under `--build` the extension is in none of the three referenced projects. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either — both strip types.
+
+What that gap cost: `RULE_ICON` in `Inbox.tsx` is `Record<GateRuleId, …>`. A new gate rule was added without an entry, so `<Icon />` was handed `undefined`; React throws on that and unmounts the whole tree, and **every Foundry surface rendered blank**. The build was green, lint was clean, 2,293 unit tests passed, and the only thing that caught it was an e2e that opened the panel and looked at the screen.
+
+`extensions/foundry/tsconfig.json` did not exist until then, so the script had been failing with "the specified path does not exist" for the whole life of the feature.

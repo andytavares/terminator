@@ -5,14 +5,15 @@ import * as path from 'node:path'
 import { modelCatalog } from './state/model-catalog.js'
 
 import { createForgeChannels } from './ipc/forge-channels.js'
-import { createRunChannels, writeRunGraph } from './ipc/run-channels.js'
+import { createRunChannels, writeRunGraph, readRunGraph } from './ipc/run-channels.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
 import { createLedgerChannels } from './ipc/ledger-channels.js'
 import { rulesFor, rulesAtRung } from './verify/rules.js'
 import { availableNames, resolveRule } from './recipe/resolve.js'
 import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
-import { createLiveGateStore } from './gates/store.js'
+import { createLiveGateStore, createGateStore } from './gates/store.js'
+import { countAttention } from './gates/attention.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { markReady, readPulls, shipOrder } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
@@ -22,10 +23,13 @@ import type { RunCommand } from './runtime/diff-metrics.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
+import { interruptedRuns, interruptedGate } from './line/adopt.js'
+import { createRoleRegistry } from './line/roles.js'
 import type { RunOutcome, StartedRun } from './line/executor.js'
 import type { RunGraph, RunNode } from './line/run-graph.js'
 import type { Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
+import { collectableWrites, readRungOutput } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
 import { decideTool } from './runtime/tool-decision.js'
 import { ensureTrusted } from './runtime/workspace-trust.js'
@@ -405,6 +409,24 @@ let paletteTimer: NodeJS.Timeout | null = null
 // start yet.
 let supervision: Supervision | null = null
 /**
+ * The orders an executor in this process is currently driving.
+ *
+ * Not decoration: a node is written down as `running` before its agent has
+ * reported a session, so for a second or two it is indistinguishable from a
+ * node whose agent is gone. Reclaiming it there would put a second agent into
+ * the same worktree. While an order is in here, nothing reclaims its nodes.
+ */
+const executingOrders = new Set<string>()
+/**
+ * Data roots already looked at for runs the last application left behind.
+ *
+ * Once per root rather than once per process: activation runs before there is
+ * a workspace, and the records location follows the workspace, so the answer
+ * to "what did the last session leave here" is per-root and changes when the
+ * operator switches.
+ */
+const adoptedRoots = new Set<string>()
+/**
  * Which runs are allowed to interrupt you.
  *
  * Muting suppresses the notification, never the entry: the feed's record stays
@@ -499,6 +521,19 @@ const MAX_STALL_FIRINGS = 200
  * off, which is worse than not shipping it. Turn it off on the evidence of the
  * firings below, not on faith.
  */
+/**
+ * Whether this process is still running that agent's session.
+ *
+ * The runner's own register, which is emptied by `end` on a `SessionEnd`, a
+ * closed tab or a dead process — and which is simply empty in a fresh
+ * application. That is the whole point: every session a previous process
+ * started is gone, and a graph that still says `running` is describing agents
+ * that no longer exist.
+ */
+function isLiveSession(sessionId: string): boolean {
+  return supervisedRunner?.terminalFor(sessionId) != null
+}
+
 function stallShadowMode(api: ExtensionAPI): boolean {
   return api.settings.get<boolean>('terminator.foundry.stallShadowMode') ?? true
 }
@@ -798,6 +833,93 @@ function ladderNode(rung: string, name: string, lane: number): RunNode {
 }
 
 /**
+ * Stop a run, and mean it.
+ *
+ * Every gate that offers "Stop here" said the order would be cancelled, and
+ * nothing did it: the decision seam returned early on `stop`, the order stayed
+ * `running` for ever, and `order.cancel` refuses a running order and tells you
+ * to stop it at its gate — the gate that did nothing. There was no way out of
+ * a run at all.
+ *
+ * The worktrees and their changes are deliberately left alone. Cancelling the
+ * order is a decision about the order; throwing away work an agent already did
+ * is a different decision, and nothing here is entitled to take it silently.
+ */
+async function stopOrder(root: string, orderId: string, reason: string): Promise<void> {
+  const store = createOrderStore(root)
+  const graph = await readRunGraph(root, orderId)
+  const stopped: string[] = []
+  for (const node of graph?.nodes ?? []) {
+    if (node.sessionId === null || !isLiveSession(node.sessionId)) continue
+    // Told why first, so the agent's own transcript carries the reason rather
+    // than ending mid-sentence for no stated cause.
+    if (supervisedRunner?.stop(node.sessionId, reason) === true) {
+      supervision?.finish(node.sessionId, Date.now())
+      supervision?.runs.archive(node.sessionId, 'stopped', Date.now())
+      stopped.push(node.id)
+    }
+  }
+
+  const order = await store.load(orderId)
+  if (order !== null && order.status === 'running') {
+    await store.save({ ...order, status: 'cancelled' })
+  }
+  await store.record({
+    at: new Date().toISOString(),
+    orderId,
+    actor: 'operator',
+    action: 'run.stopped',
+    subject: orderId,
+    reason:
+      stopped.length === 0
+        ? `${reason}; no agent was still running`
+        : `${reason}; stopped ${stopped.join(', ')}`,
+    evidence: [],
+  })
+}
+
+/**
+ * What the last application left behind, said out loud the first time this one
+ * looks at a records location.
+ *
+ * An agent's terminal is a child of the process that started it, so a run in
+ * flight when the application closed has no agents left — while its order, its
+ * graph and every surface go on saying `running`. Nothing looked, so the only
+ * way to find out was to come back hours later and notice nothing had moved.
+ *
+ * Once per records location rather than once per process: activation runs
+ * before there is a workspace, and where the records live follows the
+ * workspace.
+ */
+async function adoptInterruptedRuns(root: string): Promise<void> {
+  if (adoptedRoots.has(root)) return
+  adoptedRoots.add(root)
+
+  const store = createOrderStore(root)
+  const orders = await store.list()
+  const onDisk = await Promise.all(
+    orders.map(async (order) => ({ order, graph: await readRunGraph(root, order.id) }))
+  )
+
+  const gates = createGateStore(root)
+  const at = new Date().toISOString()
+  for (const run of interruptedRuns(onDisk, isLiveSession)) {
+    // Keyed on the order, so opening the application five times over a run
+    // nobody has answered leaves one row rather than five.
+    await gates.save(interruptedGate(run, at))
+    await store.record({
+      at,
+      orderId: run.orderId,
+      actor: 'rule:run.interrupted',
+      action: 'run.interrupted',
+      subject: run.orderId,
+      reason: `${run.stopped.join(', ')} had no agent left when the application reopened`,
+      evidence: [],
+    })
+  }
+}
+
+/**
  * Actually run a graph.
  *
  * The seam `run.start` hands the graph to, and the one place the Line's pieces
@@ -867,6 +989,12 @@ async function executeRun(
   // exists to avoid — but a conversation carried across a change of role
   // carries the last role's identity with it, which broke three live runs.
   // The executor decides; this only remembers what is open.
+  //
+  // Seeded from the graph rather than started empty. A resumed run's agents
+  // are gone but their transcripts are not — `claude --resume` picks the
+  // conversation back up — so without this a run picked back up after a
+  // restart put a cold agent that had read nothing into a worktree half full
+  // of somebody else's work.
   const conversations = new Map<string, string>()
   /**
    * Lane and role together, because the role is the guard.
@@ -878,6 +1006,11 @@ async function executeRun(
    * and none of them arrives carrying the builder's identity.
    */
   const conversation = (lane: number, role: string | null): string => `${lane}:${role ?? 'command'}`
+
+  for (const node of graph.nodes) {
+    if (node.sessionId === null || node.role === null) continue
+    conversations.set(conversation(node.lane ?? 1, node.role), node.sessionId)
+  }
 
   /**
    * One node, from launch to the end of its turn.
@@ -896,6 +1029,10 @@ async function executeRun(
     modelTier: 'fast' | 'deep'
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
+    /** The one file this rung may write, or null when it has no artefact. */
+    outputPath?: string | null
+    /** Called as soon as the session exists, not when its turn ends. */
+    onStarted?: (sessionId: string) => void
   }): Promise<StartedRun> {
     const checkout = checkouts.get(input.node.lane ?? 1)
     // No checkout and no runner mean nothing ran. Reported with a null exit
@@ -963,6 +1100,7 @@ async function executeRun(
               readOnlyTools: readOnlyTools(api),
               autonomy: autonomyFor(api),
               worktreePath: checkout.path,
+              outputPath: input.outputPath ?? null,
             }),
           onPending: (pending) => {
             // Asks reach the console as well as the inbox. A refusal is posted
@@ -1013,6 +1151,11 @@ async function executeRun(
           onRegistered: (run) => {
             sessionId = run.sessionId
             transcriptFrom = run.transcriptFrom
+            // The graph learns the session while there is still an agent in
+            // it. Before this the Floor's Watch and Attach appeared only after
+            // the turn ended, so the one moment you needed a terminal was the
+            // one moment there was no way into it.
+            input.onStarted?.(run.sessionId)
           },
           onEnd: (exitCode) => {
             // Off the live list and into the record, so a finished unit stops
@@ -1043,6 +1186,7 @@ async function executeRun(
           }
           sessionId = run.sessionId
           transcriptFrom = run.transcriptFrom
+          input.onStarted?.(run.sessionId)
           // The lane's open conversation, for the next node that may carry it
           // on. A role that may not resume is never offered it — the registry
           // refuses, structurally — and neither is a role that is not the one
@@ -1071,6 +1215,9 @@ async function executeRun(
   }
 
   const sources = resolveSources(api, root)
+  // Read once, so what a rung is told it may hand back and what is accepted
+  // from it come from the same resolution of the same role file.
+  const roleRegistry = createRoleRegistry(sources)
   const houseRules = rulesFor(sources, {
     repoPaths: sources.repoPaths,
     houseDocs: [...order.context.houseDocs],
@@ -1103,6 +1250,47 @@ async function executeRun(
     // Loaded once, so what an agent is told the house rules are and what the
     // change is judged against are the same list.
     rules: houseRules,
+    /**
+     * Take what a read-only rung wrote, put it on the order, and save it.
+     *
+     * The Forge has always had this and the Line never did: four of the
+     * standard shape's nine steps are roles whose whole product is a document,
+     * and every one of them ended its turn with the document in a terminal
+     * nobody reads. Watched on a live run — a scout's complete report of where
+     * the application picks its colours, gone; an architect's three defects in
+     * the order it was about to be built from, gone, refused on the way out by
+     * the very policy that makes the rung trustworthy.
+     */
+    collect: async ({ nodeId, role, outputPath }) => {
+      const current = (await store.load(order.id)) ?? order
+      const result = readRungOutput({
+        order: current,
+        role,
+        writes: collectableWrites(roleRegistry.get(role)),
+        outputPath,
+        at: new Date().toISOString(),
+      })
+      if (result === null) return null
+
+      // A refusal is a result too, and it is the agent's to act on rather than
+      // the operator's to decipher — so it is recorded and the rung is not
+      // credited with having filed anything.
+      if (!result.ok) {
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: `role:${role}`,
+          action: 'rung.refused',
+          subject: nodeId,
+          reason: result.reason,
+          evidence: [],
+        })
+        return null
+      }
+
+      await store.save(result.order)
+      return { order: result.order, note: result.note, defect: result.defect }
+    },
     raise: async (gate) => {
       await gates.save(gate)
       await store.record({
@@ -1680,10 +1868,33 @@ export function activate(api: ExtensionAPI): void {
       supervision?.backpressure.check() ?? { allowed: true, unreviewed: 0, limit: 0, reason: null },
     noteOverride: (orderId) => supervision?.backpressure.override(orderId, Date.now()),
     now: () => new Date().toISOString(),
-    execute: (order, recipe, graph) => executeRun(api, dataRoot(), order, recipe, graph),
+    // Marked while it runs, so nothing reclaims a node out from under an
+    // executor that is part way through starting it.
+    execute: async (order, recipe, graph) => {
+      executingOrders.add(order.id)
+      try {
+        await executeRun(api, dataRoot(), order, recipe, graph)
+      } finally {
+        executingOrders.delete(order.id)
+      }
+    },
+    isLive: isLiveSession,
+    executing: (orderId) => executingOrders.has(orderId),
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))
+  // Stop the whole order, as opposed to one agent.
+  //
+  // `foundry:run-stop` ends one session; this ends the run. The distinction is
+  // the reason a dead run could never be got rid of: the only order-level stop
+  // was a gate option that did nothing, and `order.cancel` refuses a running
+  // order and points back at that gate.
+  reg(api, 'foundry:run.stop', async (payload) => {
+    const { id } = payload as { id?: unknown }
+    if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
+    await stopOrder(dataRoot(), id, 'stopped by the operator')
+    return { ok: true }
+  })
   reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
   reg(api, 'foundry:run.recipes', (payload) => runs.recipes(payload))
   reg(api, 'foundry:session.attach', (payload) => runs.attach(payload))
@@ -1732,9 +1943,17 @@ export function activate(api: ExtensionAPI): void {
         return
       }
 
+      // `stop` now stops. Every gate offering it promised the order would be
+      // cancelled and nothing did it — the run stayed `running` for ever, and
+      // `order.cancel` refuses a running order and points back at this gate.
+      if (option === 'stop') {
+        await stopOrder(dataRoot(), gate.orderId, `stopped at the ${gate.rule} gate`)
+        return
+      }
+
       // `hold` means what it says: the run stays stopped until the operator
       // comes back to it. Everything else is a decision to carry on.
-      if (option === 'hold' || option === 'stop') return
+      if (option === 'hold') return
       await runs.resume({
         id: gate.orderId,
         // "Send back" is a retry of the node that failed; the others resume
@@ -1743,8 +1962,36 @@ export function activate(api: ExtensionAPI): void {
       })
     },
   })
-  reg(api, 'foundry:inbox.list', () => inbox.list())
+  reg(api, 'foundry:inbox.list', async () => {
+    // Before the list is composed, not after: a run the last application left
+    // in flight has to be on it the first time it is read, not the second.
+    await adoptInterruptedRuns(dataRoot())
+    return inbox.list()
+  })
   reg(api, 'foundry:inbox.decide', (payload) => inbox.decide(payload))
+
+  // How much is waiting for the operator, and where.
+  //
+  // Read by the surfaces themselves so the answer to "is anything waiting" is
+  // on screen wherever you are. Foundry holds work in three places and used to
+  // announce it on none of them: an open question sat third down the Forge's
+  // rail and a held tool call sat under a whole run graph, so the only way to
+  // find either was to already be looking at it.
+  const attentionGates = createLiveGateStore(dataRoot)
+  const attentionOrders = createLiveOrderStore(dataRoot)
+  reg(api, 'foundry:attention', async () => {
+    // The chrome polls this from the moment the application opens, which makes
+    // it the earliest place a run the last one left behind can be noticed. A
+    // dead run that announces itself in four seconds is the whole difference
+    // between this and finding out hours later that nothing had moved.
+    await adoptInterruptedRuns(dataRoot())
+    return countAttention({
+      gates: await attentionGates.list(),
+      autonomy: autonomyFor(api),
+      orders: await attentionOrders.list(),
+      pendingAsks: pendingPermissions.list().length,
+    })
+  })
 
   // ── The record ─────────────────────────────────────────────────────────
   //
@@ -2258,6 +2505,10 @@ export function deactivate(): void {
   disposables.length = 0
   supervision = null
   mutes = null
+  // Or a reactivated extension never looks again at what the last session left
+  // in a records location it has already seen this process.
+  adoptedRoots.clear()
+  executingOrders.clear()
   for (const notification of raisedNotifications.values()) notification.dispose()
   raisedNotifications.clear()
   stallWatcher?.stop()

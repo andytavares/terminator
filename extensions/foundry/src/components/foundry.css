@@ -178,6 +178,40 @@
   line-height: 1.4;
 }
 
+/* How to clear a failing check.
+
+   The five checks that were not the red team said what was wrong and stopped —
+   including `verifiable`, whose own failure text names an escape that no
+   control on this screen could reach. A red mark with no move attached is a
+   dead end the operator stares at. */
+.fdry-remedy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.fdry-remedy button {
+  appearance: none;
+  font: inherit;
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  cursor: pointer;
+}
+
+.fdry-remedy button:hover:not(:disabled) {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-remedy button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .fdry-check-mark svg {
   width: 13px;
   height: 13px;
@@ -223,6 +257,94 @@
 .fdry-compile svg {
   width: 13px;
   height: 13px;
+}
+
+/* ─── What is waiting on a person ─────────────────────────────────
+
+   The band, on the Forge and on the Floor. Everything that holds an order up
+   until somebody answers it renders here: at the top of its surface, across
+   the full width, before anything that is only there to be read.
+
+   Both of the things it replaced were a panel among panels. The Forge's open
+   questions sat third down a 260px rail, under six convergence checks and up
+   to six recipe cards; the Floor's held tool calls sat under the entire run
+   graph. Both were reported as taking for ever to find, and an interruption
+   nobody finds is one that gets answered by the deadline default instead. */
+.fdry-needs-you {
+  /* Across both columns of the Forge's grid; inert in the Floor's flex column,
+     which is what the Floor wants anyway. */
+  grid-column: 1 / -1;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-warning);
+  border-left-width: 3px;
+  border-radius: var(--tm-radius-md);
+  padding: 12px 14px;
+}
+
+/* The Forge's grid supplies its own gap; the Floor's column does not. */
+.fdry-shell > .fdry-needs-you {
+  margin-bottom: 12px;
+}
+
+.fdry-needs-you-h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tm-warning);
+}
+
+.fdry-needs-you-h svg {
+  width: 14px;
+  height: 14px;
+}
+
+.fdry-needs-you-list {
+  display: grid;
+  gap: 14px;
+}
+
+/* Three questions at the top of a wide screen are three columns, not 300px of
+   banner pushing the document off the fold. The Floor's asks stay stacked —
+   they carry a command and its arguments, which do not survive a narrow
+   column. */
+@media (min-width: 900px) {
+  .fdry-forge .fdry-needs-you-list {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+
+/* In the rail a rule separated the questions from the panel above. In the band
+   the gap does that, and a rule over the first one reads as a stray divider
+   under the heading. */
+.fdry-needs-you .fdry-question {
+  border-top: 0;
+  padding: 0;
+  font-size: 13px;
+}
+
+/* The buttons are the point of the band, so they are sized as controls rather
+   than as the footnote-sized pills they were in the rail. */
+.fdry-needs-you .fdry-options button {
+  font-size: 12px;
+  padding: 5px 12px;
+}
+
+.fdry-needs-you .fdry-options button.is-recommended {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+/* The last ask in the band has no row under it to be divided from. */
+.fdry-needs-you .fdry-ask:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .fdry-question {
@@ -319,6 +441,41 @@
   flex: 0 0 auto;
   gap: 6px;
   align-items: flex-start;
+}
+
+/* Allow, Deny, and answering in the terminal instead.
+
+   These had no rule at all, so the base reset rendered all three as bare
+   transparent text — and the `is-primary` the markup has always put on Allow
+   matched nothing. The one row on the Floor that is not read-only looked like
+   a caption. Same shape as the inbox's own gate buttons, because they answer
+   the same kind of question. */
+.fdry-ask-actions button {
+  appearance: none;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fdry-ask-actions button:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-ask-actions button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-ask-actions button svg {
+  width: 12px;
+  height: 12px;
 }
 
 .fdry-transcript {
@@ -911,6 +1068,35 @@
   color: var(--tm-text-secondary);
 }
 
+/* The written escape from "every criterion must be provable", on the criterion
+   itself — the only place an operator can say which one nothing can prove. */
+.fdry-ac-excuse {
+  appearance: none;
+  /* Its own line, like the accepted reason it turns into and the form it
+     opens. Inline, it sat against the verify kind and read as part of it. */
+  display: block;
+  font: inherit;
+  font-size: 11.5px;
+  margin-top: 5px;
+  padding: 2px 9px;
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-ac-excuse:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-ac-excused {
+  margin: 5px 0 0;
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
 .fdry-scroll {
   overflow-x: auto;
 }
@@ -1046,6 +1232,28 @@
 .fdry-tabs button.is-on {
   background: var(--tm-bg-card);
   color: var(--tm-text-primary);
+}
+
+/* How many things are waiting behind this tab.
+
+   On the app bar, which is outside the scroll area and therefore on screen
+   whichever surface is showing. Foundry holds work for a person on three
+   surfaces and used to announce it on none of them until you had already
+   opened the right one. */
+.fdry-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--tm-warning);
+  color: var(--tm-on-warning);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .fdry-shell {
@@ -1351,6 +1559,20 @@
   white-space: nowrap;
 }
 
+/* The row the tab's badge is counting.
+
+   The rule above mutes every row's mark, so a waiting row has to say so louder
+   than "not muted" — otherwise the number on the chrome sends you to a list of
+   identical rows and you open them one at a time to find out which. */
+.fdry-order-state.is-waiting {
+  color: var(--tm-warning);
+  font-weight: 600;
+}
+
+.fdry-orders li:has(.fdry-order-state.is-waiting) .fdry-order-mark {
+  color: var(--tm-warning);
+}
+
 /* ─── Foundry: the inbox ─────────────────────────────────────────
    Severity reads as a stripe and a position, never as a coloured
    icon — icons stay flat and inherit currentColor. */
@@ -1601,6 +1823,18 @@
 .fdry-unit.is-skipped {
   border-style: dashed;
   opacity: 0.7;
+}
+
+/* A step whose agent is gone. Dashed like the other two states nothing is
+   moving, and marked in the warning colour the band above it uses — the chip
+   and the band are describing the same fact and used to disagree. */
+.fdry-unit.is-orphaned {
+  border-style: dashed;
+  border-color: var(--tm-warning);
+}
+
+.fdry-unit.is-orphaned::before {
+  background: var(--tm-warning);
 }
 
 .fdry-unit-attach {

@@ -1640,3 +1640,298 @@ describe('when exactly the budget is exceeded', () => {
     expect(outcome.complete).toBe(true)
   })
 })
+
+// A running node had no session on it. `sessionId` was written after `deps.run`
+// resolved — which is when the turn is over — so for the whole life of a rung
+// the graph said `running` and named nobody, and the Floor's Watch and Attach
+// buttons, which render on `node.sessionId !== null`, appeared only once the
+// agent was gone. The one moment you need to get into a terminal is the one
+// moment there was no way in. Watched live: two builders held on permission
+// questions with no control on either card.
+describe('reaching a rung while it is still running', () => {
+  it('puts the session on the node the moment the agent exists', async () => {
+    const o = order([unit('U-1')])
+    const seen: (string | null)[] = []
+    let released: () => void = () => {}
+    const blocked = new Promise<void>((resolve) => {
+      released = resolve
+    })
+
+    const run = async (input: {
+      node: { id: string }
+      onStarted?: (sessionId: string) => void
+    }): Promise<StartedRun> => {
+      input.onStarted?.(`sess-${input.node.id}`)
+      await blocked
+      return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
+    }
+
+    const running = execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(run as never),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      persist: async (graph) => {
+        const node = graph.nodes.find((n) => n.id === 'build:U-1')
+        if (node?.state === 'running') seen.push(node.sessionId)
+      },
+    })
+
+    // Let the started callback and its persist land before the turn ends.
+    await new Promise((resolve) => setImmediate(resolve))
+    released()
+    await running
+
+    expect(seen).toContain('sess-build:U-1')
+  })
+
+  it('announces a start once, however the session is learned', async () => {
+    const o = order([unit('U-1')])
+    const events: ExecutorEvent[] = []
+    const run = async (input: {
+      node: { id: string }
+      onStarted?: (sessionId: string) => void
+    }): Promise<StartedRun> => {
+      input.onStarted?.(`sess-${input.node.id}`)
+      return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
+    }
+
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(run as never, events),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+
+    const starts = events.filter((e) => e.type === 'started' && e.nodeId === 'build:U-1')
+    expect(starts).toHaveLength(1)
+  })
+
+  it('still names the session for a caller that never reports a start', async () => {
+    // Every ladder rung and every test stub resolves without one.
+    const o = order([unit('U-1')])
+    const events: ExecutorEvent[] = []
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok), events),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(events).toContainEqual({
+      type: 'started',
+      nodeId: 'build:U-1',
+      sessionId: 'sess-build:U-1',
+    })
+  })
+})
+
+// Four of the standard shape's nine steps are read-only roles whose whole
+// product is a document, and the Line kept none of them: the brief named no
+// destination and nothing read a rung's result past its exit status. A live
+// run's scout produced a complete report of where the application picks its
+// colours, its node passed, and not a word survived.
+describe('what a read-only rung hands back', () => {
+  const READS = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: challenge
+    kind: agent
+    role: red-team
+  - id: build
+    kind: fanout
+    over: plan.units
+    after: [challenge]
+    step: { kind: agent, role: builder }
+`
+
+  it('tells the rung where to write, under the order', async () => {
+    const o = order([unit('U-1')])
+    const run = vi.fn(ok)
+    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+      ...deps(run),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      collect: async () => null,
+    })
+
+    const challenge = run.mock.calls.find((c) => c[0].node.id === 'challenge')?.[0]
+    expect(challenge?.outputPath).toBe(
+      path.join(dataRoot, 'orders', 'WO-1', 'rungs', 'challenge.json')
+    )
+    expect(challenge?.prompt).toContain('What to write, and where')
+  })
+
+  it('offers no destination to a role whose product is the diff', async () => {
+    const o = order([unit('U-1')])
+    const run = vi.fn(ok)
+    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+      ...deps(run),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      collect: async () => null,
+    })
+
+    const build = run.mock.calls.find((c) => c[0].node.id === 'build:U-1')?.[0]
+    expect(build?.outputPath).toBeNull()
+  })
+
+  it('names no destination when the caller collects nothing', async () => {
+    // A file nobody reads back is worse than silence: the agent spends a turn
+    // on it and the rung still hands back nothing.
+    const o = order([unit('U-1')])
+    const run = vi.fn(ok)
+    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+      ...deps(run),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    const challenge = run.mock.calls.find((c) => c[0].node.id === 'challenge')?.[0]
+    expect(challenge?.outputPath).toBeNull()
+    expect(challenge?.prompt).not.toContain('What to write, and where')
+  })
+
+  it('collects what the rung wrote and records it', async () => {
+    const o = order([unit('U-1')])
+    const recorded: string[][] = []
+    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      record: async (action, subject, reason) => {
+        recorded.push([action, subject, reason])
+      },
+      collect: async () => ({ order: o, note: 'AC-2 cannot be falsified', defect: null }),
+    })
+
+    expect(recorded).toContainEqual(['rung.collected', 'challenge', 'AC-2 cannot be falsified'])
+  })
+
+  it('says so when a rung wrote nothing at all', async () => {
+    // Silence here is the defect this whole channel exists to end, so it goes
+    // in the record rather than passing as an ordinary turn.
+    const o = order([unit('U-1')])
+    const recorded: string[][] = []
+    await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      record: async (action, subject, reason) => {
+        recorded.push([action, subject, reason])
+      },
+      collect: async () => null,
+    })
+
+    expect(recorded.some(([action]) => action === 'rung.wrote_nothing')).toBe(true)
+  })
+
+  it('raises forge-defect when a rung contradicts the order being built', async () => {
+    const o = order([unit('U-1')])
+    const gates: string[] = []
+    const outcome = await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'standard',
+      runStep: async () => 0,
+      raise: async (gate) => {
+        gates.push(gate.rule)
+      },
+      collect: async () => ({
+        order: o,
+        note: 'three things are wrong',
+        defect: 'The architect would rewrite the plan: three things are wrong',
+      }),
+    })
+
+    expect(gates).toContain('forge-defect')
+    expect(outcome.gates.find((g) => g.rule === 'forge-defect')?.why).toContain(
+      'three things are wrong'
+    )
+    // It stops. The builders would otherwise carry on from an order a reader
+    // has just said is wrong, which is what happened on the live run.
+    expect(outcome.complete).toBe(false)
+  })
+
+  it('does not stop for a defect the autonomy setting silences', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      collect: async () => ({ order: o, note: 'x', defect: 'the plan is wrong' }),
+    })
+    expect(outcome.complete).toBe(true)
+  })
+
+  it('carries on when collecting throws — a run is not a filing cabinet', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(READS), buildRunGraph(o, recipe(READS)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      collect: async () => {
+        throw new Error('the disk is full')
+      },
+    })
+    expect(outcome.complete).toBe(true)
+  })
+})
+
+// The scout exists to inform the plan and the build that follow it. Its
+// findings had nowhere to go, so `applyProposal` says in as many words that
+// "Scout runs after agreement, which is too late to inform one" — the design
+// had already worked around a channel that was simply missing.
+describe('what one rung filed reaching the next', () => {
+  const READS_THEN_BUILDS = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: challenge
+    kind: agent
+    role: red-team
+  - id: build
+    kind: fanout
+    over: plan.units
+    after: [challenge]
+    step: { kind: agent, role: builder }
+`
+
+  it('rebuilds the brief from what the rung before it wrote', async () => {
+    const o = order([unit('U-1')])
+    const run = vi.fn(ok)
+    await execute(o, recipe(READS_THEN_BUILDS), buildRunGraph(o, recipe(READS_THEN_BUILDS)), {
+      ...deps(run),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      collect: async () => ({
+        order: {
+          ...o,
+          context: { ...o.context, conventions: ['colour lives in tokens'] },
+        },
+        note: 'read it',
+        defect: null,
+      }),
+    })
+
+    const build = run.mock.calls.find((c) => c[0].node.id === 'build:U-1')?.[0]
+    expect(build?.prompt).toContain('colour lives in tokens')
+  })
+
+  it('never lets a rung move the agreement it is judged against', async () => {
+    // Budgets and risk are the agreement. A rung that could raise its own
+    // budget mid-run is a run with no budget.
+    const o = order([unit('U-1')])
+    const outcome = await execute(
+      o,
+      recipe(READS_THEN_BUILDS),
+      buildRunGraph(o, recipe(READS_THEN_BUILDS)),
+      {
+        ...deps(vi.fn(ok)),
+        autonomy: 'lights-out',
+        runStep: async () => 0,
+        collect: async () => ({
+          order: { ...o, risk: { ...o.risk, grade: 'P0' as const } },
+          note: '',
+          defect: null,
+        }),
+      }
+    )
+    expect(outcome.risk.grade).not.toBe('P0')
+  })
+})

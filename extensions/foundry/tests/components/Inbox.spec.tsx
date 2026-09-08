@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Inbox } from '../../src/components/Inbox.js'
-import { raiseGate } from '../../src/gates/rules.js'
+import { raiseGate, GATE_RULES } from '../../src/gates/rules.js'
 
 // The one surface the operator is required to visit. Every row names the rule
 // that raised it, says what it looked at, and says what happens if it is
@@ -214,5 +214,31 @@ describe('a decision the handler refused', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
     )
     expect(screen.queryByText(/already decided/)).toBeNull()
+  })
+})
+
+// ── Every rule can be drawn ─────────────────────────────────────────────
+//
+// `RULE_ICON` and `RULE_TONE` are keyed by `GateRuleId`, so a new rule with no
+// entry hands React `undefined` as an element type. React does not skip it: it
+// throws, unmounts the whole tree, and the extension renders a blank panel.
+//
+// Adding `run.interrupted` did exactly that. Nothing caught it — the build is
+// green, `tsc` is not run over the components by any script, and every unit
+// test here passed because none of them rendered that rule. What caught it was
+// an e2e that seeded an order and looked at the screen.
+
+describe('every gate rule can be rendered', () => {
+  it.each(GATE_RULES)('%s draws a row rather than blanking the surface', async (rule) => {
+    mount({
+      gates: [gate({ id: `g-${rule}`, rule })],
+      autonomy: 'escorted',
+      silenced: [],
+      summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
+    })
+    await waitFor(() => expect(screen.getByText(rule)).toBeTruthy())
+    // The stripe as well as the icon: a missing tone is a silent `undefined`
+    // in the class list rather than a throw, so it needs its own assertion.
+    expect(document.querySelector('.fdry-gate')?.className).toMatch(/\bis-(p0|warn|info|ok)\b/)
   })
 })

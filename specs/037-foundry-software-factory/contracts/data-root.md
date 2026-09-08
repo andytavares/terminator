@@ -40,6 +40,9 @@ $FOUNDRY_DATA/
       order.md                 # rendered; regenerated, never hand-edited
       context.json             # Scout's pack, including the toolchain probe
       ledger.jsonl             # append-only
+      proposal.json            # intake's hand-back; read, merged and cleared
+      rungs/
+        challenge.json         # one read-only rung's hand-back; same lifetime
       pr-body-<lane>.md        # passed to `gh pr create --body-file` (R7)
       lanes/
         1-api-contracts/       # worktree.json · diff.patch · pr.json
@@ -64,6 +67,7 @@ $FOUNDRY_DATA/
 - **Nothing under the root is deleted implicitly.** A cancelled order keeps its records; what is reconciled on cancellation are the artefacts _outside_ the root — branches, worktrees, temporary checkouts — and the operator is told what was removed and what was kept (FR-077).
 - **Evidence is retained for the life of the order directory** (FR-034). Pruning is an operator action, never automatic, because the thing being pruned is the record of why something was believed to be done.
 - **`ledger.jsonl` is append-only.** A reversal is a new entry. Nothing rewrites a line.
+- **`proposal.json` and `rungs/*.json` are the only files an agent writes under the root**, and each is cleared the moment it is read. They are a hand-back, not a record: a stale one read as this turn's answer is what makes a rung that produced nothing look like one that produced the same thing twice. What survives is on `order.json` and in the ledger. Each is allowed through the read-only policy by its exact path and by nothing else — a shell redirect to the same place is still refused, because a command string cannot be read as "this writes here and nowhere else".
 
 ## Concurrency
 
