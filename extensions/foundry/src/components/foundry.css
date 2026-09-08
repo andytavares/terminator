@@ -225,6 +225,94 @@
   height: 13px;
 }
 
+/* ─── What is waiting on a person ─────────────────────────────────
+
+   The band, on the Forge and on the Floor. Everything that holds an order up
+   until somebody answers it renders here: at the top of its surface, across
+   the full width, before anything that is only there to be read.
+
+   Both of the things it replaced were a panel among panels. The Forge's open
+   questions sat third down a 260px rail, under six convergence checks and up
+   to six recipe cards; the Floor's held tool calls sat under the entire run
+   graph. Both were reported as taking for ever to find, and an interruption
+   nobody finds is one that gets answered by the deadline default instead. */
+.fdry-needs-you {
+  /* Across both columns of the Forge's grid; inert in the Floor's flex column,
+     which is what the Floor wants anyway. */
+  grid-column: 1 / -1;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-warning);
+  border-left-width: 3px;
+  border-radius: var(--tm-radius-md);
+  padding: 12px 14px;
+}
+
+/* The Forge's grid supplies its own gap; the Floor's column does not. */
+.fdry-shell > .fdry-needs-you {
+  margin-bottom: 12px;
+}
+
+.fdry-needs-you-h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tm-warning);
+}
+
+.fdry-needs-you-h svg {
+  width: 14px;
+  height: 14px;
+}
+
+.fdry-needs-you-list {
+  display: grid;
+  gap: 14px;
+}
+
+/* Three questions at the top of a wide screen are three columns, not 300px of
+   banner pushing the document off the fold. The Floor's asks stay stacked —
+   they carry a command and its arguments, which do not survive a narrow
+   column. */
+@media (min-width: 900px) {
+  .fdry-forge .fdry-needs-you-list {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+
+/* In the rail a rule separated the questions from the panel above. In the band
+   the gap does that, and a rule over the first one reads as a stray divider
+   under the heading. */
+.fdry-needs-you .fdry-question {
+  border-top: 0;
+  padding: 0;
+  font-size: 13px;
+}
+
+/* The buttons are the point of the band, so they are sized as controls rather
+   than as the footnote-sized pills they were in the rail. */
+.fdry-needs-you .fdry-options button {
+  font-size: 12px;
+  padding: 5px 12px;
+}
+
+.fdry-needs-you .fdry-options button.is-recommended {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+/* The last ask in the band has no row under it to be divided from. */
+.fdry-needs-you .fdry-ask:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
 .fdry-question {
   border-top: 1px solid var(--tm-border);
   padding: 9px 0;
@@ -319,6 +407,41 @@
   flex: 0 0 auto;
   gap: 6px;
   align-items: flex-start;
+}
+
+/* Allow, Deny, and answering in the terminal instead.
+
+   These had no rule at all, so the base reset rendered all three as bare
+   transparent text — and the `is-primary` the markup has always put on Allow
+   matched nothing. The one row on the Floor that is not read-only looked like
+   a caption. Same shape as the inbox's own gate buttons, because they answer
+   the same kind of question. */
+.fdry-ask-actions button {
+  appearance: none;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fdry-ask-actions button:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-ask-actions button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-ask-actions button svg {
+  width: 12px;
+  height: 12px;
 }
 
 .fdry-transcript {
@@ -1048,6 +1171,28 @@
   color: var(--tm-text-primary);
 }
 
+/* How many things are waiting behind this tab.
+
+   On the app bar, which is outside the scroll area and therefore on screen
+   whichever surface is showing. Foundry holds work for a person on three
+   surfaces and used to announce it on none of them until you had already
+   opened the right one. */
+.fdry-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--tm-warning);
+  color: var(--tm-on-warning);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .fdry-shell {
   display: flex;
   flex-direction: column;
@@ -1349,6 +1494,20 @@
   font-size: 11.5px;
   color: var(--tm-text-secondary);
   white-space: nowrap;
+}
+
+/* The row the tab's badge is counting.
+
+   The rule above mutes every row's mark, so a waiting row has to say so louder
+   than "not muted" — otherwise the number on the chrome sends you to a list of
+   identical rows and you open them one at a time to find out which. */
+.fdry-order-state.is-waiting {
+  color: var(--tm-warning);
+  font-weight: 600;
+}
+
+.fdry-orders li:has(.fdry-order-state.is-waiting) .fdry-order-mark {
+  color: var(--tm-warning);
 }
 
 /* ─── Foundry: the inbox ─────────────────────────────────────────

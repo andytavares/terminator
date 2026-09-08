@@ -1,6 +1,6 @@
 import { Markdown } from './Markdown.js'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, X, CircleDot, Terminal, Play, Wand } from 'lucide-react'
+import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
@@ -310,6 +310,49 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
 
   return (
     <div className="fdry-forge">
+      {/* The one thing on this screen that is waiting on a person, and so the
+          first thing on it.
+
+          This was the third panel down the left rail, under six convergence
+          checks and up to six recipe cards — below the fold on any window
+          narrower than about 1200px, and on a wider one placed wherever the
+          rail's own grid happened to put it. An operator reported it took them
+          for ever to find. A question you have to go hunting for is a question
+          that does not get answered, and every unanswered one holds the whole
+          order at "no open questions" failing. */}
+      {questions.length > 0 ? (
+        <section className="fdry-needs-you" aria-labelledby="fdry-needs-you-h">
+          <h2 className="fdry-needs-you-h" id="fdry-needs-you-h">
+            <AlertCircle aria-hidden="true" />
+            Needs you — {questions.length}
+          </h2>
+          <div className="fdry-needs-you-list">
+            {questions.map((question) => (
+              <div key={question.id} className="fdry-question">
+                <b>{question.text}</b>
+                {question.why !== '' ? <p>{question.why}</p> : null}
+                <div className="fdry-options">
+                  {question.options.map((option, index) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={index === question.recommended ? 'is-recommended' : ''}
+                      disabled={busy}
+                      onClick={() =>
+                        void turn({ answer: { questionId: question.id, option: index } })
+                      }
+                    >
+                      {option}
+                      {index === question.recommended ? ' (recommended)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <aside className="fdry-rail">
         <section className="fdry-panel">
           <h2 className="fdry-panel-h">Convergence</h2>
@@ -409,34 +452,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 </button>
               )
             })}
-          </section>
-        ) : null}
-
-        {questions.length > 0 ? (
-          <section className="fdry-panel">
-            <h2 className="fdry-panel-h">Needs you — {questions.length}</h2>
-            {questions.map((question) => (
-              <div key={question.id} className="fdry-question">
-                <b>{question.text}</b>
-                {question.why !== '' ? <p>{question.why}</p> : null}
-                <div className="fdry-options">
-                  {question.options.map((option, index) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={index === question.recommended ? 'is-recommended' : ''}
-                      disabled={busy}
-                      onClick={() =>
-                        void turn({ answer: { questionId: question.id, option: index } })
-                      }
-                    >
-                      {option}
-                      {index === question.recommended ? ' (recommended)' : ''}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
           </section>
         ) : null}
 

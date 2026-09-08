@@ -408,6 +408,59 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
         {view.graph.orderId} · {view.graph.recipe}
       </h2>
 
+      {/* Held tool calls, oldest first — the order they must be answered in.
+          This is the UI-first half of the promise: the terminal is the
+          backstop, not the only way to answer.
+
+          Above the run graph rather than under it. A held call is the only
+          thing on this screen that is waiting on a person; it used to sit
+          below every lane and every unit, which on a real run is a scroll —
+          and an agent blocked at a PreToolUse hook looks exactly like an agent
+          that has gone quiet. */}
+      {pending.length > 0 ? (
+        <section className="fdry-needs-you" aria-labelledby="fdry-waiting-h">
+          <h3 className="fdry-needs-you-h" id="fdry-waiting-h">
+            <ShieldQuestion aria-hidden="true" />
+            Waiting on you — {pending.length}
+          </h3>
+          <div className="fdry-needs-you-list">
+            {pending.map((ask) => (
+              <div key={ask.requestId} className="fdry-ask">
+                <span className="fdry-ask-icon" aria-hidden="true">
+                  <ShieldQuestion />
+                </span>
+                <div className="fdry-ask-main">
+                  <b>{ask.summary}</b>
+                  <small>
+                    <code>{ask.toolName}</code>
+                  </small>
+                  {ask.detail !== null ? <pre className="fdry-ask-detail">{ask.detail}</pre> : null}
+                </div>
+                <div className="fdry-ask-actions">
+                  <button
+                    type="button"
+                    className="is-primary"
+                    onClick={() => void answer(ask, 'allow')}
+                  >
+                    Allow
+                  </button>
+                  <button type="button" onClick={() => void answer(ask, 'deny')}>
+                    Deny
+                  </button>
+                  <button
+                    type="button"
+                    title="Answer it in the terminal instead"
+                    onClick={() => void handBack(ask)}
+                  >
+                    <Terminal aria-hidden="true" /> In the terminal
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {/* Only where there is more than one repository. A single-lane order
           gets no merge-order section at all, because "1 of 1, merges first"
           is ceremony over nothing (FR-068). */}
@@ -477,48 +530,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           </div>
         </div>
       ))}
-
-      {/* Held tool calls, oldest first — the order they must be answered in.
-          This is the UI-first half of the promise: the terminal is the
-          backstop, not the only way to answer. */}
-      {pending.length > 0 ? (
-        <section className="fdry-panel" style={{ marginTop: 12 }}>
-          <h3 className="fdry-panel-h">Waiting on you — {pending.length}</h3>
-          {pending.map((ask) => (
-            <div key={ask.requestId} className="fdry-ask">
-              <span className="fdry-ask-icon" aria-hidden="true">
-                <ShieldQuestion />
-              </span>
-              <div className="fdry-ask-main">
-                <b>{ask.summary}</b>
-                <small>
-                  <code>{ask.toolName}</code>
-                </small>
-                {ask.detail !== null ? <pre className="fdry-ask-detail">{ask.detail}</pre> : null}
-              </div>
-              <div className="fdry-ask-actions">
-                <button
-                  type="button"
-                  className="is-primary"
-                  onClick={() => void answer(ask, 'allow')}
-                >
-                  Allow
-                </button>
-                <button type="button" onClick={() => void answer(ask, 'deny')}>
-                  Deny
-                </button>
-                <button
-                  type="button"
-                  title="Answer it in the terminal instead"
-                  onClick={() => void handBack(ask)}
-                >
-                  <Terminal aria-hidden="true" /> In the terminal
-                </button>
-              </div>
-            </div>
-          ))}
-        </section>
-      ) : null}
 
       {/* What the agent has been saying, and the three things you can do to it
           without leaving. */}
