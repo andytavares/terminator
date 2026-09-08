@@ -13,6 +13,7 @@ import { availableNames, resolveRule } from './recipe/resolve.js'
 import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore } from './gates/store.js'
+import { countAttention } from './gates/attention.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { markReady, readPulls, shipOrder } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
@@ -1745,6 +1746,24 @@ export function activate(api: ExtensionAPI): void {
   })
   reg(api, 'foundry:inbox.list', () => inbox.list())
   reg(api, 'foundry:inbox.decide', (payload) => inbox.decide(payload))
+
+  // How much is waiting for the operator, and where.
+  //
+  // Read by the surfaces themselves so the answer to "is anything waiting" is
+  // on screen wherever you are. Foundry holds work in three places and used to
+  // announce it on none of them: an open question sat third down the Forge's
+  // rail and a held tool call sat under a whole run graph, so the only way to
+  // find either was to already be looking at it.
+  const attentionGates = createLiveGateStore(dataRoot)
+  const attentionOrders = createLiveOrderStore(dataRoot)
+  reg(api, 'foundry:attention', async () =>
+    countAttention({
+      gates: await attentionGates.list(),
+      autonomy: autonomyFor(api),
+      orders: await attentionOrders.list(),
+      pendingAsks: pendingPermissions.list().length,
+    })
+  )
 
   // ── The record ─────────────────────────────────────────────────────────
   //

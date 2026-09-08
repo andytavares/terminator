@@ -222,6 +222,20 @@ Writes a ledger entry before acting. A gate already decided returns an error rat
 
 ---
 
+## `foundry:attention`
+
+How much is waiting for the operator, and on which surface.
+
+**Payload**: `{}`
+
+**Response**: `{ inbox: number; forge: number; byOrder: Record<string, number> }`
+
+`inbox` counts undecided gates the current autonomy setting still asks about — the same rows `foundry:inbox.list` returns, so the badge and the list never disagree. `forge` counts open questions across draft orders plus every held tool call. `byOrder` says which order each question belongs to, so a badge of two is followed by a list that says where.
+
+Read by the tab strip on every surface. Foundry holds work for a person in three places, and a queue you have to navigate to before it will admit it has anything in it is a queue that does not get answered.
+
+---
+
 ## `foundry:ledger.query`
 
 **Payload**:
