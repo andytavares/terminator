@@ -958,6 +958,34 @@ describe('a run whose agents are gone', () => {
     await waitFor(() => expect(screen.getByText('No order WO-1.')).toBeTruthy())
   })
 
+  it('stops the chip claiming to be building, which the band has just denied', async () => {
+    mount(ORPHANED)
+    await screen.findByText(/Nothing is running this/)
+    // The chip and the band read the same graph. Left alone it drew "building"
+    // under a band saying nothing was running it, and the two together are
+    // worse than either — one of them is lying and the surface will not say
+    // which.
+    const chip = document.querySelector('.fdry-unit') as HTMLElement
+    expect(chip.textContent).toContain('stopped')
+    expect(chip.className).toContain('is-orphaned')
+  })
+
+  it('leaves a genuinely running chip alone', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    const chip = document.querySelector('.fdry-unit') as HTMLElement
+    expect(chip.textContent).toContain('building')
+    expect(chip.className).not.toContain('is-orphaned')
+  })
+
+  it('offers no way into a terminal that is gone', async () => {
+    mount(ORPHANED)
+    await screen.findByText(/Nothing is running this/)
+    // Both the Watch and the Attach control: one reads a transcript that has
+    // stopped growing, the other navigates to a tab that no longer exists.
+    expect(screen.queryByRole('button', { name: /Attach to/ })).toBeNull()
+  })
+
   it('says nothing when every agent is where it should be', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))

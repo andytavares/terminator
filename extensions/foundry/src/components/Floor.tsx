@@ -8,6 +8,7 @@ import {
   X,
   ScanEye,
   BellOff,
+  Unplug,
 } from 'lucide-react'
 import type { RunGraph, RunNode } from '../line/run-graph.js'
 
@@ -484,7 +485,8 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       {orphaned.length > 0 ? (
         <section className="fdry-needs-you" aria-labelledby="fdry-orphaned-h">
           <h3 className="fdry-needs-you-h" id="fdry-orphaned-h">
-            <ShieldQuestion aria-hidden="true" />
+            {/* The same mark the inbox puts on the same rule's row. */}
+            <Unplug aria-hidden="true" />
             Nothing is running this — {orphaned.length} {orphaned.length === 1 ? 'step' : 'steps'}
           </h3>
           <p className="fdry-note">
@@ -598,39 +600,46 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           <div className="fdry-units">
             {view.graph.nodes
               .filter((n) => (n.lane ?? 0) === lane)
-              .map((node) => (
-                <span
-                  key={node.id}
-                  className={`fdry-unit is-${node.state}`}
-                  // The id stays reachable because it is what the ledger and
-                  // the graph call this node, but it is not what a person
-                  // watching the run needs to read.
-                  title={node.id}
-                >
-                  {view.labels?.[node.id] ?? node.id}
-                  <u>{STATE_LABEL[node.state]}</u>
-                  {node.sessionId !== null ? (
-                    <>
-                      <button
-                        type="button"
-                        className="fdry-unit-attach"
-                        aria-label={`Watch ${view.labels?.[node.id] ?? node.id}`}
-                        onClick={() => setWatching(node.sessionId)}
-                      >
-                        <ShieldQuestion aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        className="fdry-unit-attach"
-                        aria-label={`Attach to ${view.labels?.[node.id] ?? node.id}`}
-                        onClick={() => void attach(node.id)}
-                      >
-                        <Terminal aria-hidden="true" />
-                      </button>
-                    </>
-                  ) : null}
-                </span>
-              ))}
+              .map((node) => {
+                // A node the graph calls running that nothing is running.
+                // Drawn as what it is: left alone the chip read "building"
+                // under a band saying nothing was running it, and a surface
+                // that contradicts itself is worse than one that says less.
+                const gone = orphaned.includes(node.id)
+                return (
+                  <span
+                    key={node.id}
+                    className={`fdry-unit is-${node.state}${gone ? ' is-orphaned' : ''}`}
+                    // The id stays reachable because it is what the ledger and
+                    // the graph call this node, but it is not what a person
+                    // watching the run needs to read.
+                    title={node.id}
+                  >
+                    {view.labels?.[node.id] ?? node.id}
+                    <u>{gone ? 'stopped' : STATE_LABEL[node.state]}</u>
+                    {node.sessionId !== null && !gone ? (
+                      <>
+                        <button
+                          type="button"
+                          className="fdry-unit-attach"
+                          aria-label={`Watch ${view.labels?.[node.id] ?? node.id}`}
+                          onClick={() => setWatching(node.sessionId)}
+                        >
+                          <ShieldQuestion aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="fdry-unit-attach"
+                          aria-label={`Attach to ${view.labels?.[node.id] ?? node.id}`}
+                          onClick={() => void attach(node.id)}
+                        >
+                          <Terminal aria-hidden="true" />
+                        </button>
+                      </>
+                    ) : null}
+                  </span>
+                )
+              })}
           </div>
         </div>
       ))}

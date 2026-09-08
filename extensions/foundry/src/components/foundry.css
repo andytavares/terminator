@@ -1825,6 +1825,18 @@
   opacity: 0.7;
 }
 
+/* A step whose agent is gone. Dashed like the other two states nothing is
+   moving, and marked in the warning colour the band above it uses — the chip
+   and the band are describing the same fact and used to disagree. */
+.fdry-unit.is-orphaned {
+  border-style: dashed;
+  border-color: var(--tm-warning);
+}
+
+.fdry-unit.is-orphaned::before {
+  background: var(--tm-warning);
+}
+
 .fdry-unit-attach {
   appearance: none;
   background: transparent;
