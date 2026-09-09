@@ -820,7 +820,7 @@ function ladderNode(rung: string, name: string, lane: number): RunNode {
     stepId: `ladder-${rung}`,
     kind: 'run',
     state: 'running',
-    unitId: null,
+    unitIds: [],
     lane,
     role: null,
     dependsOn: [],

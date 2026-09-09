@@ -89,40 +89,74 @@ const RULE: Rule = {
 
 describe('the instruction', () => {
   it("leads with the role's own prompt", () => {
-    const text = brief({ order: order(), role: role(), unit: unit(), rules: [] })
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
     expect(text.startsWith('Build one unit')).toBe(true)
   })
 
   it('names the order, the problem and what done looks like', () => {
-    const text = brief({ order: order(), role: role(), unit: unit(), rules: [] })
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
     expect(text).toContain('Refuse an expired refresh token')
     expect(text).toContain('an expired refresh token is accepted')
     expect(text).toContain('it is refused with a 401')
   })
 
   it('names what is explicitly not being asked for', () => {
-    const text = brief({ order: order(), role: role(), unit: unit(), rules: [] })
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
     expect(text).toContain('rotating the signing key')
   })
 
   it('carries the risk grade, which decides what happens around it', () => {
-    const text = brief({ order: order(), role: role(), unit: unit(), rules: [] })
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
     expect(text).toMatch(/risk P3/)
   })
 })
 
 describe('what each role may read is declared, not assumed', () => {
   it('gives a builder its unit, what it may touch and what makes it done', () => {
-    const text = brief({ order: order(), role: role(), unit: unit(), rules: [] })
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
     expect(text).toContain('U-1')
     expect(text).toContain('src/auth/session.ts')
     expect(text).toContain('AC-1')
     expect(text).toContain('an expired token is refused')
   })
 
+  // A fan-out `by lane` gives one agent a whole lane. The plan's detail is
+  // the point of keeping units at all, so the brief lists every one of them,
+  // in the order the graph resolved — not a summary and not just the first.
+  it('lists every unit a lane node carries, in the order it was given them', () => {
+    const text = brief({
+      order: order(),
+      role: role(),
+      units: [
+        unit({ id: 'U-1', title: 'first', touches: ['src/a.ts'] }),
+        unit({ id: 'U-2', title: 'second', touches: ['src/b.ts'] }),
+      ],
+      rules: [],
+    })
+    expect(text.indexOf('U-1')).toBeLessThan(text.indexOf('U-2'))
+    expect(text).toContain('src/a.ts')
+    expect(text).toContain('src/b.ts')
+  })
+
+  it('says a lane is one agent doing several units in order, not a menu', () => {
+    const text = brief({
+      order: order(),
+      role: role(),
+      units: [unit({ id: 'U-1' }), unit({ id: 'U-2' })],
+      rules: [],
+    })
+    expect(text).toContain('## The units: U-1, U-2')
+    expect(text).toContain('in the order they are listed')
+  })
+
+  it('still names a single unit in the singular', () => {
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
+    expect(text).toContain('## The unit: U-1')
+  })
+
   it('gives a verifier the criteria and never the unit — that is the whole point', () => {
     const verifier = role({ id: 'verifier', reads: ['criteria'], writes: [], allowResume: false })
-    const text = brief({ order: order(), role: verifier, unit: unit(), rules: [] })
+    const text = brief({ order: order(), role: verifier, units: [unit()], rules: [] })
     expect(text).toContain('AC-1')
     expect(text).not.toContain('src/auth/session.ts')
     expect(text).not.toContain('The unit:')
@@ -130,7 +164,7 @@ describe('what each role may read is declared, not assumed', () => {
 
   it('gives a role that reads nothing its prompt and the order, and no more', () => {
     const bare = role({ reads: [] })
-    const text = brief({ order: order(), role: bare, unit: unit(), rules: [RULE] })
+    const text = brief({ order: order(), role: bare, units: [unit()], rules: [RULE] })
     expect(text).toContain('Refuse an expired refresh token')
     expect(text).not.toContain('no-stubs')
     expect(text).not.toContain('src/auth/session.ts')
@@ -144,7 +178,7 @@ describe('what each role may read is declared, not assumed', () => {
 describe('the repository, for a role that reads it', () => {
   it('names the real commands and forbids inventing others', () => {
     const runs = role({ tools: ['read', 'edit', 'run_tests'] })
-    const text = brief({ order: order(), role: runs, unit: unit(), rules: [] })
+    const text = brief({ order: order(), role: runs, units: [unit()], rules: [] })
     expect(text).toContain('npm test')
     expect(text).toContain('do not invent others')
   })
@@ -154,7 +188,7 @@ describe('the repository, for a role that reads it', () => {
   // turns on an instruction the factory would never have let it follow.
   it('tells a role that may not run them that they are run for it', () => {
     const reads = role({ tools: ['read', 'search'] })
-    const text = brief({ order: order(), role: reads, unit: unit(), rules: [] })
+    const text = brief({ order: order(), role: reads, units: [unit()], rules: [] })
     expect(text).toContain('npm test')
     expect(text).toContain('run for you')
     expect(text).not.toContain('do not invent others')
@@ -173,7 +207,7 @@ describe('the repository, for a role that reads it', () => {
         },
       },
       role: role(),
-      unit: unit(),
+      units: [unit()],
       rules: [],
     })
     expect(text).toContain('No commands were found')
@@ -181,7 +215,9 @@ describe('the repository, for a role that reads it', () => {
   })
 
   it('points at what the project says about itself', () => {
-    expect(brief({ order: order(), role: role(), unit: unit(), rules: [] })).toContain('CLAUDE.md')
+    expect(brief({ order: order(), role: role(), units: [unit()], rules: [] })).toContain(
+      'CLAUDE.md'
+    )
   })
 
   it('carries what was already decided about these files', () => {
@@ -192,7 +228,7 @@ describe('the repository, for a role that reads it', () => {
         context: { ...base.context, priorArt: ['2026-08-01 operator: review.rejected — no'] },
       },
       role: role(),
-      unit: unit(),
+      units: [unit()],
       rules: [],
     })
     expect(text).toContain('Already decided about these files')
@@ -208,7 +244,7 @@ describe('the repository, for a role that reads it', () => {
         ],
       },
       role: role(),
-      unit: unit(),
+      units: [unit()],
       rules: [],
     })
     expect(text).toContain('sessions are stored in Redis')
@@ -223,7 +259,7 @@ describe('the repository, for a role that reads it', () => {
         assumptions: [{ id: 'A-1', text: 'sessions are in Redis', struck: true, affects: [] }],
       },
       role: role(),
-      unit: unit(),
+      units: [unit()],
       rules: [],
     })
     expect(text).not.toContain('sessions are in Redis')
@@ -232,13 +268,13 @@ describe('the repository, for a role that reads it', () => {
 
 describe('house rules', () => {
   it('are named with the rung they sit on', () => {
-    const text = brief({ order: order(), role: role(), unit: unit(), rules: [RULE] })
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [RULE] })
     expect(text).toContain('no-stubs')
     expect(text).toContain('L3')
   })
 
   it('produce no section when there are none', () => {
-    expect(brief({ order: order(), role: role(), unit: unit(), rules: [] })).not.toContain(
+    expect(brief({ order: order(), role: role(), units: [unit()], rules: [] })).not.toContain(
       'House rules'
     )
   })
@@ -249,7 +285,7 @@ describe('a command step', () => {
     const text = brief({
       order: order(),
       role: null,
-      unit: null,
+      units: [],
       rules: [RULE],
       command: 'npm test',
     })
@@ -262,7 +298,7 @@ describe('a command step', () => {
   })
 
   it('falls through to the ordinary brief for an empty command', () => {
-    const text = brief({ order: order(), role: role(), unit: unit(), rules: [], command: '   ' })
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [], command: '   ' })
     expect(text).toContain('Build one unit')
   })
 })
@@ -272,7 +308,7 @@ describe('a unit with nothing declared', () => {
     const text = brief({
       order: order(),
       role: role(),
-      unit: unit({ touches: [] }),
+      units: [unit({ touches: [] })],
       rules: [],
     })
     expect(text).toContain('declared no files')
@@ -282,7 +318,7 @@ describe('a unit with nothing declared', () => {
     const text = brief({
       order: order(),
       role: role(),
-      unit: unit({ satisfies: [] }),
+      units: [unit({ satisfies: [] })],
       rules: [],
     })
     expect(text).toContain('satisfies no criterion')
@@ -294,7 +330,7 @@ describe('where a rung hands back what it found', () => {
     const text = brief({
       order: order(),
       role: role({ id: 'scout', writes: ['context'], tools: ['read'] }),
-      unit: null,
+      units: [],
       rules: [],
       outputPath: '/data/orders/WO-1/rungs/scout.json',
     })
@@ -306,7 +342,7 @@ describe('where a rung hands back what it found', () => {
     const text = brief({
       order: order(),
       role: role({ id: 'red-team', writes: ['findings'], tools: ['read'] }),
-      unit: null,
+      units: [],
       rules: [],
       outputPath: '/rungs/challenge.json',
     })
@@ -320,7 +356,7 @@ describe('where a rung hands back what it found', () => {
     const text = brief({
       order: order(),
       role: role(),
-      unit: unit(),
+      units: [unit()],
       rules: [],
       outputPath: '/rungs/build.json',
     })
@@ -331,7 +367,7 @@ describe('where a rung hands back what it found', () => {
     const text = brief({
       order: order(),
       role: role({ id: 'scout', writes: ['context'], tools: ['read'] }),
-      unit: null,
+      units: [],
       rules: [],
     })
     expect(text).not.toContain('What to write, and where')
@@ -345,7 +381,7 @@ describe('where a rung hands back what it found', () => {
         assumptions: [{ id: 'A-1', text: 'the token is a JWT', struck: false, affects: [] }],
       }),
       role: role({ id: 'scout', reads: ['context'], writes: ['context'], tools: ['read'] }),
-      unit: null,
+      units: [],
       rules: [],
       outputPath: '/rungs/scout.json',
     })

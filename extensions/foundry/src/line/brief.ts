@@ -23,8 +23,13 @@ export type Readable = (typeof READABLE)[number]
 export interface BriefInput {
   readonly order: WorkOrder
   readonly role: Role | null
-  /** The unit this node is doing, where the node has one. */
-  readonly unit: PlanUnit | null
+  /**
+   * The units this node is doing, in the order to do them.
+   *
+   * A list because a fan-out `by lane` gives one agent a whole lane's work.
+   * Empty for a node that is not about a unit at all.
+   */
+  readonly units: readonly PlanUnit[]
   /** The rules in force in this repository. Empty is a normal answer. */
   readonly rules: readonly Rule[]
   /** For a `run` step: the command, which is the whole instruction. */
@@ -40,13 +45,13 @@ export interface BriefInput {
   readonly outputPath?: string
 }
 
-function unitSection(order: WorkOrder, unit: PlanUnit): string[] {
+function oneUnit(order: WorkOrder, unit: PlanUnit, heading: string): string[] {
   const criteria = unit.satisfies
     .map((id) => order.acceptance.find((c) => c.id === id))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
 
   return [
-    `## The unit: ${unit.id} — ${unit.title}`,
+    `${heading} ${unit.id} — ${unit.title}`,
     '',
     unit.touches.length === 0
       ? 'It declared no files. Touching anything outside what the plan said is a risk trigger, not a shortcut.'
@@ -59,6 +64,28 @@ function unitSection(order: WorkOrder, unit: PlanUnit): string[] {
           '',
           ...criteria.map((c) => `- **${c.id}** ${c.statement}`),
         ]),
+  ]
+}
+
+/**
+ * The unit, or the lane's units.
+ *
+ * A lane is one worktree and one branch, so a fan-out `by lane` hands one
+ * agent everything in it. The plan's detail is why units exist at all, so
+ * every one is listed with its own files and criteria rather than summarised
+ * — what changes is that they cost one session instead of one each.
+ */
+function unitSection(order: WorkOrder, units: readonly PlanUnit[]): string[] {
+  if (units.length === 1) return oneUnit(order, units[0], '## The unit:')
+
+  return [
+    `## The units: ${units.map((unit) => unit.id).join(', ')}`,
+    '',
+    'They share one worktree and one branch, and they are all yours.',
+    'Do them in the order they are listed: the plan says a later one depends',
+    'on an earlier one, and nothing else is coming to do the rest.',
+    '',
+    ...units.flatMap((unit) => [...oneUnit(order, unit, '### '), '']),
   ]
 }
 
@@ -123,7 +150,7 @@ function rulesSection(rules: readonly Rule[]): string[] {
  * being enforced rather than requested.
  */
 export function brief(input: BriefInput): string {
-  const { order, role, unit, rules, command, outputPath } = input
+  const { order, role, units, rules, command, outputPath } = input
 
   // A `run` step is a command, not a conversation. Wrapping it in context
   // would invite an agent to reinterpret it.
@@ -164,7 +191,7 @@ export function brief(input: BriefInput): string {
     )
   }
 
-  if (reads.has('unit') && unit !== null) sections.push('', ...unitSection(order, unit))
+  if (reads.has('unit') && units.length > 0) sections.push('', ...unitSection(order, units))
 
   // A role that reads criteria but not units gets all of them — that is the
   // verifier, which is handed the change and the criteria and nothing about

@@ -1,6 +1,6 @@
-import { selectOver, evaluateWhen } from '../recipe/step-kinds.js'
+import { fanoutTargets, evaluateWhen } from '../recipe/step-kinds.js'
 import type { Recipe, Step, StepKind } from '../recipe/parse.js'
-import type { WorkOrder } from '../order/schema.js'
+import type { PlanUnit, WorkOrder } from '../order/schema.js'
 
 // An agreed order plus a recipe becomes a run graph.
 //
@@ -25,7 +25,14 @@ export interface RunNode {
   readonly stepId: string
   readonly kind: StepKind
   readonly state: NodeState
-  readonly unitId: string | null
+  /**
+   * Every unit this node is responsible for, in the order to do them.
+   *
+   * A list rather than one id because a fan-out `by lane` gives one node a
+   * whole lane's work — see `fanoutTargets`. Empty for a step that is not
+   * about a unit at all.
+   */
+  readonly unitIds: readonly string[]
   readonly lane: number | null
   readonly role: string | null
   readonly dependsOn: readonly string[]
@@ -46,7 +53,7 @@ export interface RunGraph {
 function node(over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId' | 'kind'>): RunNode {
   return {
     state: 'waiting',
-    unitId: null,
+    unitIds: [],
     lane: null,
     role: null,
     dependsOn: [],
@@ -73,25 +80,43 @@ export function buildRunGraph(order: WorkOrder, recipe: Recipe): RunGraph {
     const applies = evaluateWhen(step.when, order)
 
     if (step.kind === 'fanout') {
-      const units = selectOver(step.over ?? '', order)
+      const targets = fanoutTargets(step.over ?? '', order)
       const inner = (step.step ?? {}) as { role?: string }
+      // Which node ended up carrying each unit, so a dependency on a unit
+      // resolves to the node doing it — the same id under a plain fan-out,
+      // and the lane's node under `by lane`.
+      const nodeOfUnit = new Map<string, string>()
+      for (const target of targets) {
+        for (const unit of target.units) nodeOfUnit.set(unit.id, `${step.id}:${target.id}`)
+      }
 
-      for (const unit of units) {
+      for (const target of targets) {
+        const id = `${step.id}:${target.id}`
+        const outside = target.units
+          .flatMap((unit) => unit.dependsOn)
+          .map((unitId) => nodeOfUnit.get(unitId))
+          // A dependency this node already carries is its own internal order,
+          // not something to wait for; a node that waited on itself would
+          // never become ready.
+          .filter(
+            (dependency): dependency is string => dependency !== undefined && dependency !== id
+          )
+
         nodes.push(
           node({
-            id: `${step.id}:${unit.id}`,
+            id,
             stepId: step.id,
             kind: 'fanout',
             state: applies ? 'waiting' : 'skipped',
-            unitId: unit.id,
-            lane: unit.lane,
-            role: inner.role ?? unit.role,
+            unitIds: target.units.map((unit) => unit.id),
+            lane: target.lane,
+            role: inner.role ?? target.units[0]?.role ?? null,
             // A fan-out child waits on the steps its parent waits on, and on
-            // its own unit's dependencies within the same fan-out. That second
-            // half is what makes `depends_on` in the plan mean anything.
+            // whatever carries its units' dependencies. That second half is
+            // what makes `depends_on` in the plan mean anything.
             dependsOn: [
               ...step.after.flatMap((after) => nodesOfStep(nodes, after)),
-              ...unit.dependsOn.map((id) => `${step.id}:${id}`),
+              ...new Set(outside),
             ],
           })
         )
@@ -140,8 +165,18 @@ export function withNode(graph: RunGraph, id: string, change: Partial<RunNode>):
  * the id is the last resort rather than the default.
  */
 export function nodeLabel(order: WorkOrder | null, node: RunNode): string {
-  const unit =
-    node.unitId === null ? undefined : order?.plan.units.find((u) => u.id === node.unitId)
+  const units = unitsOf(order, node)
+
+  // A lane node covers a whole lane, and naming it after the first of seven
+  // units would describe a seventh of what it is doing. The count and the
+  // repository are what an operator watching a run actually needs.
+  if (units.length > 1) {
+    const repo = order?.plan.lanes.find((lane) => lane.ord === node.lane)?.repo
+    const what = `${units.length} units${repo === undefined ? '' : ` in ${repo}`}`
+    return node.role === null ? what : `${node.role} · ${what}`
+  }
+
+  const unit = units[0]
   if (unit !== undefined) {
     return node.role === null
       ? `${unit.id} ${unit.title}`
@@ -150,6 +185,14 @@ export function nodeLabel(order: WorkOrder | null, node: RunNode): string {
   if (node.role !== null) return node.role
   if (node.stepId.trim() !== '') return node.stepId
   return node.id
+}
+
+/** The plan units a node is responsible for, in the order it should do them. */
+export function unitsOf(order: WorkOrder | null, node: RunNode): PlanUnit[] {
+  if (order === null) return []
+  return node.unitIds
+    .map((id) => order.plan.units.find((unit) => unit.id === id))
+    .filter((unit): unit is PlanUnit => unit !== undefined)
 }
 
 /** Every node's label, keyed by id, for a surface that renders many at once. */
