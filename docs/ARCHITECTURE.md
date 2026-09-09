@@ -907,6 +907,28 @@ surfaced at once.
 - **Recipes** (`recipe/parse.ts`, `recipe/resolve.ts`) are YAML: a list of steps
   over six kinds — `agent`, `run`, `judge`, `gate`, `fanout`, `join`. There is
   no seventh. The ten SpecKit phases are one recipe, `recipes/speckit.yaml`.
+- **A fan-out parallelises lanes, never units in one lane** (ADR-044). A lane is
+  a worktree and a branch, so units inside one cannot run at the same time
+  however many nodes point at them. `over: plan.units[role=builder] by lane`
+  gives one node per lane, carrying that lane's units in dependency order —
+  `RunNode.unitIds`, and every one of them listed in the brief with its own
+  files and criteria. Measured on WO-0907-3c1, fanning out over seven units in
+  a single lane spent seven cold `claude` starts on work that was serial in one
+  checkout; the run's 21 nodes are 8 under the same order today.
+- **`verify` is one fresh-context agent, not one per unit.** Fresh context is
+  what makes a verdict independent of the work; fresh context _per unit_ adds
+  nothing on top of that and doubled the session count of every order.
+- **No recipe re-plans an agreed order.** The Forge's `converge` is the
+  architect, and its plan is what the six compile checks agreed. `direct` and
+  `standard` used to open with a `plan` step that ran the architect again over
+  an order it may not change — `applyRungOutput` refuses a `plan` from a rung —
+  so it could only end in silence or a halt. It cost 8.2 minutes doing neither.
+- **The shape is chosen from lanes and risk, never from unit count**
+  (`proposeRecipe`, `recipeLadder`): `quick` (one lane, P3, nothing flagged) →
+  `direct` (one lane, P2 or a trigger fired) → `standard` (more than one lane,
+  or above P2). A proposal walks the ladder to the first shape this repository
+  can run — `quick` needs a `test` command, being the only check it has — while
+  an operator's explicit choice is honoured or refused, never quietly swapped.
 - **Roles** are YAML data too, with a write list. A role with none is run
   read-only, enforced by the `PreToolUse` hook rather than by its prompt.
   `verifier` carries `allowResume: false`, and `assertResumable` refuses to
