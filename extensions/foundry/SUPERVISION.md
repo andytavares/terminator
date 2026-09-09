@@ -156,7 +156,13 @@ contract from the schema constant (`RISK_TRIGGERS`, `EVIDENCE_KINDS`) rather
 than retyped, with the distinction that caused the failure stated: a trigger is
 a label and not a sentence, and evidence is a kind of artifact and not a path —
 a file the judge should read is named in the rubric. A closed set added to the
-order schema and not to the contract is the next one of these.
+order schema and not to the contract is the next one of these — so
+`converge.spec.ts` holds the list, and a closed set added to a proposable part
+of the order fails that test until it is named in the brief. Sweeping it turned
+up a third before it cost anything: a lane's `role`, shown as `null` and named
+nowhere, three lines under a _unit's_ `role`, which is a free string whose
+example reads `"builder"` — the obvious wrong answer sitting on the same screen
+as the field.
 
 ## What you can do about a run
 

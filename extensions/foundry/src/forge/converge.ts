@@ -4,7 +4,7 @@ import { orderDir } from '../data-root.js'
 import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
 import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
-import { EVIDENCE_KINDS, RISK_TRIGGERS } from '../order/schema.js'
+import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role, Rule } from '../recipe/parse.js'
 import { resolveRole } from '../recipe/resolve.js'
@@ -104,6 +104,15 @@ function outputContract(file: string, order: WorkOrder): string {
     'It is a label, not a sentence. Say *why* a trigger applies in `criticalPaths`',
     'or in the note — a trigger written as prose is refused, and the whole',
     'proposal with it.',
+    '',
+    // Three lines under a unit's own `role`, which is a free string whose
+    // example reads "builder". The obvious wrong answer was on the same
+    // screen as the field. See LANE_ROLES.
+    `A lane's \`role\` is either \`null\` or exactly one of ${LANE_ROLES.map(
+      (role) => `\`${role}\``
+    ).join(' or ')} — it says which side of a shared file that lane is on, and`,
+    'is not the same field as a unit\u2019s `role`, which names a role from the',
+    'toolchain. Leave it `null` unless lanes share files.',
     '',
     'Anything else in that object is refused outright, including `status` — you',
     'do not agree your own work.',

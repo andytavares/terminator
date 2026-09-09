@@ -165,11 +165,22 @@ const UnitSchema = z.object({
   verify: z.array(VerifySchema).default([]),
 })
 
+/**
+ * What a lane may be, where lanes share files.
+ *
+ * Exported for the third time this has been necessary. The output contract
+ * showed a lane's `role` as `null` and named neither value, three lines under a
+ * *unit's* `role`, which is a free string and whose example reads `"builder"` —
+ * so the obvious wrong answer was on the same screen as the field. See
+ * RISK_TRIGGERS and EVIDENCE_KINDS for the two that were actually refused.
+ */
+export const LANE_ROLES = ['producer', 'consumer'] as const
+
 const LaneSchema = z.object({
   ord: z.number().int().min(1),
   repo: nonEmpty,
   branch: z.string(),
-  role: z.enum(['producer', 'consumer']).nullable().default(null),
+  role: z.enum(LANE_ROLES).nullable().default(null),
   // Normalised so every rule downstream can read them without guarding:
   // an absent array and an empty one mean the same thing.
   blocks: z.array(z.number().int()).default([]),

@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { convergeBrief, readProposal, NoArchitectError } from '../../src/forge/converge.js'
-import { draftOrder, EVIDENCE_KINDS, RISK_TRIGGERS } from '../../src/order/schema.js'
+import { draftOrder, EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
 
@@ -90,6 +90,41 @@ describe('what the architect is told', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('closed set too')
     expect(plan.prompt).toContain('kinds of artifact, not paths')
+  })
+
+  // The third one, found by sweeping rather than by losing another turn: a
+  // lane's `role` was shown as `null` and named neither value, three lines
+  // under a *unit's* `role`, which is a free string whose example reads
+  // "builder". The obvious wrong answer was on the same screen as the field.
+  it('names every value a lane’s role may take, and says it is not a unit’s', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    for (const role of LANE_ROLES) expect(plan.prompt).toContain(role)
+    expect(plan.prompt).toContain('not the same field as a unit')
+  })
+
+  // The standing sweep, so a fourth closed set cannot be added quietly.
+  //
+  // Every enum an agent may write has to be named in the contract it writes
+  // against — twice now a field described only by name has cost a whole turn,
+  // because Zod refuses the document rather than the field. This is the list;
+  // adding a closed set to a proposable part of the order means adding it
+  // here and rendering it there.
+  it('names every closed set a proposal may carry', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    const closedSets: Record<string, readonly string[]> = {
+      'risk.grade': ['P0', 'P1', 'P2', 'P3'],
+      'risk.triggers': RISK_TRIGGERS,
+      'acceptance[].priority': ['P0', 'P1', 'P2'],
+      'acceptance[].verify.kind': ['test', 'command', 'judge', 'artifact', 'screenshot'],
+      'acceptance[].verify.evidence': EVIDENCE_KINDS,
+      'plan.lanes[].role': LANE_ROLES,
+    }
+    for (const [field, members] of Object.entries(closedSets)) {
+      expect(members.length, `${field} has no members`).toBeGreaterThan(0)
+      for (const member of members) {
+        expect(plan.prompt, `${field} does not name ${member}`).toContain(member)
+      }
+    }
   })
 
   // The other half of the same failure: the plan that came back had seven
