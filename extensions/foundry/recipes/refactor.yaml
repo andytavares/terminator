@@ -19,7 +19,7 @@ steps:
 
   - id: change
     kind: fanout
-    over: plan.units[role=builder]
+    over: plan.units[role=builder] by lane
     after: [baseline]
     step: { kind: agent, role: builder }
 
@@ -29,11 +29,14 @@ steps:
     after: [change]
     expect: { exit_code: '== 0' }
 
+  # One verifier, not one per unit. A fresh context is what makes verification
+  # independent of the work; a fresh context *per unit* adds nothing on top of
+  # that and doubled the session count of every order that ever ran.
   - id: verify
-    kind: fanout
-    over: plan.units
+    kind: agent
+    role: verifier
+    context: fresh
     after: [unchanged]
-    step: { kind: agent, role: verifier, context: fresh }
 
   - id: integrate
     kind: join

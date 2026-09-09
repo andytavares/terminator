@@ -3,10 +3,11 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRunChannels, proposeRecipe } from '../../src/ipc/run-channels.js'
+import { createRunChannels, proposeRecipe, readRunGraph } from '../../src/ipc/run-channels.js'
 import { createOrderStore } from '../../src/order/store.js'
 import type { OrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/schema.js'
+import { probeToolchain } from '../../src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 
@@ -196,25 +197,16 @@ describe('foundry:run.recipes', () => {
   })
 })
 
+// Choosing the shape.
+//
+// The ladder is lanes first, then risk. Lanes because that is the only thing a
+// heavier shape can actually run in parallel, and risk because that is the
+// order's own statement of who ought to look. Unit count decides nothing: a
+// fan-out is `by lane` now, so seven units in one lane cost one session and
+// pricing the shape off them charged for parallelism that never existed.
 describe('proposeRecipe', () => {
-  it('keeps a shape the order already carries', () => {
-    expect(proposeRecipe(order({ recipe: 'bugfix' }))).toEqual({
-      name: 'bugfix',
-      why: 'the order already names this shape',
-    })
-  })
-
-  it('proposes the direct shape for one low-risk unit', () => {
-    const proposal = proposeRecipe(
-      order({ risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] } })
-    )
-    expect(proposal.name).toBe('direct')
-    expect(proposal.why).toBe('one unit of work, graded P3')
-  })
-
-  it('proposes the standard shape once there is more than one unit', () => {
-    const o = order({ risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] } })
-    o.plan.units.push({
+  function unit(over: Partial<WorkOrder['plan']['units'][number]> = {}) {
+    return {
       id: 'U-2',
       title: 'b',
       role: 'builder',
@@ -223,16 +215,59 @@ describe('proposeRecipe', () => {
       satisfies: ['AC-1'],
       touches: [],
       verify: [],
+      ...over,
+    }
+  }
+
+  function graded(grade: WorkOrder['risk']['grade'], triggers: WorkOrder['risk']['triggers'] = []) {
+    return order({ risk: { grade, triggers, blastRadius: [], criticalPaths: [] } })
+  }
+
+  it('keeps a shape the order already carries', () => {
+    expect(proposeRecipe(order({ recipe: 'bugfix' }))).toEqual({
+      name: 'bugfix',
+      why: 'the order already names this shape',
     })
-    const proposal = proposeRecipe(o)
-    expect(proposal.name).toBe('standard')
-    expect(proposal.why).toBe('2 units of work')
   })
 
-  it('proposes the standard shape for anything above the lowest risk', () => {
-    const proposal = proposeRecipe(
-      order({ risk: { grade: 'P1', triggers: [], blastRadius: [], criticalPaths: [] } })
-    )
+  it('proposes the quick shape for one lane at the lowest risk', () => {
+    const proposal = proposeRecipe(graded('P3'))
+    expect(proposal.name).toBe('quick')
+    expect(proposal.why).toBe('one lane, graded P3, nothing flagged')
+  })
+
+  it('still proposes it when that lane holds several units', () => {
+    const o = graded('P3')
+    o.plan.units.push(unit(), unit({ id: 'U-3' }), unit({ id: 'U-4' }))
+    expect(proposeRecipe(o).name).toBe('quick')
+  })
+
+  it('steps up to direct once the order grades itself notable', () => {
+    const proposal = proposeRecipe(graded('P2'))
+    expect(proposal.name).toBe('direct')
+    expect(proposal.why).toContain('P2')
+  })
+
+  it('steps up to direct when a trigger fired, however low the grade', () => {
+    const proposal = proposeRecipe(graded('P3', ['public_interface']))
+    expect(proposal.name).toBe('direct')
+    expect(proposal.why).toContain('public_interface')
+  })
+
+  it('proposes the standard shape once there is more than one lane', () => {
+    const o = graded('P3')
+    o.plan.units.push(unit({ lane: 2 }))
+    o.plan.lanes = [
+      { ord: 1, repo: 'a', branch: '', role: null, blocks: [], blockedBy: [] },
+      { ord: 2, repo: 'b', branch: '', role: null, blocks: [], blockedBy: [] },
+    ]
+    const proposal = proposeRecipe(o)
+    expect(proposal.name).toBe('standard')
+    expect(proposal.why).toBe('2 lanes of work')
+  })
+
+  it('proposes the standard shape for anything above the lowest two grades', () => {
+    const proposal = proposeRecipe(graded('P1'))
     expect(proposal.name).toBe('standard')
     expect(proposal.why).toContain("above the direct shape's ceiling")
   })
@@ -248,7 +283,7 @@ describe('the reason a shape was chosen (FR-014)', () => {
     await channels().start({ id: 'WO-1' })
     const text = ledgerText()
     expect(text).toContain('role:architect')
-    expect(text).toContain('one unit of work, graded P3')
+    expect(text).toContain('one lane, graded P3')
     expect(text).toContain('resolved from built-in')
   })
 
@@ -265,7 +300,113 @@ describe('the reason a shape was chosen (FR-014)', () => {
       proposedWhy: string
     }
     expect(view.proposed).toBe('direct')
-    expect(view.proposedWhy).toBe('one unit of work, graded P3')
+    expect(view.proposedWhy).toBe('one lane, graded P3')
+  })
+
+  // The shape's requirements are about the repository and the proposal is
+  // about the order, so the two can disagree. `quick` has no verifier and no
+  // inspector — the suite is its only check — so a repository with no test
+  // command gets the next shape up rather than a refused run.
+  it('steps down to a shape this repository can run, rather than refusing', async () => {
+    await store.save(order())
+    const view = (await channels().recipes({ id: 'WO-1' })) as {
+      recipes: { name: string; available: boolean }[]
+      proposed: string
+    }
+    expect(view.recipes.find((r) => r.name === 'quick')?.available).toBe(false)
+    expect(view.proposed).toBe('direct')
+  })
+
+  it('proposes the quick shape where the suite it needs exists', async () => {
+    fs.writeFileSync(
+      path.join(repo, 'package.json'),
+      JSON.stringify({ scripts: { test: 'vitest run' } })
+    )
+    const o = order()
+    await store.save({
+      ...o,
+      context: { ...o.context, toolchain: probeToolchain(repo) },
+    })
+    const view = (await channels().recipes({ id: 'WO-1' })) as { proposed: string }
+    expect(view.proposed).toBe('quick')
+  })
+
+  // Never quietly swapped: an operator who names a shape gets it or gets told
+  // why not, because a silent substitution is a decision nobody made.
+  it('refuses an operator choice this repository cannot run, rather than stepping down', async () => {
+    await store.save(order())
+    const result = (await channels().start({ id: 'WO-1', recipe: 'quick' })) as { error?: string }
+    expect(result.error).toContain('quick')
+    expect(result.error).toContain('no test command')
+  })
+})
+
+// A run left in flight when the application closed is picked back up by
+// reading its graph off disk (042). Graphs written before a fan-out node could
+// carry a whole lane have `unitId`, a single value, and nothing validates the
+// file on the way in — so the boundary that reads it is the one place worth
+// converting.
+describe('a graph written before a node could carry a lane', () => {
+  it('reads a legacy unitId as the one unit it names', async () => {
+    const dir = path.join(dataRoot, 'orders', 'WO-1')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dir, 'run-graph.json'),
+      JSON.stringify({
+        orderId: 'WO-1',
+        recipe: 'direct',
+        nodes: [
+          {
+            id: 'build:U-1',
+            stepId: 'build',
+            kind: 'fanout',
+            state: 'running',
+            unitId: 'U-1',
+            lane: 1,
+            role: 'builder',
+            dependsOn: [],
+            attempts: 1,
+            sessionId: 's-1',
+            worktreePath: null,
+            startedAt: null,
+            endedAt: null,
+          },
+        ],
+      })
+    )
+    const graph = await readRunGraph(dataRoot, 'WO-1')
+    expect(graph?.nodes[0].unitIds).toEqual(['U-1'])
+  })
+
+  it('reads a legacy node with no unit as covering none', async () => {
+    const dir = path.join(dataRoot, 'orders', 'WO-1')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dir, 'run-graph.json'),
+      JSON.stringify({
+        orderId: 'WO-1',
+        recipe: 'direct',
+        nodes: [
+          {
+            id: 'ship',
+            stepId: 'ship',
+            kind: 'gate',
+            state: 'waiting',
+            unitId: null,
+            lane: null,
+            role: null,
+            dependsOn: [],
+            attempts: 0,
+            sessionId: null,
+            worktreePath: null,
+            startedAt: null,
+            endedAt: null,
+          },
+        ],
+      })
+    )
+    const graph = await readRunGraph(dataRoot, 'WO-1')
+    expect(graph?.nodes[0].unitIds).toEqual([])
   })
 })
 
@@ -582,13 +723,13 @@ describe('foundry:run.resume', () => {
     const failed = {
       ...graph,
       nodes: graph.nodes.map((n) =>
-        n.unitId === 'U-1' ? { ...n, state: 'failed', attempts: 1 } : n
+        n.unitIds.includes('U-1') ? { ...n, state: 'failed', attempts: 1 } : n
       ),
     }
     fs.writeFileSync(file, JSON.stringify(failed))
     execute.mockClear()
 
-    const nodeId = failed.nodes.find((n) => n.unitId === 'U-1')?.id ?? ''
+    const nodeId = failed.nodes.find((n) => n.unitIds.includes('U-1'))?.id ?? ''
     await channels.resume({ id: 'WO-1', retry: [nodeId] })
 
     // Back in the queue — `waiting`, which is where the scheduler picks it
@@ -759,7 +900,7 @@ describe('a run whose agents are gone', () => {
   function withRunning(): { nodeId: string } {
     const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
     const graph = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
-    const nodeId = graph.nodes.find((n) => n.unitId === 'U-1')?.id ?? ''
+    const nodeId = graph.nodes.find((n) => n.unitIds.includes('U-1'))?.id ?? ''
     fs.writeFileSync(
       file,
       JSON.stringify({
