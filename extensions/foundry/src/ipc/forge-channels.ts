@@ -6,6 +6,8 @@ import { strikeAssumption } from '../forge/assumptions.js'
 import { applyFindings, resolveFinding, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
+import { readStanding } from '../order/standing.js'
+import type { StandingSources } from '../order/standing.js'
 import { TransitionIntentSchema, WriteBackSchema } from '../order/schema.js'
 import type { TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
@@ -92,6 +94,16 @@ const StatesPayload = z.object({ id: z.string() })
 export interface ForgeDeps {
   readonly store: OrderStore
   readonly now: () => string
+  /**
+   * Where each row's standing comes from.
+   *
+   * The list is a door onto work in flight, so it has to say what that work is
+   * doing — and the graph, the gates and whether an agent is alive are none of
+   * them in the order record. Absent, a row still stands somewhere: a draft is
+   * being shaped and everything else is starting, which is what a host with no
+   * run runtime is actually true of.
+   */
+  readonly standingSources?: StandingSources
   readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
   /**
    * Which write-backs a new order starts with (FR-062), from configuration.
@@ -527,12 +539,12 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
 
   async function list(): Promise<unknown> {
     const orders = await deps.store.list()
+    // A discarded order stays in the records and leaves the list; the list is
+    // what needs doing, not what was ever asked for.
+    const live = orders.filter((order) => order.status !== 'cancelled')
     return {
-      // A discarded order stays in the records and leaves the list; the list is
-      // what needs doing, not what was ever asked for.
-      orders: orders
-        .filter((order) => order.status !== 'cancelled')
-        .map((order) => ({
+      orders: await Promise.all(
+        live.map(async (order) => ({
           id: order.id,
           title: order.title,
           status: order.status,
@@ -544,7 +556,19 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
           // is a number you have to open every row to act on.
           openQuestions:
             order.status === 'draft' ? surfacedQuestions(order.openQuestions).length : 0,
-        })),
+          // Where the order actually stands. The row used to derive that from
+          // `failures`, which is a draft-time compile result and therefore
+          // zero for every running order for ever — so every running order,
+          // including one halted at a gate two hours earlier, said "ready to
+          // hand off".
+          standing: await readStanding(order, {
+            ...deps.standingSources,
+            openQuestionsFor: (o) =>
+              o.status === 'draft' ? surfacedQuestions(o.openQuestions).length : 0,
+            failuresFor: (o) => compileOrder(o).failures.length,
+          }),
+        }))
+      ),
     }
   }
 

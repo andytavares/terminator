@@ -14,6 +14,8 @@ import type { Resolved, ResolveSources } from '../recipe/resolve.js'
 import { checkRequirements } from '../recipe/requirements.js'
 import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
+import { readStanding } from '../order/standing.js'
+import type { Gate } from '../gates/rules.js'
 
 // Starting a run.
 //
@@ -85,6 +87,34 @@ export interface RunDeps {
    * agent into the same worktree.
    */
   readonly executing?: (orderId: string) => boolean
+  /**
+   * Every gate raised against this order, decided or not.
+   *
+   * Here rather than left to the surface because a gate is what stops the
+   * line, and a surface that has to fetch it separately is a surface that can
+   * draw a run as busy while it has been halted for two hours. Absent means
+   * no gate store to ask, which is not "no gates" — it is a host that never
+   * raises any.
+   */
+  readonly gatesFor?: (orderId: string) => Promise<readonly Gate[]>
+  /** Tool calls this order's agents are holding. No runtime means none. */
+  readonly asksFor?: (orderId: string) => number
+  /**
+   * Runs of this order the stall detector has fired on and acted on.
+   *
+   * Shadow firings are recorded and deliberately never notified, so they are
+   * not counted here: a standing is a notification.
+   */
+  readonly stallsFor?: (orderId: string) => number
+  /** Agents of this order parked at their terminal's own prompt. */
+  readonly strandedFor?: (orderId: string) => number
+  /**
+   * Which sessions those are.
+   *
+   * The count says what is wrong; these are what the one move needs — a
+   * handed-back call can only be answered in the terminal it was handed to.
+   */
+  readonly strandedSessions?: (orderId: string) => readonly string[]
 }
 
 export interface RunChannels {
@@ -409,13 +439,45 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const labels = nodeLabels(order, graph)
     const name = (id: string): string => labels[id] ?? id
 
+    const orphaned = orphansOf(parsed.data.id, graph)
+    const gates = await (deps.gatesFor?.(parsed.data.id) ?? Promise.resolve([]))
+    const waiting = gates.filter((gate) => gate.decision === null)
+
     return {
       graph,
       labels,
+      // What the operator called it. The surface's heading was the order id
+      // and the recipe name — two identifiers nobody chose — so the screen
+      // showing a run never said which piece of work it was.
+      title: order?.title ?? null,
+      // Where this order stands, and whose move it is, decided once here
+      // rather than five times over in five surfaces from whatever each of
+      // them happened to hold.
+      // Through `readStanding` with what is already in hand rather than a
+      // second assembly of the same inputs: two callers assembling them
+      // separately is how the order list and this surface came to describe
+      // one halted run as "ready to hand off" and "building" at once.
+      standing: await readStanding(
+        order ?? ({ id: parsed.data.id, status: 'running' } as WorkOrder),
+        {
+          graphFor: async () => graph,
+          gatesFor: async () => gates,
+          asksFor: deps.asksFor,
+          stallsFor: deps.stallsFor,
+          strandedFor: deps.strandedFor,
+          orphansFor: () => orphaned,
+        }
+      ),
+      // The agents waiting at a terminal prompt, so the band can offer the one
+      // move that answers a handed-back call: going to that terminal.
+      stranded: deps.strandedSessions?.(parsed.data.id) ?? [],
+      // The gates holding it, in full. A band that says "halted at a gate" and
+      // cannot offer the gate's own options is the wall this replaces.
+      waiting,
       // What the graph calls running and nothing is actually running. A
       // surface that cannot tell those apart shows a dead run as a busy one,
       // which is how an interrupted run went unnoticed for hours.
-      orphaned: orphansOf(parsed.data.id, graph),
+      orphaned,
       ready: readyNodes(graph, budgets).map((n) => n.id),
       blocked: graph.nodes
         .map((n) => ({ id: n.id, reason: blockedReason(graph, n.id, name) }))
