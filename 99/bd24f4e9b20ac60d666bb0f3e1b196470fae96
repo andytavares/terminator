@@ -1,0 +1,44 @@
+extensions/foundry/src/components/foundry.css
+  s_938eca154cb24e::t_19c099cfd494c0 2087
+  s_938eca154cb24e::t_76bf78fe9ccb71 1268-1278
+  s_938eca154cb24e::t_b0f3dddedb1b7d 1280-1283
+  s_938eca154cb24e::t_8a5609c597fd34 1958-2086,2088-2146
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_938eca154cb24e::t_df7e38095bc52c 1156
+  s_938eca154cb24e::t_5c522399efda00 73,1056-1155,1157,1159-1179,1205-1210
+  s_938eca154cb24e::t_a15f6c906b4a24 909-910,914-924,930
+  s_938eca154cb24e::t_3f8a69fdf7abfc 1196-1198
+  s_938eca154cb24e::t_ed56023c5ba268 1180-1195,1199-1204,1211
+  s_938eca154cb24e::t_9926449cc4e162 1158
+  s_938eca154cb24e::t_74ddb6e11bdfe4 1212
+extensions/foundry/tests/components/Orders.spec.tsx
+  s_938eca154cb24e::t_230789f8c84aaa 31-44,53-55,58-64,67-80,83-85,87
+extensions/foundry/src/components/Floor.tsx
+  s_938eca154cb24e::t_ff2a7fd1d446fb 681-683,685-688
+  s_938eca154cb24e::t_e2b36016c24868 58-66,531,595-625
+  s_938eca154cb24e::t_d03b8129955b1b 540-544
+  s_938eca154cb24e::t_fd7adc5d8634fe 529-530,535-539,545-594,626,653-680,684,689-693
+  s_938eca154cb24e::t_ef9bcce1d9ac49 11-13,16-17,46-57
+  s_938eca154cb24e::t_3ad8ae8038bad1 251-256,259-260,499-520
+  s_938eca154cb24e::t_1a2324abdf9e21 627-652
+  s_938eca154cb24e::t_565d289f903864 521-522,532
+extensions/foundry/src/components/Orders.tsx
+  s_938eca154cb24e::t_274b66fb05ea83 163-180
+  s_938eca154cb24e::t_e06f3abb79fd0b 2,6,30-37,357,359,362,372-387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "99bd24f4e9b20ac60d666bb0f3e1b196470fae96",
+  "prompts": {},
+  "sessions": {
+    "s_938eca154cb24e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "92c4225a-8e08-4ae9-8945-1f8359811bf7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
