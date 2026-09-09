@@ -1812,6 +1812,16 @@ export function activate(api: ExtensionAPI): void {
             reason: outcome.reason,
             evidence: [],
           })
+          // Out loud, once, because a refusal changes nothing and therefore
+          // shows up nowhere the operator happens to be looking. The Forge
+          // renders it whenever they open the order; this is for the minutes
+          // between the turn ending and them going back to look — which on
+          // the run that found this was the rest of the afternoon.
+          api.notifications.showToast(
+            'warning',
+            `${order.title}: the architect's plan was refused and nothing changed.`,
+            `foundry.converge.refused.${order.id}`
+          )
           return
         }
         await store.save(outcome.order)

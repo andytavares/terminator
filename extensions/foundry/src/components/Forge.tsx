@@ -1,5 +1,5 @@
 import { Markdown } from './Markdown.js'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
@@ -8,6 +8,8 @@ import { surfacedQuestions } from '../forge/interview.js'
 import { liveAssumptions } from '../forge/assumptions.js'
 import type { StateMapping, TransitionIntent, WriteBack } from '../order/schema.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
+import type { IntakeOutcome } from '../forge/intake-outcome.js'
+import { PROPOSAL_FILE } from '../order/proposal.js'
 
 // The Forge.
 //
@@ -23,6 +25,8 @@ export interface OrderView {
   unavailableChecks?: string[]
   /** The session the architect is drafting in, while it is drafting. */
   converging?: string
+  /** How the last intake turn ended. Absent only on a channel that predates it. */
+  intake?: IntakeOutcome
 }
 
 /** How often the document is refetched while the architect is working. */
@@ -185,15 +189,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       the red team's own reason so two open forms never share a box. */
   const [unproven, setUnproven] = useState<string | null>(null)
   const [unprovenReason, setUnprovenReason] = useState('')
-  /**
-   * The architect is working, until the document says otherwise.
-   *
-   * Its own state rather than a field on the view: the view is replaced on
-   * every poll by `order.compile`, which knows nothing about a session, so
-   * deriving it from there cleared the flag after one tick and stopped the
-   * poll — and a redraft landing a minute later never appeared.
-   */
-  const [drafting, setDrafting] = useState(false)
   const [recipes, setRecipes] = useState<RecipesView | null>(null)
   const [chosen, setChosen] = useState<string | null>(null)
 
@@ -286,37 +281,44 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       setBusy(true)
       setProblem(null)
       try {
-        decisionsAtStart.current = view?.order.provenance.decisions.length ?? 0
         const next = (await invoke('foundry:order.converge', {
           id: orderId,
           ...(message === undefined ? {} : { message }),
         })) as (OrderView & { error?: string; converging?: string }) | { error: string }
         if ('order' in next) setView(next)
         if (next.error !== undefined) setProblem(next.error)
-        setDrafting('converging' in next && next.converging !== undefined)
       } finally {
         setBusy(false)
       }
     },
-    [orderId, view]
+    [orderId]
   )
 
+  /**
+   * Whether an architect is working on this order, from the record.
+   *
+   * Its own `useState` before, set when the converge call returned and cleared
+   * when `provenance.decisions` grew. Both halves were wrong. A refusal grows
+   * nothing — the proposal failed validation, so there is no redraft to save
+   * and the document is untouched — so the flag was never cleared and the
+   * button read "The architect is working…" for ever, over a turn that had
+   * ended minutes earlier. And a flag set by a click cannot survive leaving
+   * the screen, so coming back mid-turn showed a draft that looked idle.
+   *
+   * The ledger knows both. `intake` is the last of this order's three intake
+   * lines, and a turn is running exactly while the last one is its start.
+   */
+  const intake: IntakeOutcome = view?.intake ?? { kind: 'none' }
+  const drafting = intake.kind === 'running'
+
   // The architect answers in minutes, not in the call that started it, so the
-  // document is refetched while it works and the redraft appears when it
-  // lands. What stops the poll is the record growing — the architect writes a
-  // line whether it redrafted, refused or found nothing to change — rather
-  // than a timeout, which would either give up early or poll for ever.
-  const decisionsAtStart = useRef(0)
+  // document is refetched while it works and the outcome — a redraft, or the
+  // reason it was refused — appears when it lands.
   useEffect(() => {
     if (!drafting) return
     const timer = setInterval(() => void refresh(), REDRAFT_POLL_MS)
     return () => clearInterval(timer)
   }, [drafting, refresh])
-
-  useEffect(() => {
-    if (!drafting || view === null) return
-    if (view.order.provenance.decisions.length > decisionsAtStart.current) setDrafting(false)
-  }, [drafting, view])
 
   /**
    * Compile, agree, and start the Line.
@@ -384,6 +386,56 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
 
   return (
     <div className="fdry-forge">
+      {/* The turn that ended with nothing to show for it.
+
+          Above the questions and above everything else, because until this is
+          answered nothing else on the screen will move: the checks below are
+          the checks the refused plan would have cleared, and answering a
+          question the architect asked before it was refused changes a document
+          no architect is currently reading.
+
+          It was recorded in the ledger and rendered nowhere. The operator's
+          report was two sentences — "no way to recover from this" and "there's
+          also zero indication anything has even gone wrong" — and both were
+          exactly right: the screen said the architect was working, and it had
+          stopped forty minutes earlier. */}
+      {intake.kind === 'refused' && order.status === 'draft' ? (
+        <section className="fdry-refused" aria-labelledby="fdry-refused-h">
+          <h2 className="fdry-refused-h" id="fdry-refused-h" tabIndex={-1}>
+            <AlertCircle aria-hidden="true" />
+            The architect&rsquo;s plan was refused
+          </h2>
+          <p>
+            Nothing on this order was changed. The proposal did not fit the shape an order has to
+            be, so none of it was taken.
+          </p>
+          <p className="fdry-refused-why">{intake.reason}</p>
+          <div className="fdry-options">
+            {/* The move, not just the news. The reason goes back with it: the
+                architect cannot read its own refusal — it ended before the
+                validation ran — and on the run this was found on it also
+                could not parse the JSON it had just written, because `node
+                -e`, `python3 -c` and redirects are all off intake's read-only
+                allowlist. Told what was wrong, it fixes it in one turn. */}
+            <button
+              type="button"
+              className="is-recommended"
+              disabled={busy}
+              onClick={() =>
+                void converge(
+                  `Your last proposal was refused and nothing was changed. The reason: ${intake.reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
+                )
+              }
+            >
+              Tell the architect what was wrong
+            </button>
+            <button type="button" disabled={busy} onClick={() => void converge()}>
+              Start the turn over
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {/* The one thing on this screen that is waiting on a person, and so the
           first thing on it.
 
