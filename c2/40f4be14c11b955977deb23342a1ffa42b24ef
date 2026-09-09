@@ -1,0 +1,27 @@
+specs/043-foundry-fast-lane/spec.md
+  s_78a34ff53f0a7a::t_e3c9c6c8f1ba3f 91-96
+  s_78a34ff53f0a7a::t_9a9b2474566f31 1-11,18-51,53-64,66-83,85-90,97-102,104-109,121-128
+  s_78a34ff53f0a7a::t_3991cd0f9091a0 12-17,52,65,84,103
+  s_78a34ff53f0a7a::t_a04a8bec97cdac 110-120
+docs/ARCHITECTURE.md
+  s_78a34ff53f0a7a::t_f32cc356e73c84 910-931
+docs/adr/044-a-fan-out-parallelises-lanes-not-units.md
+  s_78a34ff53f0a7a::t_3991cd0f9091a0 20-25
+  s_78a34ff53f0a7a::t_999d50d2e7c3ea 1-19,26-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "c240f4be14c11b955977deb23342a1ffa42b24ef",
+  "prompts": {},
+  "sessions": {
+    "s_78a34ff53f0a7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b511eea-aeaf-438d-9f60-d075f4be2c00",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
