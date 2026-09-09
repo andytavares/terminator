@@ -1265,7 +1265,22 @@
   color: var(--tm-text-primary);
 }
 
+/* The Floor renders its own shell inside the one that framed it, and two
+   nested `height: 100%; overflow: auto` boxes each claim the whole viewport —
+   so whatever the outer one puts *after* the inner is laid out a screen down
+   and drawn over the run. Invisible while the only thing after it was nothing.
+   The inner is a section of the outer, so it sizes to its content. */
+.fdry-shell .fdry-shell {
+  height: auto;
+  overflow: visible;
+  padding: 0;
+}
+
 .fdry-back {
+  /* A link back, not a banner. In the shell's flex column it stretched to the
+     full width of the screen and read as the page's own title bar, above the
+     title of the thing it was a way out of. */
+  align-self: flex-start;
   appearance: none;
   background: var(--tm-bg-elevated);
   border: 1px solid var(--tm-border-strong);
@@ -1939,4 +1954,193 @@
 
 .fdry-confirm .fdry-ask-actions {
   margin: 0;
+}
+
+/* ── Where an order stands ──────────────────────────────────────────────────
+ *
+ * The Floor used to open with an order id, a recipe name and a column of
+ * panels drawn in one weight of grey: the run's state, the activity feed and
+ * the blocked list all read as equally important, which meant none of them
+ * read as important. A run halted two hours earlier at an undecided gate was
+ * indistinguishable from one mid-build.
+ *
+ * Three levels and nothing else. The title says which piece of work this is.
+ * The band says where it stands and carries the move. Everything below is
+ * detail, and stays quiet. */
+
+.fdry-order-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--tm-text-primary);
+}
+
+.fdry-order-sub {
+  margin: 3px 0 14px;
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tm-text-muted);
+}
+
+.fdry-standing {
+  border: 1px solid var(--tm-border);
+  border-left: 3px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-card);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+/* Whose move it is, carried by the stripe and the heading colour rather than
+   by a word the operator has to read to find out. */
+.fdry-standing.is-yours {
+  border-color: var(--tm-warning);
+  background: color-mix(in srgb, var(--tm-warning) 7%, var(--tm-bg-card));
+}
+
+.fdry-standing.is-done {
+  border-left-color: var(--tm-success);
+}
+
+.fdry-standing-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+/* Flat, and the parent's colour. Severity is the band's job, not the icon's. */
+.fdry-standing-mark {
+  display: flex;
+  flex: none;
+  margin-top: 2px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-standing.is-yours .fdry-standing-mark {
+  color: var(--tm-warning);
+}
+
+.fdry-standing.is-done .fdry-standing-mark {
+  color: var(--tm-success);
+}
+
+.fdry-standing-mark svg {
+  width: 17px;
+  height: 17px;
+}
+
+.fdry-standing-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fdry-standing-h {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--tm-text-primary);
+}
+
+/* The headline stays the strongest text on the band rather than taking the
+   warning colour: amber on the tinted light-mode surface measures 4.48:1 at
+   15px/600, which fails AA, and the stripe and the mark already say whose move
+   it is without spending the heading on it. */
+
+.fdry-standing-detail {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-standing-count {
+  flex: none;
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+  color: var(--tm-text-muted);
+  white-space: nowrap;
+}
+
+.fdry-standing-bar {
+  height: 3px;
+  margin-top: 12px;
+  border-radius: 2px;
+  background: var(--tm-bg-input);
+  overflow: hidden;
+}
+
+.fdry-standing-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--tm-accent);
+}
+
+/* The move. Divided from the statement above it, because reading what is
+   happening and deciding what to do about it are two acts. */
+.fdry-standing-gate {
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.fdry-standing-gate-h {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--tm-text-primary);
+}
+
+.fdry-standing-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 10px;
+}
+
+/* Each option over its own consequence: what happens if you press this is not
+   something to go and find out afterwards. */
+.fdry-standing-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 0 1 230px;
+}
+
+.fdry-standing-option button {
+  appearance: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 13px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+  cursor: pointer;
+}
+
+.fdry-standing-option button:hover:not(:disabled) {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-standing-option button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.fdry-standing-option button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fdry-standing-option small {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--tm-text-muted);
 }

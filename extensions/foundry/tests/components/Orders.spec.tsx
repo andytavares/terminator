@@ -28,6 +28,20 @@ function row(over: Record<string, unknown> = {}) {
     failures: 1,
     source: { kind: 'typed', tracker: null, key: null },
     openQuestions: 0,
+    standing: standing(),
+    ...over,
+  }
+}
+
+function standing(over: Record<string, unknown> = {}) {
+  return {
+    kind: 'shaping',
+    turn: 'foundry',
+    label: 'being shaped',
+    detail: 'Foundry is still shaping this.',
+    done: 0,
+    total: 0,
+    gateId: null,
     ...over,
   }
 }
@@ -36,36 +50,41 @@ beforeEach(() => vi.clearAllMocks())
 afterEach(() => vi.useRealTimers())
 
 describe('the orders list', () => {
-  it('says which order is waiting on an answer, and how many', async () => {
-    const { container } = mount([row({ openQuestions: 2 })])
-    await waitFor(() => expect(screen.getByText('2 waiting on you')).toBeTruthy())
-    expect(container.querySelector('.fdry-order-state.is-waiting')).not.toBeNull()
+  it('says where each order stands, in the standing own words', async () => {
+    mount([row({ standing: standing({ label: '2 to answer', turn: 'you' }) })])
+    await waitFor(() => expect(screen.getByText('2 to answer')).toBeTruthy())
   })
 
-  it('says what is blocking one that is not asking anything', async () => {
-    const { container } = mount([row({ failures: 3 })])
-    await waitFor(() => expect(screen.getByText('blocked by 3')).toBeTruthy())
-    expect(container.querySelector('.fdry-order-state.is-waiting')).toBeNull()
+  it('marks the rows whose move is yours, and only those', async () => {
+    const { container } = mount([
+      row({ id: 'WO-1', standing: standing({ turn: 'you', label: 'halted' }) }),
+      row({ id: 'WO-2', title: 'Second', standing: standing({ turn: 'foundry' }) }),
+    ])
+    await waitFor(() => expect(screen.getByText('halted')).toBeTruthy())
+    expect(container.querySelectorAll('.fdry-order-state.is-waiting')).toHaveLength(1)
   })
 
-  it('still says an order is ready when it compiles clean', async () => {
-    mount([row({ failures: 0 })])
-    await waitFor(() => expect(screen.getByText('ready to hand off')).toBeTruthy())
+  // The defect the standing exists to remove. The badge read
+  // `failures === 0 ? 'ready to hand off' : ...`, and `failures` is a
+  // draft-time compile result that is zero for every running order for ever —
+  // so a run halted at a gate two hours earlier said it was ready to hand off.
+  it('does not call a running order ready to hand off just because it compiled', async () => {
+    mount([
+      row({
+        status: 'running',
+        failures: 0,
+        standing: standing({ kind: 'halted', turn: 'you', label: 'halted' }),
+      }),
+    ])
+    await waitFor(() => expect(screen.getByText('halted')).toBeTruthy())
+    expect(screen.queryByText('ready to hand off')).toBeNull()
   })
 
-  it('prefers the question over the compile failure it is causing', async () => {
-    // An unanswered question fails the "no open questions" check, so a waiting
-    // order always has a failure too. Reporting the failure sends the operator
-    // to look for something to fix; reporting the question is the fix.
-    mount([row({ openQuestions: 1, failures: 1 })])
-    await waitFor(() => expect(screen.getByText('1 waiting on you')).toBeTruthy())
-    expect(screen.queryByText('blocked by 1')).toBeNull()
-  })
-
-  it('survives a row from an older shape that does not carry the count', async () => {
-    const { openQuestions: _omitted, ...older } = row({ failures: 0 })
+  // The row is polled, and a host mid-upgrade can answer without one.
+  it('survives a row from an older shape that carries no standing', async () => {
+    const { standing: _omitted, ...older } = row({ failures: 0 })
     mount([older])
-    await waitFor(() => expect(screen.getByText('ready to hand off')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Refuse an expired refresh token')).toBeTruthy())
   })
 
   it('refetches while it is on screen, so an answer given elsewhere lands here', async () => {
