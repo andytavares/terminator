@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir, ledgerPath } from '../data-root.js'
-import { appendEntry } from '../ledger/append.js'
+import { appendEntry, readEntries } from '../ledger/append.js'
 import type { LedgerEntry } from '../ledger/append.js'
 import { parseWorkOrder } from './schema.js'
 import type { WorkOrder } from './schema.js'
@@ -21,6 +21,15 @@ export interface OrderStore {
   /** The open order already seeded from this issue, if there is one (FR-013). */
   findByIssue(tracker: string, key: string): Promise<{ id: string; title: string } | null>
   record(entry: LedgerEntry): Promise<void>
+  /**
+   * This order's ledger, oldest first.
+   *
+   * Reading it back is not bookkeeping. Some of what happens to an order is
+   * recorded here and nowhere else — an intake turn the architect never
+   * finished writes a ledger line and does not touch `order.json` — so a
+   * surface that only ever loads the document cannot see it happened.
+   */
+  entries(orderId: string): Promise<LedgerEntry[]>
 }
 
 /**
@@ -38,6 +47,7 @@ export function createLiveOrderStore(root: () => string): OrderStore {
     list: () => createOrderStore(root()).list(),
     findByIssue: (tracker, key) => createOrderStore(root()).findByIssue(tracker, key),
     record: (entry) => createOrderStore(root()).record(entry),
+    entries: (orderId) => createOrderStore(root()).entries(orderId),
   }
 }
 
@@ -97,6 +107,9 @@ export function createOrderStore(root: string): OrderStore {
     },
     async record(entry) {
       await appendEntry(ledgerPath(root, entry.orderId), entry)
+    },
+    entries(orderId) {
+      return readEntries(ledgerPath(root, orderId))
     },
   }
 }
