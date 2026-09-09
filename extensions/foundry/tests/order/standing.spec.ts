@@ -60,6 +60,7 @@ function input(over: Partial<StandingInput> = {}): StandingInput {
     openQuestions: 0,
     failures: 0,
     stranded: 0,
+    intakeRefused: null,
     ...over,
   }
 }
@@ -179,6 +180,34 @@ describe('standingOf', () => {
     expect(standing.detail).toContain('3')
   })
 
+  // A refusal moves nothing. Before it was an input here, a draft whose
+  // architect had been refused an hour earlier stood exactly where one being
+  // actively drafted stood — "Foundry is still shaping this", turn `foundry` —
+  // and the only surface that could have said otherwise said that.
+  it('hands a draft back when its last intake turn was refused', () => {
+    const standing = standingOf(
+      input({
+        status: 'draft',
+        graph: null,
+        failures: 1,
+        intakeRefused: 'acceptance.5.verify.evidence.1: Invalid enum value.',
+      })
+    )
+    expect(standing.turn).toBe('you')
+    expect(standing.headline).toMatch(/refused/i)
+    expect(standing.detail).toContain('Invalid enum value')
+  })
+
+  // Ahead of the questions, and deliberately: answering one writes an answer
+  // onto a document nothing is reading, so a screen that led with the
+  // questions would be pointing at the one move that does not help.
+  it('says the refusal before it says the open questions', () => {
+    const standing = standingOf(
+      input({ status: 'draft', graph: null, openQuestions: 3, intakeRefused: 'nope' })
+    )
+    expect(standing.headline).toMatch(/refused/i)
+  })
+
   it('is ready when an order is agreed and no graph exists yet', () => {
     const standing = standingOf(input({ status: 'agreed', graph: null }))
     expect(standing.kind).toBe('ready')
@@ -212,10 +241,11 @@ describe('standingOf', () => {
       input({ graph: graph([node({ id: 'a', state: 'failed' })]) }),
       input({ status: 'draft', graph: null, openQuestions: 2 }),
       input({ status: 'draft', graph: null }),
+      input({ status: 'draft', graph: null, intakeRefused: 'acceptance.5: Invalid enum value.' }),
       input({ status: 'agreed', graph: null }),
       input({ status: 'shipped' }),
     ]
-    expect(cases).toHaveLength(11)
+    expect(cases).toHaveLength(12)
     for (const one of cases) {
       const standing = standingOf(one)
       expect(standing.label.trim()).not.toBe('')

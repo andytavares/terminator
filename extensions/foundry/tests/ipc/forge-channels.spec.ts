@@ -710,6 +710,66 @@ describe('foundry:order.converge — the half that was missing', () => {
     expect(ledger).toContain('converge.refused')
   })
 
+  // The half that was missing after that. A refusal was recorded and read by
+  // nothing: the Forge polls `order.compile`, which handed back the document
+  // and the checks, and a refusal changes neither — so the surface went on
+  // saying the architect was working over a turn that had ended.
+  it('carries how the last turn ended on the read the Forge polls', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
+    })
+    await c.converge({ id: seed.order.id })
+
+    const r = (await c.compile({ id: seed.order.id, commit: false })) as {
+      intake: { kind: string; reason?: string }
+    }
+    expect(r.intake.kind).toBe('refused')
+    expect(r.intake.reason).toBe('acceptance.5: Invalid enum value.')
+  })
+
+  it('says a turn is running the moment it starts one', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
+    })
+    // On this call and not only on the next poll: the surface reads whether a
+    // turn is in flight from here, and would otherwise sit idle.
+    const started = (await c.converge({ id: seed.order.id })) as {
+      intake: { kind: string; sessionId?: string }
+    }
+    expect(started.intake).toEqual({ kind: 'running', at: NOW, sessionId: 'sess-arch' })
+
+    const polled = (await c.compile({ id: seed.order.id, commit: false })) as {
+      intake: { kind: string }
+    }
+    expect(polled.intake.kind).toBe('running')
+  })
+
+  // The order list said "Foundry is still shaping this" about an order nothing
+  // had touched for an hour, because a draft's standing had no idea intake had
+  // ever run.
+  it('hands a refused draft back to the operator in the list', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
+    })
+    await c.converge({ id: seed.order.id })
+
+    const listed = (await c.list()) as {
+      orders: Array<{ id: string; standing: { turn: string; headline: string } }>
+    }
+    const row = listed.orders.find((o) => o.id === seed.order.id)
+    expect(row?.standing.turn).toBe('you')
+    expect(row?.standing.headline).toMatch(/refused/i)
+  })
+
   it('says so when there is no runtime to run an architect', async () => {
     const seed = await drafted()
     const r = (await channels().converge({ id: seed.order.id })) as { error: string }

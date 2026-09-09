@@ -7,6 +7,7 @@ import { applyFindings, resolveFinding, acceptFinding } from '../forge/red-team.
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
 import { readStanding } from '../order/standing.js'
+import { intakeRefusal, lastIntake } from '../forge/intake-outcome.js'
 import type { StandingSources } from '../order/standing.js'
 import { TransitionIntentSchema, WriteBackSchema } from '../order/schema.js'
 import type { TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
@@ -391,7 +392,11 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
         reason: started.reason,
         evidence: [],
       })
-      return { ...view(order), error: started.reason }
+      return {
+        ...view(order),
+        error: started.reason,
+        intake: lastIntake(await deps.store.entries(id)),
+      }
     }
 
     await deps.store.record({
@@ -405,7 +410,16 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     })
     // The order as it stands, plus the session the architect is working in —
     // so the surface can say it is running and take the operator to it.
-    return { ...view(order), converging: started.sessionId }
+    //
+    // `intake` comes back on this call too, and not only on the poll: the
+    // Forge reads whether a turn is running from it, and a first answer that
+    // omitted it would leave the surface idle until the next poll it was
+    // never going to start.
+    return {
+      ...view(order),
+      converging: started.sessionId,
+      intake: lastIntake(await deps.store.entries(id)),
+    }
   }
 
   async function compile(raw: unknown): Promise<unknown> {
@@ -417,10 +431,17 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     if (order === null) return { error: `No order ${id}.` }
 
     const result = compileOrder(order)
-    if (!commit || !result.ok) return { compile: result, order }
+    // How the last intake turn ended, on the read the Forge polls.
+    //
+    // A refusal is recorded in the ledger and nowhere else, so a surface that
+    // only reads the document cannot tell "the architect is working" from "the
+    // architect finished an hour ago and nothing was accepted". The Forge
+    // could not, and spun on the first while it was the second.
+    const intake = lastIntake(await deps.store.entries(id))
+    if (!commit || !result.ok) return { compile: result, order, intake }
 
     const agreed = agreeOrder(order, deps.now())
-    if (!agreed.ok) return { compile: agreed.result, order }
+    if (!agreed.ok) return { compile: agreed.result, order, intake }
 
     await deps.store.save(agreed.order)
     await deps.store.record({
@@ -447,7 +468,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       // Recorded by the write-back itself; the order is agreed regardless.
     }
 
-    return { compile: compileOrder(agreed.order), order: agreed.order, capability }
+    return { compile: compileOrder(agreed.order), order: agreed.order, intake, capability }
   }
 
   /**
@@ -566,6 +587,10 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
             openQuestionsFor: (o) =>
               o.status === 'draft' ? surfacedQuestions(o.openQuestions).length : 0,
             failuresFor: (o) => compileOrder(o).failures.length,
+            // Supplied here rather than by the host: the ledger is this
+            // store's, and the host would have to build a second reader over
+            // the same files to answer it.
+            intakeRefusedFor: async (orderId) => intakeRefusal(await deps.store.entries(orderId)),
           }),
         }))
       ),

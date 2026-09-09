@@ -76,6 +76,16 @@ export interface StandingInput {
   /** Compile checks a draft has not cleared. Draft orders only. */
   readonly failures: number
   /**
+   * Why the last intake turn was refused, when it was. Draft orders only.
+   *
+   * A refusal moves nothing: the proposal failed validation, so there is no
+   * redraft to save and the document is byte-for-byte what it was. Without
+   * this the standing of such an order is indistinguishable from one an
+   * architect is still working on, and it said so — "Foundry is still shaping
+   * this" about an order nothing had touched for an hour.
+   */
+  readonly intakeRefused: string | null
+  /**
    * Agents whose tool call was handed back to the terminal's own prompt.
    *
    * The bridge does this when nobody answers in time. An unattended run never
@@ -117,6 +127,20 @@ export function standingOf(input: StandingInput): Standing {
   }
 
   if (input.status === 'draft') {
+    // Ahead of the open questions: a refused turn is why the questions are
+    // still open. Answering them is not the move — nothing will pick the
+    // answers up until intake runs again.
+    if (input.intakeRefused !== null) {
+      return {
+        ...counts,
+        kind: 'shaping',
+        turn: 'you',
+        label: 'intake was refused',
+        headline: 'The architect\u2019s plan was refused',
+        detail: `Nothing was changed: ${input.intakeRefused}`,
+      }
+    }
+
     const open = input.openQuestions
     return open > 0
       ? {
@@ -268,6 +292,8 @@ export interface StandingSources {
   readonly failuresFor?: (order: WorkOrder) => number
   /** Agents of this order parked at their terminal's own prompt. */
   readonly strandedFor?: (orderId: string) => number
+  /** Why this order's last intake turn was refused, when it was. */
+  readonly intakeRefusedFor?: (orderId: string) => Promise<string | null>
 }
 
 /**
@@ -289,5 +315,9 @@ export async function readStanding(order: WorkOrder, sources: StandingSources): 
     openQuestions: sources.openQuestionsFor?.(order) ?? 0,
     failures: sources.failuresFor?.(order) ?? 0,
     stranded: sources.strandedFor?.(order.id) ?? 0,
+    // Only a draft can be sitting on one, and reading the ledger of every
+    // running order to be told 'no' is a file read per row for nothing.
+    intakeRefused:
+      order.status === 'draft' ? ((await sources.intakeRefusedFor?.(order.id)) ?? null) : null,
   })
 }
