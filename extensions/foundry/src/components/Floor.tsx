@@ -11,6 +11,7 @@ import {
   Unplug,
 } from 'lucide-react'
 import type { RunGraph, RunNode } from '../line/run-graph.js'
+import { ConfirmButton } from './ConfirmButton.js'
 
 // Where you watch, not where you act.
 //
@@ -446,7 +447,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
    */
   const [busy, setBusy] = useState(false)
   const decideRun = useCallback(
-    async (channel: 'foundry:run.resume' | 'foundry:run.stop') => {
+    async (channel: 'foundry:run.resume' | 'foundry:run.stop' | 'foundry:run.reset') => {
       setBusy(true)
       try {
         const r = (await invoke(channel, { id: orderId })) as { error?: string }
@@ -473,6 +474,30 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       <h2 className="fdry-panel-h">
         {view.graph.orderId} · {view.graph.recipe}
       </h2>
+
+      {/* Always here, not only when the run is orphaned.
+
+          Both of these lived inside the "nothing is running this" band, so a
+          run that was live — or halted at a gate — had no way out on this
+          screen at all, and `order.cancel` refuses a running order and points
+          back at the gate. Three orders for one ask, all `cancelled`, and four
+          branches cut by hand, is what that cost. */}
+      <div className="fdry-run-controls">
+        <ConfirmButton
+          label="Stop the run"
+          confirmLabel="Stop it"
+          warning={`This ends every agent still working on ${view.graph.orderId}. What is in the worktree stays there.`}
+          disabled={busy}
+          onConfirm={() => void decideRun('foundry:run.stop')}
+        />
+        <ConfirmButton
+          label="Start over"
+          confirmLabel="Destroy it and start over"
+          warning={`This destroys the checkout, the branch, the run graph and every gate ${view.graph.orderId} raised. The order, its criteria and its plan stay, and it can be run again from the beginning.`}
+          disabled={busy}
+          onConfirm={() => void decideRun('foundry:run.reset')}
+        />
+      </div>
 
       {/* A run nothing is running.
 
@@ -502,13 +527,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               onClick={() => void decideRun('foundry:run.resume')}
             >
               Pick it back up
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void decideRun('foundry:run.stop')}
-            >
-              <Square aria-hidden="true" /> Stop the run
             </button>
           </div>
         </section>

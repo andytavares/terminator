@@ -1897,3 +1897,46 @@
   font-size: 11px;
   color: var(--tm-text-muted);
 }
+
+/* Controls that end or destroy a run.
+
+   Always on the Floor rather than inside the "nothing is running this" band,
+   because a live run and a run halted at a gate both need a way out and
+   neither is orphaned. */
+.fdry-run-controls,
+.fdry-order-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Armed: the sentence and the button in one place, so what is being agreed to
+   is on screen at the moment of agreeing. */
+.fdry-confirm {
+  border: 1px solid var(--tm-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 320px;
+}
+
+.fdry-confirm .fdry-note {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.fdry-confirm .fdry-note svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  margin-top: 2px;
+}
+
+.fdry-confirm .fdry-ask-actions {
+  margin: 0;
+}

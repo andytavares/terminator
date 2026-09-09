@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { Plus, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
+import { ConfirmButton } from './ConfirmButton.js'
 
 // The way into the Forge: what orders exist, and a way to seed another.
 //
@@ -155,20 +156,57 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
             nothing ever set it, so the list only ever grew. Marked, not
             deleted — the records are the point. A running order is refused by
             the channel and says why. */}
-        {running ? null : (
-          <button
-            type="button"
-            className="fdry-discard"
+        <div className="fdry-order-controls">
+          {running ? null : (
+            <button
+              type="button"
+              className="fdry-discard"
+              disabled={busy}
+              onClick={() => {
+                void (async () => {
+                  setBusy(true)
+                  try {
+                    const r = (await invoke('foundry:order.cancel', { id: open })) as {
+                      error?: string
+                    }
+                    if (r.error !== undefined) {
+                      setProblem(r.error)
+                      return
+                    }
+                    setOpen(null)
+                    await refresh()
+                  } finally {
+                    setBusy(false)
+                  }
+                })()
+              }}
+            >
+              Discard this order
+            </button>
+          )}
+          {/* The other answer, and the one `cancelled` never was: an order
+              that is hidden still owns a worktree, a branch and a directory.
+              Offered whatever the status, because a running order is exactly
+              the one that has those things — its agents are stopped first. */}
+          <ConfirmButton
+            label="Delete this order"
+            confirmLabel="Delete it and everything it made"
+            warning={`This removes ${open} entirely — its records and ledger, its run graph and gates, its checkout and its branch. Nothing about it can be read back afterwards.`}
             disabled={busy}
-            onClick={() => {
+            onConfirm={() => {
               void (async () => {
                 setBusy(true)
                 try {
-                  const r = (await invoke('foundry:order.cancel', { id: open })) as {
+                  const r = (await invoke('foundry:order.delete', { id: open })) as {
                     error?: string
+                    failed?: string[]
                   }
-                  if (r.error !== undefined) {
-                    setProblem(r.error)
+                  // A partial teardown is said out loud rather than reported
+                  // as success: a branch git would not delete is a branch
+                  // still there, and the operator is the one who can act on it.
+                  const trouble = r.error ?? (r.failed?.length ? r.failed.join('; ') : null)
+                  if (trouble !== null) {
+                    setProblem(trouble)
                     return
                   }
                   setOpen(null)
@@ -178,10 +216,8 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
                 }
               })()
             }}
-          >
-            Discard this order
-          </button>
-        )}
+          />
+        </div>
         {/* An order that is running is watched on the Floor; one that is still
             being agreed is worked on in the Forge. */}
         {running ? (

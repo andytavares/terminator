@@ -340,8 +340,8 @@ describe('watching a run', () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
     fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
-    await waitFor(() => screen.getByRole('button', { name: /Stop/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Stop/ }))
+    await waitFor(() => screen.getByRole('button', { name: 'Stop' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-stop', {
         sessionId: 's-1',
@@ -940,13 +940,47 @@ describe('a run whose agents are gone', () => {
   it('stops it, for a run that is not worth restarting', async () => {
     mount(ORPHANED)
     await waitFor(() => screen.getByText(/Nothing is running this/))
-    fireEvent.click(screen.getByRole('button', { name: /Stop the run/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop the run' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop it' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:run.stop',
         expect.objectContaining({
           id: 'WO-1',
         })
+      )
+    )
+  })
+
+  // Both order-level controls used to live inside the "nothing is running
+  // this" band, so a live run — or one halted at a gate — had no way out on
+  // this screen, and `order.cancel` refuses a running order and points back at
+  // the gate. Three orders for one ask, all cancelled, is what that cost.
+  it('offers a way out of a run that is not orphaned at all', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText(/Nothing is running this/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Stop the run' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start over' })).toBeTruthy()
+  })
+
+  it('says what starting over destroys before it destroys it', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }))
+    expect(screen.getByText(/destroys the checkout, the branch/)).toBeTruthy()
+    expect(invoke).not.toHaveBeenCalledWith('foundry:run.reset', expect.anything())
+  })
+
+  it('starts the same order over, rather than making a fourth one for the same ask', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Destroy it and start over' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:run.reset',
+        expect.objectContaining({ id: 'WO-1' })
       )
     )
   })

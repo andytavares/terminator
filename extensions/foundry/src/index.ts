@@ -15,6 +15,7 @@ import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore, createGateStore } from './gates/store.js'
 import { countAttention } from './gates/attention.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
+import { tearDownRun, deleteOrder } from './line/teardown.js'
 import { markReady, readPulls, shipOrder } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
 import { ensureCheckouts } from './line/worktree.js'
@@ -1851,6 +1852,27 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:order.writeBack', (payload) => forge.setWriteBack(payload))
   reg(api, 'foundry:order.cancel', (payload) => forge.cancel(payload))
 
+  // Gone, rather than hidden.
+  //
+  // `order.cancel` marks an order `cancelled` and drops it off the list, and
+  // leaves its directory, its ledger, its worktree and its branch exactly
+  // where they were — so the records location and the target repository fill
+  // up with work nobody can reach or restart. This is the other answer.
+  reg(api, 'foundry:order.delete', async (payload) => {
+    const { id } = payload as { id?: unknown }
+    if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
+
+    const root = dataRoot()
+    const order = await createOrderStore(root).load(id)
+    if (order === null) return { error: `No order ${id}.` }
+
+    // Its agents first. Deleting the records out from under a live session
+    // leaves an agent writing into a worktree whose order no longer exists.
+    await stopOrder(root, id, 'the order was deleted')
+    const result = await deleteOrder(order, { exec: (o) => api.shell.exec(o), root })
+    return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
+  })
+
   // ── The Line ───────────────────────────────────────────────────────────
   //
   // An agreed order plus a shape of work becomes a run graph. Everything that
@@ -1895,6 +1917,47 @@ export function activate(api: ExtensionAPI): void {
     await stopOrder(dataRoot(), id, 'stopped by the operator')
     return { ok: true }
   })
+  // Start the same order over.
+  //
+  // Stop whatever is still running, destroy everything the run made — every
+  // lane's checkout and branch, the graph, the gates, the rung outputs — and
+  // put the order back to `agreed` so it can be run again from node zero. The
+  // ask, the criteria and the plan survive, which is the whole difference
+  // between this and making a fourth order for the same sentence.
+  reg(api, 'foundry:run.reset', async (payload) => {
+    const { id } = payload as { id?: unknown }
+    if (typeof id !== 'string' || id === '') return { error: 'Malformed request.' }
+
+    const root = dataRoot()
+    const store = createOrderStore(root)
+    const order = await store.load(id)
+    if (order === null) return { error: `No order ${id}.` }
+
+    await stopOrder(root, id, 'starting over')
+    const result = await tearDownRun(order, { exec: (o) => api.shell.exec(o), root })
+
+    // Read back rather than reused: `stopOrder` saves, and writing the order
+    // we loaded before it would put `running` back.
+    const stopped = (await store.load(id)) ?? order
+    // Only an agreed order can be started, and only a draft can be agreed —
+    // so a reset that left it `cancelled` would be the dead end it exists to
+    // undo. It was agreed once and nothing about the agreement changed.
+    await store.save({ ...stopped, status: 'agreed', recipe: null, recipeOverriddenBy: null })
+    await store.record({
+      at: new Date().toISOString(),
+      orderId: id,
+      actor: 'operator',
+      action: 'run.reset',
+      subject: id,
+      reason:
+        result.removed.length === 0
+          ? 'started over; there was nothing left to remove'
+          : `started over; removed ${result.removed.join(', ')}`,
+      evidence: [],
+    })
+    return { ok: true, removed: result.removed, failed: result.failed }
+  })
+
   reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
   reg(api, 'foundry:run.recipes', (payload) => runs.recipes(payload))
   reg(api, 'foundry:session.attach', (payload) => runs.attach(payload))
