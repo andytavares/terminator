@@ -1,0 +1,36 @@
+extensions/foundry/src/index.ts
+  s_2a1ca59f67e349::t_6fea24586a55cf 1815-1824
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_2a1ca59f67e349::t_4856be9e110715 563,568-569,580,619
+  s_2a1ca59f67e349::t_ec685d1d3a9427 570-571
+  s_2a1ca59f67e349::t_4c2cae8bf389d8 554-561,565,573-577,581-586,596-602,605,613,626-644,657-720
+  s_2a1ca59f67e349::t_e194fbc68cbd37 721-722
+extensions/foundry/src/components/foundry.css
+  s_2a1ca59f67e349::t_c5336f334df4fe 335
+  s_2a1ca59f67e349::t_59d044b17bfb98 289-334,336-352
+extensions/foundry/src/components/Forge.tsx
+  s_2a1ca59f67e349::t_156f73cb7a3a2d 12,389-408,411-438
+  s_2a1ca59f67e349::t_c713f8023d8ae0 2
+  s_2a1ca59f67e349::t_ec685d1d3a9427 409-410
+  s_2a1ca59f67e349::t_42a8ffb1808f11 11,28-29
+  s_2a1ca59f67e349::t_1098af632def01 294,297-313,315-316
+extensions/foundry/tests/forge/refused-turn.spec.ts
+  s_2a1ca59f67e349::t_3d9f06dbe8eb98 11,28,67,71-74,114,129
+  s_2a1ca59f67e349::t_ffa512116e1e2c 1-10,12-27,29-66,68-70,75-113,115-128,130-212
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "28c983da1f26060b8d648c6e3a0e6b70226454e3",
+  "prompts": {},
+  "sessions": {
+    "s_2a1ca59f67e349": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8001031d-4184-4839-af28-167f4877d00a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
