@@ -4,7 +4,7 @@ import { orderDir } from '../data-root.js'
 import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
 import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
-import { RISK_TRIGGERS } from '../order/schema.js'
+import { EVIDENCE_KINDS, RISK_TRIGGERS } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role, Rule } from '../recipe/parse.js'
 import { resolveRole } from '../recipe/resolve.js'
@@ -85,6 +85,16 @@ function outputContract(file: string, order: WorkOrder): string {
     '`verify.kind` is one of `test`, `command`, `judge`, `artifact` or `screenshot`.',
     'A `judge` needs a `rubric` and a non-empty `evidence` list; an `artifact`',
     'needs a `path` and an `assert`; a `screenshot` needs a `target`.',
+    '',
+    // The second field to be refused for being a closed set nobody showed the
+    // architect. See EVIDENCE_KINDS.
+    `A judge's \`evidence\` is a closed set too: each entry is exactly one of ${EVIDENCE_KINDS.map(
+      (kind) => `\`${kind}\``
+    ).join(', ')}.`,
+    'They are kinds of artifact, not paths. A file the judge should read is named',
+    'in the `rubric` — `evidence: ["report_file"]` with the path in the rubric,',
+    'never `evidence: ["src/app.css"]`. A path written here is refused, and the',
+    'whole proposal with it.',
     '',
     // Shown for the same reason `grade` shows its four values, and absent for
     // the whole of the feature that preceded this one. See RISK_TRIGGERS.

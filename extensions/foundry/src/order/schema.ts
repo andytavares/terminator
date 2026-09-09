@@ -74,7 +74,19 @@ const ContextSchema = z.object({
   houseDocs: z.array(z.string()).default([]),
 })
 
-const EvidenceKindSchema = z.enum(['exit_code', 'stdout', 'report_file', 'screenshot', 'diff'])
+/**
+ * The closed set a piece of judged evidence may be.
+ *
+ * Kinds of artifact, not places to look: `report_file` says "the judge reads a
+ * report the run produced", and *which* report belongs in the rubric. Exported
+ * for the same reason as RISK_TRIGGERS and after the same failure — on
+ * WO-0909-6db the contract named this set nowhere, the architect wrote three
+ * file paths into it, and six acceptance criteria and the only unit in the
+ * plan were refused together on `Invalid enum value`.
+ */
+export const EVIDENCE_KINDS = ['exit_code', 'stdout', 'report_file', 'screenshot', 'diff'] as const
+
+const EvidenceKindSchema = z.enum(EVIDENCE_KINDS)
 
 const VerifySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('test'), command: nonEmpty, assert: nonEmpty }),

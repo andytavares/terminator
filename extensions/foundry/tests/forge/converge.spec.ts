@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { convergeBrief, readProposal, NoArchitectError } from '../../src/forge/converge.js'
-import { draftOrder, RISK_TRIGGERS } from '../../src/order/schema.js'
+import { draftOrder, EVIDENCE_KINDS, RISK_TRIGGERS } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
 
@@ -74,6 +74,22 @@ describe('what the architect is told', () => {
   it('says a trigger is a label rather than a sentence', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('`risk.triggers` is a closed set')
+  })
+
+  // The same failure, one feature later and one field over. On WO-0909-6db the
+  // contract said a judge needs "a non-empty `evidence` list" and named none of
+  // the five things that list may hold; the architect wrote three file paths,
+  // and six acceptance criteria and the only unit in the plan were refused
+  // together on `Invalid enum value`.
+  it('names every value a judge’s evidence may take', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    for (const kind of EVIDENCE_KINDS) expect(plan.prompt).toContain(kind)
+  })
+
+  it('says evidence is a kind of artifact rather than a path', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('closed set too')
+    expect(plan.prompt).toContain('kinds of artifact, not paths')
   })
 
   // The other half of the same failure: the plan that came back had seven
