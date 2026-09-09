@@ -1,0 +1,52 @@
+extensions/foundry/src/ipc/forge-channels.ts
+  s_938eca154cb24e::t_6efc47ee620397 9-10,97-106,542-544,546-547,559-567,569-571
+  s_938eca154cb24e::t_2d230f1eb83e65 568
+extensions/foundry/tests/order/standing.spec.ts
+  s_938eca154cb24e::t_931c9b0973b889 61,171-179
+  s_938eca154cb24e::t_4cf74d17b4498f 1,3-6,8-60,63-129,148-170,180-182,186-208,210-217,219-221,223-226
+  s_938eca154cb24e::t_a334e13f5f1912 222
+  s_938eca154cb24e::t_b9d64e5a9e3b7a 227-266
+  s_938eca154cb24e::t_89a92389ba290c 62,130-147,209,218
+  s_938eca154cb24e::t_d306d53fb186f6 183-185
+  s_938eca154cb24e::t_1dbb73a3e24f2c 2,7
+extensions/foundry/tests/ipc/run-standing.spec.ts
+  s_938eca154cb24e::t_0338bda06968e5 1-162
+extensions/foundry/src/ipc/run-channels.ts
+  s_938eca154cb24e::t_573497cc7b5eb3 17,456-459
+  s_938eca154cb24e::t_6f70fa20b15e6a 109-117,467,471-473
+  s_938eca154cb24e::t_6d1bd2058366bc 18
+  s_938eca154cb24e::t_93243a24daae43 449-452
+  s_938eca154cb24e::t_9926449cc4e162 460-466,468-470
+  s_938eca154cb24e::t_29961ff9b6cc94 90-108,442-445,453-455,474-476,480
+extensions/foundry/src/order/standing.ts
+  s_938eca154cb24e::t_daab71f76124ef 248-266,271-279,281-289,292-293
+  s_938eca154cb24e::t_3f8a69fdf7abfc 191-195
+  s_938eca154cb24e::t_9926449cc4e162 280
+  s_938eca154cb24e::t_931c9b0973b889 76-77,136-139,267-268,290
+  s_938eca154cb24e::t_027d632647a0f7 25,78-85,179-190,196,269-270,291
+  s_938eca154cb24e::t_1d5c301e79db3d 1-24,26-43,53-75,86-113,115-126,128-134,140-152,154-164,166-176,178,197-206,208-217,219-230,232-240,242-247
+  s_938eca154cb24e::t_a334e13f5f1912 44-52,114,127,135,153,165,177,207,218,231,241
+extensions/foundry/src/index.ts
+  s_938eca154cb24e::t_2ba9eb6167ba64 16-17,1760-1778,1786-1791,1795,1957-1959
+  s_938eca154cb24e::t_6e11f6335662b5 513-521,1134-1136,1151-1154,1779-1785,1960-1966
+  s_938eca154cb24e::t_4dd467c6f6d801 512
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_938eca154cb24e::t_9926449cc4e162 334-342
+  s_938eca154cb24e::t_48b1ff91b515ac 7-8,271-333,343-350
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "9c18c4c0ba2277c5dbe5430ab7de6d0a125e866d",
+  "prompts": {},
+  "sessions": {
+    "s_938eca154cb24e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "92c4225a-8e08-4ae9-8945-1f8359811bf7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
