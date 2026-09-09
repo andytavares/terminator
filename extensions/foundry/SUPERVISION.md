@@ -57,18 +57,23 @@ drew `building` chips over the same run. Neither named the gate.
 branches is not arbitrary — it is **how much of the run each condition has
 stopped**, worst first:
 
-| Kind       | Whose move | What it means                                                 |
-| ---------- | ---------- | ------------------------------------------------------------- |
-| `done`     | Foundry    | the order shipped                                             |
-| `shaping`  | either     | a draft: yours if it is asking questions, Foundry's otherwise |
-| `halted`   | **you**    | an undecided gate has stopped the line; nothing is scheduled  |
-| `adrift`   | **you**    | the graph says running and no process is                      |
-| `asking`   | **you**    | an agent is holding a tool call, answerable from the surface  |
-| `stranded` | **you**    | a call was handed back to a terminal prompt nobody is at      |
-| `stalled`  | **you**    | a run stopped making progress without asking for anything     |
-| `failed`   | **you**    | a step failed                                                 |
-| `ready`    | Foundry    | agreed, no graph yet                                          |
-| `working`  | Foundry    | agents are running                                            |
+| Kind       | Whose move | What it means                                                                                     |
+| ---------- | ---------- | ------------------------------------------------------------------------------------------------- |
+| `done`     | Foundry    | the order shipped                                                                                 |
+| `shaping`  | either     | a draft: yours if it is asking questions or its last intake turn was refused, Foundry's otherwise |
+| `halted`   | **you**    | an undecided gate has stopped the line; nothing is scheduled                                      |
+| `adrift`   | **you**    | the graph says running and no process is                                                          |
+| `asking`   | **you**    | an agent is holding a tool call, answerable from the surface                                      |
+| `stranded` | **you**    | a call was handed back to a terminal prompt nobody is at                                          |
+| `stalled`  | **you**    | a run stopped making progress without asking for anything                                         |
+| `failed`   | **you**    | a step failed                                                                                     |
+| `ready`    | Foundry    | agreed, no graph yet                                                                              |
+| `working`  | Foundry    | agents are running                                                                                |
+
+Within `shaping` a **refused intake turn** outranks open questions, and for the
+same kind of reason: answering a question the architect asked before it was
+refused writes an answer onto a document no architect is reading. See _A turn
+that was refused_ below.
 
 `halted` outranks everything because a gate stops the whole line and every other
 condition under it is a symptom. `asking` outranks `stranded` because a held
@@ -96,6 +101,62 @@ where the person looking at the order will see it.
 `adrift` and `stranded` carry their moves the same way — _Pick it back up_ and
 _Go to its terminal_. The separate "nothing is running this" panel is gone with
 them: two panels saying the same thing in two voices is what the band replaced.
+
+### A turn that was refused
+
+The architect proposes; Foundry validates; a proposal that would not make a
+readable order is refused whole. That is ADR 043's boundary working, and the
+cost it accepted — _the turn is wasted_ — is real: on `WO-0909-6db` six
+acceptance criteria and the only unit in the plan were lost to three file paths
+written into `verify.evidence`, which is a closed set of artifact kinds.
+
+What ADR 043 said would happen and did not is that the waste was **reported**.
+A refusal has nothing to save, so `order.json` is untouched, so every surface —
+all of which read the document — saw an order in exactly the state it had been
+in before. The Forge said _The architect is working…_ for forty minutes over a
+turn that had ended, and the order list said _Foundry is still shaping this_.
+
+So the outcome of an intake turn is read out of the ledger, which is the only
+place it is written. `src/forge/intake-outcome.ts` walks a ledger backwards to
+the newest of three lines and answers what the last turn did:
+
+| Line               | Outcome     | What the surfaces do                                          |
+| ------------------ | ----------- | ------------------------------------------------------------- |
+| `converge.started` | `running`   | the Forge polls; the button says the architect is working     |
+| `order.redrafted`  | `redrafted` | the poll stops; the redraw is already on screen               |
+| `converge.refused` | `refused`   | the poll stops; the band opens; the standing is **your** move |
+| none of them       | `none`      | intake has not run                                            |
+
+`foundry:order.compile` carries it on every read, so the Forge's "is an
+architect working" is derived from the record rather than from a flag set by a
+click — which was wrong in both directions, surviving a turn that had ended and
+not surviving a walk away from the screen.
+
+The band itself carries the **validator's own words**, verbatim and monospaced:
+the field path and the values it would have accepted. Paraphrasing would drop
+the one thing that makes the next turn succeed. Two controls sit under it —
+_Tell the architect what was wrong_, which sends the reason back as the next
+turn's instruction, and _Start the turn over_.
+
+The first is not a convenience. The architect cannot read its own refusal: its
+turn ended before the validation ran. On the run this was found on it could not
+have parsed its own JSON either — `node -e`, `python3 -c` and shell redirects
+are all off intake's read-only allowlist, so there was no way for it to check
+the deliverable before submitting it. Handed the reason, it fixes it in one
+turn.
+
+A refusal also raises a toast, once, keyed to the order. A refusal changes
+nothing, so there is nowhere else it would appear to somebody who is not looking
+at that order.
+
+**The enums are in the brief.** Both refusals of this kind have been a closed
+set the architect was never shown — `risk.triggers` on `WO-0907-3c1`,
+`verify.evidence` on `WO-0909-6db`. Both are now rendered into the output
+contract from the schema constant (`RISK_TRIGGERS`, `EVIDENCE_KINDS`) rather
+than retyped, with the distinction that caused the failure stated: a trigger is
+a label and not a sentence, and evidence is a kind of artifact and not a path —
+a file the judge should read is named in the rubric. A closed set added to the
+order schema and not to the contract is the next one of these.
 
 ## What you can do about a run
 
