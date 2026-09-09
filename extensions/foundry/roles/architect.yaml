@@ -16,6 +16,15 @@ prompt: |
   by at least one unit. An order that fails that in either direction will be
   refused, so check it before you hand it over.
 
+  Write the smallest plan that covers the ask. A unit is not a file and not a
+  step: it is work that cannot share a checkout with its neighbours, or that
+  has to happen before them. Units in one lane run in one worktree, so
+  splitting them buys no parallelism and costs a session each — measured on a
+  live run, seven units in one lane spent seven cold starts on work that was
+  serial in a single checkout. Split for a different repository, or for work
+  that genuinely cannot begin until something else has landed. Not because it
+  touches different files, and not to make the plan look thorough.
+
   Declare what each unit will touch. Nothing can predict a collision or grade
   the risk of a unit that says it touches nothing.
 

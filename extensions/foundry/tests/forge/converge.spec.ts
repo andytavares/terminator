@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { convergeBrief, readProposal, NoArchitectError } from '../../src/forge/converge.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder, RISK_TRIGGERS } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
 
@@ -60,6 +60,28 @@ describe('what the architect is told', () => {
     expect(plan.proposalPath).toBe(path.join(orderDir(root, 'WO-1'), 'proposal.json'))
     expect(plan.prompt).toContain(plan.proposalPath)
     expect(plan.prompt).toContain('Nothing else you do counts')
+  })
+
+  // Measured on WO-0907-3c1: the contract spelled out the legal values for
+  // `risk.grade` and not for `risk.triggers`, so the architect wrote a
+  // sentence into a closed enum and nine minutes of deep-tier work was refused
+  // outright. An enum an agent is never shown is an enum it writes prose into.
+  it('names every value a risk trigger may take', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    for (const trigger of RISK_TRIGGERS) expect(plan.prompt).toContain(trigger)
+  })
+
+  it('says a trigger is a label rather than a sentence', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('`risk.triggers` is a closed set')
+  })
+
+  // The other half of the same failure: the plan that came back had seven
+  // units in one lane, which cost seven cold sessions for work that was serial
+  // in one checkout.
+  it('says a unit separates work that cannot share a checkout, not work that touches different files', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('smallest plan that covers the ask')
   })
 
   it('says which checks would refuse the order as it stands', () => {
