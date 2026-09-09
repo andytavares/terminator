@@ -955,6 +955,25 @@ surfaced at once.
   flight. Either kind of disagreement raises `forge-defect` — the rule for an
   order that contradicts itself, which was declared, rendered in the Inbox, and
   until now raised by nothing.
+- **A run can be taken away again** (`line/teardown.ts`). `removeCheckout`
+  shipped with the feature that cuts worktrees, was exported, was tested, and
+  was called by nothing — so every run ever done left its checkout registered
+  in the target repository's `.git/worktrees/` plus its branch. Two operations
+  now, because they answer different questions. `foundry:run.reset` destroys
+  what the **run** made — every lane's checkout and branch, the graph, the
+  gates, the rung outputs — and returns the order to `agreed` so it runs again
+  from node zero; the ask, the criteria, the plan and the ledger stay, which is
+  the difference between starting over and retyping. `foundry:order.delete`
+  does that and then takes the order's whole directory, ledger included.
+  `order.cancel` is still there for a record worth keeping: it marks an order
+  `cancelled` and changes nothing on disk.
+- **Both order-level controls are always on the Floor.** They used to render
+  only inside the "nothing is running this" band, so a live run — or one halted
+  at a gate — had no way out on that screen at all, while `order.cancel`
+  refuses a running order and points back at the gate. Each is a two-step
+  confirm naming exactly what it will destroy: `window.confirm` inside an
+  extension's WebContentsView blocks every event the view would receive
+  afterwards.
 - **Three-rung resolution** for every recipe, role and rule: the data root, the
   repository's own `.foundry/`, then the built-ins. The middle rung is honoured
   and never created (ADR-042).
