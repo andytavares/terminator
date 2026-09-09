@@ -16,7 +16,7 @@ export interface ExpectFailure {
 
 /** `plan.units`, optionally filtered: `plan.units[role=builder]`. */
 export function selectOver(expression: string, order: WorkOrder): PlanUnit[] {
-  const match = /^plan\.units(?:\[(\w+)=([\w.-]+)\])?$/.exec(expression.trim())
+  const match = /^plan\.units(?:\[(\w+)=([\w.-]+)\])?(?:\s+by\s+lane)?$/.exec(expression.trim())
   if (match === null) return []
   const [, field, value] = match
   if (field === undefined) return [...order.plan.units]
@@ -24,6 +24,86 @@ export function selectOver(expression: string, order: WorkOrder): PlanUnit[] {
     const actual = (unit as unknown as Record<string, unknown>)[field]
     return String(actual) === value
   })
+}
+
+/** Whether a fan-out expression asked to be grouped: `… by lane`. */
+export function groupsByLane(expression: string): boolean {
+  return /\s+by\s+lane$/.test(expression.trim())
+}
+
+/**
+ * What one fan-out node covers.
+ *
+ * A plain fan-out gives one target per unit. `by lane` gives one per lane,
+ * carrying that lane's units in dependency order.
+ */
+export interface FanoutTarget {
+  /** The suffix the node is named with: a unit id, or `lane-N`. */
+  readonly id: string
+  readonly units: readonly PlanUnit[]
+  readonly lane: number | null
+}
+
+/**
+ * The nodes a fan-out should produce.
+ *
+ * `by lane` exists because a fan-out is a claim that work can happen at the
+ * same time, and units inside one lane cannot: they share a worktree and a
+ * branch, and the plan's own `dependsOn` usually orders them anyway. Measured
+ * on WO-0907-3c1 — seven units, one lane — the run spent seven cold agent
+ * sessions re-reading one repository to do work that was serial in one
+ * checkout. Grouping keeps the plan's detail, which the brief still lists,
+ * and stops charging a process for it.
+ */
+export function fanoutTargets(expression: string, order: WorkOrder): FanoutTarget[] {
+  const units = selectOver(expression, order)
+  if (!groupsByLane(expression)) {
+    return units.map((unit) => ({ id: unit.id, units: [unit], lane: unit.lane }))
+  }
+
+  // Insertion-ordered by first appearance, so a plan that lists lane 2 first
+  // gets lane 2 first — the recipe never reorders what the plan decided.
+  const byLane = new Map<number, PlanUnit[]>()
+  for (const unit of units) {
+    const existing = byLane.get(unit.lane)
+    if (existing === undefined) byLane.set(unit.lane, [unit])
+    else existing.push(unit)
+  }
+  return [...byLane].map(([lane, laneUnits]) => ({
+    id: `lane-${lane}`,
+    units: inDependencyOrder(laneUnits),
+    lane,
+  }))
+}
+
+/**
+ * A lane's units in the order one agent should do them.
+ *
+ * The plan's `dependsOn` is the whole answer where it is stated; where two
+ * units do not constrain each other the plan's own order stands. A cycle — or
+ * a dependency on a unit outside this lane — leaves the remainder in plan
+ * order rather than throwing, because a graph that cannot be built is a run
+ * that cannot start, and the compile gate is where a bad plan is refused.
+ */
+function inDependencyOrder(units: readonly PlanUnit[]): PlanUnit[] {
+  const here = new Set(units.map((unit) => unit.id))
+  const placed = new Set<string>()
+  const ordered: PlanUnit[] = []
+  let remaining = [...units]
+
+  while (remaining.length > 0) {
+    const ready = remaining.filter((unit) =>
+      unit.dependsOn.every((id) => !here.has(id) || placed.has(id))
+    )
+    // Nothing is ready: the rest depend on each other. Keep plan order.
+    if (ready.length === 0) return [...ordered, ...remaining]
+    for (const unit of ready) {
+      ordered.push(unit)
+      placed.add(unit.id)
+    }
+    remaining = remaining.filter((unit) => !placed.has(unit.id))
+  }
+  return ordered
 }
 
 /** The collections `when` can ask about. Nothing else is reachable. */

@@ -1,0 +1,32 @@
+schemaVersion: 1
+id: quick
+description: >
+  One lane, nothing flagged. One builder does the work, the project's own test
+  command says whether it holds, and it ships.
+requires:
+  # The one thing this shape cannot do without. Every heavier shape has a
+  # verifier and an inspector to fall back on; this one has the suite, so a
+  # repository that cannot run one is offered a different shape rather than
+  # this one with its only check quietly missing.
+  - toolchain: test
+steps:
+  # No scout and no adversarial pass. Intake already read the repository and
+  # already ran the structural red team, and on a one-lane order graded at the
+  # bottom two there is nothing for a second reader to be independent *of*.
+  - id: build
+    kind: fanout
+    over: plan.units[role=builder] by lane
+    step: { kind: agent, role: builder }
+
+  - id: check
+    kind: run
+    command: '${toolchain.test}'
+    after: [build]
+    expect: { exit_code: '== 0' }
+
+  - id: ship
+    kind: gate
+    rule: ready-for-review
+    options: [mark_ready, hold]
+    defaultIfIgnored: hold
+    after: [check]

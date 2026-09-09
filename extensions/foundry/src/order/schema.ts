@@ -101,7 +101,17 @@ const AcceptanceSchema = z.object({
     .default(null),
 })
 
-const TriggerSchema = z.enum([
+/**
+ * The closed set a risk trigger may be.
+ *
+ * Exported so the architect's own output contract can name them. An enum an
+ * agent is never shown is an enum it writes prose into: measured on
+ * WO-0907-3c1, where the contract spelled out `risk.grade`'s four values and
+ * not these nine, the architect wrote five sentences here and the whole
+ * proposal — nine minutes of deep-tier work — was refused on `Invalid enum
+ * value`.
+ */
+export const RISK_TRIGGERS = [
   'authentication',
   'payments',
   'secrets',
@@ -111,7 +121,9 @@ const TriggerSchema = z.enum([
   'network_egress',
   'outside_blast_radius',
   'critical_path',
-])
+] as const
+
+const TriggerSchema = z.enum(RISK_TRIGGERS)
 
 const RiskSchema = z.object({
   grade: z.enum(['P0', 'P1', 'P2', 'P3']),

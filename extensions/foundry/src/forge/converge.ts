@@ -4,6 +4,7 @@ import { orderDir } from '../data-root.js'
 import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
 import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
+import { RISK_TRIGGERS } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role, Rule } from '../recipe/parse.js'
 import { resolveRole } from '../recipe/resolve.js'
@@ -85,6 +86,15 @@ function outputContract(file: string, order: WorkOrder): string {
     'A `judge` needs a `rubric` and a non-empty `evidence` list; an `artifact`',
     'needs a `path` and an `assert`; a `screenshot` needs a `target`.',
     '',
+    // Shown for the same reason `grade` shows its four values, and absent for
+    // the whole of the feature that preceded this one. See RISK_TRIGGERS.
+    `\`risk.triggers\` is a closed set: each entry is exactly one of ${RISK_TRIGGERS.map(
+      (trigger) => `\`${trigger}\``
+    ).join(', ')}.`,
+    'It is a label, not a sentence. Say *why* a trigger applies in `criticalPaths`',
+    'or in the note — a trigger written as prose is refused, and the whole',
+    'proposal with it.',
+    '',
     'Anything else in that object is refused outright, including `status` — you',
     'do not agree your own work.',
     '',
@@ -97,6 +107,19 @@ function outputContract(file: string, order: WorkOrder): string {
     'Ask a question only where the repository genuinely cannot answer it, and',
     'never more than three. Anything you decided for yourself is an assumption',
     'the operator can strike, not a fact.',
+    '',
+    '## How big the plan should be',
+    '',
+    'Write the smallest plan that covers the ask. A unit is not a file and not',
+    'a step — it is work that cannot share a checkout with its neighbours, or',
+    'that has to happen before them. Units in one lane run in one worktree, so',
+    'splitting them buys nothing and costs a session each: measured on a live',
+    'run, seven units in one lane spent seven cold starts on work that was',
+    'serial in a single checkout.',
+    '',
+    'Split a unit when it belongs to a different repository, or when a later',
+    'unit genuinely cannot begin until an earlier one has landed. Not because',
+    'it touches different files, and not to make the plan look thorough.',
   ].join('\n')
 }
 
@@ -141,7 +164,7 @@ export function convergeBrief(input: ConvergeInput): ConvergeBrief {
   const body = brief({
     order: input.order,
     role: resolved.resolved.value,
-    unit: null,
+    units: [],
     rules: input.rules,
   })
 

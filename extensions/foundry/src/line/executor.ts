@@ -8,7 +8,7 @@ import {
   hasStalled,
   blockedNodes,
 } from './scheduler.js'
-import { withNode, stepFor, wantsFreshContext } from './run-graph.js'
+import { withNode, stepFor, unitsOf, wantsFreshContext } from './run-graph.js'
 import { checkExpect } from '../recipe/step-kinds.js'
 import type { RunGraph, RunNode } from './run-graph.js'
 import { createRoleRegistry } from './roles.js'
@@ -312,8 +312,7 @@ function promptFor(
   return brief({
     order,
     role: node.role === null ? null : roles.get(node.role),
-    unit:
-      node.unitId === null ? null : (order.plan.units.find((u) => u.id === node.unitId) ?? null),
+    units: unitsOf(order, node),
     rules,
     command: step.kind === 'run' ? (step.command ?? '') : undefined,
     outputPath: outputPath ?? undefined,
@@ -706,7 +705,9 @@ export async function execute(
 
       // Who produced the work on this unit, so the party checking it can be
       // held against them rather than against itself.
-      if (node.unitId !== null && !readOnly) producedUnit.set(node.unitId, result.sessionId)
+      if (!readOnly) {
+        for (const unitId of node.unitIds) producedUnit.set(unitId, result.sessionId)
+      }
 
       // The verdict comes from the exit status. Whatever the run printed is
       // evidence, never the decision.
@@ -728,22 +729,23 @@ export async function execute(
       // never been made, and then found a `pass` already in the ledger for the
       // criterion it was there to judge, stamped at the millisecond the
       // builder's turn ended.
-      if (node.unitId !== null && readOnly) {
-        const criteria = order.plan.units.find((u) => u.id === node.unitId)?.satisfies ?? []
-        for (const criterionId of criteria) {
-          const verdict = verdictFromExit({
-            nodeId: node.id,
-            criterionId,
-            command: `${node.role ?? node.stepId} on ${node.unitId}`,
-            exitCode: result.exitCode,
-            // The session that produced the work being checked — not this
-            // one. Where the two are the same session, `makeVerdict` refuses.
-            nodeSessionId: producedUnit.get(node.unitId) ?? null,
-            producedBy: { role: roleId ?? node.stepId, sessionId: result.sessionId },
-            at: deps.now(),
-          })
-          verdicts.push(verdict)
-          deps.onEvent?.({ type: 'verdict', verdict })
+      if (node.unitIds.length > 0 && readOnly) {
+        for (const unit of unitsOf(order, node)) {
+          for (const criterionId of unit.satisfies) {
+            const verdict = verdictFromExit({
+              nodeId: node.id,
+              criterionId,
+              command: `${node.role ?? node.stepId} on ${unit.id}`,
+              exitCode: result.exitCode,
+              // The session that produced the work being checked — not this
+              // one. Where the two are the same session, `makeVerdict` refuses.
+              nodeSessionId: producedUnit.get(unit.id) ?? null,
+              producedBy: { role: roleId ?? node.stepId, sessionId: result.sessionId },
+              at: deps.now(),
+            })
+            verdicts.push(verdict)
+            deps.onEvent?.({ type: 'verdict', verdict })
+          }
         }
       }
 
@@ -810,7 +812,7 @@ export async function execute(
           // decision rather than a retry, and this is where it is asked for.
           halted =
             (await raise('verify.repeat-fail', {
-              summary: `${node.unitId ?? node.id} failed twice`,
+              summary: `${node.unitIds.join(', ') || node.id} failed twice`,
               why: `Attempt ${node.attempts + 1} of ${node.id} exited ${result.exitCode ?? 'without a status'}. A third try is a decision, not a retry.`,
               nodeId: node.id,
             })) || halted

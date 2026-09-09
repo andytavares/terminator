@@ -42,8 +42,8 @@ steps:
     after: [inspect]
 `
 
-function recipe(text = BUGFIX): Recipe {
-  const parsed = parseRecipe(text, 'bugfix.yaml')
+function recipe(text = BUGFIX, file = 'bugfix.yaml'): Recipe {
+  const parsed = parseRecipe(text, file)
   if (!parsed.ok) throw new Error(parsed.reason)
   return parsed.value
 }
@@ -119,7 +119,7 @@ describe('buildRunGraph', () => {
   it('carries the unit and its lane onto the node', () => {
     const graph = buildRunGraph(order(), recipe())
     const node = nodeById(graph, 'build:U-1')
-    expect(node?.unitId).toBe('U-1')
+    expect(node?.unitIds).toEqual(['U-1'])
     expect(node?.lane).toBe(1)
   })
 
@@ -166,6 +166,153 @@ describe('buildRunGraph', () => {
     const o = order({ plan: { ...order().plan, units: [] } })
     const graph = buildRunGraph(o, recipe())
     expect(graph.nodes.filter((n) => n.stepId === 'build')).toEqual([])
+  })
+})
+
+// Fanning out `by lane`.
+//
+// A fan-out exists to run work at the same time. Units in one lane share one
+// worktree and one branch, so they cannot run at the same time — fanning out
+// over them spends a cold session each on work that is serial anyway.
+// Measured on WO-0907-3c1: seven units, one lane, seven sessions.
+const BY_LANE = `
+schemaVersion: 1
+id: bylane
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units[role=builder] by lane
+    step: { kind: agent, role: builder }
+  - id: verify
+    kind: agent
+    role: verifier
+    context: fresh
+    after: [build]
+`
+
+function laneOrder(units: WorkOrder['plan']['units'], lanes = [1]): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    plan: {
+      ...base.plan,
+      units,
+      lanes: lanes.map((ord) => ({
+        ord,
+        repo: `repo-${ord}`,
+        branch: '',
+        role: null,
+        blocks: [],
+        blockedBy: [],
+      })),
+    },
+  }
+}
+
+function unit(
+  id: string,
+  lane: number,
+  dependsOn: string[] = [],
+  role = 'builder'
+): WorkOrder['plan']['units'][number] {
+  return { id, title: id, role, lane, dependsOn, satisfies: ['AC-1'], touches: [], verify: [] }
+}
+
+describe('a fan-out by lane', () => {
+  it('makes one node for seven units that share a lane', () => {
+    const o = laneOrder([
+      unit('U-1', 1),
+      unit('U-2', 1, ['U-1']),
+      unit('U-3', 1, ['U-1']),
+      unit('U-4', 1, ['U-1']),
+      unit('U-5', 1),
+      unit('U-6', 1, ['U-1', 'U-2', 'U-3', 'U-5']),
+      unit('U-7', 1, ['U-1', 'U-2']),
+    ])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    const built = graph.nodes.filter((n) => n.stepId === 'build')
+    expect(built.map((n) => n.id)).toEqual(['build:lane-1'])
+  })
+
+  it('still runs one node per lane, so separate repositories stay parallel', () => {
+    const o = laneOrder([unit('U-1', 1), unit('U-2', 2), unit('U-3', 3), unit('U-4', 3)], [1, 2, 3])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(graph.nodes.filter((n) => n.stepId === 'build').map((n) => n.id)).toEqual([
+      'build:lane-1',
+      'build:lane-2',
+      'build:lane-3',
+    ])
+  })
+
+  it('carries every unit it covers, in dependency order', () => {
+    const o = laneOrder([unit('U-3', 1, ['U-1']), unit('U-1', 1), unit('U-2', 1, ['U-1'])])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(nodeById(graph, 'build:lane-1')?.unitIds).toEqual(['U-1', 'U-3', 'U-2'])
+  })
+
+  it("honours the filter, so a scribe unit is not the builder lane node's work", () => {
+    const o = laneOrder([unit('U-1', 1), unit('U-2', 1, [], 'scribe')])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(nodeById(graph, 'build:lane-1')?.unitIds).toEqual(['U-1'])
+  })
+
+  it('waits on the lane that holds a unit it depends on', () => {
+    const o = laneOrder([unit('U-1', 1), unit('U-2', 2, ['U-1'])], [1, 2])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(nodeById(graph, 'build:lane-2')?.dependsOn).toContain('build:lane-1')
+  })
+
+  it("never waits on itself, because a lane's own order is the node's own work", () => {
+    const o = laneOrder([unit('U-1', 1), unit('U-2', 1, ['U-1'])])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(nodeById(graph, 'build:lane-1')?.dependsOn).not.toContain('build:lane-1')
+  })
+
+  it('makes a later step wait on every lane', () => {
+    const o = laneOrder([unit('U-1', 1), unit('U-2', 2)], [1, 2])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(nodeById(graph, 'verify')?.dependsOn).toEqual(['build:lane-1', 'build:lane-2'])
+  })
+
+  it('produces nothing when the filter selects nothing', () => {
+    const o = laneOrder([unit('U-1', 1, [], 'scribe')])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(graph.nodes.filter((n) => n.stepId === 'build')).toEqual([])
+  })
+
+  // A cycle is a plan the compile gate should have refused. The graph is not
+  // the place to discover it: refusing to build one means a run that cannot
+  // start at all, so the units that cannot be ordered keep the order the plan
+  // gave them.
+  it('keeps plan order for units that depend on each other, rather than refusing to build', () => {
+    const o = laneOrder([unit('U-1', 1, ['U-2']), unit('U-2', 1, ['U-1'])])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(nodeById(graph, 'build:lane-1')?.unitIds).toEqual(['U-1', 'U-2'])
+  })
+
+  it('orders what it can and keeps the rest, when only some of them cycle', () => {
+    const o = laneOrder([
+      unit('U-3', 1, ['U-1']),
+      unit('U-1', 1),
+      unit('U-4', 1, ['U-5']),
+      unit('U-5', 1, ['U-4']),
+    ])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(nodeById(graph, 'build:lane-1')?.unitIds).toEqual(['U-1', 'U-3', 'U-4', 'U-5'])
+  })
+
+  it('ignores a dependency on a unit no node in this fan-out carries', () => {
+    const o = laneOrder([unit('U-1', 1, ['U-99'])])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    expect(nodeById(graph, 'build:lane-1')?.dependsOn).toEqual([])
+  })
+
+  it('names a lane node after its lane and the work, not after one unit', () => {
+    const o = laneOrder([unit('U-1', 1), unit('U-2', 1, ['U-1'])])
+    const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
+    const node = nodeById(graph, 'build:lane-1')
+    expect(node).toBeDefined()
+    expect(nodeLabel(o, node as RunNode)).toBe('builder · 2 units in repo-1')
   })
 })
 
@@ -280,7 +427,7 @@ describe('what to call a node', () => {
     stepId: 'build',
     kind: 'agent',
     state: 'waiting',
-    unitId: null,
+    unitIds: [],
     lane: null,
     role: null,
     dependsOn: [],
@@ -315,13 +462,13 @@ describe('what to call a node', () => {
   }
 
   it("uses the unit's own title, which is what the operator asked for", () => {
-    expect(nodeLabel(withUnit(), node({ id: 'n2', unitId: 'U-1', role: 'builder' }))).toBe(
+    expect(nodeLabel(withUnit(), node({ id: 'n2', unitIds: ['U-1'], role: 'builder' }))).toBe(
       'builder · U-1 refresh the token on a 401'
     )
   })
 
   it('names the unit without a role when the node has none', () => {
-    expect(nodeLabel(withUnit(), node({ id: 'n2', unitId: 'U-1' }))).toBe(
+    expect(nodeLabel(withUnit(), node({ id: 'n2', unitIds: ['U-1'] }))).toBe(
       'U-1 refresh the token on a 401'
     )
   })
@@ -339,7 +486,7 @@ describe('what to call a node', () => {
   })
 
   it('names a unit the order no longer has by its role rather than inventing one', () => {
-    expect(nodeLabel(order(), node({ id: 'n2', unitId: 'U-gone', role: 'builder' }))).toBe(
+    expect(nodeLabel(order(), node({ id: 'n2', unitIds: ['U-gone'], role: 'builder' }))).toBe(
       'builder'
     )
   })
@@ -348,7 +495,7 @@ describe('what to call a node', () => {
     const graph = {
       orderId: 'WO-1',
       recipe: 'direct',
-      nodes: [node({ id: 'n1', role: 'architect' }), node({ id: 'n2', unitId: 'U-1' })],
+      nodes: [node({ id: 'n1', role: 'architect' }), node({ id: 'n2', unitIds: ['U-1'] })],
     }
     expect(nodeLabels(withUnit(), graph)).toEqual({
       n1: 'architect',

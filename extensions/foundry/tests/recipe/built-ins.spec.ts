@@ -32,10 +32,11 @@ function recipe(file: string): Recipe {
 }
 
 describe('built-in recipes', () => {
-  it('ships the six shapes of work the design names', () => {
+  it('ships the seven shapes of work the design names', () => {
     expect(recipeFiles.sort()).toEqual([
       'bugfix.yaml',
       'direct.yaml',
+      'quick.yaml',
       'refactor.yaml',
       'speckit.yaml',
       'spike.yaml',
@@ -125,10 +126,50 @@ describe('built-in recipes', () => {
   it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'refactor.yaml', 'speckit.yaml'])(
     '%s verifies with a fresh context, never a resumed one',
     (file) => {
-      const verify = recipe(file).steps.find((s) => s.id === 'verify')
-      expect((verify?.step as { context?: string } | undefined)?.context).toBe('fresh')
+      expect(recipe(file).steps.find((s) => s.id === 'verify')?.context).toBe('fresh')
     }
   )
+
+  // One verifier, not one per unit. A fresh context is what makes verification
+  // independent; a fresh context *per unit* buys nothing on top of that and
+  // doubled the session count of every order that ever ran.
+  it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'refactor.yaml', 'speckit.yaml'])(
+    '%s verifies once, not once per unit',
+    (file) => {
+      expect(recipe(file).steps.find((s) => s.id === 'verify')?.kind).toBe('agent')
+    }
+  )
+
+  // The Forge's converge *is* the architect, and the plan it produced is what
+  // the compile gate agreed. A `plan` step after agreement re-runs it over an
+  // order it is not allowed to change: `applyRungOutput` refuses a plan from a
+  // rung outright. Measured on WO-0907-3c1, that step cost 8.2 minutes and
+  // could only have ended in silence or a halt.
+  it.each(['direct.yaml', 'standard.yaml'])('%s does not re-plan an agreed order', (file) => {
+    const architects = recipe(file)
+      .steps.filter((step) => step.role === 'architect')
+      .map((step) => step.id)
+    expect(architects).toEqual([])
+  })
+
+  // A fan-out is a claim that work can happen at the same time. Units inside
+  // one lane share a worktree and a branch, so they cannot.
+  it.each(recipeFiles)('%s fans out over lanes, never over units in one lane', (file) => {
+    for (const step of recipe(file).steps) {
+      if (step.kind !== 'fanout') continue
+      expect(step.over).toMatch(/ by lane$/)
+    }
+  })
+
+  it('gives the quick shape one builder, one check and nothing else', () => {
+    const steps = recipe('quick.yaml').steps
+    expect(steps.map((s) => s.id)).toEqual(['build', 'check', 'ship'])
+    expect(steps.filter((s) => s.kind === 'agent' || s.kind === 'fanout')).toHaveLength(1)
+  })
+
+  it('needs a test command for the quick shape, because nothing else checks it', () => {
+    expect(recipe('quick.yaml').requires).toEqual([{ kind: 'toolchain', value: 'test' }])
+  })
 
   it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'speckit.yaml'])(
     '%s runs the inspector only on a risk trigger',
@@ -258,7 +299,7 @@ describe('every shipped role is one an operator recipe could name', () => {
   it.each(roleFiles.map((f) => f.replace('.yaml', '')))(
     '%s briefs into something an agent can be launched with',
     (id) => {
-      const text = brief({ order, role: registry.get(id) ?? null, unit: null, rules: [] })
+      const text = brief({ order, role: registry.get(id) ?? null, units: [], rules: [] })
       expect(text.trim().length).toBeGreaterThan(50)
       // The role's own prompt leads, because it is the instruction.
       expect(text.startsWith((registry.get(id)?.prompt ?? '').trim())).toBe(true)

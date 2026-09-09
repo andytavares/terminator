@@ -7,7 +7,7 @@
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },
   "dependencies": {
-    "js-yaml": "4.3.1",
+    "js-yaml": "4.3.2",
     "zod": "3.23.8"
   },
   "devDependencies": {

@@ -4,13 +4,13 @@ import { z } from 'zod'
 import { orderDir, ensureWritable } from '../data-root.js'
 import { laneViews, mayMergeLane } from '../order/lanes.js'
 import { buildRunGraph, nodeLabels } from '../line/run-graph.js'
-import type { RunGraph } from '../line/run-graph.js'
+import type { RunGraph, RunNode } from '../line/run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
 import { readyNodes, blockedReason, retry as retryNode } from '../line/scheduler.js'
 import { reclaim, orphanedNodes } from '../line/reclaim.js'
 import type { SessionLiveness } from '../line/reclaim.js'
 import { resolveRecipe, availableNames } from '../recipe/resolve.js'
-import type { ResolveSources } from '../recipe/resolve.js'
+import type { Resolved, ResolveSources } from '../recipe/resolve.js'
 import { checkRequirements } from '../recipe/requirements.js'
 import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
@@ -127,11 +127,29 @@ export async function writeRunGraph(dataRoot: string, graph: RunGraph): Promise<
  */
 export async function readRunGraph(dataRoot: string, orderId: string): Promise<RunGraph | null> {
   try {
-    return JSON.parse(await fs.promises.readFile(graphPath(dataRoot, orderId), 'utf8')) as RunGraph
+    const raw = JSON.parse(
+      await fs.promises.readFile(graphPath(dataRoot, orderId), 'utf8')
+    ) as RunGraph
+    return { ...raw, nodes: raw.nodes.map(withUnitIds) }
   } catch {
     // A missing or unreadable graph is "no run", never a thrown surface.
     return null
   }
+}
+
+/**
+ * A node from a graph written before a fan-out node could carry a whole lane.
+ *
+ * Those graphs have `unitId`, a single value, and nothing else on disk says so
+ * — `readRunGraph` casts unvalidated JSON. A run left in flight when the
+ * application closed is picked back up by reading exactly this file, so the
+ * one place worth converting is the boundary that reads it: everything past
+ * here then sees one shape.
+ */
+function withUnitIds(node: RunNode): RunNode {
+  if (Array.isArray(node.unitIds)) return node
+  const legacy = (node as unknown as { unitId?: string | null }).unitId ?? null
+  return { ...node, unitIds: legacy === null ? [] : [legacy] }
 }
 
 /** A proposed shape and the reason it fits this order (FR-014). */
@@ -143,34 +161,97 @@ export interface ProposedRecipe {
 /**
  * Choose a shape when the operator has not, and say why.
  *
- * Deliberately simple and stated out loud rather than clever: one unit is a
- * direct change, several is the standard shape, and anything already carrying
- * a recipe keeps it. The operator overrides in one click and that override is
- * recorded — a proposal nobody can predict is worse than a plain one.
+ * Deliberately simple and stated out loud rather than clever, and the operator
+ * overrides in one click with the override recorded — a proposal nobody can
+ * predict is worse than a plain one.
+ *
+ * Two questions, in order. **How many lanes**, because a lane is a worktree
+ * and a branch, and it is the only thing a heavier shape can genuinely run in
+ * parallel. Then **what the order says about itself**: the grade and whether
+ * any trigger fired, which is the order's own statement of who ought to look
+ * at it before it ships.
+ *
+ * Unit count decides nothing any more. A fan-out is `by lane`, so seven units
+ * in one lane cost one session; pricing the shape off them charged for
+ * parallelism that never existed and put a seven-unit stylesheet change into
+ * the heaviest shape there is.
  *
  * The reason travels with the name because a shape decides how many agents
  * run, what gets verified and whether a pull request opens at the end. An
  * operator asked to accept or override that needs the grounds, not just the
  * answer.
  */
-export function proposeRecipe(order: WorkOrder): ProposedRecipe {
+export function recipeLadder(order: WorkOrder): ProposedRecipe[] {
   if (order.recipe !== null) {
-    return { name: order.recipe, why: 'the order already names this shape' }
+    return [{ name: order.recipe, why: 'the order already names this shape' }]
   }
-  const units = order.plan.units.length
-  if (units <= 1 && order.risk.grade === 'P3') {
-    return {
-      name: 'direct',
-      why: `${units === 1 ? 'one unit' : 'no units'} of work, graded ${order.risk.grade}`,
-    }
-  }
-  return {
-    name: 'standard',
+
+  const lanes = new Set(order.plan.units.map((unit) => unit.lane)).size
+  const heaviest: ProposedRecipe =
+    lanes > 1
+      ? { name: 'standard', why: `${lanes} lanes of work` }
+      : {
+          name: 'standard',
+          why: `graded ${order.risk.grade}, which is above the direct shape's ceiling`,
+        }
+  if (lanes > 1) return [heaviest]
+
+  const { grade, triggers } = order.risk
+  const direct: ProposedRecipe = {
+    name: 'direct',
     why:
-      units > 1
-        ? `${units} units of work`
-        : `graded ${order.risk.grade}, which is above the direct shape's ceiling`,
+      triggers.length === 0
+        ? `one lane, graded ${grade}`
+        : `one lane graded ${grade}, and ${triggers.join(', ')} fired`,
   }
+
+  if (grade === 'P3' && triggers.length === 0) {
+    // `quick` needs a test command and `direct` does not, so the fallback is
+    // not decoration: in a repository with no suite, `quick`'s only check does
+    // not exist, and proposing a shape that cannot run here would refuse the
+    // run rather than choose a shape that can.
+    return [{ name: 'quick', why: 'one lane, graded P3, nothing flagged' }, direct]
+  }
+  if (grade === 'P2' || grade === 'P3') return [direct]
+  return [heaviest]
+}
+
+/** The lightest shape that fits, ignoring whether this repository can run it. */
+export function proposeRecipe(order: WorkOrder): ProposedRecipe {
+  return recipeLadder(order)[0]
+}
+
+type FittedRecipe =
+  | { readonly proposal: ProposedRecipe; readonly fitted: Resolved<Recipe> }
+  | { readonly error: string }
+
+/**
+ * The first shape on the ladder this repository can actually run.
+ *
+ * The reason a *ladder* exists rather than one answer: a shape's requirements
+ * are about the repository and the proposal is about the order, so the two
+ * can disagree. Where they do, the lighter shape stepping down to a heavier
+ * one is the right answer; refusing the run is not. An unmet requirement on
+ * the last rung is still an error — silently running something that meets none
+ * of them would be worse than saying so.
+ */
+function fitRecipe(
+  ladder: readonly ProposedRecipe[],
+  order: WorkOrder,
+  sources: ResolveSources
+): FittedRecipe {
+  const reasons: string[] = []
+  for (const proposal of ladder) {
+    const resolved = resolveRecipe(proposal.name, sources)
+    if (!resolved.ok) {
+      reasons.push(resolved.reason)
+      continue
+    }
+    const availability = checkRequirements(resolved.resolved.value.requires, order)
+    if (availability.available) return { proposal, fitted: resolved.resolved }
+    reasons.push(`the "${proposal.name}" shape cannot run here: ${availability.unmet.join('; ')}`)
+  }
+  return { error: `${reasons.join('. ')}.` }
 }
 
 export function createRunChannels(deps: RunDeps): RunChannels {
@@ -240,17 +321,19 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     }
 
     const chosenByOperator = parsed.data.recipe !== undefined
-    const proposal = proposeRecipe(order)
-    const name = parsed.data.recipe ?? proposal.name
-    const resolved = resolveRecipe(name, deps.sources())
-    if (!resolved.ok) return { error: resolved.reason }
+    // An operator's choice is honoured or refused, never quietly swapped. A
+    // *proposal* walks its own ladder instead: proposing a shape this
+    // repository cannot run would refuse the run over a decision nobody made.
+    const ladder = chosenByOperator
+      ? [{ name: parsed.data.recipe as string, why: 'chosen by the operator' }]
+      : recipeLadder(order)
 
-    const availability = checkRequirements(resolved.resolved.value.requires, order)
-    if (!availability.available) {
-      return { error: `The "${name}" shape cannot run here: ${availability.unmet.join('; ')}.` }
-    }
+    const fitted = fitRecipe(ladder, order, deps.sources())
+    if ('error' in fitted) return { error: fitted.error }
+    const { proposal, fitted: recipe } = fitted
+    const name = proposal.name
 
-    const graph = buildRunGraph(order, resolved.resolved.value)
+    const graph = buildRunGraph(order, recipe.value)
     await saveGraph(graph)
 
     const running: WorkOrder = {
@@ -272,7 +355,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       // version of it.
       reason: `${
         chosenByOperator ? 'chosen by the operator' : proposal.why
-      }; recipe resolved from ${resolved.resolved.rung}`,
+      }; recipe resolved from ${recipe.rung}`,
       evidence: [],
     })
 
@@ -291,7 +374,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     // blocked until the last agent finished would hold the bridge for the
     // length of the work. Failures reach the ledger and the graph, which is
     // where a surface reads them.
-    void deps.execute(running, resolved.resolved.value, graph).catch(async (error: unknown) => {
+    void deps.execute(running, recipe.value, graph).catch(async (error: unknown) => {
       await deps.store.record({
         at: deps.now(),
         orderId: order.id,
@@ -450,7 +533,10 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       }
     })
 
-    const proposal = proposeRecipe(order)
+    // The same walk `start` does, so the shape the surface shows is the shape
+    // that would run.
+    const fitted = fitRecipe(recipeLadder(order), order, deps.sources())
+    const proposal = 'error' in fitted ? proposeRecipe(order) : fitted.proposal
     return { recipes: offered, proposed: proposal.name, proposedWhy: proposal.why }
   }
 

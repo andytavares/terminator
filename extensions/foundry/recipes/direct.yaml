@@ -1,21 +1,25 @@
 schemaVersion: 1
 id: direct
-description: A small, low-risk change. Plan it, build it, prove it, ship it.
+description: One lane, but something worth a second look. Build it, prove it, inspect it, ship it.
 requires: []
 steps:
-  - id: plan
-    kind: agent
-    role: architect
+  # No `plan` step. The Forge's converge *is* the architect, and the plan it
+  # produced is the one the compile gate agreed. Running it again over an
+  # agreed order asks for a plan nothing may apply — `applyRungOutput` refuses
+  # one from a rung outright — so the step could only end in silence or in a
+  # halt. Measured on WO-0907-3c1 it cost 8.2 minutes and did neither.
   - id: build
     kind: fanout
-    over: plan.units
-    after: [plan]
+    over: plan.units by lane
     step: { kind: agent, role: builder }
+  # One verifier, not one per unit. A fresh context is what makes verification
+  # independent of the work; a fresh context *per unit* adds nothing on top of
+  # that and doubled the session count of every order that ever ran.
   - id: verify
-    kind: fanout
-    over: plan.units
+    kind: agent
+    role: verifier
+    context: fresh
     after: [build]
-    step: { kind: agent, role: verifier, context: fresh }
   - id: inspect
     kind: agent
     role: inspector
