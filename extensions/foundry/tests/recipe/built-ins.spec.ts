@@ -329,3 +329,16 @@ describe('the architect and the builder, about the same files', () => {
     expect(architect?.prompt).toContain('test files')
   })
 })
+
+// The architect writes `plan` and `acceptance` and, until this was added,
+// could read neither. A role's `reads:` is a permission rather than a
+// preference, so the fix belongs on the role and not in the code that builds
+// the brief: strip `order` from this list and the amendment brief degrades
+// honestly instead of quietly ignoring what the role declared.
+describe('what the architect may read', () => {
+  it('may read the order it is writing', () => {
+    const parsed = parseRole(read(rolesDir, 'architect.yaml'), 'architect.yaml')
+    expect(parsed.ok).toBe(true)
+    expect(parsed.ok && parsed.value.reads).toContain('order')
+  })
+})

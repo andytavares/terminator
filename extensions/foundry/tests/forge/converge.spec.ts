@@ -295,3 +295,130 @@ describe('when the proposal is read', () => {
     expect(result.ok && result.note).toBe('on the third turn')
   })
 })
+
+// Amending an order, rather than drafting one again.
+//
+// Measured on WO-0910-6ea: the operator clicked "Ask for the gap to be closed"
+// on a one-line order, and the architect spent six minutes and 31 shell
+// commands before it wrote anything. It had no reason to know better. The
+// brief it was handed carried the problem statement and the repository, and
+// not the plan or the criteria it was being told were wrong — the architect's
+// `reads:` named neither — so "nothing in the plan builds AC-1" arrived as a
+// complaint about a document it could not see. Its first move was to go and
+// find the proposal it remembered writing, which `readProposal` deletes as it
+// applies it, and its second was to reconstruct the order from `order.json`
+// and the ledger by hand.
+describe('amending an order the architect has already written', () => {
+  function drafted(over: Partial<WorkOrder> = {}): WorkOrder {
+    const base = order()
+    return {
+      ...base,
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'an expired token is refused',
+          priority: 'P0',
+          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+          unverifiable: null,
+        },
+      ],
+      plan: {
+        ...base.plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'check the expiry on the refresh path',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: [],
+            touches: ['src/auth.ts'],
+            verify: [],
+          },
+        ],
+      },
+      provenance: {
+        ...base.provenance,
+        decisions: ['2026-09-06T11:00:00.000Z architect: first plan'],
+      },
+      ...over,
+    }
+  }
+
+  function prompt(target: WorkOrder, message?: string): string {
+    return convergeBrief({
+      order: target,
+      root,
+      sources: sources(),
+      rules: [],
+      ...(message === undefined ? {} : { message }),
+    }).prompt
+  }
+
+  it('hands over the criteria and the plan it is being told are wrong', () => {
+    const text = prompt(drafted())
+    expect(text).toContain('AC-1')
+    expect(text).toContain('an expired token is refused')
+    expect(text).toContain('U-1')
+    expect(text).toContain('check the expiry on the refresh path')
+  })
+
+  it('plots which criteria the plan does not build, which is the check that fails', () => {
+    expect(prompt(drafted())).toContain('| AC-1 |')
+  })
+
+  it('says the turn amends the order rather than drafting it again', () => {
+    expect(prompt(drafted())).toContain('This turn amends the order above')
+  })
+
+  // Its first move on the live run, and a dead end every time: the file is
+  // unlinked in `readProposal`'s `finally`, so what the architect remembers
+  // writing is never there to be read.
+  it('says the proposal it remembers writing was consumed', () => {
+    expect(prompt(drafted())).toContain('consumed when it was applied')
+  })
+
+  it('asks for the keys that changed and not for the ones that did not', () => {
+    expect(prompt(drafted())).toContain('Send only the keys you changed')
+  })
+
+  it('carries the operator’s instruction after the framing, not instead of it', () => {
+    const text = prompt(drafted(), 'the coverage check fails')
+    const framing = text.indexOf('This turn amends the order above')
+    const said = text.indexOf('What the operator just said')
+    expect(framing, 'the amendment framing is missing').toBeGreaterThan(-1)
+    expect(said, 'the operator’s instruction is missing').toBeGreaterThan(-1)
+    expect(framing).toBeLessThan(said)
+  })
+
+  it('says none of it on a first draft, which has nothing to amend', () => {
+    const text = prompt(order())
+    expect(text).not.toContain('This turn amends the order above')
+    expect(text).not.toContain('Send only the keys you changed')
+  })
+
+  // A ticket that states its own criteria is taken at its word, so an order
+  // can carry acceptance before any architect has seen it. Telling that
+  // architect it wrote them is a lie, and "change only what is wrong" is the
+  // wrong instruction for a plan that does not exist yet.
+  it('treats criteria that came from the ticket as a draft, not as its own work', () => {
+    const fromTicket = drafted({
+      plan: order().plan,
+      provenance: { ...order().provenance, decisions: [] },
+    })
+    expect(prompt(fromTicket)).not.toContain('This turn amends the order above')
+  })
+
+  // A refused proposal changes nothing, so the turn after one is still the
+  // first draft — the conversation happened, the order did not move.
+  it('treats a refused turn as a draft, because nothing was applied', () => {
+    const refused = drafted({
+      provenance: {
+        ...order().provenance,
+        forgeSession: 'a-session-that-produced-nothing',
+        decisions: [],
+      },
+    })
+    expect(prompt(refused)).not.toContain('This turn amends the order above')
+  })
+})
