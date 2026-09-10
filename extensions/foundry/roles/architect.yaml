@@ -2,7 +2,7 @@ schemaVersion: 1
 id: architect
 modelTier: deep
 allowResume: true
-reads: [intent, context]
+reads: [intent, context, order]
 writes: [plan, acceptance]
 tools: [read, search]
 prompt: |

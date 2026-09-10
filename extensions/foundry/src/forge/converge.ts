@@ -142,6 +142,46 @@ function outputContract(file: string, order: WorkOrder): string {
   ].join('\n')
 }
 
+/**
+ * What an amending turn is told, on top of the order it can now see.
+ *
+ * Empty on a first draft. `provenance.decisions` grows once per applied
+ * proposal and nowhere else while an order is a draft — a refused turn appends
+ * nothing, and criteria a ticket stated for itself are not a plan the
+ * architect wrote — so a non-empty list is the one honest signal that there is
+ * something here to amend rather than draft.
+ *
+ * The framing matters as much as the order printed above it. The role's own
+ * prompt opens "Turn intent and context into criteria and a plan", which is
+ * the right instruction exactly once; read again on the fourth turn it is an
+ * invitation to derive the whole thing a second time, and on WO-0910-6ea that
+ * is what it did — six minutes and 31 shell commands to close a gap in a plan
+ * it was never shown.
+ */
+function amendment(order: WorkOrder): string[] {
+  if (order.provenance.decisions.length === 0) return []
+  return [
+    '',
+    '---',
+    '',
+    '## This turn amends the order above',
+    '',
+    'You wrote it, and it is printed above as it now stands — which is not the',
+    'same as what you proposed. The operator answers questions, strikes',
+    'assumptions and resolves findings between turns, and what you can see is',
+    'after all of that. It is the record; your memory of the last turn is not.',
+    '',
+    'There is no proposal file left to read: the one you wrote last turn was',
+    'consumed when it was applied. So do not go looking for it, and do not',
+    'reconstruct from `order.json` or from the ledger anything already printed',
+    'above. Read the repository only for what the order does not tell you.',
+    '',
+    'Change what the failing checks and the operator name, and leave the rest',
+    'alone. Send only the keys you changed — every key is optional, and one',
+    'restated unchanged is a chance to restate it wrong.',
+  ]
+}
+
 export interface ConvergeInput {
   readonly order: WorkOrder
   readonly root: string
@@ -193,7 +233,12 @@ export function convergeBrief(input: ConvergeInput): ConvergeBrief {
       : ['', '---', '', '## What the operator just said', '', input.message.trim()]
 
   return {
-    prompt: [body, ...typed, outputContract(proposalPath, input.order)].join('\n'),
+    prompt: [
+      body,
+      ...amendment(input.order),
+      ...typed,
+      outputContract(proposalPath, input.order),
+    ].join('\n'),
     proposalPath,
     role: resolved.resolved.value,
     // The repository itself, not a worktree: intake reads and changes nothing,
