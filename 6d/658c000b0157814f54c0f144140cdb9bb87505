@@ -1,0 +1,19 @@
+tests/e2e/foundry-resume.spec.ts
+  s_cc184b196e0915::t_d221d5708d36b0 325-334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6d658c000b0157814f54c0f144140cdb9bb87505",
+  "prompts": {},
+  "sessions": {
+    "s_cc184b196e0915": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5675833-dadf-4f0d-b4eb-33a10ffd65ed",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
