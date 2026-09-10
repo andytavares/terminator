@@ -1,0 +1,27 @@
+extensions/foundry/tests/runtime/shell-split.spec.ts
+  s_cc184b196e0915::t_781c5f48d14221 156-213
+  s_cc184b196e0915::t_9424ea270170b2 119-155
+extensions/foundry/src/runtime/shell-split.ts
+  s_cc184b196e0915::t_9ccf2b756e8106 168-174,176,178-179,183-192
+  s_cc184b196e0915::t_c3bf131790d15b 262-271
+  s_cc184b196e0915::t_17936d38ff66d9 56-114,120-136
+  s_cc184b196e0915::t_9057037af2e54e 21-29
+  s_cc184b196e0915::t_a0ecab829e4c2c 144-145,259-261,272-281,305-308,314-322
+  s_cc184b196e0915::t_5908a5616a9e9a 115-119,309-313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1f828371dfd26e26ca6e28f12ee72953e892ee47",
+  "prompts": {},
+  "sessions": {
+    "s_cc184b196e0915": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5675833-dadf-4f0d-b4eb-33a10ffd65ed",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
