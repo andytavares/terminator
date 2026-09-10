@@ -322,7 +322,16 @@ test('the Floor carries the same move, above the graph', async () => {
   await handle.page.waitForTimeout(1500)
 
   const text = await bodyText()
-  expect(text, `the Floor rendered:\n${text}`).toContain('Nothing is running this')
+  // `Halted — your move`, not `Nothing is running this`. An orphan always
+  // raises `run.interrupted` (adopt.ts), and ADR-045 puts an unanswered gate
+  // ahead of everything else in the standing — "every other condition below is
+  // a symptom of it". The adrift headline is what this order says *after* the
+  // gate is held, which is a different screen. This assertion predates that
+  // ordering.
+  expect(text, `the Floor rendered:\n${text}`).toContain('Halted — your move')
+  // The interrupted gate's own words, so this proves the resume band rendered
+  // rather than any halt at any gate.
+  expect(text).toContain('Nothing is moving this run')
   expect(text).toContain('builder · U-1 refresh the token on a 401')
   expect(text).toContain('Pick it back up')
 
