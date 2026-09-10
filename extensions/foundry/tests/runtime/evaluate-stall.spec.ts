@@ -187,3 +187,60 @@ describe('purity', () => {
     expect(a).toEqual(b)
   })
 })
+
+// Measured on WO-0910-1fb. The architect's intake conversation is one session
+// across many turns: it converged, went quiet while the operator read what it
+// had written, and was sent a new turn twenty minutes later. `lastToolActivityAt`
+// is read from the whole transcript, so at the first tick after the new turn
+// began it still pointed at the *previous* turn's last tool call — twenty-one
+// minutes of silence against an eight-minute threshold. The run had been going
+// for twenty-three seconds. `run.stalled` was on the order before the builder's
+// third command.
+//
+// Silence belongs to the state the session is in now. `stateSince` already
+// says when that began; it was only ever consulted when there was no tool
+// activity at all.
+describe('a session that has just been given a new turn', () => {
+  const facts = (over: Partial<SessionFacts> = {}): SessionFacts => ({
+    sessionId: 's1',
+    canStall: true,
+    stateSince: 0,
+    lastToolActivityAt: null,
+    lastNetChangeAt: null,
+    openShellStartedAt: null,
+    recentToolPaths: [],
+    recentNetChange: 1,
+    ...over,
+  })
+
+  it('is not silent for the time it spent between turns', () => {
+    const resumedAt = 20 * 60_000
+    expect(
+      evaluateStall(
+        facts({ stateSince: resumedAt, lastToolActivityAt: 0, lastNetChangeAt: 0 }),
+        DEFAULT_THRESHOLDS,
+        resumedAt + 23_000
+      )
+    ).toBeNull()
+  })
+
+  it('is silent once the new turn has itself been quiet for long enough', () => {
+    const resumedAt = 20 * 60_000
+    const firing = evaluateStall(
+      facts({ stateSince: resumedAt, lastToolActivityAt: 0, lastNetChangeAt: 0 }),
+      DEFAULT_THRESHOLDS,
+      resumedAt + 9 * 60_000
+    )
+    expect(firing?.signal).toBe('silence')
+  })
+
+  it('still measures from the last tool call when that is the more recent of the two', () => {
+    const firing = evaluateStall(
+      facts({ stateSince: 0, lastToolActivityAt: 60_000, lastNetChangeAt: 60_000 }),
+      DEFAULT_THRESHOLDS,
+      60_000 + 9 * 60_000
+    )
+    expect(firing?.signal).toBe('silence')
+    expect(firing?.inputs.toolSilenceMs).toBe(9 * 60_000)
+  })
+})

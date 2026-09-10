@@ -42,6 +42,128 @@ state first — `waiting`, `stalled`, `ready`, `working`. Choosing one focuses t
 window and lands on the thing: a run's terminal if it still has one, otherwise
 the panel opened on it.
 
+## Where an order stands
+
+One derivation — `src/order/standing.ts` — answers _what is this order doing,
+and whose move is it_, and every surface reads it rather than working it out
+from whatever it happens to hold. That was the alternative, and it shipped: the
+order list read a **draft-time compile result**, which is zero for every running
+order for ever, so it labelled every one of them `ready to hand off` — including
+`WO-0909-30a`, which had been halted at an undecided budget gate for two hours
+with its builder parked at a terminal prompt. The Floor, reading only the graph,
+drew `building` chips over the same run. Neither named the gate.
+
+`standingOf` is pure and takes the whole picture at once. The order of its
+branches is not arbitrary — it is **how much of the run each condition has
+stopped**, worst first:
+
+| Kind       | Whose move | What it means                                                                                     |
+| ---------- | ---------- | ------------------------------------------------------------------------------------------------- |
+| `done`     | Foundry    | the order shipped                                                                                 |
+| `shaping`  | either     | a draft: yours if it is asking questions or its last intake turn was refused, Foundry's otherwise |
+| `halted`   | **you**    | an undecided gate has stopped the line; nothing is scheduled                                      |
+| `adrift`   | **you**    | the graph says running and no process is                                                          |
+| `asking`   | **you**    | an agent is holding a tool call, answerable from the surface                                      |
+| `stranded` | **you**    | a call was handed back to a terminal prompt nobody is at                                          |
+| `stalled`  | **you**    | a run stopped making progress without asking for anything                                         |
+| `failed`   | **you**    | a step failed                                                                                     |
+| `ready`    | Foundry    | agreed, no graph yet                                                                              |
+| `working`  | Foundry    | agents are running                                                                                |
+
+Within `shaping` a **refused intake turn** outranks open questions, and for the
+same kind of reason: answering a question the architect asked before it was
+refused writes an answer onto a document no architect is reading. See _A turn
+that was refused_ below.
+
+`halted` outranks everything because a gate stops the whole line and every other
+condition under it is a symptom. `asking` outranks `stranded` because a held
+call is answerable here in one click and a handed-back one can only be answered
+in the terminal it was handed to. A **shadow** stall firing is deliberately
+never notified, so it is not counted: a standing is a notification.
+
+`readStanding` is the one place the inputs are assembled — the graph from disk,
+the gates from the gate store, liveness from this process — and both
+`foundry:order.list` and `foundry:run.observe` go through it. Two callers
+assembling them separately is how the list and the Floor came to describe one
+halted run as `ready to hand off` and `building` at the same moment.
+
+### The band
+
+The Floor opens with the standing across its full width, before anything only
+there to be read: the order's **title**, then the headline, the sentence, how
+many steps are done — and **the move**. A screen that names a blocker and offers
+no reachable control is a wall, so the gate's own options are rendered as
+buttons here, each over its consequence, answered through `foundry:inbox.decide`
+— the same channel the inbox answers them with. This is not a second queue; the
+inbox stays the cross-order one. It is this order's one blocking thing, put
+where the person looking at the order will see it.
+
+`adrift` and `stranded` carry their moves the same way — _Pick it back up_ and
+_Go to its terminal_. The separate "nothing is running this" panel is gone with
+them: two panels saying the same thing in two voices is what the band replaced.
+
+### A turn that was refused
+
+The architect proposes; Foundry validates; a proposal that would not make a
+readable order is refused whole. That is ADR 043's boundary working, and the
+cost it accepted — _the turn is wasted_ — is real: on `WO-0909-6db` six
+acceptance criteria and the only unit in the plan were lost to three file paths
+written into `verify.evidence`, which is a closed set of artifact kinds.
+
+What ADR 043 said would happen and did not is that the waste was **reported**.
+A refusal has nothing to save, so `order.json` is untouched, so every surface —
+all of which read the document — saw an order in exactly the state it had been
+in before. The Forge said _The architect is working…_ for forty minutes over a
+turn that had ended, and the order list said _Foundry is still shaping this_.
+
+So the outcome of an intake turn is read out of the ledger, which is the only
+place it is written. `src/forge/intake-outcome.ts` walks a ledger backwards to
+the newest of three lines and answers what the last turn did:
+
+| Line               | Outcome     | What the surfaces do                                          |
+| ------------------ | ----------- | ------------------------------------------------------------- |
+| `converge.started` | `running`   | the Forge polls; the button says the architect is working     |
+| `order.redrafted`  | `redrafted` | the poll stops; the redraw is already on screen               |
+| `converge.refused` | `refused`   | the poll stops; the band opens; the standing is **your** move |
+| none of them       | `none`      | intake has not run                                            |
+
+`foundry:order.compile` carries it on every read, so the Forge's "is an
+architect working" is derived from the record rather than from a flag set by a
+click — which was wrong in both directions, surviving a turn that had ended and
+not surviving a walk away from the screen.
+
+The band itself carries the **validator's own words**, verbatim and monospaced:
+the field path and the values it would have accepted. Paraphrasing would drop
+the one thing that makes the next turn succeed. Two controls sit under it —
+_Tell the architect what was wrong_, which sends the reason back as the next
+turn's instruction, and _Start the turn over_.
+
+The first is not a convenience. The architect cannot read its own refusal: its
+turn ended before the validation ran. On the run this was found on it could not
+have parsed its own JSON either — `node -e`, `python3 -c` and shell redirects
+are all off intake's read-only allowlist, so there was no way for it to check
+the deliverable before submitting it. Handed the reason, it fixes it in one
+turn.
+
+A refusal also raises a toast, once, keyed to the order. A refusal changes
+nothing, so there is nowhere else it would appear to somebody who is not looking
+at that order.
+
+**The enums are in the brief.** Both refusals of this kind have been a closed
+set the architect was never shown — `risk.triggers` on `WO-0907-3c1`,
+`verify.evidence` on `WO-0909-6db`. Both are now rendered into the output
+contract from the schema constant (`RISK_TRIGGERS`, `EVIDENCE_KINDS`) rather
+than retyped, with the distinction that caused the failure stated: a trigger is
+a label and not a sentence, and evidence is a kind of artifact and not a path —
+a file the judge should read is named in the rubric. A closed set added to the
+order schema and not to the contract is the next one of these — so
+`converge.spec.ts` holds the list, and a closed set added to a proposable part
+of the order fails that test until it is named in the brief. Sweeping it turned
+up a third before it cost anything: a lane's `role`, shown as `null` and named
+nowhere, three lines under a _unit's_ `role`, which is a free string whose
+example reads `"builder"` — the obvious wrong answer sitting on the same screen
+as the field.
+
 ## What you can do about a run
 
 Every row offers the same set, whether or not anything has called it stuck — the
@@ -571,6 +693,17 @@ purpose rather than a fix.
 What has changed is that the silence is legible: the console says when a
 question is asked, and says again when it is handed back to the terminal, which
 is the moment the agent stops.
+
+A feed entry scrolls away, so the hand-back is also **recorded**. The session is
+held in `strandedAgents` and counted for as long as its process is alive, which
+is what lets the order's standing read `stranded` — _An agent is waiting at its
+terminal_ — instead of `working`. The entry is dropped when that agent asks
+again, which is what an agent somebody freed at the prompt does next, and when
+its process is gone, which is `adrift` and a different move.
+
+For 90 minutes on `WO-0909-30a` there was no such record: the builder was parked
+at a prompt, its node still said `running`, and every surface drew a working
+build over it until the wall-clock budget fired.
 
 ### What the ladder takes for itself
 

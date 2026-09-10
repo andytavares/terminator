@@ -116,3 +116,98 @@ describe('redirectTargets', () => {
     expect(redirectTargets('npm test')).toEqual([])
   })
 })
+
+// Measured on WO-0910-1fb. A builder inventorying CSS custom properties wrote:
+//
+//   for t in tv-color-danger tv-status-open; do
+//     echo "$t: total=$(grep -c "var(--$t" a.css)"
+//   done
+//
+// `substitution` counted parentheses without tracking quotes, so the `(` in
+// the quoted pattern `"var(--$t"` opened a level nothing closed. The scan ran
+// off the end, the shape was reported unreadable, `isDestructive` called a
+// read-only grep destruction, and the call was held for 276 seconds before
+// handing back to a terminal nobody was sitting at.
+describe('a parenthesis inside a quoted argument', () => {
+  it('does not open a level of nesting the substitution has to close', () => {
+    const reading = readShell('echo "total=$(grep -c "var(--x" a.css)"')
+    expect(reading.unreadable).toBe(false)
+    expect(reading.segments).toContain('grep -c "var(--x" a.css')
+  })
+
+  it('is read the same way in single quotes, which expand nothing', () => {
+    expect(readShell("echo $(grep -c 'var(--x' a.css)").unreadable).toBe(false)
+  })
+
+  it('still reports a substitution that genuinely never closes', () => {
+    expect(readShell('echo $(grep -c x a.css').unreadable).toBe(true)
+    expect(readShell('echo `grep -c x a.css').unreadable).toBe(true)
+  })
+
+  it('reads the real loop from the run that found this', () => {
+    const reading = readShell(
+      'for t in tv-color-danger tv-status-open; do\n' +
+        '  echo "$t: total=$(grep -c "var(--$t" a.css)"\n' +
+        'done'
+    )
+    expect(reading.unreadable).toBe(false)
+  })
+})
+
+// A heredoc body is data the shell hands to a command's stdin. It is not
+// shell, and reading it as shell is how the builder's single most common
+// operation — writing a test file — became a five-minute hold.
+//
+// Measured on WO-0910-1fb: `cat > tests/…/red-text-palette.spec.ts <<'TESTEOF'`
+// whose body was a spec file with a JSDoc comment in it. The comment quoted
+// two identifiers in backticks, `readShell` read the first as opening a
+// command substitution, found no partner, reported the shape unreadable — and
+// `isDestructive` reads unreadable as destruction. A `cat` into the unit's own
+// worktree was sent to an operator.
+//
+// Quoting is exactly what this module exists to track. A heredoc is quoting.
+describe('a heredoc body, which is data and not shell', () => {
+  const spec = [
+    "cat > tests/unit/a.spec.ts <<'TESTEOF'",
+    '/**',
+    ' * Text colour is decided in `styles.css` and in `EXTENSION_BASE_CSS`.',
+    ' */',
+    "import { describe } from 'vitest'",
+    'TESTEOF',
+  ].join('\n')
+
+  it('is not read as an unterminated substitution', () => {
+    expect(readShell(spec).unreadable).toBe(false)
+  })
+
+  it('does not offer its lines up as commands to judge', () => {
+    expect(readShell(spec).segments).not.toContain("import { describe } from 'vitest'")
+  })
+
+  it('reads the command that follows the terminator', () => {
+    const reading = readShell(`${spec}\nnpx vitest run tests/unit/a.spec.ts`)
+    expect(reading.unreadable).toBe(false)
+    expect(reading.segments).toContain('npx vitest run tests/unit/a.spec.ts')
+  })
+
+  it('still judges a destructive command after the body', () => {
+    const reading = readShell(`${spec}\nrm -f tests/unit/a.spec.ts`)
+    expect(reading.segments).toContain('rm -f tests/unit/a.spec.ts')
+  })
+
+  it('handles the tab-stripping and unquoted spellings too', () => {
+    expect(readShell('cat > a <<-EOF\n\tone `two\nEOF\necho done').unreadable).toBe(false)
+    expect(readShell('cat > a <<EOF\nplain `text\nEOF\necho done').unreadable).toBe(false)
+    expect(readShell('cat > a <<"EOF"\nx `y\nEOF\necho done').unreadable).toBe(false)
+  })
+
+  it('leaves `<<<` alone, which is a here-string and not a heredoc', () => {
+    const reading = readShell('grep x <<< "$(cat a.txt)"')
+    expect(reading.unreadable).toBe(false)
+    expect(reading.segments).toContain('cat a.txt')
+  })
+
+  it('reports a heredoc whose terminator never arrives', () => {
+    expect(readShell("cat > a <<'EOF'\nunterminated body").unreadable).toBe(true)
+  })
+})

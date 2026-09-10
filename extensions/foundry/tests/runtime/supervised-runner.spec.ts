@@ -47,12 +47,12 @@ function api() {
   } as never
 }
 
-function runner() {
+function runner(now: () => number = () => 1_000) {
   return createSupervisedRunner({
     api: api(),
     control,
     stateDir: join(dir, 'state'),
-    now: () => 1_000,
+    now,
   })
 }
 
@@ -688,5 +688,40 @@ describe('the parent session it must not inherit', () => {
   it('keeps the session id it was given, which is not inherited but chosen', async () => {
     const run = await runner().start(start)
     expect(launchScriptBody()).toContain(`--session-id ${run?.sessionId}`)
+  })
+})
+
+// The other half of the stall the detector could not have seen through. A
+// session's `startedAt` was written once, at registration, and the stall
+// detector measures silence from the later of that and the last tool call —
+// so a conversation the operator came back to after twenty minutes was judged
+// against a start twenty minutes stale, and fired the instant it was given
+// work again. When a session is handed a new turn it enters a new state, and
+// that is when the state began.
+describe('when a session is given something new to do', () => {
+  it('measures from the new turn, not from when the conversation opened', async () => {
+    let clock = 1_000
+    const supervised = runner(() => clock)
+    const run = await supervised.start(start)
+    expect(supervised.watchable()[0].startedAt).toBe(1_000)
+
+    clock = 20 * 60_000
+    supervised.continueRun(run!.sessionId, {
+      prompt: '/speckit-plan',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(supervised.watchable()[0].startedAt).toBe(20 * 60_000)
+  })
+
+  it('does the same for a message typed into a run already open', async () => {
+    let clock = 1_000
+    const supervised = runner(() => clock)
+    const run = await supervised.start(start)
+
+    clock = 9 * 60_000
+    expect(supervised.send(run!.sessionId, 'carry on')).toBe(true)
+    expect(supervised.watchable()[0].startedAt).toBe(9 * 60_000)
   })
 })

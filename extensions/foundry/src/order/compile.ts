@@ -70,6 +70,16 @@ const UI_FILE = /\.(tsx|jsx|vue|svelte|css|scss|html)$/
  * project's history passed its structural assertions first, and a criterion
  * proved by a command cannot say whether the thing renders. The escape is the
  * same one every criterion has — accept it as unverifiable, in writing.
+ *
+ * **One picture closes it, and the failure has to say so.** A check that names
+ * what is missing without naming what is enough gets over-served. Measured on
+ * WO-0910-1fb, an order whose whole content was "make all text red": this
+ * fired because the plan touched CSS, and the architect closed it by inventing
+ * three screenshot criteria across five extension views in two themes. The
+ * coverage check then pulled all five of those views into the unit's `touches`
+ * to keep the matrix complete, and a one-line ask became a 41-file plan the
+ * builder spent fifty-three minutes on. Every one of those steps was a check
+ * working exactly as written.
  */
 function checkPicture(order: WorkOrder): CompileFailure | null {
   const seen = order.plan.units.filter((unit) => unit.touches.some((p) => UI_FILE.test(p)))
@@ -85,7 +95,7 @@ function checkPicture(order: WorkOrder): CompileFailure | null {
 
   return {
     check: 'verifiable',
-    detail: `${seen.map((u) => u.id).join(', ')} change what a person sees, and no criterion asks for a picture of the running application. A command cannot say whether it renders.`,
+    detail: `${seen.map((u) => u.id).join(', ')} change what a person sees, and no criterion asks for a picture of the running application. A command cannot say whether it renders. One such criterion closes this — of a surface the plan already touches, not of new ones added to satisfy it, because every surface a criterion names is one the plan then has to touch to stay covered.`,
     subjectIds: seen.map((unit) => unit.id),
   }
 }
@@ -223,17 +233,53 @@ function checkRedTeam(order: WorkOrder): CompileFailure | null {
 }
 
 /**
+ * Room for what the plan did not foresee, as a share of the plan's own size.
+ *
+ * A files-touched budget exists to catch an agent going *wide* — substantially
+ * past what was planned. A budget the plan already fills cannot tell that from
+ * an estimate that was a few files short, so it stops being a budget and
+ * becomes a tripwire on the plan's own accuracy.
+ *
+ * Measured on WO-0910-1fb, an order whose whole content was "make all text
+ * red": the plan declared 41 files and the budget was 42. It compiled. The
+ * builder then found seven files the plan had not, reached 48, and the budget
+ * rule halted a run that had already done the work — fifty-three minutes, and
+ * nothing shipped.
+ *
+ * A quarter, rounded up. Proportional rather than flat because the thing being
+ * absorbed is estimation error, which scales with the plan.
+ */
+const HEADROOM_SHARE = 0.25
+
+/** The smallest budget a plan of this size can be agreed against. */
+export function smallestBudgetFor(filesPlanned: number): number {
+  return filesPlanned + Math.ceil(filesPlanned * HEADROOM_SHARE)
+}
+
+/**
  * Budgets are part of the agreement, not advice — so an order whose own plan
  * cannot fit inside them is refused before any agent starts rather than paused
  * half way through.
+ *
+ * "Fit" means fit with room. See `HEADROOM_SHARE`.
  */
 function checkBudgets(order: WorkOrder): CompileFailure | null {
   const distinct = new Set(order.plan.units.flatMap((u) => u.touches))
-  if (distinct.size <= order.budgets.filesTouched) return null
+  const smallest = smallestBudgetFor(distinct.size)
+  if (smallest <= order.budgets.filesTouched) return null
+
+  const subjectIds = order.plan.units.filter((u) => u.touches.length > 0).map((u) => u.id)
+  if (distinct.size > order.budgets.filesTouched) {
+    return {
+      check: 'budgets',
+      detail: `The plan touches ${distinct.size} files but the order budgets ${order.budgets.filesTouched}. Raise the budget to ${smallest} or split the order.`,
+      subjectIds,
+    }
+  }
   return {
     check: 'budgets',
-    detail: `The plan touches ${distinct.size} files but the order budgets ${order.budgets.filesTouched}. Raise the budget or split the order.`,
-    subjectIds: order.plan.units.filter((u) => u.touches.length > 0).map((u) => u.id),
+    detail: `The plan touches ${distinct.size} files and the order budgets ${order.budgets.filesTouched}, which the plan already fills. A budget with no room left cannot tell an agent going wide from an estimate that was a few files short, and stops the run once the work is done rather than before it starts. Raise the budget to ${smallest}, or split the order.`,
+    subjectIds,
   }
 }
 

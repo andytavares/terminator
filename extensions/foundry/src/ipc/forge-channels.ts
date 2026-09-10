@@ -6,6 +6,9 @@ import { strikeAssumption } from '../forge/assumptions.js'
 import { applyFindings, resolveFinding, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
+import { readStanding } from '../order/standing.js'
+import { intakeRefusal, lastIntake } from '../forge/intake-outcome.js'
+import type { StandingSources } from '../order/standing.js'
 import { TransitionIntentSchema, WriteBackSchema } from '../order/schema.js'
 import type { TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
@@ -92,6 +95,16 @@ const StatesPayload = z.object({ id: z.string() })
 export interface ForgeDeps {
   readonly store: OrderStore
   readonly now: () => string
+  /**
+   * Where each row's standing comes from.
+   *
+   * The list is a door onto work in flight, so it has to say what that work is
+   * doing — and the graph, the gates and whether an agent is alive are none of
+   * them in the order record. Absent, a row still stands somewhere: a draft is
+   * being shaped and everything else is starting, which is what a host with no
+   * run runtime is actually true of.
+   */
+  readonly standingSources?: StandingSources
   readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
   /**
    * Which write-backs a new order starts with (FR-062), from configuration.
@@ -379,7 +392,11 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
         reason: started.reason,
         evidence: [],
       })
-      return { ...view(order), error: started.reason }
+      return {
+        ...view(order),
+        error: started.reason,
+        intake: lastIntake(await deps.store.entries(id)),
+      }
     }
 
     await deps.store.record({
@@ -393,7 +410,16 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     })
     // The order as it stands, plus the session the architect is working in —
     // so the surface can say it is running and take the operator to it.
-    return { ...view(order), converging: started.sessionId }
+    //
+    // `intake` comes back on this call too, and not only on the poll: the
+    // Forge reads whether a turn is running from it, and a first answer that
+    // omitted it would leave the surface idle until the next poll it was
+    // never going to start.
+    return {
+      ...view(order),
+      converging: started.sessionId,
+      intake: lastIntake(await deps.store.entries(id)),
+    }
   }
 
   async function compile(raw: unknown): Promise<unknown> {
@@ -405,10 +431,17 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     if (order === null) return { error: `No order ${id}.` }
 
     const result = compileOrder(order)
-    if (!commit || !result.ok) return { compile: result, order }
+    // How the last intake turn ended, on the read the Forge polls.
+    //
+    // A refusal is recorded in the ledger and nowhere else, so a surface that
+    // only reads the document cannot tell "the architect is working" from "the
+    // architect finished an hour ago and nothing was accepted". The Forge
+    // could not, and spun on the first while it was the second.
+    const intake = lastIntake(await deps.store.entries(id))
+    if (!commit || !result.ok) return { compile: result, order, intake }
 
     const agreed = agreeOrder(order, deps.now())
-    if (!agreed.ok) return { compile: agreed.result, order }
+    if (!agreed.ok) return { compile: agreed.result, order, intake }
 
     await deps.store.save(agreed.order)
     await deps.store.record({
@@ -435,7 +468,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       // Recorded by the write-back itself; the order is agreed regardless.
     }
 
-    return { compile: compileOrder(agreed.order), order: agreed.order, capability }
+    return { compile: compileOrder(agreed.order), order: agreed.order, intake, capability }
   }
 
   /**
@@ -527,12 +560,12 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
 
   async function list(): Promise<unknown> {
     const orders = await deps.store.list()
+    // A discarded order stays in the records and leaves the list; the list is
+    // what needs doing, not what was ever asked for.
+    const live = orders.filter((order) => order.status !== 'cancelled')
     return {
-      // A discarded order stays in the records and leaves the list; the list is
-      // what needs doing, not what was ever asked for.
-      orders: orders
-        .filter((order) => order.status !== 'cancelled')
-        .map((order) => ({
+      orders: await Promise.all(
+        live.map(async (order) => ({
           id: order.id,
           title: order.title,
           status: order.status,
@@ -544,7 +577,23 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
           // is a number you have to open every row to act on.
           openQuestions:
             order.status === 'draft' ? surfacedQuestions(order.openQuestions).length : 0,
-        })),
+          // Where the order actually stands. The row used to derive that from
+          // `failures`, which is a draft-time compile result and therefore
+          // zero for every running order for ever — so every running order,
+          // including one halted at a gate two hours earlier, said "ready to
+          // hand off".
+          standing: await readStanding(order, {
+            ...deps.standingSources,
+            openQuestionsFor: (o) =>
+              o.status === 'draft' ? surfacedQuestions(o.openQuestions).length : 0,
+            failuresFor: (o) => compileOrder(o).failures.length,
+            // Supplied here rather than by the host: the ledger is this
+            // store's, and the host would have to build a second reader over
+            // the same files to answer it.
+            intakeRefusedFor: async (orderId) => intakeRefusal(await deps.store.entries(orderId)),
+          }),
+        }))
+      ),
     }
   }
 

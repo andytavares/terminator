@@ -4,6 +4,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { createForgeChannels } from '../../src/ipc/forge-channels.js'
 import { createOrderStore } from '../../src/order/store.js'
+import { raiseGate } from '../../src/gates/rules.js'
+import type { Standing } from '../../src/order/standing.js'
 import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { CompileResult } from '../../src/order/compile.js'
@@ -265,6 +267,86 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].status).toBe('draft')
     // A fresh draft has nothing planned yet, so at least coverage is failing.
     expect(r.orders[0].failures).toBeGreaterThan(0)
+  })
+
+  // The row used to read `failures === 0 ? 'ready to hand off' : ...`, and
+  // `failures` is a draft-time compile result that is zero for every running
+  // order for ever. Every running order therefore claimed to be ready to hand
+  // off — including one halted at an undecided gate two hours earlier.
+  it('never says a running order is ready to hand off', async () => {
+    const c = channels()
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const loaded = await store.load(seeded.order.id)
+    if (loaded === null) throw new Error('the order this test needs was not saved')
+    await store.save({ ...loaded, status: 'running' })
+
+    const r = (await c.list()) as { orders: { standing: Standing }[] }
+    expect(r.orders).toHaveLength(1)
+    expect(r.orders[0].standing.label).not.toContain('hand off')
+    expect(r.orders[0].standing.kind).not.toBe('done')
+  })
+
+  it('says a halted order is halted, and whose move it is', async () => {
+    const held = raiseGate({
+      id: 'G-1',
+      rule: 'budget.exceeded',
+      orderId: 'WO-x',
+      summary: 'past its wall clock budget',
+      why: 'the order budgets 90 and this run is at 90',
+      at: '2026-09-06T11:30:00.000Z',
+    })
+    const c = createForgeChannels({
+      store,
+      now: () => '2026-09-06T10:00:00.000Z',
+      standingSources: { gatesFor: async () => [held] },
+    })
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const loaded = await store.load(seeded.order.id)
+    if (loaded === null) throw new Error('the order this test needs was not saved')
+    await store.save({ ...loaded, status: 'running' })
+
+    const r = (await c.list()) as { orders: { standing: Standing }[] }
+    expect(r.orders).toHaveLength(1)
+    expect(r.orders[0].standing.kind).toBe('halted')
+    expect(r.orders[0].standing.turn).toBe('you')
+    expect(r.orders[0].standing.gateId).toBe('G-1')
+  })
+
+  // A draft's standing is the questions it is asking, which is the count the
+  // tab badge sends the operator here to find.
+  it('counts the questions a draft is still asking', async () => {
+    const c = channels()
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const loaded = await store.load(seeded.order.id)
+    if (loaded === null) throw new Error('the order this test needs was not saved')
+    await store.save({
+      ...loaded,
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'a?',
+          why: '',
+          options: ['x', 'y'],
+          recommended: 0,
+          answer: null,
+          rank: 1,
+        },
+      ],
+    })
+
+    const r = (await c.list()) as { orders: { standing: Standing; openQuestions: number }[] }
+    expect(r.orders[0].standing.kind).toBe('shaping')
+    expect(r.orders[0].standing.turn).toBe('you')
+    expect(r.orders[0].openQuestions).toBe(1)
   })
 })
 
@@ -626,6 +708,66 @@ describe('foundry:order.converge — the half that was missing', () => {
     await c.converge({ id: seed.order.id })
     const ledger = fs.readFileSync(path.join(root, 'orders', seed.order.id, 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('converge.refused')
+  })
+
+  // The half that was missing after that. A refusal was recorded and read by
+  // nothing: the Forge polls `order.compile`, which handed back the document
+  // and the checks, and a refusal changes neither — so the surface went on
+  // saying the architect was working over a turn that had ended.
+  it('carries how the last turn ended on the read the Forge polls', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
+    })
+    await c.converge({ id: seed.order.id })
+
+    const r = (await c.compile({ id: seed.order.id, commit: false })) as {
+      intake: { kind: string; reason?: string }
+    }
+    expect(r.intake.kind).toBe('refused')
+    expect(r.intake.reason).toBe('acceptance.5: Invalid enum value.')
+  })
+
+  it('says a turn is running the moment it starts one', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
+    })
+    // On this call and not only on the next poll: the surface reads whether a
+    // turn is in flight from here, and would otherwise sit idle.
+    const started = (await c.converge({ id: seed.order.id })) as {
+      intake: { kind: string; sessionId?: string }
+    }
+    expect(started.intake).toEqual({ kind: 'running', at: NOW, sessionId: 'sess-arch' })
+
+    const polled = (await c.compile({ id: seed.order.id, commit: false })) as {
+      intake: { kind: string }
+    }
+    expect(polled.intake.kind).toBe('running')
+  })
+
+  // The order list said "Foundry is still shaping this" about an order nothing
+  // had touched for an hour, because a draft's standing had no idea intake had
+  // ever run.
+  it('hands a refused draft back to the operator in the list', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
+    })
+    await c.converge({ id: seed.order.id })
+
+    const listed = (await c.list()) as {
+      orders: Array<{ id: string; standing: { turn: string; headline: string } }>
+    }
+    const row = listed.orders.find((o) => o.id === seed.order.id)
+    expect(row?.standing.turn).toBe('you')
+    expect(row?.standing.headline).toMatch(/refused/i)
   })
 
   it('says so when there is no runtime to run an architect', async () => {

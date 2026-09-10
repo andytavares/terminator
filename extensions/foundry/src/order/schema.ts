@@ -74,7 +74,19 @@ const ContextSchema = z.object({
   houseDocs: z.array(z.string()).default([]),
 })
 
-const EvidenceKindSchema = z.enum(['exit_code', 'stdout', 'report_file', 'screenshot', 'diff'])
+/**
+ * The closed set a piece of judged evidence may be.
+ *
+ * Kinds of artifact, not places to look: `report_file` says "the judge reads a
+ * report the run produced", and *which* report belongs in the rubric. Exported
+ * for the same reason as RISK_TRIGGERS and after the same failure — on
+ * WO-0909-6db the contract named this set nowhere, the architect wrote three
+ * file paths into it, and six acceptance criteria and the only unit in the
+ * plan were refused together on `Invalid enum value`.
+ */
+export const EVIDENCE_KINDS = ['exit_code', 'stdout', 'report_file', 'screenshot', 'diff'] as const
+
+const EvidenceKindSchema = z.enum(EVIDENCE_KINDS)
 
 const VerifySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('test'), command: nonEmpty, assert: nonEmpty }),
@@ -153,11 +165,22 @@ const UnitSchema = z.object({
   verify: z.array(VerifySchema).default([]),
 })
 
+/**
+ * What a lane may be, where lanes share files.
+ *
+ * Exported for the third time this has been necessary. The output contract
+ * showed a lane's `role` as `null` and named neither value, three lines under a
+ * *unit's* `role`, which is a free string and whose example reads `"builder"` —
+ * so the obvious wrong answer was on the same screen as the field. See
+ * RISK_TRIGGERS and EVIDENCE_KINDS for the two that were actually refused.
+ */
+export const LANE_ROLES = ['producer', 'consumer'] as const
+
 const LaneSchema = z.object({
   ord: z.number().int().min(1),
   repo: nonEmpty,
   branch: z.string(),
-  role: z.enum(['producer', 'consumer']).nullable().default(null),
+  role: z.enum(LANE_ROLES).nullable().default(null),
   // Normalised so every rule downstream can read them without guarding:
   // an absent array and an empty one mean the same thing.
   blocks: z.array(z.number().int()).default([]),

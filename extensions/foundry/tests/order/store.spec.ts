@@ -184,7 +184,42 @@ describe('a store whose root follows the workspace', () => {
     expect(fs.readFileSync(path.join(dir, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')).toContain(
       'order.seeded'
     )
+    expect((await store.entries('WO-1')).map((e) => e.action)).toEqual(['order.seeded'])
 
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  // Some of what happens to an order is recorded here and nowhere else — an
+  // intake turn whose proposal was refused writes a line and never touches
+  // `order.json` — so a store that could only append was a store no surface
+  // could ask what had happened.
+  it('reads back the ledger it wrote, oldest first', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-entries-'))
+    const store = createOrderStore(dir)
+
+    for (const action of ['converge.started', 'converge.refused']) {
+      await store.record({
+        at: '2026-09-09T19:33:00.000Z',
+        orderId: 'WO-9',
+        actor: 'role:architect',
+        action,
+        subject: 'WO-9',
+        reason: action === 'converge.refused' ? 'Invalid enum value.' : '',
+        evidence: [],
+      })
+    }
+
+    const entries = await store.entries('WO-9')
+    expect(entries.map((e) => e.action)).toEqual(['converge.started', 'converge.refused'])
+    expect(entries[1].reason).toBe('Invalid enum value.')
+
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  // An order nothing has happened to yet is not an error.
+  it('reads an empty ledger as no entries', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-noledger-'))
+    expect(await createOrderStore(dir).entries('WO-nothing')).toEqual([])
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })
 })

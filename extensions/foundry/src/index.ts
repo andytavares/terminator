@@ -13,6 +13,8 @@ import { availableNames, resolveRule } from './recipe/resolve.js'
 import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore, createGateStore } from './gates/store.js'
+import { orphanedNodes } from './line/reclaim.js'
+import type { StandingSources } from './order/standing.js'
 import { countAttention } from './gates/attention.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { tearDownRun, deleteOrder } from './line/teardown.js'
@@ -506,6 +508,16 @@ function notify(
  * exists is not something to reload on the next start.
  */
 const stallFirings: Array<{ firing: StallFiring; featureDir: string; shadow: boolean }> = []
+
+/**
+ * Agents whose tool call was handed back to the terminal's own prompt.
+ *
+ * The bridge does that when nobody answers in time, and an unattended run
+ * never reaches the prompt — so the agent stops there with its process alive
+ * and its node still `running`, which every surface drew as a working build.
+ * Keyed by session: one agent is stranded once, however many calls it lost.
+ */
+const strandedAgents = new Map<string, { orderId: string; sessionId: string; at: number }>()
 
 /**
  * How many firings to keep.
@@ -1119,6 +1131,9 @@ async function executeRun(
               author: 'console',
               summary: `asked about ${pending.toolName}: waiting for a decision`,
             })
+            // An agent that is asking again is an agent that got past the
+            // prompt somebody answered for it.
+            strandedAgents.delete(pending.sessionId)
             notePending(api, { ...pending, featureDir }, { id: order.id, root })
           },
           onResolved: (requestId, outcome) => {
@@ -1133,6 +1148,10 @@ async function executeRun(
                 summary:
                   'nobody answered, so the question went to the prompt in the terminal — an agent waits there',
               })
+              // Recorded, not only posted. A feed entry scrolls away; this is
+              // what lets the order say it is waiting on a person rather than
+              // building, which is what it said for the two hours after.
+              strandedAgents.set(sessionId, { orderId: order.id, sessionId, at: Date.now() })
             }
             noteResolved(requestId)
           },
@@ -1738,9 +1757,42 @@ export function activate(api: ExtensionAPI): void {
   // to change — so the operator is told what it costs and what avoids it.
   noteUntrackedDataRoot(api, dataRoot())
   const issuesPort = issuesPortFor(api)
+  // Where every surface's answer to "what is this order doing" comes from.
+  //
+  // Assembled once and handed to both the order list and the Floor, because
+  // the alternative was tried and shipped: each surface worked it out from
+  // whatever it happened to hold, so the same order halted at an undecided
+  // gate read "ready to hand off" in the list and drew `building` chips on
+  // the Floor, and neither of them named the gate.
+  const standingSources: StandingSources = {
+    graphFor: (orderId) => readRunGraph(dataRoot(), orderId),
+    gatesFor: async (orderId) =>
+      (await createGateStore(dataRoot()).list()).filter((gate) => gate.orderId === orderId),
+    // A run belongs to a card whose directory is named for the order, which is
+    // the join between the runtime's bookkeeping and the records'.
+    asksFor: (orderId) =>
+      pendingPermissions.list().filter((ask) => path.basename(ask.featureDir) === orderId).length,
+    // Shadow firings are recorded and deliberately never notified. A standing
+    // is a notification, so a shadow firing is not one.
+    stallsFor: (orderId) =>
+      stallFirings.filter((s) => !s.shadow && path.basename(s.featureDir) === orderId).length,
+    // Only counted while the process is still there: an agent that was
+    // stranded and has since died is orphaned, which is a different sentence
+    // with a different move.
+    strandedFor: (orderId) =>
+      [...strandedAgents.values()].filter(
+        (a) => a.orderId === orderId && isLiveSession(a.sessionId)
+      ).length,
+    // Not a record on disk: an agent's terminal is a child of this process, so
+    // only this process can say whether one is still there.
+    orphansFor: (orderId, graph) =>
+      executingOrders.has(orderId) ? [] : orphanedNodes(graph, isLiveSession).map((n) => n.id),
+  }
+
   const forge = createForgeChannels({
     store: createLiveOrderStore(dataRoot),
     now: () => new Date().toISOString(),
+    standingSources,
     writeBackDefault: () => defaultWriteBack(api),
     budgetDefaults: () => defaultBudgets(api),
     criticalPaths: () => declaredCriticalPaths(api),
@@ -1760,6 +1812,16 @@ export function activate(api: ExtensionAPI): void {
             reason: outcome.reason,
             evidence: [],
           })
+          // Out loud, once, because a refusal changes nothing and therefore
+          // shows up nowhere the operator happens to be looking. The Forge
+          // renders it whenever they open the order; this is for the minutes
+          // between the turn ending and them going back to look — which on
+          // the run that found this was the rest of the afternoon.
+          api.notifications.showToast(
+            'warning',
+            `${order.title}: the architect's plan was refused and nothing changed.`,
+            `foundry.converge.refused.${order.id}`
+          )
           return
         }
         await store.save(outcome.order)
@@ -1902,6 +1964,16 @@ export function activate(api: ExtensionAPI): void {
     },
     isLive: isLiveSession,
     executing: (orderId) => executingOrders.has(orderId),
+    gatesFor: standingSources.gatesFor,
+    asksFor: standingSources.asksFor,
+    stallsFor: standingSources.stallsFor,
+    strandedFor: standingSources.strandedFor,
+    // The sessions themselves, so the band can offer the one thing that
+    // answers a handed-back call: going to the terminal it was handed to.
+    strandedSessions: (orderId) =>
+      [...strandedAgents.values()]
+        .filter((a) => a.orderId === orderId && isLiveSession(a.sessionId))
+        .map((a) => a.sessionId),
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))

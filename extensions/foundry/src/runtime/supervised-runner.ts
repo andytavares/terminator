@@ -319,7 +319,11 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         },
         onResolved: (requestId, decision) => {
           const run = running.get(sessionId)
-          if (run !== undefined) run.isWaiting = false
+          if (run !== undefined) {
+            run.isWaiting = false
+            // However long the operator took is not the agent's silence.
+            run.startedAt = now()
+          }
           phase.current.onResolved(requestId, decision)
         },
       })
@@ -476,6 +480,11 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // not stalled — but the previous phase left this true if it ended while
       // something was waiting, and nothing else clears it.
       run.isWaiting = false
+      // A new turn is a new state, and the stall detector measures silence
+      // from when the state began. Left at registration, a conversation the
+      // operator came back to twenty minutes later was judged against a start
+      // twenty minutes stale and fired the moment it was given work again.
+      run.startedAt = now()
 
       // Typed as a person would type it. The agent is sitting at its prompt
       // with the whole card's conversation behind it: the spec it wrote, the
@@ -520,8 +529,10 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     send(sessionId, message): boolean {
       const run = running.get(sessionId)
       if (run === undefined) return false
-      // It has been given something to do, so it is no longer waiting on us.
+      // It has been given something to do, so it is no longer waiting on us,
+      // and the silence the detector measures starts again here.
       run.isWaiting = false
+      run.startedAt = now()
       // Claude Code queues input arriving mid-turn, so a redirect does not
       // require the agent to be idle first.
       api.pty.write(run.terminalSessionId, `${oneLine(message)}\r`)

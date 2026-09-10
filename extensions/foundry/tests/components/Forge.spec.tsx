@@ -551,22 +551,39 @@ describe('clearing an adversarial finding', () => {
 })
 
 describe('while the architect is working', () => {
-  /** A document that grows a provenance line on the third read, as a redraft does. */
-  function landsAfter(polls: number) {
+  /**
+   * A ledger that turns over after `polls` reads.
+   *
+   * The channel's `intake` field, not `provenance.decisions`, because a turn
+   * can end without the document moving at all — which is what a refusal is,
+   * and what the old fixture could not express.
+   */
+  function landsAfter(polls: number, ending: Record<string, unknown>) {
     let reads = 0
+    let started = false
     const before = order()
-    const after = {
-      ...before,
-      provenance: { ...before.provenance, decisions: ['2026-09-06 architect: redrafted'] },
-    }
+    const running = { kind: 'running', at: '2026-09-09T19:30:00Z', sessionId: 'sess-arch' }
     invoke = vi.fn(async (channel: string) => {
       if (channel === 'foundry:order.compile') {
+        // Before the click there is no turn, which is what the mount read
+        // sees; after it, `polls` reads of a turn in flight and then its end.
+        if (!started)
+          return { order: before, compile: compileOrder(before), intake: { kind: 'none' } }
         reads += 1
-        const shown = reads > polls ? after : before
-        return { order: shown, compile: compileOrder(shown) }
+        return {
+          order: before,
+          compile: compileOrder(before),
+          intake: reads > polls ? ending : running,
+        }
       }
       if (channel === 'foundry:order.converge') {
-        return { order: before, compile: compileOrder(before), converging: 'sess-arch' }
+        started = true
+        return {
+          order: before,
+          compile: compileOrder(before),
+          converging: 'sess-arch',
+          intake: running,
+        }
       }
       return {}
     })
@@ -576,9 +593,16 @@ describe('while the architect is working', () => {
     render(<Forge orderId="WO-1" />)
   }
 
+  const REDRAFTED = { kind: 'redrafted', at: '2026-09-09T19:33:00Z', note: 'redrafted the plan' }
+  const REFUSED = {
+    kind: 'refused',
+    at: '2026-09-09T19:33:21Z',
+    reason: "acceptance.5.verify.evidence.1: Invalid enum value. Expected 'exit_code' | 'stdout'",
+  }
+
   it('keeps asking until the redraft lands, rather than giving up after one tick', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    landsAfter(3)
+    landsAfter(3, REDRAFTED)
     await vi.waitFor(() =>
       expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy()
     )
@@ -586,20 +610,20 @@ describe('while the architect is working', () => {
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
     await vi.waitFor(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
 
-    // Three polls before the record grows. A poll that stopped after one would
+    // Three polls before the turn ends. A poll that stopped after one would
     // never see it.
     await vi.advanceTimersByTimeAsync(12_000)
     await vi.waitFor(() =>
       expect(
         invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length
-      ).toBeGreaterThan(3)
+      ).toBeGreaterThan(4)
     )
     vi.useRealTimers()
   })
 
   it('stops once the architect has written its line', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    landsAfter(1)
+    landsAfter(1, REDRAFTED)
     await vi.waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
     await vi.advanceTimersByTimeAsync(9_000)
@@ -609,6 +633,90 @@ describe('while the architect is working', () => {
     await vi.advanceTimersByTimeAsync(9_000)
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length).toBe(settled)
     vi.useRealTimers()
+  })
+
+  // The reported bug, whole. A refusal saves nothing, so the document is
+  // byte-for-byte what it was — and the stop condition used to be the document
+  // growing. The button read "The architect is working…" over a turn that had
+  // ended forty minutes earlier, and the poll never stopped.
+  it('stops when the turn was refused, though nothing was saved', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    landsAfter(1, REFUSED)
+    await vi.waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
+    await vi.advanceTimersByTimeAsync(9_000)
+
+    await vi.waitFor(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
+    const settled = invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length
+    await vi.advanceTimersByTimeAsync(9_000)
+    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.compile').length).toBe(settled)
+    vi.useRealTimers()
+  })
+})
+
+describe('a turn that was refused', () => {
+  const REFUSED = {
+    kind: 'refused',
+    at: '2026-09-09T19:33:21Z',
+    reason: "acceptance.5.verify.evidence.1: Invalid enum value. Expected 'exit_code' | 'stdout'",
+  }
+
+  function refused() {
+    const shown = order()
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: shown, compile: compileOrder(shown), intake: REFUSED }
+      }
+      if (channel === 'foundry:order.converge') {
+        return {
+          order: shown,
+          compile: compileOrder(shown),
+          converging: 'sess-arch',
+          intake: { kind: 'running', at: '2026-09-09T19:40:00Z', sessionId: 'sess-arch' },
+        }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+  }
+
+  it('says so, and says why, in the validator\u2019s own words', async () => {
+    refused()
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /plan was refused/i })).toBeTruthy()
+    )
+    expect(screen.getByText(/Invalid enum value/)).toBeTruthy()
+    expect(screen.getByText(/Nothing on this order was changed/)).toBeTruthy()
+  })
+
+  // A screen that names a problem and offers no reachable control is a wall.
+  // The reason goes back with the ask because the architect cannot read its
+  // own refusal: its turn ended before the validation ran.
+  it('carries the reason back to the architect', async () => {
+    refused()
+    await waitFor(() => screen.getByRole('heading', { name: /plan was refused/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Tell the architect what was wrong/ }))
+
+    await waitFor(() => {
+      const call = invoke.mock.calls.find((c) => c[0] === 'foundry:order.converge')
+      expect(call).toBeTruthy()
+      const message = String((call?.[1] as { message?: string }).message ?? '')
+      expect(message).toContain('Invalid enum value')
+      expect(message).toContain('proposal.json')
+    })
+  })
+
+  it('can also start the turn over, carrying nothing', async () => {
+    refused()
+    await waitFor(() => screen.getByRole('heading', { name: /plan was refused/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Start the turn over/ }))
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', { id: 'WO-1' })
+    )
   })
 })
 

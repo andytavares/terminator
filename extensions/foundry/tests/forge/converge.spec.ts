@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { convergeBrief, readProposal, NoArchitectError } from '../../src/forge/converge.js'
-import { draftOrder, RISK_TRIGGERS } from '../../src/order/schema.js'
+import { draftOrder, EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
 
@@ -74,6 +74,57 @@ describe('what the architect is told', () => {
   it('says a trigger is a label rather than a sentence', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('`risk.triggers` is a closed set')
+  })
+
+  // The same failure, one feature later and one field over. On WO-0909-6db the
+  // contract said a judge needs "a non-empty `evidence` list" and named none of
+  // the five things that list may hold; the architect wrote three file paths,
+  // and six acceptance criteria and the only unit in the plan were refused
+  // together on `Invalid enum value`.
+  it('names every value a judge’s evidence may take', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    for (const kind of EVIDENCE_KINDS) expect(plan.prompt).toContain(kind)
+  })
+
+  it('says evidence is a kind of artifact rather than a path', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('closed set too')
+    expect(plan.prompt).toContain('kinds of artifact, not paths')
+  })
+
+  // The third one, found by sweeping rather than by losing another turn: a
+  // lane's `role` was shown as `null` and named neither value, three lines
+  // under a *unit's* `role`, which is a free string whose example reads
+  // "builder". The obvious wrong answer was on the same screen as the field.
+  it('names every value a lane’s role may take, and says it is not a unit’s', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    for (const role of LANE_ROLES) expect(plan.prompt).toContain(role)
+    expect(plan.prompt).toContain('not the same field as a unit')
+  })
+
+  // The standing sweep, so a fourth closed set cannot be added quietly.
+  //
+  // Every enum an agent may write has to be named in the contract it writes
+  // against — twice now a field described only by name has cost a whole turn,
+  // because Zod refuses the document rather than the field. This is the list;
+  // adding a closed set to a proposable part of the order means adding it
+  // here and rendering it there.
+  it('names every closed set a proposal may carry', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    const closedSets: Record<string, readonly string[]> = {
+      'risk.grade': ['P0', 'P1', 'P2', 'P3'],
+      'risk.triggers': RISK_TRIGGERS,
+      'acceptance[].priority': ['P0', 'P1', 'P2'],
+      'acceptance[].verify.kind': ['test', 'command', 'judge', 'artifact', 'screenshot'],
+      'acceptance[].verify.evidence': EVIDENCE_KINDS,
+      'plan.lanes[].role': LANE_ROLES,
+    }
+    for (const [field, members] of Object.entries(closedSets)) {
+      expect(members.length, `${field} has no members`).toBeGreaterThan(0)
+      for (const member of members) {
+        expect(plan.prompt, `${field} does not name ${member}`).toContain(member)
+      }
+    }
   })
 
   // The other half of the same failure: the plan that came back had seven
@@ -242,5 +293,132 @@ describe('when the proposal is read', () => {
     const file = write({ note: 'on the third turn' })
     const result = readProposal(order(), file, 'now')
     expect(result.ok && result.note).toBe('on the third turn')
+  })
+})
+
+// Amending an order, rather than drafting one again.
+//
+// Measured on WO-0910-6ea: the operator clicked "Ask for the gap to be closed"
+// on a one-line order, and the architect spent six minutes and 31 shell
+// commands before it wrote anything. It had no reason to know better. The
+// brief it was handed carried the problem statement and the repository, and
+// not the plan or the criteria it was being told were wrong — the architect's
+// `reads:` named neither — so "nothing in the plan builds AC-1" arrived as a
+// complaint about a document it could not see. Its first move was to go and
+// find the proposal it remembered writing, which `readProposal` deletes as it
+// applies it, and its second was to reconstruct the order from `order.json`
+// and the ledger by hand.
+describe('amending an order the architect has already written', () => {
+  function drafted(over: Partial<WorkOrder> = {}): WorkOrder {
+    const base = order()
+    return {
+      ...base,
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'an expired token is refused',
+          priority: 'P0',
+          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+          unverifiable: null,
+        },
+      ],
+      plan: {
+        ...base.plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'check the expiry on the refresh path',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: [],
+            touches: ['src/auth.ts'],
+            verify: [],
+          },
+        ],
+      },
+      provenance: {
+        ...base.provenance,
+        decisions: ['2026-09-06T11:00:00.000Z architect: first plan'],
+      },
+      ...over,
+    }
+  }
+
+  function prompt(target: WorkOrder, message?: string): string {
+    return convergeBrief({
+      order: target,
+      root,
+      sources: sources(),
+      rules: [],
+      ...(message === undefined ? {} : { message }),
+    }).prompt
+  }
+
+  it('hands over the criteria and the plan it is being told are wrong', () => {
+    const text = prompt(drafted())
+    expect(text).toContain('AC-1')
+    expect(text).toContain('an expired token is refused')
+    expect(text).toContain('U-1')
+    expect(text).toContain('check the expiry on the refresh path')
+  })
+
+  it('plots which criteria the plan does not build, which is the check that fails', () => {
+    expect(prompt(drafted())).toContain('| AC-1 |')
+  })
+
+  it('says the turn amends the order rather than drafting it again', () => {
+    expect(prompt(drafted())).toContain('This turn amends the order above')
+  })
+
+  // Its first move on the live run, and a dead end every time: the file is
+  // unlinked in `readProposal`'s `finally`, so what the architect remembers
+  // writing is never there to be read.
+  it('says the proposal it remembers writing was consumed', () => {
+    expect(prompt(drafted())).toContain('consumed when it was applied')
+  })
+
+  it('asks for the keys that changed and not for the ones that did not', () => {
+    expect(prompt(drafted())).toContain('Send only the keys you changed')
+  })
+
+  it('carries the operator’s instruction after the framing, not instead of it', () => {
+    const text = prompt(drafted(), 'the coverage check fails')
+    const framing = text.indexOf('This turn amends the order above')
+    const said = text.indexOf('What the operator just said')
+    expect(framing, 'the amendment framing is missing').toBeGreaterThan(-1)
+    expect(said, 'the operator’s instruction is missing').toBeGreaterThan(-1)
+    expect(framing).toBeLessThan(said)
+  })
+
+  it('says none of it on a first draft, which has nothing to amend', () => {
+    const text = prompt(order())
+    expect(text).not.toContain('This turn amends the order above')
+    expect(text).not.toContain('Send only the keys you changed')
+  })
+
+  // A ticket that states its own criteria is taken at its word, so an order
+  // can carry acceptance before any architect has seen it. Telling that
+  // architect it wrote them is a lie, and "change only what is wrong" is the
+  // wrong instruction for a plan that does not exist yet.
+  it('treats criteria that came from the ticket as a draft, not as its own work', () => {
+    const fromTicket = drafted({
+      plan: order().plan,
+      provenance: { ...order().provenance, decisions: [] },
+    })
+    expect(prompt(fromTicket)).not.toContain('This turn amends the order above')
+  })
+
+  // A refused proposal changes nothing, so the turn after one is still the
+  // first draft — the conversation happened, the order did not move.
+  it('treats a refused turn as a draft, because nothing was applied', () => {
+    const refused = drafted({
+      provenance: {
+        ...order().provenance,
+        forgeSession: 'a-session-that-produced-nothing',
+        decisions: [],
+      },
+    })
+    expect(prompt(refused)).not.toContain('This turn amends the order above')
   })
 })

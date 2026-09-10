@@ -4,7 +4,7 @@ import { orderDir } from '../data-root.js'
 import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
 import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
-import { RISK_TRIGGERS } from '../order/schema.js'
+import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role, Rule } from '../recipe/parse.js'
 import { resolveRole } from '../recipe/resolve.js'
@@ -86,6 +86,16 @@ function outputContract(file: string, order: WorkOrder): string {
     'A `judge` needs a `rubric` and a non-empty `evidence` list; an `artifact`',
     'needs a `path` and an `assert`; a `screenshot` needs a `target`.',
     '',
+    // The second field to be refused for being a closed set nobody showed the
+    // architect. See EVIDENCE_KINDS.
+    `A judge's \`evidence\` is a closed set too: each entry is exactly one of ${EVIDENCE_KINDS.map(
+      (kind) => `\`${kind}\``
+    ).join(', ')}.`,
+    'They are kinds of artifact, not paths. A file the judge should read is named',
+    'in the `rubric` — `evidence: ["report_file"]` with the path in the rubric,',
+    'never `evidence: ["src/app.css"]`. A path written here is refused, and the',
+    'whole proposal with it.',
+    '',
     // Shown for the same reason `grade` shows its four values, and absent for
     // the whole of the feature that preceded this one. See RISK_TRIGGERS.
     `\`risk.triggers\` is a closed set: each entry is exactly one of ${RISK_TRIGGERS.map(
@@ -94,6 +104,15 @@ function outputContract(file: string, order: WorkOrder): string {
     'It is a label, not a sentence. Say *why* a trigger applies in `criticalPaths`',
     'or in the note — a trigger written as prose is refused, and the whole',
     'proposal with it.',
+    '',
+    // Three lines under a unit's own `role`, which is a free string whose
+    // example reads "builder". The obvious wrong answer was on the same
+    // screen as the field. See LANE_ROLES.
+    `A lane's \`role\` is either \`null\` or exactly one of ${LANE_ROLES.map(
+      (role) => `\`${role}\``
+    ).join(' or ')} — it says which side of a shared file that lane is on, and`,
+    'is not the same field as a unit\u2019s `role`, which names a role from the',
+    'toolchain. Leave it `null` unless lanes share files.',
     '',
     'Anything else in that object is refused outright, including `status` — you',
     'do not agree your own work.',
@@ -121,6 +140,46 @@ function outputContract(file: string, order: WorkOrder): string {
     'unit genuinely cannot begin until an earlier one has landed. Not because',
     'it touches different files, and not to make the plan look thorough.',
   ].join('\n')
+}
+
+/**
+ * What an amending turn is told, on top of the order it can now see.
+ *
+ * Empty on a first draft. `provenance.decisions` grows once per applied
+ * proposal and nowhere else while an order is a draft — a refused turn appends
+ * nothing, and criteria a ticket stated for itself are not a plan the
+ * architect wrote — so a non-empty list is the one honest signal that there is
+ * something here to amend rather than draft.
+ *
+ * The framing matters as much as the order printed above it. The role's own
+ * prompt opens "Turn intent and context into criteria and a plan", which is
+ * the right instruction exactly once; read again on the fourth turn it is an
+ * invitation to derive the whole thing a second time, and on WO-0910-6ea that
+ * is what it did — six minutes and 31 shell commands to close a gap in a plan
+ * it was never shown.
+ */
+function amendment(order: WorkOrder): string[] {
+  if (order.provenance.decisions.length === 0) return []
+  return [
+    '',
+    '---',
+    '',
+    '## This turn amends the order above',
+    '',
+    'You wrote it, and it is printed above as it now stands — which is not the',
+    'same as what you proposed. The operator answers questions, strikes',
+    'assumptions and resolves findings between turns, and what you can see is',
+    'after all of that. It is the record; your memory of the last turn is not.',
+    '',
+    'There is no proposal file left to read: the one you wrote last turn was',
+    'consumed when it was applied. So do not go looking for it, and do not',
+    'reconstruct from `order.json` or from the ledger anything already printed',
+    'above. Read the repository only for what the order does not tell you.',
+    '',
+    'Change what the failing checks and the operator name, and leave the rest',
+    'alone. Send only the keys you changed — every key is optional, and one',
+    'restated unchanged is a chance to restate it wrong.',
+  ]
 }
 
 export interface ConvergeInput {
@@ -174,7 +233,12 @@ export function convergeBrief(input: ConvergeInput): ConvergeBrief {
       : ['', '---', '', '## What the operator just said', '', input.message.trim()]
 
   return {
-    prompt: [body, ...typed, outputContract(proposalPath, input.order)].join('\n'),
+    prompt: [
+      body,
+      ...amendment(input.order),
+      ...typed,
+      outputContract(proposalPath, input.order),
+    ].join('\n'),
     proposalPath,
     role: resolved.resolved.value,
     // The repository itself, not a worktree: intake reads and changes nothing,

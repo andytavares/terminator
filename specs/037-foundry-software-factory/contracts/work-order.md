@@ -8,14 +8,16 @@ The work order is the only object that crosses from the Forge to the Line. This 
 
 Under `<dataRoot>/orders/<id>/`:
 
-| File           | Format              | Written by                 | Read by                         |
-| -------------- | ------------------- | -------------------------- | ------------------------------- |
-| `order.json`   | JSON, zod-validated | Forge only                 | Everything                      |
-| `order.md`     | Markdown            | Rendered from `order.json` | Humans, and the tracker comment |
-| `context.json` | JSON                | Scout only                 | Architect, verifier, ladder     |
-| `ledger.jsonl` | JSONL, append-only  | Everything                 | Curator, Ledger surface         |
+| File           | Format              | Written by                 | Read by                                                         |
+| -------------- | ------------------- | -------------------------- | --------------------------------------------------------------- |
+| `order.json`   | JSON, zod-validated | Forge only                 | Everything                                                      |
+| `order.md`     | Markdown            | Rendered from `order.json` | Humans, and the tracker comment                                 |
+| `context.json` | JSON                | Scout only                 | Architect, verifier, ladder                                     |
+| `ledger.jsonl` | JSONL, append-only  | Everything                 | Curator, Ledger surface, the Forge and the order list (ADR 046) |
 
 `order.json` is the truth. `order.md` is a rendering and is regenerated on every change — **never hand-edited**, and the Forge overwrites it without asking. Anything an operator wants to change is changed through intake, so it lands in the truth.
+
+`order.json` is the truth about the **order**, and it is not the whole truth about what has happened to it. An intake turn whose proposal was refused has nothing to merge, so it writes one ledger line and leaves the document byte-for-byte what it was. A surface that reads only `order.json` cannot tell that turn from one still in flight, and for one feature none of them could: see ADR 046. `OrderStore.entries(orderId)` reads the ledger back, and `src/forge/intake-outcome.ts` derives the last turn's outcome from it.
 
 ## Producer obligations — the Forge
 

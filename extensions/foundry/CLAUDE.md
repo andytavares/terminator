@@ -4,7 +4,7 @@ Foundry is a software factory: a **Forge** that converges an idea or tracker iss
 
 Design documents: `specs/037-foundry-software-factory/`.
 
-## The two rules that are specific to this extension
+## The three rules that are specific to this extension
 
 ### 1. Nothing is written into a target repository
 
@@ -17,6 +17,28 @@ Foundry's own records go to `terminator.foundry.dataDir` when set, and to `<work
 ### 2. Nothing is assumed about a repository's toolchain
 
 There is no hardcoded `npm run lint`. `src/verify/toolchain-probe.ts` reads the target project's manifests — never executes them — and records the real command, or `null`. A `null` means the matching check reports **"not measured"**, never a pass. Boolean-coercing that third value anywhere in the verification path turns "we did not check" into "it is fine", which is the bug the ladder exists to prevent.
+
+### 3. A question this policy asks by accident costs five minutes
+
+`runtime/tool-decision.ts` decides every tool call an agent makes. Anything it
+does not decide is **held for `DEFAULT_ASK_AFTER_MS` — five minutes** — before
+handing back to a terminal that, in an unattended run, nobody is sitting at.
+
+So reading a command correctly is a latency requirement here, not only a
+correctness one. Measured on WO-0910-1fb: thirteen of a builder's 131 calls
+were held and those thirteen ate 16.6 of the run's 26.7 minutes of tool time.
+A held call averages 77 seconds; a taken one averages 5.
+
+When you change `shell-split.ts`, `autonomy-policy.ts` or `read-only-policy.ts`,
+the question is not only "does this let the wrong thing through". It is also
+"does this hold the right thing", and the second one has a price tag. Every
+defect ADR-049 found was the second kind: a discard that needed whitespace
+after it, a parenthesis inside a quoted argument, a heredoc body read as shell,
+a scratch file in the OS temp directory.
+
+`shell-split.ts` tracks quoting and escaping. It is not a shell parser and must
+not become one — heredocs are in because a heredoc is quoting, and that is the
+whole of the licence.
 
 ## Extension Isolation (MANDATORY)
 

@@ -8,9 +8,13 @@ import {
   X,
   ScanEye,
   BellOff,
-  Unplug,
+  AlertCircle,
+  Loader,
+  CheckCircle2,
 } from 'lucide-react'
 import type { RunGraph, RunNode } from '../line/run-graph.js'
+import type { Standing } from '../order/standing.js'
+import type { Gate } from '../gates/rules.js'
 import { ConfirmButton } from './ConfirmButton.js'
 
 // Where you watch, not where you act.
@@ -39,6 +43,27 @@ interface LaneRow {
 
 interface FloorView {
   graph: RunGraph
+  /** What the operator called this order. The heading was two identifiers. */
+  title?: string | null
+  /**
+   * Where the run stands, and whose move it is.
+   *
+   * Optional because this is polled and a host part way through an upgrade
+   * answers without one — the panel draws the run and no band rather than
+   * blanking.
+   */
+  standing?: Standing
+  /** Gates holding this order, undecided. Answerable from here. */
+  waiting?: Gate[]
+  /**
+   * Agents parked at their terminal's own prompt.
+   *
+   * A tool call nobody answered in time is handed back there, and an
+   * unattended run never reaches it — so the agent stops with its process
+   * alive and its node still `running`. The only thing that answers one is
+   * going to that terminal, which is what these are for.
+   */
+  stranded?: string[]
   /** What to call each node, keyed by id — worked out where the order is. */
   labels?: Record<string, string>
   ready: string[]
@@ -223,8 +248,16 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     setView(next)
   }, [orderId])
 
+  // Polled, not fetched once.
+  //
+  // This was a single call on mount, so every state chip on the screen was a
+  // snapshot of whenever the panel happened to open: a run that halted, failed
+  // or finished while you were looking at it went on drawing `building` until
+  // you navigated away and back.
   useEffect(() => {
     void refresh()
+    const timer = setInterval(() => void refresh(), LIVE_POLL_MS)
+    return () => clearInterval(timer)
   }, [refresh])
 
   // The live half: what an agent is holding at, and what it has been saying.
@@ -463,17 +496,201 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     [orderId, refresh]
   )
 
+  /**
+   * Answer the gate holding this order, from the screen that shows the order.
+   *
+   * The same channel the inbox answers it with — this is not a second queue,
+   * it is the one blocking thing on this order put where the person looking at
+   * the order will see it. The inbox stays the cross-order queue.
+   */
+  const decideGate = useCallback(
+    async (gateId: string, option: string) => {
+      setBusy(true)
+      try {
+        const r = (await invoke('foundry:inbox.decide', { gateId, option })) as {
+          error?: string
+          actionError?: string
+        }
+        setProblem(r.error ?? r.actionError ?? null)
+        await refresh()
+      } finally {
+        setBusy(false)
+      }
+    },
+    [refresh]
+  )
+
   if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
   if (view === null) return <div className="fdry-empty">Loading the run…</div>
 
   const lanes = [...new Set(view.graph.nodes.map((n) => n.lane ?? 0))].sort((a, b) => a - b)
   const orphaned = view.orphaned ?? []
 
+  const standing = view.standing
+  const waiting = view.waiting ?? []
+  const stranded = view.stranded ?? []
+
   return (
     <div className="fdry-shell">
-      <h2 className="fdry-panel-h">
-        {view.graph.orderId} · {view.graph.recipe}
-      </h2>
+      {/* What the order is, then what it is called by the records. The heading
+          used to be the id and the recipe name — two identifiers nobody chose
+          — on a screen whose whole job is to say which piece of work this is. */}
+      <h2 className="fdry-order-title">{view.title ?? view.graph.orderId}</h2>
+      <p className="fdry-order-sub">
+        {/* The id belongs under the title, not as it — and never twice, which
+            is what happens when the title is what the id is falling back to. */}
+        {view.title === null || view.title === undefined
+          ? view.graph.recipe
+          : `${view.graph.orderId} · ${view.graph.recipe}`}
+      </p>
+
+      {/* Where the run stands, and the move that takes it forward.
+
+          First on the screen and across its width, because everything below is
+          detail about a run whose state this is the only statement of. Without
+          it the panel opened on a wall of grey chips: a run halted two hours
+          earlier at an undecided gate drew the same chips as one mid-build,
+          the gate holding it was named nowhere, and the list that sent you
+          here called the same order "ready to hand off". */}
+      {standing === undefined ? null : (
+        <section
+          className={`fdry-standing is-${standing.kind}${standing.turn === 'you' ? ' is-yours' : ''}`}
+          aria-labelledby="fdry-standing-h"
+        >
+          <div className="fdry-standing-head">
+            <span className="fdry-standing-mark" aria-hidden="true">
+              {standing.turn === 'you' ? (
+                <AlertCircle />
+              ) : standing.kind === 'done' ? (
+                <CheckCircle2 />
+              ) : (
+                <Loader />
+              )}
+            </span>
+            <div className="fdry-standing-main">
+              <h3 className="fdry-standing-h" id="fdry-standing-h">
+                {standing.headline}
+              </h3>
+              <p className="fdry-standing-detail">{standing.detail}</p>
+            </div>
+            {standing.total === 0 ? null : (
+              <span className="fdry-standing-count">
+                {standing.done} of {standing.total}
+              </span>
+            )}
+          </div>
+
+          {standing.total === 0 ? null : (
+            <div
+              className="fdry-standing-bar"
+              role="progressbar"
+              aria-valuenow={standing.done}
+              aria-valuemin={0}
+              aria-valuemax={standing.total}
+              aria-label="steps done"
+            >
+              <span style={{ width: `${(standing.done / standing.total) * 100}%` }} />
+            </div>
+          )}
+
+          {/* An agent stopped at a prompt only a person can clear.
+
+              Nothing on this screen could answer it: the bridge had already
+              taken the question out of the UI and put it in the terminal, so
+              the one move is to go there. */}
+          {standing.kind === 'stranded' && stranded.length > 0 ? (
+            <div className="fdry-standing-gate">
+              <div className="fdry-standing-options">
+                {stranded.map((session) => (
+                  <div key={session} className="fdry-standing-option">
+                    <button
+                      type="button"
+                      className="is-primary"
+                      disabled={busy}
+                      onClick={() => void control('foundry:run-terminal', { sessionId: session })}
+                    >
+                      <Terminal aria-hidden="true" /> Go to its terminal
+                    </button>
+                    <small>
+                      {view.graph.nodes.find((n) => n.sessionId === session) === undefined
+                        ? session
+                        : (view.labels?.[
+                            view.graph.nodes.find((n) => n.sessionId === session)?.id ?? ''
+                          ] ?? session)}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* A run nothing is running, and the one thing to do about it.
+
+              This was its own panel below the band, which meant the screen
+              said "nothing is running this" twice in two different voices.
+              The band states it; this is the move. */}
+          {standing.kind === 'adrift' ? (
+            <div className="fdry-standing-gate">
+              <p className="fdry-note">
+                {orphaned.map((id) => view.labels?.[id] ?? id).join(', ')}
+              </p>
+              <div className="fdry-standing-options">
+                <div className="fdry-standing-option">
+                  <button
+                    type="button"
+                    className="is-primary"
+                    disabled={busy}
+                    onClick={() => void decideRun('foundry:run.resume')}
+                  >
+                    Pick it back up
+                  </button>
+                  <small>Every step that stopped is started again where it left off.</small>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* The gate's own options, on the screen showing the order it holds.
+              A check that names a problem and offers no reachable control is a
+              wall: this one was answerable only from a tab the operator had no
+              reason to connect to the run they were looking at. */}
+          {waiting.map((gate) => (
+            <div key={gate.id} className="fdry-standing-gate">
+              <p className="fdry-standing-gate-h">{gate.summary}</p>
+              <p className="fdry-note">{gate.why}</p>
+              <div className="fdry-standing-options">
+                {/* One recommended action, not two. Every rule lists the
+                    affirmative — carry on, approve, raise — first, and the
+                    ways of stopping after it; drawing "Stop here" as loudly as
+                    "Raise the budget" makes the operator read three buttons to
+                    find out which one keeps the work alive. */}
+                {gate.options.map((option, index) => (
+                  <div key={option.id} className="fdry-standing-option">
+                    <button
+                      type="button"
+                      className={index === 0 ? 'is-primary' : undefined}
+                      disabled={busy}
+                      onClick={() => void decideGate(gate.id, option.id)}
+                    >
+                      {option.label}
+                    </button>
+                    <small>{option.consequence}</small>
+                  </div>
+                ))}
+              </div>
+              {/* What happens if this is left alone, in the option's own
+                  words. It printed the option id — "this holds: hold" — which
+                  is a token from a rules file, not a sentence. */}
+              <p className="fdry-note">
+                Nothing happens until you answer. Left alone, Foundry takes &ldquo;
+                {gate.options.find((o) => o.id === gate.defaultIfIgnored)?.label ??
+                  gate.defaultIfIgnored}
+                &rdquo;.
+              </p>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Always here, not only when the run is orphaned.
 
@@ -498,39 +715,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           onConfirm={() => void decideRun('foundry:run.reset')}
         />
       </div>
-
-      {/* A run nothing is running.
-
-          At the top and across the width, before the graph, because the chips
-          underneath it are describing agents that do not exist: an agent's
-          terminal is a child of the application and does not outlive it. This
-          used to be invisible — the same chips a working run draws — so the
-          only way to find out was to come back later and notice that nothing
-          had moved. */}
-      {orphaned.length > 0 ? (
-        <section className="fdry-needs-you" aria-labelledby="fdry-orphaned-h">
-          <h3 className="fdry-needs-you-h" id="fdry-orphaned-h">
-            {/* The same mark the inbox puts on the same rule's row. */}
-            <Unplug aria-hidden="true" />
-            Nothing is running this — {orphaned.length} {orphaned.length === 1 ? 'step' : 'steps'}
-          </h3>
-          <p className="fdry-note">
-            {orphaned.map((id) => view.labels?.[id] ?? id).join(', ')}{' '}
-            {orphaned.length === 1 ? 'was' : 'were'} still working when the application last closed,
-            and an agent&rsquo;s terminal does not outlive it.
-          </p>
-          <div className="fdry-ask-actions">
-            <button
-              type="button"
-              className="is-primary"
-              disabled={busy}
-              onClick={() => void decideRun('foundry:run.resume')}
-            >
-              Pick it back up
-            </button>
-          </div>
-        </section>
-      ) : null}
 
       {/* Held tool calls, oldest first — the order they must be answered in.
           This is the UI-first half of the promise: the terminal is the

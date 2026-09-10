@@ -1,5 +1,5 @@
 import { Markdown } from './Markdown.js'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
@@ -8,6 +8,8 @@ import { surfacedQuestions } from '../forge/interview.js'
 import { liveAssumptions } from '../forge/assumptions.js'
 import type { StateMapping, TransitionIntent, WriteBack } from '../order/schema.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
+import type { IntakeOutcome } from '../forge/intake-outcome.js'
+import { PROPOSAL_FILE } from '../order/proposal.js'
 
 // The Forge.
 //
@@ -23,6 +25,8 @@ export interface OrderView {
   unavailableChecks?: string[]
   /** The session the architect is drafting in, while it is drafting. */
   converging?: string
+  /** How the last intake turn ended. Absent only on a channel that predates it. */
+  intake?: IntakeOutcome
 }
 
 /** How often the document is refetched while the architect is working. */
@@ -185,15 +189,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       the red team's own reason so two open forms never share a box. */
   const [unproven, setUnproven] = useState<string | null>(null)
   const [unprovenReason, setUnprovenReason] = useState('')
-  /**
-   * The architect is working, until the document says otherwise.
-   *
-   * Its own state rather than a field on the view: the view is replaced on
-   * every poll by `order.compile`, which knows nothing about a session, so
-   * deriving it from there cleared the flag after one tick and stopped the
-   * poll — and a redraft landing a minute later never appeared.
-   */
-  const [drafting, setDrafting] = useState(false)
   const [recipes, setRecipes] = useState<RecipesView | null>(null)
   const [chosen, setChosen] = useState<string | null>(null)
 
@@ -286,37 +281,44 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       setBusy(true)
       setProblem(null)
       try {
-        decisionsAtStart.current = view?.order.provenance.decisions.length ?? 0
         const next = (await invoke('foundry:order.converge', {
           id: orderId,
           ...(message === undefined ? {} : { message }),
         })) as (OrderView & { error?: string; converging?: string }) | { error: string }
         if ('order' in next) setView(next)
         if (next.error !== undefined) setProblem(next.error)
-        setDrafting('converging' in next && next.converging !== undefined)
       } finally {
         setBusy(false)
       }
     },
-    [orderId, view]
+    [orderId]
   )
 
+  /**
+   * Whether an architect is working on this order, from the record.
+   *
+   * Its own `useState` before, set when the converge call returned and cleared
+   * when `provenance.decisions` grew. Both halves were wrong. A refusal grows
+   * nothing — the proposal failed validation, so there is no redraft to save
+   * and the document is untouched — so the flag was never cleared and the
+   * button read "The architect is working…" for ever, over a turn that had
+   * ended minutes earlier. And a flag set by a click cannot survive leaving
+   * the screen, so coming back mid-turn showed a draft that looked idle.
+   *
+   * The ledger knows both. `intake` is the last of this order's three intake
+   * lines, and a turn is running exactly while the last one is its start.
+   */
+  const intake: IntakeOutcome = view?.intake ?? { kind: 'none' }
+  const drafting = intake.kind === 'running'
+
   // The architect answers in minutes, not in the call that started it, so the
-  // document is refetched while it works and the redraft appears when it
-  // lands. What stops the poll is the record growing — the architect writes a
-  // line whether it redrafted, refused or found nothing to change — rather
-  // than a timeout, which would either give up early or poll for ever.
-  const decisionsAtStart = useRef(0)
+  // document is refetched while it works and the outcome — a redraft, or the
+  // reason it was refused — appears when it lands.
   useEffect(() => {
     if (!drafting) return
     const timer = setInterval(() => void refresh(), REDRAFT_POLL_MS)
     return () => clearInterval(timer)
   }, [drafting, refresh])
-
-  useEffect(() => {
-    if (!drafting || view === null) return
-    if (view.order.provenance.decisions.length > decisionsAtStart.current) setDrafting(false)
-  }, [drafting, view])
 
   /**
    * Compile, agree, and start the Line.
@@ -384,6 +386,56 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
 
   return (
     <div className="fdry-forge">
+      {/* The turn that ended with nothing to show for it.
+
+          Above the questions and above everything else, because until this is
+          answered nothing else on the screen will move: the checks below are
+          the checks the refused plan would have cleared, and answering a
+          question the architect asked before it was refused changes a document
+          no architect is currently reading.
+
+          It was recorded in the ledger and rendered nowhere. The operator's
+          report was two sentences — "no way to recover from this" and "there's
+          also zero indication anything has even gone wrong" — and both were
+          exactly right: the screen said the architect was working, and it had
+          stopped forty minutes earlier. */}
+      {intake.kind === 'refused' && order.status === 'draft' ? (
+        <section className="fdry-refused" aria-labelledby="fdry-refused-h">
+          <h2 className="fdry-refused-h" id="fdry-refused-h" tabIndex={-1}>
+            <AlertCircle aria-hidden="true" />
+            The architect&rsquo;s plan was refused
+          </h2>
+          <p>
+            Nothing on this order was changed. The proposal did not fit the shape an order has to
+            be, so none of it was taken.
+          </p>
+          <p className="fdry-refused-why">{intake.reason}</p>
+          <div className="fdry-options">
+            {/* The move, not just the news. The reason goes back with it: the
+                architect cannot read its own refusal — it ended before the
+                validation ran — and on the run this was found on it also
+                could not parse the JSON it had just written, because `node
+                -e`, `python3 -c` and redirects are all off intake's read-only
+                allowlist. Told what was wrong, it fixes it in one turn. */}
+            <button
+              type="button"
+              className="is-recommended"
+              disabled={busy}
+              onClick={() =>
+                void converge(
+                  `Your last proposal was refused and nothing was changed. The reason: ${intake.reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
+                )
+              }
+            >
+              Tell the architect what was wrong
+            </button>
+            <button type="button" disabled={busy} onClick={() => void converge()}>
+              Start the turn over
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {/* The one thing on this screen that is waiting on a person, and so the
           first thing on it.
 
@@ -427,466 +479,473 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
         </section>
       ) : null}
 
-      <aside className="fdry-rail">
-        <section className="fdry-panel">
-          <h2 className="fdry-panel-h">Convergence</h2>
-          {CHECK_ORDER.map((id) => {
-            const bad = failed.has(id)
-            const failure = compile.failures.find((f) => f.check === id)
-            return (
-              <div key={id} className={`fdry-check ${bad ? 'is-fail' : 'is-pass'}`}>
-                <span className="fdry-check-mark" aria-hidden="true">
-                  {bad ? <X /> : <Check />}
-                </span>
-                <span>
-                  <b>{CHECK_LABELS[id]}</b>
-                  {bad && failure !== undefined ? <small>{failure.detail}</small> : null}
-                  {/* Saying what is wrong is half of it. A check that names no
+      {/* The rail and the document, side by side and each scrolling itself.
+          Their own box so the bands above keep the full width. */}
+      <div className="fdry-cols">
+        <aside className="fdry-rail">
+          <section className="fdry-panel">
+            <h2 className="fdry-panel-h">Convergence</h2>
+            {CHECK_ORDER.map((id) => {
+              const bad = failed.has(id)
+              const failure = compile.failures.find((f) => f.check === id)
+              return (
+                <div key={id} className={`fdry-check ${bad ? 'is-fail' : 'is-pass'}`}>
+                  <span className="fdry-check-mark" aria-hidden="true">
+                    {bad ? <X /> : <Check />}
+                  </span>
+                  <span>
+                    <b>{CHECK_LABELS[id]}</b>
+                    {bad && failure !== undefined ? <small>{failure.detail}</small> : null}
+                    {/* Saying what is wrong is half of it. A check that names no
                       move is one the operator stares at — which is what every
                       one of these but the red team did. */}
-                  {bad && order.status === 'draft' ? (
-                    <span className="fdry-remedy">
-                      {CHECK_REMEDIES[id].map((remedy) => (
-                        <button
-                          key={remedy.label}
-                          type="button"
-                          disabled={busy || (remedy.kind === 'ask' && drafting)}
-                          onClick={() =>
-                            remedy.kind === 'goto'
-                              ? goTo(remedy.target)
-                              : void converge(remedy.message)
-                          }
-                        >
-                          {remedy.label}
-                        </button>
-                      ))}
-                    </span>
-                  ) : null}
-                </span>
-              </div>
-            )
-          })}
-          {/* The plan does not write itself. Until the architect has run, the
+                    {bad && order.status === 'draft' ? (
+                      <span className="fdry-remedy">
+                        {CHECK_REMEDIES[id].map((remedy) => (
+                          <button
+                            key={remedy.label}
+                            type="button"
+                            disabled={busy || (remedy.kind === 'ask' && drafting)}
+                            onClick={() =>
+                              remedy.kind === 'goto'
+                                ? goTo(remedy.target)
+                                : void converge(remedy.message)
+                            }
+                          >
+                            {remedy.label}
+                          </button>
+                        ))}
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+              )
+            })}
+            {/* The plan does not write itself. Until the architect has run, the
               six checks below are a list of everything that is missing — so
               this is the action, and hand-off is the one after it. */}
-          {order.status === 'draft' ? (
-            <button
-              type="button"
-              className="fdry-converge"
-              disabled={busy || drafting}
-              onClick={() => void converge()}
-            >
-              <Wand aria-hidden="true" />
-              {drafting
-                ? 'The architect is working…'
-                : order.acceptance.length === 0
-                  ? 'Draft the plan'
-                  : 'Redraft'}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="fdry-compile"
-            disabled={!compile.ok || busy || order.status !== 'draft'}
-            onClick={() => void handOff()}
-          >
-            <Play aria-hidden="true" />
-            {order.status !== 'draft'
-              ? `Handed off — ${order.status}`
-              : compile.ok
-                ? 'Compile & hand off'
-                : `Blocked by ${compile.failures.length}`}
-          </button>
-          {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
-          {/* The one refusal the operator can answer: it is about their own
-              review queue, not about the order. Overriding is one click, and
-              the depth they ignored goes in the record (FR-054). */}
-          {heldBack !== null ? (
+            {order.status === 'draft' ? (
+              <button
+                type="button"
+                className="fdry-converge"
+                disabled={busy || drafting}
+                onClick={() => void converge()}
+              >
+                <Wand aria-hidden="true" />
+                {drafting
+                  ? 'The architect is working…'
+                  : order.acceptance.length === 0
+                    ? 'Draft the plan'
+                    : 'Redraft'}
+              </button>
+            ) : null}
             <button
               type="button"
               className="fdry-compile"
-              disabled={busy}
-              onClick={() => void handOff(true)}
+              disabled={!compile.ok || busy || order.status !== 'draft'}
+              onClick={() => void handOff()}
             >
-              <Play aria-hidden="true" /> Start anyway — {heldBack.unreviewed} waiting for review
+              <Play aria-hidden="true" />
+              {order.status !== 'draft'
+                ? `Handed off — ${order.status}`
+                : compile.ok
+                  ? 'Compile & hand off'
+                  : `Blocked by ${compile.failures.length}`}
             </button>
-          ) : null}
-        </section>
+            {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
+            {/* The one refusal the operator can answer: it is about their own
+              review queue, not about the order. Overriding is one click, and
+              the depth they ignored goes in the record (FR-054). */}
+            {heldBack !== null ? (
+              <button
+                type="button"
+                className="fdry-compile"
+                disabled={busy}
+                onClick={() => void handOff(true)}
+              >
+                <Play aria-hidden="true" /> Start anyway — {heldBack.unreviewed} waiting for review
+              </button>
+            ) : null}
+          </section>
 
-        {/* The shape of work. Proposed rather than chosen — a proposal nobody
+          {/* The shape of work. Proposed rather than chosen — a proposal nobody
             can predict is worse than a plain one — and overridden in one
             click, with the override recorded. */}
-        {(recipes?.recipes?.length ?? 0) > 0 && order.status === 'draft' ? (
-          <section className="fdry-panel">
-            <h2 className="fdry-panel-h">Shape of work</h2>
-            {recipes?.proposedWhy !== undefined && recipes.proposedWhy !== '' ? (
-              <p className="fdry-note">
-                {recipes.proposed} proposed — {recipes.proposedWhy}.
-              </p>
-            ) : null}
-            {recipes?.recipes?.map((option) => {
-              const isChosen = (chosen ?? recipes.proposed) === option.name
-              return (
-                <button
-                  key={option.name}
-                  type="button"
-                  className={`fdry-recipe ${isChosen ? 'is-on' : ''}`}
-                  disabled={!option.available || busy}
-                  title={option.available ? option.description : option.unmet.join('; ')}
-                  onClick={() => setChosen(option.name)}
-                >
-                  <b>{option.name}</b>
-                  <small>
-                    {option.available
-                      ? (option.description ?? `from ${option.rung ?? 'built-in'}`)
-                      : option.unmet.join('; ')}
-                  </small>
-                  {option.name === recipes.proposed && chosen === null ? (
-                    <span className="fdry-recipe-mark">proposed</span>
-                  ) : null}
-                </button>
-              )
-            })}
-          </section>
-        ) : null}
-
-        {states?.capability !== undefined && states.capability.transitions !== 'no_issue' ? (
-          <section className="fdry-panel">
-            <h2 className="fdry-panel-h">Tracker write-back</h2>
-            {states.capability.transitions === 'unsupported' ? (
-              <p className="fdry-note">
-                {order.source.tracker} cannot be asked to move an issue, so {order.source.key} will
-                not change state. The summary comment and the pull request links still go across.
-              </p>
-            ) : (
-              <>
+          {(recipes?.recipes?.length ?? 0) > 0 && order.status === 'draft' ? (
+            <section className="fdry-panel">
+              <h2 className="fdry-panel-h">Shape of work</h2>
+              {recipes?.proposedWhy !== undefined && recipes.proposedWhy !== '' ? (
                 <p className="fdry-note">
-                  Which of {order.source.tracker}&rsquo;s own states each moment means. Left alone,
-                  the tracker resolves it.
+                  {recipes.proposed} proposed — {recipes.proposedWhy}.
                 </p>
-                {INTENTS.map((intent) => (
-                  <label key={intent} className="fdry-map">
-                    <span>{INTENT_LABELS[intent]}</span>
-                    <select
-                      value={states.mapping?.[intent] ?? ''}
-                      onChange={(event) =>
-                        void mapIntent(
-                          intent,
-                          event.target.value === '' ? null : event.target.value
-                        )
-                      }
-                    >
-                      <option value="">
-                        {states.capability?.unreachable.includes(intent) === true
-                          ? 'nowhere to go — skipped'
-                          : 'let the tracker decide'}
-                      </option>
-                      {states.capability?.states.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ))}
-              </>
-            )}
+              ) : null}
+              {recipes?.recipes?.map((option) => {
+                const isChosen = (chosen ?? recipes.proposed) === option.name
+                return (
+                  <button
+                    key={option.name}
+                    type="button"
+                    className={`fdry-recipe ${isChosen ? 'is-on' : ''}`}
+                    disabled={!option.available || busy}
+                    title={option.available ? option.description : option.unmet.join('; ')}
+                    onClick={() => setChosen(option.name)}
+                  >
+                    <b>{option.name}</b>
+                    <small>
+                      {option.available
+                        ? (option.description ?? `from ${option.rung ?? 'built-in'}`)
+                        : option.unmet.join('; ')}
+                    </small>
+                    {option.name === recipes.proposed && chosen === null ? (
+                      <span className="fdry-recipe-mark">proposed</span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </section>
+          ) : null}
 
-            {/* Per order, defaulting from configuration (FR-062). A run
+          {states?.capability !== undefined && states.capability.transitions !== 'no_issue' ? (
+            <section className="fdry-panel">
+              <h2 className="fdry-panel-h">Tracker write-back</h2>
+              {states.capability.transitions === 'unsupported' ? (
+                <p className="fdry-note">
+                  {order.source.tracker} cannot be asked to move an issue, so {order.source.key}{' '}
+                  will not change state. The summary comment and the pull request links still go
+                  across.
+                </p>
+              ) : (
+                <>
+                  <p className="fdry-note">
+                    Which of {order.source.tracker}&rsquo;s own states each moment means. Left
+                    alone, the tracker resolves it.
+                  </p>
+                  {INTENTS.map((intent) => (
+                    <label key={intent} className="fdry-map">
+                      <span>{INTENT_LABELS[intent]}</span>
+                      <select
+                        value={states.mapping?.[intent] ?? ''}
+                        onChange={(event) =>
+                          void mapIntent(
+                            intent,
+                            event.target.value === '' ? null : event.target.value
+                          )
+                        }
+                      >
+                        <option value="">
+                          {states.capability?.unreachable.includes(intent) === true
+                            ? 'nowhere to go — skipped'
+                            : 'let the tracker decide'}
+                        </option>
+                        {states.capability?.states.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </>
+              )}
+
+              {/* Per order, defaulting from configuration (FR-062). A run
                 against somebody else's repository is a reason to turn one off
                 without changing the setting for every order after it. */}
-            <div className="fdry-writebacks">
-              {WRITE_BACKS.map((kind) => (
-                <label key={kind.id} className="fdry-writeback">
-                  <input
-                    type="checkbox"
-                    checked={order.writeBack.includes(kind.id)}
-                    onChange={(event) =>
-                      void setWriteBack(
-                        event.target.checked
-                          ? [...order.writeBack, kind.id]
-                          : order.writeBack.filter((w) => w !== kind.id)
-                      )
-                    }
-                  />
-                  {kind.label}
-                </label>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {view.unavailableChecks !== undefined && view.unavailableChecks.length > 0 ? (
-          <section className="fdry-panel">
-            <h2 className="fdry-panel-h">Not measurable here</h2>
-            <p className="fdry-note">
-              This repository has no command for {view.unavailableChecks.join(', ')}. Those checks
-              will report &ldquo;not measured&rdquo; rather than passing.
-            </p>
-          </section>
-        ) : null}
-      </aside>
-
-      <main className="fdry-doc">
-        <header className="fdry-doc-head">
-          <h1>{order.title}</h1>
-          {order.source.key !== null ? (
-            <span className="fdry-src">
-              {order.source.tracker} {order.source.key}
-            </span>
+              <div className="fdry-writebacks">
+                {WRITE_BACKS.map((kind) => (
+                  <label key={kind.id} className="fdry-writeback">
+                    <input
+                      type="checkbox"
+                      checked={order.writeBack.includes(kind.id)}
+                      onChange={(event) =>
+                        void setWriteBack(
+                          event.target.checked
+                            ? [...order.writeBack, kind.id]
+                            : order.writeBack.filter((w) => w !== kind.id)
+                        )
+                      }
+                    />
+                    {kind.label}
+                  </label>
+                ))}
+              </div>
+            </section>
           ) : null}
-          <span className="fdry-id">{order.id}</span>
-          {/* The conversation that wrote this plan. Rendered from the order's
+
+          {view.unavailableChecks !== undefined && view.unavailableChecks.length > 0 ? (
+            <section className="fdry-panel">
+              <h2 className="fdry-panel-h">Not measurable here</h2>
+              <p className="fdry-note">
+                This repository has no command for {view.unavailableChecks.join(', ')}. Those checks
+                will report &ldquo;not measured&rdquo; rather than passing.
+              </p>
+            </section>
+          ) : null}
+        </aside>
+
+        <main className="fdry-doc">
+          <header className="fdry-doc-head">
+            <h1>{order.title}</h1>
+            {order.source.key !== null ? (
+              <span className="fdry-src">
+                {order.source.tracker} {order.source.key}
+              </span>
+            ) : null}
+            <span className="fdry-id">{order.id}</span>
+            {/* The conversation that wrote this plan. Rendered from the order's
               own record rather than a prop nobody passed — which is why this
               control never appeared in the running application at all. */}
-          {order.provenance.forgeSession !== null ? (
-            <button
-              type="button"
-              className="fdry-attach"
-              onClick={() =>
-                void attachToArchitect(order.provenance.forgeSession ?? '').then(setProblem)
-              }
-            >
-              <Terminal aria-hidden="true" /> Attach
-            </button>
-          ) : null}
-        </header>
-        <p className="fdry-doc-sub">
-          recipe <b>{order.recipe ?? 'not chosen'}</b> · risk {order.risk.grade} ·{' '}
-          {order.plan.units.length} units · {order.status}
-        </p>
+            {order.provenance.forgeSession !== null ? (
+              <button
+                type="button"
+                className="fdry-attach"
+                onClick={() =>
+                  void attachToArchitect(order.provenance.forgeSession ?? '').then(setProblem)
+                }
+              >
+                <Terminal aria-hidden="true" /> Attach
+              </button>
+            ) : null}
+          </header>
+          <p className="fdry-doc-sub">
+            recipe <b>{order.recipe ?? 'not chosen'}</b> · risk {order.risk.grade} ·{' '}
+            {order.plan.units.length} units · {order.status}
+          </p>
 
-        <section className={`fdry-field ${moved.includes('intent') ? 'is-redrawn' : ''}`}>
-          <h2 className="fdry-panel-h">Intent</h2>
-          {/* A tracker's description is markdown, and it was rendered inside a
+          <section className={`fdry-field ${moved.includes('intent') ? 'is-redrawn' : ''}`}>
+            <h2 className="fdry-panel-h">Intent</h2>
+            {/* A tracker's description is markdown, and it was rendered inside a
               `<p>` — which collapses every newline, so a ticket's headings and
               acceptance list arrived as one unbroken line. */}
-          <p className="fdry-md-label">
-            <b>Problem.</b>
-            {order.intent.problem === '' ? ' not stated yet' : null}
-          </p>
-          <Markdown text={order.intent.problem} />
-          <p className="fdry-md-label">
-            <b>Outcome.</b>
-            {order.intent.outcome === '' ? ' not stated yet' : null}
-          </p>
-          <Markdown text={order.intent.outcome} />
-        </section>
-
-        <section className={`fdry-field ${moved.includes('acceptance') ? 'is-redrawn' : ''}`}>
-          <h2 className="fdry-panel-h" id="fdry-acceptance" tabIndex={-1}>
-            Acceptance &amp; how it is proven
-          </h2>
-          {order.acceptance.length === 0 ? (
-            <p className="fdry-note">
-              {order.source.kind === 'tracker'
-                ? `Nothing under an acceptance heading in ${order.source.key ?? 'the ticket'}. Press “Draft the plan” and the architect will write the criteria from what it does say.`
-                : 'No criteria yet. Nothing writes them but the architect — press “Draft the plan”.'}
+            <p className="fdry-md-label">
+              <b>Problem.</b>
+              {order.intent.problem === '' ? ' not stated yet' : null}
             </p>
-          ) : (
-            order.acceptance.map((criterion) => {
-              const uncovered = matrix.uncoveredCriteria.includes(criterion.id)
-              const excused = criterion.unverifiable?.accepted === true
-              return (
-                <div key={criterion.id} className={`fdry-ac ${uncovered ? 'is-gap' : ''}`}>
-                  <span className="fdry-ac-id">{criterion.id}</span>
-                  <div>
-                    <p>{criterion.statement}</p>
-                    <span className="fdry-verify">
-                      {criterion.verify.kind}
-                      {uncovered ? ' · no unit satisfies this' : ''}
-                    </span>
-                    {/* The escape the falsifiable check has always named and
+            <Markdown text={order.intent.problem} />
+            <p className="fdry-md-label">
+              <b>Outcome.</b>
+              {order.intent.outcome === '' ? ' not stated yet' : null}
+            </p>
+            <Markdown text={order.intent.outcome} />
+          </section>
+
+          <section className={`fdry-field ${moved.includes('acceptance') ? 'is-redrawn' : ''}`}>
+            <h2 className="fdry-panel-h" id="fdry-acceptance" tabIndex={-1}>
+              Acceptance &amp; how it is proven
+            </h2>
+            {order.acceptance.length === 0 ? (
+              <p className="fdry-note">
+                {order.source.kind === 'tracker'
+                  ? `Nothing under an acceptance heading in ${order.source.key ?? 'the ticket'}. Press “Draft the plan” and the architect will write the criteria from what it does say.`
+                  : 'No criteria yet. Nothing writes them but the architect — press “Draft the plan”.'}
+              </p>
+            ) : (
+              order.acceptance.map((criterion) => {
+                const uncovered = matrix.uncoveredCriteria.includes(criterion.id)
+                const excused = criterion.unverifiable?.accepted === true
+                return (
+                  <div key={criterion.id} className={`fdry-ac ${uncovered ? 'is-gap' : ''}`}>
+                    <span className="fdry-ac-id">{criterion.id}</span>
+                    <div>
+                      <p>{criterion.statement}</p>
+                      <span className="fdry-verify">
+                        {criterion.verify.kind}
+                        {uncovered ? ' · no unit satisfies this' : ''}
+                      </span>
+                      {/* The escape the falsifiable check has always named and
                         nothing could reach: a criterion nothing here can prove
                         may be accepted anyway, in writing, and the reason
                         travels with the order. */}
-                    {excused ? (
-                      <p className="fdry-ac-excused">
-                        accepted as unverifiable — {criterion.unverifiable?.reason}
-                      </p>
-                    ) : order.status === 'draft' && unproven !== criterion.id ? (
-                      <button
-                        type="button"
-                        className="fdry-ac-excuse"
-                        disabled={busy}
-                        onClick={() => setUnproven(criterion.id)}
-                      >
-                        Nothing here can prove this
-                      </button>
-                    ) : null}
-                    {unproven === criterion.id && !excused ? (
-                      <form
-                        className="fdry-accept"
-                        onSubmit={(event) => {
-                          event.preventDefault()
-                          if (unprovenReason.trim() === '') return
-                          void turn({
-                            unverifiable: {
-                              criterionId: criterion.id,
-                              reason: unprovenReason.trim(),
-                            },
-                          })
-                          setUnproven(null)
-                          setUnprovenReason('')
-                        }}
-                      >
-                        <input
-                          aria-label={`Why ${criterion.id} cannot be proven`}
-                          placeholder="Why nothing can prove it…"
-                          value={unprovenReason}
-                          onChange={(event) => setUnprovenReason(event.target.value)}
-                        />
-                        <button type="submit" disabled={unprovenReason.trim() === ''}>
-                          Accept it
-                        </button>
-                      </form>
-                    ) : null}
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </section>
-
-        {matrix.criteria.length > 0 && matrix.units.length > 0 ? (
-          <section className="fdry-field">
-            <h2 className="fdry-panel-h">Coverage</h2>
-            <div className="fdry-scroll">
-              <table className="fdry-matrix">
-                <thead>
-                  <tr>
-                    <th aria-label="criterion" />
-                    {matrix.units.map((unit) => (
-                      <th key={unit}>{unit}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {matrix.criteria.map((criterion, row) => (
-                    <tr key={criterion}>
-                      <td className="fdry-matrix-row">{criterion}</td>
-                      {matrix.cells[row].map((hit, column) => (
-                        <td
-                          key={matrix.units[column]}
-                          className={
-                            hit
-                              ? 'is-hit'
-                              : matrix.uncoveredCriteria.includes(criterion)
-                                ? 'is-gap'
-                                : ''
-                          }
+                      {excused ? (
+                        <p className="fdry-ac-excused">
+                          accepted as unverifiable — {criterion.unverifiable?.reason}
+                        </p>
+                      ) : order.status === 'draft' && unproven !== criterion.id ? (
+                        <button
+                          type="button"
+                          className="fdry-ac-excuse"
+                          disabled={busy}
+                          onClick={() => setUnproven(criterion.id)}
                         >
-                          {hit ? '●' : '·'}
-                        </td>
+                          Nothing here can prove this
+                        </button>
+                      ) : null}
+                      {unproven === criterion.id && !excused ? (
+                        <form
+                          className="fdry-accept"
+                          onSubmit={(event) => {
+                            event.preventDefault()
+                            if (unprovenReason.trim() === '') return
+                            void turn({
+                              unverifiable: {
+                                criterionId: criterion.id,
+                                reason: unprovenReason.trim(),
+                              },
+                            })
+                            setUnproven(null)
+                            setUnprovenReason('')
+                          }}
+                        >
+                          <input
+                            aria-label={`Why ${criterion.id} cannot be proven`}
+                            placeholder="Why nothing can prove it…"
+                            value={unprovenReason}
+                            onChange={(event) => setUnprovenReason(event.target.value)}
+                          />
+                          <button type="submit" disabled={unprovenReason.trim() === ''}>
+                            Accept it
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </section>
+
+          {matrix.criteria.length > 0 && matrix.units.length > 0 ? (
+            <section className="fdry-field">
+              <h2 className="fdry-panel-h">Coverage</h2>
+              <div className="fdry-scroll">
+                <table className="fdry-matrix">
+                  <thead>
+                    <tr>
+                      <th aria-label="criterion" />
+                      {matrix.units.map((unit) => (
+                        <th key={unit}>{unit}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ) : null}
+                  </thead>
+                  <tbody>
+                    {matrix.criteria.map((criterion, row) => (
+                      <tr key={criterion}>
+                        <td className="fdry-matrix-row">{criterion}</td>
+                        {matrix.cells[row].map((hit, column) => (
+                          <td
+                            key={matrix.units[column]}
+                            className={
+                              hit
+                                ? 'is-hit'
+                                : matrix.uncoveredCriteria.includes(criterion)
+                                  ? 'is-gap'
+                                  : ''
+                            }
+                          >
+                            {hit ? '●' : '·'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
 
-        {assumptions.length > 0 ? (
-          <section className={`fdry-field ${moved.includes('assumptions') ? 'is-redrawn' : ''}`}>
-            <h2 className="fdry-panel-h">Assumptions — strike any that are wrong</h2>
-            <div className="fdry-assume">
-              {assumptions.map((assumption) => (
-                <button
-                  key={assumption.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void turn({ strike: assumption.id })}
-                >
-                  {assumption.text} <X aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
+          {assumptions.length > 0 ? (
+            <section className={`fdry-field ${moved.includes('assumptions') ? 'is-redrawn' : ''}`}>
+              <h2 className="fdry-panel-h">Assumptions — strike any that are wrong</h2>
+              <div className="fdry-assume">
+                {assumptions.map((assumption) => (
+                  <button
+                    key={assumption.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void turn({ strike: assumption.id })}
+                  >
+                    {assumption.text} <X aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
-        {/* Every one of these has to be cleared before the order can be handed
+          {/* Every one of these has to be cleared before the order can be handed
             off. Showing them without a way to clear them is what blocked the
             gate for ever. */}
-        {openFindings.length > 0 ? (
-          <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
-            <h2 className="fdry-panel-h" id="fdry-redteam" tabIndex={-1}>
-              Red team — {openFindings.length} open
-            </h2>
-            {openFindings.map((finding) => (
-              <div key={finding.id} className="fdry-finding">
-                <CircleDot aria-hidden="true" />
-                <span>{finding.text}</span>
-                <span className="fdry-finding-actions">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    title="It is fixed"
-                    onClick={() => void turn({ finding: { id: finding.id, decision: 'resolved' } })}
-                  >
-                    Fixed
+          {openFindings.length > 0 ? (
+            <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
+              <h2 className="fdry-panel-h" id="fdry-redteam" tabIndex={-1}>
+                Red team — {openFindings.length} open
+              </h2>
+              {openFindings.map((finding) => (
+                <div key={finding.id} className="fdry-finding">
+                  <CircleDot aria-hidden="true" />
+                  <span>{finding.text}</span>
+                  <span className="fdry-finding-actions">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      title="It is fixed"
+                      onClick={() =>
+                        void turn({ finding: { id: finding.id, decision: 'resolved' } })
+                      }
+                    >
+                      Fixed
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      title="It stands, and here is why"
+                      onClick={() => setAccepting(finding.id)}
+                    >
+                      Accept
+                    </button>
+                  </span>
+                </div>
+              ))}
+              {accepting !== null ? (
+                <form
+                  className="fdry-accept"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    if (reason.trim() === '') return
+                    void turn({
+                      finding: { id: accepting, decision: 'accepted', reason: reason.trim() },
+                    })
+                    setAccepting(null)
+                    setReason('')
+                  }}
+                >
+                  <input
+                    aria-label="Why this finding is accepted"
+                    placeholder="Why it stands…"
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                  />
+                  <button type="submit" disabled={reason.trim() === ''}>
+                    Accept it
                   </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    title="It stands, and here is why"
-                    onClick={() => setAccepting(finding.id)}
-                  >
-                    Accept
-                  </button>
-                </span>
-              </div>
-            ))}
-            {accepting !== null ? (
-              <form
-                className="fdry-accept"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  if (reason.trim() === '') return
-                  void turn({
-                    finding: { id: accepting, decision: 'accepted', reason: reason.trim() },
-                  })
-                  setAccepting(null)
-                  setReason('')
-                }}
-              >
-                <input
-                  aria-label="Why this finding is accepted"
-                  placeholder="Why it stands…"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                />
-                <button type="submit" disabled={reason.trim() === ''}>
-                  Accept it
-                </button>
-              </form>
-            ) : null}
-          </section>
-        ) : null}
+                </form>
+              ) : null}
+            </section>
+          ) : null}
 
-        <form
-          className="fdry-input"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (draft.trim() === '') return
-            // Straight to the architect. `turn` routes free text there too;
-            // going directly says what the button does.
-            void converge(draft)
-            setDraft('')
-          }}
-        >
-          <input
-            aria-label="Tell the architect what is wrong, or what you want instead"
-            placeholder="Tell the architect what's wrong, or what you want instead…"
-            value={draft}
-            disabled={busy}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <button type="submit" disabled={busy || draft.trim() === ''}>
-            Send
-          </button>
-        </form>
-      </main>
+          <form
+            className="fdry-input"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (draft.trim() === '') return
+              // Straight to the architect. `turn` routes free text there too;
+              // going directly says what the button does.
+              void converge(draft)
+              setDraft('')
+            }}
+          >
+            <input
+              aria-label="Tell the architect what is wrong, or what you want instead"
+              placeholder="Tell the architect what's wrong, or what you want instead…"
+              value={draft}
+              disabled={busy}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+            <button type="submit" disabled={busy || draft.trim() === ''}>
+              Send
+            </button>
+          </form>
+        </main>
+      </div>
     </div>
   )
 }
