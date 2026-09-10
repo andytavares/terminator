@@ -561,6 +561,15 @@ code genuinely could not answer.
 
 The document is the subject; the conversation sits behind it.
 
+An open order is a **frame**, not a page: **All orders** at the top, the order
+itself in the middle, and **Discard this order** / **Delete this order** along
+the foot. The rail and the document each scroll inside the frame, so the
+controls at the foot are always where you left them and neither column decides
+how long the screen is. **Discard** marks an order cancelled and keeps its
+records; **Delete** removes the order and everything it made — its ledger, its
+run graph, its checkout and its branch — and asks you to confirm that in as
+many words first.
+
 **Needs you** is the band across the top of the screen — **at most three
 questions**, ever, above everything else on the surface, because a question you
 have to go looking for is a question that does not get answered. The
@@ -611,7 +620,8 @@ that cannot run here says which requirement it does not meet rather than
 quietly disappearing. Foundry proposes one and says why it chose it ("2 units
 of work", "graded P1, which is above the direct shape's ceiling"). Pick a
 different one in a click; the override is recorded alongside the proposal it
-replaced.
+replaced. The shape that is selected spells itself out; the rest keep a line
+each, with the whole description on hover.
 
 ![A work order in the Forge, with its convergence checks and the shape of work](screenshots/08b-foundry-forge.png)
 

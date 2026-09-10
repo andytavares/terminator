@@ -558,3 +558,120 @@ test('a run cuts a worktree and launches a supervised agent in a visible termina
   const worktrees = execFileSync('git', ['worktree', 'list'], { cwd: repo }).toString()
   expect(worktrees).toContain(join('.foundry', 'orders', id, 'worktrees', 'fixture'))
 })
+
+test('an open order is a frame, and the controls that end it never scroll away', async () => {
+  // What this is about, in the operator's words: "use of space is terrible, I
+  // have to scroll so far to find the delete/discard button. Why the hell are
+  // there so many cards on the left side and we have nothing on the right for
+  // most of the screen."
+  //
+  // Both halves were one fault. The Forge's rail is controls and its document
+  // is the subject, and neither was bounded — measured on the reported order
+  // at the reported window (1005x768), the rail came out 1494px beside a
+  // 1906px document in a 729px viewport, so the page was 2383px long, two
+  // thirds of the width was empty for the stretch where only the rail was
+  // left, and the controls that end an order — which render after both
+  // columns — sat at 2367px. 1654px of scrolling to reach a button.
+  //
+  // Asserted as behaviour rather than as a stylesheet: the controls are on
+  // screen before anything is scrolled, and still on screen after everything
+  // that can scroll has been scrolled to its end.
+  const created = (await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'the frame keeps its controls at the foot' },
+    repoPaths: [repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id
+  expect(id, 'no order was created to open').toBeTruthy()
+
+  // A window small enough that the rail cannot fit in it, which is the whole
+  // point — and the size the report came from. Restored afterwards, because
+  // every test in this file shares one application.
+  const before = await handle.app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].getSize()
+  )
+  await handle.app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setSize(1305, 800)
+  )
+  await handle.page.waitForTimeout(400)
+
+  try {
+    await openFoundry()
+    expect(await clickByName('button', 'Forge')).toBe(true)
+    await handle.page.waitForTimeout(800)
+
+    // The row for this order, found by the id it prints rather than by a class.
+    const opened = await inFoundry<boolean>(`(function () {
+      var all = document.querySelectorAll('button')
+      for (var i = 0; i < all.length; i++) {
+        if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
+          all[i].click()
+          return true
+        }
+      }
+      return false
+    })()`)
+    expect(opened, `no row for ${id} in the Forge`).toBe(true)
+    await handle.page.waitForTimeout(1200)
+
+    const onScreen = (): Promise<Record<string, unknown>> =>
+      inFoundry(`(function () {
+        var wanted = ['Discard this order', 'Delete this order']
+        var out = {}
+        var all = document.querySelectorAll('button')
+        for (var i = 0; i < all.length; i++) {
+          var label = (all[i].textContent || '').trim()
+          if (wanted.indexOf(label) === -1) continue
+          var r = all[i].getBoundingClientRect()
+          out[label] = {
+            top: Math.round(r.top),
+            bottom: Math.round(r.bottom),
+            inView: r.top >= 0 && r.bottom <= window.innerHeight,
+          }
+        }
+        return out
+      })()`)
+
+    // Nothing scrolled yet: the operator has just opened the order.
+    const resting = (await onScreen()) as Record<string, { inView: boolean }>
+    expect(Object.keys(resting).sort(), 'the controls are not on this surface').toEqual([
+      'Delete this order',
+      'Discard this order',
+    ])
+    for (const [label, box] of Object.entries(resting)) {
+      expect(box.inView, `"${label}" is off screen before anything is scrolled`).toBe(true)
+    }
+
+    // And after every scroller on the surface has been driven to its end —
+    // the rail, the document, the frame. This is the half that used to fail:
+    // the controls were the last thing in the page's own scroll.
+    await inFoundry(`(function () {
+      var all = document.querySelectorAll('*')
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].scrollHeight > all[i].clientHeight) all[i].scrollTop = 1e6
+      }
+    })()`)
+    await handle.page.waitForTimeout(300)
+
+    const scrolled = (await onScreen()) as Record<string, { inView: boolean }>
+    for (const [label, box] of Object.entries(scrolled)) {
+      expect(box.inView, `"${label}" scrolled off the screen`).toBe(true)
+    }
+
+    // The rail no longer decides how long the page is. It is bounded by the
+    // frame, whatever it holds.
+    const rail = await inFoundry<{ height: number; viewport: number } | null>(`(function () {
+      var el = document.querySelector('.fdry-rail')
+      if (!el) return null
+      return { height: Math.round(el.getBoundingClientRect().height), viewport: window.innerHeight }
+    })()`)
+    expect(rail, 'the Forge rail did not render').not.toBeNull()
+    expect(rail && rail.height).toBeLessThanOrEqual((rail as { viewport: number }).viewport)
+  } finally {
+    await handle.app.evaluate(
+      ({ BrowserWindow }, size) =>
+        BrowserWindow.getAllWindows()[0].setSize(size[0] as number, size[1] as number),
+      before
+    )
+    await handle.page.waitForTimeout(400)
+  }
+})

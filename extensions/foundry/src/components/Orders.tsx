@@ -149,7 +149,12 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
     // surface swaps without waiting for the list to be refetched.
     const running = status === 'running' || started === open
     return (
-      <div className="fdry-shell">
+      /* An open order is a frame, not a page: the way back at the top, the
+         order in the middle scrolling inside it, the controls that end it at
+         the foot. They used to be the last thing in one 1510px scroll — under
+         a rail that came out twice the height of the document — and finding
+         them meant scrolling past 714px of empty column. */
+      <div className="fdry-shell is-open">
         <button
           type="button"
           className="fdry-back"
