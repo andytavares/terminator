@@ -902,6 +902,27 @@ genuinely could not answer — a question the code _could_ have answered is a
 defect in intake rather than a question. At most three questions are ever
 surfaced at once.
 
+**An amendment is not a redraft** (ADR-048). Converging is a conversation, and
+every turn after the first is amending an order that already exists, so the
+brief says so and carries the order to be amended. The architect's `reads:`
+names `order`, which is what puts the rendered order — criteria, units, the
+coverage matrix, and which of the six checks refuse it — into the brief, and
+`convergeBrief` adds the framing that tells it this turn changes that document
+rather than deriving one. Both halves were missing and each cost a turn on
+their own: measured on WO-0910-6ea, "Ask for the gap to be closed" produced
+`coverage — nothing in the plan builds AC-1` about a plan the architect had
+never been shown, so it went looking for the proposal it remembered writing —
+which `readProposal` unlinks as it applies it — and then rebuilt the order from
+`order.json` and the ledger by hand: 31 shell commands and just under seven
+minutes before it wrote a line, on a one-criterion order.
+
+Whether a turn amends is read from `provenance.decisions`, which grows once per
+applied proposal and nowhere else while an order is a draft. A refused turn
+appends nothing and a ticket that stated its own acceptance criteria is not a
+plan the architect wrote, so neither is mistaken for work to amend — telling an
+architect it wrote something it did not is the same class of defect in the
+other direction.
+
 ### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
 
 - **Recipes** (`recipe/parse.ts`, `recipe/resolve.ts`) are YAML: a list of steps
