@@ -1,0 +1,26 @@
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_cc184b196e0915::t_ca3246adfd095e 322-326,483-487,532-533,535
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_cc184b196e0915::t_9edc020f685483 50,55,693-726
+  s_cc184b196e0915::t_3f0fc8cb4082b8 727
+extensions/foundry/tests/runtime/evaluate-stall.spec.ts
+  s_cc184b196e0915::t_9049f35cb39041 190-246
+extensions/foundry/src/runtime/evaluate-stall.ts
+  s_cc184b196e0915::t_ee16ab6891e6b8 77-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b91bc8481d685cecb9d1805ceaa989dd04011b10",
+  "prompts": {},
+  "sessions": {
+    "s_cc184b196e0915": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5675833-dadf-4f0d-b4eb-33a10ffd65ed",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
