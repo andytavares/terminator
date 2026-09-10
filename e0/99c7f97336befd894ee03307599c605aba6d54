@@ -1,0 +1,26 @@
+extensions/foundry/src/forge/converge.ts
+  s_c8a87cf8b76eab::t_78b308457b658e 145-184,236-241
+extensions/foundry/tests/forge/converge.spec.ts
+  s_c8a87cf8b76eab::t_f1366805c7ac0a 298-386,392-424
+  s_c8a87cf8b76eab::t_d1752aed5861f4 387-391
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_c8a87cf8b76eab::t_0842a4e369cafe 332-344
+extensions/foundry/roles/architect.yaml
+  s_c8a87cf8b76eab::t_65b230802126a5 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e099c7f97336befd894ee03307599c605aba6d54",
+  "prompts": {},
+  "sessions": {
+    "s_c8a87cf8b76eab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0665d9b4-4423-40b0-9923-0f120595d72b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
