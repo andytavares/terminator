@@ -74,8 +74,18 @@ export function evaluateStall(
   const shellInFlight = facts.openShellStartedAt !== null
   // An agent that has never called a tool has been quiet since it started, and
   // one that has never changed a line has changed nothing since it started.
-  const toolSilenceMs = now - (facts.lastToolActivityAt ?? facts.stateSince)
-  const diffSilenceMs = now - (facts.lastNetChangeAt ?? facts.stateSince)
+  //
+  // The later of the two, not the tool call alone. A session spans turns — the
+  // architect's intake conversation is one session the operator comes back to
+  // — and the transcript keeps every turn's tool calls, so a session given a
+  // new turn after a long gap carried the *previous* turn's last call as its
+  // most recent activity. Measured on a live run: a run twenty-three seconds
+  // old was reported silent for twenty-one minutes and `run.stalled` was on
+  // the order before the builder's third command. Silence belongs to the state
+  // the session is in now, and `stateSince` is when that state began.
+  const since = (at: number | null): number => Math.max(at ?? facts.stateSince, facts.stateSince)
+  const toolSilenceMs = now - since(facts.lastToolActivityAt)
+  const diffSilenceMs = now - since(facts.lastNetChangeAt)
   const distinctFiles = new Set(facts.recentToolPaths).size
 
   const inputs = {

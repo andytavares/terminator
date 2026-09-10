@@ -1,4 +1,5 @@
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 import * as path from 'node:path'
 import { readShell, redirectTargets } from './shell-split.js'
 import type { PolicyDecision } from './read-only-policy.js'
@@ -62,8 +63,16 @@ const DESTRUCTIVE_FLAGS: ReadonlyArray<RegExp> = [
   /^--prune$/,
 ]
 
-/** Output thrown away, and stderr folded into stdout. Neither writes. */
-const DISCARDS = /(?:\d?>>?|&>)\s*\/dev\/null(?=\s|$)|2>&1/g
+/**
+ * Output thrown away, and stderr folded into stdout. Neither writes.
+ *
+ * The lookahead has to admit every operator the shell can put next to it, not
+ * only whitespace. It used to require `\s` or end-of-string, so `2>/dev/null `
+ * was a discard and `2>/dev/null;` was a write to a file outside the checkout
+ * — the same command, spelled the way people actually spell it. Measured on a
+ * live run: a bare `ls node_modules 2>/dev/null; …` was held 322 seconds.
+ */
+const DISCARDS = /(?:\d?>>?|&>)\s*\/dev\/null(?=[\s;|&)]|$)|2>&1/g
 
 /** The tools that name a path, and the field each names it in. */
 const PATH_FIELDS = ['file_path', 'path', 'notebook_path'] as const
@@ -141,6 +150,44 @@ function destructiveSegment(segment: string): boolean {
 }
 
 /**
+ * Where a run may leave a throwaway file without asking.
+ *
+ * The harness an agent runs inside gives it a scratchpad under the OS temp
+ * directory and tells it, in its own system prompt, to put intermediate files
+ * there. Calling that a write outside the checkout put the policy in a fight
+ * with the harness that the agent could not win: it obeyed its prompt, Foundry
+ * held the call, and the run lost five minutes to a file the operator will
+ * never see. Measured on WO-0910-1fb: 195 seconds for one throwaway `.mjs`.
+ *
+ * This is not a hole in FR-050. A temp file is disposable by definition and
+ * cannot damage anything the operator has. The trade-off, stated rather than
+ * discovered: a `foundry.dataDir` configured *inside* the OS temp directory
+ * gives up cross-checkout protection along with it. The default data root is
+ * `<workdir>/.foundry`, and a data root in temp does not survive a reboot.
+ *
+ * Resolved once. `realpathSync` on `/tmp` is `/private/tmp` on macOS, and both
+ * names reach the policy depending on who wrote the path.
+ */
+const SCRATCH_ROOTS: readonly string[] = [
+  ...new Set(
+    [os.tmpdir(), '/tmp', '/private/tmp', '/var/tmp'].flatMap((root) => {
+      const resolved = path.resolve(root)
+      try {
+        return [resolved, fs.realpathSync(resolved)]
+      } catch {
+        // A root this platform does not have. Nothing writes there either.
+        return [resolved]
+      }
+    })
+  ),
+]
+
+/** Whether a path is a throwaway rather than something the operator keeps. */
+function isScratch(target: string): boolean {
+  return SCRATCH_ROOTS.some((root) => target === root || target.startsWith(`${root}${path.sep}`))
+}
+
+/**
  * Whether this call writes somewhere the unit was not given.
  *
  * A unit works in its own checkout. A path outside it is either a mistake or
@@ -158,6 +205,7 @@ export function writesOutside(toolName: string, input: unknown, worktreePath: st
   const outside = (named: string): boolean => {
     if (named === '' || !path.isAbsolute(named)) return false
     const targets = [...new Set([path.resolve(named), realPath(named)])]
+    if (targets.some(isScratch)) return false
     return !targets.some((target) =>
       roots.some((root) => target === root || target.startsWith(`${root}${path.sep}`))
     )

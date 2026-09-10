@@ -136,6 +136,25 @@ describe('compileOrder', () => {
       expect(failures(order)).not.toContain('verifiable')
     })
 
+    // Measured on WO-0910-1fb, an order whose whole content was "make all text
+    // red". The picture check fired because the plan touched CSS, and the
+    // architect closed it by inventing three screenshot criteria naming five
+    // extension views in two themes. Five criteria became eight, coverage then
+    // pulled every one of those views into the unit's `touches`, and a
+    // one-line ask became a 41-file plan the builder spent 53 minutes on.
+    //
+    // The check asks for a picture. It has never asked for three, and the
+    // failure it hands the architect is the only place that can say so.
+    it('says one picture closes it, on a surface the plan already touches', () => {
+      const order = complete()
+      order.acceptance = order.acceptance.filter((c) => c.verify.kind !== 'screenshot')
+      order.plan.units[0].satisfies = order.acceptance.map((c) => c.id)
+      const detail =
+        compileOrder(order).failures.find((f) => f.check === 'verifiable')?.detail ?? ''
+      expect(detail).toContain('One')
+      expect(detail).toMatch(/already touches|already changes/)
+    })
+
     it('names the criterion that cannot be proven', () => {
       const order = complete()
       order.acceptance[0].verify = { kind: 'test', command: '', assert: 'x' }
@@ -264,7 +283,10 @@ describe('compileOrder', () => {
 
     it('counts a file touched by two units once', () => {
       const order = complete()
-      order.budgets = { ...order.budgets, filesTouched: 1 }
+      // Two, not one: a plan needs room past what it predicts (below), and at
+      // two this still discriminates — one distinct file fits, and two would
+      // not, which is what a missing de-duplication would produce.
+      order.budgets = { ...order.budgets, filesTouched: 2 }
       order.risk.blastRadius = ['src/']
       order.plan.units[0].touches = ['src/a']
       order.plan.units.push({
@@ -282,6 +304,39 @@ describe('compileOrder', () => {
 
     it('passes a plan inside its budget', () => {
       expect(failures(complete())).not.toContain('budgets')
+    })
+
+    // Measured on WO-0910-1fb, an order whose whole content was "make all text
+    // red". Its plan declared 41 files and its budget was 42, so the check
+    // passed — and then the builder found seven files the plan had not, went
+    // to 48, and the budget rule halted a run that had already finished its
+    // work. Fifty-three minutes, nothing shipped.
+    //
+    // A budget the plan already fills cannot tell an agent going wide from an
+    // estimate that was one file short, which is the only thing it is for.
+    it('fails a budget the plan already fills, which is a tripwire and not a budget', () => {
+      const order = complete()
+      order.risk.blastRadius = ['src/']
+      order.plan.units[0].touches = Array.from({ length: 41 }, (_, i) => `src/f${i}.css`)
+      order.budgets = { ...order.budgets, filesTouched: 42 }
+      expect(failures(order)).toContain('budgets')
+    })
+
+    it('passes the same plan once the budget has room for what it did not foresee', () => {
+      const order = complete()
+      order.risk.blastRadius = ['src/']
+      order.plan.units[0].touches = Array.from({ length: 41 }, (_, i) => `src/f${i}.css`)
+      order.budgets = { ...order.budgets, filesTouched: 52 }
+      expect(failures(order)).not.toContain('budgets')
+    })
+
+    it('says how much room the plan is short of, so the number is not a guess', () => {
+      const order = complete()
+      order.risk.blastRadius = ['src/']
+      order.plan.units[0].touches = Array.from({ length: 41 }, (_, i) => `src/f${i}.css`)
+      order.budgets = { ...order.budgets, filesTouched: 42 }
+      const detail = compileOrder(order).failures.find((f) => f.check === 'budgets')?.detail ?? ''
+      expect(detail).toContain('52')
     })
   })
 

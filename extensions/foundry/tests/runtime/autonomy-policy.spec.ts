@@ -186,7 +186,9 @@ describe('a write outside the checkout (FR-050)', () => {
   describe('a redirection, which writes the file it names', () => {
     it('asks when it writes outside the checkout', () => {
       expect(writesOutside('Bash', bash('echo hi > /etc/hosts'), '/work/checkout')).toBe(true)
-      expect(writesOutside('Bash', bash('npm test >> /tmp/out.log'), '/work/checkout')).toBe(true)
+      expect(writesOutside('Bash', bash('npm test >> /work/other/out.log'), '/work/checkout')).toBe(
+        true
+      )
     })
 
     it('takes one inside it, which is a unit writing its own files', () => {
@@ -240,7 +242,7 @@ describe('a write outside the checkout (FR-050)', () => {
 
     it('still asks about a path that is genuinely elsewhere', () => {
       expect(writesOutside('Edit', { file_path: '/etc/hosts' }, checkout)).toBe(true)
-      expect(writesOutside('Edit', { file_path: `${checkout}-other/x.ts` }, checkout)).toBe(true)
+      expect(writesOutside('Edit', { file_path: '/work/other/x.ts' }, checkout)).toBe(true)
     })
   })
 
@@ -259,5 +261,88 @@ describe('what this is not', () => {
       decide('Edit', { file_path: `${WORKTREE}/a.js` }, 'escorted'),
     ]
     for (const answer of answers) expect(answer?.allow ?? true).toBe(true)
+  })
+})
+
+// Both of these were measured on WO-0910-1fb, an order whose whole content was
+// "make all text red". Thirteen of its builder's 131 tool calls were held by
+// this policy, and those thirteen ate 16.6 of the run's 26.7 minutes of tool
+// time — a mean of 77 seconds against 5 for a call that was taken. Each hold
+// waits `DEFAULT_ASK_AFTER_MS` (five minutes) before handing back to a
+// terminal nobody is sitting at, so a policy that asks by accident does not
+// cost a click. It costs five minutes.
+describe('a discard, wherever the shell puts its punctuation', () => {
+  // `DISCARDS` required whitespace or end-of-string after `/dev/null`, so the
+  // discard was only recognised in the one spelling that happens to have a
+  // space in front of the next operator. Every other spelling left `/dev/null`
+  // standing as a redirect target, which is outside any checkout — so a bare
+  // `ls` was held for 322 seconds.
+  const WT = '/work/checkout'
+
+  it('is a discard when an operator follows it with no space', () => {
+    expect(writesOutside('Bash', bash('ls a 2>/dev/null; echo x'), WT)).toBe(false)
+    expect(writesOutside('Bash', bash('ls a 2>/dev/null|head'), WT)).toBe(false)
+    expect(writesOutside('Bash', bash('ls a 2>/dev/null&& echo x'), WT)).toBe(false)
+    expect(writesOutside('Bash', bash('(ls a 2>/dev/null)'), WT)).toBe(false)
+    expect(writesOutside('Bash', bash('ls a 2>/dev/null\necho x'), WT)).toBe(false)
+  })
+
+  it('is a discard for stdout as well as stderr', () => {
+    expect(writesOutside('Bash', bash('npm run lint >/dev/null; echo $?'), WT)).toBe(false)
+    expect(writesOutside('Bash', bash('npm run lint &>/dev/null; echo $?'), WT)).toBe(false)
+  })
+
+  it('reads the real command from the run that found this', () => {
+    const real =
+      'ls node_modules 2>/dev/null | head -3 ; echo "present: $?"; ' +
+      'ls -d node_modules/.bin 2>/dev/null; echo "---"; ls -la | head -20'
+    expect(writesOutside('Bash', bash(real), WT)).toBe(false)
+    expect(decide('Bash', bash(real), 'standard', WT)?.allow).toBe(true)
+  })
+
+  it('still reads a real file next to a discard', () => {
+    expect(writesOutside('Bash', bash('ls 2>/dev/null > /work/other/out.log'), WT)).toBe(true)
+  })
+})
+
+// The harness an agent runs inside gives it a scratchpad under the OS temp
+// directory and tells it, in its own system prompt, to put intermediate files
+// there. This policy called every one of those a write outside the checkout,
+// so the agent obeyed its harness and Foundry held it: 195 seconds to write
+// one throwaway `.mjs`, and more for each `> $SP/…` after it.
+//
+// A temp file is not what this rule protects. It is disposable by definition,
+// the operator will never see it, and nothing is lost if it is wrong. The
+// trade-off, stated: an operator who configures `foundry.dataDir` *inside* the
+// OS temp directory gives up cross-checkout protection with it. The default is
+// `<workdir>/.foundry`, and a data root in temp does not survive a reboot.
+describe('a scratch file, where the harness tells the agent to put one', () => {
+  const WT = '/work/checkout'
+
+  it('is taken without asking, under any of the temp roots', () => {
+    for (const root of [os.tmpdir(), '/tmp', '/private/tmp']) {
+      expect(writesOutside('Write', { file_path: path.join(root, 'probe.mjs') }, WT)).toBe(false)
+      expect(writesOutside('Bash', bash(`npm test > ${path.join(root, 'out.log')}`), WT)).toBe(
+        false
+      )
+    }
+  })
+
+  it('is taken for the session scratchpad the harness actually hands out', () => {
+    const scratch = path.join(os.tmpdir(), 'claude-501', 'a-project', 'a-session', 'scratchpad')
+    expect(writesOutside('Write', { file_path: path.join(scratch, 'nontext.mjs') }, WT)).toBe(false)
+    expect(
+      decide('Bash', bash(`cat > ${scratch}/ramp.mjs <<'EOF'\nx\nEOF`), 'standard', WT)?.allow
+    ).toBe(true)
+  })
+
+  it('still asks about everywhere else outside the checkout', () => {
+    expect(writesOutside('Write', { file_path: '/etc/hosts' }, WT)).toBe(true)
+    expect(writesOutside('Write', { file_path: '/work/other/src/a.ts' }, WT)).toBe(true)
+    expect(writesOutside('Write', { file_path: path.join(os.homedir(), '.zshrc') }, WT)).toBe(true)
+  })
+
+  it('does not make a destructive command ordinary just because it is in temp', () => {
+    expect(decide('Bash', bash(`rm -rf ${os.tmpdir()}/x`), 'lights-out', WT)).toBeNull()
   })
 })

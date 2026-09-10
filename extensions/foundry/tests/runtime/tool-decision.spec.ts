@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { decideTool } from '../../src/runtime/tool-decision.js'
 import type { ToolRequest } from '../../src/runtime/tool-decision.js'
 
@@ -216,7 +218,7 @@ describe('a question with nobody to answer it', () => {
     // A reason an agent cannot do anything with wastes the turn it was given
     // to adapt. This one names the alternative.
     const decision = unattended({
-      input: { command: 'npm test > /tmp/scratch/out.log' },
+      input: { command: 'npm test > /work/other/out.log' },
     })
     expect(decision?.reason).toContain('unattended')
     expect(decision?.reason).toContain('inside the worktree')
@@ -230,7 +232,7 @@ describe('a question with nobody to answer it', () => {
       { tool: 'Bash', input: { command: 'git reset --hard' } },
       { tool: 'Bash', input: { command: 'rm -rf build' } },
       { tool: 'Bash', input: { command: 'echo $(' } },
-      { tool: 'Bash', input: { command: 'npm test > /tmp/out.log' } },
+      { tool: 'Bash', input: { command: 'npm test > /work/other/out.log' } },
     ]
     for (const call of held) {
       expect(
@@ -239,6 +241,20 @@ describe('a question with nobody to answer it', () => {
       ).toBeNull()
       const unattendedDecision = decideTool(request({ ...call, autonomy: 'lights-out' }))
       expect(unattendedDecision?.allow, JSON.stringify(call)).toBe(false)
+    }
+  })
+
+  // The one thing that changed, and the only one. A throwaway under the OS
+  // temp directory — where the harness's own system prompt tells the agent to
+  // put intermediate files — used to be held as a write outside the checkout,
+  // so the agent obeyed its harness and Foundry charged it five minutes a
+  // file. It is taken now. Nothing else outside the checkout moved.
+  it('takes a scratch file, which is the one thing that used to be held and is not', () => {
+    for (const autonomy of ['standard', 'lights-out'] as const) {
+      const decision = decideTool(
+        request({ input: { command: `npm test > ${join(tmpdir(), 'out.log')}` }, autonomy })
+      )
+      expect(decision?.allow, autonomy).toBe(true)
     }
   })
 
