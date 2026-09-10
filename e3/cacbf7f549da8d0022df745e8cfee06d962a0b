@@ -1,0 +1,27 @@
+docs/adr/049-an-accidental-question-costs-five-minutes.md
+  s_cc184b196e0915::t_39b0f1cc46fa48 1-17,25-181
+  s_cc184b196e0915::t_5908a5616a9e9a 18-24
+extensions/foundry/CLAUDE.md
+  s_cc184b196e0915::t_2e5f6182f2a00c 7,21
+  s_cc184b196e0915::t_5908a5616a9e9a 22-41
+  s_cc184b196e0915::t_e26a15afa21139 42
+docs/ARCHITECTURE.md
+  s_cc184b196e0915::t_5eaca50046eec8 1043-1065,1154
+  s_cc184b196e0915::t_5f02848f108c55 889-900
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e3cacbf7f549da8d0022df745e8cfee06d962a0b",
+  "prompts": {},
+  "sessions": {
+    "s_cc184b196e0915": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5675833-dadf-4f0d-b4eb-33a10ffd65ed",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
