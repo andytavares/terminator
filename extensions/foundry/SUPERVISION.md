@@ -42,6 +42,61 @@ state first — `waiting`, `stalled`, `ready`, `working`. Choosing one focuses t
 window and lands on the thing: a run's terminal if it still has one, otherwise
 the panel opened on it.
 
+## Where an order stands
+
+One derivation — `src/order/standing.ts` — answers _what is this order doing,
+and whose move is it_, and every surface reads it rather than working it out
+from whatever it happens to hold. That was the alternative, and it shipped: the
+order list read a **draft-time compile result**, which is zero for every running
+order for ever, so it labelled every one of them `ready to hand off` — including
+`WO-0909-30a`, which had been halted at an undecided budget gate for two hours
+with its builder parked at a terminal prompt. The Floor, reading only the graph,
+drew `building` chips over the same run. Neither named the gate.
+
+`standingOf` is pure and takes the whole picture at once. The order of its
+branches is not arbitrary — it is **how much of the run each condition has
+stopped**, worst first:
+
+| Kind       | Whose move | What it means                                                 |
+| ---------- | ---------- | ------------------------------------------------------------- |
+| `done`     | Foundry    | the order shipped                                             |
+| `shaping`  | either     | a draft: yours if it is asking questions, Foundry's otherwise |
+| `halted`   | **you**    | an undecided gate has stopped the line; nothing is scheduled  |
+| `adrift`   | **you**    | the graph says running and no process is                      |
+| `asking`   | **you**    | an agent is holding a tool call, answerable from the surface  |
+| `stranded` | **you**    | a call was handed back to a terminal prompt nobody is at      |
+| `stalled`  | **you**    | a run stopped making progress without asking for anything     |
+| `failed`   | **you**    | a step failed                                                 |
+| `ready`    | Foundry    | agreed, no graph yet                                          |
+| `working`  | Foundry    | agents are running                                            |
+
+`halted` outranks everything because a gate stops the whole line and every other
+condition under it is a symptom. `asking` outranks `stranded` because a held
+call is answerable here in one click and a handed-back one can only be answered
+in the terminal it was handed to. A **shadow** stall firing is deliberately
+never notified, so it is not counted: a standing is a notification.
+
+`readStanding` is the one place the inputs are assembled — the graph from disk,
+the gates from the gate store, liveness from this process — and both
+`foundry:order.list` and `foundry:run.observe` go through it. Two callers
+assembling them separately is how the list and the Floor came to describe one
+halted run as `ready to hand off` and `building` at the same moment.
+
+### The band
+
+The Floor opens with the standing across its full width, before anything only
+there to be read: the order's **title**, then the headline, the sentence, how
+many steps are done — and **the move**. A screen that names a blocker and offers
+no reachable control is a wall, so the gate's own options are rendered as
+buttons here, each over its consequence, answered through `foundry:inbox.decide`
+— the same channel the inbox answers them with. This is not a second queue; the
+inbox stays the cross-order one. It is this order's one blocking thing, put
+where the person looking at the order will see it.
+
+`adrift` and `stranded` carry their moves the same way — _Pick it back up_ and
+_Go to its terminal_. The separate "nothing is running this" panel is gone with
+them: two panels saying the same thing in two voices is what the band replaced.
+
 ## What you can do about a run
 
 Every row offers the same set, whether or not anything has called it stuck — the
@@ -571,6 +626,17 @@ purpose rather than a fix.
 What has changed is that the silence is legible: the console says when a
 question is asked, and says again when it is handed back to the terminal, which
 is the moment the agent stops.
+
+A feed entry scrolls away, so the hand-back is also **recorded**. The session is
+held in `strandedAgents` and counted for as long as its process is alive, which
+is what lets the order's standing read `stranded` — _An agent is waiting at its
+terminal_ — instead of `working`. The entry is dropped when that agent asks
+again, which is what an agent somebody freed at the prompt does next, and when
+its process is gone, which is `adrift` and a different move.
+
+For 90 minutes on `WO-0909-30a` there was no such record: the builder was parked
+at a prompt, its node still said `running`, and every surface drew a working
+build over it until the wall-clock budget fired.
 
 ### What the ladder takes for itself
 

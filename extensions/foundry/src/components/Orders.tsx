@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Plus, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
 import { ConfirmButton } from './ConfirmButton.js'
+import type { Standing } from '../order/standing.js'
 
 // The way into the Forge: what orders exist, and a way to seed another.
 //
@@ -26,6 +27,14 @@ interface OrderRow {
   readonly source: { kind: string; tracker: string | null; key: string | null }
   /** Questions this order is waiting on an answer to. */
   readonly openQuestions?: number
+  /**
+   * Where this order actually stands.
+   *
+   * Optional because the list is polled and a host part way through an upgrade
+   * can answer without one. Absent, the row says nothing rather than guessing
+   * — guessing is what it used to do.
+   */
+  readonly standing?: Standing
 }
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
@@ -151,6 +160,24 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
         >
           All orders
         </button>
+        {/* An order that is running is watched on the Floor; one that is still
+            being agreed is worked on in the Forge. */}
+        {running ? (
+          <Floor orderId={open} />
+        ) : (
+          <Forge
+            orderId={open}
+            onStarted={(id) => {
+              setStarted(id)
+              void refresh()
+            }}
+          />
+        )}
+        {/* Getting rid of the order, under everything that describes it.
+
+            These were the second and third things on the screen, above the
+            order's own title: a destructive control read before the operator
+            had been told what they were looking at. */}
         {/* Discard, because an order made by mistake had no way out: the
             `cancelled` status has been in the schema from the start and
             nothing ever set it, so the list only ever grew. Marked, not
@@ -218,19 +245,6 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
             }}
           />
         </div>
-        {/* An order that is running is watched on the Floor; one that is still
-            being agreed is worked on in the Forge. */}
-        {running ? (
-          <Floor orderId={open} />
-        ) : (
-          <Forge
-            orderId={open}
-            onStarted={(id) => {
-              setStarted(id)
-              void refresh()
-            }}
-          />
-        )}
       </div>
     )
   }
@@ -340,12 +354,12 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
             <li key={row.id}>
               <button type="button" onClick={() => setOpen(row.id)}>
                 <span className="fdry-order-mark" aria-hidden="true">
-                  {(row.openQuestions ?? 0) > 0 ? (
+                  {row.standing?.turn === 'you' ? (
                     <AlertCircle />
-                  ) : row.failures === 0 ? (
+                  ) : row.standing?.kind === 'done' ? (
                     <CheckCircle2 />
                   ) : (
-                    <AlertTriangle />
+                    <Loader />
                   )}
                 </span>
                 <span className="fdry-order-main">
@@ -355,18 +369,22 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
                     {row.source.key !== null ? ` · ${row.source.tracker} ${row.source.key}` : ''}
                   </small>
                 </span>
-                {/* Which order the tab badge is counting. Without this the
-                    number on the chrome sends you to a list that will not say
-                    where it came from. */}
-                <span
-                  className={`fdry-order-state${(row.openQuestions ?? 0) > 0 ? ' is-waiting' : ''}`}
-                >
-                  {(row.openQuestions ?? 0) > 0
-                    ? `${row.openQuestions} waiting on you`
-                    : row.failures === 0
-                      ? 'ready to hand off'
-                      : `blocked by ${row.failures}`}
-                </span>
+                {/* Where the order stands, said once, by the one derivation
+                    every surface reads.
+
+                    This used to be `failures === 0 ? 'ready to hand off' : …`,
+                    and `failures` is a draft-time compile result that is zero
+                    for every running order for ever. Every running order
+                    therefore claimed to be ready to hand off — including one
+                    that had been halted at an undecided gate for two hours,
+                    with an agent sitting at a terminal prompt nobody was at. */}
+                {row.standing === undefined ? null : (
+                  <span
+                    className={`fdry-order-state${row.standing.turn === 'you' ? ' is-waiting' : ''}`}
+                  >
+                    {row.standing.label}
+                  </span>
+                )}
               </button>
             </li>
           ))}

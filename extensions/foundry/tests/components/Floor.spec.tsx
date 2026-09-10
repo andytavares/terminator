@@ -70,6 +70,7 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
       }
     }
     if (channel === 'foundry:run.resume') return live.resume ?? { started: true, reclaimed: [] }
+    if (channel === 'foundry:inbox.decide') return live.decide ?? { ok: true }
     if (channel === 'foundry:run.stop') return live.stop ?? { ok: true }
     if (channel === 'foundry:review-decide-hunk') return live.decideHunk ?? { ok: true }
     if (channel === 'foundry:permission-hand-back') return live.handBack ?? { ok: true }
@@ -905,15 +906,28 @@ describe('a hunk decision the review refused', () => {
 // and notice nothing had moved.
 
 describe('a run whose agents are gone', () => {
+  // It is the standing band that says this now, rather than a second panel
+  // underneath saying the same thing in a different voice.
   const ORPHANED = reply({
     orphaned: ['N-1'],
     labels: { 'N-1': 'builder · U-1 the first bit' },
+    standing: {
+      kind: 'adrift',
+      turn: 'you',
+      label: 'nothing running it',
+      headline: 'Nothing is running this',
+      detail:
+        "1 step was still working when the application last closed, and an agent's terminal does not outlive it.",
+      done: 0,
+      total: 2,
+      gateId: null,
+    },
   })
 
   it('says so at the top, across the width, before anything only there to be read', async () => {
     mount(ORPHANED)
     await waitFor(() => expect(screen.getByText(/Nothing is running this/)).toBeTruthy())
-    const band = document.querySelector('.fdry-needs-you')
+    const band = document.querySelector('.fdry-standing')
     expect(band?.textContent).toMatch(/Nothing is running this/)
   })
 
@@ -1037,5 +1051,162 @@ describe('getting into a running agent’s terminal', () => {
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 't-1' })
     )
+  })
+})
+
+// What to do next.
+//
+// This screen used to open with an order id, a recipe name and a wall of grey
+// chips. A run halted two hours earlier at an undecided gate looked exactly
+// like a run mid-build, the gate holding it was named nowhere on the screen,
+// and the list that sent you here said the same order was "ready to hand off".
+describe('the standing band', () => {
+  function standing(over: Record<string, unknown> = {}) {
+    return {
+      kind: 'working',
+      turn: 'foundry',
+      label: 'building 0/6',
+      headline: 'Building',
+      detail: '1 agent is working — 0 of 6 steps done.',
+      done: 0,
+      total: 6,
+      gateId: null,
+      ...over,
+    }
+  }
+
+  const GATE = {
+    id: 'WO-1-budget.exceeded-1',
+    rule: 'budget.exceeded',
+    orderId: 'WO-1',
+    nodeId: null,
+    summary: 'Make all text red has gone past its wall clock budget',
+    why: 'The order budgets 90 and this run is at 90.',
+    evidence: [],
+    options: [
+      { id: 'raise', label: 'Raise the budget', consequence: 'Work continues with more room.' },
+      { id: 'stop', label: 'Stop here', consequence: 'The order is cancelled and reconciled.' },
+      { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
+    ],
+    defaultIfIgnored: 'hold',
+    deadline: null,
+    blockedUnits: 5,
+    riskGrade: 'P2',
+    raisedAt: '2026-09-09T18:12:21.514Z',
+    decision: null,
+  }
+
+  it('opens with where the run stands and what the order is called', async () => {
+    mount(reply({ standing: standing(), title: 'Make all text in the application red' }))
+    await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
+    expect(screen.getByText('Make all text in the application red')).toBeTruthy()
+    expect(screen.getByText('1 agent is working — 0 of 6 steps done.')).toBeTruthy()
+  })
+
+  it('says how far along the run is', async () => {
+    mount(reply({ standing: standing({ done: 2, total: 6 }) }))
+    await waitFor(() => expect(screen.getByText('2 of 6')).toBeTruthy())
+  })
+
+  // The whole point of the band. A screen that names a blocker and offers no
+  // control is a wall, and this one did not even name it.
+  it('offers the gate own options when the line is halted', async () => {
+    mount(
+      reply({
+        standing: standing({ kind: 'halted', turn: 'you', headline: 'Halted — your move' }),
+        waiting: [GATE],
+      })
+    )
+    await waitFor(() => expect(screen.getByText('Halted — your move')).toBeTruthy())
+    expect(screen.getByText(GATE.summary)).toBeTruthy()
+    expect(screen.getByText(GATE.why)).toBeTruthy()
+    for (const option of GATE.options) {
+      expect(screen.getByRole('button', { name: new RegExp(option.label) })).toBeTruthy()
+    }
+  })
+
+  it('answers the gate through the same channel the inbox answers it with', async () => {
+    mount(
+      reply({
+        standing: standing({ kind: 'halted', turn: 'you', headline: 'Halted — your move' }),
+        waiting: [GATE],
+      })
+    )
+    await waitFor(() => expect(screen.getByText(GATE.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: 'WO-1-budget.exceeded-1',
+        option: 'raise',
+      })
+    )
+  })
+
+  it('says what happens to each option, and what happens if you do nothing', async () => {
+    mount(
+      reply({
+        standing: standing({ kind: 'halted', turn: 'you', headline: 'Halted — your move' }),
+        waiting: [GATE],
+      })
+    )
+    await waitFor(() => expect(screen.getByText('Work continues with more room.')).toBeTruthy())
+    expect(screen.getByText(/Nothing happens until you answer/)).toBeTruthy()
+  })
+
+  it('marks the band as yours when the move is yours', async () => {
+    mount(reply({ standing: standing({ turn: 'you' }) }))
+    await waitFor(() => expect(document.querySelector('.fdry-standing.is-yours')).not.toBeNull())
+  })
+
+  it('leaves the band quiet while Foundry is the one working', async () => {
+    mount(reply({ standing: standing({ turn: 'foundry' }) }))
+    await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
+    expect(document.querySelector('.fdry-standing.is-yours')).toBeNull()
+  })
+
+  // The graph half of this screen was fetched once, on mount, and never again
+  // — so a state chip was a snapshot of whenever the panel happened to open.
+  it('refetches the graph while it is on screen', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    mount(reply({ standing: standing() }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.observe', { id: 'WO-1' }))
+    const before = invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
+    await vi.advanceTimersByTimeAsync(2100)
+    const after = invoke.mock.calls.filter((c) => c[0] === 'foundry:run.observe').length
+    expect(after).toBeGreaterThan(before)
+    vi.useRealTimers()
+  })
+
+  // The failure the whole band came out of: a tool call nobody answered was
+  // handed back to the terminal's own prompt, the agent stopped there, and the
+  // screen went on drawing a working build over it for two hours.
+  it('offers the terminal an agent was handed back to', async () => {
+    mount(
+      reply({
+        standing: standing({
+          kind: 'stranded',
+          turn: 'you',
+          headline: 'An agent is waiting at its terminal',
+          detail:
+            "Nobody answered in time, so Foundry handed the question back to the terminal's own prompt.",
+        }),
+        stranded: ['s-1'],
+      })
+    )
+    await waitFor(() =>
+      expect(screen.getByText('An agent is waiting at its terminal')).toBeTruthy()
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Go to its terminal/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
+    )
+  })
+
+  // A host part way through an upgrade answers without one. The panel has to
+  // render the run anyway rather than blank.
+  it('renders the run when the host sends no standing', async () => {
+    mount(reply())
+    await waitFor(() => expect(screen.getByText('Stop the run')).toBeTruthy())
+    expect(document.querySelector('.fdry-standing')).toBeNull()
   })
 })
