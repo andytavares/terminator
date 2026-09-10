@@ -886,7 +886,18 @@ _completeness_. Six checks, none of which can be waved through:
 | `coverage`   | a criterion has no unit, a unit satisfies no criterion, or two lanes change one file with no declared producer |
 | `risk`       | the plan touches something outside the blast radius the grade was taken over                                   |
 | `redTeam`    | an adversarial finding is neither resolved nor accepted with a reason                                          |
-| `budgets`    | the plan cannot fit inside the budgets it declares                                                             |
+| `budgets`    | the plan cannot fit inside the budgets it declares, **with room to spare** (ADR-049)                           |
+
+A check names what is missing **and what is enough**, because one that names
+only the first gets over-served (ADR-049). `verifiable`'s picture rule says one
+criterion closes it, of a surface the plan already touches: coverage runs both
+ways, so every surface a criterion names is one the plan then has to touch, and
+an architect that answered "no criterion asks for a picture" with three of them
+across five extension panels turned a one-line ask into a 41-file plan.
+`budgets` refuses a budget the plan already fills for the same reason it
+refuses one the plan overflows — a budget with no room cannot tell an agent
+going wide from an estimate a few files short, and fires once the work is done
+rather than before it starts. About a quarter more than the plan declares.
 
 `agreeOrder` is the only thing that may set an order to `agreed`, which is what
 makes the checks a gate rather than a suggestion. It also writes down the
@@ -1029,6 +1040,29 @@ other direction.
   `ready-for-review` — stay live at every setting.
 - **The executor** (`line/executor.ts`) joins the scheduler, the roles and the
   supervised runner: a wave at a time, so the agent budget means something.
+- **An accidental question costs five minutes, not a click** (ADR-049).
+  `runtime/tool-decision.ts` takes the ordinary decisions an agent's tool calls
+  need, and `DEFAULT_ASK_AFTER_MS` holds anything it does not take for five
+  minutes before handing back to a terminal nobody is sitting at. Reading a
+  command correctly is therefore a latency requirement, not only a correctness
+  one: measured on WO-0910-1fb, thirteen of a builder's 131 calls were held and
+  those thirteen ate 16.6 of the run's 26.7 minutes of tool time — 77 seconds
+  a call against 5 for one that was taken. Four defects did it, all in reading:
+  a discard was only a discard with whitespace after it, a parenthesis inside a
+  quoted argument opened a nesting level, a heredoc body was read as shell, and
+  the harness's own scratch directory was treated as territory outside the
+  checkout. `shell-split.ts` tracks quoting and escaping and now heredocs,
+  which are quoting; it is still not a shell parser. The OS temp roots are
+  scratch, with the hole that names — a data root configured inside temp — in
+  the ADR.
+- **A stall is measured from the state the session is in now.**
+  `evaluate-stall.ts` takes the later of the last tool call and `stateSince`,
+  and the runner moves a session's `startedAt` whenever it is given a new turn.
+  A session spans turns and its transcript keeps all of them, so a conversation
+  the operator came back to twenty minutes later carried the previous turn's
+  last call as its most recent activity: `run.stalled` landed on WO-0910-1fb
+  twenty-one seconds into the run, raised against the architect's intake
+  session rather than any run node.
 - **A node carries its session while the agent is still in it.** `sessionId` was
   written onto the node after `deps.run` resolved — which is when the turn is
   over — so for the whole life of a rung the graph said `running` and named
@@ -1117,6 +1151,7 @@ App
 - [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
 - [ADR-042: Foundry installs nothing](adr/042-foundry-installs-nothing.md) — the data root, the three rungs, and the toolchain probe.
 - [ADR-043: an agent proposes the order](adr/043-an-agent-proposes-the-order-and-never-writes-it.md) — intake is an agent turn, and what it may and may not write.
+- [ADR-049: an accidental question costs five minutes](adr/049-an-accidental-question-costs-five-minutes.md) — why a policy that asks by accident is a latency defect, and the eight changes measured against one live run.
 
 The feature's own design documents are in
 [`specs/037-foundry-software-factory/`](../specs/037-foundry-software-factory/):
