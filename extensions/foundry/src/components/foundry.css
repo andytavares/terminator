@@ -83,18 +83,44 @@
    inherit currentColor; state is carried by shape and position. */
 
 .fdry-forge {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 16px;
-  align-items: start;
   color: var(--tm-text-primary);
 }
 
-@media (max-width: 860px) {
-  .fdry-forge {
-    grid-template-columns: minmax(0, 1fr);
-  }
+/* The rail and the document. Their own box because the bands above them — a
+   refused turn, the questions — run the full width and are not columns. */
+.fdry-cols {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+/* An open order is a frame, at every width: the way back at the top, the order
+   scrolling in the middle, the controls that end it at the foot.
+
+   It was one long page, and the two halves of what that cost were the same
+   fault. The rail is controls and the document is the subject, and nothing
+   bounded either — measured on the reported order at the reported window
+   (1005x768), a 1494px rail beside a 1906px document made the page 2383px
+   long, so two thirds of the width was empty for the stretch where only the
+   rail was left, and the controls, which render after both columns, sat at
+   2367px. 1654px of scrolling to reach a button.
+
+   The Floor renders its own shell in here and is the same shape: a run that
+   outgrows the window scrolls inside the frame rather than carrying the
+   controls that stop it off the bottom. */
+.fdry-shell.is-open {
+  overflow: hidden;
+}
+
+.fdry-shell.is-open > .fdry-forge,
+.fdry-shell.is-open > .fdry-shell {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .fdry-empty {
@@ -105,37 +131,48 @@
 .fdry-rail {
   display: grid;
   gap: 12px;
-  position: sticky;
-  top: 16px;
   align-content: start;
 }
 
-/* On a wide screen the rail's panels sit beside each other rather than in one
-   tall stack.
+/* Wide enough for two columns, and each of them scrolls itself.
 
-   The rail was 260px whatever the window, so three panels stacked past the
-   bottom of the screen and the order beside them — which is text, and does not
-   want 1300px of line length — left the right-hand two thirds empty. Scrolling
-   past dead space. Two columns roughly halves the rail's height, which is what
-   decides whether any of this needs scrolling at all. */
-@media (min-width: 1200px) {
-  .fdry-forge {
-    grid-template-columns: minmax(520px, 0.95fr) minmax(0, 1.05fr);
+   `100%` of the frame, and the box does not shrink — so the columns are one
+   screenful and never more. With nothing above them that is the whole frame
+   and nothing scrolls at all. With a band above — a refused turn, the
+   questions — the frame scrolls by exactly the band's height and then stops,
+   because the columns cannot add to it. Capping the band instead would put a
+   scrollbar through the questions, which are the one thing on the screen that
+   is waiting on a person.
+
+   Below this width the columns stack and the frame scrolls them as one, which
+   is the only thing that works in a narrow window. The frame itself does not
+   depend on the width: what changes here is one column or two.
+
+   This replaces a pair of rules that gave the rail two columns at 1200px and
+   three at 1700px, widening it to half the window to keep its height down.
+   That was this same problem answered with width — controls taking half a
+   wide screen from the thing they are about — and it did nothing at all
+   below 1200px, which is where it was reported. */
+@media (min-width: 861px) {
+  .fdry-cols {
+    grid-template-columns: 260px minmax(0, 1fr);
+    flex: none;
+    height: 100%;
+    align-items: stretch;
   }
 
-  .fdry-rail {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+  .fdry-rail,
+  .fdry-doc {
+    min-height: 0;
+    overflow-y: auto;
   }
 }
 
-@media (min-width: 1700px) {
-  .fdry-forge {
-    grid-template-columns: minmax(780px, 1fr) minmax(0, 1fr);
-  }
-
-  .fdry-rail {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+/* Room for the rail's own labels once there is room to spare. The document
+   keeps the rest — it is what the screen is for. */
+@media (min-width: 1400px) {
+  .fdry-cols {
+    grid-template-columns: 300px minmax(0, 1fr);
   }
 }
 
@@ -271,9 +308,6 @@
    graph. Both were reported as taking for ever to find, and an interruption
    nobody finds is one that gets answered by the deadline default instead. */
 .fdry-needs-you {
-  /* Across both columns of the Forge's grid; inert in the Floor's flex column,
-     which is what the Floor wants anyway. */
-  grid-column: 1 / -1;
   background: var(--tm-bg-card);
   border: 1px solid var(--tm-warning);
   border-left-width: 3px;
@@ -293,13 +327,11 @@
    that was thrown away. Above the questions in the source order, so it is
    above them on the screen. */
 .fdry-refused {
-  grid-column: 1 / -1;
   background: var(--tm-bg-card);
   border: 1px solid var(--tm-danger);
   border-left-width: 3px;
   border-radius: var(--tm-radius-md);
   padding: 12px 14px;
-  margin-bottom: 12px;
 }
 
 .fdry-refused-h {
@@ -664,6 +696,18 @@
 .fdry-recipe small {
   font-size: 11px;
   color: var(--tm-text-secondary);
+}
+
+/* Only the shape that is actually selected spells itself out. Six cards each
+   wrapping a sentence was 609px of a 1367px rail — for one choice, whose
+   proposal and its grounds are already stated in the line above the list. The
+   rest keep a line each, and the whole description is on the card's title. */
+.fdry-recipe:not(.is-on) small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  align-self: stretch;
+  overflow: hidden;
 }
 
 .fdry-recipe-mark {
@@ -1988,6 +2032,13 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+/* The foot of the frame. It keeps its own height whatever the order does
+   above it — including when the delete is armed and grows into a sentence. */
+.fdry-shell.is-open > .fdry-order-controls {
+  flex: none;
+  margin: 12px 0 0;
 }
 
 /* Armed: the sentence and the button in one place, so what is being agreed to
