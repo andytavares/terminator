@@ -1,0 +1,14 @@
+nn.txt
+  h_330e75a16c7ef4 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "47bb234ed653e66aa9366e249e1671e327038644",
+  "prompts": {},
+  "humans": {
+    "h_330e75a16c7ef4": {
+      "author": "Test <test@example.com>"
+    }
+  }
+}
