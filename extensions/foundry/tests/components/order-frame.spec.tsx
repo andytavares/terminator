@@ -10,8 +10,8 @@ import { compileOrder } from '../../src/order/compile.js'
 //
 // An open order is a frame — a way back at the top, the order in the middle
 // scrolling inside it, the controls that end it at the foot — and the Forge's
-// two columns are one box inside that frame so neither of them can drive how
-// long the page is. Whether it actually holds is measured in the running
+// steps are one box inside that frame: the step list, the step scrolling
+// itself, and the way forward pinned under it. Whether it actually holds is measured in the running
 // application (tests/e2e/foundry.spec.ts); what is asserted here is the
 // structure that rule is written against, because a wrapper quietly dropped in
 // a refactor takes the whole layout with it and every other test stays green.
@@ -35,20 +35,20 @@ function bridge(handlers: Record<string, unknown>): void {
 
 beforeEach(() => vi.clearAllMocks())
 
-describe('the Forge is two columns in one box', () => {
-  it('puts the rail and the document inside it, and nothing else', async () => {
+describe('the Forge is one box of steps', () => {
+  it('puts the step list, the step and the way forward inside it, and nothing else', async () => {
     bridge({
       'foundry:order.compile': { order: ORDER, compile: compileOrder(ORDER) },
       'foundry:run.recipes': { recipes: [], proposed: null },
     })
     const { container } = render(<Forge orderId="WO-1" />)
-    await waitFor(() => expect(container.querySelector('.fdry-rail')).not.toBeNull())
+    await waitFor(() => expect(container.querySelector('.fdry-wizard')).not.toBeNull())
 
-    const cols = container.querySelector('.fdry-cols')
-    expect(cols, 'the columns box is gone; the rail drives the page height again').not.toBeNull()
-    expect(Array.from(cols?.children ?? []).map((el) => el.className)).toEqual([
-      'fdry-rail',
-      'fdry-doc',
+    const wizard = container.querySelector('.fdry-wizard')
+    expect(Array.from(wizard?.children ?? []).map((el) => el.className)).toEqual([
+      'fdry-wizard-head',
+      'fdry-step',
+      'fdry-wizard-foot',
     ])
   })
 })

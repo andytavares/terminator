@@ -86,28 +86,15 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
   color: var(--tm-text-primary);
-}
-
-/* The rail and the document. Their own box because the bands above them — a
-   refused turn, the questions — run the full width and are not columns. */
-.fdry-cols {
-  display: grid;
-  gap: 16px;
-  align-items: start;
 }
 
 /* An open order is a frame, at every width: the way back at the top, the order
    scrolling in the middle, the controls that end it at the foot.
 
-   It was one long page, and the two halves of what that cost were the same
-   fault. The rail is controls and the document is the subject, and nothing
-   bounded either — measured on the reported order at the reported window
-   (1005x768), a 1494px rail beside a 1906px document made the page 2383px
-   long, so two thirds of the width was empty for the stretch where only the
-   rail was left, and the controls, which render after both columns, sat at
-   2367px. 1654px of scrolling to reach a button.
+   It was one long page: measured on a reported order at 1005x768, a 1494px
+   rail beside a 1906px document put the controls at 2367px, 1654px of
+   scrolling to reach a button.
 
    The Floor renders its own shell in here and is the same shape: a run that
    outgrows the window scrolls inside the frame rather than carrying the
@@ -128,52 +115,317 @@
   color: var(--tm-text-secondary);
 }
 
-.fdry-rail {
+/* ─── The Forge's steps ────────────────────────────────────────────
+
+   One box: the order and its step list at the top, the open step scrolling
+   itself, the way forward pinned at the foot. `100%` of the frame and not
+   shrinking, so with nothing above it nothing scrolls but the step; with a
+   band above — a refused turn, the questions — the frame scrolls by exactly
+   the band's height. Capping the band instead would put a scrollbar through
+   the questions, the one thing on the screen waiting on a person.
+
+   It replaced a 260px rail of checks, recipe cards and tracker settings beside
+   the document, whose cards an operator reported as too condensed to read.
+   Each step has the full width, and its text a readable measure. */
+.fdry-wizard {
+  flex: none;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+
+.fdry-wizard-head {
+  flex: none;
+  padding: 14px 20px 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-order-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fdry-order-head h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.fdry-order-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  align-self: center;
+}
+
+.fdry-wizard-head .fdry-order-sub {
+  margin: 4px 0 8px;
+}
+
+/* A sequence, so numbered, and joined by a rule. A step holding hand-off up
+   trades its number for a cross: the six checks, read as a map. */
+.fdry-steps {
+  display: flex;
+  align-items: center;
+  margin: 0 -8px;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.fdry-steps li {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.fdry-steps li + li::before {
+  content: '';
+  width: 18px;
+  height: 1px;
+  background: var(--tm-border-strong);
+}
+
+.fdry-step-link {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fdry-step-link:hover {
+  color: var(--tm-text-primary);
+}
+
+.fdry-step-link[aria-current='step'] {
+  color: var(--tm-text-primary);
+  font-weight: 600;
+  border-bottom-color: var(--tm-accent);
+}
+
+.fdry-step-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid var(--tm-border-strong);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.fdry-step-link[aria-current='step'] .fdry-step-mark {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.fdry-step-link.is-blocking .fdry-step-mark {
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
+}
+
+.fdry-step-link[aria-current='step'].is-blocking .fdry-step-mark {
+  background: var(--tm-danger);
+  border-color: var(--tm-danger);
+  color: var(--tm-on-accent);
+}
+
+.fdry-step-mark svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* The last turn redrew something on this step, which may not be the step the
+   operator is looking at (FR-007). */
+.fdry-step-link.is-redrawn::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--tm-accent);
+}
+
+.fdry-step {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.fdry-step-body {
+  max-width: 760px;
+  padding: 22px 24px 28px;
+}
+
+.fdry-step-h {
+  scroll-margin-top: 22px;
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.fdry-step-intro {
+  margin: 0 0 18px;
+  max-width: 68ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-step-callout {
+  margin: 18px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--tm-accent);
+  background: var(--tm-bg-surface);
+  border-radius: var(--tm-radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tm-text-primary);
+}
+
+/* What on this step is holding hand-off up, before the things that clear it. */
+.fdry-blockers {
   display: grid;
-  gap: 12px;
-  align-content: start;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--tm-danger);
+  border-left-width: 3px;
+  border-radius: var(--tm-radius-md);
 }
 
-/* Wide enough for two columns, and each of them scrolls itself.
-
-   `100%` of the frame, and the box does not shrink — so the columns are one
-   screenful and never more. With nothing above them that is the whole frame
-   and nothing scrolls at all. With a band above — a refused turn, the
-   questions — the frame scrolls by exactly the band's height and then stops,
-   because the columns cannot add to it. Capping the band instead would put a
-   scrollbar through the questions, which are the one thing on the screen that
-   is waiting on a person.
-
-   Below this width the columns stack and the frame scrolls them as one, which
-   is the only thing that works in a narrow window. The frame itself does not
-   depend on the width: what changes here is one column or two.
-
-   This replaces a pair of rules that gave the rail two columns at 1200px and
-   three at 1700px, widening it to half the window to keep its height down.
-   That was this same problem answered with width — controls taking half a
-   wide screen from the thing they are about — and it did nothing at all
-   below 1200px, which is where it was reported. */
-@media (min-width: 861px) {
-  .fdry-cols {
-    grid-template-columns: 260px minmax(0, 1fr);
-    flex: none;
-    height: 100%;
-    align-items: stretch;
-  }
-
-  .fdry-rail,
-  .fdry-doc {
-    min-height: 0;
-    overflow-y: auto;
-  }
+.fdry-checks {
+  display: grid;
 }
 
-/* Room for the rail's own labels once there is room to spare. The document
-   keeps the rest — it is what the screen is for. */
-@media (min-width: 1400px) {
-  .fdry-cols {
-    grid-template-columns: 300px minmax(0, 1fr);
-  }
+.fdry-checks .fdry-check {
+  padding: 10px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-checks .fdry-check:last-child {
+  border-bottom: 0;
+}
+
+.fdry-field-h {
+  scroll-margin-top: 22px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tm-text-primary);
+}
+
+.fdry-field-h ~ .fdry-field-h {
+  margin-top: 18px;
+}
+
+/* Focused so a keyboard user's place moves with the step, but not a control:
+   it is never tabbed to, so a ring on it only reads as a selected heading. */
+.fdry-step-h:focus,
+.fdry-field-h:focus {
+  outline: none;
+}
+
+/* The intro already separates the heading from the first section. */
+.fdry-step-intro + .fdry-field {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+/* The order's own words are what the step is about, not a caption. */
+.fdry-step .fdry-md {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tm-text-primary);
+}
+
+.fdry-wizard-foot {
+  flex: none;
+  padding: 12px 20px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.fdry-wizard-foot .fdry-problem {
+  margin: 0 0 10px;
+}
+
+.fdry-wizard-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fdry-wizard-forward {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.fdry-nav-back,
+.fdry-nav-next {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--tm-radius-sm);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.fdry-nav-back {
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+}
+
+.fdry-nav-next {
+  border: 1px solid var(--tm-accent);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-nav-back:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+/* A hand-off that cannot happen yet still says why, in the place it will be. */
+.fdry-nav-next:disabled {
+  border: 1px dashed var(--tm-border-strong);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  cursor: not-allowed;
+}
+
+.fdry-nav-next svg {
+  width: 13px;
+  height: 13px;
 }
 
 .fdry-panel {
@@ -197,8 +449,7 @@
   grid-template-columns: 16px 1fr;
   gap: 8px;
   align-items: start;
-  margin-bottom: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--tm-text-secondary);
 }
 
@@ -210,9 +461,9 @@
 .fdry-check small {
   display: block;
   margin-top: 2px;
-  color: var(--tm-text-muted);
-  font-size: 11.5px;
-  line-height: 1.4;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 
 /* How to clear a failing check.
@@ -228,11 +479,12 @@
   margin-top: 6px;
 }
 
-.fdry-remedy button {
+.fdry-remedy button,
+.fdry-finding-actions button {
   appearance: none;
   font: inherit;
-  font-size: 11.5px;
-  padding: 3px 9px;
+  font-size: 12px;
+  padding: 4px 11px;
   border: 1px solid var(--tm-border-strong);
   border-radius: 999px;
   background: transparent;
@@ -240,11 +492,13 @@
   cursor: pointer;
 }
 
-.fdry-remedy button:hover:not(:disabled) {
+.fdry-remedy button:hover:not(:disabled),
+.fdry-finding-actions button:hover:not(:disabled) {
   background: var(--tm-bg-card-hover);
 }
 
-.fdry-remedy button:disabled {
+.fdry-remedy button:disabled,
+.fdry-finding-actions button:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -260,40 +514,6 @@
 
 .fdry-check.is-fail .fdry-check-mark {
   color: var(--tm-danger);
-}
-
-.fdry-compile {
-  appearance: none;
-  margin-top: 12px;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-secondary);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.fdry-compile:not(:disabled) {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
-.fdry-compile:disabled {
-  cursor: not-allowed;
-  border-style: dashed;
-}
-
-.fdry-compile svg {
-  width: 13px;
-  height: 13px;
 }
 
 /* ─── What is waiting on a person ─────────────────────────────────
@@ -639,16 +859,12 @@
   padding-left: 10px;
 }
 
-/* The action that has to happen before the six checks mean anything: until
-   the architect has run they are a list of everything missing. */
+/* Drafting or redrafting the plan, in the order's header on every step. */
 .fdry-converge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  width: 100%;
-  margin-top: 10px;
-  padding: 7px 12px;
+  padding: 5px 12px;
   font: inherit;
   font-size: 12px;
   font-weight: 500;
@@ -664,17 +880,26 @@
   cursor: not-allowed;
 }
 
-/* One shape of work per row. An unavailable one is shown, not hidden, with
-   the requirement it does not meet — "why is that not on offer" should be
-   answerable without reading a YAML file. */
+.fdry-converge svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* The shapes of work, each with its whole description: the step has the room
+   the rail never did. An unavailable one is shown, not hidden, with the
+   requirement it does not meet. */
+.fdry-recipes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
 .fdry-recipe {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
-  width: 100%;
-  margin-top: 4px;
-  padding: 5px 8px;
+  gap: 4px;
+  padding: 12px 14px;
   text-align: left;
   font: inherit;
   color: var(--tm-text-primary);
@@ -684,6 +909,10 @@
   cursor: pointer;
 }
 
+.fdry-recipe:hover:not(:disabled) {
+  border-color: var(--tm-border-strong);
+}
+
 .fdry-recipe:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -691,29 +920,32 @@
 
 .fdry-recipe.is-on {
   border-color: var(--tm-accent);
+  box-shadow: inset 0 0 0 1px var(--tm-accent);
+}
+
+.fdry-recipe-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fdry-recipe b {
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .fdry-recipe small {
-  font-size: 11px;
+  font-size: 12.5px;
+  line-height: 1.45;
   color: var(--tm-text-secondary);
 }
 
-/* Only the shape that is actually selected spells itself out. Six cards each
-   wrapping a sentence was 609px of a 1367px rail — for one choice, whose
-   proposal and its grounds are already stated in the line above the list. The
-   rest keep a line each, and the whole description is on the card's title. */
-.fdry-recipe:not(.is-on) small {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-  align-self: stretch;
-  overflow: hidden;
-}
-
 .fdry-recipe-mark {
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  padding: 0 7px;
+  border: 1px solid var(--tm-accent);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 17px;
   color: var(--tm-accent-text);
 }
 
@@ -1033,17 +1265,14 @@
 .fdry-writebacks {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--tm-border);
+  gap: 8px;
 }
 
 .fdry-writeback {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 13px;
   color: var(--tm-text-secondary);
 }
 
@@ -1052,9 +1281,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: 12px;
+  gap: 12px;
+  max-width: 520px;
+  margin-top: 10px;
+  font-size: 13px;
   color: var(--tm-text-secondary);
 }
 
@@ -1073,27 +1303,6 @@
   border-radius: var(--tm-radius-sm);
 }
 
-.fdry-doc {
-  background: var(--tm-bg-card);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-md);
-  padding: 16px 18px;
-  min-width: 0;
-}
-
-.fdry-doc-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.fdry-doc-head h1 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
 .fdry-src,
 .fdry-id {
   font-family: var(--tm-font-mono, ui-monospace, monospace);
@@ -1110,7 +1319,6 @@
 
 .fdry-attach {
   appearance: none;
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1128,31 +1336,25 @@
   height: 12px;
 }
 
-.fdry-doc-sub {
-  color: var(--tm-text-secondary);
-  font-size: 12.5px;
-  margin: 4px 0 14px;
-}
-
 .fdry-field {
   border-top: 1px solid var(--tm-border);
-  padding-top: 10px;
-  margin-top: 12px;
+  padding-top: 14px;
+  margin-top: 16px;
 }
 
 .fdry-field p {
   margin: 0 0 6px;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 
 .fdry-ac {
   display: grid;
-  grid-template-columns: 46px 1fr;
+  grid-template-columns: 52px 1fr;
   gap: 10px;
-  padding: 7px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .fdry-ac:last-child {
@@ -1270,10 +1472,12 @@
 .fdry-finding {
   display: flex;
   align-items: start;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--tm-text-secondary);
-  padding: 5px 0;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--tm-text-primary);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--tm-border);
 }
 
 .fdry-finding svg {
@@ -1287,7 +1491,7 @@
 .fdry-input {
   display: flex;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 24px;
 }
 
 .fdry-input input {
@@ -1508,16 +1712,6 @@
 
 .fdry-md > *:last-child {
   margin-bottom: 0;
-}
-
-.fdry-md-label {
-  margin: 10px 0 2px;
-  color: var(--tm-text-primary);
-  font-size: 12.5px;
-}
-
-.fdry-md-label:first-child {
-  margin-top: 0;
 }
 
 /* One weight for every heading level: a ticket's `#` is its author's habit,
