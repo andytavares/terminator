@@ -593,7 +593,7 @@ the order that depended on it are redrawn.
 **Draft the plan** is the first thing to press, and it sits in the order's
 header on every step (it reads **Redraft** once there is a plan). Foundry seeds
 a draft with your problem statement and what it read in the repository; the
-architect turns that into criteria, units, a risk grade and budgets. It runs in
+architect turns that into criteria, units and a risk grade. It runs in
 a terminal you can watch, and it can only _propose_ — it cannot mark its own
 work agreed. Type into the box at the bottom of any step to tell it what is
 wrong, and it redrafts. **Attach**, beside it, takes you into the terminal the
@@ -617,6 +617,19 @@ add a `screenshot` criterion. If nothing here can take that picture — no
 display, no runner — mark the criterion **"Nothing here can prove this"** on the
 Plan step. That costs a written reason, which travels with the order and shows
 in the ledger.
+
+**Budgets** are yours to set, not the architect's. Each new order starts with
+the limits in Settings → Foundry: agents at once, minutes, and files touched.
+In Settings, 0 means no limit. To change the limits for one order, use the
+**Budgets** section at the bottom of the Plan step: enter a number or tick
+**No limit**, then press **Save budgets**. If a plan does not fit its budgets,
+the budgets check offers **Change the budget** or **Ask it to cut the plan**.
+
+If a run goes past a budget, it stops and asks you what to do. **Raise the
+budget** asks for the new limit. It suggests about a quarter more than the run
+has already used, and won't accept less than what the run has already used.
+The new limit is saved to the order and the run resumes. You can tick **No
+limit** there as well.
 
 **Red team** findings are each either **Fixed** or **Accepted**, and accepting
 one costs a written reason. Nothing hands off while one is open.
