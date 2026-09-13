@@ -1,0 +1,38 @@
+extensions/foundry/recipes/design-doc.yaml
+  s_2ec7471f967bde::t_c398a8e72673f5 1-42
+extensions/foundry/recipes/poc.yaml
+  s_2ec7471f967bde::t_c398a8e72673f5 1-40
+extensions/foundry/roles/author.yaml
+  s_2ec7471f967bde::t_c398a8e72673f5 1-24
+docs/ARCHITECTURE.md
+  s_2ec7471f967bde::t_cc47616b459f1a 971-980
+extensions/foundry/rules/outcome-first.yaml
+  s_2ec7471f967bde::t_c398a8e72673f5 1-12
+docs/user-guide/USER-GUIDE.md
+  s_2ec7471f967bde::t_cc47616b459f1a 633-640
+extensions/foundry/recipes/research.yaml
+  s_2ec7471f967bde::t_c398a8e72673f5 1-36
+extensions/foundry/rules/scope-as-asked.yaml
+  s_2ec7471f967bde::t_c398a8e72673f5 1-12
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_2ec7471f967bde::t_c398a8e72673f5 35,38,40,43,194-223,225,228,260,262,405-407
+  s_2ec7471f967bde::t_35692c78301daf 124-131
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_2ec7471f967bde::t_c398a8e72673f5 215-216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9675d68a629ec084f7bd97583e3d605a75e6abd9",
+  "prompts": {},
+  "sessions": {
+    "s_2ec7471f967bde": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "036c4f1d-a492-4e80-a2e2-cc51a35ef281",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
