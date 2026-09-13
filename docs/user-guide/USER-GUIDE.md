@@ -559,69 +559,74 @@ reads the repository: its manifests, its real commands, its house documents
 decision about a file your idea names. A question that survives that is one the
 code genuinely could not answer.
 
-The document is the subject; the conversation sits behind it.
-
 An open order is a **frame**, not a page: **All orders** at the top, the order
 itself in the middle, and **Discard this order** / **Delete this order** along
-the foot. The rail and the document each scroll inside the frame, so the
-controls at the foot are always where you left them and neither column decides
-how long the screen is. **Discard** marks an order cancelled and keeps its
-records; **Delete** removes the order and everything it made — its ledger, its
-run graph, its checkout and its branch — and asks you to confirm that in as
-many words first.
+the foot. **Discard** marks an order cancelled and keeps its records; **Delete**
+removes the order and everything it made — its ledger, its run graph, its
+checkout and its branch — and asks you to confirm that in as many words first.
 
-**Needs you** is the band across the top of the screen — **at most three
-questions**, ever, above everything else on the surface, because a question you
-have to go looking for is a question that does not get answered. The
-recommended answer is the filled button. Everything else Foundry decided is a
-**strikeable assumption** rather than a question — click it to strike it, and
-the parts of the document that depended on it are redrawn.
+Inside the frame the order is **walked in steps**, one full-width screen each,
+with **Back** and **Next** at the bottom:
 
-On the left rail, under the band:
+1. **Intent** — the problem and the outcome the order is for.
+2. **Plan** — the acceptance criteria and how each is proven, the coverage
+   matrix, and the assumptions the architect made.
+3. **Red team** — what an adversarial pass found in the plan.
+4. **Shape** — the shape of work. Shown while the order is a draft.
+5. **Tracker** — what goes back to the issue. Shown only for an order seeded
+   from a tracker issue.
+6. **Hand off** — the six checks, and **Compile & hand off**.
 
-- **Six checks**, and it will not hand off until all six pass — no open
-  questions, every acceptance criterion falsifiable, coverage complete in both
-  directions, risk graded against _this_ plan, adversarial findings resolved,
-  budgets set. Each failure names the specific criterion, unit or question
-  responsible, **and what to do about it**: either a button that takes you to
-  the control that clears it, or one that redrafts with the instruction the
-  architect needs. A red mark you can only stare at is not a gate, it is a wall.
+Any step can be opened from the step list at any time. A step that is holding
+hand-off up shows a **cross** in place of its number, and a dot appears beside a
+step the architect's last turn redrew. An order opens where the next thing to
+do is: **Intent** if nothing is planned yet, otherwise the first step with a
+failing check, otherwise **Hand off**.
 
-  The one that catches people is **criteria falsifiable** on a change somebody
-  can see: a plan that touches a `.tsx`, `.css` or `.html` file and has no
-  criterion asking for a picture of the running application fails, because a
-  command cannot say whether a thing renders. **Ask for proof** has the
-  architect add a `screenshot` criterion. If nothing here can take that picture
-  — no display, no runner — open **Acceptance** and mark the criterion
-  **"Nothing here can prove this"**. That costs a written reason, which travels
-  with the order and shows in the ledger.
+**Needs you** is the band above the steps — **at most three questions**, ever,
+above everything else on the surface, because a question you have to go looking
+for is a question that does not get answered. The recommended answer is the
+filled button. Everything else Foundry decided is a **strikeable assumption** on
+the Plan step rather than a question — click it to strike it, and the parts of
+the order that depended on it are redrawn.
 
-- **"Not measurable here"**, when the repository has no command for a check.
-  Those report **"not measured"** rather than passing. A green you did not earn
-  is worse than a gap you can see — and the three rungs that were never
-  commands (independent verification, the security inspection, your own
-  decision) say where they were decided instead of counting as gaps.
+**Draft the plan** is the first thing to press, and it sits in the order's
+header on every step (it reads **Redraft** once there is a plan). Foundry seeds
+a draft with your problem statement and what it read in the repository; the
+architect turns that into criteria, units, a risk grade and budgets. It runs in
+a terminal you can watch, and it can only _propose_ — it cannot mark its own
+work agreed. Type into the box at the bottom of any step to tell it what is
+wrong, and it redrafts. **Attach**, beside it, takes you into the terminal the
+architect is working in — the same conversation, whether it is still running
+or you came back to it after a restart.
 
-**Draft the plan** is the first thing to press. Foundry seeds a draft with your
-problem statement and what it read in the repository; the architect turns that
-into criteria, units, a risk grade and budgets. It runs in a terminal you can
-watch, and it can only _propose_ — it cannot mark its own work agreed. Type into
-the box at the bottom to tell it what is wrong, and it redrafts.
+**Six checks**, and it will not hand off until all six pass — no open
+questions, every acceptance criterion falsifiable, coverage complete in both
+directions, risk graded against _this_ plan, adversarial findings resolved,
+budgets set. A failing check is shown at the top of the step that clears it,
+and all six are listed on **Hand off**. Each failure names the specific
+criterion, unit or question responsible, **and what to do about it**: either a
+button that takes you to the control that clears it — on its own step — or one
+that redrafts with the instruction the architect needs.
 
-**Attach**, in the order's header, takes you into the terminal the architect
-is working in — the same conversation, whether it is still running or you came
-back to it after a restart.
+The one that catches people is **criteria falsifiable** on a change somebody
+can see: a plan that touches a `.tsx`, `.css` or `.html` file and has no
+criterion asking for a picture of the running application fails, because a
+command cannot say whether a thing renders. **Ask for proof** has the architect
+add a `screenshot` criterion. If nothing here can take that picture — no
+display, no runner — mark the criterion **"Nothing here can prove this"** on the
+Plan step. That costs a written reason, which travels with the order and shows
+in the ledger.
 
-**Red team** findings appear alongside; each is either **Fixed** or **Accepted**,
-and accepting one costs a written reason. Nothing hands off while one is open.
+**Red team** findings are each either **Fixed** or **Accepted**, and accepting
+one costs a written reason. Nothing hands off while one is open.
 
-**Shape of work** offers the shapes this repository can actually support — one
-that cannot run here says which requirement it does not meet rather than
-quietly disappearing. Foundry proposes one and says why it chose it ("2 units
-of work", "graded P1, which is above the direct shape's ceiling"). Pick a
-different one in a click; the override is recorded alongside the proposal it
-replaced. The shape that is selected spells itself out; the rest keep a line
-each, with the whole description on hover.
+**Shape** offers the shapes this repository can actually support, each with its
+whole description — one that cannot run here says which requirement it does not
+meet rather than quietly disappearing. Foundry proposes one and says why it
+chose it ("2 units of work", "graded P1, which is above the direct shape's
+ceiling"). Pick a different one in a click; the override is recorded alongside
+the proposal it replaced.
 
 Each shape also says how hard its agents think. `quick` and `spike` run at
 the runtime's `high` effort; `direct`, `standard`, `bugfix`, `refactor` and
@@ -638,16 +643,26 @@ learned). Each still ends in a draft pull request carrying the result. Write
 the acceptance criteria as statements about the document or the demonstration,
 so the verifier has something to check.
 
-![A work order in the Forge, with its convergence checks and the shape of work](screenshots/08b-foundry-forge.png)
+**Tracker** lets you say which of _your_ workflow states each moment means —
+when work starts, when the draft opens, when it merges. Left alone, the tracker
+decides. It also says, for this order alone, what goes back to the issue: the
+agreed order as a comment, the workflow state, and the pull request links.
+
+**Hand off** also says when the repository has no command for a check — **"Not
+measurable here"**. Those report **"not measured"** rather than passing. A green
+you did not earn is worse than a gap you can see — and the three rungs that
+were never commands (independent verification, the security inspection, your
+own decision) say where they were decided instead of counting as gaps.
+
+![A work order in the Forge, open on its first step with the step list above it](screenshots/08b-foundry-forge.png)
+
+**Compile & hand off**, at the foot of the Hand off step, agrees the order and
+starts the work. If the run is held back because too much finished work is
+waiting for your review, **Start anyway** appears beside it.
 
 In the list of orders, a row that is waiting on an answer says **"N waiting on
 you"** where the others say what is blocking them — so the count on the Forge
 tab tells you which order to open.
-
-**Compile & hand off** agrees the order and starts the work. If the order is
-seeded from a tracker issue, a **Tracker write-back** panel lets you say which
-of _your_ workflow states each moment means — when work starts, when the draft
-opens, when it merges. Left alone, the tracker decides.
 
 ### Floor — watching a run
 

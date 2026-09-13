@@ -1135,7 +1135,7 @@ App
   │            work each decision unblocks, every row naming the rule that
   │            raised it and what happens if it is ignored
   ├─ Orders  — the door
-  │    ├─ Forge  — the document, six checks, at most three questions
+  │    ├─ Forge  — steps (intent → hand off), six checks, at most three questions
   │    └─ Floor  — the run graph, the merge order, held tool calls, the live
   │                transcript, and a way into the terminal
   ├─ Ledger  — every decision, filtered by order / actor / action; the one
