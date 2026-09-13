@@ -1,0 +1,23 @@
+docs/user-guide/USER-GUIDE.md
+  s_2ec7471f967bde::t_20828d0d11c354 626-632
+docs/adr/050-effort-is-a-property-of-the-shape.md
+  s_2ec7471f967bde::t_f557f0010da23c 1-79
+docs/ARCHITECTURE.md
+  s_2ec7471f967bde::t_20828d0d11c354 964-970
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3eec52b8b7cf83e19e492a32fa49a972b9df7f60",
+  "prompts": {},
+  "sessions": {
+    "s_2ec7471f967bde": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "036c4f1d-a492-4e80-a2e2-cc51a35ef281",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
