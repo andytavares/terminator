@@ -1,0 +1,60 @@
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_2ec7471f967bde::t_2577d0f2f94128 72-73,339
+extensions/foundry/recipes/bugfix.yaml
+  s_2ec7471f967bde::t_31d32ee32d7d49 4-6
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_2ec7471f967bde::t_709e860caaad7f 345-367
+extensions/foundry/src/runtime/claude-launch.ts
+  s_2ec7471f967bde::t_2577d0f2f94128 60-61,227-229
+extensions/foundry/recipes/speckit.yaml
+  s_2ec7471f967bde::t_31d32ee32d7d49 6-7
+extensions/foundry/recipes/standard.yaml
+  s_2ec7471f967bde::t_31d32ee32d7d49 4-6
+extensions/foundry/recipes/refactor.yaml
+  s_2ec7471f967bde::t_31d32ee32d7d49 4-6
+extensions/foundry/tests/line/executor.spec.ts
+  s_2ec7471f967bde::t_20828d0d11c354 1998-2000
+  s_2ec7471f967bde::t_709e860caaad7f 1938-1997,2001-2004
+extensions/foundry/tests/recipe/parse.spec.ts
+  s_2ec7471f967bde::t_709e860caaad7f 318-364
+extensions/foundry/recipes/direct.yaml
+  s_2ec7471f967bde::t_31d32ee32d7d49 4-5
+extensions/foundry/recipes/quick.yaml
+  s_2ec7471f967bde::t_31d32ee32d7d49 6-8
+extensions/foundry/tests/runtime/claude-launch.spec.ts
+  s_2ec7471f967bde::t_20828d0d11c354 298
+  s_2ec7471f967bde::t_709e860caaad7f 291-297,299-305
+extensions/foundry/recipes/spike.yaml
+  s_2ec7471f967bde::t_31d32ee32d7d49 4-6
+specs/037-foundry-software-factory/contracts/recipe-role-rule.md
+  s_2ec7471f967bde::t_7cc2df7efa15c9 32-33,71-73
+  s_2ec7471f967bde::t_18ca8a56e72e4b 74
+extensions/foundry/src/line/executor.ts
+  s_2ec7471f967bde::t_20828d0d11c354 645-646
+  s_2ec7471f967bde::t_2577d0f2f94128 20,99-104,636,644
+extensions/foundry/src/index.ts
+  s_2ec7471f967bde::t_ad3fdfb1066c5c 33
+  s_2ec7471f967bde::t_2577d0f2f94128 1043-1044,1095
+  s_2ec7471f967bde::t_b4dd0f14d81e40 1340-1341,1343
+specs/037-foundry-software-factory/data-model.md
+  s_2ec7471f967bde::t_20828d0d11c354 207-211,213,219-220,222-226
+  s_2ec7471f967bde::t_7cc2df7efa15c9 212,221,228
+extensions/foundry/src/recipe/parse.ts
+  s_2ec7471f967bde::t_2577d0f2f94128 66-76,96,128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0edd4104c56549b551bbe46d9c760b9b1aeab5ac",
+  "prompts": {},
+  "sessions": {
+    "s_2ec7471f967bde": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "036c4f1d-a492-4e80-a2e2-cc51a35ef281",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
