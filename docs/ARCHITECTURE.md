@@ -961,6 +961,13 @@ other direction.
   or above P2). A proposal walks the ladder to the first shape this repository
   can run — `quick` needs a `test` command, being the only check it has — while
   an operator's explicit choice is honoured or refused, never quietly swapped.
+- **Effort is a property of the shape** (ADR-050). A recipe declares
+  `effort: low | medium | high | xhigh | max`, every agent step inherits it and
+  a step may override it; the executor hands it to the launch beside the model
+  tier and `buildLaunchSpec` passes it as `--effort`. `quick` and `spike` run
+  at `high`, every other built-in at `xhigh`. A recipe that declares none
+  passes no flag, and a fast-tier role is never passed one — the fast model
+  does not take it.
 - **Roles** are YAML data too, with a write list. A role with none is run
   read-only, enforced by the `PreToolUse` hook rather than by its prompt.
   `verifier` carries `allowResume: false`, and `assertResumable` refuses to

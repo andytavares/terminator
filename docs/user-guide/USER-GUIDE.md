@@ -623,6 +623,13 @@ different one in a click; the override is recorded alongside the proposal it
 replaced. The shape that is selected spells itself out; the rest keep a line
 each, with the whole description on hover.
 
+Each shape also says how hard its agents think. `quick` and `spike` run at
+the runtime's `high` effort; `direct`, `standard`, `bugfix`, `refactor` and
+`speckit` run at `xhigh`, because a second look, a root cause or a refactor
+that must prove behaviour unchanged is where deeper reasoning pays. A recipe
+of your own sets it with one line, `effort: xhigh`, on the recipe or on a
+single step.
+
 ![A work order in the Forge, with its convergence checks and the shape of work](screenshots/08b-foundry-forge.png)
 
 In the list of orders, a row that is waiting on an answer says **"N waiting on
