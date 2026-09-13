@@ -32,12 +32,15 @@ function recipe(file: string): Recipe {
 }
 
 describe('built-in recipes', () => {
-  it('ships the seven shapes of work the design names', () => {
+  it('ships the seven shapes of work the design names, and the three whose product is a document or a demonstration', () => {
     expect(recipeFiles.sort()).toEqual([
       'bugfix.yaml',
+      'design-doc.yaml',
       'direct.yaml',
+      'poc.yaml',
       'quick.yaml',
       'refactor.yaml',
+      'research.yaml',
       'speckit.yaml',
       'spike.yaml',
       'standard.yaml',
@@ -118,7 +121,14 @@ describe('built-in recipes', () => {
   })
 
   it('asks nothing of a repository for the shapes that need nothing', () => {
-    for (const file of ['direct.yaml', 'standard.yaml', 'spike.yaml']) {
+    for (const file of [
+      'direct.yaml',
+      'standard.yaml',
+      'spike.yaml',
+      'research.yaml',
+      'design-doc.yaml',
+      'poc.yaml',
+    ]) {
       expect(recipe(file).requires).toEqual([])
     }
   })
@@ -181,10 +191,41 @@ describe('built-in recipes', () => {
   )
 })
 
+// Three shapes whose deliverable is a document or a demonstration rather
+// than a code change. They still end in a draft pull request, because a
+// document nobody can find is a document nobody reads; and they are still
+// checked by a fresh reader, because the author's own summary is not evidence.
+describe('the shapes whose product is a document', () => {
+  it.each(['research.yaml', 'design-doc.yaml'])('%s is written by the author', (file) => {
+    expect(recipe(file).steps.find((s) => s.id === 'write')?.role).toBe('author')
+  })
+
+  it.each(['research.yaml', 'design-doc.yaml', 'poc.yaml'])(
+    '%s is checked in a fresh context and ships as a draft',
+    (file) => {
+      const steps = recipe(file).steps
+      expect(steps.find((s) => s.id === 'verify')?.context).toBe('fresh')
+      expect(steps.find((s) => s.id === 'ship')?.rule).toBe('ready-for-review')
+    }
+  )
+
+  it('attacks the order before a design document is written', () => {
+    const write = recipe('design-doc.yaml').steps.find((s) => s.id === 'write')
+    expect(write?.after).toContain('challenge')
+  })
+
+  it('records what a proof of concept learned before it ships', () => {
+    const document = recipe('poc.yaml').steps.find((s) => s.id === 'document')
+    expect(document?.role).toBe('scribe')
+    expect(recipe('poc.yaml').steps.find((s) => s.id === 'integrate')?.after).toContain('document')
+  })
+})
+
 describe('built-in roles', () => {
-  it('ships the nine roles the design names', () => {
+  it('ships the nine roles the design names, and the author', () => {
     expect(roleFiles.map((f) => f.replace('.yaml', '')).sort()).toEqual([
       'architect',
+      'author',
       'builder',
       'foreman',
       'inspector',
@@ -216,9 +257,9 @@ describe('built-in roles', () => {
   // The property that matters is narrower than "writes nothing": the red team
   // and the foreman do produce output — findings, a schedule — they just may
   // not touch a checkout. Only three roles may.
-  it('lets only the builder, the integrator and the scribe write to a checkout', () => {
+  it('lets only the builder, the integrator, the scribe and the author write to a checkout', () => {
     const CHECKOUT = ['worktree', 'integration_branch', 'docs']
-    const allowed = new Set(['builder', 'integrator', 'scribe'])
+    const allowed = new Set(['builder', 'integrator', 'scribe', 'author'])
     for (const file of roleFiles) {
       const parsed = parseRole(read(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
@@ -361,6 +402,9 @@ describe('the effort each built-in shape asks for', () => {
     ['refactor.yaml', 'xhigh'],
     ['speckit.yaml', 'xhigh'],
     ['spike.yaml', 'high'],
+    ['research.yaml', 'high'],
+    ['design-doc.yaml', 'xhigh'],
+    ['poc.yaml', 'high'],
   ])('%s runs at %s', (file, effort) => {
     expect(recipe(file).effort).toBe(effort)
   })

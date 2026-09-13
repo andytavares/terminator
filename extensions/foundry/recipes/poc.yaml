@@ -1,0 +1,40 @@
+schemaVersion: 1
+id: poc
+description: >
+  A proof of concept. Build the smallest thing that demonstrates the claim,
+  check the demonstration in a fresh context, record what was learned, ship
+  it as a draft so the result is visible.
+effort: high
+requires: []
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units[role=builder] by lane
+    step: { kind: agent, role: builder }
+
+  # The criteria of a proof of concept are the demonstration: a command and
+  # the output that means yes. The verifier runs it without having watched it
+  # being built.
+  - id: verify
+    kind: agent
+    role: verifier
+    context: fresh
+    after: [build]
+
+  # What was proved, what was not, and what it would take to make it real.
+  - id: document
+    kind: agent
+    role: scribe
+    after: [verify]
+
+  - id: integrate
+    kind: join
+    order: lane.ord
+    after: [document]
+
+  - id: ship
+    kind: gate
+    rule: ready-for-review
+    options: [mark_ready, hold]
+    defaultIfIgnored: hold
+    after: [integrate]

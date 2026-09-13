@@ -1,0 +1,36 @@
+schemaVersion: 1
+id: research
+description: >
+  A question whose answer is a document. Read the ground, write the answer
+  with evidence, have a fresh reader check it against the criteria, ship it
+  as a pull request so the work is visible.
+effort: high
+requires: []
+steps:
+  - id: scout
+    kind: agent
+    role: scout
+
+  - id: write
+    kind: agent
+    role: author
+    after: [scout]
+
+  # A fresh context is what makes the check independent of the writing.
+  - id: verify
+    kind: agent
+    role: verifier
+    context: fresh
+    after: [write]
+
+  - id: integrate
+    kind: join
+    order: lane.ord
+    after: [verify]
+
+  - id: ship
+    kind: gate
+    rule: ready-for-review
+    options: [mark_ready, hold]
+    defaultIfIgnored: hold
+    after: [integrate]

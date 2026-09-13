@@ -212,6 +212,8 @@ describe('rulesFor', () => {
         'reachability',
         'every-consumer',
         'no-stubs',
+        'scope-as-asked',
+        'outcome-first',
       ])
     )
   })

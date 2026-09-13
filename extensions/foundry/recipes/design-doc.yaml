@@ -1,0 +1,42 @@
+schemaVersion: 1
+id: design-doc
+description: >
+  A design or strategy document. The order is attacked before a word is
+  written, the document is written against the checkout, and a fresh reader
+  checks it against the criteria before it ships.
+effort: xhigh
+requires: []
+steps:
+  - id: scout
+    kind: agent
+    role: scout
+
+  # Attack the order, not the document: a criterion nobody could falsify or a
+  # scope the intent never asked for is cheaper to catch before the writing.
+  - id: challenge
+    kind: agent
+    role: red-team
+    after: [scout]
+
+  - id: write
+    kind: agent
+    role: author
+    after: [challenge]
+
+  - id: verify
+    kind: agent
+    role: verifier
+    context: fresh
+    after: [write]
+
+  - id: integrate
+    kind: join
+    order: lane.ord
+    after: [verify]
+
+  - id: ship
+    kind: gate
+    rule: ready-for-review
+    options: [mark_ready, hold]
+    defaultIfIgnored: hold
+    after: [integrate]

@@ -1,0 +1,12 @@
+schemaVersion: 1
+id: outcome-first
+scope: universal
+rung: L0
+asserts: >
+  Written output leads with the outcome. A document, a pull-request body or a
+  hand-back says what was done or found in its first sentence, carries the
+  evidence after it, and is sized to what the reader needs. It does not
+  narrate the process, restate itself in a summary, or pad with sections that
+  have nothing in them.
+appliesWhen: always
+origin: built-in

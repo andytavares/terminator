@@ -630,6 +630,14 @@ that must prove behaviour unchanged is where deeper reasoning pays. A recipe
 of your own sets it with one line, `effort: xhigh`, on the recipe or on a
 single step.
 
+Three shapes are never proposed and are there to be picked: **research**
+(a question whose answer is a document), **design-doc** (the order is attacked
+first, then the document is written and checked by a fresh reader) and **poc**
+(the smallest thing that demonstrates a claim, with a note of what was
+learned). Each still ends in a draft pull request carrying the result. Write
+the acceptance criteria as statements about the document or the demonstration,
+so the verifier has something to check.
+
 ![A work order in the Forge, with its convergence checks and the shape of work](screenshots/08b-foundry-forge.png)
 
 In the list of orders, a row that is waiting on an answer says **"N waiting on
