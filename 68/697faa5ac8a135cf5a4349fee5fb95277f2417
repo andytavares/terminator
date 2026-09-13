@@ -1,0 +1,14 @@
+main.py
+  h_330e75a16c7ef4 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "68697faa5ac8a135cf5a4349fee5fb95277f2417",
+  "prompts": {},
+  "humans": {
+    "h_330e75a16c7ef4": {
+      "author": "Test <test@example.com>"
+    }
+  }
+}
