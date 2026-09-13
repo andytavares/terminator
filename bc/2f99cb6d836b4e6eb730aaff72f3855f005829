@@ -1,0 +1,127 @@
+extensions/foundry/src/order/schema.ts
+  s_07040b8eb928ea::t_1f8a79b586a610 148,150-152
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_07040b8eb928ea::t_02d3f443bde847 342-407
+extensions/foundry/src/ipc/forge-channels.ts
+  s_07040b8eb928ea::t_3a14f2c27349cc 12-14
+  s_07040b8eb928ea::t_0dbb3ae3e098e7 96-102
+  s_07040b8eb928ea::t_4adfebd30eda11 128-131,133
+  s_07040b8eb928ea::t_faab345704aca8 181-182
+  s_07040b8eb928ea::t_0e3c5732272de7 642-679
+extensions/foundry/tests/order/schema.spec.ts
+  s_07040b8eb928ea::t_9bfb16970c5929 228-244
+extensions/foundry/src/order/render.ts
+  s_07040b8eb928ea::t_6bb327a45681bc 3
+  s_07040b8eb928ea::t_e52c198e5a1ded 33-43
+  s_07040b8eb928ea::t_63f05faa8f4e88 134
+extensions/foundry/tests/forge/converge.spec.ts
+  s_07040b8eb928ea::t_378e48b5cfb410 130-138
+extensions/foundry/src/line/executor.ts
+  s_07040b8eb928ea::t_59209291288d26 524
+  s_07040b8eb928ea::t_ae9be363a9059a 439
+  s_07040b8eb928ea::t_781a78dc4ffd99 669
+  s_07040b8eb928ea::t_f7c46d1c468948 458
+  s_07040b8eb928ea::t_cd285373443fe5 11
+extensions/foundry/tests/order/budget-setting.spec.ts
+  s_07040b8eb928ea::t_925db84b70be64 1-29
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_07040b8eb928ea::t_f5a21a74874a74 419
+  s_07040b8eb928ea::t_3261a66a7f8846 347-349
+  s_07040b8eb928ea::t_bcf26eb0ac1ba7 229,235
+  s_07040b8eb928ea::t_a680d8cfc5f014 236,412-418
+extensions/foundry/src/components/BudgetForm.tsx
+  s_07040b8eb928ea::t_403f4b96e21b4f 1,4-114
+  s_07040b8eb928ea::t_3f7b5b0d67e7ae 2-3
+  s_07040b8eb928ea::t_6ec124934ca5fe 115-154
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_07040b8eb928ea::t_99e34c29dafb47 103-143
+extensions/foundry/src/components/Forge.tsx
+  s_07040b8eb928ea::t_57c1f9ddf39993 14-15
+  s_07040b8eb928ea::t_bd6a4f395142fb 171,174,176
+  s_07040b8eb928ea::t_165731a1e7cd47 294-310
+  s_07040b8eb928ea::t_fcfbfa0033df8e 867-899
+tests/e2e/foundry.spec.ts
+  s_07040b8eb928ea::t_adea5ee2c78cd5 682
+  s_07040b8eb928ea::t_455e1678525589 678-681,683-711,715-793
+  s_07040b8eb928ea::t_1aa85834572beb 712-714
+extensions/foundry/src/gates/rules.ts
+  s_07040b8eb928ea::t_415157c0203eaa 264
+  s_07040b8eb928ea::t_cb495dd81376e6 84-88
+  s_07040b8eb928ea::t_65064fe413d857 215
+  s_07040b8eb928ea::t_c2d349b919f143 2
+  s_07040b8eb928ea::t_3c233b86cb3605 36
+extensions/foundry/src/components/Floor.tsx
+  s_07040b8eb928ea::t_7c1fb793201181 507,509,511,513-514
+  s_07040b8eb928ea::t_2824cdc04feded 665-697
+  s_07040b8eb928ea::t_1cbc1a20e9ad4e 19
+extensions/foundry/tests/line/executor.spec.ts
+  s_07040b8eb928ea::t_e83fdbfb0819c8 735-747
+extensions/foundry/src/order/proposal.ts
+  s_07040b8eb928ea::t_a8d52db0afdc7f 41-42
+  s_07040b8eb928ea::t_01fd3e05ad01af 87-90
+extensions/foundry/src/line/scheduler.ts
+  s_07040b8eb928ea::t_eedfbcc69d567a 49-50
+  s_07040b8eb928ea::t_79ceb287021edf 189-192,194-196,200-225
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_07040b8eb928ea::t_94df54f30afa96 1145-1215
+extensions/foundry/tests/order/compile.spec.ts
+  s_07040b8eb928ea::t_507a2df4a56e7c 333-340
+extensions/foundry/src/order/compile.ts
+  s_07040b8eb928ea::t_5a59539e4952cd 267
+extensions/foundry/src/components/Inbox.tsx
+  s_07040b8eb928ea::t_046d29576f2b4c 110,112,115,121-122
+  s_07040b8eb928ea::t_9e2870461ec550 13
+  s_07040b8eb928ea::t_9063046c339436 190-192,194-197,199-218
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_07040b8eb928ea::t_fd3303eabcb05a 1035-1089
+extensions/foundry/src/order/budget-setting.ts
+  s_07040b8eb928ea::t_bf99ceb9b12f1d 1-9
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_07040b8eb928ea::t_716a65a13347d5 1081-1172
+  s_07040b8eb928ea::t_32115f6d9b74f3 1194-1200,1204
+  s_07040b8eb928ea::t_530459c9210a28 1201-1203
+extensions/foundry/src/index.ts
+  s_07040b8eb928ea::t_761b426bcaba66 43-44
+  s_07040b8eb928ea::t_f32a0ff2ef9171 734-736
+  s_07040b8eb928ea::t_ad135a1f798bf0 1915
+  s_07040b8eb928ea::t_57135badc14bb7 2509-2510,2512,2518,2520,2525
+  s_07040b8eb928ea::t_81bab30cf9610b 2526,2528
+extensions/foundry/tests/components/BudgetForm.spec.tsx
+  s_07040b8eb928ea::t_9ac8e3c7ab64f8 1-104
+  s_07040b8eb928ea::t_f5bc0cc53ee831 105
+extensions/foundry/tests/line/scheduler.spec.ts
+  s_07040b8eb928ea::t_b0a67b7cc69b4d 277-314,318-323,327-333
+  s_07040b8eb928ea::t_1edf34dd3baaf1 315-317,324-326
+  s_07040b8eb928ea::t_c03a828ef33384 14-15
+extensions/foundry/src/ipc/inbox-channels.ts
+  s_07040b8eb928ea::t_85b7f85ae20b58 3
+  s_07040b8eb928ea::t_8104c96f9595c6 117-128
+  s_07040b8eb928ea::t_07c05bf98500c1 146-156
+  s_07040b8eb928ea::t_430a324f7e854a 21-22
+extensions/foundry/tests/gates/rules.spec.ts
+  s_07040b8eb928ea::t_8655d74b59787e 72-77
+extensions/foundry/tests/order/render.spec.ts
+  s_07040b8eb928ea::t_5e1fd586b6e53c 190-197
+extensions/foundry/tests/order/proposal.spec.ts
+  s_07040b8eb928ea::t_d36fff11fb3438 81-96
+extensions/foundry/src/components/foundry.css
+  s_07040b8eb928ea::t_1f997afa4b15ce 2456-2534
+extensions/foundry/src/forge/converge.ts
+  s_07040b8eb928ea::t_0611ca23a24a98 119-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bc2f99cb6d836b4e6eb730aaff72f3855f005829",
+  "prompts": {},
+  "sessions": {
+    "s_07040b8eb928ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4241d7a6-38a5-4b80-83be-6fc820a3272e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Test <test@example.com>"
+    }
+  }
+}
