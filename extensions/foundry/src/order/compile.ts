@@ -264,6 +264,7 @@ export function smallestBudgetFor(filesPlanned: number): number {
  * "Fit" means fit with room. See `HEADROOM_SHARE`.
  */
 function checkBudgets(order: WorkOrder): CompileFailure | null {
+  if (order.budgets.filesTouched === null) return null
   const distinct = new Set(order.plan.units.flatMap((u) => u.touches))
   const smallest = smallestBudgetFor(distinct.size)
   if (smallest <= order.budgets.filesTouched) return null

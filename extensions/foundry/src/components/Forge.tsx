@@ -11,6 +11,8 @@ import type { CapabilityReport } from '../trackers/write-back.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
 import { PROPOSAL_FILE } from '../order/proposal.js'
 import { forgeSteps, openingStep, type StepId } from '../forge/steps.js'
+import { budgetsInWords } from '../order/render.js'
+import { BudgetForm } from './BudgetForm.js'
 
 // The Forge.
 //
@@ -166,11 +168,12 @@ const CHECK_REMEDIES: Record<CheckId, readonly Remedy[]> = {
   ],
   redTeam: [{ kind: 'goto', label: 'Clear them', step: 'redTeam', target: STEP_HEADING }],
   budgets: [
+    { kind: 'goto', label: 'Change the budget', step: 'plan', target: 'fdry-budgets' },
     {
       kind: 'ask',
-      label: 'Ask it to fit the budget',
+      label: 'Ask it to cut the plan',
       message:
-        'The plan does not fit its budgets. Either propose budgets this plan fits, or cut the plan down to the budgets the order already has.',
+        'The plan does not fit its budgets, and the budgets are the operator’s to set. Cut the plan down until it fits the budgets the order has.',
     },
   ],
 }
@@ -284,6 +287,23 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
         | OrderView
         | { error: string }
       if ('order' in next) setView(next)
+    },
+    [orderId]
+  )
+
+  const setBudgets = useCallback(
+    async (budgets: Record<string, number | null>) => {
+      setBusy(true)
+      setProblem(null)
+      try {
+        const next = (await invoke('foundry:order.budgets', { id: orderId, budgets })) as
+          | OrderView
+          | { error: string }
+        if ('order' in next) setView(next)
+        else setProblem(next.error)
+      } finally {
+        setBusy(false)
+      }
     },
     [orderId]
   )
@@ -844,6 +864,39 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                     </div>
                   </section>
                 ) : null}
+
+                <section className="fdry-field" aria-labelledby="fdry-budgets">
+                  <h3 className="fdry-field-h" id="fdry-budgets" tabIndex={-1}>
+                    Budgets
+                  </h3>
+                  <p className="fdry-note">
+                    Where the run pauses and asks you. New orders start with the limits in Settings;
+                    these are this order&rsquo;s.
+                  </p>
+                  {isDraft ? (
+                    <BudgetForm
+                      key={JSON.stringify(order.budgets)}
+                      rows={[
+                        { key: 'agents', label: 'Agents at once', value: order.budgets.agents },
+                        {
+                          key: 'wallClockMinutes',
+                          label: 'Minutes',
+                          value: order.budgets.wallClockMinutes,
+                        },
+                        {
+                          key: 'filesTouched',
+                          label: 'Files touched',
+                          value: order.budgets.filesTouched,
+                        },
+                      ]}
+                      submitLabel="Save budgets"
+                      disabled={busy}
+                      onSubmit={(budgets) => void setBudgets(budgets)}
+                    />
+                  ) : (
+                    <p>{budgetsInWords(order.budgets)}</p>
+                  )}
+                </section>
               </>
             ) : null}
 

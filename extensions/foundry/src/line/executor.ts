@@ -8,6 +8,7 @@ import {
   hasStalled,
   blockedNodes,
 } from './scheduler.js'
+import type { BudgetBreach } from './scheduler.js'
 import { withNode, stepFor, unitsOf, wantsFreshContext } from './run-graph.js'
 import { checkExpect } from '../recipe/step-kinds.js'
 import type { RunGraph, RunNode } from './run-graph.js'
@@ -435,6 +436,7 @@ export async function execute(
        * a promise no gate could keep.
        */
       deadlineMinutes?: number
+      breach?: BudgetBreach
     }
   ): Promise<boolean> {
     if (!isLive(rule, autonomy)) return false
@@ -453,6 +455,7 @@ export async function execute(
         input.deadlineMinutes === undefined
           ? null
           : new Date(Date.parse(deps.now()) + input.deadlineMinutes * 60_000).toISOString(),
+      breach: input.breach ?? null,
     })
     gates.push(gate)
     deps.onEvent?.({ type: 'gate', gate })
@@ -518,6 +521,7 @@ export async function execute(
       halted = await raise('budget.exceeded', {
         summary: `${order.title} has gone past its ${breach.kind.replace('_', ' ')} budget`,
         why: `The order budgets ${breach.limit} and this run is at ${Math.round(breach.actual)}.`,
+        breach,
       })
       if (halted) break
     }
@@ -662,6 +666,7 @@ export async function execute(
         why:
           `The order budgets ${breach.limit} and this run is at ${Math.round(breach.actual)}. ` +
           `Its agents are still in their terminals — nothing was thrown away.`,
+        breach,
       })
       // Even where the rule is silenced, a run past its budget stops asking
       // for more. The budget is part of what was agreed, not a preference.

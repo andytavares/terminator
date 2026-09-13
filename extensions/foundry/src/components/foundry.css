@@ -2453,3 +2453,82 @@
   line-height: 1.45;
   color: var(--tm-text-muted);
 }
+
+/* A budget is a whole number or no limit: the Forge's Plan step sets an order's
+   three, and a budget gate raises the one a run stopped at. */
+.fdry-budgets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fdry-budget {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+
+.fdry-budget-label {
+  flex: 0 0 120px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-budget input[type='number'] {
+  width: 90px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+}
+
+.fdry-budget input[aria-invalid='true'] {
+  border-color: var(--tm-border-strong);
+}
+
+.fdry-budget-unlimited {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-budget-min {
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-budget-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.fdry-budget-actions button {
+  appearance: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 13px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+  cursor: pointer;
+}
+
+.fdry-budget-actions button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.fdry-budget-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

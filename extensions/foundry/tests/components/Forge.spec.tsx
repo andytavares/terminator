@@ -1032,6 +1032,61 @@ describe('a failing check says how to clear it', () => {
   })
 })
 
+// Budgets came from settings and could be changed nowhere on an order, and
+// the architect could replace them. They are the operator's, on the Plan step.
+describe('an order’s budgets', () => {
+  const TIGHT = { agents: 3, wallClockMinutes: 45, filesTouched: 1, tokens: null }
+
+  it('shows them on the Plan step and saves what the operator sets', async () => {
+    mountBlocked({ budgets: { agents: 2, wallClockMinutes: null, filesTouched: 25, tokens: null } })
+    await openStep('Plan')
+    const section = await waitFor(() => screen.getByRole('region', { name: 'Budgets' }))
+    expect(
+      (within(section).getByRole('spinbutton', { name: 'Agents at once' }) as HTMLInputElement)
+        .value
+    ).toBe('2')
+    expect(
+      (within(section).getByRole('checkbox', { name: 'No limit on minutes' }) as HTMLInputElement)
+        .checked
+    ).toBe(true)
+
+    fireEvent.change(within(section).getByRole('spinbutton', { name: 'Files touched' }), {
+      target: { value: '60' },
+    })
+    fireEvent.click(within(section).getByRole('button', { name: 'Save budgets' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.budgets', {
+        id: 'WO-1',
+        budgets: { agents: 2, wallClockMinutes: null, filesTouched: 60 },
+      })
+    )
+  })
+
+  it('takes a plan that does not fit to the budget, and asks the architect only to cut it', async () => {
+    mountBlocked({ budgets: TIGHT })
+    await openStep('Plan')
+    const change = await waitFor(() => screen.getByRole('button', { name: 'Change the budget' }))
+    fireEvent.click(change)
+    await waitFor(() => expect(document.activeElement?.id).toBe('fdry-budgets'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask it to cut the plan' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        expect.objectContaining({ message: expect.not.stringContaining('propose budgets') })
+      )
+    )
+  })
+
+  it('shows them without controls once the order is no longer a draft', async () => {
+    mountBlocked({ status: 'running' as const, budgets: TIGHT })
+    await openStep('Plan')
+    const section = await waitFor(() => screen.getByRole('region', { name: 'Budgets' }))
+    expect(within(section).getByText('3 agents · 45 minutes · 1 files')).toBeTruthy()
+    expect(within(section).queryByRole('button', { name: 'Save budgets' })).toBeNull()
+  })
+})
+
 // Walked, one step at a time, rather than read off a rail of tiles beside the
 // document: an operator reported the rail's cards as too condensed to read.
 describe('walking the Forge', () => {

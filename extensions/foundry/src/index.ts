@@ -40,7 +40,8 @@ import type { LedgerEntry } from './ledger/append.js'
 import type { IntegrateDeps } from './line/integrate.js'
 import { checkCapability, writeBack } from './trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
-import type { WorkOrder, WriteBack } from './order/schema.js'
+import type { Budgets, WorkOrder, WriteBack } from './order/schema.js'
+import { budgetFromSetting } from './order/budget-setting.js'
 import { resolveDataRoot, untrackedNotice, ledgerPath, orderDir } from './data-root.js'
 import { queryEntries } from './ledger/append.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
@@ -730,15 +731,9 @@ function defaultWriteBack(api: ExtensionAPI): WriteBack[] {
  * budgets, and changing the setting later must not silently re-price work the
  * operator already agreed to.
  */
-function defaultBudgets(api: ExtensionAPI): {
-  agents: number
-  wallClockMinutes: number
-  filesTouched: number
-} {
-  const num = (key: string, fallback: number): number => {
-    const value = api.settings?.get<number>(key)
-    return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? value : fallback
-  }
+function defaultBudgets(api: ExtensionAPI): Omit<Budgets, 'tokens'> {
+  const num = (key: string, fallback: number): number | null =>
+    budgetFromSetting(api.settings?.get<number>(key), fallback)
   return {
     agents: num('terminator.foundry.budgets.agents', 3),
     wallClockMinutes: num('terminator.foundry.budgets.wallClockMinutes', 45),
@@ -1917,6 +1912,7 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:order.mapState', (payload) => forge.mapState(payload))
   reg(api, 'foundry:order.converge', (payload) => forge.converge(payload))
   reg(api, 'foundry:order.writeBack', (payload) => forge.setWriteBack(payload))
+  reg(api, 'foundry:order.budgets', (payload) => forge.setBudgets(payload))
   reg(api, 'foundry:order.cancel', (payload) => forge.cancel(payload))
 
   // Gone, rather than hidden.
@@ -2510,22 +2506,26 @@ export function activate(api: ExtensionAPI): void {
         'terminator.foundry.budgets.agents': {
           type: 'number',
           label: 'Agents running at once',
+          description:
+            '0 means no limit. Each new order starts with this, and you can change it on the order.',
           default: 3,
-          min: 1,
+          min: 0,
         },
         'terminator.foundry.budgets.wallClockMinutes': {
           type: 'number',
           label: 'Minutes before an order pauses and asks',
           description:
-            'Exceeding a budget pauses the work and raises a decision. It never continues silently, and it never dies silently.',
+            'Exceeding a budget pauses the work and raises a decision. It never continues silently, and it never dies silently. 0 means no limit.',
           default: 45,
-          min: 1,
+          min: 0,
         },
         'terminator.foundry.budgets.filesTouched': {
           type: 'number',
           label: 'Files an order may touch before it pauses and asks',
+          description:
+            '0 means no limit. Each new order starts with this, and you can change it on the order.',
           default: 25,
-          min: 1,
+          min: 0,
         },
         // Three booleans rather than a list: the settings surface has no array
         // type, and each write-back is independently worth turning off.

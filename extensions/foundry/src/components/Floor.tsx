@@ -16,6 +16,7 @@ import type { RunGraph, RunNode } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
 import { ConfirmButton } from './ConfirmButton.js'
+import { RaiseBudgetForm } from './BudgetForm.js'
 
 // Where you watch, not where you act.
 //
@@ -503,11 +504,14 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
    * it is the one blocking thing on this order put where the person looking at
    * the order will see it. The inbox stays the cross-order queue.
    */
+  const [raising, setRaising] = useState<string | null>(null)
   const decideGate = useCallback(
-    async (gateId: string, option: string) => {
+    async (gateId: string, option: string, limit?: number | null) => {
       setBusy(true)
+      setRaising(null)
       try {
-        const r = (await invoke('foundry:inbox.decide', { gateId, option })) as {
+        const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
+        const r = (await invoke('foundry:inbox.decide', payload)) as {
           error?: string
           actionError?: string
         }
@@ -658,26 +662,39 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             <div key={gate.id} className="fdry-standing-gate">
               <p className="fdry-standing-gate-h">{gate.summary}</p>
               <p className="fdry-note">{gate.why}</p>
-              <div className="fdry-standing-options">
-                {/* One recommended action, not two. Every rule lists the
-                    affirmative — carry on, approve, raise — first, and the
-                    ways of stopping after it; drawing "Stop here" as loudly as
-                    "Raise the budget" makes the operator read three buttons to
-                    find out which one keeps the work alive. */}
-                {gate.options.map((option, index) => (
-                  <div key={option.id} className="fdry-standing-option">
-                    <button
-                      type="button"
-                      className={index === 0 ? 'is-primary' : undefined}
-                      disabled={busy}
-                      onClick={() => void decideGate(gate.id, option.id)}
-                    >
-                      {option.label}
-                    </button>
-                    <small>{option.consequence}</small>
-                  </div>
-                ))}
-              </div>
+              {raising === gate.id && gate.breach ? (
+                <RaiseBudgetForm
+                  breach={gate.breach}
+                  disabled={busy}
+                  onRaise={(limit) => void decideGate(gate.id, 'raise', limit)}
+                  onCancel={() => setRaising(null)}
+                />
+              ) : (
+                <div className="fdry-standing-options">
+                  {/* One recommended action, not two. Every rule lists the
+                      affirmative — carry on, approve, raise — first, and the
+                      ways of stopping after it; drawing "Stop here" as loudly as
+                      "Raise the budget" makes the operator read three buttons to
+                      find out which one keeps the work alive. */}
+                  {gate.options.map((option, index) => (
+                    <div key={option.id} className="fdry-standing-option">
+                      <button
+                        type="button"
+                        className={index === 0 ? 'is-primary' : undefined}
+                        disabled={busy}
+                        onClick={() =>
+                          option.id === 'raise' && gate.breach
+                            ? setRaising(gate.id)
+                            : void decideGate(gate.id, option.id)
+                        }
+                      >
+                        {option.label}
+                      </button>
+                      <small>{option.consequence}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* What happens if this is left alone, in the option's own
                   words. It printed the option id — "this holds: hold" — which
                   is a token from a rules file, not a sentence. */}

@@ -732,6 +732,19 @@ describe('the budget is part of the agreement', () => {
     expect(outcome.gates[0].summary).toContain('files touched')
   })
 
+  it('records which budget it stopped at, with the limit and the count', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      observe: () => ({ elapsedMinutes: 0, filesTouched: 10_000 }),
+    })
+    expect(outcome.gates[0].breach).toEqual({
+      kind: 'files_touched',
+      limit: o.budgets.filesTouched,
+      actual: 10_000,
+    })
+  })
+
   it('runs normally when it is inside them', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])

@@ -32,7 +32,7 @@ Under `<dataRoot>/orders/<id>/`:
 1. **Read the order; do not negotiate with it.** The Line has no path back into the intake conversation. If it needs something the order does not carry, that is a `forge-defect` gate (FR-083) — answered by the operator _and_ recorded against intake, so the schema can grow.
 2. **Never mutate `order.json`.** Execution state lives in the run graph and the ledger. The order is what was agreed; a record you can rewrite is not a record of an agreement.
 3. **Satisfy every criterion or fail loudly.** `not_measured` is not a pass. An order cannot reach `shipped` with an unmeasured `P0` criterion.
-4. **Honour the budgets.** They are part of the agreement, not advice (FR-030).
+4. **Honour the budgets.** They are part of the agreement, not advice (FR-030). A `null` budget means no limit. Only the operator changes budgets: on a draft, or on a running order at its `budget.exceeded` gate (ADR 052).
 5. **Stay inside the blast radius.** Writing outside it is a risk trigger, not a warning (FR-043).
 
 ## Amendment

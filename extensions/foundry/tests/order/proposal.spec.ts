@@ -78,6 +78,22 @@ describe('merging one in', () => {
     expect(after.id).toBe('WO-1')
   })
 
+  it('never changes the budgets, which are the operator’s', () => {
+    // The architect's contract carried an example budget, and whatever it
+    // wrote replaced the configured one: an operator who set 25 files got 10.
+    const before = order({
+      budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25, tokens: null },
+    })
+    const after = applyProposal(
+      before,
+      parseProposal({
+        budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 10, tokens: null },
+      }),
+      NOW
+    )
+    expect(after.budgets).toEqual(before.budgets)
+  })
+
   it('records what the architect said it changed', () => {
     const after = applyProposal(order(), parseProposal({ note: 'added AC-1' }), NOW)
     expect(after.provenance.decisions.at(-1)).toContain('added AC-1')

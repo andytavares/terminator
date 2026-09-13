@@ -1,4 +1,5 @@
 import type { Evidence } from '../verify/verdict.js'
+import type { BudgetBreach } from '../line/scheduler.js'
 
 // A gate is a row raised by a named rule, not a checkpoint stapled to a phase.
 //
@@ -32,7 +33,7 @@ export type GateRuleId = (typeof GATE_RULES)[number]
  */
 const RULE_IN_WORDS: Record<GateRuleId, string> = {
   'risk.p0': 'changes that turn out to be riskier than planned',
-  'budget.exceeded': 'a run going past its time or agent budget',
+  'budget.exceeded': 'a run going past its time, files or agent budget',
   destructive: 'anything that destroys work rather than changing it',
   'ready-for-review': 'whether a draft is ready for review',
   'verify.repeat-fail': 'work that keeps failing its checks',
@@ -80,6 +81,11 @@ export interface Gate {
   readonly riskGrade: 'P0' | 'P1' | 'P2' | 'P3'
   readonly raisedAt: string
   readonly decision: GateDecision | null
+  /**
+   * The budget a `budget.exceeded` gate stopped at. Absent on gates written
+   * before it was recorded, which is every one raised before ADR 052.
+   */
+  readonly breach?: BudgetBreach | null
 }
 
 const HOLD: GateOption = {
@@ -206,6 +212,7 @@ export interface RaiseInput {
   readonly blockedUnits?: number
   readonly riskGrade?: Gate['riskGrade']
   readonly deadline?: string | null
+  readonly breach?: BudgetBreach | null
   readonly at: string
 }
 
@@ -254,6 +261,7 @@ export function raiseGate(input: RaiseInput): Gate {
     riskGrade: input.riskGrade ?? 'P3',
     raisedAt: input.at,
     decision: null,
+    breach: input.breach ?? null,
   }
 }
 

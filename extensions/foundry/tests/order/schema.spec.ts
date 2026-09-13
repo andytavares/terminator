@@ -225,6 +225,23 @@ describe('parseWorkOrder', () => {
     expect(parseWorkOrder(o).budgets.tokens).toBeNull()
   })
 
+  it('takes no limit on any enforced budget', () => {
+    const o = valid() as Record<string, unknown>
+    o.budgets = { agents: null, wallClockMinutes: null, filesTouched: null, tokens: null }
+    expect(parseWorkOrder(o).budgets).toEqual({
+      agents: null,
+      wallClockMinutes: null,
+      filesTouched: null,
+      tokens: null,
+    })
+  })
+
+  it('refuses a budget of zero, which would stop the run before it started', () => {
+    const o = valid() as Record<string, unknown>
+    o.budgets = { agents: 0, wallClockMinutes: 45, filesTouched: 25, tokens: null }
+    expect(() => parseWorkOrder(o)).toThrow()
+  })
+
   it('accepts every kind of proof a criterion can carry', () => {
     const kinds = [
       { kind: 'command', command: 'make check', assert: 'exit_code == 0' },

@@ -145,10 +145,11 @@ const RiskSchema = z.object({
   criticalPaths: z.array(z.string()).default([]),
 })
 
+// Null is no limit, which the operator chooses and nothing else can.
 const BudgetsSchema = z.object({
-  agents: z.number().int().min(1),
-  wallClockMinutes: z.number().int().min(1),
-  filesTouched: z.number().int().min(1),
+  agents: z.number().int().min(1).nullable(),
+  wallClockMinutes: z.number().int().min(1).nullable(),
+  filesTouched: z.number().int().min(1).nullable(),
   // Deliberately nullable: a token ceiling that fires part-way through leaves a
   // half-finished change, which is worse than an expensive one.
   tokens: z.number().int().min(1).nullable().default(null),

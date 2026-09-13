@@ -46,7 +46,8 @@ function anyDependencyFailed(graph: RunGraph, node: RunNode): boolean {
  * take an hour would idle the factory.
  */
 export function readyNodes(graph: RunGraph, budgets: Budgets): RunNode[] {
-  const capacity = Math.max(0, budgets.agents - inFlight(graph).length)
+  const capacity =
+    budgets.agents === null ? Infinity : Math.max(0, budgets.agents - inFlight(graph).length)
   const eligible = graph.nodes.filter(
     (n) => (n.state === 'waiting' || n.state === 'ready') && dependenciesSettled(graph, n)
   )
@@ -185,18 +186,40 @@ export function budgetBreach(
   budgets: Budgets,
   observed: { elapsedMinutes: number; filesTouched: number; agents: number }
 ): BudgetBreach | null {
-  if (observed.elapsedMinutes > budgets.wallClockMinutes) {
-    return {
-      kind: 'wall_clock',
-      limit: budgets.wallClockMinutes,
-      actual: observed.elapsedMinutes,
-    }
+  const actual: Record<BudgetBreach['kind'], number> = {
+    wall_clock: observed.elapsedMinutes,
+    files_touched: observed.filesTouched,
+    agents: observed.agents,
   }
-  if (observed.filesTouched > budgets.filesTouched) {
-    return { kind: 'files_touched', limit: budgets.filesTouched, actual: observed.filesTouched }
-  }
-  if (observed.agents > budgets.agents) {
-    return { kind: 'agents', limit: budgets.agents, actual: observed.agents }
+  for (const kind of ['wall_clock', 'files_touched', 'agents'] as const) {
+    const limit = budgets[BUDGET_FIELD[kind]]
+    if (limit !== null && actual[kind] > limit) return { kind, limit, actual: actual[kind] }
   }
   return null
+}
+
+const BUDGET_FIELD = {
+  wall_clock: 'wallClockMinutes',
+  files_touched: 'filesTouched',
+  agents: 'agents',
+} as const satisfies Record<BudgetBreach['kind'], keyof Budgets>
+
+/** The budgets with the one a breach named set to `limit`. Null is no limit. */
+export function withLimit(
+  budgets: Budgets,
+  kind: BudgetBreach['kind'],
+  limit: number | null
+): Budgets {
+  return { ...budgets, [BUDGET_FIELD[kind]]: limit }
+}
+
+/**
+ * Why a raised limit would not let the run continue, or null when it would.
+ *
+ * A limit the run is already past halts it again on the next poll, which is a
+ * decision that looks taken and changes nothing.
+ */
+export function raisedLimitProblem(breach: BudgetBreach, limit: number | null): string | null {
+  if (limit === null || breach.actual <= limit) return null
+  return `This run is already at ${Math.ceil(breach.actual)}, so a limit of ${limit} would stop it again straight away. Choose at least ${Math.ceil(breach.actual)}.`
 }

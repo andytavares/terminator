@@ -899,6 +899,15 @@ refuses one the plan overflows — a budget with no room cannot tell an agent
 going wide from an estimate a few files short, and fires once the work is done
 rather than before it starts. About a quarter more than the plan declares.
 
+Budgets are the operator's (ADR 052). The architect's proposal never changes
+them. A draft's budgets are set on the Forge's Plan step
+(`foundry:order.budgets`). On a running order, the one budget it went past is
+raised at its `budget.exceeded` gate: the gate carries the `breach`, and
+`foundry:inbox.decide` writes the new limit to the order before resuming. Any
+enforced budget may be `null`, meaning no limit, which the breach check, the
+scheduler and the `budgets` check all treat as unbounded. In Settings, no limit
+is written as `0`.
+
 `agreeOrder` is the only thing that may set an order to `agreed`, which is what
 makes the checks a gate rather than a suggestion. It also writes down the
 derived lane ordering, so the Line reads the plan that was agreed rather than

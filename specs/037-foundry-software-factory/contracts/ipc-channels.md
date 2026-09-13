@@ -226,11 +226,13 @@ Ordered by `rank` descending. The summary is what the surface shows when `gates`
 
 ## `foundry:inbox.decide`
 
-**Payload**: `{ gateId: string; option: string; note?: string }`
+**Payload**: `{ gateId: string; option: string; note?: string; limit?: number | null }`
 
 **Response**: `{ ok: true } | { error: string }`
 
 Writes a ledger entry before acting. A gate already decided returns an error rather than deciding twice.
+
+`raise` on a `budget.exceeded` gate that carries its `breach` needs `limit`: the new limit for the budget it stopped at, or `null` for no limit. A limit the run is already past is refused and nothing is decided. The limit is written to the order, and recorded as `budget.raised`, before the run resumes (ADR 052).
 
 ---
 
@@ -342,9 +344,9 @@ Registered via `api.settings.register`; not channels, but part of the surface. *
 | `terminator.foundry.dataDir`                  | string                                       | `""` — empty means `<workdir>/.foundry/` (FR-074)                                     |
 | `terminator.foundry.autoOpenDraftPr`          | boolean                                      | `true` (FR-053)                                                                       |
 | `terminator.foundry.autonomy`                 | `escorted` \| `standard` \| `lights-out`     | `standard`                                                                            |
-| `terminator.foundry.budgets.agents`           | number                                       | `3` — seeded onto every new order (FR-030)                                            |
-| `terminator.foundry.budgets.wallClockMinutes` | number                                       | `45` — seeded onto every new order                                                    |
-| `terminator.foundry.budgets.filesTouched`     | number                                       | `25` — seeded onto every new order                                                    |
+| `terminator.foundry.budgets.agents`           | number — `0` is no limit                     | `3` — seeded onto every new order (FR-030)                                            |
+| `terminator.foundry.budgets.wallClockMinutes` | number — `0` is no limit                     | `45` — seeded onto every new order                                                    |
+| `terminator.foundry.budgets.filesTouched`     | number — `0` is no limit                     | `25` — seeded onto every new order                                                    |
 | `terminator.foundry.writeBack.summaryComment` | boolean                                      | `true` (FR-062)                                                                       |
 | `terminator.foundry.writeBack.status`         | boolean                                      | `true` (FR-062)                                                                       |
 | `terminator.foundry.writeBack.prLink`         | boolean                                      | `true` (FR-062)                                                                       |
@@ -407,13 +409,14 @@ Thirty channels serve the Floor: the live runs, their permissions, their transcr
 
 ### The order, beyond compiling it
 
-| Channel                   | Payload                            | Response                                                           |
-| ------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
-| `foundry:order.list`      | `{}`                               | Every order, for the board                                         |
-| `foundry:order.converge`  | `{ id: string }`                   | Runs the architect read-only and reads back its proposal (ADR-043) |
-| `foundry:order.states`    | `{ id: string }`                   | The tracker's workflow positions, for the intent mapping (FR-060)  |
-| `foundry:order.mapState`  | `{ id: string; intent; optionId }` | `{ ok, mapping }`                                                  |
-| `foundry:order.writeBack` | `{ id: string; events: string[] }` | Which write-backs this order will make (FR-062)                    |
+| Channel                   | Payload                                                               | Response                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `foundry:order.list`      | `{}`                                                                  | Every order, for the board                                                                                                                                      |
+| `foundry:order.converge`  | `{ id: string }`                                                      | Runs the architect read-only and reads back its proposal (ADR-043)                                                                                              |
+| `foundry:order.states`    | `{ id: string }`                                                      | The tracker's workflow positions, for the intent mapping (FR-060)                                                                                               |
+| `foundry:order.mapState`  | `{ id: string; intent; optionId }`                                    | `{ ok, mapping }`                                                                                                                                               |
+| `foundry:order.writeBack` | `{ id: string; events: string[] }`                                    | Which write-backs this order will make (FR-062)                                                                                                                 |
+| `foundry:order.budgets`   | `{ id: string; budgets: { agents; wallClockMinutes; filesTouched } }` | The order and its checks. Each limit is a whole number ≥ 1 or `null` for no limit. Drafts only: a running order's budget is raised at its budget gate (ADR 052) |
 
 ### The model
 

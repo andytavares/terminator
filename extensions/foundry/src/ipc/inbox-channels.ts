@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { decide, applyDefault, isOverdue } from '../gates/rules.js'
+import { raisedLimitProblem, withLimit } from '../line/scheduler.js'
 import { rankInbox, summariseInbox } from '../gates/rank.js'
 import { isLive, silencedRules } from '../gates/autonomy.js'
 import type { Autonomy } from '../gates/autonomy.js'
@@ -17,6 +18,8 @@ const DecidePayload = z.object({
   gateId: z.string(),
   option: z.string(),
   note: z.string().optional(),
+  /** The new limit when raising a budget. Null is no limit. */
+  limit: z.number().int().min(1).nullable().optional(),
 })
 
 export interface InboxDeps {
@@ -111,6 +114,18 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
       return { error: `Gate ${gate.id} was already decided (${gate.decision.option}).` }
     }
 
+    // A gate without a breach predates it being recorded; resuming raises a
+    // fresh one that has it.
+    const breach = parsed.data.option === 'raise' ? (gate.breach ?? null) : null
+    const order = breach === null ? null : await deps.orders.load(gate.orderId)
+    if (breach !== null) {
+      const { limit } = parsed.data
+      if (limit === undefined) return { error: 'Say what the new limit is, or choose no limit.' }
+      const problem = raisedLimitProblem(breach, limit)
+      if (problem !== null) return { error: problem }
+      if (order === null) return { error: `No order ${gate.orderId}.` }
+    }
+
     let decided
     try {
       decided = decide(gate, parsed.data.option, parsed.data.note ?? '', deps.now())
@@ -127,6 +142,17 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
       `${gate.rule} -> ${parsed.data.option}${parsed.data.note === undefined ? '' : `: ${parsed.data.note}`}`
     )
     await deps.gates.save(decided)
+
+    if (breach !== null && order !== null && parsed.data.limit !== undefined) {
+      const { limit } = parsed.data
+      await deps.orders.save({ ...order, budgets: withLimit(order.budgets, breach.kind, limit) })
+      await deps.record(
+        gate.orderId,
+        'budget.raised',
+        breach.kind,
+        `${breach.limit} -> ${limit === null ? 'no limit' : limit}`
+      )
+    }
 
     try {
       await deps.act?.(decided, parsed.data.option)
