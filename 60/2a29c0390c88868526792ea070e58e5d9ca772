@@ -1,0 +1,23 @@
+docs/adr/051-the-forge-is-walked-in-steps.md
+  s_368c38f44c9040::t_8437c89843d204 1-68
+docs/ARCHITECTURE.md
+  s_368c38f44c9040::t_ceff8b7d1110a4 1138
+docs/user-guide/USER-GUIDE.md
+  s_368c38f44c9040::t_31b785243651bb 564-629,646-661
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "602a29c0390c88868526792ea070e58e5d9ca772",
+  "prompts": {},
+  "sessions": {
+    "s_368c38f44c9040": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f42c333d-df2d-45d3-920a-71af6a21b8ba",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
