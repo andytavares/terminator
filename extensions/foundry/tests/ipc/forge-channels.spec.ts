@@ -1078,6 +1078,98 @@ describe('turning a write-back off for one order (FR-062)', () => {
   })
 })
 
+// The configured budgets were a default the operator could not see or change
+// on any one order, and the architect could replace them. They are set here.
+describe('setting one order’s budgets', () => {
+  async function seed(): Promise<OrderView> {
+    return (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+  }
+
+  it('keeps what the operator chose, including no limit, and leaves tokens alone', async () => {
+    const { order } = await seed()
+    const r = (await channels().setBudgets({
+      id: order.id,
+      budgets: { agents: 1, wallClockMinutes: null, filesTouched: 60 },
+    })) as OrderView
+    const expected = { agents: 1, wallClockMinutes: null, filesTouched: 60, tokens: null }
+    expect(r.order.budgets).toEqual(expected)
+    expect((await store.load(order.id))?.budgets).toEqual(expected)
+  })
+
+  it('re-runs the checks, so a budget that now fits the plan clears its check', async () => {
+    const { order } = await seed()
+    await store.save({
+      ...order,
+      budgets: { ...order.budgets, filesTouched: 1 },
+      plan: {
+        ...order.plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'u',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: [],
+            touches: ['a', 'b', 'c'],
+            verify: [],
+          },
+        ],
+      },
+    })
+    const r = (await channels().setBudgets({
+      id: order.id,
+      budgets: { agents: 3, wallClockMinutes: 45, filesTouched: null },
+    })) as OrderView
+    expect(r.compile.failures.map((f) => f.check)).not.toContain('budgets')
+  })
+
+  it('records the choice in words', async () => {
+    const { order } = await seed()
+    await channels().setBudgets({
+      id: order.id,
+      budgets: { agents: 2, wallClockMinutes: 30, filesTouched: null },
+    })
+    const ledger = fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')
+    expect(ledger).toContain('budgets.configured')
+    expect(ledger).toContain('2 agents · 30 minutes · files unlimited')
+  })
+
+  it('refuses a limit of zero', async () => {
+    const { order } = await seed()
+    expect(
+      await channels().setBudgets({
+        id: order.id,
+        budgets: { agents: 0, wallClockMinutes: 45, filesTouched: 25 },
+      })
+    ).toEqual({ error: 'Malformed request.' })
+  })
+
+  // A running order's budgets change at its budget gate, where the run is
+  // resumed against them; changed here, nothing would read them until then.
+  it('refuses an order that is no longer a draft', async () => {
+    const { order } = await seed()
+    await store.save({ ...order, status: 'running' })
+    const r = (await channels().setBudgets({
+      id: order.id,
+      budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25 },
+    })) as { error: string }
+    expect(r.error).toContain('running')
+  })
+
+  it('reports an order it cannot find', async () => {
+    expect(
+      await channels().setBudgets({
+        id: 'WO-nope',
+        budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25 },
+      })
+    ).toEqual({ error: 'No order WO-nope.' })
+  })
+})
+
 // A setting that reaches nothing is a control the operator can move while the
 // factory ignores it. Both of these were registered and read by nobody: every
 // order got 3 agents / 45 minutes / 25 files regardless, and a critical path
@@ -1097,6 +1189,17 @@ describe('what configuration a new order starts with', () => {
       budgetDefaults: () => ({ agents: 1, wallClockMinutes: 10, filesTouched: 4 }),
     })
     expect(r.order.budgets).toMatchObject({ agents: 1, wallClockMinutes: 10, filesTouched: 4 })
+  })
+
+  it('takes a configured budget of no limit', async () => {
+    const r = await seeded({
+      budgetDefaults: () => ({ agents: null, wallClockMinutes: 10, filesTouched: null }),
+    })
+    expect(r.order.budgets).toMatchObject({
+      agents: null,
+      wallClockMinutes: 10,
+      filesTouched: null,
+    })
   })
 
   it('falls back to the schema defaults when nothing is configured', async () => {

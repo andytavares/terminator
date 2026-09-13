@@ -100,6 +100,47 @@ describe('a row the operator can act on', () => {
   })
 })
 
+describe('raising a budget from the inbox', () => {
+  const budgetGate = () =>
+    gate({
+      rule: 'budget.exceeded',
+      summary: 'x has gone past its wall clock budget',
+      why: 'The order budgets 45 and this run is at 46.',
+      breach: { kind: 'wall_clock', limit: 45, actual: 45.6 },
+    })
+
+  it('asks for the new limit, then sends it with the decision', async () => {
+    mount({ gates: [budgetGate()] })
+    await waitFor(() => screen.getByText('budget.exceeded'))
+    fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
+    expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
+    expect(screen.getByText('At least 46.')).toBeTruthy()
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
+      target: { value: '90' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: 'G-1',
+        option: 'raise',
+        limit: 90,
+      })
+    )
+  })
+
+  it('decides straight away for a gate that never recorded its budget', async () => {
+    mount({ gates: [gate({ rule: 'budget.exceeded' })] })
+    await waitFor(() => screen.getByText('budget.exceeded'))
+    fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: 'G-1',
+        option: 'raise',
+      })
+    )
+  })
+})
+
 describe('nothing needs you', () => {
   it('says so', async () => {
     mount()

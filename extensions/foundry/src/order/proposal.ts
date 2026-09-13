@@ -38,6 +38,8 @@ export const ProposalSchema = z
     findings: FindingsSchema.optional(),
     acceptance: orderShape.acceptance.optional(),
     risk: orderShape.risk.optional(),
+    // Read and never applied. Refusing it would throw away the whole turn over
+    // a field an architect that saw budgets in a rendered order may still write.
     budgets: orderShape.budgets.optional(),
     plan: orderShape.plan.optional(),
     assumptions: orderShape.assumptions.optional(),
@@ -82,9 +84,10 @@ export function parseProposal(value: unknown): Proposal {
  * replacement, so an operator's struck assumption is not undone by the next
  * redraft.
  *
- * `status`, `id`, `source`, `provenance` and `redTeam` are not reachable from
- * here at all. The first two would let an agent agree its own work, and
- * `redTeam` is written by a reader who is not allowed to fix what it finds.
+ * `status`, `id`, `source`, `provenance`, `redTeam` and `budgets` are not
+ * reachable from here at all. The first two would let an agent agree its own
+ * work, `redTeam` is written by a reader who is not allowed to fix what it
+ * finds, and budgets are the operator's limit on the agent.
  * Of `context`, only the findings half is reachable — see `FindingsSchema`.
  */
 export function applyProposal(order: WorkOrder, proposal: Proposal, at: string): WorkOrder {
@@ -102,7 +105,6 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
     },
     acceptance: proposal.acceptance ?? order.acceptance,
     risk: proposal.risk ?? order.risk,
-    budgets: proposal.budgets ?? order.budgets,
     plan: proposal.plan ?? order.plan,
     // An operator's struck assumption stays struck: the proposal's version of
     // one already on the order does not resurrect it.

@@ -187,6 +187,14 @@ describe('renderOrder', () => {
     expect(renderOrder(order())).toContain('tokens uncapped')
   })
 
+  it('says a budget has no limit rather than printing null', () => {
+    const out = renderOrder(
+      order({ budgets: { agents: null, wallClockMinutes: 30, filesTouched: null, tokens: null } })
+    )
+    expect(out).toContain('agents unlimited · 30 minutes · files unlimited')
+    expect(out).not.toContain('null')
+  })
+
   it('renders an empty draft without throwing', () => {
     const empty = draftOrder({
       id: 'WO-1',

@@ -1,6 +1,6 @@
 import { coverageMatrix } from './coverage-matrix.js'
 import { compileOrder } from './compile.js'
-import type { WorkOrder } from './schema.js'
+import type { Budgets, WorkOrder } from './schema.js'
 
 // The order, rendered for a person.
 //
@@ -28,6 +28,17 @@ function verifyLine(order: WorkOrder, criterionId: string): string {
     case 'screenshot':
       return `screenshot · ${v.target}`
   }
+}
+
+/** The three enforced budgets, e.g. "3 agents · 45 minutes · files unlimited". */
+export function budgetsInWords(budgets: Budgets): string {
+  const limit = (value: number | null, unit: string): string =>
+    value === null ? `${unit} unlimited` : `${value} ${unit}`
+  return [
+    limit(budgets.agents, 'agents'),
+    limit(budgets.wallClockMinutes, 'minutes'),
+    limit(budgets.filesTouched, 'files'),
+  ].join(' · ')
 }
 
 function coverageTable(order: WorkOrder): string[] {
@@ -120,10 +131,7 @@ export function renderOrder(order: WorkOrder): string {
   }
 
   lines.push('## Budgets', '')
-  lines.push(
-    `${order.budgets.agents} agents · ${order.budgets.wallClockMinutes} minutes · ${order.budgets.filesTouched} files · tokens ${order.budgets.tokens ?? 'uncapped'}`,
-    ''
-  )
+  lines.push(`${budgetsInWords(order.budgets)} · tokens ${order.budgets.tokens ?? 'uncapped'}`, '')
 
   lines.push('## Convergence', '')
   if (result.ok) {

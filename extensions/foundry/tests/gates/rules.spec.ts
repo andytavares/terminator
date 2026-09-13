@@ -69,6 +69,12 @@ describe('raiseGate', () => {
   it('starts undecided', () => {
     expect(gate().decision).toBeNull()
   })
+
+  it('carries the budget it stopped at, so raising it can name the new limit', () => {
+    const breach = { kind: 'files_touched' as const, limit: 10, actual: 47 }
+    expect(gate({ rule: 'budget.exceeded', breach }).breach).toEqual(breach)
+    expect(gate().breach).toBeNull()
+  })
 })
 
 describe('decide', () => {

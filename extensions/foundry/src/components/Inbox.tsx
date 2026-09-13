@@ -10,6 +10,7 @@ import {
   Unplug,
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
+import { RaiseBudgetForm } from './BudgetForm.js'
 
 // The one surface the operator is required to visit.
 //
@@ -106,16 +107,19 @@ export function Inbox(): JSX.Element {
     void refresh()
   }, [refresh])
 
+  const [raising, setRaising] = useState<string | null>(null)
   const answer = useCallback(
-    async (gateId: string, option: string) => {
+    async (gateId: string, option: string, limit?: number | null) => {
       setBusy(gateId)
       setProblem(null)
+      setRaising(null)
       try {
         // Said out loud. This is the control the whole autonomy dial exists to
         // reach: a decision the handler refused — already answered, gate gone,
         // a rule that threw — used to look exactly like one it took, because
         // the reply was thrown away and the list simply redrew.
-        const result = (await invoke('foundry:inbox.decide', { gateId, option })) as {
+        const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
+        const result = (await invoke('foundry:inbox.decide', payload)) as {
           error?: string
         }
         if (result.error !== undefined) setProblem(result.error)
@@ -183,21 +187,35 @@ export function Inbox(): JSX.Element {
                       {gate.deadline === null ? ' (waits)' : ''}
                     </span>
                   </div>
-                </div>
-                <div className="fdry-gate-actions">
-                  {gate.options.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      title={option.consequence}
+                  {raising === gate.id && gate.breach ? (
+                    <RaiseBudgetForm
+                      breach={gate.breach}
                       disabled={busy === gate.id}
-                      className={option.id === gate.defaultIfIgnored ? '' : 'is-primary'}
-                      onClick={() => void answer(gate.id, option.id)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                      onRaise={(limit) => void answer(gate.id, 'raise', limit)}
+                      onCancel={() => setRaising(null)}
+                    />
+                  ) : null}
                 </div>
+                {raising === gate.id ? null : (
+                  <div className="fdry-gate-actions">
+                    {gate.options.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        title={option.consequence}
+                        disabled={busy === gate.id}
+                        className={option.id === gate.defaultIfIgnored ? '' : 'is-primary'}
+                        onClick={() =>
+                          option.id === 'raise' && gate.breach
+                            ? setRaising(gate.id)
+                            : void answer(gate.id, option.id)
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </li>
             )
           })}

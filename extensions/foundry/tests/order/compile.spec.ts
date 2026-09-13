@@ -330,6 +330,14 @@ describe('compileOrder', () => {
       expect(failures(order)).not.toContain('budgets')
     })
 
+    it('passes any plan when files touched has no limit', () => {
+      const order = complete()
+      order.risk.blastRadius = ['src/']
+      order.plan.units[0].touches = Array.from({ length: 41 }, (_, i) => `src/f${i}.css`)
+      order.budgets = { ...order.budgets, filesTouched: null }
+      expect(failures(order)).not.toContain('budgets')
+    })
+
     it('says how much room the plan is short of, so the number is not a guess', () => {
       const order = complete()
       order.risk.blastRadius = ['src/']

@@ -675,3 +675,119 @@ test('an open order is a frame, and the controls that end it never scroll away',
     await handle.page.waitForTimeout(400)
   }
 })
+
+/** Types into a React-controlled input inside the view, found by its accessible name. */
+function fillByName(name: string, value: string): Promise<boolean> {
+  return inFoundry<boolean>(`(function () {
+    var input = document.querySelector(${JSON.stringify(`input[aria-label="${name}"]`)})
+    if (!input) return false
+    var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    setter.call(input, ${JSON.stringify(value)})
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+}
+
+async function budgetsOf(id: string): Promise<Record<string, number | null>> {
+  const view = (await foundry('foundry:order.compile', { id })) as {
+    order: { budgets: Record<string, number | null> }
+  }
+  return view.order.budgets
+}
+
+// The operator could not see or change an order's budgets, and "Raise the
+// budget" resumed the run against the budget it had just gone past. Both are
+// read back from the order the running application saved, not from the call.
+test('an order’s budgets are set on the Plan step, and raised at the gate that stopped it', async () => {
+  const created = (await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'budgets are the operator’s to set' },
+    repoPaths: [repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id as string
+  expect(id, 'no order was created').toBeTruthy()
+
+  await openFoundry()
+  expect(await clickByName('button', 'Forge')).toBe(true)
+  await handle.page.waitForTimeout(800)
+  // The Forge stays on whichever order an earlier test left open.
+  await clickByName('button', 'All orders')
+  await handle.page.waitForTimeout(600)
+  const opened = await inFoundry<boolean>(`(function () {
+    var all = document.querySelectorAll('button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
+        all[i].click()
+        return true
+      }
+    }
+    return false
+  })()`)
+  expect(opened, `no row for ${id} in the Forge`).toBe(true)
+  await handle.page.waitForTimeout(1200)
+
+  const plan = await inFoundry<boolean>(`(function () {
+    var all = document.querySelectorAll('nav[aria-label="Steps"] button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').indexOf('Plan') !== -1) { all[i].click(); return true }
+    }
+    return false
+  })()`)
+  expect(plan, 'no Plan step').toBe(true)
+  await handle.page.waitForTimeout(600)
+
+  expect(await fillByName('Files touched', '60'), 'no files-touched field').toBe(true)
+  expect(
+    await inFoundry<boolean>(`(function () {
+      var box = document.querySelector('input[aria-label="No limit on minutes"]')
+      if (!box) return false
+      box.click()
+      return true
+    })()`)
+  ).toBe(true)
+  await handle.page.waitForTimeout(200)
+  expect(await clickByName('button', 'Save budgets')).toBe(true)
+  await expect
+    .poll(() => budgetsOf(id), { timeout: 10_000 })
+    .toMatchObject({
+      filesTouched: 60,
+      wallClockMinutes: null,
+    })
+
+  // A gate the Line raised when the run went past 60 files.
+  const gate = {
+    id: `${id}-budget.exceeded-1`,
+    rule: 'budget.exceeded',
+    orderId: id,
+    nodeId: null,
+    summary: 'budgets are the operator’s to set has gone past its files touched budget',
+    why: 'The order budgets 60 and this run is at 75.',
+    evidence: [],
+    options: [
+      { id: 'raise', label: 'Raise the budget', consequence: 'Work continues with more room.' },
+      { id: 'stop', label: 'Stop here', consequence: 'The order is cancelled and reconciled.' },
+      { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
+    ],
+    defaultIfIgnored: 'hold',
+    deadline: null,
+    blockedUnits: 1,
+    riskGrade: 'P3',
+    raisedAt: new Date().toISOString(),
+    decision: null,
+    breach: { kind: 'files_touched', limit: 60, actual: 75 },
+  }
+  writeFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), JSON.stringify([gate]))
+
+  expect(await clickByName('button', 'Inbox')).toBe(true)
+  await expect.poll(bodyText, { timeout: 10_000 }).toContain(gate.summary)
+  expect(await clickByName('button', 'Raise the budget')).toBe(true)
+  await handle.page.waitForTimeout(400)
+  expect(await bodyText()).toContain('At least 75.')
+
+  expect(await fillByName('Files touched', '100')).toBe(true)
+  expect(await clickByName('button', 'Raise and resume')).toBe(true)
+  await expect.poll(async () => (await budgetsOf(id)).filesTouched, { timeout: 10_000 }).toBe(100)
+  const decided = JSON.parse(
+    readFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), 'utf8')
+  ) as { decision: { option: string } | null }[]
+  expect(decided[0].decision?.option).toBe('raise')
+})

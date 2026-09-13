@@ -11,6 +11,8 @@ import {
   blockedReason,
   inFlight,
   budgetBreach,
+  withLimit,
+  raisedLimitProblem,
   MAX_ATTEMPTS,
 } from '../../src/line/scheduler.js'
 import { buildRunGraph, nodeById, withNode } from '../../src/line/run-graph.js'
@@ -271,5 +273,62 @@ describe('budgetBreach', () => {
 
   it('does not fire exactly at the limit — the budget is what is allowed', () => {
     expect(budgetBreach(BUDGETS, { elapsedMinutes: 45, filesTouched: 25, agents: 2 })).toBeNull()
+  })
+
+  it('never fires on a budget with no limit', () => {
+    const open: Budgets = { agents: null, wallClockMinutes: null, filesTouched: null, tokens: null }
+    expect(
+      budgetBreach(open, { elapsedMinutes: 10_000, filesTouched: 10_000, agents: 99 })
+    ).toBeNull()
+  })
+
+  it('still fires on the budgets that kept a limit', () => {
+    const filesOnly: Budgets = { ...BUDGETS, wallClockMinutes: null }
+    expect(
+      budgetBreach(filesOnly, { elapsedMinutes: 10_000, filesTouched: 99, agents: 1 })?.kind
+    ).toBe('files_touched')
+  })
+})
+
+describe('an agent budget with no limit', () => {
+  it('offers everything that is ready at once', () => {
+    const g = graph([unit('U-1'), unit('U-2'), unit('U-3')])
+    expect(readyNodes(g, { ...BUDGETS, agents: null }).map((n) => n.id)).toEqual([
+      'build:U-1',
+      'build:U-2',
+      'build:U-3',
+    ])
+  })
+})
+
+describe('withLimit', () => {
+  it('sets the budget the breach named and leaves the others', () => {
+    expect(withLimit(BUDGETS, 'files_touched', 60)).toEqual({ ...BUDGETS, filesTouched: 60 })
+    expect(withLimit(BUDGETS, 'wall_clock', 90)).toEqual({ ...BUDGETS, wallClockMinutes: 90 })
+    expect(withLimit(BUDGETS, 'agents', null)).toEqual({ ...BUDGETS, agents: null })
+  })
+})
+
+describe('raisedLimitProblem', () => {
+  const breach = { kind: 'files_touched' as const, limit: 10, actual: 47 }
+
+  it('takes a limit the run is inside, which the breach allows up to and including', () => {
+    expect(raisedLimitProblem(breach, 47)).toBeNull()
+    expect(raisedLimitProblem(breach, 60)).toBeNull()
+  })
+
+  it('takes no limit', () => {
+    expect(raisedLimitProblem(breach, null)).toBeNull()
+  })
+
+  it('refuses a limit the run is already past, since it would stop again at once', () => {
+    expect(raisedLimitProblem(breach, 46)).toContain('47')
+    expect(raisedLimitProblem(breach, 10)).toContain('47')
+  })
+
+  it('compares against the unrounded time, as the breach does', () => {
+    const late = { kind: 'wall_clock' as const, limit: 45, actual: 45.4 }
+    expect(raisedLimitProblem(late, 45)).not.toBeNull()
+    expect(raisedLimitProblem(late, 46)).toBeNull()
   })
 })

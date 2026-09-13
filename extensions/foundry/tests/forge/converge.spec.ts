@@ -127,6 +127,15 @@ describe('what the architect is told', () => {
     }
   })
 
+  // The contract showed a budget of 12 files as an example, the architect
+  // wrote a budget of 10, and a run was halted at a limit the operator had
+  // configured as 25. Budgets are the operator's now; the architect fits them.
+  it('does not offer budgets, and says the plan has to fit the ones it has', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).not.toContain('"budgets"')
+    expect(plan.prompt).toContain('Budgets are the operator’s')
+  })
+
   // The other half of the same failure: the plan that came back had seven
   // units in one lane, which cost seven cold sessions for work that was serial
   // in one checkout.

@@ -9,8 +9,9 @@ import type { OrderStore } from '../order/store.js'
 import { readStanding } from '../order/standing.js'
 import { intakeRefusal, lastIntake } from '../forge/intake-outcome.js'
 import type { StandingSources } from '../order/standing.js'
-import { TransitionIntentSchema, WriteBackSchema } from '../order/schema.js'
-import type { TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
+import { TransitionIntentSchema, WorkOrderSchema, WriteBackSchema } from '../order/schema.js'
+import type { Budgets, TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
+import { budgetsInWords } from '../order/render.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
 
 /** What one turn of intake produced, or why it produced nothing. */
@@ -92,6 +93,13 @@ const MapStatePayload = z.object({
 
 const StatesPayload = z.object({ id: z.string() })
 
+const BudgetsPayload = z.object({
+  id: z.string(),
+  budgets: WorkOrderSchema.shape.budgets
+    .pick({ agents: true, wallClockMinutes: true, filesTouched: true })
+    .strict(),
+})
+
 export interface ForgeDeps {
   readonly store: OrderStore
   readonly now: () => string
@@ -117,12 +125,12 @@ export interface ForgeDeps {
   /**
    * The budgets a new order starts with (FR-030), from configuration.
    *
-   * A default, not a ceiling: the architect may propose different ones and the
-   * operator may change them. Absent, the schema's own defaults stand — which
-   * is what happened for every order before this was wired, and is why an
-   * operator who set the agent limit to 1 still got three.
+   * A default, not a ceiling: the operator may change them per order, and the
+   * architect may not. Absent, the schema's own defaults stand — which is what
+   * happened for every order before this was wired, and is why an operator who
+   * set the agent limit to 1 still got three.
    */
-  readonly budgetDefaults?: () => { agents: number; wallClockMinutes: number; filesTouched: number }
+  readonly budgetDefaults?: () => Omit<Budgets, 'tokens'>
   /**
    * The paths the operator declared critical (FR-043). Workspace-scoped and
    * operator-declared: Foundry never infers this list, and an order that
@@ -170,6 +178,8 @@ export interface ForgeChannels {
   mapState(payload: unknown): Promise<unknown>
   /** Turn each write-back on or off for this order (FR-062). */
   setWriteBack(payload: unknown): Promise<unknown>
+  /** Set a draft order's budgets. Null is no limit. */
+  setBudgets(payload: unknown): Promise<unknown>
   /** Discard an order that should not have been made. */
   cancel(payload: unknown): Promise<unknown>
 }
@@ -629,5 +639,42 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     return view(next, ['writeBack'])
   }
 
-  return { create, turn, compile, list, states, mapState, converge, setWriteBack, cancel }
+  async function setBudgets(raw: unknown): Promise<unknown> {
+    const parsed = BudgetsPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const order = await deps.store.load(parsed.data.id)
+    if (order === null) return { error: `No order ${parsed.data.id}.` }
+    if (order.status !== 'draft') {
+      return {
+        error: `${order.id} is ${order.status}. A running order's budget is raised at its budget gate.`,
+      }
+    }
+
+    const next: WorkOrder = { ...order, budgets: { ...order.budgets, ...parsed.data.budgets } }
+    await deps.store.save(next)
+    await deps.store.record({
+      at: deps.now(),
+      orderId: order.id,
+      actor: 'operator',
+      action: 'budgets.configured',
+      subject: order.id,
+      reason: budgetsInWords(next.budgets),
+      evidence: [],
+    })
+    return view(next)
+  }
+
+  return {
+    create,
+    turn,
+    compile,
+    list,
+    states,
+    mapState,
+    converge,
+    setWriteBack,
+    setBudgets,
+    cancel,
+  }
 }
