@@ -63,6 +63,17 @@ function idMatchesFile(id: string, file: string): boolean {
 export const STEP_KINDS = ['agent', 'run', 'judge', 'gate', 'fanout', 'join'] as const
 export type StepKind = (typeof STEP_KINDS)[number]
 
+/**
+ * How hard an agent works, as `claude --effort` takes it.
+ *
+ * A property of the shape of the work, so it lives on the recipe and every
+ * agent step inherits it; a step may say otherwise for itself. Nothing here
+ * chooses a default: a recipe that declares none launches at whatever the
+ * operator's own runtime configuration says.
+ */
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+export type EffortLevel = (typeof EFFORT_LEVELS)[number]
+
 const StepSchema = z
   .object({
     id: z.string().min(1),
@@ -82,6 +93,7 @@ const StepSchema = z
     expect: z.record(z.string(), z.unknown()).optional(),
     context: z.enum(['fresh', 'resume']).optional(),
     evidence: z.array(z.string()).optional(),
+    effort: z.enum(EFFORT_LEVELS).optional(),
   })
   .superRefine((step, ctx) => {
     const need = (field: string): void => {
@@ -113,6 +125,7 @@ const RecipeSchema = z.object({
   id: z.string().min(1),
   description: z.string().default(''),
   requires: z.array(RequirementSchema).default([]),
+  effort: z.enum(EFFORT_LEVELS).optional(),
   steps: z.array(StepSchema).min(1),
 })
 

@@ -342,3 +342,26 @@ describe('what the architect may read', () => {
     expect(parsed.ok && parsed.value.reads).toContain('order')
   })
 })
+
+// Every shipped shape says how hard its agents work. The ladder is the one
+// the kit's intake uses: a one-lane P3 change at `high`, anything that spans
+// modules, roots a cause, or characterises behaviour before changing it at
+// `xhigh`. A shape with no effort would run at whatever the runtime defaults
+// to, which is the state every order was in before this.
+describe('the effort each built-in shape asks for', () => {
+  it.each(recipeFiles)('%s declares one', (file) => {
+    expect(recipe(file).effort).toBeDefined()
+  })
+
+  it.each([
+    ['quick.yaml', 'high'],
+    ['direct.yaml', 'xhigh'],
+    ['standard.yaml', 'xhigh'],
+    ['bugfix.yaml', 'xhigh'],
+    ['refactor.yaml', 'xhigh'],
+    ['speckit.yaml', 'xhigh'],
+    ['spike.yaml', 'high'],
+  ])('%s runs at %s', (file, effort) => {
+    expect(recipe(file).effort).toBe(effort)
+  })
+})

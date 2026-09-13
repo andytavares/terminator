@@ -1,6 +1,9 @@
 schemaVersion: 1
 id: refactor
 description: Change the shape, prove the behaviour did not change.
+# Proving behaviour unchanged across a shape change is cross-cutting by
+# definition.
+effort: xhigh
 requires:
   - toolchain: test
 steps:

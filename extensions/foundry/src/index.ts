@@ -30,7 +30,7 @@ import { interruptedRuns, interruptedGate } from './line/adopt.js'
 import { createRoleRegistry } from './line/roles.js'
 import type { RunOutcome, StartedRun } from './line/executor.js'
 import type { RunGraph, RunNode } from './line/run-graph.js'
-import type { Recipe } from './recipe/parse.js'
+import type { EffortLevel, Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
 import { collectableWrites, readRungOutput } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
@@ -1040,6 +1040,8 @@ async function executeRun(
     resumeSessionId: string | undefined
     readOnly: boolean
     modelTier: 'fast' | 'deep'
+    /** The step's effort, resolved by the executor; null passes no flag. */
+    effort: EffortLevel | null
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
     /** The one file this rung may write, or null when it has no artefact. */
@@ -1090,6 +1092,7 @@ async function executeRun(
           phase: (input.role ?? input.node.id) as never,
           resumeSessionId: input.resumeSessionId,
           model: modelForTier(api, input.modelTier),
+          effort: input.effort ?? undefined,
           // The read-only decision is taken by the same policy the hook
           // applies, so a verifier that decides to fix what it found is
           // refused rather than reminded.
@@ -1334,8 +1337,10 @@ async function executeRun(
         role: null,
         // A rung is a command, not a conversation. It runs on whatever the
         // operator chose, like any node with no role of its own, and answers
-        // to no role's tool list.
+        // to no role's tool list. No effort either: a shell command has no
+        // reasoning to size.
         modelTier: 'deep',
+        effort: null,
         mayUseTool: () => true,
         prompt: `Run this exactly, and report its exit status. Do not fix what it reports.\n\n\`\`\`\n${step.command}\n\`\`\``,
         // In the ladder's own conversation, not the lane's. Eight rungs would

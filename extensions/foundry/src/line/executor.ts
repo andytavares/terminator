@@ -17,7 +17,7 @@ import { brief } from './brief.js'
 import { collectableWrites, rungOutputPath } from './rung-output.js'
 import { orderDir } from '../data-root.js'
 import type { ResolveSources } from '../recipe/resolve.js'
-import type { Recipe, Rule } from '../recipe/parse.js'
+import type { EffortLevel, Recipe, Rule } from '../recipe/parse.js'
 import type { Budgets, RiskAssessment, WorkOrder } from '../order/schema.js'
 import { verdictFromExit, summarise } from '../verify/verdict.js'
 import type { Verdict } from '../verify/verdict.js'
@@ -96,6 +96,12 @@ export interface ExecutorDeps {
      * 'deep' for a node with no role, so the operator's choice stands.
      */
     modelTier: 'fast' | 'deep'
+    /**
+     * How hard this node's agent works: the step's own effort, else the
+     * recipe's, else null. Null for a fast-tier role always, because the fast
+     * model takes none — and null means "pass no flag", never a default.
+     */
+    effort: EffortLevel | null
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
     /**
@@ -627,6 +633,7 @@ export async function execute(
           if (roleId !== null) roles.assertResumable(roleId, resumeSessionId)
           const readOnly = roleId !== null && !roles.mayWrite(roleId)
           const outputPath = outputFor(node, roleId)
+          const tier = (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep'
 
           const result = await deps.run({
             node,
@@ -634,7 +641,9 @@ export async function execute(
             prompt: promptFor(briefed, recipe, node, roles, rules, outputPath),
             resumeSessionId,
             readOnly,
-            modelTier: (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep',
+            modelTier: tier,
+            effort:
+              tier === 'fast' ? null : (stepFor(recipe, node)?.effort ?? recipe.effort ?? null),
             mayUseTool: (tool) => roleId === null || roles.mayUseTool(roleId, tool),
             outputPath,
             // Reported as it happens rather than waited for: this is what puts
