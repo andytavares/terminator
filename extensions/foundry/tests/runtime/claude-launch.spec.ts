@@ -288,3 +288,18 @@ describe('continuing a conversation that already exists', () => {
     expect(spec.command).not.toContain('--resume')
   })
 })
+
+describe('effort on the command line', () => {
+  it('passes no --effort when none was chosen, so the operator config wins', () => {
+    expect(buildLaunchSpec(options()).command).not.toContain('--effort')
+  })
+
+  it('passes the chosen effort', () => {
+    expect(buildLaunchSpec({ ...options(), effort: 'xhigh' }).command).toContain("--effort 'xhigh'")
+  })
+
+  it('quotes the effort, since it reaches a shell command line', () => {
+    const spec = buildLaunchSpec({ ...options(), effort: "x'; rm -rf /" })
+    expect(spec.command).toContain(`--effort 'x'\\''; rm -rf /'`)
+  })
+})

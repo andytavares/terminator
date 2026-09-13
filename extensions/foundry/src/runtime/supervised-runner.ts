@@ -69,6 +69,8 @@ export interface StartSupervisedRunOptions {
   resumeSessionId?: string
   /** What `--model` gets. Empty or absent leaves the flag off entirely. */
   model?: string
+  /** What `--effort` gets. Absent leaves the flag off entirely. */
+  effort?: string
   /** Decides without asking when the autonomy ladder allows it. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   /** The ladder refused something without asking. Only refusals are reported. */
@@ -334,6 +336,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         cwd: start.worktreePath,
         prompt: start.prompt,
         model: start.model,
+        effort: start.effort,
         settingsDirectory: path.join(stateDir, 'settings'),
         hookScriptPath,
         controlUrl: control.url,

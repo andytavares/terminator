@@ -57,6 +57,8 @@ export interface LaunchSpecOptions {
    * configuration says, which is the right answer when nobody has chosen.
    */
   model?: string
+  /** What `--effort` gets. Absent leaves the flag off, so the operator's configuration wins. */
+  effort?: string
 }
 
 /**
@@ -222,6 +224,9 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
     ...(options.model === undefined || options.model === ''
       ? []
       : ['--model', shellQuote(options.model)]),
+    ...(options.effort === undefined || options.effort === ''
+      ? []
+      : ['--effort', shellQuote(options.effort)]),
     // The ladder still decides first: a PreToolUse hook runs under every
     // permission mode, and its allow/deny is honoured before the mode is
     // consulted at all. What the mode picks up is only what the ladder

@@ -3,6 +3,8 @@ id: speckit
 description: >
   The ten-stage specification pipeline, kept whole. Offered only where the
   repository actually has the toolkit installed.
+# The pipeline plans before it builds; both halves are reasoning-heavy.
+effort: xhigh
 requires:
   # One line replaces the whole plain-prose fallback table: where this is
   # absent the recipe is not offered, rather than silently becoming a

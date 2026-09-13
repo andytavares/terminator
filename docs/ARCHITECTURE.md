@@ -961,6 +961,23 @@ other direction.
   or above P2). A proposal walks the ladder to the first shape this repository
   can run — `quick` needs a `test` command, being the only check it has — while
   an operator's explicit choice is honoured or refused, never quietly swapped.
+- **Effort is a property of the shape** (ADR-050). A recipe declares
+  `effort: low | medium | high | xhigh | max`, every agent step inherits it and
+  a step may override it; the executor hands it to the launch beside the model
+  tier and `buildLaunchSpec` passes it as `--effort`. `quick` and `spike` run
+  at `high`, every other built-in at `xhigh`. A recipe that declares none
+  passes no flag, and a fast-tier role is never passed one — the fast model
+  does not take it.
+- **Three shapes produce a document or a demonstration, not a code change**:
+  `research` (scout, author, fresh verifier), `design-doc` (scout, red team on
+  the order, author, fresh verifier) and `poc` (builders by lane, fresh
+  verifier, scribe). All three still end in a draft pull request — the
+  deliverable has to land somewhere a reviewer looks — and none is proposed by
+  the ladder; an operator picks them in the Forge. The **author** role is the
+  tenth: deep tier, writes `docs` in the checkout, edits nothing else. Two
+  universal rules ship with them, `scope-as-asked` (L3) and `outcome-first`
+  (L0), so every brief carries the scope discipline and the lead-with-the-
+  outcome instruction the model guidance calls for.
 - **Roles** are YAML data too, with a write list. A role with none is run
   read-only, enforced by the `PreToolUse` hook rather than by its prompt.
   `verifier` carries `allowResume: false`, and `assertResumable` refuses to

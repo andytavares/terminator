@@ -29,6 +29,8 @@ description: Reproduce first, then fix, then prove the reproduction flips.
 requires:
   - toolchain: test # not offered where the probe found no test command
 
+effort: xhigh # what every agent step launches with, as `claude --effort` takes it
+
 steps:
   - id: reproduce
     kind: agent
@@ -65,6 +67,10 @@ steps:
 ### The six step kinds
 
 `agent`, `run`, `judge`, `gate`, `fanout`, `join`. There is no conditional kind, no loop kind and no sub-recipe kind, because no built-in recipe needs one (Complexity Tracking). `when` is an attribute of a step, not a kind.
+
+### `effort`
+
+How hard the shape's agents work, `low` | `medium` | `high` | `xhigh` | `max`, passed to the runtime as `--effort`. The recipe sets it once and every agent step inherits it; a step may declare its own to override. A recipe that declares none passes no flag, so the operator's runtime configuration decides. A fast-tier role is never passed one, because the fast model does not take it. Every built-in shape declares one (ADR-050).
 
 ### `requires`
 

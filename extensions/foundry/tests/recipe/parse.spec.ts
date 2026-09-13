@@ -315,3 +315,50 @@ describe('parseRule', () => {
     expect(r.ok && r.value.appliesWhen).toBe('always')
   })
 })
+
+// Effort is how hard the agent works, and it is a property of the shape of
+// the work: a one-lane P3 change and a cross-cutting refactor should not think
+// equally hard. A recipe sets it for every agent step; a step may say
+// otherwise for itself.
+describe('effort on a recipe and on a step', () => {
+  const EFFORT = `
+schemaVersion: 1
+id: direct
+effort: xhigh
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units by lane
+    step: { kind: agent, role: builder }
+  - id: document
+    kind: agent
+    role: scribe
+    effort: medium
+    after: [build]
+`
+
+  it('parses a recipe-level effort', () => {
+    const r = parseRecipe(EFFORT, 'direct.yaml')
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    if (r.ok) expect(r.value.effort).toBe('xhigh')
+  })
+
+  it('parses a step-level effort', () => {
+    const r = parseRecipe(EFFORT, 'direct.yaml')
+    if (r.ok) expect(r.value.steps.find((s) => s.id === 'document')?.effort).toBe('medium')
+  })
+
+  it('leaves effort undefined where nothing declared one', () => {
+    const r = parseRecipe(RECIPE, 'bugfix.yaml')
+    if (r.ok) {
+      expect(r.value.effort).toBeUndefined()
+      expect(r.value.steps.every((s) => s.effort === undefined)).toBe(true)
+    }
+  })
+
+  it('refuses an effort the runtime does not have, by file', () => {
+    const r = parseRecipe(EFFORT.replace('effort: xhigh', 'effort: extreme'), 'direct.yaml')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/^direct\.yaml: /)
+  })
+})

@@ -1,0 +1,12 @@
+schemaVersion: 1
+id: scope-as-asked
+scope: universal
+rung: L3
+asserts: >
+  The change is what the order asked for, at the scope it intended. Nothing
+  was quietly narrowed, widened, or transformed; a better approach was said
+  in a sentence and the ask was still delivered. A unit is finished whole,
+  and anything that could not be finished is named with the reason rather
+  than reported done.
+appliesWhen: always
+origin: built-in

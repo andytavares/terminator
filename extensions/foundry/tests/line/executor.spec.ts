@@ -1935,3 +1935,70 @@ steps:
     expect(outcome.risk.grade).not.toBe('P0')
   })
 })
+
+// Effort travels with the node the way the tier does, and for the same reason:
+// nothing read it, so every builder on every shape thought exactly as hard as
+// the runtime's default. The shape decides, a step may override, and a
+// fast-tier role gets none — the fast model does not take one.
+describe('the effort a node is launched with', () => {
+  const SHAPED = `
+schemaVersion: 1
+id: direct
+effort: xhigh
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units by lane
+    step: { kind: agent, role: builder }
+  - id: verify
+    kind: agent
+    role: verifier
+    context: fresh
+    effort: high
+    after: [build]
+  - id: document
+    kind: agent
+    role: scribe
+    after: [verify]
+`
+
+  async function efforts(text = SHAPED): Promise<{ role: string | null; effort: unknown }[]> {
+    const seen: { role: string | null; effort: unknown }[] = []
+    const run = vi.fn(
+      async (input: { node: { id: string }; role: string | null; effort: unknown }) => {
+        seen.push({ role: input.role, effort: input.effort })
+        return ok(input)
+      }
+    )
+    const o = order([unit('U-1')])
+    const r = recipe(text)
+    await execute(o, r, buildRunGraph(o, r), deps(run as never))
+    return seen
+  }
+
+  it("launches a fan-out's builders at the recipe's effort", async () => {
+    const builders = (await efforts()).filter((s) => s.role === 'builder')
+    expect(builders.length).toBeGreaterThan(0)
+    expect(builders.every((s) => s.effort === 'xhigh')).toBe(true)
+  })
+
+  it("lets a step's own effort override the recipe's", async () => {
+    const verifiers = (await efforts()).filter((s) => s.role === 'verifier')
+    expect(verifiers.length).toBeGreaterThan(0)
+    expect(verifiers.every((s) => s.effort === 'high')).toBe(true)
+  })
+
+  it('gives a fast-tier role no effort, because the fast model takes none', async () => {
+    const scribes = (await efforts()).filter((s) => s.role === 'scribe')
+    expect(scribes.length).toBeGreaterThan(0)
+    expect(scribes.every((s) => s.effort === null)).toBe(true)
+  })
+
+  it('passes null where the recipe declared nothing, so the operator config wins', async () => {
+    const seen = await efforts(
+      SHAPED.replace('effort: xhigh\n', '').replace('    effort: high\n', '')
+    )
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every((s) => s.effort === null)).toBe(true)
+  })
+})

@@ -204,27 +204,28 @@ Authored as YAML, validated on load (R2). Resolution order for all four: data ro
 
 ### Recipe
 
-| Field         | Type          | Rules                            |
-| ------------- | ------------- | -------------------------------- |
-| `id`          | string        | Filename must match.             |
-| `description` | string        |                                  |
-| `requires`    | Requirement[] | Unmet ⇒ not offered (FR-020).    |
-| `steps`       | Step[]        | Ids unique; `after` forms a DAG. |
+| Field         | Type          | Rules                                                |
+| ------------- | ------------- | ---------------------------------------------------- |
+| `id`          | string        | Filename must match.                                 |
+| `description` | string        |                                                      |
+| `requires`    | Requirement[] | Unmet ⇒ not offered (FR-020).                        |
+| `effort`      | EffortLevel?  | `low`…`max`; every agent step inherits it (ADR-050). |
+| `steps`       | Step[]        | Ids unique; `after` forms a DAG.                     |
 
 `Requirement` examples: `path_exists: .specify/`, `toolchain: test`, `repos: >1`.
 
 ### Step
 
-| `kind`   | Fields                                              | Verdict                  |
-| -------- | --------------------------------------------------- | ------------------------ |
-| `agent`  | `role`, `expect?`, `context: fresh \| resume`       | Output schema validates  |
-| `run`    | `command`, `expect?`                                | Exit status              |
-| `judge`  | `role`, `rubric`, `evidence[]`                      | Cited pass/fail          |
-| `gate`   | `rule`, `options[]`, `defaultIfIgnored`, `deadline` | Operator, or the default |
-| `fanout` | `over`, `step`, `after[]`                           | All children             |
-| `join`   | `order`                                             | Merge is clean           |
+| `kind`   | Fields                                                   | Verdict                  |
+| -------- | -------------------------------------------------------- | ------------------------ |
+| `agent`  | `role`, `expect?`, `context: fresh \| resume`, `effort?` | Output schema validates  |
+| `run`    | `command`, `expect?`                                     | Exit status              |
+| `judge`  | `role`, `rubric`, `evidence[]`                           | Cited pass/fail          |
+| `gate`   | `rule`, `options[]`, `defaultIfIgnored`, `deadline`      | Operator, or the default |
+| `fanout` | `over`, `step`, `after[]`                                | All children             |
+| `join`   | `order`                                                  | Merge is clean           |
 
-Six kinds, no more (Complexity Tracking).
+Six kinds, no more (Complexity Tracking). Any step may carry `effort`, which overrides the recipe's for that step; a fan-out's applies to every node it produces. A fast-tier role is launched with none, because the fast model takes none.
 
 ### Role
 
