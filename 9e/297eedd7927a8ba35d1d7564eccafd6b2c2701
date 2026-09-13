@@ -1,0 +1,27 @@
+docs/ARCHITECTURE.md
+  s_07040b8eb928ea::t_fa725a69b9e89d 902-910
+docs/user-guide/USER-GUIDE.md
+  s_07040b8eb928ea::t_094eb5c685b6fb 621-632
+  s_07040b8eb928ea::t_90cfc4377a4529 596
+  s_07040b8eb928ea::t_46e4a02c0114d3 633
+specs/037-foundry-software-factory/contracts/work-order.md
+  s_07040b8eb928ea::t_c0f625d4da96ea 35
+docs/adr/052-budgets-are-the-operators.md
+  s_07040b8eb928ea::t_cff7387ffa6978 1-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9e297eedd7927a8ba35d1d7564eccafd6b2c2701",
+  "prompts": {},
+  "sessions": {
+    "s_07040b8eb928ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4241d7a6-38a5-4b80-83be-6fc820a3272e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Test <test@example.com>"
+    }
+  }
+}
