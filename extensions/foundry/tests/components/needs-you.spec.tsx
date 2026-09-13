@@ -12,7 +12,8 @@ import type { OpenQuestion, WorkOrder } from '../../src/order/schema.js'
 //
 // Foundry holds work for a person in three places, and every one of them used
 // to be somewhere you had to already know about: the Forge's open questions
-// third down a 260px rail under six checks and six recipe cards, the Floor's
+// third down a 260px rail under six checks and six recipe cards (the Forge is
+// now walked as steps, with the questions above all of them), the Floor's
 // held tool calls under an entire run graph, and the inbox behind a tab that
 // said nothing until you clicked it. An operator reported the first of those
 // as taking for ever to find, which it did.
@@ -85,24 +86,20 @@ describe('the Forge puts its open questions above everything else', () => {
     expect(screen.getByText(QUESTIONS[0].text)).toBeTruthy()
   })
 
-  it('is not inside the rail it used to be buried in', async () => {
+  it('is not inside any step, so it shows whichever step is open', async () => {
     const { container } = mountForge(QUESTIONS)
     await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
     const band = container.querySelector('.fdry-needs-you')
-    expect(band?.closest('.fdry-rail'), 'the band is back inside the rail').toBeNull()
+    expect(band?.closest('.fdry-wizard'), 'the band is back inside the steps').toBeNull()
   })
 
-  it('comes before the rail and the document, not after them', async () => {
+  it('comes before the steps, not after them', async () => {
     const { container } = mountForge(QUESTIONS)
     await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
     const band = container.querySelector('.fdry-needs-you')
-    const rail = container.querySelector('.fdry-rail')
-    const doc = container.querySelector('.fdry-doc')
+    const wizard = container.querySelector('.fdry-wizard')
     // DOCUMENT_POSITION_FOLLOWING: the argument comes after the node.
-    expect(band?.compareDocumentPosition(rail as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    )
-    expect(band?.compareDocumentPosition(doc as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+    expect(band?.compareDocumentPosition(wizard as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     )
   })
@@ -116,7 +113,7 @@ describe('the Forge puts its open questions above everything else', () => {
 
   it('takes no room at all when nothing is being asked', async () => {
     const { container } = mountForge([])
-    await waitFor(() => expect(container.querySelector('.fdry-rail')).not.toBeNull())
+    await waitFor(() => expect(container.querySelector('.fdry-wizard')).not.toBeNull())
     expect(container.querySelector('.fdry-needs-you')).toBeNull()
   })
 })

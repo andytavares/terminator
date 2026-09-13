@@ -657,15 +657,15 @@ test('an open order is a frame, and the controls that end it never scroll away',
       expect(box.inView, `"${label}" scrolled off the screen`).toBe(true)
     }
 
-    // The rail no longer decides how long the page is. It is bounded by the
+    // The open step does not decide how long the page is. It is bounded by the
     // frame, whatever it holds.
-    const rail = await inFoundry<{ height: number; viewport: number } | null>(`(function () {
-      var el = document.querySelector('.fdry-rail')
+    const step = await inFoundry<{ height: number; viewport: number } | null>(`(function () {
+      var el = document.querySelector('.fdry-step')
       if (!el) return null
       return { height: Math.round(el.getBoundingClientRect().height), viewport: window.innerHeight }
     })()`)
-    expect(rail, 'the Forge rail did not render').not.toBeNull()
-    expect(rail && rail.height).toBeLessThanOrEqual((rail as { viewport: number }).viewport)
+    expect(step, 'the Forge step did not render').not.toBeNull()
+    expect(step && step.height).toBeLessThanOrEqual((step as { viewport: number }).viewport)
   } finally {
     await handle.app.evaluate(
       ({ BrowserWindow }, size) =>

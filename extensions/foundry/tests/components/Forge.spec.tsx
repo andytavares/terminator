@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { Forge } from '../../src/components/Forge.js'
 import { draftOrder } from '../../src/order/schema.js'
@@ -66,12 +66,25 @@ function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
 // jsdom doesn't implement scrollIntoView
 window.HTMLElement.prototype.scrollIntoView = vi.fn()
 
+/** The step list, where every step of the Forge is reached. */
+function stepList(): HTMLElement {
+  return screen.getByRole('navigation', { name: 'Steps' })
+}
+
+/** Go to a step by the name the step list shows, once it is offered. */
+async function openStep(name: string): Promise<void> {
+  const label = new RegExp(`^${name}`)
+  await waitFor(() => within(stepList()).getByRole('button', { name: label }))
+  fireEvent.click(within(stepList()).getByRole('button', { name: label }))
+}
+
 beforeEach(() => vi.clearAllMocks())
 
 describe('the tracker write-back panel', () => {
   it('offers one row per moment in the order life', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await waitFor(() => expect(screen.getByText('Tracker write-back')).toBeTruthy())
+    await openStep('Tracker')
+    expect(screen.getByRole('heading', { name: 'Tracker write-back' })).toBeTruthy()
     for (const label of ['When work starts', 'When the draft opens', 'When it merges']) {
       expect(screen.getByText(label)).toBeTruthy()
     }
@@ -79,19 +92,19 @@ describe('the tracker write-back panel', () => {
 
   it('offers the tracker own states as the choices, by their own names', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
     expect(screen.getAllByRole('option', { name: 'In Review' })).toHaveLength(3)
   })
 
   it('defaults to letting the tracker resolve the intent', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
     expect(screen.getAllByRole('option', { name: 'let the tracker decide' })).toHaveLength(3)
   })
 
   it('stores the override when the operator picks one', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
 
     const select = screen.getAllByRole('combobox')[1]
     fireEvent.change(select, { target: { value: 'st-progress' } })
@@ -110,7 +123,7 @@ describe('the tracker write-back panel', () => {
       capability: { transitions: 'supported', states: STATES, unreachable: [] },
       mapping: { started: null, in_review: 'st-review', done: null },
     })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
 
     fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '' } })
     await waitFor(() =>
@@ -130,32 +143,32 @@ describe('the tracker write-back panel', () => {
         unreachable: ['in_review'],
       },
     })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
     expect(screen.getByRole('option', { name: 'nowhere to go — skipped' })).toBeTruthy()
   })
 
   it('says the tracker cannot be moved at all, and what still works', async () => {
     mount({ capability: { transitions: 'unsupported', states: [], unreachable: [] } })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
     expect(screen.getByText(/cannot be asked to move an issue/)).toBeTruthy()
     expect(screen.queryByRole('combobox')).toBeNull()
   })
 
-  it('shows no panel at all for an order nobody seeded from a tracker', async () => {
+  it('offers no step at all for an order nobody seeded from a tracker', async () => {
     mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
     await waitFor(() => screen.getByText('Refuse an expired refresh token'))
-    expect(screen.queryByText('Tracker write-back')).toBeNull()
+    expect(within(stepList()).queryByRole('button', { name: /^Tracker/ })).toBeNull()
   })
 
-  it('shows no panel when the states channel answered with nothing', async () => {
+  it('offers no step when the states channel answered with nothing', async () => {
     mount({})
     await waitFor(() => screen.getByText('Refuse an expired refresh token'))
-    expect(screen.queryByText('Tracker write-back')).toBeNull()
+    expect(within(stepList()).queryByRole('button', { name: /^Tracker/ })).toBeNull()
   })
 
   it('asks the tracker once, not on every redraw', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.states')).toHaveLength(1)
   })
 })
@@ -259,6 +272,7 @@ describe('handing off', () => {
 
   it('starts nothing for an order that did not compile', async () => {
     mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
+    await openStep('Hand off')
     await waitFor(() => screen.getByRole('button', { name: /Blocked by/ }))
     expect(screen.getByRole('button', { name: /Blocked by/ }).hasAttribute('disabled')).toBe(true)
   })
@@ -267,14 +281,15 @@ describe('handing off', () => {
 describe('choosing the shape of work', () => {
   it('offers the shapes this repository can support, marking the proposal', async () => {
     mountForStart()
-    await waitFor(() => expect(screen.getByText('Shape of work')).toBeTruthy())
+    await openStep('Shape')
+    expect(screen.getByRole('heading', { name: 'Shape of work' })).toBeTruthy()
     expect(screen.getByText('direct')).toBeTruthy()
-    expect(screen.getByText('proposed')).toBeTruthy()
+    expect(screen.getByText('Proposed')).toBeTruthy()
   })
 
   it('says why that shape was proposed, not only that it was (FR-014)', async () => {
     mountForStart()
-    await waitFor(() => screen.getByText('Shape of work'))
+    await openStep('Shape')
     expect(screen.getByText(/standard proposed — 2 units of work/)).toBeTruthy()
   })
 
@@ -285,19 +300,19 @@ describe('choosing the shape of work', () => {
         proposed: 'direct',
       },
     })
-    await waitFor(() => screen.getByText('Shape of work'))
+    await openStep('Shape')
     expect(screen.queryByText(/proposed —/)).toBeNull()
   })
 
   it('shows one it cannot run, with the requirement it does not meet', async () => {
     mountForStart()
-    await waitFor(() => screen.getByText('Shape of work'))
+    await openStep('Shape')
     expect(screen.getByText(/no SpecKit skills/)).toBeTruthy()
   })
 
   it('will not let one it cannot run be chosen', async () => {
     mountForStart()
-    await waitFor(() => screen.getByText('Shape of work'))
+    await openStep('Shape')
     const speckit = screen.getByText('speckit').closest('button')
     expect(speckit?.hasAttribute('disabled')).toBe(true)
   })
@@ -311,8 +326,9 @@ describe('choosing the shape of work', () => {
 
   it("carries the operator's own choice when they make one", async () => {
     mountForStart()
-    await waitFor(() => screen.getByText('Shape of work'))
+    await openStep('Shape')
     fireEvent.click(screen.getByText('direct').closest('button') as HTMLElement)
+    await openStep('Hand off')
     fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1', recipe: 'direct' })
@@ -322,7 +338,7 @@ describe('choosing the shape of work', () => {
   it('offers nothing when the repository supports no shape at all', async () => {
     mountForStart({ recipes: { recipes: [], proposed: '' } })
     await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
-    expect(screen.queryByText('Shape of work')).toBeNull()
+    expect(within(stepList()).queryByRole('button', { name: /^Shape/ })).toBeNull()
   })
 })
 
@@ -454,6 +470,7 @@ describe('only the parts affected are redrawn (FR-007)', () => {
 
   it('marks what a struck assumption moved, and nothing else', async () => {
     withChanged(['acceptance'])
+    await openStep('Plan')
     await waitFor(() => screen.getByText(/sessions are stored in Redis/))
 
     // Striking one goes through `turn`, which is what carries the redraw list.
@@ -461,13 +478,22 @@ describe('only the parts affected are redrawn (FR-007)', () => {
       screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
     )
     await waitFor(() =>
-      expect(screen.getByText(/Acceptance/).closest('section')?.className).toContain('is-redrawn')
+      expect(
+        screen.getByRole('heading', { name: 'Acceptance criteria' }).closest('section')?.className
+      ).toContain('is-redrawn')
     )
-    expect(screen.getByText('Intent').closest('section')?.className).not.toContain('is-redrawn')
+    // A redraw on a step the operator is not looking at is marked on the step list.
+    expect(within(stepList()).getByRole('button', { name: /^Plan/ }).className).toContain(
+      'is-redrawn'
+    )
+    expect(within(stepList()).getByRole('button', { name: /^Intent/ }).className).not.toContain(
+      'is-redrawn'
+    )
   })
 
   it('marks nothing when nothing moved', async () => {
     withChanged([])
+    await openStep('Plan')
     await waitFor(() => screen.getByText(/sessions are stored in Redis/))
     fireEvent.click(
       screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
@@ -475,7 +501,11 @@ describe('only the parts affected are redrawn (FR-007)', () => {
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.turn', expect.anything())
     )
-    expect(screen.getByText('Intent').closest('section')?.className).not.toContain('is-redrawn')
+    expect(
+      within(stepList())
+        .getAllByRole('button')
+        .some((step) => step.className.includes('is-redrawn'))
+    ).toBe(false)
   })
 })
 
@@ -510,14 +540,15 @@ describe('clearing an adversarial finding', () => {
 
   it('offers a way to clear it, not just a list of what is blocking', async () => {
     withFinding()
-    await waitFor(() => expect(screen.getByText(/Red team — 1 open/)).toBeTruthy())
+    await openStep('Red team')
+    expect(screen.getByText(/1 open/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Fixed' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy()
   })
 
   it('marks one fixed', async () => {
     withFinding()
-    await waitFor(() => screen.getByText(/Red team — 1 open/))
+    await openStep('Red team')
     fireEvent.click(screen.getByRole('button', { name: 'Fixed' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.turn', {
@@ -529,7 +560,7 @@ describe('clearing an adversarial finding', () => {
 
   it('asks for the reason before accepting one', async () => {
     withFinding()
-    await waitFor(() => screen.getByText(/Red team — 1 open/))
+    await openStep('Red team')
     fireEvent.click(screen.getByRole('button', { name: 'Accept' }))
     await waitFor(() => expect(screen.getByLabelText(/Why this finding is accepted/)).toBeTruthy())
 
@@ -723,7 +754,7 @@ describe('a turn that was refused', () => {
 describe('what this order writes back (FR-062)', () => {
   it('offers each write-back, checked from the order', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
     expect(screen.getByLabelText(/The agreed order, as a comment/)).toBeTruthy()
     expect(screen.getByLabelText(/Move its workflow state/)).toBeTruthy()
     expect(screen.getByLabelText(/The pull request links/)).toBeTruthy()
@@ -731,7 +762,7 @@ describe('what this order writes back (FR-062)', () => {
 
   it('turns one on for this order alone', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
-    await waitFor(() => screen.getByText('Tracker write-back'))
+    await openStep('Tracker')
     fireEvent.click(screen.getByLabelText(/Move its workflow state/))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.writeBack', {
@@ -762,7 +793,7 @@ describe('attaching to the architect', () => {
 
   it('offers nothing for an order no architect has run on', async () => {
     mount({})
-    await waitFor(() => screen.getByRole('button', { name: /Compile|Blocked by/ }))
+    await waitFor(() => screen.getByRole('heading', { name: 'What is being asked' }))
     expect(screen.queryByRole('button', { name: /Attach/ })).toBeNull()
   })
 
@@ -909,12 +940,14 @@ describe('a failing check says how to clear it', () => {
     )
   })
 
-  it('offers the written escape, and takes the operator to it', async () => {
+  it('offers the written escape, and takes the operator to it from hand-off', async () => {
     mountBlocked()
-    await waitFor(() => screen.getByRole('button', { name: /Or mark one unprovable/ }))
+    await openStep('Hand off')
     fireEvent.click(screen.getByRole('button', { name: /Or mark one unprovable/ }))
-    // The heading it lands on is the one the acceptance list sits under.
-    expect(document.getElementById('fdry-acceptance')).not.toBeNull()
+    // The heading it lands on is the one the acceptance list sits under, on the
+    // step that list is on.
+    await waitFor(() => expect(document.getElementById('fdry-acceptance')).not.toBeNull())
+    expect(document.activeElement?.id).toBe('fdry-acceptance')
   })
 
   it('accepts a criterion as unverifiable, with a reason', async () => {
@@ -954,6 +987,8 @@ describe('a failing check says how to clear it', () => {
         },
       ],
     })
+    // Nothing blocks once it is accepted, so the order opens on hand-off.
+    await openStep('Plan')
     await waitFor(() =>
       expect(
         screen.getByText(/accepted as unverifiable — no display in this environment/)
@@ -976,22 +1011,69 @@ describe('a failing check says how to clear it', () => {
         },
       ],
     })
-    await waitFor(() => screen.getByRole('button', { name: 'Answer them' }))
+    await openStep('Hand off')
     fireEvent.click(screen.getByRole('button', { name: 'Answer them' }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
   })
 
   it('offers no remedy on a check that passes', async () => {
     mountBlocked()
-    await waitFor(() => screen.getByText('Convergence'))
+    await waitFor(() => screen.getByRole('heading', { name: 'The plan and how it is proven' }))
     // Risk is graded against this plan, so its row carries no button.
     expect(screen.queryByRole('button', { name: 'Ask for a regrade' })).toBeNull()
   })
 
   it('offers no remedy at all once the order has been handed off', async () => {
     mountBlocked({ status: 'running' as const })
-    await waitFor(() => screen.getByText('Convergence'))
+    await waitFor(() => screen.getByRole('heading', { name: 'Checks before hand-off' }))
     expect(screen.queryByRole('button', { name: 'Ask for proof' })).toBeNull()
+    await openStep('Plan')
     expect(screen.queryByRole('button', { name: 'Nothing here can prove this' })).toBeNull()
+  })
+})
+
+// Walked, one step at a time, rather than read off a rail of tiles beside the
+// document: an operator reported the rail's cards as too condensed to read.
+describe('walking the Forge', () => {
+  it('opens on the step that is blocking, not on the first one', async () => {
+    mountBlocked()
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'The plan and how it is proven' })).toBeTruthy()
+    )
+    expect(
+      within(stepList()).getByRole('button', { name: /^Plan/ }).getAttribute('aria-current')
+    ).toBe('step')
+  })
+
+  it('says on the step list which steps are holding hand-off up', async () => {
+    mountBlocked()
+    await waitFor(() => screen.getByRole('heading', { name: 'The plan and how it is proven' }))
+    expect(within(stepList()).getByRole('button', { name: 'Plan, blocking hand-off' })).toBeTruthy()
+    expect(within(stepList()).getByRole('button', { name: 'Intent' })).toBeTruthy()
+  })
+
+  it('goes forward to the next step and back again', async () => {
+    mount({})
+    await waitFor(() => screen.getByRole('heading', { name: 'What is being asked' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Plan' }))
+    expect(screen.getByRole('heading', { name: 'The plan and how it is proven' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByRole('heading', { name: 'What is being asked' })).toBeTruthy()
+  })
+
+  it('offers no way back from the first step, and hand-off in place of next on the last', async () => {
+    mountForStart()
+    await waitFor(() => screen.getByRole('heading', { name: 'Checks before hand-off' }))
+    expect(screen.queryByRole('button', { name: /^Next/ })).toBeNull()
+    await openStep('Intent')
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Compile/ })).toBeNull()
+  })
+
+  it('moves focus to the step it opened, for a keyboard user', async () => {
+    mount({})
+    await waitFor(() => screen.getByRole('heading', { name: 'What is being asked' }))
+    await openStep('Red team')
+    expect(document.activeElement?.textContent).toBe('Red team findings')
   })
 })
