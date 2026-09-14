@@ -1280,4 +1280,34 @@ describe('the standing band', () => {
     await waitFor(() => expect(screen.getByText('Stop the run')).toBeTruthy())
     expect(document.querySelector('.fdry-standing')).toBeNull()
   })
+
+  // Every step passed and the run still never opened its pull request — the
+  // one move left is to have Foundry check the work again and try.
+  it('offers to try again when a finished run never shipped', async () => {
+    mount(
+      reply({
+        standing: standing({
+          kind: 'stopped',
+          turn: 'you',
+          label: 'not shipped',
+          headline: 'Finished, but not shipped',
+          detail: 'Opening the pull request for terminator failed: exit code 1',
+          done: 3,
+          total: 3,
+        }),
+      })
+    )
+    await waitFor(() => expect(screen.getByText('Finished, but not shipped')).toBeTruthy())
+    expect(
+      screen.getByText('Opening the pull request for terminator failed: exit code 1')
+    ).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.resume', { id: 'WO-1' }))
+  })
+
+  it('offers no way to try again while the run is still working', async () => {
+    mount(reply({ standing: standing() }))
+    await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
 })
