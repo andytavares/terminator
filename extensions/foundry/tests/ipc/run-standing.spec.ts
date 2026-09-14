@@ -39,6 +39,19 @@ function channels(over: { gates?: Gate[]; asks?: number; stalls?: number } = {})
   })
 }
 
+async function markAllPassed(orderId: string): Promise<void> {
+  const file = path.join(dataRoot, 'orders', orderId, 'run-graph.json')
+  const graph = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+    orderId: string
+    recipe: string
+    nodes: Array<Record<string, unknown>>
+  }
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ ...graph, nodes: graph.nodes.map((n) => ({ ...n, state: 'passed' })) })
+  )
+}
+
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: 'WO-1',
@@ -158,5 +171,69 @@ describe('what run.observe says about where an order stands', () => {
     const view = (await bare.observe({ id: 'WO-1' })) as Observed
     expect(view.standing.label.trim()).not.toBe('')
     expect(view.waiting).toEqual([])
+  })
+
+  // The WO-0913-0bd shape: every node in the graph finished, but the ledger's
+  // tail says the run went on to fail — here, opening the pull request.
+  // Before `runFailureFor` was wired in, this read `working`/"Between steps.
+  // Nothing is running right now.", a dead end naming no move.
+  it('is stopped when the ledger ends in a run failure and every step passed', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    await markAllPassed('WO-1')
+    await store.record({
+      at: '2026-09-13T10:05:00.000Z',
+      orderId: 'WO-1',
+      actor: 'rule:line',
+      action: 'run.complete',
+      subject: 'WO-1',
+      reason: '',
+      evidence: [],
+    })
+    await store.record({
+      at: '2026-09-13T10:05:01.000Z',
+      orderId: 'WO-1',
+      actor: 'rule:line',
+      action: 'run.failed',
+      subject: 'WO-1',
+      reason: 'Opening the pull request for terminator failed: ',
+      evidence: [],
+    })
+
+    const view = (await channels().observe({ id: 'WO-1' })) as Observed
+    expect(view.standing.kind).toBe('stopped')
+    expect(view.standing.turn).toBe('you')
+    expect(view.standing.label).toBe('not shipped')
+    expect(view.standing.detail).toContain('Opening the pull request')
+  })
+
+  // Resuming records `run.resumed`, so a run that failed once and is retried
+  // stops reading `stopped` while the retry is in flight.
+  it('clears a stopped standing once the run is resumed', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    await store.record({
+      at: '2026-09-13T10:05:01.000Z',
+      orderId: 'WO-1',
+      actor: 'rule:line',
+      action: 'run.failed',
+      subject: 'WO-1',
+      reason: 'no worktree could be prepared',
+      evidence: [],
+    })
+
+    let view = (await channels().observe({ id: 'WO-1' })) as Observed
+    expect(view.standing.kind).toBe('stopped')
+
+    const withExecute = createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-13T10:10:00.000Z',
+      execute: async () => undefined,
+    })
+    await withExecute.resume({ id: 'WO-1' })
+    view = (await channels().observe({ id: 'WO-1' })) as Observed
+    expect(view.standing.kind).not.toBe('stopped')
   })
 })

@@ -748,6 +748,38 @@ describe('foundry:run.resume', () => {
     expect(handed.nodes.every((n) => n.state !== 'failed')).toBe(true)
   })
 
+  // Clears any `run.failed` a previous attempt left behind — without this a
+  // retry that goes on to succeed still reads `stopped`, because the ledger's
+  // newest run-shaped line stays the old failure for ever.
+  it('records that the run was resumed', async () => {
+    const execute = vi.fn(async () => undefined)
+    const channels = await started(execute)
+
+    await channels.resume({ id: 'WO-1' })
+
+    const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
+    const ledger = fs.readFileSync(ledgerFile, 'utf8')
+    expect(ledger).toContain('run.resumed')
+  })
+
+  // Never recorded when there is nothing to resume it with — a ledger line
+  // saying a run picked back up would be false when nothing did.
+  it('does not record a resume when there is no runtime to run it', async () => {
+    await store.save(order())
+    const noRuntime = createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+    })
+    await noRuntime.start({ id: 'WO-1' })
+    await noRuntime.resume({ id: 'WO-1' })
+
+    const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
+    const ledger = fs.readFileSync(ledgerFile, 'utf8')
+    expect(ledger).not.toContain('run.resumed')
+  })
+
   it('refuses an order that is not running', async () => {
     await store.save(order({ status: 'agreed' }))
     expect(await live().resume({ id: 'WO-1' })).toEqual({

@@ -61,6 +61,7 @@ function input(over: Partial<StandingInput> = {}): StandingInput {
     failures: 0,
     stranded: 0,
     intakeRefused: null,
+    runFailure: null,
     ...over,
   }
 }
@@ -152,6 +153,68 @@ describe('standingOf', () => {
     expect(standing.turn).toBe('you')
   })
 
+  // The defect this change fixes. WO-0913-0bd: every node passed, the order
+  // still said `running`, and the ledger's tail was `run.complete` then
+  // `run.failed` ("Opening the pull request for terminator failed: "). Before
+  // this, standing had no way to see the ledger and fell through to "Between
+  // steps. Nothing is running right now." — a dead end naming no move.
+  it('is stopped, not shipped, when every step finished but the run then failed', () => {
+    const standing = standingOf(
+      input({
+        graph: graph([node({ id: 'a', state: 'passed' }), node({ id: 'b', state: 'skipped' })]),
+        runFailure: 'Opening the pull request for terminator failed: ',
+      })
+    )
+    expect(standing.kind).toBe('stopped')
+    expect(standing.turn).toBe('you')
+    expect(standing.gateId).toBeNull()
+    expect(standing.label).toBe('not shipped')
+    expect(standing.headline).toBe('Finished, but not shipped')
+    expect(standing.detail).toContain('Opening the pull request for terminator failed')
+  })
+
+  it('is stopped on an error when the run failed before every step finished', () => {
+    const standing = standingOf(
+      input({
+        graph: graph([node({ id: 'a', state: 'passed' }), node({ id: 'b', state: 'waiting' })]),
+        runFailure: 'no worktree could be prepared',
+      })
+    )
+    expect(standing.kind).toBe('stopped')
+    expect(standing.label).toBe('stopped')
+    expect(standing.headline).toBe('The run stopped on an error')
+    expect(standing.detail).toContain('no worktree could be prepared')
+  })
+
+  it('says so when the run failed for no recorded reason', () => {
+    const standing = standingOf(
+      input({
+        graph: graph([node({ id: 'a', state: 'waiting' })]),
+        runFailure: '   ',
+      })
+    )
+    expect(standing.detail).toContain('It recorded no reason.')
+  })
+
+  // A gate still stops the whole line even after a run has already failed
+  // once — the gate is the newer, more total, stop.
+  it('puts an open gate ahead of a stopped run', () => {
+    const standing = standingOf(input({ gates: [gate()], runFailure: 'boom' }))
+    expect(standing.kind).toBe('halted')
+  })
+
+  it('leaves a running order between steps when nothing has failed', () => {
+    const standing = standingOf(input({ runFailure: null }))
+    expect(standing.kind).toBe('working')
+  })
+
+  // Only a running order's run can have failed; a draft's compile checks are
+  // a different thing entirely and this field means nothing there.
+  it('ignores runFailure on a draft', () => {
+    const standing = standingOf(input({ status: 'draft', graph: null, runFailure: 'irrelevant' }))
+    expect(standing.kind).toBe('shaping')
+  })
+
   it('is failed when a step failed and no gate covers it', () => {
     const standing = standingOf(input({ graph: graph([node({ id: 'a', state: 'failed' })]) }))
     expect(standing.kind).toBe('failed')
@@ -239,13 +302,14 @@ describe('standingOf', () => {
       input({ orphaned: ['build'] }),
       input({ stalls: 1 }),
       input({ graph: graph([node({ id: 'a', state: 'failed' })]) }),
+      input({ runFailure: 'boom' }),
       input({ status: 'draft', graph: null, openQuestions: 2 }),
       input({ status: 'draft', graph: null }),
       input({ status: 'draft', graph: null, intakeRefused: 'acceptance.5: Invalid enum value.' }),
       input({ status: 'agreed', graph: null }),
       input({ status: 'shipped' }),
     ]
-    expect(cases).toHaveLength(12)
+    expect(cases).toHaveLength(13)
     for (const one of cases) {
       const standing = standingOf(one)
       expect(standing.label.trim()).not.toBe('')

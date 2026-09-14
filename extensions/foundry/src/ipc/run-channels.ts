@@ -15,6 +15,7 @@ import { checkRequirements } from '../recipe/requirements.js'
 import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
+import { runFailure } from '../line/run-outcome.js'
 import type { Gate } from '../gates/rules.js'
 
 // Starting a run.
@@ -466,6 +467,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
           stallsFor: deps.stallsFor,
           strandedFor: deps.strandedFor,
           orphansFor: () => orphaned,
+          runFailureFor: async (id) => runFailure(await deps.store.entries(id)),
         }
       ),
       // The agents waiting at a terminal prompt, so the band can offer the one
@@ -561,6 +563,19 @@ export function createRunChannels(deps: RunDeps): RunChannels {
         reason: 'The supervision runtime is not available.',
       }
     }
+    // Clears any failure the previous attempt left in the ledger: without
+    // this, a resumed run that goes on to succeed still reads `stopped` from
+    // the attempt before it, because `runFailure` has nothing newer to stop
+    // its backward scan on.
+    await deps.store.record({
+      at: deps.now(),
+      orderId: order.id,
+      actor: 'rule:line',
+      action: 'run.resumed',
+      subject: order.id,
+      reason: 'picked up by the operator',
+      evidence: [],
+    })
     void deps.execute(order, resolved.resolved.value, retried).catch(async (error: unknown) => {
       await deps.store.record({
         at: deps.now(),
