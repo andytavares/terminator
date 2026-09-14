@@ -56,7 +56,7 @@ asked.
 ```typescript
 {
   connected: { tracker: string; account: string }[]  // empty when none is connected
-  issues: { tracker: string; key: string; title: string; status: string }[]
+  issues: { tracker: string; key: string; title: string; status: string }[]  // never a finished one
   failures?: string[]                                // per-tracker, reported not thrown
 }
 | { error: string }
@@ -64,6 +64,11 @@ asked.
 
 No tracker connected is a real answer and not an error: the surface says so
 rather than showing an empty list, which reads as "you have no tickets".
+
+Issues whose `state.type` is `completed` or `canceled` are dropped from both the
+list and a search: a finished ticket is not work to pick up. The filter runs
+over the 50 the host returns, so an account whose 50 most recent are all
+finished sees fewer, or none.
 
 ---
 

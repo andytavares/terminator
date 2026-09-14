@@ -1890,12 +1890,15 @@ export function activate(api: ExtensionAPI): void {
           tracker: String(c.tracker),
           account: String(c.account ?? ''),
         })),
-        issues: (found.issues ?? []).map((issue) => ({
-          tracker: String(issue.tracker),
-          key: String(issue.key),
-          title: String(issue.title ?? ''),
-          status: String((issue as { status?: unknown }).status ?? ''),
-        })),
+        // A finished ticket is not work to pick up; the host lists them anyway.
+        issues: (found.issues ?? [])
+          .filter((issue) => issue.state.type !== 'completed' && issue.state.type !== 'canceled')
+          .map((issue) => ({
+            tracker: String(issue.tracker),
+            key: String(issue.key),
+            title: String(issue.title ?? ''),
+            status: String((issue as { status?: unknown }).status ?? ''),
+          })),
         failures: (found.failures ?? []).map((f) =>
           String((f as { message?: unknown }).message ?? f)
         ),
