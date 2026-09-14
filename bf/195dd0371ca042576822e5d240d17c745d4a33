@@ -1,0 +1,29 @@
+tests/e2e/foundry-resume.spec.ts
+  s_bb70744b31bb29::t_ed6a9861686de3 135-190
+  s_bb70744b31bb29::t_a28b9e3a74ef7c 422-425
+  s_bb70744b31bb29::t_5d08205804db9b 426-436
+  s_bb70744b31bb29::t_6b071881b60d0b 418-421,437-467
+  s_bb70744b31bb29::t_ed04691ad6a5d4 278-288
+extensions/foundry/SUPERVISION.md
+  s_bb70744b31bb29::t_bc55d8f6fcc462 168-177
+  s_bb70744b31bb29::t_98d55e45bb262d 69
+docs/adr/053-a-stopped-run-is-a-state.md
+  s_bb70744b31bb29::t_cc6019a339f8cf 18
+  s_bb70744b31bb29::t_31c39f5cdeb122 1-17,19-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bf195dd0371ca042576822e5d240d17c745d4a33",
+  "prompts": {},
+  "sessions": {
+    "s_bb70744b31bb29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37c46304-0b8f-490a-ac74-c05e5ab026aa",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
