@@ -132,6 +132,62 @@ function graph(): unknown {
   }
 }
 
+const UNSHIPPED_ID = 'WO-UNSHIPPED'
+
+/** An order whose run finished every step and then failed to ship. */
+function unshippedOrder(): unknown {
+  const base = order() as Record<string, unknown>
+  return {
+    ...base,
+    id: UNSHIPPED_ID,
+    title: 'Retry the failed upload',
+  }
+}
+
+/** The graph, every node passed — WO-0913-0bd: the run finished and still failed. */
+function unshippedGraph(): unknown {
+  return {
+    orderId: UNSHIPPED_ID,
+    recipe: 'direct',
+    nodes: [
+      {
+        id: 'build:U-1',
+        stepId: 'build',
+        kind: 'fanout',
+        state: 'passed',
+        unitId: 'U-1',
+        lane: 1,
+        role: 'builder',
+        dependsOn: [],
+        attempts: 1,
+        sessionId: null,
+        worktreePath: null,
+        startedAt: '2026-09-06T10:00:00.000Z',
+        endedAt: '2026-09-06T10:10:00.000Z',
+      },
+    ],
+  }
+}
+
+/** The ledger tail WO-0913-0bd left: every node passed, then the ship tail threw. */
+function unshippedLedger(): string {
+  const line = (action: string, reason: string): string =>
+    `${JSON.stringify({
+      at: '2026-09-06T10:20:00.000Z',
+      orderId: UNSHIPPED_ID,
+      actor: 'role:builder',
+      action,
+      subject: UNSHIPPED_ID,
+      reason,
+      evidence: [],
+    })}\n`
+  return (
+    line('run.started', 'run started') +
+    line('run.complete', 'every step passed') +
+    line('run.failed', 'Opening the pull request for fixture failed: exit code 1')
+  )
+}
+
 function dataRoot(): string {
   return join(repo, '.foundry')
 }
@@ -218,6 +274,17 @@ test.beforeAll(async () => {
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'order.json'), `${JSON.stringify(order(), null, 2)}\n`)
   writeFileSync(join(dir, 'run-graph.json'), `${JSON.stringify(graph(), null, 2)}\n`)
+
+  // A second order, left the way WO-0913-0bd was: every node passed, status
+  // still `running`, and the ledger's last word is a failure to ship.
+  const unshippedDir = join(dataRoot(), 'orders', UNSHIPPED_ID)
+  mkdirSync(unshippedDir, { recursive: true })
+  writeFileSync(join(unshippedDir, 'order.json'), `${JSON.stringify(unshippedOrder(), null, 2)}\n`)
+  writeFileSync(
+    join(unshippedDir, 'run-graph.json'),
+    `${JSON.stringify(unshippedGraph(), null, 2)}\n`
+  )
+  writeFileSync(join(unshippedDir, 'ledger.jsonl'), unshippedLedger())
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'Foundry', repo)
@@ -346,6 +413,56 @@ test('the Floor carries the same move, above the graph', async () => {
     join(process.cwd(), 'test-results', 'foundry-interrupted-floor.png'),
     Buffer.from(shot, 'base64')
   )
+})
+
+test('a run that finished every step and still failed to ship says so, with a move', async () => {
+  test.setTimeout(90_000)
+  await openFoundry()
+
+  // The previous test left an order open on the Forge tab, which is already
+  // selected — clicking it again does not remount the list, so the way back
+  // to it is the frame's own control.
+  expect(await clickByName('All orders')).toBe(true)
+  // The list refetches on its own 4s timer, and the previous test left the
+  // view mid-navigation — a fixed pause here was a flake waiting to happen.
+  await expect
+    .poll(
+      () =>
+        inFoundry<string>(
+          `Array.from(document.querySelectorAll('.fdry-orders button')).map(b => b.textContent || '').join('|')`
+        ),
+      { timeout: 15_000 }
+    )
+    .toContain(UNSHIPPED_ID)
+  expect(
+    await inFoundry<boolean>(`(function () {
+      var rows = document.querySelectorAll('.fdry-orders button')
+      for (var i = 0; i < rows.length; i++) {
+        if ((rows[i].textContent || '').indexOf(${JSON.stringify(UNSHIPPED_ID)}) >= 0) {
+          rows[i].click(); return true
+        }
+      }
+      return false
+    })()`),
+    'no row for the unshipped order'
+  ).toBe(true)
+  await handle.page.waitForTimeout(1500)
+
+  const text = await bodyText()
+  expect(text, `the Floor rendered:\n${text}`).toContain('Finished, but not shipped')
+  expect(text).toContain('Opening the pull request for fixture failed: exit code 1')
+  expect(text).not.toContain('Between steps')
+
+  await expect(
+    inFoundry<boolean>(`(function () {
+      var all = document.querySelectorAll('button')
+      for (var i = 0; i < all.length; i++) {
+        var label = (all[i].getAttribute('aria-label') || all[i].textContent || '').trim()
+        if (label === 'Try again') return true
+      }
+      return false
+    })()`)
+  ).resolves.toBe(true)
 })
 
 test('answering it puts the abandoned step back in the queue', async () => {
