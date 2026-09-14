@@ -654,6 +654,31 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             </div>
           ) : null}
 
+          {/* Every step passed and the run still never opened its pull
+              request — or it failed outright — and neither is answerable by
+              starting a fresh run: the finished steps are still finished.
+              The one move is to have Foundry check the work again. */}
+          {standing.kind === 'stopped' ? (
+            <div className="fdry-standing-gate">
+              <div className="fdry-standing-options">
+                <div className="fdry-standing-option">
+                  <button
+                    type="button"
+                    className="is-primary"
+                    disabled={busy}
+                    onClick={() => void decideRun('foundry:run.resume')}
+                  >
+                    Try again
+                  </button>
+                  <small>
+                    Finished steps stay finished. Once every step has passed, Foundry checks the
+                    work again and tries to open the pull request.
+                  </small>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* The gate's own options, on the screen showing the order it holds.
               A check that names a problem and offers no reachable control is a
               wall: this one was answerable only from a tab the operator had no

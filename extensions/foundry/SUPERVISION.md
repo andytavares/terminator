@@ -66,6 +66,7 @@ stopped**, worst first:
 | `asking`   | **you**    | an agent is holding a tool call, answerable from the surface                                      |
 | `stranded` | **you**    | a call was handed back to a terminal prompt nobody is at                                          |
 | `stalled`  | **you**    | a run stopped making progress without asking for anything                                         |
+| `stopped`  | **you**    | the run stopped on an error, or finished every step and still failed to ship                      |
 | `failed`   | **you**    | a step failed                                                                                     |
 | `ready`    | Foundry    | agreed, no graph yet                                                                              |
 | `working`  | Foundry    | agents are running                                                                                |
@@ -163,6 +164,16 @@ up a third before it cost anything: a lane's `role`, shown as `null` and named
 nowhere, three lines under a _unit's_ `role`, which is a free string whose
 example reads `"builder"` — the obvious wrong answer sitting on the same screen
 as the field.
+
+### A run that stopped
+
+The ledger is also where a run attempt's outcome lives, and `standingOf` reads
+it back the same way it reads a refused intake turn: `src/line/run-outcome.ts`
+walks a run's ledger backwards for its newest `run.failed` or `ship.refused`.
+`WO-0913-0bd` finished every node and still never opened its pull request —
+`Finished, but not shipped`, the ledger's own reason on screen, and a **Try
+again** button that re-enters the executor and its shipping tail. See
+[ADR 053](../../docs/adr/053-a-stopped-run-is-a-state.md).
 
 ## What you can do about a run
 

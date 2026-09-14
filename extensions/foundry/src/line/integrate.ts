@@ -106,18 +106,34 @@ function criteriaSummary(shipment: Shipment): string {
   return 'every criterion passed'
 }
 
+/**
+ * The reason to show for a failed `git`/`gh` call.
+ *
+ * `gh pr create` can fail with nothing on stderr and its actual reason on
+ * stdout instead (e.g. "a pull request for branch ... already exists"), and
+ * some failures print nothing at all — stderr alone left the operator with a
+ * message ending in ": " and no reason.
+ */
+function detailFor(result: ExecResult): string {
+  const stderr = result.stderr.trim()
+  if (stderr !== '') return stderr
+  const stdout = result.stdout.trim()
+  if (stdout !== '') return stdout
+  return `exit code ${result.exitCode}`
+}
+
 export class PushRefusedError extends Error {
   readonly code = 'PUSH_REFUSED'
-  constructor(repo: string, stderr: string) {
-    super(`Pushing ${repo} was refused, so no pull request was opened: ${stderr.trim()}`)
+  constructor(repo: string, result: ExecResult) {
+    super(`Pushing ${repo} was refused, so no pull request was opened: ${detailFor(result)}`)
     this.name = 'PushRefusedError'
   }
 }
 
 export class PullRequestFailedError extends Error {
   readonly code = 'PR_FAILED'
-  constructor(what: string, stderr: string) {
-    super(`${what}: ${stderr.trim()}`)
+  constructor(what: string, result: ExecResult) {
+    super(`${what}: ${detailFor(result)}`)
     this.name = 'PullRequestFailedError'
   }
 }
@@ -318,7 +334,7 @@ async function pushLane(
     cwd: repo.path,
     timeoutMs: 120_000,
   })
-  if (result.exitCode !== 0) throw new PushRefusedError(repo.name, result.stderr)
+  if (result.exitCode !== 0) throw new PushRefusedError(repo.name, result)
 }
 
 async function openDraft(
@@ -349,10 +365,7 @@ async function openDraft(
     timeoutMs: 120_000,
   })
   if (result.exitCode !== 0) {
-    throw new PullRequestFailedError(
-      `Opening the pull request for ${repo.name} failed`,
-      result.stderr
-    )
+    throw new PullRequestFailedError(`Opening the pull request for ${repo.name} failed`, result)
   }
   return {
     lane: repo.lane,
@@ -376,7 +389,7 @@ export async function markReady(
     timeoutMs: 60_000,
   })
   if (result.exitCode !== 0) {
-    throw new PullRequestFailedError(`Marking ${pull.url} ready failed`, result.stderr)
+    throw new PullRequestFailedError(`Marking ${pull.url} ready failed`, result)
   }
 }
 

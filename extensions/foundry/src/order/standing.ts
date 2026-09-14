@@ -27,6 +27,7 @@ export type StandingKind =
   | 'stalled'
   | 'adrift'
   | 'failed'
+  | 'stopped'
   | 'done'
 
 /**
@@ -85,6 +86,17 @@ export interface StandingInput {
    * this" about an order nothing had touched for an hour.
    */
   readonly intakeRefused: string | null
+  /**
+   * Why the run last stopped on an error or refused to ship, when it did.
+   * Running orders only.
+   *
+   * A run can finish its whole graph and still fail — the WO-0913-0bd case:
+   * every node passed, but opening the pull request threw, and the ledger
+   * carries the only record of that. Without this the standing of such a run
+   * is indistinguishable from one between steps, and it said so — "Nothing is
+   * running right now" about a run that had stopped for good.
+   */
+  readonly runFailure: string | null
   /**
    * Agents whose tool call was handed back to the terminal's own prompt.
    *
@@ -233,6 +245,19 @@ export function standingOf(input: StandingInput): Standing {
     }
   }
 
+  if (input.runFailure !== null) {
+    const reason = input.runFailure.trim() === '' ? 'It recorded no reason.' : input.runFailure
+    const finished = total > 0 && done === total
+    return {
+      ...counts,
+      kind: 'stopped',
+      turn: 'you',
+      label: finished ? 'not shipped' : 'stopped',
+      headline: finished ? 'Finished, but not shipped' : 'The run stopped on an error',
+      detail: reason,
+    }
+  }
+
   if (failed > 0) {
     return {
       ...counts,
@@ -294,6 +319,8 @@ export interface StandingSources {
   readonly strandedFor?: (orderId: string) => number
   /** Why this order's last intake turn was refused, when it was. */
   readonly intakeRefusedFor?: (orderId: string) => Promise<string | null>
+  /** Why this order's run last stopped on an error or refused to ship. */
+  readonly runFailureFor?: (orderId: string) => Promise<string | null>
 }
 
 /**
@@ -319,5 +346,10 @@ export async function readStanding(order: WorkOrder, sources: StandingSources): 
     // running order to be told 'no' is a file read per row for nothing.
     intakeRefused:
       order.status === 'draft' ? ((await sources.intakeRefusedFor?.(order.id)) ?? null) : null,
+    // Only a running order can have a run to have failed, and reading the
+    // ledger of every other status to be told 'no' is a file read for
+    // nothing.
+    runFailure:
+      order.status === 'running' ? ((await sources.runFailureFor?.(order.id)) ?? null) : null,
   })
 }

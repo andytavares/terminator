@@ -8,6 +8,7 @@ import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
 import { readStanding } from '../order/standing.js'
 import { intakeRefusal, lastIntake } from '../forge/intake-outcome.js'
+import { runFailure } from '../line/run-outcome.js'
 import type { StandingSources } from '../order/standing.js'
 import { TransitionIntentSchema, WorkOrderSchema, WriteBackSchema } from '../order/schema.js'
 import type { Budgets, TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
@@ -601,6 +602,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
             // store's, and the host would have to build a second reader over
             // the same files to answer it.
             intakeRefusedFor: async (orderId) => intakeRefusal(await deps.store.entries(orderId)),
+            runFailureFor: async (orderId) => runFailure(await deps.store.entries(orderId)),
           }),
         }))
       ),

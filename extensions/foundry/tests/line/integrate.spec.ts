@@ -210,6 +210,72 @@ describe('the command line', () => {
       shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
     ).rejects.toThrow(/non-fast-forward/)
   })
+
+  // `gh pr create` can fail with an empty stderr and its reason on stdout
+  // instead (e.g. "a pull request for branch ... already exists"). Reading
+  // stderr alone produced a message ending in ": " with no reason at all.
+  it('falls back to stdout when gh failed with nothing on stderr', async () => {
+    const exec = vi.fn(async (options: { command: string }) =>
+      options.command === 'git'
+        ? { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+        : {
+            exitCode: 1,
+            stdout: 'a pull request for branch "foundry/wo-1" into "main" already exists',
+            stderr: '',
+            timedOut: false,
+          }
+    )
+    await expect(
+      shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
+    ).rejects.toThrow(/already exists/)
+  })
+
+  it('falls back to the exit code when gh failed with nothing on either stream', async () => {
+    const exec = vi.fn(async (options: { command: string }) =>
+      options.command === 'git'
+        ? { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+        : { exitCode: 1, stdout: '', stderr: '', timedOut: false }
+    )
+    const err: Error = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ exec: exec as never })
+    ).catch((e: Error) => e)
+    expect(err.message).toContain('exit code 1')
+    expect(err.message.endsWith(': ')).toBe(false)
+  })
+
+  it('prefers stderr over stdout when gh wrote to both', async () => {
+    const exec = vi.fn(async (options: { command: string }) =>
+      options.command === 'git'
+        ? { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+        : {
+            exitCode: 1,
+            stdout: 'some progress output',
+            stderr: 'fatal: no such ref',
+            timedOut: false,
+          }
+    )
+    const err: Error = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ exec: exec as never })
+    ).catch((e: Error) => e)
+    expect(err.message).toContain('fatal: no such ref')
+    expect(err.message).not.toContain('some progress output')
+  })
+
+  it('falls back to stdout for a push failure too', async () => {
+    const exec = vi.fn(async () => ({
+      exitCode: 1,
+      stdout: 'everything up-to-date but refused anyway',
+      stderr: '',
+      timedOut: false,
+    }))
+    await expect(
+      shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
+    ).rejects.toThrow(/refused anyway/)
+  })
 })
 
 describe('marking ready', () => {
