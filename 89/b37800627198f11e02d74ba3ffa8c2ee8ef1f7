@@ -1,0 +1,65 @@
+tests/e2e/tools/capture-session-home-screenshots.spec.ts
+  s_cf6284d326023a::t_10e192ed18ac1d 1-74,80-126
+  s_cf6284d326023a::t_32016003918202 75-79
+docs/adr/036-the-board-is-one-grid.md
+  s_cf6284d326023a::t_ce738e7d3f3151 3
+docs/adr/054-overview-is-a-wall-sessions-carry-context.md
+  s_cf6284d326023a::t_ce738e7d3f3151 42-47
+src/renderer/components/terminal/TerminalSession.tsx
+  s_cf6284d326023a::t_c6aa23219053ac 482-486
+  s_cf6284d326023a::t_679da8fc60f973 516-518,526
+src/renderer/components/overview/WallTile.css
+  s_cf6284d326023a::t_246655237a556f 121-126
+README.md
+  s_cf6284d326023a::t_9c0fc84312dc5b 8,31-32
+src/shared/schemas/session-records.schema.ts
+  s_cf6284d326023a::t_246655237a556f 6,17
+src/renderer/components/home/LogbookView.tsx
+  s_cf6284d326023a::t_e8c8b1a5523563 83-85
+src/renderer/components/session/WorkItemCell.tsx
+  s_cf6284d326023a::t_e8c8b1a5523563 89
+docs/ARCHITECTURE.md
+  s_cf6284d326023a::t_bc9b36f45c12bb 110,116,153,592,600,635,656,664,666-672,682
+  s_cf6284d326023a::t_d5c73804169e13 103-109,111-114,630-634,636-644
+  s_cf6284d326023a::t_84ed09f8757739 115
+specs/054-session-home-wall/tasks.md
+  s_cf6284d326023a::t_d5c73804169e13 473,477-478
+  s_cf6284d326023a::t_df8c420f008783 479,486-487
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_cf6284d326023a::t_a0643875ecf4bb 16
+  s_cf6284d326023a::t_bc9b36f45c12bb 312
+docs/user-guide/USER-GUIDE.md
+  s_cf6284d326023a::t_9c0fc84312dc5b 19,73,99,349,351,353,355,357,359-384
+  s_cf6284d326023a::t_d5c73804169e13 70-72,74
+src/renderer/sidebar/screen.ts
+  s_cf6284d326023a::t_c6aa23219053ac 1-14,16
+src/main/sessions/session-record-store.ts
+  s_cf6284d326023a::t_246655237a556f 19
+tests/unit/renderer/sidebar/screen.spec.ts
+  s_cf6284d326023a::t_d5c73804169e13 9
+  s_cf6284d326023a::t_c6aa23219053ac 10-18
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_cf6284d326023a::t_c6aa23219053ac 246-251
+  s_cf6284d326023a::t_679da8fc60f973 520-538
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_cf6284d326023a::t_8099cbe27099aa 10,28-30,82,472-475,478,483,486-492,495-508
+src/renderer/terminal/session-controller.ts
+  s_cf6284d326023a::t_e8c8b1a5523563 86
+  s_cf6284d326023a::t_8099cbe27099aa 49-50,53,56,63,66-68,70,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "89b37800627198f11e02d74ba3ffa8c2ee8ef1f7",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
