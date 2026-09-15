@@ -1,0 +1,34 @@
+specs/055-resume-agent-session/contracts/session-records-ipc.md
+  s_cf6284d326023a::t_7b48b84b575d33 1-28
+specs/055-resume-agent-session/quickstart.md
+  s_cf6284d326023a::t_7b48b84b575d33 1-51
+specs/055-resume-agent-session/data-model.md
+  s_cf6284d326023a::t_7b48b84b575d33 1-57
+specs/055-resume-agent-session/research.md
+  s_cf6284d326023a::t_64efb67f45bfa9 1-92
+docs/adr/055-a-conversation-outlives-its-terminal.md
+  s_cf6284d326023a::t_11fb64a75570b8 1-41
+specs/055-resume-agent-session/contracts/agent-hook.md
+  s_cf6284d326023a::t_7b48b84b575d33 1-38
+specs/055-resume-agent-session/plan.md
+  s_cf6284d326023a::t_dcb908bb8d4377 2,4,6,8-10,15-17,19,21,23,25,27,29,31,33,38,40-42,60-65,77-81,103-104,122-123,125,127,135
+  s_cf6284d326023a::t_a663301671e79c 1,3,5,7,11-14,18,20,22,24,26,28,30,32,34-37,39,43-59,66-76,82-102,105-121,124,126,128-134,136
+specs/055-resume-agent-session/contracts/ui-surfaces.md
+  s_cf6284d326023a::t_7b48b84b575d33 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "34060013cdfb0427a233c95b04984ca3c17636ba",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
