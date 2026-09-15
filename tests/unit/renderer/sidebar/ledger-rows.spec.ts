@@ -26,7 +26,7 @@ describe('buildLedger — default grouping and order (US1)', () => {
     ])
   })
 
-  it('puts a session with no project in a last "No project" group', () => {
+  it('puts a session with no project in a last "No branch" group', () => {
     const groups = buildLedger(
       [
         fact({ sessionId: 'scratch', projectId: null, workspaceName: null, projectName: null }),
@@ -38,7 +38,7 @@ describe('buildLedger — default grouping and order (US1)', () => {
     )
     expect(shape(groups)).toEqual([
       ['Personal / terminator', ['a']],
-      ['No project', ['scratch']],
+      ['No branch', ['scratch']],
     ])
   })
 

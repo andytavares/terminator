@@ -40,6 +40,8 @@ function makeMockBuffer(
   }
 }
 
+const mockRenderDispose = vi.fn()
+
 vi.mock('xterm', () => {
   const Terminal = vi.fn().mockImplementation(function () {
     return {
@@ -56,6 +58,7 @@ vi.mock('xterm', () => {
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
       registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      onRender: vi.fn().mockReturnValue({ dispose: mockRenderDispose }),
       buffer: makeMockBuffer(24, 80),
       options: { theme: null as unknown },
     }
@@ -478,6 +481,34 @@ describe('TerminalInstance', () => {
 
       document.body.removeChild(mountContainer)
       document.body.removeChild(previewContainer)
+    })
+
+    it('follows the cursor on every render, and stops when the preview goes', () => {
+      const instance = new TerminalInstance('ses-1', 1000)
+      const mountContainer = document.createElement('div')
+      document.body.appendChild(mountContainer)
+      instance.mount(mountContainer)
+      instance.unmount()
+      Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
+      Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
+
+      const previewContainer = document.createElement('div')
+      // A short box, so a full screen is taller than it and the window has to move.
+      Object.defineProperty(previewContainer, 'offsetWidth', { value: 220 })
+      Object.defineProperty(previewContainer, 'offsetHeight', { value: 60 })
+      Object.assign(instance.terminal.buffer.active, { cursorY: 0 })
+      const cleanup = instance.mountPreview(previewContainer)!
+      const onRender = vi.mocked(instance.terminal.onRender)
+      expect(onRender).toHaveBeenCalledTimes(1)
+      expect(instance.element.style.transform).toMatch(/^translateY\(.*\) scale\(.*\)$/)
+
+      Object.assign(instance.terminal.buffer.active, { cursorY: 23 })
+      ;(onRender.mock.calls[0][0] as () => void)()
+      expect(instance.element.style.transform).toMatch(/translateY\(-/)
+
+      cleanup()
+      expect(mockRenderDispose).toHaveBeenCalled()
+      document.body.removeChild(mountContainer)
     })
 
     it('cleanup removes element and restores original cssText', () => {

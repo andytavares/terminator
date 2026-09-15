@@ -1,68 +1,210 @@
-.overview-screen {
+.wall {
   display: flex;
   flex-direction: column;
   height: 100%;
   background: var(--bg-base);
+  color: var(--text-primary);
   overflow: hidden;
-  container-type: inline-size;
 }
 
-/* One row of chrome, holding the layout choice and nothing else. */
-.overview-screen__bar {
+/* One row of chrome. */
+.wall__bar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  padding: 8px 16px;
+  min-height: 44px;
+  padding: 6px var(--space-4);
   border-bottom: 1px solid var(--border);
-  flex: 0 0 auto;
 }
 
-.overview-screen__layouts {
-  display: flex;
+.wall__title {
+  margin: 0 6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wall__meta {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wall__sizes {
+  display: inline-flex;
+  height: 26px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
-.overview-screen__layout {
-  display: grid;
-  place-items: center;
-  padding: 4px 9px;
-  background: transparent;
+.wall__size {
+  min-width: 28px;
+  padding: 0 8px;
   border: 0;
-  color: var(--text-muted);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
 }
 
-.overview-screen__layout + .overview-screen__layout {
+.wall__size + .wall__size {
   border-left: 1px solid var(--border-strong);
 }
 
-.overview-screen__layout svg {
-  width: 13px;
-  height: 13px;
-}
-
-.overview-screen__layout[aria-pressed='true'] {
-  background: var(--bg-card-hover);
+.wall__size[aria-checked='true'] {
+  background: var(--accent-dim);
   color: var(--text-primary);
 }
 
-/* The flat arrangement this screen used to be, kept as the other layout. */
-.overview-screen__grid {
+.wall__toggle {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wall__toggle[aria-checked='true'] {
+  background: var(--accent-dim);
+  border-color: transparent;
+  color: var(--text-primary);
+}
+
+.wall__select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.wall__select select {
+  height: 26px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.wall__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  width: 180px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-muted);
+}
+
+.wall__search svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.wall__search input {
   flex: 1;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-  padding: 16px;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.wall__size:focus-visible,
+.wall__toggle:focus-visible,
+.wall__select select:focus-visible,
+.wall__empty-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.wall__search:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.wall__body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+}
+
+/* One grid for every tile and both headings. Size sets the column width and
+   the preview heights; a pinned tile spans two columns. */
+.wall__grid {
+  --tile-min: 300px;
+  --tile-preview-h: 150px;
+  --tile-preview-needs-h: 240px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr));
+  gap: 10px;
+  padding: var(--space-3) var(--space-4) var(--space-5);
   align-content: start;
 }
 
-.overview-screen__empty {
-  flex: 1;
+.wall__grid[data-size='s'] {
+  --tile-min: 220px;
+  --tile-preview-h: 104px;
+  --tile-preview-needs-h: 180px;
+}
+
+.wall__grid[data-size='l'] {
+  --tile-min: 420px;
+  --tile-preview-h: 230px;
+  --tile-preview-needs-h: 320px;
+}
+
+.wall__band {
+  grid-column: 1 / -1;
+  margin: 4px 0 -2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.wall__empty {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  color: var(--text-secondary);
   font-size: 13px;
+}
+
+.wall__empty p {
+  margin: 0;
+}
+
+.wall__empty-action {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wall__empty-action:hover {
+  background: var(--bg-card-hover);
 }

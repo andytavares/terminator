@@ -1,7 +1,7 @@
 import { matchesFilter, type IssueTitles } from './session-filter'
 import type { HomePrefs } from './home-prefs'
 import type { SessionFacts } from './session-facts'
-import type { AgentState } from '../../shared/types/index'
+import { STATUS_ORDER } from './view-model'
 
 export interface LedgerGroup {
   key: string
@@ -16,29 +16,21 @@ export interface LedgerFilters {
 
 export const NO_FILTERS: LedgerFilters = { needsYou: false, text: '' }
 
-const NO_PROJECT = 'No project'
+const NO_BRANCH = 'No branch'
 const ALL_SESSIONS = 'All sessions'
 const CLOSED = 'Closed'
 
-/** Blocked on the operator first: it is the only state that waits for them. */
-const STATE_RANK: Record<AgentState, number> = {
-  'awaiting-input': 0,
-  working: 1,
-  idle: 2,
-  exited: 3,
-}
-
 function groupLabel(facts: SessionFacts, groupBy: HomePrefs['groupBy']): string {
   if (groupBy === 'none') return ALL_SESSIONS
-  if (facts.projectName === null) return NO_PROJECT
+  if (facts.projectName === null) return NO_BRANCH
   if (groupBy === 'project') return facts.projectName
-  return `${facts.workspaceName ?? NO_PROJECT} / ${facts.projectName}`
+  return `${facts.workspaceName ?? NO_BRANCH} / ${facts.projectName}`
 }
 
 function compare(sort: HomePrefs['sort']) {
   return (a: SessionFacts, b: SessionFacts): number => {
     if (sort === 'needs-you') {
-      const byState = STATE_RANK[a.state] - STATE_RANK[b.state]
+      const byState = STATUS_ORDER.indexOf(a.state) - STATUS_ORDER.indexOf(b.state)
       if (byState !== 0) return byState
     }
     return b.lastActivityAt - a.lastActivityAt
@@ -73,8 +65,8 @@ export function buildLedger(
 
   const open = [...byLabel.entries()]
     .sort(([a], [b]) => {
-      if (a === NO_PROJECT) return 1
-      if (b === NO_PROJECT) return -1
+      if (a === NO_BRANCH) return 1
+      if (b === NO_BRANCH) return -1
       return a.localeCompare(b)
     })
     .map(([label, rows]) => ({ key: label, label, facts: rows.sort(compare(prefs.sort)) }))

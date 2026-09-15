@@ -1,6 +1,7 @@
 import { Terminal, IBufferCell, ILinkProvider, ILink } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
+import { previewWindow } from '../../terminal/preview-window'
 
 const IDLE_DEBOUNCE_MS = 1500
 
@@ -490,18 +491,30 @@ export class TerminalInstance {
     const naturalW = Math.ceil(cols * charW + 12)
     const naturalH = rows * lineHeight + 8
 
-    const containerW = container.offsetWidth || 220
-    const containerH = container.offsetHeight || 150
-    const scale = Math.min(containerW / naturalW, containerH / naturalH)
+    const place = (): void => {
+      const { scale, translateY } = previewWindow({
+        rows,
+        cursorY: this.terminal.buffer.active.cursorY,
+        lineHeight,
+        naturalW,
+        naturalH,
+        containerW: container.offsetWidth || 220,
+        containerH: container.offsetHeight || 150,
+      })
+      this.element.style.transform = `translateY(${translateY}px) scale(${scale})`
+    }
 
     this.element.style.width = `${naturalW}px`
     this.element.style.height = `${naturalH}px`
-    this.element.style.transform = `scale(${scale})`
     this.element.style.transformOrigin = 'top left'
     this.element.style.pointerEvents = 'none'
+    place()
     container.appendChild(this.element)
+    // The cursor moves as output arrives; the window follows it on each render.
+    const following = this.terminal.onRender(place)
 
     return () => {
+      following.dispose()
       this.element.style.width = '100%'
       this.element.style.height = '100%'
       this.element.style.transform = ''

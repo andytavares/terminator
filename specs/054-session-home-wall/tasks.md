@@ -262,13 +262,13 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Tests first
 
-- [ ] T049 [P] [US3] Write failing specs for `loadWallPrefs` and `saveWallPrefs` in `tests/unit/renderer/sidebar/wall-prefs.spec.ts`, the same shape as T029, with key `terminator.wall.prefs`.
-- [ ] T050 [P] [US3] Write failing specs for `placeWall` in `tests/unit/renderer/sidebar/wall-order.spec.ts`:
+- [x] T049 [P] [US3] Write failing specs for `loadWallPrefs` and `saveWallPrefs` in `tests/unit/renderer/sidebar/wall-prefs.spec.ts`, the same shape as T029, with key `terminator.wall.prefs`.
+- [x] T050 [P] [US3] Write failing specs for `placeWall` in `tests/unit/renderer/sidebar/wall-order.spec.ts`:
   - The output array order is by `sessionId` and identical before and after a session changes state (R11).
   - Awaiting sessions get `band: 'needs'`, `span: 2` when `pinNeeds`, and `band: 'rest'`, `span: 1` otherwise.
   - `order` follows `thenBy`: `state` (working, idle, exited), `workspace-project`, or `recent`.
   - Closed facts are excluded.
-- [ ] T051 [P] [US3] Write failing component specs:
+- [x] T051 [P] [US3] Write failing component specs:
   - `tests/unit/renderer/components/WallTile.spec.tsx`:
     - `article` named `<workspace> / <project> / <branch>, <name>`.
     - Caption with state, path, name and age.
@@ -285,16 +285,16 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Implementation
 
-- [ ] T052 [P] [US3] Implement `src/renderer/sidebar/wall-prefs.ts` (T049).
-- [ ] T053 [P] [US3] Implement `placeWall` in `src/renderer/sidebar/wall-order.ts` (T050).
-- [ ] T054 [US3] Create `src/renderer/components/overview/WallTile.tsx` and `WallTile.css` from `SessionTile.tsx`, using `StateIcon`, `LivePreview` and `WorkItemCell`. Tile size is a `data-size` attribute on the grid, with preview heights per size in CSS (T051).
-- [ ] T055 [US3] Rewrite `src/renderer/components/overview/OverviewScreen.tsx` and `OverviewScreen.css` as the wall (T051):
+- [x] T052 [P] [US3] Implement `src/renderer/sidebar/wall-prefs.ts` (T049).
+- [x] T053 [P] [US3] Implement `placeWall` in `src/renderer/sidebar/wall-order.ts` (T050).
+- [x] T054 [US3] Create `src/renderer/components/overview/WallTile.tsx` and `WallTile.css` from `SessionTile.tsx`, using `StateIcon`, `LivePreview` and `WorkItemCell`. Tile size is a `data-size` attribute on the grid, with preview heights per size in CSS (T051).
+- [x] T055 [US3] Rewrite `src/renderer/components/overview/OverviewScreen.tsx` and `OverviewScreen.css` as the wall (T051):
   - One grid.
   - The band heading is a grid item spanning all columns at `order: -1`, rendered only when needed.
   - The "Everything else" heading follows the last needs tile.
   - Metrics polling is kept as it is today.
   - The Board/List toggle and its lucide `LayoutGrid`/`Rows3` imports are removed.
-- [ ] T056 [US3] Delete the board, then run `npm run lint` and `npx vitest run` to confirm nothing still imports them:
+- [x] T056 [US3] Delete the board, then run `npm run lint` and `npx vitest run` to confirm nothing still imports them:
 
   - `src/renderer/components/overview/BoardScreen.tsx`
   - `src/renderer/components/overview/BoardScreen.css`
@@ -309,7 +309,7 @@ description: 'Task list for Session Home and Monitor Wall'
 
   Note in the PR that the stored `terminator.board.lanes` localStorage key is abandoned.
 
-- [ ] T057 [US3] Write `tests/e2e/monitor-wall.spec.ts`:
+- [x] T057 [US3] Write `tests/e2e/monitor-wall.spec.ts`:
   - Open Overview, run `yes | head -n 100000` in a terminal, and read the tile's preview text twice to assert it changed.
   - Set `Large`, toggle the pin off, relaunch, and assert both are kept.
   - Close all terminals and assert `No terminals are open`.

@@ -21,7 +21,7 @@ End-to-end tests address these by role and accessible name, never by CSS class (
 ### Ledger
 
 - `grid` named `Sessions`.
-- One `rowgroup` per group, named by its label (e.g. `Northwind / northwind-api`, `Closed`).
+- One `rowgroup` per group, named by its label (e.g. `Northwind / northwind-api`, `No branch`, `Closed`).
 - One `row` per session, named by the session name.
 - Selected row: `aria-selected="true"`. The expanded region is a `region` named `Preview of <name>`.
 

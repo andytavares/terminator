@@ -21,7 +21,7 @@
 
 - React 18.3.1
 - Zustand 4.5.5
-- `@xterm/xterm` 6.0.0
+- `xterm` 5.3.0
 - Zod (IPC schemas)
 - lucide-react
 

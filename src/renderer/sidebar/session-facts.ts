@@ -1,4 +1,3 @@
-import { branchLabel } from './branch-display'
 import { resolveWorkItem, type WorkItem } from './work-item'
 import type {
   AgentState,
@@ -59,7 +58,8 @@ function openFacts(
 ): SessionFacts {
   const project = input.projects.find((p) => p.id === session.projectId)
   const workspace = project && input.workspaces.find((w) => w.id === project.workspaceId)
-  const branch = project ? branchLabel(project) : null
+  // A project with no git branch has no branch to show; its name is already the project's.
+  const branch = project?.gitBranch ?? null
   const snapshot: SessionSnapshot = {
     sessionId: session.id,
     projectId: session.projectId,

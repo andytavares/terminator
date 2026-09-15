@@ -196,6 +196,17 @@ describe('buildSessionFacts', () => {
     expect(facts.workspaceColor).toBeNull()
   })
 
+  it('has no branch for a project that is not a git branch, rather than repeating its name', () => {
+    const plain = { ...project, id: 'p2', gitBranch: undefined }
+    const [facts] = buildSessionFacts({
+      ...empty,
+      projects: [plain],
+      sessions: [{ ...session, projectId: 'p2' }],
+    })
+    expect(facts.projectName).toBe('northwind-api')
+    expect(facts.branch).toBeNull()
+  })
+
   it('leaves the shell out when it is not known', () => {
     const [facts] = buildSessionFacts({ ...empty, sessions: [{ ...session, shell: undefined }] })
     expect(facts.shell).toBeNull()
