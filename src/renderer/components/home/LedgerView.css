@@ -6,6 +6,8 @@
   flex-direction: column;
   padding-bottom: var(--space-4);
   min-width: 0;
+  /* The list fits its surface: no column may push the row sideways. */
+  overflow-x: hidden;
 }
 
 .ledger__head,
@@ -102,6 +104,7 @@
 .ledger__work {
   display: flex;
   min-width: 0;
+  overflow: hidden;
 }
 
 .ledger__tags {

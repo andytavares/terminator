@@ -24,15 +24,21 @@ interface Props {
   renderAnswers?: (facts: SessionFacts) => React.ReactNode
 }
 
-/** One track per visible column, so a hidden column gives its width to the rest. */
+/**
+ * One track per visible column, so a hidden column gives its width to the rest.
+ *
+ * Every flexible track may shrink to nothing and let its text truncate. Minimum
+ * widths that added up to more than the window pushed the last column — the age
+ * — off the right edge and made the whole list scroll sideways.
+ */
 function template(columns: LedgerColumns): string {
   return [
-    '26px',
-    'minmax(120px, 0.9fr)',
-    columns.branch && '170px',
-    columns.workItem && 'minmax(240px, 1.6fr)',
-    columns.tags && 'minmax(110px, 0.7fr)',
-    columns.latestLine && 'minmax(180px, 1.2fr)',
+    '24px',
+    'minmax(72px, 0.9fr)',
+    columns.branch && 'minmax(0, 1.1fr)',
+    columns.workItem && 'minmax(0, 1.8fr)',
+    columns.tags && 'minmax(0, 0.7fr)',
+    columns.latestLine && 'minmax(0, 1.3fr)',
     columns.age && '44px',
   ]
     .filter(Boolean)

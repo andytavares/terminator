@@ -153,7 +153,8 @@
   --tile-preview-h: 150px;
   --tile-preview-needs-h: 240px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr));
+  /* min() keeps a single column narrower than a tile from overflowing. */
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--tile-min), 100%), 1fr));
   gap: 10px;
   padding: var(--space-3) var(--space-4) var(--space-5);
   align-content: start;

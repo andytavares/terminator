@@ -299,3 +299,31 @@ test('Home draws its controls as one set, in the bar and in the empty state', as
   await expect(page.getByText('No terminals are open')).toBeVisible()
   expect(await shapeOf(home, /^New terminal$/, 1)).toEqual(await shapeOf(home, /^Go to terminals$/))
 })
+
+test('the Ledger fits its surface at every width, with every column on', async () => {
+  handle = await launchApp()
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+
+  // Tags is the one column off by default; with it on the row is at its widest.
+  await page.getByRole('region', { name: 'Home' }).getByRole('button', { name: 'Display' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Tags' }).click()
+  await page.mouse.click(500, 700)
+
+  for (const width of [1440, 1100, 900, 780]) {
+    await page.setViewportSize({ width, height: 800 })
+    const measured = await page.evaluate(() => {
+      const home = document.querySelector('.home')!.getBoundingClientRect()
+      const grid = document.querySelector('.ledger') as HTMLElement
+      const age = document.querySelector('.ledger__row .ledger__age')!.getBoundingClientRect()
+      return {
+        overflow: grid.scrollWidth - grid.clientWidth,
+        ageGap: Math.round(home.right - age.right),
+      }
+    })
+    expect(measured.overflow, `no sideways scroll at ${width}px`).toBeLessThanOrEqual(0)
+    expect(measured.ageGap, `gutter at ${width}px`).toBeGreaterThanOrEqual(12)
+  }
+})
