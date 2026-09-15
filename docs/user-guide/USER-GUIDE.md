@@ -16,7 +16,7 @@ An end-to-end reference for every feature and extension in Terminator — an ext
 8. [Command Palette](#8-command-palette)
 9. [Settings](#9-settings)
 10. [Issue Tracking](#10-issue-tracking)
-11. [Overview Screen](#11-overview-screen)
+11. [Home and the Overview Wall](#11-home-and-the-overview-wall)
 12. [Notification Center & Activity Indicators](#12-notification-center--activity-indicators)
 13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
 14. [Extensions Overview](#14-extensions-overview)
@@ -67,11 +67,11 @@ npm run dev
 
 The window is divided into three zones:
 
-| Zone             | Description                                                                                                                                                                                                                                                                                              |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                                                                                                                                                        |
-| **Main sidebar** | A compact row of app icons at the top (Overview, Notes, Remote Control, Task Vault, Git Changes, and the notification bell), then search with the Filter and Display menus, then every repo with its branches. Terminals are not listed here — they are tabs above the terminal, and cards on the board. |
-| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, Foundry, Git).                                                                                                                                                                                                |
+| Zone             | Description                                                                                                                                                                                                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                                                                                                                                                                                    |
+| **Main sidebar** | A compact row of app icons at the top (Home, Overview, Notes, Remote Control, Task Vault, Git Changes, and the notification bell), then search with the Filter and Display menus, then every repo with its branches. Terminals are not listed here — they are tabs above the terminal, rows on Home, and tiles on the Overview wall. |
+| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, Foundry, Git).                                                                                                                                                                                                                            |
 
 The **status bar** at the bottom of the window shows live CPU, Memory, and Network figures when the global metrics bar is enabled in Settings.
 
@@ -96,7 +96,7 @@ Projects live inside a workspace and hold one or more terminal sessions scoped t
 
 - **Create a branch:** Hover a repo's header and click `+`. A branch is usually its own git worktree; the sidebar marks the exception — a plain checkout gets a small branch glyph, and a worktree is left unmarked.
 - **Naming:** A branch is named by its branch — there is nothing else to name and nothing to rename. Check out a different branch in a plain checkout's own terminal and its card follows within a moment. A worktree's branch is fixed when you create it. (A workspace whose folder is not a git repository has no branch to take a name from, so there you are asked for one and can rename it.)
-- **Terminals per branch:** A branch can hold several named terminal tabs. They are listed in the tab bar above the terminal, not in the sidebar — each tab carries its own state glyph and unread bell count, and its note on hover. The tab bar states which branch's terminals it is showing.
+- **Terminals per branch:** A branch can hold several named terminal tabs. They are listed in the tab bar above the terminal, not in the sidebar — each tab carries its own state glyph and unread bell count, and its description on hover. The tab bar states which branch's terminals it is showing.
 
 - **What a branch row tells you:** its state, folded from its terminals — waiting on you beats working, working beats idle, idle beats exited — plus its name, any linked issue key, how much has changed on it, and either how many terminals share that state or how long since it was last active. A branch with no terminals is still listed, and reads as idle.
 
@@ -346,19 +346,42 @@ only thing it can write is a comment, and only in two places:
 
 ---
 
-## 11. Overview Screen
+## 11. Home and the Overview Wall
 
-![Overview screen](screenshots/12-overview-screen.png)
+### Home
 
-The overview screen displays a **full-screen tiled grid** of all open sessions. Each tile shows:
+![Home, Ledger layout](screenshots/11a-home-ledger.png)
 
-- A live canvas snapshot of the terminal (refreshed every ~3 seconds).
-- The project name and session name.
-- Per-session CPU% and memory usage.
+Terminator opens on **Home**. It answers one question for every terminal you have open: which session, in which repo and branch, is working on what, and what state is it in. The Home icon at the top of the sidebar counts the sessions waiting on you.
 
-Click any tile to navigate directly to that session.
+Home has two layouts. Switch between them with **Ledger** and **Logbook** at the top; Terminator remembers which you chose.
 
-**Open overview:** Click the **grid icon** in the sidebar header or press **`Cmd+Shift+E`**.
+- **Ledger** — one row per session, grouped by repo and branch, with sessions waiting on you first. Each row shows the session's state, name, branch, its ticket or your description, its latest line of output and how long since it was active. Click a row to open a live preview with **Open terminal**; press `Enter` to go straight to the terminal. **Display** chooses the grouping, the sort, which columns show, whether the selected row previews, and whether exited sessions are hidden — all remembered.
+- **Logbook** — sessions listed under **Needs you**, **Working**, **Idle**, **Exited** and **Closed**, each headlined by its ticket's title, or your description, or **Add a description**. Select one to see where it lives, edit what it is for (**Save description**, or `Cmd+Enter`), link a ticket, and watch a large live preview. Tickets worth linking are suggested: your branch's own ticket, then open tickets assigned to you.
+
+**Filter sessions** matches a session's name, repo, branch, ticket key or title, and description. **Needs you** narrows either layout to sessions waiting on you. Neither filter is remembered, so Home never opens narrowed.
+
+![Home, Logbook layout](screenshots/11b-home-logbook.png)
+
+### Saying what a session is for
+
+A session with no ticket shows **What is this session doing?**. Type an answer and press `Enter` — on Home, on its Overview tile, or from its tab (right-click → **Add description…**, or `Cmd+I`). The description is saved at once and survives a restart. When the session ends, it moves to **Closed** and stays findable by the filter for 30 days.
+
+### Linking a session to a ticket
+
+A session shows its branch's linked ticket by default. **Link** on any row, tile or the Logbook pins a different Linear or Jira ticket to that one session, which matters when two terminals on one branch serve different tickets. **Remove session link** hands the session back to its branch's ticket; the branch's own link is never changed from here. With no tracker connected, the dialog tells you to connect one in **Settings → Integrations**. The ticket an agent is briefed with at start-up still comes from the branch (see [What your agent sessions are told](#what-your-agent-sessions-are-told)).
+
+### The Overview wall
+
+![The Overview wall](screenshots/12-overview-screen.png)
+
+**Overview** (`Cmd+Shift+E`) shows every open terminal as a live tile, named by repo, branch and session, with its ticket or description underneath. Sessions waiting on you are pinned double-width in a **Needs you** band at the top; everything else follows, ordered by state unless **Then by** says otherwise.
+
+When an agent is waiting on a numbered choice — a Claude Code permission prompt, for example — its options appear as buttons on the tile and in the Ledger's preview. Pressing one answers it as if you had typed the number. Terminator reads the screen again first, and sends nothing if the question has changed or been answered in the terminal.
+
+Tile size (**S**, **M**, **L**), **Pin sessions that need you** and **Then by** are remembered. Previews fill the tile's width and follow the cursor, so the newest line is the one you see; on a very wide terminal, Large tiles are the readable size.
+
+"Waiting on you" is worked out from what the terminal does: a bell, or a numbered choice left on screen when output stops. An agent that waits without either reads as idle.
 
 ---
 

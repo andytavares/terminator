@@ -7,6 +7,7 @@ vi.mock('../../../../src/renderer/lib/notifications', () => ({
 
 // Capture constructor args + hooks so tests can drive bell/busy/idle events.
 let screenRows: string[] = []
+let screenCursor = 99
 let capturedCtorArgs: Array<{
   sessionId: string
   scrollbackLimit: number
@@ -23,6 +24,9 @@ vi.mock('../../../../src/renderer/components/terminal/TerminalSession', () => ({
     }
     readVisibleRows(): string[] {
       return screenRows
+    }
+    cursorRow(): number {
+      return screenCursor
     }
   },
 }))
@@ -75,6 +79,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   capturedCtorArgs = []
   screenRows = []
+  screenCursor = 99
   sessions.clear()
   mockCreateSession.mockResolvedValue('session-123')
   vi.mocked(useSessionStore.getState).mockReturnValue({
@@ -464,24 +469,43 @@ describe('reading a choice prompt off the screen (054)', () => {
 
   it('forgets the prompt as soon as output moves again', async () => {
     await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
-    sessions.set('session-123', {
-      projectId: 'proj-1',
-      tabTitle: 'T',
-      latestLine: 'x',
-      choicePrompt: PROMPT,
-    })
+    capturedCtorArgs[0].hooks!.onBusy!()
+    mockSetSessionScreen.mockClear()
+    sessions.set('session-123', { projectId: 'proj-1', tabTitle: 'T', choicePrompt: PROMPT })
+    screenRows = ['⏺ Wrote 1 line to a.txt', '']
     capturedCtorArgs[0].hooks!.onBusy!()
     expect(mockSetSessionScreen).toHaveBeenCalledWith('session-123', {
-      latestLine: 'x',
+      latestLine: '⏺ Wrote 1 line to a.txt',
       choicePrompt: null,
     })
   })
 
-  it('writes nothing on output when there was no prompt to forget', async () => {
+  it('refreshes the latest line of a session that never settles, once a second', async () => {
     await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
     sessions.set('session-123', { projectId: 'proj-1', tabTitle: 'T' })
+    screenRows = ['17:02:21 14 passed', '']
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('session-123', {
+      latestLine: '17:02:21 14 passed',
+      choicePrompt: null,
+    })
+    mockSetSessionScreen.mockClear()
     capturedCtorArgs[0].hooks!.onBusy!()
     expect(mockSetSessionScreen).not.toHaveBeenCalled()
+    setActivityClock(() => 1000)
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(mockSetSessionScreen).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the latest line from above the cursor', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    screenRows = ['$ pnpm test', '14 passed, 2 failed', 'me@host $ ', '']
+    screenCursor = 2
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith(
+      'session-123',
+      expect.objectContaining({ latestLine: '14 passed, 2 failed' })
+    )
   })
 })
 

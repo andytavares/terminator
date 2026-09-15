@@ -118,3 +118,9 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-tile {
+    transition: none;
+  }
+}

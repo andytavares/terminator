@@ -479,6 +479,11 @@ export class TerminalInstance {
     )
   }
 
+  /** The cursor's row on screen, 0 at the top. */
+  cursorRow(): number {
+    return this.terminal.buffer.active.cursorY
+  }
+
   mountPreview(container: HTMLElement): (() => void) | null {
     if (!this.opened) return null
     const { cols, rows } = this.terminal
@@ -508,6 +513,9 @@ export class TerminalInstance {
     this.element.style.height = `${naturalH}px`
     this.element.style.transformOrigin = 'top left'
     this.element.style.pointerEvents = 'none'
+    // A preview is for reading. Its xterm input stays out of the tab order, or
+    // tabbing through Home would type into the session behind a thumbnail.
+    this.terminal.textarea?.setAttribute('tabindex', '-1')
     place()
     container.appendChild(this.element)
     // The cursor moves as output arrives; the window follows it on each render.
@@ -515,6 +523,7 @@ export class TerminalInstance {
 
     return () => {
       following.dispose()
+      this.terminal.textarea?.removeAttribute('tabindex')
       this.element.style.width = '100%'
       this.element.style.height = '100%'
       this.element.style.transform = ''

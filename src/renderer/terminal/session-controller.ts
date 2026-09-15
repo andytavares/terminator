@@ -46,27 +46,30 @@ export function resetActivityThrottle(): void {
   lastStampedAt.clear()
 }
 
-function stampActivity(sessionId: string, force = false): void {
+/** Returns whether it stamped, so a caller can do its own throttled work on the same beat. */
+function stampActivity(sessionId: string, force = false): boolean {
   const at = now()
   const last = lastStampedAt.get(sessionId)
-  if (!force && last !== undefined && at - last < ACTIVITY_STAMP_INTERVAL_MS) return
+  if (!force && last !== undefined && at - last < ACTIVITY_STAMP_INTERVAL_MS) return false
   lastStampedAt.set(sessionId, at)
   useSessionStore.getState().stampActivity(sessionId, at)
+  return true
 }
 
 function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInstance {
   const instance: TerminalInstance = new TerminalInstance(sessionId, scrollbackLimit, {
     onBell: () => handleBell(sessionId),
     onBusy: () => {
-      stampActivity(sessionId)
+      const stamped = stampActivity(sessionId)
       const store = useSessionStore.getState()
       store.setSessionBusy(sessionId)
-      // Output moving means the question was answered or redrawn; the next
-      // settle reads it again.
+      // Output moving means a question was answered or redrawn; the next
+      // settle reads it again. A session that never settles still gets its
+      // latest line refreshed, on the activity stamp's once-a-second beat.
       const session = store.sessions.get(sessionId)
-      if (session?.choicePrompt !== undefined) {
+      if (stamped || session?.choicePrompt !== undefined) {
         store.setSessionScreen(sessionId, {
-          latestLine: session.latestLine ?? '',
+          latestLine: latestLineOf(instance.readVisibleRows(), instance.cursorRow()),
           choicePrompt: null,
         })
       }
@@ -80,7 +83,7 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
       // per output chunk across every live terminal.
       const rows = instance.readVisibleRows()
       useSessionStore.getState().setSessionScreen(sessionId, {
-        latestLine: latestLineOf(rows),
+        latestLine: latestLineOf(rows, instance.cursorRow()),
         choicePrompt: parseChoicePrompt(rows),
       })
     },

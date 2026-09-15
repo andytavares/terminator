@@ -86,7 +86,7 @@ export function WorkItemCell({
       <input
         className="work-item__input"
         aria-label={PROMPT}
-        placeholder={PROMPT}
+        placeholder="What is it doing?"
         maxLength={DESCRIPTION_MAX_LENGTH}
         value={draft}
         autoFocus={editing}

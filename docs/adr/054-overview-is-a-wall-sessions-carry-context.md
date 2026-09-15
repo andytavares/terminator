@@ -39,6 +39,9 @@ Three facts in the code shaped the answer:
 
 ## Consequences
 
-- `BoardScreen`, `board-lanes.ts`, the hidden-lanes preference, the session note, and their tests are deleted.
-- A prompt shaped like a numbered list that is not a question (for example, a numbered log at the bottom of the screen) can read as needs-you. The parser requires ≥ 2 options numbered 1..n in the bottom half of the screen, with a line above, which bounds but does not remove this.
-- Whether a bare digit confirms a Claude Code select option is observed, not documented. It is verified live before release, and a change there is confined to `answerChoice`.
+- `BoardScreen`, `board-lanes.ts`, `SessionTile`, the hidden-lanes preference, the session note and their tests are deleted. The stored `terminator.board.lanes` key is abandoned.
+- **`agentState` was never stored.** Only the sidebar derived it, locally, so any surface reading `session.agentState` saw every session as idle. Home, the wall and the Home badge derive state through `BellAndBusySource`, the same as the sidebar.
+- The choice-prompt parser was built against a real Claude Code 2.1.273 screen, not a guess. It requires at least two options numbered 1..n, exactly one `❯` cursor, and the block to be the last thing on screen apart from up to two footer lines. A numbered list in ordinary output has no cursor and is ignored. A prompt from another tool drawn in the same shape would still read as needs-you.
+- **A bare digit answers a Claude Code select prompt**, verified live on 2.1.273: once by pressing `1` alone, and once by clicking the wall tile's button (`tests/e2e/live/choice-prompt.spec.ts`). If a later version needs `Enter`, the change is confined to `answerChoice`.
+- Previews now fill their box's width and follow the cursor. On a very wide terminal, even a Large tile draws small text; readable previews of such terminals would need the preview to render at its own column count, which would resize the PTY, and is not done.
+- Settings can only be opened from `App`, so the session link dialog tells an operator with no tracker where to connect one rather than taking them there, as the sidebar's link dialog already does.

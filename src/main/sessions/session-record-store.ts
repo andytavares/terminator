@@ -16,7 +16,7 @@ const FILE_NAME = 'session-records.json'
 
 type RecordChangeHandler = (sessionId: string, record: SessionRecord | null) => void
 
-export class SessionRecordError extends Error {
+class SessionRecordError extends Error {
   constructor(
     readonly code: 'VALIDATION_ERROR' | 'RECORD_CLOSED',
     message: string

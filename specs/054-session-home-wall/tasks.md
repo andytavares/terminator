@@ -470,21 +470,21 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ## Phase 10: Polish & Cross-Cutting
 
-- [ ] T085 [P] Update `docs/ARCHITECTURE.md`:
+- [x] T085 [P] Update `docs/ARCHITECTURE.md`:
   - Persistence boundaries table: add the `SessionRecord` row, and make the TerminalSession row note that descriptions persist through records.
   - Replace the board/lanes text in "Navigation Chrome" and "One state vocabulary, three surfaces" with a "Session Home and Monitor Wall" section.
   - Terminal Session Lifecycle: `terminal:close` also stamps the record.
-- [ ] T086 [P] Add a user guide page, `docs/user-guide/session-home.md`, covering Home, both layouts, describing and linking sessions, the Closed list's 30 days, and the wall and answering in place. Update the README feature list.
-- [ ] T087 [P] Finalise `docs/adr/054-overview-is-a-wall-sessions-carry-context.md` with the R6 outcome from T067. Add a "Superseded by ADR 054 (layout)" line to `docs/adr/036-the-board-is-one-grid.md`'s status block, the only edit an immutable ADR allows.
-- [ ] T088 Accessibility and motion pass:
+- [x] T086 [P] (Written as section 11 of the existing single-file `docs/user-guide/USER-GUIDE.md` rather than a new page.) Add a user guide page, `docs/user-guide/session-home.md`, covering Home, both layouts, describing and linking sessions, the Closed list's 30 days, and the wall and answering in place. Update the README feature list.
+- [x] T087 [P] Finalise `docs/adr/054-overview-is-a-wall-sessions-carry-context.md` with the R6 outcome from T067. Add a "Superseded by ADR 054 (layout)" line to `docs/adr/036-the-board-is-one-grid.md`'s status block, the only edit an immutable ADR allows.
+- [x] T088 Accessibility and motion pass:
 
   - Tab through Home (both layouts) and the wall. Every control is reachable with a visible focus ring.
   - With `prefers-reduced-motion` emulated, the state spinner and tile moves do not animate.
 
   Fix any gaps with a spec per fix in the relevant component spec (FR-037, FR-038).
 
-- [ ] T089 Verify reachability: list every exported function and component this feature added, and `grep` for a caller outside tests for each. Delete any that have none (`feedback_wire_the_seams_not_the_tasks`, `feedback_audit_callers_not_existence`).
-- [ ] T090 Screenshot the running app: `launchApp`, then capture Home Ledger, Home Logbook and the wall, with sessions in all four states, in both themes, to `test-results/054/`. Look at each image before claiming done (`feedback_screenshot_the_running_app`).
+- [x] T089 Verify reachability: list every exported function and component this feature added, and `grep` for a caller outside tests for each. Delete any that have none (`feedback_wire_the_seams_not_the_tasks`, `feedback_audit_callers_not_existence`).
+- [x] T090 Screenshot the running app: `launchApp`, then capture Home Ledger, Home Logbook and the wall, with sessions in all four states, in both themes, to `test-results/054/`. Look at each image before claiming done (`feedback_screenshot_the_running_app`).
 - [ ] T091 Run `quickstart.md` §1–§6 in order and put each command's output and exit code in the PR description:
   - `npm run format`
   - `npm run lint`

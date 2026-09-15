@@ -243,6 +243,12 @@ describe('TerminalInstance', () => {
     expect(getLine.mock.calls.map((c) => c[0])).toEqual([40, 41, 42])
   })
 
+  it("reports the cursor's row on screen", () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    Object.assign(instance.terminal.buffer.active, { cursorY: 7 })
+    expect(instance.cursorRow()).toBe(7)
+  })
+
   it('reads a missing buffer line as an empty row', () => {
     const instance = new TerminalInstance('ses-1', 1000)
     ;(instance.terminal as unknown as { rows: number }).rows = 2
@@ -508,6 +514,25 @@ describe('TerminalInstance', () => {
 
       cleanup()
       expect(mockRenderDispose).toHaveBeenCalled()
+      document.body.removeChild(mountContainer)
+    })
+
+    it('keeps a preview out of the tab order, and gives the terminal back its place after', () => {
+      const instance = new TerminalInstance('ses-1', 1000)
+      const mountContainer = document.createElement('div')
+      document.body.appendChild(mountContainer)
+      instance.mount(mountContainer)
+      instance.unmount()
+      Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
+      Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
+      const textarea = document.createElement('textarea')
+      Object.assign(instance.terminal, { textarea })
+      Object.assign(instance.terminal.buffer.active, { cursorY: 0 })
+
+      const cleanup = instance.mountPreview(document.createElement('div'))!
+      expect(textarea.getAttribute('tabindex')).toBe('-1')
+      cleanup()
+      expect(textarea.hasAttribute('tabindex')).toBe(false)
       document.body.removeChild(mountContainer)
     })
 

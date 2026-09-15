@@ -80,9 +80,9 @@ function Detail({
   }
 
   const rows: Array<[string, string | null]> = [
-    ['Workspace', facts.workspaceName],
-    ['Project', facts.projectName],
-    ['Branch', facts.branch],
+    ['Repo', facts.workspaceName],
+    ['Branch', facts.projectName],
+    ['Git branch', facts.branch !== facts.projectName ? facts.branch : null],
     ['Shell', facts.shell],
     ['Started', timeOf(facts.startedAt)],
   ]

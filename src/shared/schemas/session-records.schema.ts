@@ -3,7 +3,7 @@ import { TrackerIdSchema } from './integrations.schema.js'
 
 export const DESCRIPTION_MAX_LENGTH = 500
 
-export const SessionSnapshotSchema = z.object({
+const SessionSnapshotSchema = z.object({
   sessionId: z.string().min(1),
   projectId: z.string().min(1),
   workspaceName: z.string().nullable(),
@@ -14,7 +14,7 @@ export const SessionSnapshotSchema = z.object({
   startedAt: z.string(),
 })
 
-export const WorkItemRefSchema = z.object({
+const WorkItemRefSchema = z.object({
   tracker: TrackerIdSchema,
   key: z.string().min(1),
 })
