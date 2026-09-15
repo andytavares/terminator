@@ -439,12 +439,12 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Tests first
 
-- [ ] T079 [P] [US7] Extend `tests/unit/renderer/sidebar/ledger-rows.spec.ts`:
+- [x] T079 [P] [US7] Extend `tests/unit/renderer/sidebar/ledger-rows.spec.ts`:
   - `groupBy: 'project'` and `'none'`.
   - `sort: 'recent'`.
   - `hideExited` drops exited open sessions but keeps Closed.
   - The Needs you filter keeps only awaiting-input.
-- [ ] T080 [P] [US7] Write failing specs:
+- [x] T080 [P] [US7] Write failing specs:
   - `tests/unit/renderer/components/DisplayMenu.spec.tsx`: `dialog` `Display options`, `combobox`es `Group by`/`Sort`, the seven `checkbox`es, and each change calls `onChange` with the new prefs.
   - Extend `LedgerView.spec.tsx`:
     - A hidden column removes its cells and header.
@@ -453,16 +453,16 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Implementation
 
-- [ ] T081 [US7] Add grouping, sort, `hideExited` and the Needs you filter to `buildLedger` in `src/renderer/sidebar/ledger-rows.ts` (T079).
-- [ ] T082 [US7] Implement `src/renderer/components/home/DisplayMenu.tsx` and `DisplayMenu.css`, using the shared dialog and popover primitives the core already uses (`src/renderer/components/sidebar/SidebarMenu.tsx` pattern) (T080).
-- [ ] T083 [US7] Wire in `HomeScreen.tsx` and `LedgerView.tsx`:
+- [x] T081 [US7] Add grouping, sort, `hideExited` and the Needs you filter to `buildLedger` in `src/renderer/sidebar/ledger-rows.ts` (T079).
+- [x] T082 [US7] (Built as `LedgerDisplayMenu`, a `menu` in the shape of the sidebar's Display menu rather than a dialog with comboboxes.) Implement `src/renderer/components/home/DisplayMenu.tsx` and `DisplayMenu.css`, using the shared dialog and popover primitives the core already uses (`src/renderer/components/sidebar/SidebarMenu.tsx` pattern) (T080).
+- [x] T083 [US7] Wire in `HomeScreen.tsx` and `LedgerView.tsx`:
 
   - `Display` and the `Needs you` toggle (`aria-pressed`, not persisted) in `HomeScreen.tsx`.
   - Column visibility in the grid template and `previewSelected` in `LedgerView.tsx`.
 
   T080 passes.
 
-- [ ] T084 [US7] Extend `tests/e2e/session-home.spec.ts` (US7 block): uncheck `Latest output`, choose Group by `Project`, relaunch, and assert the column header is absent and the rowgroup names are project-only.
+- [x] T084 [US7] Extend `tests/e2e/session-home.spec.ts` (US7 block): uncheck `Latest output`, choose Group by `Project`, relaunch, and assert the column header is absent and the rowgroup names are project-only.
 
 **Checkpoint**: Every story is complete.
 

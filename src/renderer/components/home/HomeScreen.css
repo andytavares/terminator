@@ -64,6 +64,36 @@
   outline-offset: -2px;
 }
 
+.home__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.home__toggle[aria-pressed='true'] {
+  background: var(--accent-dim);
+  border-color: transparent;
+}
+
+.home__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.home__count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .home__search {
   display: inline-flex;
   align-items: center;

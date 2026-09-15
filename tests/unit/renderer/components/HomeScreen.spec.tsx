@@ -196,4 +196,54 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close link' }))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('shows only sessions that need you while that filter is on, in either layout', () => {
+    render(<HomeScreen />)
+    const toggle = screen.getByRole('button', { name: /Needs you/ })
+    expect(toggle.textContent).toContain('1')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByRole('row', { name: 'zsh' })).toBeNull()
+    expect(screen.getByRole('row', { name: 'claude' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: 'Logbook' }))
+    expect(screen.queryByRole('option', { name: /Checking bundle size/ })).toBeNull()
+  })
+
+  it('does not remember the Needs you filter', () => {
+    const { unmount } = render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('button', { name: /Needs you/ }))
+    unmount()
+    render(<HomeScreen />)
+    expect(screen.getByRole('button', { name: /Needs you/ }).getAttribute('aria-pressed')).toBe(
+      'false'
+    )
+  })
+
+  it('clears both filters when nothing matches', () => {
+    state.facts = [fact({ sessionId: 'b', name: 'zsh' })]
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('button', { name: /Needs you/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(screen.getByRole('row', { name: 'zsh' })).toBeTruthy()
+  })
+
+  it('arranges the Ledger from the Display menu, and remembers it', () => {
+    const { unmount } = render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Display' }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Latest output' }))
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).not.toContain(
+      'Latest output'
+    )
+    unmount()
+    render(<HomeScreen />)
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).not.toContain(
+      'Latest output'
+    )
+  })
+
+  it('offers the Display menu only for the Ledger', () => {
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('radio', { name: 'Logbook' }))
+    expect(screen.queryByRole('button', { name: 'Display' })).toBeNull()
+  })
 })

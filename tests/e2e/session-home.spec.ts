@@ -2,7 +2,14 @@ import { test, expect, type Page } from '@playwright/test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  selectProject,
+} from './helpers'
 
 // Home against the running app: it is the launch view, it lists every terminal
 // where it lives, and what the operator writes about a session is still there
@@ -123,4 +130,28 @@ test('linking a session says where to connect a tracker when none is', async () 
   )
   await dialog.getByRole('button', { name: 'Cancel' }).click()
   await expect(dialog).toBeHidden()
+})
+
+test("the Ledger's columns and grouping survive a restart", async () => {
+  handle = await launchApp()
+  const profile = handle.userDataDir
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+
+  await page.getByRole('region', { name: 'Home' }).getByRole('button', { name: 'Display' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Latest output' }).click()
+  await page.getByRole('menuitemradio', { name: 'Branch', exact: true }).click()
+  await expect(page.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
+
+  await closeApp(handle, { keepProfile: true })
+  handle = await launchApp(profile)
+  const restarted = handle.page
+  // Terminals do not survive a restart, so give the Ledger a row to arrange.
+  await selectProject(restarted, 'Repo One', 'feature-a')
+  await openHome(restarted)
+  await expect(restarted.getByRole('columnheader', { name: 'Session' })).toBeVisible()
+  await expect(restarted.getByRole('columnheader', { name: 'Latest output' })).toHaveCount(0)
+  await expect(restarted.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
 })

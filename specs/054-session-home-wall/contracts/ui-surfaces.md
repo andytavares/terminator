@@ -12,9 +12,10 @@ End-to-end tests address these by role and accessible name, never by CSS class (
 - Layout switch: `radiogroup` named `Layout`, with `radio`s `Ledger` and `Logbook`.
 - Filter: `searchbox` named `Filter sessions`.
 - Needs you filter: `button` named `Needs you`, with `aria-pressed`.
-- Display menu: `button` named `Display` opens a `dialog` named `Display options`. Inside:
-  - `combobox`es `Group by` and `Sort`
-  - `checkbox`es `Branch`, `Work item or description`, `Tags`, `Latest output`, `Age`, `Preview the selected row`, `Hide exited sessions`
+- Home is a `region` named `Home`; its controls are addressed inside it, because the sidebar has its own `Display`.
+- Display menu (Ledger only): `button` named `Display` opens a `menu` named `Display options`, in the shape of the sidebar's Display menu. Inside:
+  - `menuitemradio`s `Repo, then branch`, `Branch`, `None` (group by) and `Needs you first`, `Recent activity` (sort), which close the menu
+  - `menuitemcheckbox`es `Branch`, `Work item or description`, `Tags`, `Latest output`, `Age`, `Preview the selected row`, `Hide exited sessions`, which leave it open
 - Empty filter result: text `No sessions match`, and `button` `Clear filters`.
 - No sessions at all: text `No terminals are open`, and `button` `Go to terminals`.
 

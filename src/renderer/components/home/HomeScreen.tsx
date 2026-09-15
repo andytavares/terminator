@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { LedgerView } from './LedgerView'
 import { LogbookView } from './LogbookView'
+import { LedgerDisplayMenu } from './LedgerDisplayMenu'
+import { StateIcon } from '../session/StateIcon'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
@@ -39,14 +41,24 @@ export function HomeScreen(): JSX.Element {
 
   const [prefs, setPrefs] = useState<HomePrefs>(loadHomePrefs)
   const [text, setText] = useState('')
+  const [needsYou, setNeedsYou] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [linking, setLinking] = useState<SessionFacts | null>(null)
 
   const groups = useMemo(
-    () => buildLedger(facts, prefs, { needsYou: false, text }, titles),
-    [facts, prefs, text, titles]
+    () => buildLedger(facts, prefs, { needsYou, text }, titles),
+    [facts, prefs, needsYou, text, titles]
   )
-  const logbook = useMemo(() => buildLogbook(facts, text, titles), [facts, text, titles])
+  const logbook = useMemo(
+    () =>
+      buildLogbook(
+        needsYou ? facts.filter((f) => f.state === 'awaiting-input') : facts,
+        text,
+        titles
+      ),
+    [facts, needsYou, text, titles]
+  )
+  const needsYouCount = facts.filter((f) => f.state === 'awaiting-input').length
   const selected = facts.find((f) => f.sessionId === selectedId) ?? null
   const matches = prefs.layout === 'ledger' ? groups.length : logbook.length
 
@@ -70,7 +82,7 @@ export function HomeScreen(): JSX.Element {
   }
 
   return (
-    <div className="home">
+    <section className="home" aria-label="Home">
       <div className="home__bar">
         <h2 className="home__title">Home</h2>
         <span className="home__meta">
@@ -90,6 +102,16 @@ export function HomeScreen(): JSX.Element {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          aria-pressed={needsYou}
+          className="home__toggle"
+          onClick={() => setNeedsYou((v) => !v)}
+        >
+          <StateIcon state="awaiting-input" />
+          Needs you
+          <span className="home__count">{needsYouCount}</span>
+        </button>
         <label className="home__search">
           <Search aria-hidden="true" />
           <input
@@ -100,6 +122,7 @@ export function HomeScreen(): JSX.Element {
             onChange={(e) => setText(e.target.value)}
           />
         </label>
+        {prefs.layout === 'ledger' && <LedgerDisplayMenu prefs={prefs} onChange={update} />}
       </div>
 
       <div className="home__body">
@@ -119,7 +142,14 @@ export function HomeScreen(): JSX.Element {
         {facts.length > 0 && matches === 0 ? (
           <div className="home__empty">
             <p>No sessions match</p>
-            <button type="button" className="home__empty-action" onClick={() => setText('')}>
+            <button
+              type="button"
+              className="home__empty-action"
+              onClick={() => {
+                setText('')
+                setNeedsYou(false)
+              }}
+            >
               Clear filters
             </button>
           </div>
@@ -155,6 +185,6 @@ export function HomeScreen(): JSX.Element {
         )}
       </div>
       {linking !== null && <SessionLinkDialog facts={linking} onClose={() => setLinking(null)} />}
-    </div>
+    </section>
   )
 }
