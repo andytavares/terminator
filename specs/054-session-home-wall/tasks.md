@@ -492,7 +492,7 @@ description: 'Task list for Session Home and Monitor Wall'
   - `npm run build`
   - `npx playwright test tests/e2e/session-home.spec.ts tests/e2e/monitor-wall.spec.ts`
   - The §6 keystroke timing
-- [ ] T092 Open the PR from `054-session-home-wall`. The body names the deleted board files and tests, the abandoned `terminator.board.lanes` key, the needs-you widening, and the R6 finding. Check `git log --oneline -1` after the last commit to confirm the coverage gate did not refuse it (`feedback_report_the_gate_not_the_preview`).
+- [x] T092 Open the PR from `054-session-home-wall`. The body names the deleted board files and tests, the abandoned `terminator.board.lanes` key, the needs-you widening, and the R6 finding. Check `git log --oneline -1` after the last commit to confirm the coverage gate did not refuse it (`feedback_report_the_gate_not_the_preview`).
 
 ---
 
