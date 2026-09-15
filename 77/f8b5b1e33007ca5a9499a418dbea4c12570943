@@ -1,0 +1,84 @@
+src/renderer/components/home/LedgerView.tsx
+  s_cf6284d326023a::t_2addc41b9b954b 1-214
+tests/unit/renderer/sidebar/fixtures/facts.ts
+  s_cf6284d326023a::t_f277fb22726282 1-37
+tests/unit/renderer/components/useSessionFacts.spec.tsx
+  s_cf6284d326023a::t_798dd2835fdc22 10,97-107
+  s_cf6284d326023a::t_d98e19eb956b3c 108-109
+src/renderer/extensions/registry.ts
+  s_cf6284d326023a::t_88c2a5263cc467 11-12
+src/renderer/components/home/HomeScreen.tsx
+  s_cf6284d326023a::t_b667c229bde969 1-97
+tests/unit/renderer/sidebar/session-filter.spec.ts
+  s_cf6284d326023a::t_d03187b73406ed 1-24,26-48
+  s_cf6284d326023a::t_0b3812834a3daf 25
+src/renderer/sidebar/session-filter.ts
+  s_cf6284d326023a::t_0b3812834a3daf 1-26
+tests/unit/renderer/sidebar/ledger-rows.spec.ts
+  s_cf6284d326023a::t_8d0e834ccf5683 1-30,35-110,117-125,132-165
+  s_cf6284d326023a::t_6845a7c18296ec 31-34,111-116,126-131
+src/renderer/sidebar/ledger-rows.ts
+  s_cf6284d326023a::t_0b3812834a3daf 1-87
+src/renderer/components/home/LedgerView.css
+  s_cf6284d326023a::t_3a72fe94d150c0 1-191
+src/renderer/components/home/HomeScreen.css
+  s_cf6284d326023a::t_d12376cfd01298 1-109
+tests/unit/renderer/components/AppBand.spec.tsx
+  s_cf6284d326023a::t_0251e59e79accc 176-200
+src/renderer/components/terminal/TabBar.tsx
+  s_cf6284d326023a::t_1a14dede7e64c3 11-13,33-34,62-63,131,136-137,139-140,214-218,234-235,295,367
+tests/unit/renderer/sidebar/home-prefs.spec.ts
+  s_cf6284d326023a::t_2a25f82a038df2 1-91
+src/renderer/sidebar/home-prefs.ts
+  s_cf6284d326023a::t_0b3812834a3daf 1-87
+src/renderer/terminal/navigate-to-session.ts
+  s_cf6284d326023a::t_34d9b93ca2d7f1 1-27
+tests/unit/renderer/components/LedgerView.spec.tsx
+  s_cf6284d326023a::t_6845a7c18296ec 6-8,96-103
+  s_cf6284d326023a::t_ed0b8c31c2528f 149-229
+  s_cf6284d326023a::t_b946974ba13bc8 1-5,9-95,104-148
+src/renderer/components/session/useSessionFacts.ts
+  s_cf6284d326023a::t_798dd2835fdc22 45-54
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_cf6284d326023a::t_6845a7c18296ec 110-116
+  s_cf6284d326023a::t_798dd2835fdc22 1-109,117-122
+tests/e2e/session-home.spec.ts
+  s_cf6284d326023a::t_6845a7c18296ec 47-49
+  s_cf6284d326023a::t_0b2be28b0f138b 76-77
+  s_cf6284d326023a::t_fc32f9012a2e96 1-46,50-75,78-80
+specs/054-session-home-wall/tasks.md
+  s_cf6284d326023a::t_1c09414a7be9ef 156,161,167,175,183-188,196,214,219,222,228,234-237,246
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_cf6284d326023a::t_6845a7c18296ec 502-504,598-601
+  s_cf6284d326023a::t_eeca6da0bc43a4 12-25,485-487,494,544,575-576,610,618,628-642,644-645,648,651,655-656,659
+src/renderer/components/sidebar/AppBand.tsx
+  s_cf6284d326023a::t_88c2a5263cc467 47-49,52
+tests/unit/renderer/terminal/navigate-to-session.spec.ts
+  s_cf6284d326023a::t_34d9b93ca2d7f1 1-73
+tests/e2e/helpers.ts
+  s_cf6284d326023a::t_45f8d154e2c6f5 17-23,41-44,70
+src/renderer/App.tsx
+  s_cf6284d326023a::t_b044556605fadd 2
+  s_cf6284d326023a::t_88c2a5263cc467 29,514-544
+  s_cf6284d326023a::t_523ab6ccb1606f 545
+tests/unit/renderer/App.spec.tsx
+  s_cf6284d326023a::t_0251e59e79accc 22,1307-1358
+  s_cf6284d326023a::t_6845a7c18296ec 1223,1248,1261,1277,1290,1301
+  s_cf6284d326023a::t_3829dcce246ace 1359-1360
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "77f8b5b1e33007ca5a9499a418dbea4c12570943",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
