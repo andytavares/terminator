@@ -153,18 +153,18 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Tests first
 
-- [ ] T029 [P] [US1] Write failing specs for `loadHomePrefs` and `saveHomePrefs` in `tests/unit/renderer/sidebar/home-prefs.spec.ts`:
+- [x] T029 [P] [US1] Write failing specs for `loadHomePrefs` and `saveHomePrefs` in `tests/unit/renderer/sidebar/home-prefs.spec.ts`:
   - Defaults are as in `data-model.md`.
   - Missing, corrupt or non-object input falls back.
   - An unknown field value falls back per field, keeping the valid ones.
   - `save` swallows a throwing `localStorage`.
-- [ ] T030 [P] [US1] Write failing specs for `buildLedger` with default prefs and no filters in `tests/unit/renderer/sidebar/ledger-rows.spec.ts`:
+- [x] T030 [P] [US1] Write failing specs for `buildLedger` with default prefs and no filters in `tests/unit/renderer/sidebar/ledger-rows.spec.ts`:
   - Groups are labelled `<workspace> / <project>`.
   - A scratch session goes under `No project`.
   - Within a group: awaiting-input, working, idle, exited.
   - Ties break by `lastActivityAt` descending.
   - Empty groups are omitted.
-- [ ] T031 [P] [US1] Write failing component specs:
+- [x] T031 [P] [US1] Write failing component specs:
   - `tests/unit/renderer/components/LedgerView.spec.tsx`:
     - A `grid` named `Sessions` with one `rowgroup` per group and one `row` per session showing state, name, branch, work item and age.
     - Selecting a row sets `aria-selected` and renders `region` `Preview of <name>`, containing `LivePreview` and a `button` `Open <name>`.
@@ -172,7 +172,7 @@ description: 'Task list for Session Home and Monitor Wall'
   - `tests/unit/renderer/components/HomeScreen.spec.tsx`:
     - Renders the Ledger.
     - With zero sessions and no records, shows `No terminals are open` and `Open a terminal`.
-- [ ] T032 [P] [US1] Write failing specs for the tab badge:
+- [x] T032 [P] [US1] Write failing specs for the tab badge:
   - `tests/unit/renderer/extensions/registry.spec.ts`: `updateGlobalTab(id, { badge })` stores the badge.
   - `tests/unit/renderer/components/AppBand.spec.tsx`:
     - A global tab's `badge` renders as a count, `9+` above 9, and nothing at 0.
@@ -180,12 +180,12 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Implementation
 
-- [ ] T033 [P] [US1] Implement `src/renderer/sidebar/home-prefs.ts`, with the key `terminator.home.prefs` (T029). Add a comment naming its `localStorage` side effect, the same as `loadHiddenLanes` does today.
-- [ ] T034 [P] [US1] Implement `buildLedger(facts, prefs, filters)` and the `LedgerGroup` type in `src/renderer/sidebar/ledger-rows.ts`. This phase covers the default grouping and sort only (T030).
-- [ ] T035 [US1] Implement `src/renderer/components/home/LedgerView.tsx` and `LedgerView.css`. Columns use one CSS grid template, per the mockup A layout. Navigation reuses the `navigate(sessionId)` logic currently in `OverviewScreen.tsx`, extracted to `src/renderer/terminal/navigate-to-session.ts` and imported by both (T031).
-- [ ] T036 [US1] Implement `src/renderer/components/home/HomeScreen.tsx` and `HomeScreen.css`, with a toolbar holding the `Home` title and the session count, the Ledger body and the empty state (T031). `Open a terminal` closes the global tab, which is the same action the board's empty state used.
-- [ ] T037 [US1] Add `badge?: number` to `GlobalTabRegistration` in `src/renderer/extensions/registry.ts`, and render it in `src/renderer/components/sidebar/AppBand.tsx` through the existing `badge` prop (T032).
-- [ ] T038 [US1] In `src/renderer/App.tsx`:
+- [x] T033 [P] [US1] Implement `src/renderer/sidebar/home-prefs.ts`, with the key `terminator.home.prefs` (T029). Add a comment naming its `localStorage` side effect, the same as `loadHiddenLanes` does today.
+- [x] T034 [P] [US1] Implement `buildLedger(facts, prefs, filters)` and the `LedgerGroup` type in `src/renderer/sidebar/ledger-rows.ts`. This phase covers the default grouping and sort only (T030).
+- [x] T035 [US1] Implement `src/renderer/components/home/LedgerView.tsx` and `LedgerView.css`. Columns use one CSS grid template, per the mockup A layout. Navigation reuses the `navigate(sessionId)` logic currently in `OverviewScreen.tsx`, extracted to `src/renderer/terminal/navigate-to-session.ts` and imported by both (T031).
+- [x] T036 [US1] Implement `src/renderer/components/home/HomeScreen.tsx` and `HomeScreen.css`, with a toolbar holding the `Home` title and the session count, the Ledger body and the empty state (T031). `Open a terminal` closes the global tab, which is the same action the board's empty state used.
+- [x] T037 [US1] Add `badge?: number` to `GlobalTabRegistration` in `src/renderer/extensions/registry.ts`, and render it in `src/renderer/components/sidebar/AppBand.tsx` through the existing `badge` prop (T032).
+- [x] T038 [US1] In `src/renderer/App.tsx`:
 
   - Register `core.home` (label `Home`, lucide `House`, component `HomeScreen`, `permanent: true`), ordered before `core.overview`.
   - Call `setActiveGlobalTab('core.home')` once on first mount.
@@ -193,7 +193,7 @@ description: 'Task list for Session Home and Monitor Wall'
 
   Extend `tests/unit/renderer/App.spec.tsx`, or the nearest existing App spec, first.
 
-- [ ] T039 [US1] Write `tests/e2e/session-home.spec.ts` (US1 block) with `launchApp` and `closeApp` from `tests/e2e/helpers.ts`:
+- [x] T039 [US1] Write `tests/e2e/session-home.spec.ts` (US1 block) with `launchApp` and `closeApp` from `tests/e2e/helpers.ts`:
   - The app opens on Home.
   - Create two workspaces with projects and open terminals.
   - Assert the rowgroup names and row names by role.
@@ -211,30 +211,30 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Tests first
 
-- [ ] T040 [P] [US2] Write failing specs for `matchesFilter` in `tests/unit/renderer/sidebar/session-filter.spec.ts`:
+- [x] T040 [P] [US2] Write failing specs for `matchesFilter` in `tests/unit/renderer/sidebar/session-filter.spec.ts`:
   - Case-insensitive.
   - Matches each of name, workspace, project, branch, ticket key, ticket title and description.
   - Empty text matches all.
   - A multi-line description matches on any line.
-- [ ] T041 [P] [US2] Extend `tests/unit/renderer/sidebar/ledger-rows.spec.ts`:
+- [x] T041 [P] [US2] Extend `tests/unit/renderer/sidebar/ledger-rows.spec.ts`:
   - Closed facts form a final `Closed` group, ordered by `closedAt` descending.
   - The text filter applies to open and closed alike.
-- [ ] T042 [P] [US2] Extend `tests/unit/renderer/components/LedgerView.spec.tsx` and `HomeScreen.spec.tsx`:
+- [x] T042 [P] [US2] Extend `tests/unit/renderer/components/LedgerView.spec.tsx` and `HomeScreen.spec.tsx`:
   - Saving in the describe textbox calls `sessionRecords.setDescription` and the row then shows the description.
   - `Edit description`, then clearing it, brings the textbox back.
   - A `Closed` row is read-only, with no textbox and no Link.
   - `searchbox` `Filter sessions` narrows rows.
   - `No sessions match` with `Clear filters` appears when nothing matches.
-- [ ] T043 [P] [US2] Rewrite the note specs in `tests/unit/renderer/components/TabBar.spec.tsx` and `tests/unit/renderer/stores/session.store.spec.ts`:
+- [x] T043 [P] [US2] Rewrite the note specs in `tests/unit/renderer/components/TabBar.spec.tsx` and `tests/unit/renderer/stores/session.store.spec.ts`:
   - The tab's note control edits the session's description through `sessionRecords.setDescription`.
   - `setSessionNote` no longer exists.
 
 ### Implementation
 
-- [ ] T044 [P] [US2] Implement `matchesFilter` in `src/renderer/sidebar/session-filter.ts` (T040).
-- [ ] T045 [US2] Add the Closed group and text filter to `buildLedger` in `src/renderer/sidebar/ledger-rows.ts` (T041).
-- [ ] T046 [US2] Wire `WorkItemCell.onSaveDescription` to `useSessionRecordsStore().setDescription` in `LedgerView.tsx`. Add the `Filter sessions` searchbox and the empty-match state to `HomeScreen.tsx`, with filter text in component state and not persisted (T042).
-- [ ] T047 [US2] Remove the session note:
+- [x] T044 [P] [US2] Implement `matchesFilter` in `src/renderer/sidebar/session-filter.ts` (T040).
+- [x] T045 [US2] Add the Closed group and text filter to `buildLedger` in `src/renderer/sidebar/ledger-rows.ts` (T041).
+- [x] T046 [US2] Wire `WorkItemCell.onSaveDescription` to `useSessionRecordsStore().setDescription` in `LedgerView.tsx`. Add the `Filter sessions` searchbox and the empty-match state to `HomeScreen.tsx`, with filter text in component state and not persisted (T042).
+- [x] T047 [US2] Remove the session note:
 
   - Delete `note`, `NOTE_MAX_LENGTH` and `setSessionNote` from `src/shared/types/index.ts` and `src/renderer/stores/session.store.ts`.
   - Repoint the TabBar note editor in `src/renderer/components/terminal/TabBar.tsx` to read and write the record's description.
@@ -243,7 +243,7 @@ description: 'Task list for Session Home and Monitor Wall'
 
   T043 passes. `npm run lint` shows 0 unused.
 
-- [ ] T048 [US2] Extend `tests/e2e/session-home.spec.ts` (US2 block):
+- [x] T048 [US2] Extend `tests/e2e/session-home.spec.ts` (US2 block):
   - Describe a terminal from Home.
   - Assert the same text on the Overview tile once US3 lands. Until then, assert it on the TabBar tooltip.
   - `closeApp`, then `launchApp` again.

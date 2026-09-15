@@ -42,3 +42,13 @@ export function useIssue(ref: WorkItemRef | null | undefined): Issue | null | un
 
   return issue
 }
+
+/** Ticket titles read so far, keyed `tracker:key`, so a text filter can match a ticket by its title. */
+export function useIssueTitles(): Map<string, string> {
+  const issuesByKey = useIntegrationsStore((s) => s.issuesByKey)
+  return useMemo(() => {
+    const titles = new Map<string, string>()
+    for (const [id, issue] of issuesByKey) if (issue !== null) titles.set(id, issue.title)
+    return titles
+  }, [issuesByKey])
+}

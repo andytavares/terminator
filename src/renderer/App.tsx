@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, createElement } from 'react'
-import { LayoutGrid } from 'lucide-react'
+import { House, LayoutGrid } from 'lucide-react'
 import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
 import { TerminalPane } from './components/terminal/TerminalPane'
 import { TabBar } from './components/terminal/TabBar'
@@ -26,6 +26,7 @@ import { useExtensionRegistry } from './extensions/registry'
 import type { CommandRegistration } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
 import { OverviewScreen } from './components/overview/OverviewScreen'
+import { HomeScreen } from './components/home/HomeScreen'
 import { MetricsBar } from './components/overview/MetricsBar'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
@@ -509,6 +510,38 @@ export function App(): JSX.Element {
       savedPanelsRef.current = new Set()
     }
   }, [activeProjectTabId, togglePanel])
+
+  // Home is registered before Overview so it sits first in the band.
+  useEffect(() => {
+    return useExtensionRegistry.getState().registerGlobalTab({
+      id: 'core.home',
+      label: 'Home',
+      icon: createElement(House),
+      component: HomeScreen,
+      permanent: true,
+    })
+  }, [])
+
+  // Home is where the app opens.
+  useEffect(() => {
+    setActiveGlobalTab('core.home')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const needsYouCount = useMemo(
+    () =>
+      [...sessions.values()].filter(
+        (s) => s.status !== 'closed' && s.agentState === 'awaiting-input'
+      ).length,
+    [sessions]
+  )
+
+  useEffect(() => {
+    useExtensionRegistry.getState().updateGlobalTab('core.home', {
+      badge: needsYouCount,
+      badgeLabel: `${needsYouCount} need you`,
+    })
+  }, [needsYouCount])
 
   // Register Overview as a built-in global tab
   useEffect(() => {

@@ -73,8 +73,6 @@ export interface TerminalSession {
   lastAttendedAt?: number
   /** Derived from bell/busy/exit, never stored authoritatively (renderer-side view state). */
   agentState: AgentState
-  /** Optional single-line user note: one line, at most 120 chars (renderer-side view state). */
-  note?: string
   /** The shell the main process spawned. Absent for adopted sessions, whose shell is not reported. */
   shell?: string
   /** The last non-empty visible row at the last busy → idle (renderer-side view state). */

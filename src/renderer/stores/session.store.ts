@@ -26,9 +26,6 @@ export interface ProjectView {
 
 const EMPTY_VIEW: ProjectView = { terminalCounter: 0 }
 
-/** A session note is a single line of free text, never a structured task. */
-const NOTE_MAX_LENGTH = 120
-
 function viewOf(views: Map<string, ProjectView>, projectId: string): ProjectView {
   return views.get(projectId) ?? EMPTY_VIEW
 }
@@ -138,8 +135,6 @@ interface SessionState {
   getTerminalInstance: (sessionId: string) => TerminalInstance | undefined
   /** Records PTY activity. `now` is supplied by the caller so this stays pure. */
   stampActivity: (sessionId: string, now: number) => void
-  /** Sets a session's one-line note. Newlines collapsed, capped at 120 chars. */
-  setSessionNote: (sessionId: string, note: string) => void
   setActiveSessionForProject: (projectId: string, sessionId: string, now?: number) => void
   getActiveSessionForProject: (projectId: string) => string | null
   handleProcessExit: (sessionId: string, exitCode: number) => void
@@ -387,12 +382,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   stampActivity: (sessionId, now) => {
     set((s) => patchSession(s, sessionId, { lastActivityAt: now }) ?? s)
-  },
-
-  setSessionNote: (sessionId, note) => {
-    const oneLine = note.replace(/\s*[\r\n]+\s*/g, ' ').trim()
-    const normalised = oneLine.slice(0, NOTE_MAX_LENGTH)
-    set((s) => patchSession(s, sessionId, { note: normalised || undefined }) ?? s)
   },
 
   getActiveSessionForProject: (projectId) =>

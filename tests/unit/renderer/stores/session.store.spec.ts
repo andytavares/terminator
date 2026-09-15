@@ -802,38 +802,6 @@ describe('activity, attention and notes (feature 030)', () => {
       expect(useSessionStore.getState().sessions.get('b')!.lastAttendedAt).toBeUndefined()
     })
   })
-
-  describe('setSessionNote', () => {
-    it('stores a trimmed single-line note', () => {
-      seed()
-      useSessionStore.getState().setSessionNote('sess-1', '  waiting on review  ')
-      expect(useSessionStore.getState().sessions.get('sess-1')!.note).toBe('waiting on review')
-    })
-
-    it('collapses newlines so the note stays one line', () => {
-      seed()
-      useSessionStore.getState().setSessionNote('sess-1', 'first\nsecond\r\nthird')
-      expect(useSessionStore.getState().sessions.get('sess-1')!.note).toBe('first second third')
-    })
-
-    it('caps the note at 120 characters', () => {
-      seed()
-      useSessionStore.getState().setSessionNote('sess-1', 'x'.repeat(200))
-      expect(useSessionStore.getState().sessions.get('sess-1')!.note).toHaveLength(120)
-    })
-
-    it('stores an all-whitespace note as undefined, not an empty string', () => {
-      seed({ note: 'old' })
-      useSessionStore.getState().setSessionNote('sess-1', '   ')
-      expect(useSessionStore.getState().sessions.get('sess-1')!.note).toBeUndefined()
-    })
-
-    it('is a no-op for an unknown session', () => {
-      const before = useSessionStore.getState().sessions
-      useSessionStore.getState().setSessionNote('nope', 'hi')
-      expect(useSessionStore.getState().sessions).toBe(before)
-    })
-  })
 })
 
 describe('setSessionScreen', () => {

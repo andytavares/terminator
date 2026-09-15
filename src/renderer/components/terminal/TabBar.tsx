@@ -8,6 +8,9 @@ import type { ProjectTabRegistration } from '../../extensions/registry'
 import { qualifiedBranchLabel } from '../../sidebar/branch-display'
 import { statusPresentationFor, type StatusIcon } from '../../sidebar/session-status'
 import './TabBar.css'
+import { useSessionFacts } from '../session/useSessionFacts'
+import { useSessionRecordsStore } from '../../stores/session-records.store'
+import { DESCRIPTION_MAX_LENGTH } from '../../../shared/schemas/session-records.schema'
 
 /**
  * Past this many terminals the row scrolls, and it says so. Overflow being
@@ -27,9 +30,8 @@ const STATUS_ICON: Record<StatusIcon, typeof Circle> = {
 interface Props {
   projectId: string
   /**
-   * Opens the note editor on this terminal. The note used to be edited on the
-   * sidebar row; with the rows gone the tab is where the note lives, so the
-   * ⌘I shortcut points here instead (FR-023).
+   * Opens the description editor on this terminal. The ⌘I shortcut points here;
+   * the description is the same one Home and the wall show and edit.
    */
   editNoteSessionId?: string | null
   activeProjectTabId: string | null
@@ -56,8 +58,9 @@ export function TabBar({
     getBellCountForSession,
     renameSession,
     reorderSessions,
-    setSessionNote,
   } = useSessionStore()
+  const factsById = new Map(useSessionFacts().map((f) => [f.sessionId, f]))
+  const setDescription = useSessionRecordsStore((s) => s.setDescription)
   const [notingId, setNotingId] = useState<string | null>(null)
   const [noteValue, setNoteValue] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -125,13 +128,16 @@ export function TabBar({
     const target = allSessions.find((s) => s.id === editNoteSessionId)
     if (target === undefined) return
     setNotingId(editNoteSessionId)
-    setNoteValue(target.note ?? '')
+    setNoteValue(factsById.get(editNoteSessionId)?.description ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editNoteSessionId])
 
   function commitNote(sessionId: string): void {
-    setSessionNote(sessionId, noteValue.trim())
+    const facts = factsById.get(sessionId)
+    const text = noteValue.trim()
     setNotingId(null)
+    if (facts === undefined || (text === '' && facts.description === null)) return
+    void setDescription(facts.snapshot, text === '' ? null : text)
   }
 
   function handleTabDrop(dropIndex: number): void {
@@ -205,11 +211,11 @@ export function TabBar({
               onClick={() => handleSessionTabClick(session.id)}
               onContextMenu={(e) => handleSessionContextMenu(e, session.id)}
               onDoubleClick={(e) => startRename(e, session.id, session.tabTitle)}
-              /* The note lives here and is drawn nowhere: re-homing it from the
-                 sidebar row must not put a fifth thing on a 100px tab. The
-                 rename affordance sits on the same element, so the tooltip
-                 describes what double-clicking the tab actually does. */
-              title={session.note ?? 'Double-click to rename'}
+              /* The description is drawn nowhere on the tab: a fifth thing on a
+                 100px tab makes it unreadable. The rename affordance sits on the
+                 same element, so without one the tooltip says what
+                 double-clicking the tab actually does. */
+              title={factsById.get(session.id)?.description ?? 'Double-click to rename'}
             >
               {renamingId !== session.id &&
                 (() => {
@@ -225,8 +231,8 @@ export function TabBar({
                 <input
                   className="tab-bar__note-input"
                   value={noteValue}
-                  maxLength={120}
-                  placeholder="note"
+                  maxLength={DESCRIPTION_MAX_LENGTH}
+                  placeholder="What is this session doing?"
                   autoFocus
                   onChange={(e) => setNoteValue(e.target.value)}
                   onKeyDown={(e) => {
@@ -286,7 +292,7 @@ export function TabBar({
           y={ctxMenu.y}
           sessionId={ctxMenu.sessionId}
           currentTitle={sessions.find((s) => s.id === ctxMenu.sessionId)?.tabTitle ?? ''}
-          currentNote={sessions.find((s) => s.id === ctxMenu.sessionId)?.note ?? ''}
+          currentNote={factsById.get(ctxMenu.sessionId)?.description ?? ''}
           onRename={(id, title) => {
             setCtxMenu(null)
             setRenamingId(id)
@@ -358,7 +364,7 @@ function SessionTabCtxMenu({
         Rename
       </button>
       <button className="ctx-menu__item" onClick={() => onNote(sessionId, currentNote)}>
-        {currentNote ? 'Edit note…' : 'Add note…'}
+        {currentNote ? 'Edit description…' : 'Add description…'}
       </button>
       <div className="ctx-menu__separator" />
       <button className="ctx-menu__item" onClick={() => onMove(sessionId)}>

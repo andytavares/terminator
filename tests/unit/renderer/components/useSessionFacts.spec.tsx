@@ -7,6 +7,7 @@ import { useIntegrationsStore } from '../../../../src/renderer/stores/integratio
 import {
   useSessionFacts,
   useIssue,
+  useIssueTitles,
 } from '../../../../src/renderer/components/session/useSessionFacts'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
@@ -91,5 +92,18 @@ describe('useIssue', () => {
     const { result } = renderHook(() => useIssue(null))
     expect(result.current).toBeUndefined()
     expect(getIssue).not.toHaveBeenCalled()
+  })
+})
+
+describe('useIssueTitles', () => {
+  it('maps every issue read so far to its title, leaving out unreadable ones', () => {
+    useIntegrationsStore.setState({
+      issuesByKey: new Map([
+        ['linear:TAV-1', { key: 'TAV-1', title: 'Home' } as never],
+        ['linear:TAV-2', null],
+      ]),
+    })
+    const { result } = renderHook(() => useIssueTitles())
+    expect([...result.current]).toEqual([['linear:TAV-1', 'Home']])
   })
 })
