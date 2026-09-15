@@ -1,0 +1,79 @@
+specs/054-session-home-wall/research.md
+  s_cf6284d326023a::t_af316f2afa4fcd 73,75-76,78,86,97
+tests/unit/renderer/App.spec.tsx
+  s_cf6284d326023a::t_73065e529dcf03 1341-1343,1345,1349-1352
+src/renderer/App.tsx
+  s_cf6284d326023a::t_73065e529dcf03 30,537
+  s_cf6284d326023a::t_603d666032bd46 39-40
+  s_cf6284d326023a::t_8763d173af53ee 41
+tests/unit/renderer/components/answers.spec.tsx
+  s_cf6284d326023a::t_63a977ecc0cceb 1-18,26-31
+  s_cf6284d326023a::t_af316f2afa4fcd 19-25
+tests/unit/renderer/sidebar/agent-state.spec.ts
+  s_cf6284d326023a::t_73065e529dcf03 54-55,60-69
+  s_cf6284d326023a::t_af316f2afa4fcd 56-59
+tests/unit/renderer/sidebar/fixtures/claude-prompt-1.txt
+  s_cf6284d326023a::t_a84d2f7bf2a49a 4
+  s_cf6284d326023a::t_d0a99fe06882b7 1-3,5-38
+src/renderer/sidebar/choice-prompt.ts
+  s_cf6284d326023a::t_af316f2afa4fcd 74-76
+  s_cf6284d326023a::t_23db6f6036ce6a 1-73,77
+specs/054-session-home-wall/tasks.md
+  s_cf6284d326023a::t_af316f2afa4fcd 330,337,340,344,352-355,360-361
+src/renderer/sidebar/session-facts.ts
+  s_cf6284d326023a::t_73065e529dcf03 2,55-57,80
+src/renderer/components/session/answers.tsx
+  s_cf6284d326023a::t_63a977ecc0cceb 1-15
+src/renderer/terminal/session-controller.ts
+  s_cf6284d326023a::t_af316f2afa4fcd 82-85
+  s_cf6284d326023a::t_141e249ed59be9 6,62-72,198-219
+  s_cf6284d326023a::t_ffb313d1b4224f 220
+src/renderer/components/overview/OverviewScreen.tsx
+  s_cf6284d326023a::t_63a977ecc0cceb 9,191
+tests/unit/renderer/sidebar/session-facts.spec.ts
+  s_cf6284d326023a::t_fd2005c1ccf0b0 74,96-112
+  s_cf6284d326023a::t_d1e6febfe476c8 113-114
+tests/unit/renderer/components/useSessionFacts.spec.tsx
+  s_cf6284d326023a::t_68ea06257f7460 75
+src/renderer/components/session/ChoiceButtons.css
+  s_cf6284d326023a::t_63a977ecc0cceb 1-49
+src/renderer/components/home/HomeScreen.tsx
+  s_cf6284d326023a::t_63a977ecc0cceb 8,92
+tests/unit/renderer/sidebar/choice-prompt.spec.ts
+  s_cf6284d326023a::t_af316f2afa4fcd 55-59,79-88,98-100,119-125,133-135
+  s_cf6284d326023a::t_23db6f6036ce6a 1-54,60-78,89-97,101-118,126-132,136-143
+tests/e2e/live/choice-prompt.spec.ts
+  s_cf6284d326023a::t_c2819526a1907b 1-2,4-12,17-41,52-54,56-62,66-67,70,89,91
+  s_cf6284d326023a::t_bf6144cb4b4233 3,13-16,50,90
+  s_cf6284d326023a::t_d66b6eec1dd3b0 42-49,51
+  s_cf6284d326023a::t_af316f2afa4fcd 55
+  s_cf6284d326023a::t_a84d2f7bf2a49a 63-65,68-69,71-88
+  s_cf6284d326023a::t_9c22bdb58492f9 92
+src/renderer/sidebar/agent-state.ts
+  s_cf6284d326023a::t_73065e529dcf03 12-13,24-26
+tests/unit/renderer/components/ChoiceButtons.spec.tsx
+  s_cf6284d326023a::t_63a977ecc0cceb 1-18,24-49
+  s_cf6284d326023a::t_af316f2afa4fcd 19-23
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_cf6284d326023a::t_af316f2afa4fcd 467-472
+  s_cf6284d326023a::t_c66293c2d47ddd 490-491
+  s_cf6284d326023a::t_35b44feb0de6cc 45,60-61,65-71,94,437-466,473-489,492-526
+src/renderer/components/session/ChoiceButtons.tsx
+  s_cf6284d326023a::t_63a977ecc0cceb 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d5b1fd8cd80a75fb3666835ee29bd03dcc3d758f",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
