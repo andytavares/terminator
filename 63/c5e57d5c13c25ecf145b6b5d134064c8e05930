@@ -1,0 +1,29 @@
+tests/unit/renderer/components/SessionLinkDialog.spec.tsx
+  s_cf6284d326023a::t_a12ba88bde0324 132,134,136-138,146-155
+  s_cf6284d326023a::t_c6d9b8c73ed2bd 133,135,139-145
+tests/unit/renderer/components/IssuePicker.spec.tsx
+  s_cf6284d326023a::t_b466591dcf56cc 119-144,148-173
+  s_cf6284d326023a::t_dd332335905e74 145-147
+src/renderer/components/session/SessionLinkDialog.tsx
+  s_cf6284d326023a::t_c6d9b8c73ed2bd 1,30-39
+tests/e2e/session-home.spec.ts
+  s_cf6284d326023a::t_dd332335905e74 135-157
+src/renderer/components/integrations/IssuePicker.tsx
+  s_cf6284d326023a::t_9bf340d91b90ed 38,62-73,101-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "63c5e57d5c13c25ecf145b6b5d134064c8e05930",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
