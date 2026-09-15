@@ -11,6 +11,7 @@ import { CommandPalette } from './components/CommandPalette'
 import { useWorkspaceStore } from './stores/workspace.store'
 import { useSettingsStore } from './stores/settings.store'
 import { useIntegrationsStore } from './stores/integrations.store'
+import { useSessionRecordsStore } from './stores/session-records.store'
 import { useSessionStore } from './stores/session.store'
 import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -342,6 +343,12 @@ export function App(): JSX.Element {
     loadWorkspaces()
     loadSettings()
   }, [loadWorkspaces, loadSettings])
+
+  useEffect(() => {
+    const records = useSessionRecordsStore.getState()
+    void records.load()
+    return records.subscribe()
+  }, [])
 
   useEffect(() => {
     if (activeWorkspaceId) loadSettings(activeWorkspaceId)

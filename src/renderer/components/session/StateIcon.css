@@ -1,0 +1,26 @@
+.state-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.state-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.state-icon--awaiting-input {
+  opacity: var(--state-op-awaiting);
+}
+
+.state-icon--working {
+  opacity: var(--state-op-working);
+}
+
+.state-icon--idle {
+  opacity: var(--state-op-idle);
+}
+
+.state-icon--exited {
+  opacity: var(--state-op-exited);
+}

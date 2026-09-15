@@ -2,6 +2,7 @@ import { useSessionStore } from '../stores/session.store'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
 import { dispatchNotification } from '../lib/notifications'
+import { latestLineOf } from '../sidebar/screen'
 import type { PaneSplitDirection } from '../../shared/types/index'
 
 // The single owner of "a live terminal tab": composes the store record, the
@@ -53,7 +54,7 @@ function stampActivity(sessionId: string, force = false): void {
 }
 
 function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInstance {
-  return new TerminalInstance(sessionId, scrollbackLimit, {
+  const instance: TerminalInstance = new TerminalInstance(sessionId, scrollbackLimit, {
     onBell: () => handleBell(sessionId),
     onBusy: () => {
       stampActivity(sessionId)
@@ -64,8 +65,15 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
       // that decides how stale the session looks from here on.
       stampActivity(sessionId, true)
       useSessionStore.getState().setSessionIdle(sessionId)
+      // Read once per burst, when the screen has stopped moving, rather than
+      // per output chunk across every live terminal.
+      const rows = instance.readVisibleRows()
+      useSessionStore
+        .getState()
+        .setSessionScreen(sessionId, { latestLine: latestLineOf(rows), choicePrompt: null })
     },
   })
+  return instance
 }
 
 /**

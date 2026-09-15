@@ -45,6 +45,15 @@ describe('useSessionStore', () => {
   })
 
   describe('createSession', () => {
+    it('keeps the shell the main process spawned', async () => {
+      mockElectronAPI.terminal.create.mockResolvedValue({
+        sessionId: 'sess-sh',
+        shell: '/bin/fish',
+      })
+      await useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
+      expect(useSessionStore.getState().sessions.get('sess-sh')?.shell).toBe('/bin/fish')
+    })
+
     it('creates a session and stores it', async () => {
       mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
       const id = await useSessionStore
@@ -824,5 +833,22 @@ describe('activity, attention and notes (feature 030)', () => {
       useSessionStore.getState().setSessionNote('nope', 'hi')
       expect(useSessionStore.getState().sessions).toBe(before)
     })
+  })
+})
+
+describe('setSessionScreen', () => {
+  it("records a session's last visible line", async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'scr-1' })
+    await useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
+    useSessionStore.getState().setSessionScreen('scr-1', { latestLine: 'done', choicePrompt: null })
+    const session = useSessionStore.getState().sessions.get('scr-1')
+    expect(session?.latestLine).toBe('done')
+    expect(session?.choicePrompt).toBeUndefined()
+  })
+
+  it('does nothing for an unknown session', () => {
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().setSessionScreen('nobody', { latestLine: 'x', choicePrompt: null })
+    expect(useSessionStore.getState().sessions).toBe(before)
   })
 })

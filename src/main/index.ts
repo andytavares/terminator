@@ -9,6 +9,8 @@ import { registerGitHandlers } from './ipc/git.ipc.js'
 import { registerIntegrationsHandlers } from './ipc/integrations.ipc.js'
 import { migrateLegacyCredentials } from './integrations/tracker-store.js'
 import { loadLinks, registerLinkGarbageCollection } from './integrations/issue-link-store.js'
+import { loadRecords, sweepOpenRecords } from './sessions/session-record-store.js'
+import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { registerEditorHandlers } from './ipc/editor.ipc.js'
@@ -372,6 +374,7 @@ app.whenReady().then(async () => {
   })
   registerGitHandlers()
   registerIntegrationsHandlers(() => mainWindow)
+  registerSessionRecordsHandlers(() => mainWindow)
   // The operator already gave these to the SpecKit Pilot extension; asking
   // again because the code moved would be the migration failing at the only
   // thing it exists to do. Best-effort — a failure here never blocks startup.
@@ -380,6 +383,9 @@ app.whenReady().then(async () => {
   // path (the sidebar draws a badge per project) and none can await a file.
   void loadLinks()
   registerLinkGarbageCollection()
+  // Nothing can be open at startup: sessions die with the app, so whatever the
+  // last run left open is closed at its last update before anyone reads it.
+  void loadRecords().then(sweepOpenRecords)
   // Written at startup rather than shipped beside the bundle: a loose script
   // survives development and vanishes from the packaged app (ADR-026).
   void ensureHookScript()

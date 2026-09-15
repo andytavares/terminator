@@ -33,7 +33,7 @@ description: 'Task list for Session Home and Monitor Wall'
 
 **Purpose**: Know the baseline before touching files that the patch-coverage gate measures whole.
 
-- [ ] T001 Record the current line coverage of every existing file this feature edits in `specs/054-session-home-wall/coverage-baseline.md`. Run `npx vitest run --coverage` and read the `coverage/` entries for these files:
+- [x] T001 Record the current line coverage of every existing file this feature edits in `specs/054-session-home-wall/coverage-baseline.md`. Run `npx vitest run --coverage` and read the `coverage/` entries for these files:
 
   - `src/renderer/stores/session.store.ts`
   - `src/renderer/components/terminal/TabBar.tsx`
@@ -50,7 +50,7 @@ description: 'Task list for Session Home and Monitor Wall'
 
   List every file below 80% as pre-existing debt the phase touching it must cover.
 
-- [ ] T002 Confirm the pre-commit gate runs in this checkout. `git config core.hooksPath` must resolve to an existing `.husky/_` directory. If it doesn't, run `npm run prepare` before the first code commit.
+- [x] T002 Confirm the pre-commit gate runs in this checkout. `git config core.hooksPath` must resolve to an existing `.husky/_` directory. If it doesn't, run `npm run prepare` before the first code commit.
 
 ---
 
@@ -60,12 +60,12 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Tests first
 
-- [ ] T003 [P] Write failing specs for `pruneRecords` in `tests/unit/shared/session-records/retention.spec.ts`:
+- [x] T003 [P] Write failing specs for `pruneRecords` in `tests/unit/shared/session-records/retention.spec.ts`:
   - Keeps open records.
   - Keeps a record closed exactly 30 days ago.
   - Drops one closed 30 days + 1 ms ago.
   - Never reorders.
-- [ ] T004 [P] Write failing specs for the store in `tests/unit/sessions/session-record-store.spec.ts`. Mock `electron` `app.getPath` to a tmp dir, as `tests/unit/integrations/issue-link-store.spec.ts` does. Cover:
+- [x] T004 [P] Write failing specs for the store in `tests/unit/sessions/session-record-store.spec.ts`. Mock `electron` `app.getPath` to a tmp dir, as `tests/unit/integrations/issue-link-store.spec.ts` does. Cover:
   - `loadRecords` tolerates a missing, corrupt or non-array file, and entries with an unknown tracker.
   - `setDescription` creates a record with its snapshot.
   - Clearing both description and link on an open record deletes it.
@@ -75,18 +75,18 @@ description: 'Task list for Session Home and Monitor Wall'
   - `sweepOpenRecords` sets `closedAt = updatedAt` on open records.
   - Every change calls `onRecordChange` handlers.
   - The file is written via tmp-then-rename.
-- [ ] T005 [P] Write failing specs for the IPC handlers in `tests/unit/ipc/session-records.ipc.spec.ts`:
+- [x] T005 [P] Write failing specs for the IPC handlers in `tests/unit/ipc/session-records.ipc.spec.ts`:
   - `session-records:list` returns pruned records, closed newest first.
   - `set-description` and `set-link` return `VALIDATION_ERROR` on a bad payload and `RECORD_CLOSED` on a closed record.
   - A `session-records:changed` event is sent after each write.
-- [ ] T006 [P] Extend `tests/unit/ipc/terminal.ipc.spec.ts`:
+- [x] T006 [P] Extend `tests/unit/ipc/terminal.ipc.spec.ts`:
   - `terminal:create` returns `{ sessionId, shell }` with the resolved shell.
   - `terminal:close` calls `markClosed(sessionId, …)` after `ptyManager.kill`.
-- [ ] T007 [P] Write failing specs for `resolveWorkItem` in `tests/unit/renderer/sidebar/work-item.spec.ts`:
+- [x] T007 [P] Write failing specs for `resolveWorkItem` in `tests/unit/renderer/sidebar/work-item.spec.ts`:
   - The session link wins (`source: 'session'`).
   - Falls back to the project link (`source: 'project'`).
   - `null` when both are absent.
-- [ ] T008 [P] Write failing specs for `buildSessionFacts` in `tests/unit/renderer/sidebar/session-facts.spec.ts`:
+- [x] T008 [P] Write failing specs for `buildSessionFacts` in `tests/unit/renderer/sidebar/session-facts.spec.ts`:
   - One fact per open session.
   - A closed record is included only when no open session has its id.
   - A missing project yields workspace/project `null` and a "No project" group label, not a dropped session.
@@ -94,15 +94,15 @@ description: 'Task list for Session Home and Monitor Wall'
   - `workspaceColor` is `null` for scratch and closed.
   - `state` is `exited` for closed.
   - `shell` is omitted when unknown.
-- [ ] T009 [P] Write failing specs for the `integrations.store` `issueByKey` cache in `tests/unit/renderer/stores/integrations.store.spec.ts`:
+- [x] T009 [P] Write failing specs for the `integrations.store` `issueByKey` cache in `tests/unit/renderer/stores/integrations.store.spec.ts`:
   - One `integrations:issue-get` call per `tracker:key`, however many readers.
   - `undefined` while loading.
   - `null` on failure, with the key still readable.
-- [ ] T010 [P] Write failing specs for the session records renderer store in `tests/unit/renderer/stores/session-records.store.spec.ts`:
+- [x] T010 [P] Write failing specs for the session records renderer store in `tests/unit/renderer/stores/session-records.store.spec.ts`:
   - `load()` fills from `session-records:list`.
   - A `session-records:changed` event upserts or deletes one record.
   - `setDescription` and `setLink` build the snapshot from the session, project and workspace, then call the IPC.
-- [ ] T011 [P] Write failing component specs:
+- [x] T011 [P] Write failing component specs:
   - `tests/unit/renderer/components/StateIcon.spec.tsx`: the icon per state from `ICON_FOR_STATE`, no inline colour, accessible name.
   - `tests/unit/renderer/components/LivePreview.spec.tsx`: calls `mountPreview` once on mount and its cleanup on unmount, and keeps the same container node across a `state` prop change.
   - `tests/unit/renderer/components/WorkItemCell.spec.tsx`:
@@ -114,32 +114,32 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Implementation
 
-- [ ] T012 Add `SessionRecord`, `SessionSnapshot`, `WorkItemRef` and `ChoicePrompt` to `src/shared/types/index.ts`. On `TerminalSession`, add `shell?: string` and `choicePrompt?: ChoicePrompt`, keeping `note` until T047 removes it. Shapes are in `data-model.md`.
-- [ ] T013 [P] Implement `pruneRecords` in `src/shared/session-records/retention.ts`, with `RETENTION_MS = 30 * 24 * 60 * 60 * 1000`, so T003 passes.
-- [ ] T014 [P] Add Zod schemas `SessionSnapshotSchema`, `SetDescriptionInputSchema` (description ≤ 500 after trim, or null) and `SetLinkInputSchema` in `src/shared/schemas/session-records.schema.ts`.
-- [ ] T015 Implement `src/main/sessions/session-record-store.ts` in the shape of `src/main/integrations/issue-link-store.ts`, so T004 passes:
+- [x] T012 Add `SessionRecord`, `SessionSnapshot`, `WorkItemRef` and `ChoicePrompt` to `src/shared/types/index.ts`. On `TerminalSession`, add `shell?: string` and `choicePrompt?: ChoicePrompt`, keeping `note` until T047 removes it. Shapes are in `data-model.md`.
+- [x] T013 [P] Implement `pruneRecords` in `src/shared/session-records/retention.ts`, with `RETENTION_MS = 30 * 24 * 60 * 60 * 1000`, so T003 passes.
+- [x] T014 [P] Add Zod schemas `SessionSnapshotSchema`, `SetDescriptionInputSchema` (description ≤ 500 after trim, or null) and `SetLinkInputSchema` in `src/shared/schemas/session-records.schema.ts`.
+- [x] T015 Implement `src/main/sessions/session-record-store.ts` in the shape of `src/main/integrations/issue-link-store.ts`, so T004 passes:
   - In-memory `Map` and `userData/session-records.json`.
   - Exports `loadRecords`, `sweepOpenRecords`, `listRecords`, `setDescription`, `setLink`, `markClosed` and `onRecordChange`.
   - Applies `pruneRecords` on load and before every persist.
-- [ ] T016 Implement `src/main/ipc/session-records.ipc.ts` (`registerSessionRecordsHandlers(getWindow)`) using `handleChannel`, with `safeParse` returning `{ error, message }`. It forwards `onRecordChange` as `session-records:changed` via `sendToWindow`. T005 passes.
-- [ ] T017 In `src/main/ipc/terminal.ipc.ts`:
+- [x] T016 Implement `src/main/ipc/session-records.ipc.ts` (`registerSessionRecordsHandlers(getWindow)`) using `handleChannel`, with `safeParse` returning `{ error, message }`. It forwards `onRecordChange` as `session-records:changed` via `sendToWindow`. T005 passes.
+- [x] T017 In `src/main/ipc/terminal.ipc.ts`:
 
   - Return `shell: defaultShell` from `terminal:create`.
   - Call `markClosed(sessionId, new Date())` in `terminal:close` after the kill.
 
   T006 passes.
 
-- [ ] T018 In `src/main/index.ts`, `await loadRecords()` then `await sweepOpenRecords()` beside `loadLinks()`, and call `registerSessionRecordsHandlers` beside `registerIntegrationsHandlers`.
-- [ ] T019 Expose `electronAPI.sessionRecords.{ list, setDescription, setLink, onChanged }` in `src/main/preload.ts`, typed in `src/renderer/electron.d.ts`. Add the channels to the invoke table in `src/main/ipc/invoke-table.ts` if that table lists core channels. Do not add them to `src/shared/electron-api/manifest.ts` or any extension-view preload (Principle II).
-- [ ] T020 [P] Store `shell` from the `terminal:create` result on the new session in `createSession` in `src/renderer/stores/session.store.ts`. Extend `tests/unit/renderer/stores/session.store.spec.ts` first.
-- [ ] T021 [P] Implement `resolveWorkItem` in `src/renderer/sidebar/work-item.ts` (T007).
-- [ ] T022 Implement `buildSessionFacts` in `src/renderer/sidebar/session-facts.ts`, reusing `branchLabel` from `src/renderer/sidebar/branch-display.ts` (T008). `latestLine` is a parameter map `sessionId → string`, supplied by the caller, so the function stays pure.
-- [ ] T023 [P] Add `issueByKey(tracker, key)` and its cache to `src/renderer/stores/integrations.store.ts` (T009).
-- [ ] T024 Implement `src/renderer/stores/session-records.store.ts`, a Zustand store with `records: Map<string, SessionRecord>`, `load`, `subscribe`, `setDescription` and `setLink` (T010). Call `load()` and `subscribe()` once from `src/renderer/App.tsx`, beside the integrations subscription.
-- [ ] T025 [P] Implement `src/renderer/components/session/StateIcon.tsx` and `StateIcon.css` (T011).
-- [ ] T026 [P] Implement `src/renderer/components/session/LivePreview.tsx`, moving the `mountPreview` layout effect out of `src/renderer/components/overview/SessionTile.tsx` unchanged (T011).
-- [ ] T027 [P] Implement `src/renderer/components/session/WorkItemCell.tsx` and `WorkItemCell.css`, with props `{ facts, issue, onSaveDescription, onLink? }` (T011).
-- [ ] T028 Add a hook `src/renderer/components/session/useSessionFacts.ts`. It reads the session, workspace, records and integrations stores, calls `buildSessionFacts` with one `Date.now()` per render, and returns `SessionFacts[]`. Cover it in `tests/unit/renderer/components/useSessionFacts.spec.tsx`: an open session and a closed record come back together.
+- [x] T018 In `src/main/index.ts`, `await loadRecords()` then `await sweepOpenRecords()` beside `loadLinks()`, and call `registerSessionRecordsHandlers` beside `registerIntegrationsHandlers`.
+- [x] T019 Expose `electronAPI.sessionRecords.{ list, setDescription, setLink, onChanged }` in `src/main/preload.ts`, typed in `src/renderer/electron.d.ts`. Add the channels to the invoke table in `src/main/ipc/invoke-table.ts` if that table lists core channels. Do not add them to `src/shared/electron-api/manifest.ts` or any extension-view preload (Principle II).
+- [x] T020 [P] Store `shell` from the `terminal:create` result on the new session in `createSession` in `src/renderer/stores/session.store.ts`. Extend `tests/unit/renderer/stores/session.store.spec.ts` first.
+- [x] T021 [P] Implement `resolveWorkItem` in `src/renderer/sidebar/work-item.ts` (T007).
+- [x] T022 Implement `buildSessionFacts` in `src/renderer/sidebar/session-facts.ts`, reusing `branchLabel` from `src/renderer/sidebar/branch-display.ts` (T008). `latestLine` is a parameter map `sessionId → string`, supplied by the caller, so the function stays pure.
+- [x] T023 [P] Add `issueByKey(tracker, key)` and its cache to `src/renderer/stores/integrations.store.ts` (T009).
+- [x] T024 Implement `src/renderer/stores/session-records.store.ts`, a Zustand store with `records: Map<string, SessionRecord>`, `load`, `subscribe`, `setDescription` and `setLink` (T010). Call `load()` and `subscribe()` once from `src/renderer/App.tsx`, beside the integrations subscription.
+- [x] T025 [P] Implement `src/renderer/components/session/StateIcon.tsx` and `StateIcon.css` (T011).
+- [x] T026 [P] Implement `src/renderer/components/session/LivePreview.tsx`, moving the `mountPreview` layout effect out of `src/renderer/components/overview/SessionTile.tsx` unchanged (T011).
+- [x] T027 [P] Implement `src/renderer/components/session/WorkItemCell.tsx` and `WorkItemCell.css`, with props `{ facts, issue, onSaveDescription, onLink? }` (T011).
+- [x] T028 Add a hook `src/renderer/components/session/useSessionFacts.ts`. It reads the session, workspace, records and integrations stores, calls `buildSessionFacts` with one `Date.now()` per render, and returns `SessionFacts[]`. Cover it in `tests/unit/renderer/components/useSessionFacts.spec.tsx`: an open session and a closed record come back together.
 
 **Checkpoint**: Records persist and close correctly, and every surface can draw a session's facts. `npm test` exits 0.
 

@@ -468,6 +468,16 @@ export class TerminalInstance {
   // Mount the live xterm element into a preview container (e.g. an Overview tile).
   // Scales the element to fit the container without sending a PTY resize event.
   // Returns a cleanup function that restores the element and removes it from the container.
+  /** The rows currently on screen, top to bottom, each trimmed on the right. */
+  readVisibleRows(): string[] {
+    const { buffer, rows } = this.terminal
+    const top = buffer.active.viewportY
+    return Array.from(
+      { length: rows },
+      (_, i) => buffer.active.getLine(top + i)?.translateToString(true) ?? ''
+    )
+  }
+
   mountPreview(container: HTMLElement): (() => void) | null {
     if (!this.opened) return null
     const { cols, rows } = this.terminal

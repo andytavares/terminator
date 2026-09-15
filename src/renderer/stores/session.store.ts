@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import type { TerminalSession, PaneNode, PaneSplitDirection } from '../../shared/types/index'
+import type {
+  ChoicePrompt,
+  TerminalSession,
+  PaneNode,
+  PaneSplitDirection,
+} from '../../shared/types/index'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 import { splitLeaf, removeLeaf, leafIds, updateSplitRatio } from '../utils/pane-tree'
 import type { TerminalInstance } from '../components/terminal/TerminalSession'
@@ -144,6 +149,11 @@ interface SessionState {
   getBellCountForProject: (projectId: string) => number
   setSessionBusy: (sessionId: string) => void
   setSessionIdle: (sessionId: string) => void
+  /** What a session's screen showed when its output last settled. */
+  setSessionScreen: (
+    sessionId: string,
+    screen: { latestLine: string; choicePrompt: ChoicePrompt | null }
+  ) => void
   isSessionBusy: (sessionId: string) => boolean
   isProjectBusy: (projectId: string) => boolean
   renameSession: (sessionId: string, title: string) => void
@@ -208,7 +218,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // the message names the folder, and the folder is the whole answer.
     if ('error' in result) throw new Error(result.message ?? result.error)
 
-    const { sessionId } = result
+    const { sessionId, shell } = result
     const createdAt = new Date().toISOString()
     const session: TerminalSession = {
       id: sessionId,
@@ -223,6 +233,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       // was created, so recency is representable from the first render (FR-007).
       lastActivityAt: Date.parse(createdAt),
       agentState: 'idle',
+      ...(shell === undefined ? {} : { shell }),
     }
 
     set((s) => {
@@ -421,6 +432,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       if (!s.sessions.get(sessionId)?.busy) return s
       return patchSession(s, sessionId, { busy: false }) ?? s
     }),
+
+  setSessionScreen: (sessionId, { latestLine, choicePrompt }) =>
+    set(
+      (s) =>
+        patchSession(s, sessionId, { latestLine, choicePrompt: choicePrompt ?? undefined }) ?? s
+    ),
 
   isSessionBusy: (sessionId) => get().sessions.get(sessionId)?.busy ?? false,
 

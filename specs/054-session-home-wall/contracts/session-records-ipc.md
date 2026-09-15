@@ -1,6 +1,6 @@
 # Contract: `session-records:*` IPC
 
-These are core-only channels, registered in `src/main/ipc/session-records.ipc.ts` through `handleChannel` and validated with Zod schemas in `src/shared/schemas/session-records.schema.ts`. They are not part of the Extension API: no `api.*` surface, and no `manifest.ts` exposure to extension views (Principle II).
+These are core-only channels, registered in `src/main/ipc/session-records.ipc.ts` and validated with Zod schemas in `src/shared/schemas/session-records.schema.ts`. They are exposed on `window.electronAPI.sessionRecords` through `src/shared/electron-api/manifest.ts`, which generates both the core preload and the remote `/app/` shim, with remote behaviour `same`. They are not part of the Extension API: there is no `api.*` surface, and extension views cannot reach them (Principle II).
 
 Every handler validates its payload with `safeParse` and returns `{ error: 'VALIDATION_ERROR', message }` on failure, never throwing. This is the same convention as `terminal:create`.
 

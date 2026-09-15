@@ -6,6 +6,7 @@ vi.mock('../../../../src/renderer/lib/notifications', () => ({
 }))
 
 // Capture constructor args + hooks so tests can drive bell/busy/idle events.
+let screenRows: string[] = []
 let capturedCtorArgs: Array<{
   sessionId: string
   scrollbackLimit: number
@@ -19,6 +20,9 @@ vi.mock('../../../../src/renderer/components/terminal/TerminalSession', () => ({
       hooks?: { onBell?: () => void; onBusy?: () => void; onIdle?: () => void }
     ) {
       capturedCtorArgs.push({ sessionId, scrollbackLimit, hooks })
+    }
+    readVisibleRows(): string[] {
+      return screenRows
     }
   },
 }))
@@ -51,6 +55,7 @@ const mockGetFocusedSession = vi.fn()
 const mockGetActiveSessionForProject = vi.fn()
 const mockAdoptSession = vi.fn()
 const mockStampActivity = vi.fn()
+const mockSetSessionScreen = vi.fn()
 
 const sessions = new Map<
   string,
@@ -60,6 +65,7 @@ const sessions = new Map<
 beforeEach(() => {
   vi.clearAllMocks()
   capturedCtorArgs = []
+  screenRows = []
   sessions.clear()
   mockCreateSession.mockResolvedValue('session-123')
   vi.mocked(useSessionStore.getState).mockReturnValue({
@@ -75,6 +81,7 @@ beforeEach(() => {
     getActiveSessionForProject: mockGetActiveSessionForProject,
     adoptSession: mockAdoptSession,
     stampActivity: mockStampActivity,
+    setSessionScreen: mockSetSessionScreen,
   } as unknown as ReturnType<typeof useSessionStore.getState>)
   resetActivityThrottle()
   setActivityClock(() => 0)
@@ -147,6 +154,16 @@ describe('createTerminalSession', () => {
     expect(mockSetSessionBusy).toHaveBeenCalledWith('session-123')
     hooks!.onIdle!()
     expect(mockSetSessionIdle).toHaveBeenCalledWith('session-123')
+  })
+
+  it('reads the screen when output settles, and records its last line', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    screenRows = ['$ pnpm test', '  14 passed, 2 failed', '', '']
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith(
+      'session-123',
+      expect.objectContaining({ latestLine: '14 passed, 2 failed' })
+    )
   })
 })
 

@@ -40,5 +40,10 @@ const PRESENTATION: Record<AgentState, StatusPresentation> = {
  * running, idle and waiting indistinguishable.
  */
 export function statusPresentationFor(session: TerminalSession): StatusPresentation {
-  return PRESENTATION[session.agentState]
+  return statusPresentationForState(session.agentState)
+}
+
+/** The same presentation, for a surface that holds a state rather than a session. */
+export function statusPresentationForState(state: AgentState): StatusPresentation {
+  return PRESENTATION[state]
 }

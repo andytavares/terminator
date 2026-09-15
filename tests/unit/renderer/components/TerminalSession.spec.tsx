@@ -228,6 +228,27 @@ describe('TerminalInstance', () => {
     expect(mockOnOutput).toHaveBeenCalledTimes(1)
   })
 
+  it('reads the visible screen as one string per row, trailing spaces trimmed', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const translate = vi.fn((trimRight?: boolean) => (trimRight ? 'row' : 'row   '))
+    const getLine = vi.fn(() => ({ translateToString: translate }))
+    ;(instance.terminal as unknown as { rows: number }).rows = 3
+    ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
+      active: { viewportY: 40, getLine },
+    }
+    expect(instance.readVisibleRows()).toEqual(['row', 'row', 'row'])
+    expect(getLine.mock.calls.map((c) => c[0])).toEqual([40, 41, 42])
+  })
+
+  it('reads a missing buffer line as an empty row', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    ;(instance.terminal as unknown as { rows: number }).rows = 2
+    ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
+      active: { viewportY: 0, getLine: () => undefined },
+    }
+    expect(instance.readVisibleRows()).toEqual(['', ''])
+  })
+
   it('creates a div element on construction', () => {
     const instance = new TerminalInstance('ses-1', 1000)
     expect(instance.element).toBeInstanceOf(HTMLDivElement)
