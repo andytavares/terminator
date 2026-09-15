@@ -1,0 +1,23 @@
+specs/054-session-home-wall/checklists/requirements.md
+  s_cf6284d326023a::t_dad91854c35206 1-35
+specs/054-session-home-wall/spec.md
+  s_cf6284d326023a::t_9b69f1869c5df8 1-262
+.specify/feature.json
+  s_cf6284d326023a::t_3d30da9cb4e99d 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6091bdaea167cb26957d1bc50997720ea7439dd4",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
