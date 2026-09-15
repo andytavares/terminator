@@ -1,0 +1,131 @@
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_cf6284d326023a::t_527c4e05364aa6 9,24-26,58,68,84,158-166
+  s_cf6284d326023a::t_54294851994f1d 167
+tests/unit/renderer/stores/session.store.spec.ts
+  s_cf6284d326023a::t_d5277045ce45c4 48,53-56,838-853
+  s_cf6284d326023a::t_3f7fb36c564dfd 49-52
+  s_cf6284d326023a::t_b04fbdfb428964 854
+specs/054-session-home-wall/contracts/session-records-ipc.md
+  s_cf6284d326023a::t_6c45cb895e28a1 3
+src/renderer/stores/integrations.store.ts
+  s_cf6284d326023a::t_290cb30dbc8dee 139-140,189-191,195,197
+  s_cf6284d326023a::t_a50a397de89c76 40-44,61-64,137,141,146,187-188,192-194,196,198-201
+  s_cf6284d326023a::t_7f308347254dcf 138,202
+src/renderer/App.tsx
+  s_cf6284d326023a::t_faaf1b738c24b3 14,347-351
+  s_cf6284d326023a::t_8c6868a208118b 352
+src/renderer/components/session/StateIcon.tsx
+  s_cf6284d326023a::t_941885b3c85cd4 1-19
+src/shared/electron-api/manifest.ts
+  s_cf6284d326023a::t_58fa9b31016858 533-542
+tests/unit/renderer/stores/integrations.store.spec.ts
+  s_cf6284d326023a::t_59037dc81a3dbd 14,48,400-433
+  s_cf6284d326023a::t_26de883f3b233d 434
+src/renderer/components/terminal/TerminalSession.tsx
+  s_cf6284d326023a::t_5d0f7e1fddea17 471-480
+src/shared/types/index.ts
+  s_cf6284d326023a::t_281ac11c99375b 78-79,82-95,353-385
+  s_cf6284d326023a::t_5d0f7e1fddea17 80-81
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_cf6284d326023a::t_d413daa7ab92ea 126-131
+specs/054-session-home-wall/tasks.md
+  s_cf6284d326023a::t_c6c73d5f6cbe69 63,68,78,82,85,89,97,101,105,117-120,124-125,132-142
+  s_cf6284d326023a::t_3f7fb36c564dfd 36,53
+src/main/sessions/session-record-store.ts
+  s_cf6284d326023a::t_bd1f7f38843e54 1-104,107-183
+  s_cf6284d326023a::t_3f7fb36c564dfd 105-106
+src/main/ipc/terminal.ipc.ts
+  s_cf6284d326023a::t_6d6d7cdf2034a7 13,137,160
+tests/unit/renderer/sidebar/session-facts.spec.ts
+  s_cf6284d326023a::t_5d0f7e1fddea17 74
+  s_cf6284d326023a::t_e9da0c0d39ffee 1-73,75-226
+tests/unit/renderer/components/LivePreview.spec.tsx
+  s_cf6284d326023a::t_f69e0981472e02 1-44
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_cf6284d326023a::t_527c4e05364aa6 231-251
+tests/unit/renderer/stores/session-records.store.spec.ts
+  s_cf6284d326023a::t_a3819dabe257a9 1-103
+src/renderer/terminal/session-controller.ts
+  s_cf6284d326023a::t_5d0f7e1fddea17 5,57,68-73,76
+src/renderer/electron.d.ts
+  s_cf6284d326023a::t_58fa9b31016858 242-255
+  s_cf6284d326023a::t_f334bff5347bb7 19-21,42-44
+src/renderer/sidebar/work-item.ts
+  s_cf6284d326023a::t_30c5cc35442284 1-24
+src/renderer/components/session/LivePreview.tsx
+  s_cf6284d326023a::t_817e54c84d2d1b 1-29
+src/renderer/components/session/StateIcon.css
+  s_cf6284d326023a::t_4d6e816e2584a8 1-26
+tests/unit/sessions/session-record-store.spec.ts
+  s_cf6284d326023a::t_4e7acf1ce27058 1-101,103-106,108-259
+  s_cf6284d326023a::t_370474c1e2a274 102,107
+src/renderer/components/session/LivePreview.css
+  s_cf6284d326023a::t_865df136a4a2db 1-9
+src/main/index.ts
+  s_cf6284d326023a::t_f334bff5347bb7 12-13,377,386-388
+src/renderer/sidebar/session-status.ts
+  s_cf6284d326023a::t_290cb30dbc8dee 43-48
+src/renderer/components/session/WorkItemCell.tsx
+  s_cf6284d326023a::t_7dd761449f05a0 1-119
+src/main/ipc/session-records.ipc.ts
+  s_cf6284d326023a::t_6c393c9c3a51f5 1-68
+tests/unit/renderer/sidebar/screen.spec.ts
+  s_cf6284d326023a::t_527c4e05364aa6 1-13
+tests/unit/shared/session-records/retention.spec.ts
+  s_cf6284d326023a::t_84792faea6840f 1-53
+specs/054-session-home-wall/coverage-baseline.md
+  s_cf6284d326023a::t_c6c73d5f6cbe69 5-19
+  s_cf6284d326023a::t_a84c5441748696 1-4,20-21
+tests/unit/ipc/session-records.ipc.spec.ts
+  s_cf6284d326023a::t_cb720592666aa3 1-92,100-149,176-222
+  s_cf6284d326023a::t_e00eca8e579e13 93-99,150-175
+tests/unit/renderer/sidebar/work-item.spec.ts
+  s_cf6284d326023a::t_e49e2e013f57fd 1-31
+src/renderer/sidebar/session-facts.ts
+  s_cf6284d326023a::t_5d0f7e1fddea17 93
+  s_cf6284d326023a::t_4bc7fcbd59969b 1-54,60-92,94-139
+  s_cf6284d326023a::t_3f7fb36c564dfd 55-59
+tests/unit/renderer/components/WorkItemCell.spec.tsx
+  s_cf6284d326023a::t_e104f02d340d86 1-14,21-150,157-183
+  s_cf6284d326023a::t_3f7fb36c564dfd 15-20,151-156
+tests/unit/renderer/components/StateIcon.spec.tsx
+  s_cf6284d326023a::t_f36c8271d57ba8 1-27
+src/renderer/sidebar/screen.ts
+  s_cf6284d326023a::t_5d0f7e1fddea17 1-8
+src/renderer/components/session/WorkItemCell.css
+  s_cf6284d326023a::t_b4588d1677a412 1-84
+src/renderer/components/session/useSessionFacts.ts
+  s_cf6284d326023a::t_0d2b76602a3246 1-44
+src/renderer/stores/session-records.store.ts
+  s_cf6284d326023a::t_3f7fb36c564dfd 32-35
+  s_cf6284d326023a::t_28a68e9b7436f6 1-31,36-66
+src/shared/schemas/session-records.schema.ts
+  s_cf6284d326023a::t_b9daec7ac9e504 1-35
+src/shared/session-records/retention.ts
+  s_cf6284d326023a::t_613bbd3a04d90a 1-19
+tests/unit/renderer/components/useSessionFacts.spec.tsx
+  s_cf6284d326023a::t_4afcc3a8e00f5e 1-95
+tests/unit/ipc/terminal.ipc.spec.ts
+  s_cf6284d326023a::t_3f7fb36c564dfd 174-180
+  s_cf6284d326023a::t_901674863488fc 20-25,171-173,181-183,248-253
+  s_cf6284d326023a::t_dfd88537a4a30a 254-255
+src/renderer/stores/session.store.ts
+  s_cf6284d326023a::t_5d0f7e1fddea17 2-7,152-156,221,236,436-440
+  s_cf6284d326023a::t_c883a7f0f0a52d 441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6322f9f38efce044383e9b7a50469bcfe65b248d",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
