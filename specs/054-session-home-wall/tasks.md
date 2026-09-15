@@ -485,7 +485,7 @@ description: 'Task list for Session Home and Monitor Wall'
 
 - [x] T089 Verify reachability: list every exported function and component this feature added, and `grep` for a caller outside tests for each. Delete any that have none (`feedback_wire_the_seams_not_the_tasks`, `feedback_audit_callers_not_existence`).
 - [x] T090 Screenshot the running app: `launchApp`, then capture Home Ledger, Home Logbook and the wall, with sessions in all four states, in both themes, to `test-results/054/`. Look at each image before claiming done (`feedback_screenshot_the_running_app`).
-- [ ] T091 Run `quickstart.md` §1–§6 in order and put each command's output and exit code in the PR description:
+- [x] T091 Run `quickstart.md` §1–§6 in order and put each command's output and exit code in the PR description:
   - `npm run format`
   - `npm run lint`
   - `npm test; echo "exit=$?"`
