@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { closeAllContextMenus } from '../ContextMenu'
+import { useMenuPlacement } from './use-menu-placement'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import '../sidebar/SidebarMenu.css'
 
@@ -18,6 +19,9 @@ interface Props {
  */
 export function NewSessionMenu({ onStartInBranch, onStartScratch }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const placement = useMenuPlacement(open, buttonRef, panelRef)
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const projectsByWorkspaceId = useWorkspaceStore((s) => s.projectsByWorkspaceId)
 
@@ -44,6 +48,7 @@ export function NewSessionMenu({ onStartInBranch, onStartScratch }: Props): JSX.
   return (
     <div className="sidebar-menu home-menu" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={buttonRef}
         type="button"
         className={`sidebar-menu__button${open ? ' sidebar-menu__button--on' : ''}`}
         aria-expanded={open}
@@ -58,7 +63,13 @@ export function NewSessionMenu({ onStartInBranch, onStartScratch }: Props): JSX.
       </button>
 
       {open && (
-        <div className="sidebar-menu__panel" role="menu" aria-label="Start a terminal">
+        <div
+          ref={panelRef}
+          className="sidebar-menu__panel home-menu__panel"
+          role="menu"
+          aria-label="Start a terminal"
+          style={placement}
+        >
           {repos.length === 0 && <div className="sidebar-menu__heading">No branches yet</div>}
           {repos.map(({ repo, branches }) => (
             <React.Fragment key={repo.id}>

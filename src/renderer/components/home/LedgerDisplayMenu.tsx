@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import { closeAllContextMenus } from '../ContextMenu'
+import { useMenuPlacement } from './use-menu-placement'
 import type { HomePrefs, LedgerColumns, LedgerGroupBy, LedgerSort } from '../../sidebar/home-prefs'
 import '../sidebar/SidebarMenu.css'
 
@@ -31,6 +32,9 @@ interface Props {
 /** How the Ledger is arranged, behind one control, in the shape of the sidebar's Display menu. */
 export function LedgerDisplayMenu({ prefs, onChange }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const placement = useMenuPlacement(open, buttonRef, panelRef)
 
   useEffect(() => {
     if (!open) return
@@ -75,6 +79,7 @@ export function LedgerDisplayMenu({ prefs, onChange }: Props): JSX.Element {
   return (
     <div className="sidebar-menu home-menu" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={buttonRef}
         type="button"
         className={`sidebar-menu__button${open ? ' sidebar-menu__button--on' : ''}`}
         aria-expanded={open}
@@ -89,7 +94,13 @@ export function LedgerDisplayMenu({ prefs, onChange }: Props): JSX.Element {
       </button>
 
       {open && (
-        <div className="sidebar-menu__panel" role="menu" aria-label="Display options">
+        <div
+          ref={panelRef}
+          className="sidebar-menu__panel home-menu__panel"
+          role="menu"
+          aria-label="Display options"
+          style={placement}
+        >
           <div className="sidebar-menu__heading">Group by</div>
           {GROUPS.map(([key, label]) => radio(prefs.groupBy === key, label, { groupBy: key }))}
           <div className="sidebar-menu__separator" />

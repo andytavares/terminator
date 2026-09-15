@@ -151,13 +151,6 @@
   gap: var(--space-2);
 }
 
-/* In the empty state the menu hangs below a control at the left, so it opens
-   from its left edge, unlike the ones in the bar. */
-.home__empty-actions .sidebar-menu__panel {
-  left: 0;
-  right: auto;
-}
-
 .home__empty p {
   margin: 0;
 }
@@ -183,13 +176,13 @@
   outline-offset: 1px;
 }
 
-/* Home's menus hang off controls at the right edge of the bar, so they open
-   from their right edge — anchored left they run off the window. */
-.home-menu .sidebar-menu__panel {
-  left: auto;
-  right: 0;
+/* Home's menus are placed from the button's measured position (see
+   use-menu-placement.ts), so they are never clipped by the scrolling body and
+   never open past a window edge. Their own width and height are all the CSS
+   has to say. */
+.home-menu__panel {
   min-width: 220px;
-  max-width: min(320px, calc(100vw - 24px));
+  max-width: min(320px, calc(100vw - 16px));
   max-height: min(70vh, 520px);
   overflow-y: auto;
 }

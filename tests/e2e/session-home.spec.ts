@@ -156,25 +156,58 @@ test("the Ledger's columns and grouping survive a restart", async () => {
   await expect(restarted.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
 })
 
-test('the Display menu opens inside the window, not off its right edge', async () => {
+async function assertMenuOnScreen(page: Page, name: string): Promise<void> {
+  const menu = page.getByRole('menu', { name })
+  await expect(menu).toBeVisible()
+  const box = (await menu.boundingBox())!
+  const view =
+    page.viewportSize() ??
+    (await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight })))
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.y).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(view.width)
+  expect(box.y + box.height).toBeLessThanOrEqual(view.height)
+  // Every item inside it is readable, not clipped by the panel or a scroller.
+  for (const item of await menu.getByRole('menuitem').all()) {
+    const label = (await item.boundingBox())!
+    expect(label.x).toBeGreaterThanOrEqual(box.x)
+    expect(label.x + label.width).toBeLessThanOrEqual(box.x + box.width + 1)
+  }
+}
+
+test('every Home menu opens inside the window, wherever its button sits', async () => {
   handle = await launchApp()
   const { page } = handle
   await createWorkspace(page, 'Repo One', folder)
   await addAndSelectProject(page, 'Repo One', 'feature-a')
   await openHome(page)
 
-  await page.getByRole('region', { name: 'Home' }).getByRole('button', { name: 'Display' }).click()
-  const menu = page.getByRole('menu', { name: 'Display options' })
-  await expect(menu).toBeVisible()
-  const box = (await menu.boundingBox())!
-  const width = page.viewportSize()?.width ?? (await page.evaluate(() => window.innerWidth))
-  expect(box.x).toBeGreaterThanOrEqual(0)
-  expect(box.x + box.width).toBeLessThanOrEqual(width)
-  // Every label readable, not clipped by the panel either.
-  for (const item of await menu.getByRole('menuitemcheckbox').all()) {
-    const label = (await item.boundingBox())!
-    expect(label.x + label.width).toBeLessThanOrEqual(box.x + box.width)
-  }
+  const home = page.getByRole('region', { name: 'Home' })
+  await home.getByRole('button', { name: 'Display' }).click()
+  await assertMenuOnScreen(page, 'Display options')
+  await page.keyboard.press('Escape')
+  await page.mouse.click(600, 600)
+
+  await home.getByRole('button', { name: 'New terminal' }).click()
+  await assertMenuOnScreen(page, 'Start a terminal')
+})
+
+test('the empty state opens its menu inside the window too', async () => {
+  handle = await launchApp()
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  // Close the only terminal, so Home shows its empty state.
+  await page.locator('.tab-bar__close').first().click()
+  await openHome(page)
+  await expect(page.getByText('No terminals are open')).toBeVisible()
+
+  await page
+    .getByRole('region', { name: 'Home' })
+    .getByRole('button', { name: 'New terminal' })
+    .last()
+    .click()
+  await assertMenuOnScreen(page, 'Start a terminal')
 })
 
 test('a terminal can be started from Home, on a branch or as a scratch', async () => {
