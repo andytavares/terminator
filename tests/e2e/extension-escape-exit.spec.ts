@@ -47,8 +47,8 @@ async function pressEscapeInExtensionView(times: number): Promise<void> {
   }, times)
 }
 
-// Named explicitly: the first rail tab is the core Overview screen, which
-// renders no extension panel and is deliberately not exitable.
+// Named explicitly: the first rail tabs are the core Home and Overview screens, which
+// render no extension panel and are deliberately not exitable.
 const EXTENSION_TAB_TITLE = 'Notes'
 
 async function openExtensionGlobalTab(): Promise<void> {

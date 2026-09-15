@@ -123,6 +123,12 @@ describe('remoteAccessibleCoreChannels()', () => {
     'integrations:status-changed',
     'integrations:link-changed',
     'integrations:context-injected',
+    // Session descriptions and session-level work items. The remote /app/ runs
+    // the same Home and Overview, so it reads and writes the same records.
+    'session-records:list',
+    'session-records:set-description',
+    'session-records:set-link',
+    'session-records:changed',
   ]
 
   it('derives exactly the expected remote surface', () => {

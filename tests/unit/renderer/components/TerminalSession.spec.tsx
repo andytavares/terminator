@@ -40,6 +40,8 @@ function makeMockBuffer(
   }
 }
 
+const mockRenderDispose = vi.fn()
+
 vi.mock('xterm', () => {
   const Terminal = vi.fn().mockImplementation(function () {
     return {
@@ -56,6 +58,7 @@ vi.mock('xterm', () => {
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
       registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      onRender: vi.fn().mockReturnValue({ dispose: mockRenderDispose }),
       buffer: makeMockBuffer(24, 80),
       options: { theme: null as unknown },
     }
@@ -226,6 +229,33 @@ describe('TerminalInstance', () => {
   it('subscribes to terminal output on construction', () => {
     new TerminalInstance('ses-1', 1000)
     expect(mockOnOutput).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the visible screen as one string per row, trailing spaces trimmed', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const translate = vi.fn((trimRight?: boolean) => (trimRight ? 'row' : 'row   '))
+    const getLine = vi.fn(() => ({ translateToString: translate }))
+    ;(instance.terminal as unknown as { rows: number }).rows = 3
+    ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
+      active: { viewportY: 40, getLine },
+    }
+    expect(instance.readVisibleRows()).toEqual(['row', 'row', 'row'])
+    expect(getLine.mock.calls.map((c) => c[0])).toEqual([40, 41, 42])
+  })
+
+  it("reports the cursor's row on screen", () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    Object.assign(instance.terminal.buffer.active, { cursorY: 7 })
+    expect(instance.cursorRow()).toBe(7)
+  })
+
+  it('reads a missing buffer line as an empty row', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    ;(instance.terminal as unknown as { rows: number }).rows = 2
+    ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
+      active: { viewportY: 0, getLine: () => undefined },
+    }
+    expect(instance.readVisibleRows()).toEqual(['', ''])
   })
 
   it('creates a div element on construction', () => {
@@ -457,6 +487,53 @@ describe('TerminalInstance', () => {
 
       document.body.removeChild(mountContainer)
       document.body.removeChild(previewContainer)
+    })
+
+    it('follows the cursor on every render, and stops when the preview goes', () => {
+      const instance = new TerminalInstance('ses-1', 1000)
+      const mountContainer = document.createElement('div')
+      document.body.appendChild(mountContainer)
+      instance.mount(mountContainer)
+      instance.unmount()
+      Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
+      Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
+
+      const previewContainer = document.createElement('div')
+      // A short box, so a full screen is taller than it and the window has to move.
+      Object.defineProperty(previewContainer, 'offsetWidth', { value: 220 })
+      Object.defineProperty(previewContainer, 'offsetHeight', { value: 60 })
+      Object.assign(instance.terminal.buffer.active, { cursorY: 0 })
+      const cleanup = instance.mountPreview(previewContainer)!
+      const onRender = vi.mocked(instance.terminal.onRender)
+      expect(onRender).toHaveBeenCalledTimes(1)
+      expect(instance.element.style.transform).toMatch(/^translateY\(.*\) scale\(.*\)$/)
+
+      Object.assign(instance.terminal.buffer.active, { cursorY: 23 })
+      ;(onRender.mock.calls[0][0] as () => void)()
+      expect(instance.element.style.transform).toMatch(/translateY\(-/)
+
+      cleanup()
+      expect(mockRenderDispose).toHaveBeenCalled()
+      document.body.removeChild(mountContainer)
+    })
+
+    it('keeps a preview out of the tab order, and gives the terminal back its place after', () => {
+      const instance = new TerminalInstance('ses-1', 1000)
+      const mountContainer = document.createElement('div')
+      document.body.appendChild(mountContainer)
+      instance.mount(mountContainer)
+      instance.unmount()
+      Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
+      Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
+      const textarea = document.createElement('textarea')
+      Object.assign(instance.terminal, { textarea })
+      Object.assign(instance.terminal.buffer.active, { cursorY: 0 })
+
+      const cleanup = instance.mountPreview(document.createElement('div'))!
+      expect(textarea.getAttribute('tabindex')).toBe('-1')
+      cleanup()
+      expect(textarea.hasAttribute('tabindex')).toBe(false)
+      document.body.removeChild(mountContainer)
     })
 
     it('cleanup removes element and restores original cssText', () => {

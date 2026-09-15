@@ -35,6 +35,7 @@ export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): 
   const [loading, setLoading] = useState(false)
   // Guards against a slow earlier request replacing a faster later one.
   const requestId = useRef(0)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -57,6 +58,18 @@ export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): 
     const timer = setTimeout(() => void run(), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [term, open, listMine, searchIssues])
+
+  // The list is a dropdown, so it goes away the way one does: Escape, or a
+  // pointer anywhere else. Without this it stayed open over whatever it was
+  // opened from, and only picking an issue closed it.
+  useEffect(() => {
+    if (!open) return
+    const dismiss = (event: PointerEvent): void => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [open])
 
   // A tracker the operator never connected is not a failure worth warning
   // about — it is just absent. Only real failures are named.
@@ -85,7 +98,18 @@ export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): 
   }
 
   return (
-    <div className="issue-picker">
+    <div
+      className="issue-picker"
+      ref={rootRef}
+      onKeyDown={(e) => {
+        // Only while the list is showing: with it closed, Escape belongs to
+        // whatever the picker sits in, which is usually a dialog to close.
+        if (e.key === 'Escape' && open) {
+          e.stopPropagation()
+          setOpen(false)
+        }
+      }}
+    >
       <div className="issue-picker__search">
         <Search />
         <input

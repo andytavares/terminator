@@ -37,6 +37,11 @@ interface IntegrationsState {
    * here renders as unavailable rather than disappearing.
    */
   issues: Map<string, Issue | null>
+  /**
+   * Issues read by key, for surfaces that show a ticket without owning a
+   * project's link — a session's own work item. Keyed `tracker:key`.
+   */
+  issuesByKey: Map<string, Issue | null>
   loading: boolean
   /**
    * Which project's link picker is open, if any.
@@ -53,6 +58,10 @@ interface IntegrationsState {
 
   loadConnections: () => Promise<void>
   loadLink: (projectId: string) => Promise<void>
+  /** Reads an issue by key once; later calls for the same key do nothing. */
+  loadIssue: (tracker: TrackerId, key: string) => Promise<void>
+  /** undefined until read, null when it could not be. */
+  issueByKey: (tracker: TrackerId, key: string) => Issue | null | undefined
   linkIssue: (
     projectId: string,
     tracker: TrackerId,
@@ -125,10 +134,16 @@ function subscribeTo(
   return typeof fn === 'function' ? fn(handler) : () => {}
 }
 
+const issueKey = (tracker: TrackerId, key: string): string => `${tracker}:${key}`
+
+/** Reads in flight, so ten surfaces showing one ticket make one request. */
+const pendingIssues = new Map<string, Promise<void>>()
+
 export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
   connections: [],
   links: new Map(),
   issues: new Map(),
+  issuesByKey: new Map(),
   loading: false,
   linkDialogProjectId: null,
   drawerProjectId: null,
@@ -168,6 +183,22 @@ export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
       issues: new Map(state.issues).set(projectId, result.issue),
     }))
   },
+
+  loadIssue: (tracker, key) => {
+    const id = issueKey(tracker, key)
+    if (get().issuesByKey.has(id)) return Promise.resolve()
+    const pending = pendingIssues.get(id)
+    if (pending !== undefined) return pending
+    const request = (async () => {
+      const result = ok(await api().getIssue?.({ tracker, key }))
+      set((state) => ({ issuesByKey: new Map(state.issuesByKey).set(id, result?.issue ?? null) }))
+      pendingIssues.delete(id)
+    })()
+    pendingIssues.set(id, request)
+    return request
+  },
+
+  issueByKey: (tracker, key) => get().issuesByKey.get(issueKey(tracker, key)),
 
   linkIssue: async (projectId, tracker, key, injectContext) => {
     const result = ok(await api().linkSet?.({ projectId, tracker, key, injectContext }))

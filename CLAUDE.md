@@ -6,6 +6,6 @@ The constitution at **`.specify/memory/constitution.md`** is the law of this cod
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/034-declutter-sidebar/plan.md
+at specs/054-session-home-wall/plan.md
 
 <!-- SPECKIT END -->

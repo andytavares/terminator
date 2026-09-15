@@ -530,6 +530,16 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     }),
   },
 
+  // ── session records (descriptions and session-level work items) ───────────
+  { path: 'sessionRecords.list', kind: 'invoke', channel: 'session-records:list' },
+  {
+    path: 'sessionRecords.setDescription',
+    kind: 'invoke',
+    channel: 'session-records:set-description',
+  },
+  { path: 'sessionRecords.setLink', kind: 'invoke', channel: 'session-records:set-link' },
+  { path: 'sessionRecords.onChanged', kind: 'event', channel: 'session-records:changed' },
+
   // ── integrations (issue trackers) ─────────────────────────────────────────
   { path: 'integrations.status', kind: 'invoke', channel: 'integrations:status' },
   // Credential entry stays on the local renderer. The /app/ surface is

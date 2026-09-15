@@ -73,8 +73,24 @@ export interface TerminalSession {
   lastAttendedAt?: number
   /** Derived from bell/busy/exit, never stored authoritatively (renderer-side view state). */
   agentState: AgentState
-  /** Optional single-line user note: one line, at most 120 chars (renderer-side view state). */
-  note?: string
+  /** The shell the main process spawned. Absent for adopted sessions, whose shell is not reported. */
+  shell?: string
+  /** The last non-empty visible row at the last busy → idle (renderer-side view state). */
+  latestLine?: string
+  /** A numbered-choice prompt read off the visible screen at the last busy → idle (renderer-side view state). */
+  choicePrompt?: ChoicePrompt
+}
+
+/** One option in a numbered-choice prompt, numbered as on screen. */
+export interface ChoiceOption {
+  number: number
+  label: string
+}
+
+/** A numbered-choice question an agent is showing, as parsed from the terminal screen. */
+export interface ChoicePrompt {
+  question: string
+  options: ChoiceOption[]
 }
 
 export type ExtensionStatus = 'enabled' | 'disabled' | 'error'
@@ -331,4 +347,37 @@ export interface TrackerFailure {
 export interface IssueListResult {
   issues: IssueSummary[]
   failures: TrackerFailure[]
+}
+
+/** A ticket in a connected tracker, by key alone. */
+export interface WorkItemRef {
+  tracker: TrackerId
+  key: string
+}
+
+/**
+ * The facts about a session that are copied into its record, so a closed
+ * session still reads correctly after its project or workspace is gone.
+ */
+export interface SessionSnapshot {
+  sessionId: string
+  projectId: string
+  workspaceName: string | null
+  projectName: string | null
+  branch: string | null
+  tabTitle: string
+  shell: string | null
+  startedAt: string
+}
+
+/**
+ * The retained context of one session: the operator's description of it and
+ * its own work item link. Exists only while one of the two is set, and for 30
+ * days after the session closes.
+ */
+export interface SessionRecord extends SessionSnapshot {
+  description: string | null
+  link: WorkItemRef | null
+  updatedAt: string
+  closedAt?: string
 }

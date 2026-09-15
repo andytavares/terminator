@@ -100,19 +100,20 @@ Extension ──── contributes to ──── GlobalSettings.extensions[ext
 
 ### Persistence boundaries
 
-| Entity                    | Stored? | Where                                                 |
-| ------------------------- | ------- | ----------------------------------------------------- |
-| Workspace, Project        | Yes     | electron-store (`workspaces.json`)                    |
-| GlobalSettings            | Yes     | electron-store (`settings.json`)                      |
-| WorkspaceSettings         | Yes     | electron-store (`settings.json`)                      |
-| Extension registry        | Yes     | electron-store (`extensions.json`)                    |
-| TerminalSession metadata  | No      | In-memory (Zustand)                                   |
-| xterm.js buffer           | No      | In-memory (xterm.js Terminal instance)                |
-| PTY process               | No      | OS process (killed on tab close or app quit)          |
-| Tracker credentials       | Yes     | `safeStorage`-encrypted (`integrations.json`)         |
-| Tracker connection config | Yes     | Plaintext beside the credential (`integrations.json`) |
+| Entity                    | Stored? | Where                                                    |
+| ------------------------- | ------- | -------------------------------------------------------- |
+| Workspace, Project        | Yes     | electron-store (`workspaces.json`)                       |
+| GlobalSettings            | Yes     | electron-store (`settings.json`)                         |
+| WorkspaceSettings         | Yes     | electron-store (`settings.json`)                         |
+| Extension registry        | Yes     | electron-store (`extensions.json`)                       |
+| TerminalSession metadata  | No      | In-memory (Zustand)                                      |
+| SessionRecord             | Yes     | Main process, `session-records.json`; 30 days past close |
+| xterm.js buffer           | No      | In-memory (xterm.js Terminal instance)                   |
+| PTY process               | No      | OS process (killed on tab close or app quit)             |
+| Tracker credentials       | Yes     | `safeStorage`-encrypted (`integrations.json`)            |
+| Tracker connection config | Yes     | Plaintext beside the credential (`integrations.json`)    |
 
-Sessions do not survive app restart. This is an explicit Phase 1 scope decision.
+Sessions do not survive app restart. This is an explicit Phase 1 scope decision. What the operator wrote about a session does: its description and its own work item link are a `SessionRecord`, kept until 30 days after the session closes (see [Home and the Monitor wall](#home-and-the-monitor-wall), ADR 054).
 
 See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision.
 
@@ -149,7 +150,7 @@ Tab switch (return)
 
 Tab close
       │
-      ├─ terminal:close IPC ──► PtyManager.kill(sessionId)
+      ├─ terminal:close IPC ──► PtyManager.kill(sessionId), then markClosed(sessionId) on its record
       ├─ session removed from Zustand store
       └─ TerminalInstance.dispose() — xterm.js instance disposed, output unsubscribed
 ```
@@ -588,7 +589,7 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 
 ## Navigation Chrome — UnifiedSidebar
 
-The primary navigation is a single resizable sidebar (`UnifiedSidebar`) listing **repos and their branches**. Terminals are not sidebar rows: they are tabs in the tab bar above the terminal, and cards on the board (ADR 035).
+The primary navigation is a single resizable sidebar (`UnifiedSidebar`) listing **repos and their branches**. Terminals are not sidebar rows: they are tabs in the tab bar above the terminal, rows on Home, and tiles on the Overview wall (ADR 035, ADR 054).
 
 ### Component hierarchy
 
@@ -596,7 +597,7 @@ The primary navigation is a single resizable sidebar (`UnifiedSidebar`) listing 
 UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 ├── SidebarHeader                     — two bands, and no more (FR-033)
 │   ├── AppBand — every app-level surface as one compact row of icons: core's
-│   │     Overview, the `contributes.globalTab` entries, the items from
+│   │     Home and Overview, the `contributes.globalTab` entries, the items from
 │   │     api.sidebar.registerItem(), and the notification bell pushed to the
 │   │     far edge. Icons only; the 8px text label became the accessible name
 │   │     and tooltip it duplicated. Both contribution contracts unchanged —
@@ -626,17 +627,21 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 
 `src/renderer/sidebar/` holds the pure core. **These modules import nothing but types** — no React, no store, no `Date.now()`; `now` is always a parameter. `tests/unit/renderer/sidebar/purity.spec.ts` guards the directory rather than any one module, so a file added here inherits the rule.
 
-| Module                                                    | Role                                                                                     |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `branch-rows.ts`                                          | `buildBranchRows` — the sidebar's list: repos, and the branches under them               |
-| `branch-state.ts`                                         | `aggregateBranchState`, `countInState` — a branch's one state, folded from its terminals |
-| `board-lanes.ts`                                          | `buildLanes` — every terminal, in lanes by state; plus the lane-visibility preference    |
-| `manual-order.ts`                                         | `mergeReorder` — folds a drag over the visible rows back into the stored list            |
-| `view-model.ts`                                           | `STATUS_ORDER`, `isStale`, and the view/filter/sort types                                |
-| `views.ts`                                                | built-in views as data, and their persistence                                            |
-| `session-status.ts`                                       | state → glyph/label, total over `AgentState`                                             |
-| `branch-display.ts`                                       | `branchLabel`, `abbreviatePath`, `qualifiedBranchLabel`                                  |
-| `collapse-state.ts`, `relative-time.ts`, `agent-state.ts` | unchanged                                                                                |
+| Module                                                     | Role                                                                                     |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `branch-rows.ts`                                           | `buildBranchRows` — the sidebar's list: repos, and the branches under them               |
+| `branch-state.ts`                                          | `aggregateBranchState`, `countInState` — a branch's one state, folded from its terminals |
+| `session-facts.ts`, `work-item.ts`                         | `buildSessionFacts` — what Home and the wall say about every session; `resolveWorkItem`  |
+| `ledger-rows.ts`, `logbook-groups.ts`, `session-filter.ts` | Home's two layouts: grouping, ordering, suggestions, and the text filter                 |
+| `wall-order.ts`                                            | `placeWall` — each wall tile's band, CSS `order` and span, emitted in session id order   |
+| `choice-prompt.ts`, `screen.ts`                            | `parseChoicePrompt`, `samePrompt`, `latestLineOf` — read off a settled terminal screen   |
+| `home-prefs.ts`, `wall-prefs.ts`                           | Home and wall arrangement, persisted (the named `localStorage` side effect)              |
+| `manual-order.ts`                                          | `mergeReorder` — folds a drag over the visible rows back into the stored list            |
+| `view-model.ts`                                            | `STATUS_ORDER`, `isStale`, and the view/filter/sort types                                |
+| `views.ts`                                                 | built-in views as data, and their persistence                                            |
+| `session-status.ts`                                        | state → glyph/label, total over `AgentState`                                             |
+| `branch-display.ts`                                        | `branchLabel`, `abbreviatePath`, `qualifiedBranchLabel`                                  |
+| `collapse-state.ts`, `relative-time.ts`, `agent-state.ts`  | unchanged                                                                                |
 
 `buildBranchRows` is the seam the whole list rests on. The rule that matters: **every branch is a row whether or not a terminal is open on it, unconditionally**. Filters lift one level — a branch matches when any of its terminals matches — with `hideStale` the deliberate exception, since it is about abandoned work and has nothing to say about a branch nobody has started.
 
@@ -648,7 +653,7 @@ Deliberately absent from a `BranchRow`: change statistics and the linked issue k
 
 ### One state vocabulary, three surfaces
 
-The sidebar gutter, the terminal tabs and the board lanes all read `STATUS_ORDER` and `statusPresentationFor`, so they cannot disagree about severity or shape. Emphasis is the `--state-op-*` scale in `styles.css` — opacity, never hue, because Constitution XII forbids differentiating an icon's state by colour, and because that is what keeps the four readable in greyscale.
+The sidebar gutter, the terminal tabs, Home and the Overview wall all read `STATUS_ORDER` and `statusPresentationFor`, so they cannot disagree about severity or shape. Nothing stores `agentState`: every surface derives it through `BellAndBusySource`, from exit, the bell, byte flow, and a numbered choice prompt left on screen. Emphasis is the `--state-op-*` scale in `styles.css` — opacity, never hue, because Constitution XII forbids differentiating an icon's state by colour, and because that is what keeps the four readable in greyscale.
 
 Precedence is fixed: waiting on the user, then working, then idle, then exited. A branch with no terminals is **idle, not exited** — folding an empty list would otherwise land on the last entry in the order, and a branch you have not opened is not a finished one.
 
@@ -656,9 +661,15 @@ Precedence is fixed: waiting on the user, then working, then idle, then exited. 
 
 Clicking a branch resolves to exactly one terminal: one that is waiting on you, else the one you last had open on that branch (which `session.store`'s `projectViews` has kept all along), else the most recently active. A branch with no terminals is simply selected — `App`'s auto-open effect gives it its first one, and starting one here as well opened two.
 
-### The board
+### Home and the Monitor wall
 
-`OverviewScreen` hosts two layouts of the same surface: `BoardScreen` (the default) and the flat grid it used to be. **A lane is a `grid-column`, not a container** — every card is a direct child of one grid, emitted in a stable order, so a state change rewrites two style properties and never re-parents the node. That is load-bearing: `mountPreview` moves the single live xterm element into the card's node, and re-parenting would tear the live preview out mid-transition. See ADR 036.
+Two core global tabs draw every session from one view model. `useSessionFacts` builds `SessionFacts` from the session, workspace, session-records and integrations stores through `buildSessionFacts`, which is pure.
+
+- **Home** (`core.home`, `components/home/`) is the launch view: `App.tsx` activates it on mount and keeps its app-band badge at the count of sessions waiting on you. `HomeScreen` switches between `LedgerView` (rows from `buildLedger`, arranged by `LedgerDisplayMenu`) and `LogbookView` (a list from `buildLogbook` and one session's detail). The layout and the Ledger's arrangement persist; the text and Needs you filters do not.
+- **The Monitor wall** (`core.overview`, `OverviewScreen`) draws a `WallTile` per open session. **Every tile and both band headings are direct children of one grid**, and `placeWall` emits placements in session id order with position carried by CSS `order` and `grid-column: span`. That is load-bearing: `LivePreview` calls `mountPreview`, which moves the session's single xterm element into the tile, and a re-parented or reordered tile would tear the live terminal out. ADR 036's invariant, kept by ADR 054.
+- **Live previews** fill their box's width and follow the cursor (`terminal/preview-window.ts`), re-placed on every xterm render.
+- **Descriptions and session links** live in `src/main/sessions/session-record-store.ts`, beside `issue-link-store` and in its shape: in memory, mirrored to `userData/session-records.json` with a tmp-then-rename write, exposed as `session-records:*` on `window.electronAPI.sessionRecords`. A record exists only while a session has a description or its own link. `terminal:close` closes it, a startup sweep closes anything the last run left open (a quit closes no terminals one by one), and `pruneRecords` drops records 30 days after close. A session's work item is its own link, else its branch's. The branch link, and the agent context injected from it, are untouched.
+- **Answering in place.** `session-controller` reads a terminal's visible rows once per busy → idle transition, stores `latestLine` and `parseChoicePrompt`'s result as view state, and clears the prompt on the next output. `answerChoice` re-reads the screen and types the option's digit only when `samePrompt` still holds. A bare digit answers a Claude Code select prompt, verified live on 2.1.273 (`tests/e2e/live/choice-prompt.spec.ts`).
 
 ### Colour propagation
 
@@ -668,7 +679,7 @@ Every mix spells its fallback as `var(--ws-color, transparent)`: an unresolved c
 
 ### Collapse persistence
 
-`collapse-state.ts` plus `localStorage` key `terminator.sidebar.collapsed`, keyed by grouping. Board lane visibility is its own key, `terminator.board.lanes`, degrading to all-visible on corrupt storage.
+`collapse-state.ts` plus `localStorage` key `terminator.sidebar.collapsed`, keyed by grouping. Home's arrangement is `terminator.home.prefs` and the wall's is `terminator.wall.prefs`; both degrade field by field to defaults on corrupt storage. Filters are never persisted.
 
 ### Resize
 

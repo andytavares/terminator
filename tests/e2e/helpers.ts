@@ -14,8 +14,13 @@ export interface AppHandle {
   userDataDir: string
 }
 
-export async function launchApp(): Promise<AppHandle> {
-  const userDataDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-'))
+/**
+ * `userDataDir` relaunches onto an existing profile, for a spec that proves
+ * something survives a restart; pair it with `closeApp(handle, { keepProfile: true })`.
+ */
+export async function launchApp(
+  userDataDir: string = mkdtempSync(join(tmpdir(), 'terminator-e2e-'))
+): Promise<AppHandle> {
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${userDataDir}`],
     env: { ...process.env, NODE_ENV: 'test' },
@@ -33,7 +38,10 @@ export async function launchApp(): Promise<AppHandle> {
 // and fails the whole job as a non-test error).
 const GRACEFUL_CLOSE_MS = 5000
 
-export async function closeApp(handle: AppHandle | undefined): Promise<void> {
+export async function closeApp(
+  handle: AppHandle | undefined,
+  { keepProfile = false }: { keepProfile?: boolean } = {}
+): Promise<void> {
   if (!handle) return
   // Capture the OS process up front: once app.close() resolves, Playwright
   // tears down its internal handle and app.process() would throw.
@@ -59,7 +67,7 @@ export async function closeApp(handle: AppHandle | undefined): Promise<void> {
   // directory disappearing out from under those races the delete. Without this
   // a spec that ran a real agent fails in teardown as ENOTEMPTY, which reads
   // as a broken test rather than as tidying up too eagerly.
-  if (handle.userDataDir) {
+  if (handle.userDataDir && !keepProfile) {
     // Two seconds of retries, not half of one: the supervision runtime keeps
     // its control-server settings, hook script and feed under userData, and on
     // a loaded CI machine those are still being flushed when the window goes.

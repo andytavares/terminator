@@ -19,6 +19,7 @@ vi.mock('../../../src/renderer/extensions/registry', () => {
   const useExtensionRegistry = vi.fn()
   ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
     registerGlobalTab: vi.fn(() => vi.fn()),
+    updateGlobalTab: vi.fn(),
     setActiveGlobalTab: vi.fn(),
     sidebarPanels: new Map(),
   }))
@@ -1219,6 +1220,7 @@ describe('App', () => {
     // Registry has a registered panel; getState returns a sidebarPanels map with one entry
     ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
       registerGlobalTab: vi.fn(() => vi.fn()),
+      updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
       sidebarPanels: new Map([['git-changes', {}]]),
     }))
@@ -1243,6 +1245,7 @@ describe('App', () => {
     // Restore the default getState mock
     ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
       registerGlobalTab: vi.fn(() => vi.fn()),
+      updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
       sidebarPanels: new Map(),
     }))
@@ -1255,6 +1258,7 @@ describe('App', () => {
     localStorage.setItem('openPanels', JSON.stringify(['saved-panel']))
     ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
       registerGlobalTab: vi.fn(() => vi.fn()),
+      updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
       sidebarPanels: new Map(),
       openPanels: new Set<string>(), // 'saved-panel' is NOT open → triggers togglePanel
@@ -1270,6 +1274,7 @@ describe('App', () => {
     localStorage.removeItem('openPanels')
     ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
       registerGlobalTab: vi.fn(() => vi.fn()),
+      updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
       sidebarPanels: new Map(),
     }))
@@ -1282,6 +1287,7 @@ describe('App', () => {
     // leave electronAPI.extensionEvents as null (set by setupMocks → beforeEach default)
     ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
       registerGlobalTab: vi.fn(() => vi.fn()),
+      updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
       sidebarPanels: new Map([['git-changes', {}]]),
     }))
@@ -1292,9 +1298,66 @@ describe('App', () => {
     expect(() => render(<App />)).not.toThrow()
     ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
       registerGlobalTab: vi.fn(() => vi.fn()),
+      updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
       sidebarPanels: new Map(),
     }))
+  })
+
+  describe('Home', () => {
+    it('registers Home as a permanent core tab, ahead of Overview', () => {
+      const registered: string[] = []
+      ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+        registerGlobalTab: vi.fn((tab: { id: string; permanent?: boolean }) => {
+          registered.push(`${tab.id}:${tab.permanent}`)
+          return vi.fn()
+        }),
+        updateGlobalTab: vi.fn(),
+        setActiveGlobalTab: vi.fn(),
+        sidebarPanels: new Map(),
+      }))
+      setupMocks({})
+      render(<App />)
+      expect(registered.indexOf('core.home:true')).toBeGreaterThanOrEqual(0)
+      expect(registered.indexOf('core.home:true')).toBeLessThan(
+        registered.indexOf('core.overview:true')
+      )
+    })
+
+    it('opens on Home at launch', () => {
+      setupMocks({})
+      render(<App />)
+      expect(defaultExtensionRegistry.setActiveGlobalTab).toHaveBeenCalledWith('core.home')
+    })
+
+    it('badges Home with the number of sessions waiting on the operator', () => {
+      const updateGlobalTab = vi.fn()
+      ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+        registerGlobalTab: vi.fn(() => vi.fn()),
+        updateGlobalTab,
+        setActiveGlobalTab: vi.fn(),
+        sidebarPanels: new Map(),
+      }))
+      // State is derived, never read from the store: a bell or a visible choice
+      // makes a session wait on the operator; a closed one never does.
+      const session = (id: string, patch: Record<string, unknown>) => [
+        id,
+        { id, projectId: 'p', tabTitle: id, agentState: 'idle', status: 'active', ...patch },
+      ]
+      setupMocks({
+        sessions: new Map([
+          session('a', { bellCount: 1 }),
+          session('b', { choicePrompt: { question: 'Proceed?', options: [] } }),
+          session('c', { busy: true }),
+          session('d', { bellCount: 2, status: 'closed' }),
+        ] as never),
+      })
+      render(<App />)
+      expect(updateGlobalTab).toHaveBeenLastCalledWith('core.home', {
+        badge: 2,
+        badgeLabel: '2 need you',
+      })
+    })
   })
 
   describe('handleNewTab', () => {

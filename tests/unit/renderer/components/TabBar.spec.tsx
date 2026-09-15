@@ -9,6 +9,20 @@ import type { ComponentType } from 'react'
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn(),
 }))
+const records = vi.hoisted(() => ({ setDescription: vi.fn().mockResolvedValue(true) }))
+vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
+  useSessionRecordsStore: (select: (s: unknown) => unknown) => select(records),
+}))
+// The tab's description comes from the session's facts. Here every session the
+// tab bar lists carries its description on a `description` field for the test.
+vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
+  useSessionFacts: () =>
+    (mockGetSessions() ?? []).map((s: { id: string; description?: string }) => ({
+      sessionId: s.id,
+      description: s.description ?? null,
+      snapshot: { sessionId: s.id },
+    })),
+}))
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   useWorkspaceStore: vi.fn(),
 }))
@@ -468,16 +482,16 @@ describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
     expect(container.textContent).toContain('4')
   })
 
-  // FR-023 as amended. The note is reachable, and drawn nowhere.
-  it('carries a terminal note as a tooltip and never as text', () => {
-    mockGetSessions.mockReturnValue([session('a', { note: 'rebasing onto main' })])
+  // FR-023 as amended. The description is reachable, and drawn nowhere.
+  it("carries a terminal's description as a tooltip and never as text", () => {
+    mockGetSessions.mockReturnValue([session('a', { description: 'rebasing onto main' })])
     const { container } = renderTabBar()
     const tab = tabs(container)[0]
     expect(tab.getAttribute('title')).toContain('rebasing onto main')
     expect(tab.textContent).not.toContain('rebasing onto main')
   })
 
-  it('falls back to the rename hint when there is no note', () => {
+  it('falls back to the rename hint when there is no description', () => {
     mockGetSessions.mockReturnValue([session('a')])
     const { container } = renderTabBar()
     expect(tabs(container)[0].getAttribute('title')).toMatch(/rename/i)
@@ -485,7 +499,9 @@ describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
 
   // The cap that stops this repeating what 032 did to the 24px row.
   it('draws no more than four elements on a tab', () => {
-    mockGetSessions.mockReturnValue([session('a', { agentState: 'awaiting-input', note: 'x' })])
+    mockGetSessions.mockReturnValue([
+      session('a', { agentState: 'awaiting-input', description: 'x' }),
+    ])
     mockGetActive.mockReturnValue('a')
     mockGetBell.mockReturnValue(9)
     const { container } = renderTabBar()
@@ -525,7 +541,7 @@ describe('TabBar — the terminals the sidebar stopped listing (US3)', () => {
   })
 })
 
-describe('TabBar — the note found a new home (US3, FR-023)', () => {
+describe('TabBar — the description, edited from the tab (054 FR-006)', () => {
   const noted = (patch: Record<string, unknown> = {}) => ({
     id: 'ses-1',
     projectId: 'proj-1',
@@ -535,8 +551,6 @@ describe('TabBar — the note found a new home (US3, FR-023)', () => {
     agentState: 'idle',
     ...patch,
   })
-
-  const mockSetSessionNote = vi.fn()
 
   beforeEach(() => {
     vi.mocked(useSessionStore).mockReturnValue({
@@ -548,7 +562,6 @@ describe('TabBar — the note found a new home (US3, FR-023)', () => {
       isSessionBusy: vi.fn().mockReturnValue(false),
       renameSession: mockRenameSession,
       reorderSessions: mockReorderSessions,
-      setSessionNote: mockSetSessionNote,
     } as unknown as ReturnType<typeof useSessionStore>)
     mockGetSessions.mockReturnValue([noted()])
     mockGetActive.mockReturnValue('ses-1')
@@ -559,8 +572,8 @@ describe('TabBar — the note found a new home (US3, FR-023)', () => {
     expect(container.querySelector('.tab-bar__note-input')).toBeTruthy()
   })
 
-  it('opens with the note already there, so editing is not retyping', () => {
-    mockGetSessions.mockReturnValue([noted({ note: 'rebasing' })])
+  it('opens with the description already there, so editing is not retyping', () => {
+    mockGetSessions.mockReturnValue([noted({ description: 'rebasing' })])
     const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
     expect(container.querySelector<HTMLInputElement>('.tab-bar__note-input')!.value).toBe(
       'rebasing'
@@ -582,7 +595,10 @@ describe('TabBar — the note found a new home (US3, FR-023)', () => {
     const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
     fireEvent.change(input, { target: { value: 'rebasing onto main' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(mockSetSessionNote).toHaveBeenCalledWith('ses-1', 'rebasing onto main')
+    expect(records.setDescription).toHaveBeenCalledWith(
+      { sessionId: 'ses-1' },
+      'rebasing onto main'
+    )
     expect(container.querySelector('.tab-bar__note-input')).toBeNull()
   })
 
@@ -591,7 +607,7 @@ describe('TabBar — the note found a new home (US3, FR-023)', () => {
     const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
     fireEvent.change(input, { target: { value: 'blurred' } })
     fireEvent.blur(input)
-    expect(mockSetSessionNote).toHaveBeenCalledWith('ses-1', 'blurred')
+    expect(records.setDescription).toHaveBeenCalledWith({ sessionId: 'ses-1' }, 'blurred')
   })
 
   it('abandons on Escape', () => {
@@ -599,7 +615,7 @@ describe('TabBar — the note found a new home (US3, FR-023)', () => {
     const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
     fireEvent.change(input, { target: { value: 'nope' } })
     fireEvent.keyDown(input, { key: 'Escape' })
-    expect(mockSetSessionNote).not.toHaveBeenCalled()
+    expect(records.setDescription).not.toHaveBeenCalled()
     expect(container.querySelector('.tab-bar__note-input')).toBeNull()
   })
 
@@ -609,22 +625,37 @@ describe('TabBar — the note found a new home (US3, FR-023)', () => {
     expect(mockSetActive).not.toHaveBeenCalled()
   })
 
-  it('bounds the note so a tab cannot be made unreadable by one', () => {
+  it('bounds the description at the length a record keeps', () => {
     const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
-    expect(container.querySelector('.tab-bar__note-input')!.getAttribute('maxLength')).toBe('120')
+    expect(container.querySelector('.tab-bar__note-input')!.getAttribute('maxLength')).toBe('500')
   })
 
-  it('offers adding a note from the tab menu', () => {
+  it('clears the description when saved empty', () => {
+    mockGetSessions.mockReturnValue([noted({ description: 'rebasing' })])
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    const input = container.querySelector<HTMLInputElement>('.tab-bar__note-input')!
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(records.setDescription).toHaveBeenCalledWith({ sessionId: 'ses-1' }, null)
+  })
+
+  it('does not write when an empty editor is left empty', () => {
+    const { container } = renderTabBar({ editNoteSessionId: 'ses-1' })
+    fireEvent.blur(container.querySelector('.tab-bar__note-input')!)
+    expect(records.setDescription).not.toHaveBeenCalled()
+  })
+
+  it('offers adding a description from the tab menu', () => {
     const { container } = renderTabBar()
     fireEvent.contextMenu(container.querySelector('.tab-bar__tab--session')!)
-    fireEvent.click(screen.getByText('Add note…'))
+    fireEvent.click(screen.getByText('Add description…'))
     expect(container.querySelector('.tab-bar__note-input')).toBeTruthy()
   })
 
-  it('offers editing an existing note instead', () => {
-    mockGetSessions.mockReturnValue([noted({ note: 'rebasing' })])
+  it('offers editing an existing description instead', () => {
+    mockGetSessions.mockReturnValue([noted({ description: 'rebasing' })])
     const { container } = renderTabBar()
     fireEvent.contextMenu(container.querySelector('.tab-bar__tab--session')!)
-    expect(screen.getByText('Edit note…')).toBeTruthy()
+    expect(screen.getByText('Edit description…')).toBeTruthy()
   })
 })

@@ -51,3 +51,19 @@ describe('BellAndBusySource', () => {
     expect(derive({ status: 'backgrounded', busy: true })).toBe('working')
   })
 })
+
+describe('BellAndBusySource — a visible choice prompt (054)', () => {
+  const prompt = {
+    question: 'Do you want to create a.txt?',
+    options: [{ number: 1, label: 'Yes' }],
+  }
+
+  it('reads a session showing a numbered choice as waiting on you, bell or no bell', () => {
+    expect(derive({ choicePrompt: prompt })).toBe('awaiting-input')
+    expect(derive({ choicePrompt: prompt, busy: true })).toBe('awaiting-input')
+  })
+
+  it('still reads a closed session as exited', () => {
+    expect(derive({ choicePrompt: prompt, status: 'closed' })).toBe('exited')
+  })
+})

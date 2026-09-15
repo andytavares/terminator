@@ -45,6 +45,15 @@ describe('useSessionStore', () => {
   })
 
   describe('createSession', () => {
+    it('keeps the shell the main process spawned', async () => {
+      mockElectronAPI.terminal.create.mockResolvedValue({
+        sessionId: 'sess-sh',
+        shell: '/bin/fish',
+      })
+      await useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
+      expect(useSessionStore.getState().sessions.get('sess-sh')?.shell).toBe('/bin/fish')
+    })
+
     it('creates a session and stores it', async () => {
       mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
       const id = await useSessionStore
@@ -793,36 +802,21 @@ describe('activity, attention and notes (feature 030)', () => {
       expect(useSessionStore.getState().sessions.get('b')!.lastAttendedAt).toBeUndefined()
     })
   })
+})
 
-  describe('setSessionNote', () => {
-    it('stores a trimmed single-line note', () => {
-      seed()
-      useSessionStore.getState().setSessionNote('sess-1', '  waiting on review  ')
-      expect(useSessionStore.getState().sessions.get('sess-1')!.note).toBe('waiting on review')
-    })
+describe('setSessionScreen', () => {
+  it("records a session's last visible line", async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'scr-1' })
+    await useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
+    useSessionStore.getState().setSessionScreen('scr-1', { latestLine: 'done', choicePrompt: null })
+    const session = useSessionStore.getState().sessions.get('scr-1')
+    expect(session?.latestLine).toBe('done')
+    expect(session?.choicePrompt).toBeUndefined()
+  })
 
-    it('collapses newlines so the note stays one line', () => {
-      seed()
-      useSessionStore.getState().setSessionNote('sess-1', 'first\nsecond\r\nthird')
-      expect(useSessionStore.getState().sessions.get('sess-1')!.note).toBe('first second third')
-    })
-
-    it('caps the note at 120 characters', () => {
-      seed()
-      useSessionStore.getState().setSessionNote('sess-1', 'x'.repeat(200))
-      expect(useSessionStore.getState().sessions.get('sess-1')!.note).toHaveLength(120)
-    })
-
-    it('stores an all-whitespace note as undefined, not an empty string', () => {
-      seed({ note: 'old' })
-      useSessionStore.getState().setSessionNote('sess-1', '   ')
-      expect(useSessionStore.getState().sessions.get('sess-1')!.note).toBeUndefined()
-    })
-
-    it('is a no-op for an unknown session', () => {
-      const before = useSessionStore.getState().sessions
-      useSessionStore.getState().setSessionNote('nope', 'hi')
-      expect(useSessionStore.getState().sessions).toBe(before)
-    })
+  it('does nothing for an unknown session', () => {
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().setSessionScreen('nobody', { latestLine: 'x', choicePrompt: null })
+    expect(useSessionStore.getState().sessions).toBe(before)
   })
 })

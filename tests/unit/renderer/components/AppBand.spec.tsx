@@ -173,3 +173,28 @@ describe('AppBand — icons', () => {
     expect(screen.getByRole('button', { name: 'Git Changes' })).toBeTruthy()
   })
 })
+
+describe('AppBand — a tab badge', () => {
+  it('counts on the entry and names the count for a reader', () => {
+    renderBand({
+      globalTabs: [
+        { id: 'core.home', label: 'Home', component: noop, badge: 2, badgeLabel: '2 need you' },
+      ],
+    })
+    const entry = screen.getByRole('button', { name: 'Home, 2 need you' })
+    expect(entry.textContent).toContain('2')
+  })
+
+  it('caps the count at 9+', () => {
+    renderBand({ globalTabs: [{ id: 'core.home', label: 'Home', component: noop, badge: 12 }] })
+    expect(screen.getByRole('button', { name: 'Home' }).textContent).toContain('9+')
+  })
+
+  it('draws nothing for a zero count', () => {
+    renderBand({
+      globalTabs: [{ id: 'core.home', label: 'Home', component: noop, badge: 0, badgeLabel: 'x' }],
+    })
+    const entry = screen.getByRole('button', { name: 'Home' })
+    expect(entry.querySelector('.app-band__badge')).toBeNull()
+  })
+})

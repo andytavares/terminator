@@ -17,6 +17,12 @@ const issues = vi.hoisted(() => ({
   sent: [] as Array<{ channel: string; data: unknown }>,
 }))
 
+const records = vi.hoisted(() => ({ markClosed: vi.fn().mockResolvedValue(undefined) }))
+
+vi.mock('../../../src/main/sessions/session-record-store.js', () => ({
+  markClosed: records.markClosed,
+}))
+
 vi.mock('../../../src/main/integrations/issue-link-store.js', () => ({
   getLink: () => issues.link,
 }))
@@ -162,6 +168,19 @@ describe('registerTerminalHandlers', () => {
       expect(spawned.cwd.startsWith('/')).toBe(true)
     })
 
+    it('returns the shell it actually spawned', () => {
+      const fromSettings = invokeHandler('terminal:create')({}, VALID_CREATE) as { shell: string }
+      expect(fromSettings.shell).toBe('/bin/zsh')
+      const explicit = invokeHandler('terminal:create')(
+        {},
+        {
+          ...VALID_CREATE,
+          shell: '/bin/fish',
+        }
+      ) as { shell: string }
+      expect(explicit.shell).toBe('/bin/fish')
+    })
+
     it('honors an explicit shell over the settings default', () => {
       invokeHandler('terminal:create')({}, { ...VALID_CREATE, shell: '/bin/fish' })
       expect(ptyManager.spawnSession).toHaveBeenCalledWith(
@@ -224,6 +243,14 @@ describe('registerTerminalHandlers', () => {
       }
       expect(result.success).toBe(true)
       expect(ptyManager.kill).toHaveBeenCalledWith('s1')
+    })
+
+    it('closes the session record after killing the process', () => {
+      invokeHandler('terminal:close')({}, { sessionId: 's1' })
+      expect(records.markClosed).toHaveBeenCalledWith('s1', expect.any(Date))
+      expect(ptyManager.kill.mock.invocationCallOrder[0]).toBeLessThan(
+        records.markClosed.mock.invocationCallOrder[0]
+      )
     })
 
     it('writes valid input and ignores invalid payloads', () => {

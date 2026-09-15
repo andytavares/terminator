@@ -10,6 +10,7 @@ import { MissingCwdError } from '../terminal/pty-manager.js'
 import type { PtyManager } from '../terminal/pty-manager.js'
 import type { BrowserWindow } from 'electron'
 import { getGlobalSettings } from '../storage/settings-store.js'
+import { markClosed } from '../sessions/session-record-store.js'
 
 const CreateTerminalSchema = z.object({
   projectId: z.string().uuid(),
@@ -133,7 +134,7 @@ export function registerTerminalHandlers(
 
     void announceIssueContext(projectId, sessionId, getWindow)
 
-    return { sessionId }
+    return { sessionId, shell: defaultShell }
   })
 
   handleChannel('terminal:list-sessions', () => {
@@ -156,6 +157,7 @@ export function registerTerminalHandlers(
 
   handleChannel('terminal:close', (_event, { sessionId }) => {
     ptyManager.kill(sessionId)
+    void markClosed(sessionId, new Date())
     return { success: true }
   })
 

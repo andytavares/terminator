@@ -13,7 +13,7 @@ interface Options {
   onToggleOverview?: () => void
   onNewScratch?: () => void
   onNewTab?: () => void
-  /** Opens the inline note editor for the focused session. */
+  /** Opens the inline description editor for the focused session. */
   onEditSessionNote?: () => void
   /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
   scratchProjectId?: string | null
@@ -309,7 +309,7 @@ export function useKeyboardShortcuts({
         return
       }
 
-      // Cmd+I: edit the focused session's one-line note.
+      // Cmd+I: edit the focused session's description.
       if (isMeta && !e.shiftKey && (e.key === 'i' || e.key === 'I') && !inTextField) {
         e.preventDefault()
         onEditSessionNote?.()
