@@ -7,6 +7,7 @@ import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
 import { answersFor } from '../session/answers'
+import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { matchesFilter } from '../../sidebar/session-filter'
 import { placeWall } from '../../sidebar/wall-order'
 import {
@@ -46,6 +47,7 @@ export function OverviewScreen(): JSX.Element {
 
   const [prefs, setPrefs] = useState<WallPrefs>(loadWallPrefs)
   const [text, setText] = useState('')
+  const [linking, setLinking] = useState<SessionFacts | null>(null)
 
   function update(patch: Partial<WallPrefs>): void {
     setPrefs((current) => {
@@ -188,12 +190,14 @@ export function OverviewScreen(): JSX.Element {
                 now={now}
                 onOpen={navigateToSession}
                 onSaveDescription={saveDescription}
+                onLink={setLinking}
                 answers={answersFor(factsById.get(placement.sessionId)!)}
               />
             ))}
           </div>
         )}
       </div>
+      {linking !== null && <SessionLinkDialog facts={linking} onClose={() => setLinking(null)} />}
     </div>
   )
 }

@@ -41,6 +41,16 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: { getState: () => ({ setActiveGlobalTab }) },
 }))
 
+vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
+  SessionLinkDialog: ({ facts, onClose }: { facts: { name: string }; onClose: () => void }) => (
+    <div role="dialog" aria-label={`Link ${facts.name}`}>
+      <button type="button" onClick={onClose}>
+        Close link
+      </button>
+    </div>
+  ),
+}))
+
 import { HomeScreen } from '../../../../src/renderer/components/home/HomeScreen'
 
 beforeEach(() => {
@@ -176,5 +186,14 @@ describe('HomeScreen', () => {
       target: { value: 'no such thing' },
     })
     expect(screen.getByText('No sessions match')).toBeTruthy()
+  })
+
+  it('opens the link dialog for a session, and closes it', () => {
+    render(<HomeScreen />)
+    const host = screen.getByRole('row', { name: 'claude' })
+    fireEvent.click(within(host).getByRole('button', { name: 'Link a work item' }))
+    expect(screen.getByRole('dialog', { name: 'Link claude' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Close link' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })

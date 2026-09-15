@@ -37,6 +37,16 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: { getState: () => ({ setActiveGlobalTab }) },
 }))
 
+vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
+  SessionLinkDialog: ({ facts, onClose }: { facts: { name: string }; onClose: () => void }) => (
+    <div role="dialog" aria-label={`Link ${facts.name}`}>
+      <button type="button" onClick={onClose}>
+        Close link
+      </button>
+    </div>
+  ),
+}))
+
 import { OverviewScreen } from '../../../../src/renderer/components/overview/OverviewScreen'
 
 const getPids = vi.fn()
@@ -201,5 +211,14 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(metrics.startPolling).toHaveBeenCalledWith([])
     fireEvent.click(screen.getByRole('button', { name: 'Go to terminals' }))
     expect(setActiveGlobalTab).toHaveBeenCalledWith(null)
+  })
+
+  it('opens the link dialog for a session, and closes it', () => {
+    render(<OverviewScreen />)
+    const host = tiles().find((t) => t.getAttribute('aria-label')?.endsWith('claude'))!
+    fireEvent.click(within(host).getByRole('button', { name: 'Link a work item' }))
+    expect(screen.getByRole('dialog', { name: 'Link claude' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Close link' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })

@@ -7,6 +7,7 @@ import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
 import { answersFor } from '../session/answers'
+import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import {
   loadHomePrefs,
   saveHomePrefs,
@@ -39,6 +40,7 @@ export function HomeScreen(): JSX.Element {
   const [prefs, setPrefs] = useState<HomePrefs>(loadHomePrefs)
   const [text, setText] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [linking, setLinking] = useState<SessionFacts | null>(null)
 
   const groups = useMemo(
     () => buildLedger(facts, prefs, { needsYou: false, text }, titles),
@@ -133,6 +135,7 @@ export function HomeScreen(): JSX.Element {
               onOpen={navigateToSession}
               onSaveDescription={saveDescription}
               onLinkIssue={linkIssue}
+              onLink={setLinking}
               renderAnswers={answersFor}
             />
           ) : (
@@ -145,11 +148,13 @@ export function HomeScreen(): JSX.Element {
               onSelect={setSelectedId}
               onOpen={navigateToSession}
               onSaveDescription={saveDescription}
+              onLink={setLinking}
               renderAnswers={answersFor}
             />
           ))
         )}
       </div>
+      {linking !== null && <SessionLinkDialog facts={linking} onClose={() => setLinking(null)} />}
     </div>
   )
 }

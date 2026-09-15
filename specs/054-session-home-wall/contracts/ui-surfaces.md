@@ -16,7 +16,7 @@ End-to-end tests address these by role and accessible name, never by CSS class (
   - `combobox`es `Group by` and `Sort`
   - `checkbox`es `Branch`, `Work item or description`, `Tags`, `Latest output`, `Age`, `Preview the selected row`, `Hide exited sessions`
 - Empty filter result: text `No sessions match`, and `button` `Clear filters`.
-- No sessions at all: text `No terminals are open`, and `button` `Open a terminal`.
+- No sessions at all: text `No terminals are open`, and `button` `Go to terminals`.
 
 ### Ledger
 
@@ -50,7 +50,8 @@ End-to-end tests address these by role and accessible name, never by CSS class (
 - Link control: `button` named `Link a work item`.
 - Edit description: `button` named `Edit description`.
 - Choice buttons: a `group` named by the prompt's question, containing one `button` per option named `<n>. <label>`.
-- No tracker connected: after Link, `alert` `No issue tracker is connected`, and `button` `Connect a tracker`.
+- Link: `dialog` named `Link a work item`, with `button`s `Link issue` (or `Link <KEY>` once chosen), `Cancel`, and `Remove session link` when the session has its own link.
+- No tracker connected: inside that dialog, `alert` `No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.`
 
 ## Icons
 

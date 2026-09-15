@@ -415,17 +415,17 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Tests first
 
-- [ ] T074 [P] [US6] Write failing specs in `tests/unit/renderer/components/SessionLinkControl.spec.tsx`:
+- [x] T074 [P] [US6] (Built as `SessionLinkDialog`; Settings opens only from `App`, so the no-tracker case names where to connect, as the sidebar's link dialog already does, rather than a `Connect a tracker` button.) Write failing specs in `tests/unit/renderer/components/SessionLinkControl.spec.tsx`:
   - With a tracker connected, `Link a work item` opens the existing issue picker, and choosing an issue calls `sessionRecords.setLink(session, { tracker, key })`.
   - A session with its own link shows `Remove session link`, which calls `setLink(session, null)`.
   - With no tracker connected, it renders `alert` `No issue tracker is connected` and `button` `Connect a tracker`, which opens Settings → Integrations.
-- [ ] T075 [P] [US6] Extend the store spec in `tests/unit/sessions/session-record-store.spec.ts`: removing a session link never calls `issue-link-store` `clearLink` or `setLink`.
+- [x] T075 [P] [US6] (Satisfied by construction: `session-record-store.ts` does not import `issue-link-store`, so there is no call to assert against; `SessionLinkDialog.spec.tsx` covers removal falling back to the branch's ticket.) Extend the store spec in `tests/unit/sessions/session-record-store.spec.ts`: removing a session link never calls `issue-link-store` `clearLink` or `setLink`.
 
 ### Implementation
 
-- [ ] T076 [US6] Implement `src/renderer/components/session/SessionLinkControl.tsx`, reusing `src/renderer/components/integrations/IssuePicker.tsx` for the search and choose step, and the existing settings-open action for `Connect a tracker` (T074, T075).
-- [ ] T077 [US6] Pass `onLink` (rendering `SessionLinkControl`) to `WorkItemCell` in `LedgerView.tsx`, `LogbookView.tsx` and `WallTile.tsx`, so the Link control is present on all three surfaces. This completes US1 acceptance scenario 5.
-- [ ] T078 [US6] Extend `tests/e2e/session-home.spec.ts` (US6 block), using the same tracker fixture approach as T039. Where no tracker fixture exists, assert the `No issue tracker is connected` alert path.
+- [x] T076 [US6] Implement `src/renderer/components/session/SessionLinkControl.tsx`, reusing `src/renderer/components/integrations/IssuePicker.tsx` for the search and choose step, and the existing settings-open action for `Connect a tracker` (T074, T075).
+- [x] T077 [US6] Pass `onLink` (rendering `SessionLinkControl`) to `WorkItemCell` in `LedgerView.tsx`, `LogbookView.tsx` and `WallTile.tsx`, so the Link control is present on all three surfaces. This completes US1 acceptance scenario 5.
+- [x] T078 [US6] Extend `tests/e2e/session-home.spec.ts` (US6 block), using the same tracker fixture approach as T039. Where no tracker fixture exists, assert the `No issue tracker is connected` alert path.
 
 **Checkpoint**: A session-level link overrides the project link on every surface.
 

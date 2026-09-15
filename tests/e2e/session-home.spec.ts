@@ -105,3 +105,22 @@ test('the Logbook is remembered, and describing a session there names it in the 
     handle.page.getByRole('radiogroup', { name: 'Layout' }).getByRole('radio', { name: 'Logbook' })
   ).toHaveAttribute('aria-checked', 'true')
 })
+
+test('linking a session says where to connect a tracker when none is', async () => {
+  handle = await launchApp()
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+
+  await page
+    .getByRole('rowgroup', { name: 'Repo One / feature-a' })
+    .getByRole('button', { name: 'Link a work item' })
+    .click()
+  const dialog = page.getByRole('dialog', { name: 'Link a work item' })
+  await expect(dialog.getByRole('alert')).toHaveText(
+    'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
+  )
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toBeHidden()
+})
