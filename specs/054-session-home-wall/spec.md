@@ -253,7 +253,7 @@ The Ledger's Display menu lets me group by workspace then project, project only,
 
 - **Home and Overview both exist**: Home (Ledger or Logbook) is a new view; Overview keeps its place and becomes the Monitor wall. The mockups' Board direction (B) and Matrix direction (D) are out of scope.
 - **Home is the launch view**, replacing whatever the app currently opens to; no setting to change it in this feature.
-- **Needs-you detection is unchanged**: this feature consumes the app's existing awaiting-input heuristic and does not improve it; answer buttons depend on reading a numbered choice prompt from the visible screen.
+- **Needs-you detection gains one signal**: besides the terminal bell, a numbered choice prompt visible on a session's screen marks it as needing you. The bell alone rarely fires for agents, which would leave answer buttons unreachable. Detection remains a heuristic, and anything it misses is shown as working or idle.
 - **Ticket suggestions** come from the issue tracker integration already in core (Linear and Jira). A project is linked to one ticket, not to a tracker project, so "tickets in this project" cannot be derived; suggestions are the project's ticket plus the user's own open tickets.
 - **Tags** are the session's workspace tags, plus "agent" for agent sessions. Sessions carry no tags of their own, and this feature adds no tag editing.
 - **Recent commands are out of scope**: the app does not capture the commands a shell runs, so the Logbook mockup's recent-commands list is dropped rather than shipped empty. Capturing them would need shell integration, which is a separate feature.
