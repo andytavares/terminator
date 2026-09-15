@@ -32,4 +32,5 @@
 ## Notes
 
 - Two scope questions resolved with the user on 2026-09-15 (session-level link overriding the project link; 30-day retention of described closed sessions), recorded under Clarifications in the spec.
+- Re-validation on 2026-09-15 found three requirements the app cannot back, now corrected: recent commands (no command capture exists, so it is dropped and marked out of scope), ticket suggestions "from the same project" (projects link to one ticket, not a tracker project, so suggestions are now the project ticket plus the user's open tickets), and session tags (sessions have none, so tags are now workspace tags plus "agent").
 - The Assumptions section names the constitution's lucide icon rule and the ADR requirement. These are project governance, not implementation choices.

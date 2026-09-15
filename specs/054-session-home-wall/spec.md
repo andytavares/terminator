@@ -95,7 +95,7 @@ When an agent in a session asks a numbered-choice question, its tile on the Moni
 
 ### User Story 5 - Switch Home between Ledger and Logbook (Priority: P2)
 
-Home has a layout switch with two choices, Ledger and Logbook, remembered across restarts. The Logbook lists sessions grouped by state (Needs you, Working, Idle, Exited, Closed), each headlined by its ticket title, else its description, else "Add a description". Selecting one opens a detail pane with the session's location, a description editor, a Link a work item control with suggested tickets, session facts, recent commands and a large live preview.
+Home has a layout switch with two choices, Ledger and Logbook, remembered across restarts. The Logbook lists sessions grouped by state (Needs you, Working, Idle, Exited, Closed), each headlined by its ticket title, else its description, else "Add a description". Selecting one opens a detail pane with the session's location, a description editor, a Link a work item control with suggested tickets, session facts and a large live preview.
 
 **Why this priority**: The Logbook is the deeper, context-first view. It builds on the facts and descriptions from Stories 1 and 2.
 
@@ -107,8 +107,8 @@ Home has a layout switch with two choices, Ledger and Logbook, remembered across
 2. **Given** I chose Logbook, **When** I restart the app, **Then** Home opens in Logbook.
 3. **Given** a session with a ticket, **When** the Logbook list renders, **Then** its headline is the ticket title and its ticket key is shown beneath.
 4. **Given** a session with neither ticket nor description, **When** I select it, **Then** the detail pane opens with the description editor focused.
-5. **Given** the selected session's project has open tickets assigned to me, **When** the detail pane renders, **Then** up to three of them are offered as one-click links, each showing key, title and status.
-6. **Given** the selected session, **When** the detail pane renders, **Then** it shows workspace, project, branch, shell, start time, tags, and the session's most recent commands newest first.
+5. **Given** a tracker is connected and open tickets are assigned to me, **When** the detail pane renders, **Then** up to three suggestions are offered as one-click links, each showing key, title and status, with the session's project ticket first when it has one and the session is not already on it.
+6. **Given** the selected session, **When** the detail pane renders, **Then** it shows workspace, project, branch, shell, start time and tags.
 7. **Given** a Closed session is selected, **When** the detail pane renders, **Then** it shows its description and facts, and in place of the live preview states that the session is closed and when.
 
 ---
@@ -204,8 +204,8 @@ The Ledger's Display menu lets me group by workspace then project, project only,
 **Logbook**
 
 - **FR-024**: The Logbook MUST list sessions grouped as Needs you, Working, Idle, Exited and Closed, omitting empty groups, each entry headlined by ticket title, else description, else "Add a description".
-- **FR-025**: Selecting an entry MUST show a detail pane with workspace, project and branch; a description editor with Save; a Link a work item control; session facts (shell, start time, tags); the session's recent commands newest first; and a live preview for open sessions.
-- **FR-026**: The detail pane MUST suggest up to three open tickets assigned to the user from the selected session's project's connected tracker, each linkable in one action.
+- **FR-025**: Selecting an entry MUST show a detail pane with workspace, project and branch; a description editor with Save; a Link a work item control; session facts (shell, start time, tags); and a live preview for open sessions.
+- **FR-026**: The detail pane MUST suggest up to three tickets, each linkable in one action: the session's project ticket first when the session has a different own link or none, then open tickets assigned to the user in the connected tracker.
 - **FR-027**: Selecting a session with neither work item nor description MUST place focus in the description editor.
 
 **Monitor wall (Overview tab)**
@@ -254,9 +254,9 @@ The Ledger's Display menu lets me group by workspace then project, project only,
 - **Home and Overview both exist**: Home (Ledger or Logbook) is a new view; Overview keeps its place and becomes the Monitor wall. The mockups' Board direction (B) and Matrix direction (D) are out of scope.
 - **Home is the launch view**, replacing whatever the app currently opens to; no setting to change it in this feature.
 - **Needs-you detection is unchanged**: this feature consumes the app's existing awaiting-input heuristic and does not improve it; answer buttons depend on reading a numbered choice prompt from the visible screen.
-- **Ticket suggestions** come from the issue tracker integration already in core (Linear and Jira) and are limited to tickets assigned to the user in the project's connected tracker.
-- **Tags** are the tags the app already records; this feature displays them but adds no tag editing.
-- **Recent commands** are those the session's shell has run, as far as the app can observe them; when none can be observed the section is omitted.
+- **Ticket suggestions** come from the issue tracker integration already in core (Linear and Jira). A project is linked to one ticket, not to a tracker project, so "tickets in this project" cannot be derived; suggestions are the project's ticket plus the user's own open tickets.
+- **Tags** are the session's workspace tags, plus "agent" for agent sessions. Sessions carry no tags of their own, and this feature adds no tag editing.
+- **Recent commands are out of scope**: the app does not capture the commands a shell runs, so the Logbook mockup's recent-commands list is dropped rather than shipped empty. Capturing them would need shell integration, which is a separate feature.
 - **Closed sessions without a description or own link** are not retained: they have no context worth recovering beyond what their project already records.
 - **The existing session note is migrated**, not kept alongside, so there is exactly one place to write what a session is for.
 - **Constitution constraints apply**: flat lucide icons with state by opacity only; everything here is core, with no dependency on or from any extension; test-first with 80% coverage; README, ARCHITECTURE.md and a new ADR (replacing the state-columned board, session-level work item links) ship in the same PR.
