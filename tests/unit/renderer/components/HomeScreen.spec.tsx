@@ -6,6 +6,7 @@ import type { SessionFacts } from '../../../../src/renderer/sidebar/session-fact
 
 const state = vi.hoisted(() => ({ facts: [] as SessionFacts[] }))
 const setDescription = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+const setLink = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const navigate = vi.hoisted(() => vi.fn())
 const setActiveGlobalTab = vi.hoisted(() => vi.fn())
 
@@ -18,7 +19,20 @@ vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   LivePreview: () => <div />,
 }))
 vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: (select: (s: unknown) => unknown) => select({ setDescription }),
+  useSessionRecordsStore: (select: (s: unknown) => unknown) => select({ setDescription, setLink }),
+}))
+// One object for every render, as a real store's actions are: a fresh function
+// per render would re-run every effect that depends on one, for ever.
+const integrations = vi.hoisted(() => ({
+  isAnyConnected: () => true,
+  listMine: async () => ({
+    issues: [{ tracker: 'linear', key: 'NW-84', title: '429s', state: { name: 'Todo' } }],
+    failures: [],
+  }),
+  issueFor: () => null,
+}))
+vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
+  useIntegrationsStore: (select: (s: unknown) => unknown) => select(integrations),
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
   navigateToSession: navigate,
@@ -118,5 +132,49 @@ describe('HomeScreen', () => {
     render(<HomeScreen />)
     expect(screen.getByText('No terminals are open')).toBeTruthy()
     expect(screen.getByRole('rowgroup', { name: 'Closed' })).toBeTruthy()
+  })
+
+  it('switches to the Logbook, and remembers the choice', () => {
+    const { unmount } = render(<HomeScreen />)
+    const layouts = screen.getByRole('radiogroup', { name: 'Layout' })
+    expect(
+      within(layouts).getByRole('radio', { name: 'Ledger' }).getAttribute('aria-checked')
+    ).toBe('true')
+    fireEvent.click(within(layouts).getByRole('radio', { name: 'Logbook' }))
+    expect(screen.getByRole('listbox', { name: 'Sessions' })).toBeTruthy()
+    unmount()
+    render(<HomeScreen />)
+    expect(screen.getByRole('listbox', { name: 'Sessions' })).toBeTruthy()
+  })
+
+  it('keeps the selection when switching layout', () => {
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('row', { name: 'zsh' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Logbook' }))
+    expect(
+      within(screen.getByRole('region', { name: 'Session details' })).getByRole('button', {
+        name: 'Open zsh',
+      })
+    ).toBeTruthy()
+  })
+
+  it('links a suggested ticket to the selected session', async () => {
+    localStorage.setItem('terminator.home.prefs', JSON.stringify({ layout: 'logbook' }))
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('option', { name: /Checking bundle size/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'NW-84 429s' }))
+    expect(setLink).toHaveBeenCalledWith(state.facts[1].snapshot, {
+      tracker: 'linear',
+      key: 'NW-84',
+    })
+  })
+
+  it('says when nothing matches in the Logbook too', () => {
+    localStorage.setItem('terminator.home.prefs', JSON.stringify({ layout: 'logbook' }))
+    render(<HomeScreen />)
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter sessions' }), {
+      target: { value: 'no such thing' },
+    })
+    expect(screen.getByText('No sessions match')).toBeTruthy()
   })
 })

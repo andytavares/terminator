@@ -1,15 +1,28 @@
 import React, { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { LedgerView } from './LedgerView'
+import { LogbookView } from './LogbookView'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
 import { answersFor } from '../session/answers'
-import { loadHomePrefs } from '../../sidebar/home-prefs'
+import {
+  loadHomePrefs,
+  saveHomePrefs,
+  type HomeLayout,
+  type HomePrefs,
+} from '../../sidebar/home-prefs'
 import { buildLedger } from '../../sidebar/ledger-rows'
+import { buildLogbook } from '../../sidebar/logbook-groups'
 import type { SessionFacts } from '../../sidebar/session-facts'
+import type { IssueSummary } from '../../../shared/types/index'
 import './HomeScreen.css'
+
+const LAYOUTS: Array<{ value: HomeLayout; label: string }> = [
+  { value: 'ledger', label: 'Ledger' },
+  { value: 'logbook', label: 'Logbook' },
+]
 
 /**
  * The launch view: every session, where it lives, and what it is for.
@@ -21,8 +34,9 @@ export function HomeScreen(): JSX.Element {
   const facts = useSessionFacts()
   const titles = useIssueTitles()
   const setDescription = useSessionRecordsStore((s) => s.setDescription)
+  const setLink = useSessionRecordsStore((s) => s.setLink)
 
-  const [prefs] = useState(loadHomePrefs)
+  const [prefs, setPrefs] = useState<HomePrefs>(loadHomePrefs)
   const [text, setText] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -30,12 +44,27 @@ export function HomeScreen(): JSX.Element {
     () => buildLedger(facts, prefs, { needsYou: false, text }, titles),
     [facts, prefs, text, titles]
   )
+  const logbook = useMemo(() => buildLogbook(facts, text, titles), [facts, text, titles])
+  const selected = facts.find((f) => f.sessionId === selectedId) ?? null
+  const matches = prefs.layout === 'ledger' ? groups.length : logbook.length
+
+  function update(patch: Partial<HomePrefs>): void {
+    setPrefs((current) => {
+      const next = { ...current, ...patch }
+      saveHomePrefs(next)
+      return next
+    })
+  }
 
   const openCount = facts.filter((f) => !f.isClosed).length
   const now = Date.now()
 
   function saveDescription(target: SessionFacts, description: string | null): void {
     void setDescription(target.snapshot, description)
+  }
+
+  function linkIssue(target: SessionFacts, issue: IssueSummary): void {
+    void setLink(target.snapshot, { tracker: issue.tracker, key: issue.key })
   }
 
   return (
@@ -45,6 +74,20 @@ export function HomeScreen(): JSX.Element {
         <span className="home__meta">
           {openCount} {openCount === 1 ? 'session' : 'sessions'}
         </span>
+        <div className="home__layouts" role="radiogroup" aria-label="Layout">
+          {LAYOUTS.map((layout) => (
+            <button
+              key={layout.value}
+              type="button"
+              role="radio"
+              aria-checked={prefs.layout === layout.value}
+              className="home__layout"
+              onClick={() => update({ layout: layout.value })}
+            >
+              {layout.label}
+            </button>
+          ))}
+        </div>
         <label className="home__search">
           <Search aria-hidden="true" />
           <input
@@ -71,7 +114,7 @@ export function HomeScreen(): JSX.Element {
           </div>
         )}
 
-        {facts.length > 0 && groups.length === 0 ? (
+        {facts.length > 0 && matches === 0 ? (
           <div className="home__empty">
             <p>No sessions match</p>
             <button type="button" className="home__empty-action" onClick={() => setText('')}>
@@ -79,7 +122,20 @@ export function HomeScreen(): JSX.Element {
             </button>
           </div>
         ) : (
-          groups.length > 0 && (
+          matches > 0 &&
+          (prefs.layout === 'logbook' ? (
+            <LogbookView
+              groups={logbook}
+              selected={selected}
+              titles={titles}
+              now={now}
+              onSelect={setSelectedId}
+              onOpen={navigateToSession}
+              onSaveDescription={saveDescription}
+              onLinkIssue={linkIssue}
+              renderAnswers={answersFor}
+            />
+          ) : (
             <LedgerView
               groups={groups}
               columns={prefs.columns}
@@ -91,7 +147,7 @@ export function HomeScreen(): JSX.Element {
               onSaveDescription={saveDescription}
               renderAnswers={answersFor}
             />
-          )
+          ))
         )}
       </div>
     </div>

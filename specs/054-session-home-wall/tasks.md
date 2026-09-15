@@ -372,13 +372,13 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Tests first
 
-- [ ] T068 [P] [US5] Write failing specs for `buildLogbook` and `suggestWorkItems` in `tests/unit/renderer/sidebar/logbook-groups.spec.ts`:
+- [x] T068 [P] [US5] Write failing specs for `buildLogbook` and `suggestWorkItems` in `tests/unit/renderer/sidebar/logbook-groups.spec.ts`:
   - Group order is Needs you, Working, Idle, Exited, Closed, with empty groups omitted.
   - The headline is the ticket title, else the description's first line, else `Add a description`.
   - The filter applies.
   - Suggestions put the project issue first when it differs from the session's own link.
   - Then `mine`, excluding the current work item, deduplicated by `tracker:key`, capped at 3.
-- [ ] T069 [P] [US5] Write failing component specs:
+- [x] T069 [P] [US5] Write failing component specs:
   - `tests/unit/renderer/components/LogbookView.spec.tsx`:
     - A `listbox` `Sessions` with state `group`s.
     - Selecting renders `region` `Session details`, with workspace/project/branch, a `textbox` `What is this session doing?`, `Save description`, `Link a work item`, a `list` `Suggested work items`, the facts (shell, started, tags) and `LivePreview`.
@@ -388,8 +388,8 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Implementation
 
-- [ ] T070 [P] [US5] Implement `src/renderer/sidebar/logbook-groups.ts` (T068).
-- [ ] T071 [US5] Implement `src/renderer/components/home/LogbookView.tsx` and `LogbookView.css`, per the mockup E layout:
+- [x] T070 [P] [US5] Implement `src/renderer/sidebar/logbook-groups.ts` (T068).
+- [x] T071 [US5] Implement `src/renderer/components/home/LogbookView.tsx` and `LogbookView.css`, per the mockup E layout:
 
   - Suggestions come from `integrationsStore.listMine({ limit: 10 })` plus the project issue, loaded once per selection.
   - A suggestion button calls `sessionRecords.setLink`.
@@ -397,8 +397,8 @@ description: 'Task list for Session Home and Monitor Wall'
 
   T069 passes.
 
-- [ ] T072 [US5] Add the `Layout` radiogroup to `HomeScreen.tsx`, reading and writing `HomePrefs.layout` (T069).
-- [ ] T073 [US5] Extend `tests/e2e/session-home.spec.ts` (US5 block):
+- [x] T072 [US5] Add the `Layout` radiogroup to `HomeScreen.tsx`, reading and writing `HomePrefs.layout` (T069).
+- [x] T073 [US5] Extend `tests/e2e/session-home.spec.ts` (US5 block):
   - Switch to Logbook, relaunch, and assert the Logbook radio is checked.
   - Select an undescribed session and assert the textbox is focused.
   - Save a description and assert the list headline matches.

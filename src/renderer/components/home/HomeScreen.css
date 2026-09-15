@@ -32,6 +32,38 @@
   font-variant-numeric: tabular-nums;
 }
 
+.home__layouts {
+  display: inline-flex;
+  height: 26px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.home__layout {
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.home__layout + .home__layout {
+  border-left: 1px solid var(--border-strong);
+}
+
+.home__layout[aria-checked='true'] {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+}
+
+.home__layout:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .home__search {
   display: inline-flex;
   align-items: center;

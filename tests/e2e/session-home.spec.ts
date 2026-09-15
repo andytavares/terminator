@@ -78,3 +78,30 @@ test('a description survives a restart, and a closed session is found by it', as
   await restarted.getByRole('searchbox', { name: 'Filter sessions' }).fill('nothing like this')
   await expect(restarted.getByText('No sessions match')).toBeVisible()
 })
+
+test('the Logbook is remembered, and describing a session there names it in the list', async () => {
+  handle = await launchApp()
+  const profile = handle.userDataDir
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+  await page
+    .getByRole('radiogroup', { name: 'Layout' })
+    .getByRole('radio', { name: 'Logbook' })
+    .click()
+
+  const list = page.getByRole('listbox', { name: 'Sessions' })
+  await list.getByRole('option', { name: /Add a description/ }).click()
+  const box = page.getByRole('textbox', { name: 'What is this session doing?' })
+  await expect(box).toBeFocused()
+  await box.fill('Trying the Logbook')
+  await page.getByRole('button', { name: 'Save description' }).click()
+  await expect(list.getByRole('option', { name: /Trying the Logbook/ })).toBeVisible()
+
+  await closeApp(handle, { keepProfile: true })
+  handle = await launchApp(profile)
+  await expect(
+    handle.page.getByRole('radiogroup', { name: 'Layout' }).getByRole('radio', { name: 'Logbook' })
+  ).toHaveAttribute('aria-checked', 'true')
+})
