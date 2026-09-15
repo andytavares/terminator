@@ -12,6 +12,7 @@ End-to-end tests address these by role and accessible name, never by CSS class (
 - Layout switch: `radiogroup` named `Layout`, with `radio`s `Ledger` and `Logbook`.
 - Filter: `searchbox` named `Filter sessions`.
 - Needs you filter: `button` named `Needs you`, with `aria-pressed`.
+- New terminal: `button` named `New terminal` opens a `menu` named `Start a terminal`, with one `menuitem` per branch named `New terminal in <repo> / <branch>` and one named `New scratch terminal`. It is also offered in the empty state.
 - Home is a `region` named `Home`; its controls are addressed inside it, because the sidebar has its own `Display`.
 - Display menu (Ledger only): `button` named `Display` opens a `menu` named `Display options`, in the shape of the sidebar's Display menu. Inside:
   - `menuitemradio`s `Repo, then branch`, `Branch`, `None` (group by) and `Needs you first`, `Recent activity` (sort), which close the menu

@@ -145,6 +145,19 @@
   font-size: 13px;
 }
 
+.home__empty-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* In the empty state the menu hangs below a control at the left, so it opens
+   from its left edge, unlike the ones in the bar. */
+.home__empty-actions .sidebar-menu__panel {
+  left: 0;
+  right: auto;
+}
+
 .home__empty p {
   margin: 0;
 }
@@ -168,4 +181,15 @@
 .home__empty-action:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* Home's menus hang off controls at the right edge of the bar, so they open
+   from their right edge — anchored left they run off the window. */
+.home-menu .sidebar-menu__panel {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
 }

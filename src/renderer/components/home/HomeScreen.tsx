@@ -3,11 +3,13 @@ import { Search } from 'lucide-react'
 import { LedgerView } from './LedgerView'
 import { LogbookView } from './LogbookView'
 import { LedgerDisplayMenu } from './LedgerDisplayMenu'
+import { NewSessionMenu } from './NewSessionMenu'
 import { StateIcon } from '../session/StateIcon'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
+import { startScratchSession, startSessionInBranch } from '../../terminal/start-session'
 import { answersFor } from '../session/answers'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import {
@@ -88,6 +90,10 @@ export function HomeScreen(): JSX.Element {
         <span className="home__meta">
           {openCount} {openCount === 1 ? 'session' : 'sessions'}
         </span>
+        <NewSessionMenu
+          onStartInBranch={(projectId) => void startSessionInBranch(projectId)}
+          onStartScratch={() => void startScratchSession()}
+        />
         <div className="home__layouts" role="radiogroup" aria-label="Layout">
           {LAYOUTS.map((layout) => (
             <button
@@ -129,13 +135,19 @@ export function HomeScreen(): JSX.Element {
         {openCount === 0 && (
           <div className="home__empty">
             <p>No terminals are open</p>
-            <button
-              type="button"
-              className="home__empty-action"
-              onClick={() => useExtensionRegistry.getState().setActiveGlobalTab(null)}
-            >
-              Go to terminals
-            </button>
+            <div className="home__empty-actions">
+              <NewSessionMenu
+                onStartInBranch={(projectId) => void startSessionInBranch(projectId)}
+                onStartScratch={() => void startScratchSession()}
+              />
+              <button
+                type="button"
+                className="home__empty-action"
+                onClick={() => useExtensionRegistry.getState().setActiveGlobalTab(null)}
+              >
+                Go to terminals
+              </button>
+            </div>
           </div>
         )}
 

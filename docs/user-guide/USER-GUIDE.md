@@ -359,6 +359,8 @@ Home has two layouts. Switch between them with **Ledger** and **Logbook** at the
 - **Ledger** — one row per session, grouped by repo and branch, with sessions waiting on you first. Each row shows the session's state, name, branch, its ticket or your description, its latest line of output and how long since it was active. Click a row to open a live preview with **Open terminal**; press `Enter` to go straight to the terminal. **Display** chooses the grouping, the sort, which columns show, whether the selected row previews, and whether exited sessions are hidden — all remembered.
 - **Logbook** — sessions listed under **Needs you**, **Working**, **Idle**, **Exited** and **Closed**, each headlined by its ticket's title, or your description, or **Add a description**. Select one to see where it lives, edit what it is for (**Save description**, or `Cmd+Enter`), link a ticket, and watch a large live preview. Tickets worth linking are suggested: your branch's own ticket, then open tickets assigned to you.
 
+**New terminal** starts work without leaving Home: pick any branch in any repo, or a scratch terminal that belongs to none. Terminator opens the terminal it started, so you land in it.
+
 **Filter sessions** matches a session's name, repo, branch, ticket key or title, and description. **Needs you** narrows either layout to sessions waiting on you. Neither filter is remembered, so Home never opens narrowed.
 
 ![Home, Logbook layout](screenshots/11b-home-logbook.png)

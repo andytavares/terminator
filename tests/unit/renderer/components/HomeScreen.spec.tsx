@@ -34,6 +34,18 @@ const integrations = vi.hoisted(() => ({
 vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
   useIntegrationsStore: (select: (s: unknown) => unknown) => select(integrations),
 }))
+const started = vi.hoisted(() => ({ inBranch: vi.fn(), scratch: vi.fn() }))
+vi.mock('../../../../src/renderer/terminal/start-session', () => ({
+  startSessionInBranch: started.inBranch,
+  startScratchSession: started.scratch,
+}))
+vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
+  useWorkspaceStore: (select: (s: unknown) => unknown) =>
+    select({
+      workspaces: [{ id: 'w1', name: 'terminator' }],
+      projectsByWorkspaceId: new Map([['w1', [{ id: 'p1', workspaceId: 'w1', name: 'main' }]]]),
+    }),
+}))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
   navigateToSession: navigate,
 }))
@@ -245,5 +257,28 @@ describe('HomeScreen', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('radio', { name: 'Logbook' }))
     expect(screen.queryByRole('button', { name: 'Display' })).toBeNull()
+  })
+
+  it('starts a terminal on a branch from Home', () => {
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New terminal in terminator / main' }))
+    expect(started.inBranch).toHaveBeenCalledWith('p1')
+  })
+
+  it('starts a scratch terminal from Home', () => {
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New scratch terminal' }))
+    expect(started.scratch).toHaveBeenCalled()
+  })
+
+  it('offers a way to start one when nothing is open', () => {
+    state.facts = []
+    render(<HomeScreen />)
+    expect(screen.getAllByRole('button', { name: 'New terminal' })).toHaveLength(2)
+    fireEvent.click(screen.getAllByRole('button', { name: 'New terminal' })[1])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New scratch terminal' }))
+    expect(started.scratch).toHaveBeenCalled()
   })
 })

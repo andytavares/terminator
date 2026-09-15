@@ -155,3 +155,52 @@ test("the Ledger's columns and grouping survive a restart", async () => {
   await expect(restarted.getByRole('columnheader', { name: 'Latest output' })).toHaveCount(0)
   await expect(restarted.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
 })
+
+test('the Display menu opens inside the window, not off its right edge', async () => {
+  handle = await launchApp()
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+
+  await page.getByRole('region', { name: 'Home' }).getByRole('button', { name: 'Display' }).click()
+  const menu = page.getByRole('menu', { name: 'Display options' })
+  await expect(menu).toBeVisible()
+  const box = (await menu.boundingBox())!
+  const width = page.viewportSize()?.width ?? (await page.evaluate(() => window.innerWidth))
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(width)
+  // Every label readable, not clipped by the panel either.
+  for (const item of await menu.getByRole('menuitemcheckbox').all()) {
+    const label = (await item.boundingBox())!
+    expect(label.x + label.width).toBeLessThanOrEqual(box.x + box.width)
+  }
+})
+
+test('a terminal can be started from Home, on a branch or as a scratch', async () => {
+  handle = await launchApp()
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+  await expect(
+    page.getByRole('rowgroup', { name: 'Repo One / feature-a' }).getByRole('row')
+  ).toHaveCount(1)
+
+  const home = page.getByRole('region', { name: 'Home' })
+  await home.getByRole('button', { name: 'New terminal' }).click()
+  await page.getByRole('menuitem', { name: 'New terminal in Repo One / feature-a' }).click()
+  // Starting a terminal shows it, so Home gives way to the terminal.
+  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(2)
+
+  await openHome(page)
+  await expect(
+    page.getByRole('rowgroup', { name: 'Repo One / feature-a' }).getByRole('row')
+  ).toHaveCount(2)
+
+  await home.getByRole('button', { name: 'New terminal' }).click()
+  await page.getByRole('menuitem', { name: 'New scratch terminal' }).click()
+  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(1)
+  await openHome(page)
+  await expect(page.getByRole('rowgroup', { name: 'No branch' }).getByRole('row')).toHaveCount(1)
+})

@@ -73,7 +73,7 @@ export function LedgerDisplayMenu({ prefs, onChange }: Props): JSX.Element {
   )
 
   return (
-    <div className="sidebar-menu" onClick={(e) => e.stopPropagation()}>
+    <div className="sidebar-menu home-menu" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         className={`sidebar-menu__button${open ? ' sidebar-menu__button--on' : ''}`}
