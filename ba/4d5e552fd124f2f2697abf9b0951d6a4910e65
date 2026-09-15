@@ -1,0 +1,39 @@
+specs/054-session-home-wall/contracts/ui-surfaces.md
+  s_cf6284d326023a::t_388301bf5fff5e 1-58
+docs/adr/054-overview-is-a-wall-sessions-carry-context.md
+  s_cf6284d326023a::t_00c97905271f3f 1-44
+CLAUDE.md
+  s_cf6284d326023a::t_af784d2c523a1f 9
+specs/054-session-home-wall/contracts/pure-layer.md
+  s_cf6284d326023a::t_83ed91ba36a8c5 1-22
+specs/054-session-home-wall/plan.md
+  s_cf6284d326023a::t_593211c17731cf 1,3,5,9-14,18,20,22-26,28,30,32,34,36,38,40-41,43-53,55,57-73,80-90,96-144,147-160,163,165,167-176,178
+  s_cf6284d326023a::t_e98954f49ca5d7 2,4,6-8,15-17,19,21,27,29,31,33,35,37,39,42,54,56,74-79,91-95,145-146,161-162,164,166,177
+specs/054-session-home-wall/contracts/session-records-ipc.md
+  s_cf6284d326023a::t_e7cce270adbce2 1-50
+specs/054-session-home-wall/research.md
+  s_cf6284d326023a::t_612130f0c533ed 12
+  s_cf6284d326023a::t_2d9461453671c5 1-11,13-162
+specs/054-session-home-wall/data-model.md
+  s_cf6284d326023a::t_3c1292363d7ea5 1-94
+specs/054-session-home-wall/quickstart.md
+  s_cf6284d326023a::t_560b17c413dd2b 1-59
+specs/054-session-home-wall/spec.md
+  s_cf6284d326023a::t_460279cb0ee2f1 256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ba4d5e552fd124f2f2697abf9b0951d6a4910e65",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
