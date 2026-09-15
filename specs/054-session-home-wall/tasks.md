@@ -114,7 +114,7 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Implementation
 
-- [ ] T012 Add `SessionRecord`, `SessionSnapshot`, `WorkItemRef` and `ChoicePrompt` to `src/shared/types/index.ts`. On `TerminalSession`, add `shell?: string` and `choicePrompt?: ChoicePrompt`, keeping `note` until T034 removes it. Shapes are in `data-model.md`.
+- [ ] T012 Add `SessionRecord`, `SessionSnapshot`, `WorkItemRef` and `ChoicePrompt` to `src/shared/types/index.ts`. On `TerminalSession`, add `shell?: string` and `choicePrompt?: ChoicePrompt`, keeping `note` until T047 removes it. Shapes are in `data-model.md`.
 - [ ] T013 [P] Implement `pruneRecords` in `src/shared/session-records/retention.ts`, with `RETENTION_MS = 30 * 24 * 60 * 60 * 1000`, so T003 passes.
 - [ ] T014 [P] Add Zod schemas `SessionSnapshotSchema`, `SetDescriptionInputSchema` (description ≤ 500 after trim, or null) and `SetLinkInputSchema` in `src/shared/schemas/session-records.schema.ts`.
 - [ ] T015 Implement `src/main/sessions/session-record-store.ts` in the shape of `src/main/integrations/issue-link-store.ts`, so T004 passes:
