@@ -42,6 +42,7 @@ import {
   splitTerminalSession,
   setActivityClock,
   resetActivityThrottle,
+  answerChoice,
 } from '../../../../src/renderer/terminal/session-controller'
 
 const mockCreateSession = vi.fn()
@@ -56,10 +57,18 @@ const mockGetActiveSessionForProject = vi.fn()
 const mockAdoptSession = vi.fn()
 const mockStampActivity = vi.fn()
 const mockSetSessionScreen = vi.fn()
+const mockGetTerminalInstance = vi.fn()
+const mockInput = vi.fn()
 
 const sessions = new Map<
   string,
-  { projectId: string; tabTitle: string; parentSessionId?: string }
+  {
+    projectId: string
+    tabTitle: string
+    parentSessionId?: string
+    latestLine?: string
+    choicePrompt?: unknown
+  }
 >()
 
 beforeEach(() => {
@@ -82,6 +91,7 @@ beforeEach(() => {
     adoptSession: mockAdoptSession,
     stampActivity: mockStampActivity,
     setSessionScreen: mockSetSessionScreen,
+    getTerminalInstance: mockGetTerminalInstance,
   } as unknown as ReturnType<typeof useSessionStore.getState>)
   resetActivityThrottle()
   setActivityClock(() => 0)
@@ -422,5 +432,95 @@ describe('activity stamping throttle (FR-002)', () => {
     mockStampActivity.mockClear()
     hooks.onIdle!()
     expect(mockStampActivity).toHaveBeenCalledWith('s1', 9_000)
+  })
+})
+
+const PROMPT_ROWS = [
+  '⏺ Write(a.txt)',
+  ' Do you want to create a.txt?',
+  ' ❯ 1. Yes',
+  '   2. No',
+  ' Esc to cancel',
+  '',
+]
+const PROMPT = {
+  question: 'Do you want to create a.txt?',
+  options: [
+    { number: 1, label: 'Yes' },
+    { number: 2, label: 'No' },
+  ],
+}
+
+describe('reading a choice prompt off the screen (054)', () => {
+  it('records the prompt a settled screen shows', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    screenRows = PROMPT_ROWS
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('session-123', {
+      latestLine: 'Esc to cancel',
+      choicePrompt: PROMPT,
+    })
+  })
+
+  it('forgets the prompt as soon as output moves again', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    sessions.set('session-123', {
+      projectId: 'proj-1',
+      tabTitle: 'T',
+      latestLine: 'x',
+      choicePrompt: PROMPT,
+    })
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('session-123', {
+      latestLine: 'x',
+      choicePrompt: null,
+    })
+  })
+
+  it('writes nothing on output when there was no prompt to forget', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    sessions.set('session-123', { projectId: 'proj-1', tabTitle: 'T' })
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(mockSetSessionScreen).not.toHaveBeenCalled()
+  })
+})
+
+describe('answerChoice (054)', () => {
+  beforeEach(() => {
+    // A node-project spec: the controller only reaches window.electronAPI.
+    vi.stubGlobal('window', { electronAPI: { terminal: { input: mockInput } } })
+    sessions.set('s1', { projectId: 'p', tabTitle: 'claude', latestLine: '', choicePrompt: PROMPT })
+    mockGetTerminalInstance.mockReturnValue({ readVisibleRows: () => screenRows })
+  })
+
+  it('types the option number when the prompt is still on screen', () => {
+    screenRows = PROMPT_ROWS
+    expect(answerChoice('s1', 2)).toBe(true)
+    expect(mockInput).toHaveBeenCalledWith('s1', '2')
+  })
+
+  it('sends nothing and drops the buttons when the prompt has changed', () => {
+    screenRows = PROMPT_ROWS.map((r) => r.replace('2. No', '2. No, and tell Claude why'))
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(mockInput).not.toHaveBeenCalled()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('s1', { latestLine: '', choicePrompt: null })
+  })
+
+  it('sends nothing when the prompt has gone', () => {
+    screenRows = ['⏺ Done.', '']
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(mockInput).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing for a number the prompt does not offer', () => {
+    screenRows = PROMPT_ROWS
+    expect(answerChoice('s1', 3)).toBe(false)
+    expect(mockInput).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing for a session without a terminal', () => {
+    mockGetTerminalInstance.mockReturnValue(undefined)
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(mockInput).not.toHaveBeenCalled()
   })
 })

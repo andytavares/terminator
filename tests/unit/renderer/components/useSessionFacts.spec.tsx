@@ -72,7 +72,7 @@ describe('useSessionFacts', () => {
     const { result } = renderHook(() => useSessionFacts())
     act(() => {
       useSessionStore.setState({
-        sessions: new Map([['s1', { ...session, agentState: 'working' }]]),
+        sessions: new Map([['s1', { ...session, busy: true }]]),
       })
     })
     expect(result.current[0].state).toBe('working')

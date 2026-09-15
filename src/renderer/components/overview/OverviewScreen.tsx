@@ -6,6 +6,7 @@ import { useMetricsStore } from '../../stores/metrics.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
+import { answersFor } from '../session/answers'
 import { matchesFilter } from '../../sidebar/session-filter'
 import { placeWall } from '../../sidebar/wall-order'
 import {
@@ -187,6 +188,7 @@ export function OverviewScreen(): JSX.Element {
                 now={now}
                 onOpen={navigateToSession}
                 onSaveDescription={saveDescription}
+                answers={answersFor(factsById.get(placement.sessionId)!)}
               />
             ))}
           </div>

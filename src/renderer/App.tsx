@@ -27,6 +27,7 @@ import type { CommandRegistration } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
 import { OverviewScreen } from './components/overview/OverviewScreen'
 import { HomeScreen } from './components/home/HomeScreen'
+import { BellAndBusySource } from './sidebar/agent-state'
 import { MetricsBar } from './components/overview/MetricsBar'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
@@ -34,6 +35,9 @@ import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 import { adoptTerminalSession } from './terminal/session-controller'
 import { qualifiedBranchLabel } from './sidebar/branch-display'
+
+/** Counts the sessions waiting on the operator for Home's badge. */
+const needsYouSource = new BellAndBusySource()
 
 installLogInterceptor()
 
@@ -530,9 +534,7 @@ export function App(): JSX.Element {
 
   const needsYouCount = useMemo(
     () =>
-      [...sessions.values()].filter(
-        (s) => s.status !== 'closed' && s.agentState === 'awaiting-input'
-      ).length,
+      [...sessions.values()].filter((s) => needsYouSource.derive(s) === 'awaiting-input').length,
     [sessions]
   )
 

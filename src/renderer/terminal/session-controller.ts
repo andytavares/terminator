@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '../stores/workspace.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
 import { dispatchNotification } from '../lib/notifications'
 import { latestLineOf } from '../sidebar/screen'
+import { parseChoicePrompt, samePrompt } from '../sidebar/choice-prompt'
 import type { PaneSplitDirection } from '../../shared/types/index'
 
 // The single owner of "a live terminal tab": composes the store record, the
@@ -58,7 +59,17 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
     onBell: () => handleBell(sessionId),
     onBusy: () => {
       stampActivity(sessionId)
-      useSessionStore.getState().setSessionBusy(sessionId)
+      const store = useSessionStore.getState()
+      store.setSessionBusy(sessionId)
+      // Output moving means the question was answered or redrawn; the next
+      // settle reads it again.
+      const session = store.sessions.get(sessionId)
+      if (session?.choicePrompt !== undefined) {
+        store.setSessionScreen(sessionId, {
+          latestLine: session.latestLine ?? '',
+          choicePrompt: null,
+        })
+      }
     },
     onIdle: () => {
       // Unthrottled: idle is the end of a burst, and its timestamp is the one
@@ -68,9 +79,10 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
       // Read once per burst, when the screen has stopped moving, rather than
       // per output chunk across every live terminal.
       const rows = instance.readVisibleRows()
-      useSessionStore
-        .getState()
-        .setSessionScreen(sessionId, { latestLine: latestLineOf(rows), choicePrompt: null })
+      useSessionStore.getState().setSessionScreen(sessionId, {
+        latestLine: latestLineOf(rows),
+        choicePrompt: parseChoicePrompt(rows),
+      })
     },
   })
   return instance
@@ -182,4 +194,27 @@ export async function splitTerminalSession(
   const instance = buildInstance(sessionId, scrollbackLimit)
   store.setTerminalInstance(sessionId, instance)
   store.activateSplit(projectId, focusedId, sessionId, direction)
+}
+
+/**
+ * Answers a session's numbered prompt as if its number were typed.
+ *
+ * The screen is read again first: the prompt the button was drawn from may
+ * have been answered in the terminal, or replaced, since. Only the same options
+ * on screen now get the keypress; otherwise nothing is sent and the buttons go.
+ * A bare digit answers a Claude Code select prompt (verified live on 2.1.273).
+ */
+export function answerChoice(sessionId: string, number: number): boolean {
+  const store = useSessionStore.getState()
+  const session = store.sessions.get(sessionId)
+  const instance = store.getTerminalInstance(sessionId)
+  if (session === undefined || instance === undefined) return false
+  const onScreen = parseChoicePrompt(instance.readVisibleRows())
+  const offered = onScreen?.options.some((o) => o.number === number) === true
+  if (!samePrompt(session.choicePrompt ?? null, onScreen) || !offered) {
+    store.setSessionScreen(sessionId, { latestLine: session.latestLine ?? '', choicePrompt: null })
+    return false
+  }
+  window.electronAPI.terminal.input(sessionId, String(number))
+  return true
 }

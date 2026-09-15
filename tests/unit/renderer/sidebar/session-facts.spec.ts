@@ -71,7 +71,7 @@ describe('buildSessionFacts', () => {
   it('describes an open session from where it lives', () => {
     const [facts] = buildSessionFacts({
       ...empty,
-      sessions: [{ ...session, latestLine: '14 passed, 2 failed' }],
+      sessions: [{ ...session, busy: true, latestLine: '14 passed, 2 failed' }],
     })
     expect(facts).toMatchObject({
       sessionId: 's1',
@@ -91,6 +91,25 @@ describe('buildSessionFacts', () => {
       closedAt: null,
       latestLine: '14 passed, 2 failed',
     })
+  })
+
+  it("derives the state from the session's signals, since nothing stores it", () => {
+    const stored = { ...session, agentState: 'idle' as const }
+    const facts = buildSessionFacts({
+      ...empty,
+      sessions: [
+        { ...stored, id: 'bell', bellCount: 1 },
+        { ...stored, id: 'busy', busy: true },
+        { ...stored, id: 'asking', choicePrompt: { question: 'Proceed?', options: [] } },
+        { ...stored, id: 'quiet' },
+      ],
+    })
+    expect(facts.map((f) => [f.sessionId, f.state])).toEqual([
+      ['bell', 'awaiting-input'],
+      ['busy', 'working'],
+      ['asking', 'awaiting-input'],
+      ['quiet', 'idle'],
+    ])
   })
 
   it('lists every open session exactly once', () => {

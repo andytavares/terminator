@@ -327,21 +327,21 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Tests first
 
-- [ ] T058 [P] [US4] Write failing specs for `parseChoicePrompt` and `samePrompt` in `tests/unit/renderer/sidebar/choice-prompt.spec.ts`. Use fixtures copied verbatim from a real Claude Code permission prompt and a select prompt, with the `❯` cursor on option 1 and on option 2. Also cover:
+- [x] T058 [P] [US4] Write failing specs for `parseChoicePrompt` and `samePrompt` in `tests/unit/renderer/sidebar/choice-prompt.spec.ts`. Use fixtures copied verbatim from a real Claude Code permission prompt and a select prompt, with the `❯` cursor on option 1 and on option 2. Also cover:
   - Options numbered 1,2,4 give `null`.
   - A single option gives `null`.
   - A block in the top half of the rows gives `null`.
   - No question line above gives `null`.
   - Trailing blank rows below the block are ignored.
   - `samePrompt` ignores the question text and compares labels in order.
-- [ ] T059 [P] [US4] Extend `tests/unit/renderer/sidebar/agent-state.spec.ts`:
+- [x] T059 [P] [US4] Extend `tests/unit/renderer/sidebar/agent-state.spec.ts`:
   - `choicePrompt` set with `bellCount` 0 gives `awaiting-input`.
   - Closed with a `choicePrompt` gives `exited`.
-- [ ] T060 [P] [US4] Write failing specs for the controller in `tests/unit/renderer/terminal/session-controller.spec.ts`:
+- [x] T060 [P] [US4] Write failing specs for the controller in `tests/unit/renderer/terminal/session-controller.spec.ts`:
   - On idle, the visible rows are parsed and `setChoicePrompt` is called.
   - On busy, the prompt is cleared.
   - `answerChoice(sessionId, n)` re-reads and re-parses. When `samePrompt` holds, it sends the digit via `electronAPI.terminal.input`. Otherwise it sends nothing and clears the prompt.
-- [ ] T061 [P] [US4] Write failing component specs:
+- [x] T061 [P] [US4] Write failing component specs:
   - `tests/unit/renderer/components/ChoiceButtons.spec.tsx`: a `group` named by the question, containing one `button` per option named `<n>. <label>`, in order, and a press calls `onAnswer(n)`.
   - Extend `WallTile.spec.tsx` and `LedgerView.spec.tsx`:
     - Buttons render only when `facts.choicePrompt` is set.
@@ -349,16 +349,16 @@ description: 'Task list for Session Home and Monitor Wall'
 
 ### Implementation
 
-- [ ] T062 [P] [US4] Implement `src/renderer/sidebar/choice-prompt.ts` (T058).
-- [ ] T063 [P] [US4] Add `readVisibleRows(): string[]` to `TerminalInstance` in `src/renderer/components/terminal/TerminalSession.tsx`, reading `terminal.buffer.active` from `viewportY` for `rows` lines with `translateToString(true)`. Cover it in `tests/unit/renderer/components/TerminalSession.spec.ts` with a mocked buffer.
-- [ ] T064 [US4] Add `setChoicePrompt(sessionId, prompt | null)` to `src/renderer/stores/session.store.ts`. Widen `BellAndBusySource.derive` in `src/renderer/sidebar/agent-state.ts` (T059), and make sure the store re-derives `agentState` when the prompt changes.
-- [ ] T065 [US4] In `src/renderer/terminal/session-controller.ts` (T060):
+- [x] T062 [P] [US4] Implement `src/renderer/sidebar/choice-prompt.ts` (T058).
+- [x] T063 [P] [US4] Add `readVisibleRows(): string[]` to `TerminalInstance` in `src/renderer/components/terminal/TerminalSession.tsx`, reading `terminal.buffer.active` from `viewportY` for `rows` lines with `translateToString(true)`. Cover it in `tests/unit/renderer/components/TerminalSession.spec.ts` with a mocked buffer.
+- [x] T064 [US4] Add `setChoicePrompt(sessionId, prompt | null)` to `src/renderer/stores/session.store.ts`. Widen `BellAndBusySource.derive` in `src/renderer/sidebar/agent-state.ts` (T059), and make sure the store re-derives `agentState` when the prompt changes.
+- [x] T065 [US4] In `src/renderer/terminal/session-controller.ts` (T060):
   - `onIdle` parses `readVisibleRows()` into `setChoicePrompt`.
   - `onBusy` clears it.
   - Export `answerChoice(sessionId, n)`.
   - Also derive `latestLine` for `buildSessionFacts` from the same read, exposed through the session store as view state.
-- [ ] T066 [US4] Implement `src/renderer/components/session/ChoiceButtons.tsx` and `ChoiceButtons.css`, and render it in `WallTile.tsx` and in the expanded row of `LedgerView.tsx`, wired to `answerChoice` (T061).
-- [ ] T067 [US4] Run `quickstart.md` §5 against a live `claude`. If a bare digit only moves the cursor, change `answerChoice` to send `${n}\r` and update the spec in T060 to match. Record the observed behaviour in `specs/054-session-home-wall/research.md` R6, replacing `[UNVERIFIED]` with what was seen and the Claude Code version (`claude --version`).
+- [x] T066 [US4] Implement `src/renderer/components/session/ChoiceButtons.tsx` and `ChoiceButtons.css`, and render it in `WallTile.tsx` and in the expanded row of `LedgerView.tsx`, wired to `answerChoice` (T061).
+- [x] T067 [US4] Run `quickstart.md` §5 against a live `claude`. If a bare digit only moves the cursor, change `answerChoice` to send `${n}\r` and update the spec in T060 to match. Record the observed behaviour in `specs/054-session-home-wall/research.md` R6, replacing `[UNVERIFIED]` with what was seen and the Claude Code version (`claude --version`).
 
 **Checkpoint**: Answering in place has worked once for real. The wall's Needs you band fills from a real agent, not just the bell.
 

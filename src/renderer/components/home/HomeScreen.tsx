@@ -5,6 +5,7 @@ import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
+import { answersFor } from '../session/answers'
 import { loadHomePrefs } from '../../sidebar/home-prefs'
 import { buildLedger } from '../../sidebar/ledger-rows'
 import type { SessionFacts } from '../../sidebar/session-facts'
@@ -88,6 +89,7 @@ export function HomeScreen(): JSX.Element {
               onSelect={setSelectedId}
               onOpen={navigateToSession}
               onSaveDescription={saveDescription}
+              renderAnswers={answersFor}
             />
           )
         )}

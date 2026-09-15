@@ -70,11 +70,12 @@ Every decision below is grounded in the code as of `6e0adbff`. File references a
 
 **Spec impact**: The spec's Assumptions said needs-you detection is unchanged. This plan widens it by one signal, a visible numbered prompt, and the spec is updated to match.
 
-**Recognised shape** (Claude Code's select prompt, see `data-model.md` → ChoicePrompt):
+**Recognised shape**, from a real capture (`tests/unit/renderer/sidebar/fixtures/claude-prompt-1.txt`):
 
-- A contiguous block of at least two lines matching `^\s*(?:❯\s*)?(\d+)\.\s+(.+?)\s*$`.
+- A contiguous block of at least two option lines, `N. label`, with box-drawing edges stripped. A deeper-indented row continues the previous label.
+- Exactly one option carries the `❯` cursor. This is what separates a select prompt from a numbered list in ordinary output.
 - Numbers run 1..n in order.
-- The block sits in the bottom half of the visible rows.
+- The block is the last thing on screen, apart from up to two footer lines such as "Esc to cancel · Tab to amend". The planned "bottom half of the rows" rule was dropped: the terminal usually has blank rows below the prompt, and a prompt that scrolled up under newer output has already been answered.
 - The nearest non-empty line above the block is the question.
 
 Anything else yields `null`.
@@ -82,6 +83,7 @@ Anything else yields `null`.
 **Alternatives considered**:
 
 - **Consume Claude Code hooks (`Notification`)**: those hooks belong to extensions. Principle II forbids core reading them, and a shell-started `claude` has none.
+- **Read `agentState` from the session store**: nothing writes it. The sidebar derives it locally, so Home, the wall and the badge derive it through the same `BellAndBusySource`, in `buildSessionFacts` and `App.tsx`.
 - **Parse on every output chunk**: this is a render-time cost across 12+ live sessions, and SC-005 sets a 50 ms echo budget.
 
 ## R6. Answering in place
@@ -92,7 +94,7 @@ Anything else yields `null`.
 - The send writes the number's digit through the existing `terminal:input` channel.
 - Otherwise it clears `choicePrompt` and sends nothing (FR-035).
 
-`[UNVERIFIED]` That a single digit keypress selects and confirms that option in Claude Code's select prompt is observed behaviour, not documented. No official doc covers the select widget's key bindings. `quickstart.md` step 5 verifies it against a live `claude` before the feature ships. If it turns out a digit only moves the cursor, the send becomes the digit followed by `\r`, and that is the only change.
+**Verified live** on Claude Code 2.1.273 (`tests/e2e/live/choice-prompt.spec.ts`, run with `E2E_LIVE=1`). With `--permission-mode default`, Claude paused on "Do you want to create a.txt?" with options 1–3. The first run pressed `1` and nothing else, and the prompt cleared within 4 seconds. The second run clicked the wall tile's **1. Yes** button, and `a.txt` was created and the Needs you band emptied. A bare digit is enough; no `\r` is sent.
 
 **Rationale**: The re-read closes the race where the prompt changed between render and click. Reusing `terminal:input` means there is no new privileged path into a PTY.
 

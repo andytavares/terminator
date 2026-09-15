@@ -1338,16 +1338,18 @@ describe('App', () => {
         setActiveGlobalTab: vi.fn(),
         sidebarPanels: new Map(),
       }))
-      const session = (id: string, agentState: string, status = 'active') => [
+      // State is derived, never read from the store: a bell or a visible choice
+      // makes a session wait on the operator; a closed one never does.
+      const session = (id: string, patch: Record<string, unknown>) => [
         id,
-        { id, projectId: 'p', tabTitle: id, agentState, status },
+        { id, projectId: 'p', tabTitle: id, agentState: 'idle', status: 'active', ...patch },
       ]
       setupMocks({
         sessions: new Map([
-          session('a', 'awaiting-input'),
-          session('b', 'awaiting-input'),
-          session('c', 'working'),
-          session('d', 'awaiting-input', 'closed'),
+          session('a', { bellCount: 1 }),
+          session('b', { choicePrompt: { question: 'Proceed?', options: [] } }),
+          session('c', { busy: true }),
+          session('d', { bellCount: 2, status: 'closed' }),
         ] as never),
       })
       render(<App />)

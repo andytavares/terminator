@@ -1,4 +1,5 @@
 import { resolveWorkItem, type WorkItem } from './work-item'
+import { BellAndBusySource } from './agent-state'
 import type {
   AgentState,
   ChoicePrompt,
@@ -51,6 +52,9 @@ export interface SessionFactsInput {
 
 const AGENT_TAG = 'agent'
 
+/** agentState is never stored; every surface derives it from the same signals. */
+const stateSource = new BellAndBusySource()
+
 function openFacts(
   session: TerminalSession,
   input: SessionFactsInput,
@@ -73,7 +77,7 @@ function openFacts(
   return {
     sessionId: session.id,
     name: session.tabTitle,
-    state: session.status === 'closed' ? 'exited' : session.agentState,
+    state: stateSource.derive(session),
     isClosed: false,
     projectId: project?.id ?? null,
     workspaceName: snapshot.workspaceName,
