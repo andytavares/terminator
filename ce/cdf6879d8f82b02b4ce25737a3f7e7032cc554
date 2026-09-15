@@ -1,0 +1,76 @@
+tests/unit/renderer/sidebar/wall-order.spec.ts
+  s_cf6284d326023a::t_b450dfe4667b1e 13-18,38-40,43-46,53-60
+  s_cf6284d326023a::t_215245cddc6556 1-12,19-37,41-42,47-52,61-90
+src/renderer/components/overview/WallTile.tsx
+  s_cf6284d326023a::t_738a81d563e4a2 35
+  s_cf6284d326023a::t_5377da741a5608 1-34,36-111
+tests/unit/renderer/terminal/preview-window.spec.ts
+  s_cf6284d326023a::t_a0d609b1f5fbed 1-35
+tests/unit/renderer/components/WallTile.spec.tsx
+  s_cf6284d326023a::t_b450dfe4667b1e 6-8,67-72,96-98,111-113
+  s_cf6284d326023a::t_738a81d563e4a2 73
+  s_cf6284d326023a::t_5377da741a5608 1-5,9-66,74-95,99-110,114-137
+src/renderer/sidebar/session-facts.ts
+  s_cf6284d326023a::t_fab51a4dd336cc 61-62
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_cf6284d326023a::t_3748372b66686d 499
+  s_cf6284d326023a::t_7f136d9ea6d7f3 43-44,61,486-495,500-511
+  s_cf6284d326023a::t_fab51a4dd336cc 496-498
+  s_cf6284d326023a::t_64a1a2355f4272 512-513
+specs/054-session-home-wall/plan.md
+  s_cf6284d326023a::t_b450dfe4667b1e 24
+src/renderer/sidebar/wall-order.ts
+  s_cf6284d326023a::t_215245cddc6556 1-2,4-26,28-65
+  s_cf6284d326023a::t_6a1d668eebda7f 3,27
+src/renderer/terminal/preview-window.ts
+  s_cf6284d326023a::t_a0d609b1f5fbed 1-29
+tests/unit/renderer/sidebar/ledger-rows.spec.ts
+  s_cf6284d326023a::t_738a81d563e4a2 29,41
+src/renderer/sidebar/ledger-rows.ts
+  s_cf6284d326023a::t_6a1d668eebda7f 4,33
+  s_cf6284d326023a::t_738a81d563e4a2 19
+  s_cf6284d326023a::t_e6f8a2d9560093 25,27,68-69
+tests/e2e/monitor-wall.spec.ts
+  s_cf6284d326023a::t_b450dfe4667b1e 60-63
+  s_cf6284d326023a::t_46ddf0b4becfc3 1-59,64-75
+tests/unit/renderer/sidebar/wall-prefs.spec.ts
+  s_cf6284d326023a::t_215245cddc6556 1-51
+src/renderer/sidebar/wall-prefs.ts
+  s_cf6284d326023a::t_215245cddc6556 1-44
+src/renderer/components/terminal/TerminalSession.tsx
+  s_cf6284d326023a::t_7f136d9ea6d7f3 4,494-505,511,513-514,517
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_cf6284d326023a::t_b450dfe4667b1e 23-25,53-59,117-119,134-137
+  s_cf6284d326023a::t_54a10d7ffa6c16 3-15,17-20,22,28,30-31,33-37,42,47-52,60,63,65-72,75-81,84-88,91-102,105-111,114-116,120-122,125-128,130-131,133,138-140,143-146,148-150,152-159,161-164,167-174,176,178-180,183-187,190-194,197-203
+src/renderer/components/overview/WallTile.css
+  s_cf6284d326023a::t_5377da741a5608 1-120
+specs/054-session-home-wall/tasks.md
+  s_cf6284d326023a::t_b450dfe4667b1e 265-266,271,288-291,297,312
+src/renderer/components/overview/OverviewScreen.css
+  s_cf6284d326023a::t_10e17f5136ef58 1,6,10-12,15,17-18,22-37,43-45,47-51,54,58-60,63-124,126-140,143,145,147-158,162-182,184-188,191-210
+src/renderer/components/overview/OverviewScreen.tsx
+  s_cf6284d326023a::t_d95cfb8b8e318b 1-4,6,8-10,12-18,21-28,30-31,34,36-38,41-43,46-47,49-55,57-60,62-64,67,77,89-91,94-113,115-147,150-194
+  s_cf6284d326023a::t_738a81d563e4a2 29
+tests/e2e/extension-escape-exit.spec.ts
+  s_cf6284d326023a::t_46ddf0b4becfc3 50-51
+tests/unit/renderer/sidebar/session-facts.spec.ts
+  s_cf6284d326023a::t_fab51a4dd336cc 199-209
+specs/054-session-home-wall/contracts/ui-surfaces.md
+  s_cf6284d326023a::t_0f22bb81e5b030 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cecdf6879d8f82b02b4ce25737a3f7e7032cc554",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
