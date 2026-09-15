@@ -1,0 +1,49 @@
+tests/unit/renderer/terminal/start-session.spec.ts
+  s_cf6284d326023a::t_771187946ce247 4,14,47-51,64-69,91-96
+  s_cf6284d326023a::t_29d53daedd6426 1-3,5-13,16-46,52-63,70-87,89-90,97-105
+  s_cf6284d326023a::t_be7cc8a9c9582c 15
+  s_cf6284d326023a::t_0845bc567bb9b1 88
+src/renderer/components/home/NewSessionMenu.tsx
+  s_cf6284d326023a::t_be7cc8a9c9582c 1-94
+src/renderer/components/home/HomeScreen.css
+  s_cf6284d326023a::t_aed7da67e23e69 148-160
+  s_cf6284d326023a::t_a56d36fb3c6332 185-195
+tests/unit/renderer/components/NewSessionMenu.spec.tsx
+  s_cf6284d326023a::t_be7cc8a9c9582c 1-48,54-62,66-90
+  s_cf6284d326023a::t_0845bc567bb9b1 49-53,63-65
+src/renderer/components/home/HomeScreen.tsx
+  s_cf6284d326023a::t_aed7da67e23e69 6,12,93-96,138-150
+docs/user-guide/USER-GUIDE.md
+  s_cf6284d326023a::t_a379f1d8a14e5f 362-363
+src/renderer/terminal/start-session.ts
+  s_cf6284d326023a::t_be7cc8a9c9582c 46
+  s_cf6284d326023a::t_29d53daedd6426 1-22,26-45,47-54
+  s_cf6284d326023a::t_0845bc567bb9b1 23-25
+README.md
+  s_cf6284d326023a::t_a379f1d8a14e5f 31
+src/renderer/components/home/LedgerDisplayMenu.tsx
+  s_cf6284d326023a::t_a56d36fb3c6332 76
+specs/054-session-home-wall/contracts/ui-surfaces.md
+  s_cf6284d326023a::t_a379f1d8a14e5f 15
+tests/e2e/session-home.spec.ts
+  s_cf6284d326023a::t_0845bc567bb9b1 179-206
+  s_cf6284d326023a::t_c0d9090982a6b7 158-178
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_cf6284d326023a::t_aed7da67e23e69 37-48,261-283
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a6f54474d3437c6617e78b52b0d86d308a60a3d3",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
