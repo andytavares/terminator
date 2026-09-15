@@ -1,0 +1,40 @@
+specs/054-session-home-wall/tasks.md
+  s_cf6284d326023a::t_259e6701e5120b 418,422,426-428
+src/renderer/components/overview/OverviewScreen.tsx
+  s_cf6284d326023a::t_aff951c0e3ee30 10,50,193,200
+specs/054-session-home-wall/contracts/ui-surfaces.md
+  s_cf6284d326023a::t_259e6701e5120b 19,53-54
+src/renderer/components/home/HomeScreen.tsx
+  s_cf6284d326023a::t_aff951c0e3ee30 10,43,138,151,157
+tests/unit/renderer/components/SessionLinkDialog.spec.tsx
+  s_cf6284d326023a::t_72a0ea4d2fe0ac 76-79
+  s_cf6284d326023a::t_ef9a3b8d674134 1-75,80-101
+  s_cf6284d326023a::t_17807b84bf22bf 102-132
+tests/e2e/session-home.spec.ts
+  s_cf6284d326023a::t_72a0ea4d2fe0ac 108-126
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_cf6284d326023a::t_aff951c0e3ee30 40-49,215-222
+  s_cf6284d326023a::t_a269f952d1b088 223
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_cf6284d326023a::t_aff951c0e3ee30 44-53,190-197
+  s_cf6284d326023a::t_6e3fb400c3a8e0 198
+src/renderer/components/session/SessionLinkDialog.tsx
+  s_cf6284d326023a::t_72a0ea4d2fe0ac 30-32
+  s_cf6284d326023a::t_ef9a3b8d674134 1-29,33-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "060c88b956fb4177760a603a7ffd9c1b9dde295e",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
