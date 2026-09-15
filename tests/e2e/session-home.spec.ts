@@ -237,3 +237,42 @@ test('a terminal can be started from Home, on a branch or as a scratch', async (
   await openHome(page)
   await expect(page.getByRole('rowgroup', { name: 'No branch' }).getByRole('row')).toHaveCount(1)
 })
+
+/** Height, text size and corner radius of a control, as rendered. */
+async function shapeOf(
+  scope: ReturnType<Page['getByRole']>,
+  name: string | RegExp,
+  nth = 0
+): Promise<Record<string, string>> {
+  return scope
+    .getByRole('button', { name })
+    .nth(nth)
+    .evaluate((el) => {
+      const style = getComputedStyle(el)
+      return {
+        height: `${Math.round(el.getBoundingClientRect().height)}`,
+        fontSize: style.fontSize,
+        borderRadius: style.borderRadius,
+      }
+    })
+}
+
+test('Home draws its controls as one set, in the bar and in the empty state', async () => {
+  handle = await launchApp()
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+
+  const home = page.getByRole('region', { name: 'Home' })
+  const needsYou = await shapeOf(home, /Needs you/)
+  expect(await shapeOf(home, /^New terminal$/)).toEqual(needsYou)
+  expect(await shapeOf(home, /^Display$/)).toEqual(needsYou)
+
+  // Close the only terminal, so the empty state's two buttons sit side by side.
+  await page.getByRole('button', { name: /^Home/ }).click()
+  await page.locator('.tab-bar__close').first().click()
+  await openHome(page)
+  await expect(page.getByText('No terminals are open')).toBeVisible()
+  expect(await shapeOf(home, /^New terminal$/, 1)).toEqual(await shapeOf(home, /^Go to terminals$/))
+})

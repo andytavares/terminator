@@ -64,12 +64,17 @@
   outline-offset: -2px;
 }
 
-.home__toggle {
+/* One control shape for Home's bar: the Needs you toggle and the two menus
+   (New terminal, Display) sit in the same row and must read as one set. The
+   menus carry the sidebar's classes for their panel, so their button is
+   restated here rather than inheriting a sidebar size. */
+.home__toggle,
+.home-menu .sidebar-menu__button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 26px;
-  padding: 0 8px;
+  padding: 0 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   background: var(--bg-input);
@@ -79,12 +84,28 @@
   cursor: pointer;
 }
 
+.home-menu .sidebar-menu__button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.home-menu .sidebar-menu__button--on {
+  background: var(--accent-dim);
+  border-color: transparent;
+  color: var(--text-primary);
+}
+
+.home-menu .sidebar-menu__label {
+  font-size: inherit;
+}
+
 .home__toggle[aria-pressed='true'] {
   background: var(--accent-dim);
   border-color: transparent;
 }
 
-.home__toggle:focus-visible {
+.home__toggle:focus-visible,
+.home-menu .sidebar-menu__button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -155,7 +176,9 @@
   margin: 0;
 }
 
-.home__empty-action {
+/* The empty state's pair: the same two shapes, one size up, side by side. */
+.home__empty-action,
+.home__empty-actions .home-menu .sidebar-menu__button {
   height: 28px;
   padding: 0 12px;
   border-radius: var(--radius-sm);
@@ -167,7 +190,8 @@
   cursor: pointer;
 }
 
-.home__empty-action:hover {
+.home__empty-action:hover,
+.home__empty-actions .home-menu .sidebar-menu__button:hover {
   background: var(--bg-card-hover);
 }
 
