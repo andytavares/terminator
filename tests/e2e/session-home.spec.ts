@@ -132,6 +132,29 @@ test('linking a session says where to connect a tracker when none is', async () 
   await expect(dialog).toBeHidden()
 })
 
+test('the link dialog closes on Escape and on a click outside it', async () => {
+  handle = await launchApp()
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+
+  const link = page
+    .getByRole('rowgroup', { name: 'Repo One / feature-a' })
+    .getByRole('button', { name: 'Link a work item' })
+  const dialog = page.getByRole('dialog', { name: 'Link a work item' })
+
+  await link.click()
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+
+  await link.click()
+  await expect(dialog).toBeVisible()
+  await page.mouse.click(40, 700)
+  await expect(dialog).toBeHidden()
+})
+
 test("the Ledger's columns and grouping survive a restart", async () => {
   handle = await launchApp()
   const profile = handle.userDataDir

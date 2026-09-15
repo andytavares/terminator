@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { IssuePicker } from '../integrations/IssuePicker'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
@@ -26,6 +26,16 @@ export function SessionLinkDialog({ facts, onClose }: Props): JSX.Element {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const own = facts.workItem?.source === 'session' ? facts.workItem.ref : null
+
+  // Escape closes the dialog wherever focus is. The picker's dropdown stops the
+  // event while it is open, so the first Escape dismisses that instead.
+  useEffect(() => {
+    const close = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', close)
+    return () => document.removeEventListener('keydown', close)
+  }, [onClose])
 
   async function write(
     ref: { tracker: IssueSummary['tracker']; key: string } | null

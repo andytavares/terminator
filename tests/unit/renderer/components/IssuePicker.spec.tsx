@@ -116,6 +116,61 @@ describe('IssuePicker — choosing', () => {
   })
 })
 
+describe('IssuePicker — dismissing the list', () => {
+  async function openList() {
+    const view = open()
+    await act(async () => {
+      fireEvent.focus(screen.getByPlaceholderText('Search, or type an issue key'))
+    })
+    await waitFor(() => expect(screen.getByText('TAV-42')).toBeTruthy())
+    return view
+  }
+
+  it('closes on Escape, and keeps the key from reaching the dialog behind it', async () => {
+    const behind = vi.fn()
+    render(<div onKeyDown={behind} />)
+    await openList()
+    const input = screen.getByPlaceholderText('Search, or type an issue key')
+    fireEvent.keyDown(input, { key: 'Escape', bubbles: true })
+    expect(screen.queryByText('TAV-42')).toBeNull()
+    expect(behind).not.toHaveBeenCalled()
+  })
+
+  it('lets Escape through once the list is already closed, so the dialog can take it', async () => {
+    const behind = vi.fn()
+    const { container } = render(<div onKeyDown={behind} />)
+    await openList()
+    const input = screen.getByPlaceholderText('Search, or type an issue key')
+    fireEvent.keyDown(input, { key: 'Escape' })
+    container.firstChild?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    )
+    expect(behind).toHaveBeenCalled()
+  })
+
+  it('closes when the pointer goes down anywhere else', async () => {
+    await openList()
+    fireEvent.pointerDown(document.body)
+    await waitFor(() => expect(screen.queryByText('TAV-42')).toBeNull())
+  })
+
+  it('stays open when the pointer goes down inside it', async () => {
+    await openList()
+    fireEvent.pointerDown(screen.getByText('TAV-42'))
+    expect(screen.getByText('TAV-42')).toBeTruthy()
+  })
+
+  it('opens again on the next focus', async () => {
+    await openList()
+    fireEvent.pointerDown(document.body)
+    await waitFor(() => expect(screen.queryByText('TAV-42')).toBeNull())
+    await act(async () => {
+      fireEvent.focus(screen.getByPlaceholderText('Search, or type an issue key'))
+    })
+    await waitFor(() => expect(screen.getByText('TAV-42')).toBeTruthy())
+  })
+})
+
 describe('IssuePicker — once chosen', () => {
   it('shows the choice instead of the search box', () => {
     open({ selected: summary() })

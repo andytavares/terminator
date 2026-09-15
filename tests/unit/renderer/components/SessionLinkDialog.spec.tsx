@@ -129,4 +129,28 @@ describe('SessionLinkDialog', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter' })
     expect(behind).not.toHaveBeenCalled()
   })
+
+  it('closes on Escape, wherever the focus is', () => {
+    render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops listening for Escape once it is gone', () => {
+    const { unmount } = render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
+    unmount()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('leaves other keys to the dialog, without reaching the row behind it', () => {
+    const behind = vi.fn()
+    render(
+      <div onKeyDown={behind}>
+        <SessionLinkDialog facts={fact()} onClose={onClose} />
+      </div>
+    )
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'a' })
+    expect(behind).not.toHaveBeenCalled()
+  })
 })
