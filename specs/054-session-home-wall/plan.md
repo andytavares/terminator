@@ -96,13 +96,12 @@ specs/054-session-home-wall/
 src/shared/
 ├── session-records/retention.ts          # new, pruneRecords
 ├── schemas/session-records.schema.ts     # new, Zod for session-records:*
-├── schemas/terminal.schema.ts            # create result gains shell
 └── types/index.ts                        # SessionRecord, WorkItemRef, ChoicePrompt; TerminalSession: −note +shell +choicePrompt
 
 src/main/
 ├── sessions/session-record-store.ts      # new, load/sweep/prune/set/markClosed/onChange
 ├── ipc/session-records.ipc.ts            # new
-├── ipc/terminal.ipc.ts                   # close → markClosed; create → returns shell
+├── ipc/terminal.ipc.ts                   # close → markClosed; create → returns shell (schema lives here)
 ├── preload.ts                            # electronAPI.sessionRecords
 └── index.ts                              # loadRecords + sweep at startup, register IPC
 
