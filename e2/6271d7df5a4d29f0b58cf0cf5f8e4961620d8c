@@ -1,0 +1,32 @@
+tests/e2e/session-home.spec.ts
+  s_cf6284d326023a::t_75b7c8cb2ce08e 159-178,185-210
+src/renderer/components/home/NewSessionMenu.tsx
+  s_cf6284d326023a::t_d22a43d5794361 1,4,22-24,51,66-72
+src/renderer/components/home/use-menu-placement.ts
+  s_cf6284d326023a::t_4eae6c52608948 1-26,46-50
+  s_cf6284d326023a::t_22d82c207e96e3 27-45
+tests/unit/renderer/components/use-menu-placement.spec.tsx
+  s_cf6284d326023a::t_4eae6c52608948 1-2,4-21,23-25,27-29,37-38,46-47,60-69,71-76,80-86,91-94,99-102,107-110,115,140-141
+  s_cf6284d326023a::t_22d82c207e96e3 3,22,26,30-36,39-45,48-59,70,116-139
+  s_cf6284d326023a::t_55fe260ef8eb9f 77-79,87-90,95-98,103-106,111-114
+src/renderer/components/home/HomeScreen.css
+  s_cf6284d326023a::t_d22a43d5794361 179-183,185
+src/renderer/components/home/LedgerDisplayMenu.tsx
+  s_cf6284d326023a::t_d22a43d5794361 1,4,35-37,82,97-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e26271d7df5a4d29f0b58cf0cf5f8e4961620d8c",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
