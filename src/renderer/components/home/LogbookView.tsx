@@ -3,6 +3,7 @@ import { Link, SquareArrowOutUpRight } from 'lucide-react'
 import { StateIcon } from '../session/StateIcon'
 import { LivePreview } from '../session/LivePreview'
 import { ResumeButton } from '../session/ResumeButton'
+import { CloseSessionButton } from '../session/CloseSessionButton'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import { headlineOf, suggestWorkItems, type LogbookGroup } from '../../sidebar/logbook-groups'
@@ -23,6 +24,7 @@ interface Props {
   onLinkIssue: (facts: SessionFacts, issue: IssueSummary) => void
   onLink?: (facts: SessionFacts) => void
   onResume?: (facts: SessionFacts) => void
+  onCloseSession?: (facts: SessionFacts) => void
   renderAnswers?: (facts: SessionFacts) => React.ReactNode
 }
 
@@ -69,6 +71,7 @@ function Detail({
   onLinkIssue,
   onLink,
   onResume,
+  onCloseSession,
   renderAnswers,
 }: Omit<Props, 'groups' | 'selected' | 'titles' | 'onSelect'> & {
   facts: SessionFacts
@@ -107,6 +110,7 @@ function Detail({
             Open terminal
           </button>
         )}
+        {onCloseSession && <CloseSessionButton facts={facts} onClose={onCloseSession} />}
       </div>
 
       <div className="logbook__main">

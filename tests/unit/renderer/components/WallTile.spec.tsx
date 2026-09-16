@@ -183,6 +183,14 @@ describe('WallTile', () => {
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
 
+  it('ends the session from its tile without opening it', () => {
+    const onCloseSession = vi.fn()
+    render(<WallTile {...props} onCloseSession={onCloseSession} />)
+    fireEvent.click(screen.getByRole('button', { name: /^Close / }))
+    expect(onCloseSession).toHaveBeenCalled()
+    expect(props.onOpen).not.toHaveBeenCalled()
+  })
+
   it('offers no Resume while the session is running', () => {
     render(<WallTile {...props} onResume={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()

@@ -8,6 +8,8 @@ const state = vi.hoisted(() => ({ facts: [] as SessionFacts[] }))
 const navigate = vi.hoisted(() => vi.fn())
 const setDescription = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const setActiveGlobalTab = vi.hoisted(() => vi.fn())
+const startScratch = vi.hoisted(() => vi.fn())
+const closeFromFacts = vi.hoisted(() => vi.fn())
 const metrics = vi.hoisted(() => ({
   processesBySessionId: new Map(),
   startPolling: vi.fn(),
@@ -32,6 +34,14 @@ vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
   navigateToSession: navigate,
+}))
+vi.mock('../../../../src/renderer/terminal/start-session', () => ({
+  resumeSession: vi.fn(),
+  startScratchSession: startScratch,
+  startSessionInBranch: vi.fn(),
+}))
+vi.mock('../../../../src/renderer/terminal/close-session', () => ({
+  closeSessionFromFacts: closeFromFacts,
 }))
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: { getState: () => ({ setActiveGlobalTab }) },
@@ -220,5 +230,20 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(screen.getByRole('dialog', { name: 'Link claude' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Close link' }))
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  // Starting work and ending it both belong where the work is shown, not only
+  // in the sidebar.
+  it('starts a scratch terminal from its bar', () => {
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New scratch terminal' }))
+    expect(startScratch).toHaveBeenCalled()
+  })
+
+  it('ends a session from its tile', () => {
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
+    expect(closeFromFacts).toHaveBeenCalled()
   })
 })

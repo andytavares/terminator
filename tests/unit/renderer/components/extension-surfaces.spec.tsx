@@ -5,7 +5,7 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
-import { SidebarHeader } from '../../../../src/renderer/components/sidebar/SidebarHeader'
+import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 import type { GroupKey } from '../../../../src/renderer/sidebar/view-model'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
@@ -169,21 +169,16 @@ const renderSidebar = (groupBy: GroupKey) =>
   render(<UnifiedSidebar {...sidebarProps} initialViewId={`g-${groupBy}`} />)
 
 describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupBy) => {
-  it('surface 1: the global tab button renders in the header and fires', () => {
+  // Both surfaces now hang on the window's own left rail rather than the
+  // sidebar's header; what an extension contributes is unchanged.
+  it('surface 1: the global tab button renders in the app band and fires', () => {
     const onSelectGlobalTab = vi.fn()
     render(
-      <SidebarHeader
+      <AppBand
         globalTabs={[globalTab]}
         sidebarItems={[]}
-        activeGlobalTabId={null}
-        onSelectGlobalTab={onSelectGlobalTab}
-        onSearchFocus={() => {}}
-        onAddWorkspace={() => {}}
-        unreadNotifications={0}
-        onBellClick={() => {}}
-        searchQuery=""
-        onSearchChange={() => {}}
-        onSearchClear={() => {}}
+        activeId={null}
+        onSelect={onSelectGlobalTab}
       />
     )
     fireEvent.click(screen.getByLabelText('Fake Tab'))
@@ -213,7 +208,9 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
   })
 
   it('surface 3: the contributed sidebar item renders once and its click reaches the handler', () => {
-    renderSidebar(groupBy)
+    render(
+      <AppBand globalTabs={[]} sidebarItems={[sidebarItem]} activeId={null} onSelect={() => {}} />
+    )
     expect(screen.getAllByRole('button', { name: 'Fake Sidebar Item' })).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Fake Sidebar Item' }))
     expect(sidebarItemAction).toHaveBeenCalledOnce()

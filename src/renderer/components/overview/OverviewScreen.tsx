@@ -6,7 +6,13 @@ import { useMetricsStore } from '../../stores/metrics.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
-import { resumeSession } from '../../terminal/start-session'
+import { closeSessionFromFacts } from '../../terminal/close-session'
+import { NewSessionMenu } from '../session/NewSessionMenu'
+import {
+  resumeSession,
+  startScratchSession,
+  startSessionInBranch,
+} from '../../terminal/start-session'
 import { answersFor } from '../session/answers'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { matchesFilter } from '../../sidebar/session-filter'
@@ -101,6 +107,10 @@ export function OverviewScreen(): JSX.Element {
         <span className="wall__meta">
           {open.length} live {open.length === 1 ? 'terminal' : 'terminals'}
         </span>
+        <NewSessionMenu
+          onStartInBranch={(projectId) => void startSessionInBranch(projectId)}
+          onStartScratch={() => void startScratchSession()}
+        />
         <div className="wall__sizes" role="radiogroup" aria-label="Tile size">
           {SIZES.map((size) => (
             <button
@@ -193,6 +203,8 @@ export function OverviewScreen(): JSX.Element {
                 onSaveDescription={saveDescription}
                 onLink={setLinking}
                 onResume={(facts) => void resumeSession(facts)}
+                onCloseSession={(facts) => void closeSessionFromFacts(facts)}
+                onCloseSession={(facts) => void closeSessionFromFacts(facts)}
                 answers={answersFor(factsById.get(placement.sessionId)!)}
               />
             ))}

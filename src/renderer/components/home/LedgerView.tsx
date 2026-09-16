@@ -4,6 +4,7 @@ import { StateIcon } from '../session/StateIcon'
 import { LivePreview } from '../session/LivePreview'
 import { WorkItemCell } from '../session/WorkItemCell'
 import { ResumeButton } from '../session/ResumeButton'
+import { CloseSessionButton } from '../session/CloseSessionButton'
 import { useIssue } from '../session/useSessionFacts'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import type { LedgerColumns } from '../../sidebar/home-prefs'
@@ -22,6 +23,7 @@ interface Props {
   onSaveDescription: (facts: SessionFacts, description: string | null) => void
   onLink?: (facts: SessionFacts) => void
   onResume?: (facts: SessionFacts) => void
+  onCloseSession?: (facts: SessionFacts) => void
   /** Drawn inside the selected row's preview, beside Open: answers to a waiting prompt. */
   renderAnswers?: (facts: SessionFacts) => React.ReactNode
 }
@@ -57,6 +59,7 @@ function Row({
   onSaveDescription,
   onLink,
   onResume,
+  onCloseSession,
 }: {
   facts: SessionFacts
   columns: LedgerColumns
@@ -67,6 +70,7 @@ function Row({
   onSaveDescription: Props['onSaveDescription']
   onLink?: Props['onLink']
   onResume?: Props['onResume']
+  onCloseSession?: Props['onCloseSession']
 }): JSX.Element {
   const issue = useIssue(facts.workItem?.ref)
   return (
@@ -113,6 +117,7 @@ function Row({
             onLink={onLink && !facts.isClosed ? () => onLink(facts) : undefined}
           />
           {onResume && <ResumeButton facts={facts} onResume={onResume} />}
+          {onCloseSession && <CloseSessionButton facts={facts} onClose={onCloseSession} />}
         </span>
       )}
       {columns.tags && (
@@ -150,6 +155,7 @@ export function LedgerView({
   onSaveDescription,
   onLink,
   onResume,
+  onCloseSession,
   renderAnswers,
 }: Props): JSX.Element {
   return (
@@ -193,6 +199,7 @@ export function LedgerView({
                   onSaveDescription={onSaveDescription}
                   onLink={onLink}
                   onResume={onResume}
+                  onCloseSession={onCloseSession}
                 />
                 {selected && previewSelected && !facts.isClosed && (
                   <div role="row" className="ledger__expand">

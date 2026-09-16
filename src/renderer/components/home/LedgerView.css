@@ -139,6 +139,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The close control's own cell: quiet until the row is hovered or it has
+   focus, so a list at rest is not a row of crosses. */
+.ledger__close {
+  display: grid;
+  place-items: center;
+}
+
+.ledger__close .close-session {
+  opacity: 0;
+}
+
+.ledger__row:hover .ledger__close .close-session,
+.ledger__row:focus-within .ledger__close .close-session {
+  opacity: 1;
+}
+
 .ledger__expand {
   display: block;
   border-bottom: 1px solid var(--border);

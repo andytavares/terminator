@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, createElement } from 'react'
 import { House, LayoutGrid } from 'lucide-react'
 import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
+import { AppBand } from './components/sidebar/AppBand'
 import { TerminalPane } from './components/terminal/TerminalPane'
 import { TabBar } from './components/terminal/TabBar'
 import { SettingsPanel } from './components/settings/SettingsPanel'
@@ -100,7 +101,22 @@ export function App(): JSX.Element {
     setActiveWorkspaceTab,
     commands: extensionCommands,
     overlays,
+    sidebarButtons,
   } = useExtensionRegistry()
+
+  /**
+   * App-level destinations in a stable order: core's first, then contributed
+   * ones, unless a registration asked for a place of its own.
+   */
+  const sortedGlobalTabs = useMemo(
+    () =>
+      Array.from(globalTabs.values()).sort((a, b) => {
+        const weight = (t: typeof a) =>
+          t.sortOrder !== undefined ? t.sortOrder : t.id.startsWith('core.') ? 0 : 1
+        return weight(a) - weight(b)
+      }),
+    [globalTabs]
+  )
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
   const activeProjects = activeWorkspaceId
@@ -623,14 +639,18 @@ export function App(): JSX.Element {
     <ErrorBoundary>
       <div className="app-layout">
         <div className="app-body">
+          {/* App-level destinations own the window's left edge, full height, so
+              they stay put whether or not the sidebar is showing. */}
+          <AppBand
+            globalTabs={sortedGlobalTabs}
+            sidebarItems={sidebarButtons}
+            activeId={activeGlobalTabId}
+            onSelect={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
+            unreadNotifications={unreadCount}
+            onBellClick={toggleNotificationPanel}
+          />
+
           <UnifiedSidebar
-            globalTabs={Array.from(globalTabs.values()).sort((a, b) => {
-              const weight = (t: typeof a) =>
-                t.sortOrder !== undefined ? t.sortOrder : t.id.startsWith('core.') ? 0 : 1
-              return weight(a) - weight(b)
-            })}
-            activeGlobalTabId={activeGlobalTabId}
-            onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
             activeWorkspaceTabId={activeWorkspaceTabId}
             onSelectWorkspaceTab={(workspaceId, tabId) => {
               const isAlreadyActive =
@@ -643,8 +663,6 @@ export function App(): JSX.Element {
               if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
               if (activeProjectTabId) setActiveProjectTab(null)
             }}
-            unreadNotifications={unreadCount}
-            onBellClick={toggleNotificationPanel}
             onNewScratch={handleNewScratch}
             activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
             onSelectScratchSession={(sessionId) => {

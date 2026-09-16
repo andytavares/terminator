@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { GlobalTabRegistration } from '../../extensions/registry'
 import type { SessionView } from '../../sidebar/view-model'
 import type { Workspace } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
@@ -38,15 +37,9 @@ import { BranchRow } from './BranchRow'
 import './UnifiedSidebar.css'
 
 interface UnifiedSidebarProps {
-  /** Session whose note the host asked to edit (Cmd+I). */
-  globalTabs: GlobalTabRegistration[]
-  activeGlobalTabId: string | null
-  onSelectGlobalTab: (id: string) => void
   activeWorkspaceTabId: string | null
   onSelectWorkspaceTab: (workspaceId: string, tabId: string) => void
   onSelectProject?: () => void
-  unreadNotifications: number
-  onBellClick: () => void
   onNewScratch: () => void
   activeScratchSessionId: string | null
   onSelectScratchSession: (sessionId: string) => void
@@ -87,14 +80,9 @@ function readStoredWidth(): number {
 }
 
 export function UnifiedSidebar({
-  globalTabs,
-  activeGlobalTabId,
-  onSelectGlobalTab,
   activeWorkspaceTabId,
   onSelectWorkspaceTab,
   onSelectProject,
-  unreadNotifications,
-  onBellClick,
   onNewScratch,
   activeScratchSessionId,
   onSelectScratchSession,
@@ -131,7 +119,6 @@ export function UnifiedSidebar({
   const staleAfterMs = resolveSettings().sidebar?.staleAfterMs ?? DEFAULT_STALE_AFTER_MS
   const { createSession } = useTerminalSession()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
-  const sidebarButtons = useExtensionRegistry((s) => s.sidebarButtons)
 
   // Eager-load projects for every workspace that has not been fetched yet.
   // The flat list shows all workspaces at once, so we cannot rely on
@@ -669,14 +656,8 @@ export function UnifiedSidebar({
         style={{ width }}
       >
         <SidebarHeader
-          globalTabs={globalTabs}
-          sidebarItems={sidebarButtons}
-          activeGlobalTabId={activeGlobalTabId}
-          onSelectGlobalTab={onSelectGlobalTab}
           onSearchFocus={() => {}}
           onAddWorkspace={() => setCreateWsOpen(true)}
-          unreadNotifications={unreadNotifications}
-          onBellClick={onBellClick}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSearchClear={() => setSearchQuery('')}

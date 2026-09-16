@@ -687,47 +687,6 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
   })
 })
 
-describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', () => {
-  const action = vi.fn()
-
-  beforeEach(() => {
-    mockRegistryState.sidebarButtons = [{ id: 'git-sidebar-toggle', label: 'Git Changes', action }]
-  })
-
-  it('renders each contributed item exactly once', () => {
-    renderSidebar()
-    expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
-  })
-
-  it('fires the item action on click', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByRole('button', { name: 'Git Changes' }))
-    expect(action).toHaveBeenCalledOnce()
-  })
-
-  it.each(['by-status', 'by-workspace', 'flat'])(
-    'keeps the item in the footer under the %s grouping',
-    (viewId) => {
-      localStorage.setItem(
-        'terminator.sidebar.views',
-        JSON.stringify([
-          { id: 'by-status', name: 'S', groupBy: 'status', sortBy: 'name', filters: {} },
-          { id: 'by-workspace', name: 'W', groupBy: 'workspace', sortBy: 'name', filters: {} },
-          { id: 'flat', name: 'F', groupBy: 'none', sortBy: 'name', filters: {} },
-        ])
-      )
-      renderSidebar({ initialViewId: viewId })
-      expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
-    }
-  )
-
-  it('renders no footer when no extension contributes an item', () => {
-    mockRegistryState.sidebarButtons = []
-    const { container } = renderSidebar()
-    expect(container.querySelector('.extension-footer')).toBeNull()
-  })
-})
-
 describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () => {
   const openDisplay = () => fireEvent.click(screen.getByRole('button', { name: 'Display' }))
   const openFilter = () => fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
@@ -841,11 +800,13 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5)', () =
     ).toBe(true)
   })
 
+  // Fewer than FR-033 allows, since the app band moved out to the window's own
+  // left rail: the sidebar's only chrome is the row that acts on its list.
   it('keeps at most two bands of chrome above the first row of work (FR-033)', () => {
     const { container } = renderSidebar()
     const header = container.querySelector('.sidebar-header')!
-    expect(header.children).toHaveLength(2)
-    expect(container.querySelector('.app-band')).toBeTruthy()
+    expect(header.children).toHaveLength(1)
+    expect(container.querySelector('.app-band')).toBeNull()
     expect(container.querySelector('.sidebar-header__search-row')).toBeTruthy()
   })
 })
@@ -901,15 +862,6 @@ describe('UnifiedSidebar — the link dialog names what it attaches to (US3, FR-
 })
 
 describe('UnifiedSidebar — app surfaces have one home, scratch has a group (US4)', () => {
-  it('draws contributed sidebar items in the app band, not a separate footer', () => {
-    mockRegistryState.sidebarButtons = [{ id: 'git', label: 'Git Changes', action: vi.fn() }]
-    const { container } = renderSidebar()
-    expect(container.querySelector('.extension-footer')).toBeNull()
-    expect(container.querySelector('.app-band')).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'Git Changes' })).toHaveLength(1)
-    mockRegistryState.sidebarButtons = []
-  })
-
   it('offers a way to start a scratch terminal from that group', () => {
     const onNewScratch = vi.fn()
     const { container } = renderSidebar({ onNewScratch })

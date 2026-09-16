@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from './use-menu-placement'
+import { useMenuPlacement } from '../use-menu-placement'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import '../sidebar/SidebarMenu.css'
 

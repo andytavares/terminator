@@ -1,17 +1,36 @@
 /* One live terminal on the wall. The workspace colour is the left edge only. */
 
 .wall-tile {
+  position: relative;
   display: grid;
   grid-template-rows: auto 1fr auto;
   min-width: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  box-shadow: inset 2px 0 0 var(--rail, transparent);
   overflow: hidden;
   cursor: pointer;
   outline: none;
   transition: background 0.12s ease;
+}
+
+/*
+ * The repo's colour, as one solid bar down the whole left edge.
+ *
+ * A bar rather than an inset shadow: the tile's own children paint over an
+ * inset shadow as they stack down the tile, which left the colour looking like
+ * it faded out halfway.
+ */
+.wall-tile::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--rail, transparent);
+  z-index: 1;
+  pointer-events: none;
 }
 
 .wall-tile:hover {

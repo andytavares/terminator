@@ -306,6 +306,23 @@ describe('LedgerView', () => {
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
 
+  it('ends a session from its row', () => {
+    const onCloseSession = vi.fn()
+    render(<LedgerView {...props} onCloseSession={onCloseSession} />)
+    fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
+    expect(onCloseSession).toHaveBeenCalled()
+    expect(props.onSelect).not.toHaveBeenCalled()
+  })
+
+  it('offers no way to close a session that has already closed', () => {
+    const closed = {
+      ...groups[0],
+      facts: [{ ...groups[0].facts[0], isClosed: true, state: 'exited' as const }],
+    }
+    render(<LedgerView {...props} groups={[closed]} onCloseSession={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /^Close / })).toBeNull()
+  })
+
   it('offers no Resume on a running session', () => {
     render(<LedgerView {...props} onResume={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()

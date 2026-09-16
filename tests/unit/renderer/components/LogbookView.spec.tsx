@@ -250,6 +250,13 @@ describe('LogbookView — the detail of a closed session', () => {
     expect(onResume).toHaveBeenCalledWith(stopped)
   })
 
+  it('ends the selected session', () => {
+    const onCloseSession = vi.fn()
+    render(<LogbookView {...props} selected={undescribed} onCloseSession={onCloseSession} />)
+    fireEvent.click(screen.getByRole('button', { name: /^Close / }))
+    expect(onCloseSession).toHaveBeenCalledWith(undescribed)
+  })
+
   it('says when a stopped session’s conversation has gone', () => {
     render(
       <LogbookView

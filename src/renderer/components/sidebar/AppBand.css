@@ -1,20 +1,27 @@
 /*
- * App-level surfaces: one compact row of icons.
+ * App-level surfaces: one narrow rail down the window's left edge.
+ *
+ * A rail rather than a row across the sidebar's top, because these are the
+ * app's destinations and not part of the repo list: they keep their place when
+ * the sidebar is hidden, and a vertical strip grows with the number of
+ * extensions instead of competing with the list for horizontal room.
  *
  * The 8px text label under each icon is gone. At that size it was barely
- * legible and it doubled the band's height for information the accessible name
+ * legible and it doubled the band's size for information the accessible name
  * and tooltip already carry — which is what the label had become anyway, since
  * a contribution's own name is what both read. Both contribution contracts are
  * unchanged; only the density moved (FR-036).
  */
 .app-band {
+  flex: none;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 5px 7px;
+  padding: 7px 5px;
   background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
   scrollbar-width: none;
 }
 
@@ -22,10 +29,10 @@
   display: none;
 }
 
-/* Pushes the bell to the far edge: it is a notification, not a destination. */
+/* Pushes the bell to the far end: it is a notification, not a destination. */
 .app-band__spacer {
   flex: 1 1 auto;
-  min-width: 4px;
+  min-height: 4px;
 }
 
 .app-band__entry {
@@ -33,7 +40,7 @@
   display: grid;
   place-items: center;
   position: relative;
-  padding: 5px;
+  padding: 7px;
   border: 0;
   border-radius: var(--radius-xs, 4px);
   background: transparent;
@@ -62,8 +69,8 @@
 }
 
 .app-band__icon svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 
