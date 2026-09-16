@@ -1,0 +1,82 @@
+src/renderer/components/session/CloseSessionButton.tsx
+  s_cf6284d326023a::t_6c9238c686b468 1-36
+src/renderer/terminal/close-session.ts
+  s_cf6284d326023a::t_159bd0b0160cfc 1-19
+src/renderer/components/session/CloseSessionButton.css
+  s_cf6284d326023a::t_126097b692cb6e 1-36
+src/renderer/components/session/NewSessionMenu.tsx
+  s_cf6284d326023a::t_f1657f3e56b3dd 1-3,5-105
+  s_cf6284d326023a::t_9a56b9a140d9a7 4
+src/renderer/components/home/HomeScreen.tsx
+  s_cf6284d326023a::t_5df718add30135 6
+  s_cf6284d326023a::t_c1ba0afcd26433 12,187,202
+tests/unit/renderer/components/WallTile.spec.tsx
+  s_cf6284d326023a::t_d17fbb0657fc29 186-193
+tests/unit/renderer/terminal/close-session.spec.ts
+  s_cf6284d326023a::t_fa43cd7293ac0b 1-37
+src/renderer/components/overview/OverviewScreen.tsx
+  s_cf6284d326023a::t_5df718add30135 10-15
+  s_cf6284d326023a::t_c1ba0afcd26433 9,206
+  s_cf6284d326023a::t_61bbd44eb26224 110-113
+  s_cf6284d326023a::t_eec625702216bc 207
+tests/unit/renderer/components/NewSessionMenu.spec.tsx
+  s_cf6284d326023a::t_5df718add30135 15
+src/renderer/components/overview/WallTile.tsx
+  s_cf6284d326023a::t_9a750198394276 7,24,58,96
+tests/unit/renderer/components/SidebarHeader.spec.tsx
+  s_cf6284d326023a::t_c8de45e5ccb2d4 53,60
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_cf6284d326023a::t_710ed9313b4348 240
+  s_cf6284d326023a::t_bb3c2fd86af043 11-12,38-45,234-239,241-248
+tests/unit/renderer/App.spec.tsx
+  s_cf6284d326023a::t_84102705cf9e06 771-772
+  s_cf6284d326023a::t_05fdc43295a396 192-193
+src/renderer/App.tsx
+  s_cf6284d326023a::t_0690a0abe4d334 104,107-119
+  s_cf6284d326023a::t_74069c912f0a51 4,642-652
+  s_cf6284d326023a::t_762b1477a85969 120
+tests/unit/renderer/components/CloseSessionButton.spec.tsx
+  s_cf6284d326023a::t_cad0217b7b390a 1-35
+src/renderer/components/home/LedgerView.tsx
+  s_cf6284d326023a::t_36dc598b572487 7,26,62,73,158,202
+  s_cf6284d326023a::t_382d897059eeef 120
+src/renderer/components/sidebar/AppBand.css
+  s_cf6284d326023a::t_3e5e964705ed06 2-7,10,16,18,21,23-24,32,35,43,72-73
+src/renderer/components/overview/WallTile.css
+  s_cf6284d326023a::t_745ab2f23bccec 4,17-33
+  s_cf6284d326023a::t_05486ae5597144 34-35
+src/renderer/components/home/LedgerView.css
+  s_cf6284d326023a::t_1a76766325cb0d 142-157
+tests/unit/renderer/components/LogbookView.spec.tsx
+  s_cf6284d326023a::t_d17fbb0657fc29 253-259
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_cf6284d326023a::t_9d8e54e30daf02 212
+  s_cf6284d326023a::t_1c9ce37163750d 8,172-174,177,180-181,211,213
+src/renderer/components/home/LogbookView.tsx
+  s_cf6284d326023a::t_432fd391536cb6 6,27,113
+  s_cf6284d326023a::t_4973d6b76e911c 74
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_cf6284d326023a::t_3c7017bbe5a429 803-804,808-809
+src/renderer/components/home/LedgerDisplayMenu.tsx
+  s_cf6284d326023a::t_9a56b9a140d9a7 4
+tests/unit/renderer/components/use-menu-placement.spec.tsx
+  s_cf6284d326023a::t_9a56b9a140d9a7 4
+tests/unit/renderer/components/LedgerView.spec.tsx
+  s_cf6284d326023a::t_d17fbb0657fc29 309-325
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "afb0ec5fe61c48ca34e44a137a12098b0845586b",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
