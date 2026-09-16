@@ -115,7 +115,29 @@ describe('createTerminalSession', () => {
       'My Tab',
       '/repo',
       5000,
-      'parent-1'
+      'parent-1',
+      undefined
+    )
+  })
+
+  it('carries the line a resuming terminal opens with', async () => {
+    await createTerminalSession(
+      'proj-1',
+      'human',
+      'My Tab',
+      '/repo',
+      5000,
+      undefined,
+      'claude --resume abc'
+    )
+    expect(mockCreateSession).toHaveBeenCalledWith(
+      'proj-1',
+      'human',
+      'My Tab',
+      '/repo',
+      5000,
+      undefined,
+      'claude --resume abc'
     )
   })
 

@@ -226,4 +226,34 @@ describe('LedgerView', () => {
     const { container } = render(<LedgerView {...props} groups={[bare]} />)
     expect(container.querySelector('.ledger__branch svg')).toBeNull()
   })
+
+  it('offers Resume on a stopped session whose conversation is still there', () => {
+    const onResume = vi.fn()
+    const stopped = {
+      ...groups[0],
+      facts: [
+        {
+          ...groups[0].facts[0],
+          state: 'exited' as const,
+          agent: {
+            provider: 'claude' as const,
+            sessionId: 'conv-1',
+            transcriptPath: '/t/c.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: true,
+        },
+      ],
+    }
+    render(<LedgerView {...props} groups={[stopped]} onResume={onResume} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(onResume).toHaveBeenCalledWith(stopped.facts[0])
+    expect(props.onSelect).not.toHaveBeenCalled()
+  })
+
+  it('offers no Resume on a running session', () => {
+    render(<LedgerView {...props} onResume={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
+  })
 })

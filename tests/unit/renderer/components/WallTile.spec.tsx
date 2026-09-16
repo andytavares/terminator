@@ -134,4 +134,34 @@ describe('WallTile', () => {
     expect(onLink).toHaveBeenCalledWith(facts)
     expect(props.onOpen).not.toHaveBeenCalled()
   })
+
+  it('offers Resume on a stopped session whose conversation is still there', () => {
+    const onResume = vi.fn()
+    render(
+      <WallTile
+        {...props}
+        facts={{
+          ...facts,
+          state: 'exited',
+          agent: {
+            provider: 'claude',
+            sessionId: 'conv-1',
+            transcriptPath: '/t/c.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: true,
+        }}
+        onResume={onResume}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(onResume).toHaveBeenCalled()
+    expect(props.onOpen).not.toHaveBeenCalled()
+  })
+
+  it('offers no Resume while the session is running', () => {
+    render(<WallTile {...props} onResume={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
+  })
 })

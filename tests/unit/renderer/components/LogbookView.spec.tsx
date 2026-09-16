@@ -230,4 +230,45 @@ describe('LogbookView — the detail of a closed session', () => {
     expect(within(detail).queryByRole('button', { name: 'Open pnpm build' })).toBeNull()
     expect(within(detail).queryByTestId('preview-c')).toBeNull()
   })
+
+  it('offers Resume on the selected stopped session', () => {
+    const onResume = vi.fn()
+    const stopped = {
+      ...undescribed,
+      state: 'exited' as const,
+      agent: {
+        provider: 'claude' as const,
+        sessionId: 'conv-1',
+        transcriptPath: '/t/c.jsonl',
+        cwd: '/code/repo',
+        capturedAt: '2026-09-15T18:00:00.000Z',
+      },
+      resumable: true,
+    }
+    render(<LogbookView {...props} selected={stopped} onResume={onResume} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume zsh' }))
+    expect(onResume).toHaveBeenCalledWith(stopped)
+  })
+
+  it('says when a stopped session’s conversation has gone', () => {
+    render(
+      <LogbookView
+        {...props}
+        selected={{
+          ...undescribed,
+          state: 'exited',
+          agent: {
+            provider: 'claude',
+            sessionId: 'conv-1',
+            transcriptPath: '/t/gone.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: false,
+        }}
+        onResume={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Conversation no longer available')).toBeTruthy()
+  })
 })

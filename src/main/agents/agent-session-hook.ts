@@ -118,18 +118,31 @@ function quote(value: string): string {
  * reasoning as the issue-context hook.
  */
 export function captureCommand(options: CaptureHookOptions): string {
-  return [
+  const run = [
     'ELECTRON_RUN_AS_NODE=1',
     quote(options.execPath),
     quote(options.scriptPath),
     quote(reportDirectory()),
   ].join(' ')
+  // Guarded by the script's own existence. This entry lives in the operator's
+  // settings and outlives any particular install of this application — a
+  // development profile, a moved app — and a hook whose script has gone must do
+  // nothing at all rather than fail before every agent session on the machine.
+  return `test -f ${quote(options.scriptPath)} && ${run} || true`
 }
 
-function isOurs(entry: unknown, scriptPath: string): boolean {
+/**
+ * Ours, whichever install wrote it.
+ *
+ * Matched on the script's name rather than its full path: the path contains the
+ * application's data directory, which differs between a packaged app, a
+ * development run and a test profile. Matching the path would leave one stale
+ * entry per profile stacked in the operator's settings.
+ */
+function isOurs(entry: unknown): boolean {
   const hooks = (entry as HookEntry | null)?.hooks
   if (!Array.isArray(hooks)) return false
-  return hooks.some((h) => typeof h?.command === 'string' && h.command.includes(scriptPath))
+  return hooks.some((h) => typeof h?.command === 'string' && h.command.includes(SCRIPT_NAME))
 }
 
 async function readSettings(): Promise<SettingsFile | null> {
@@ -172,7 +185,7 @@ export async function installUserHook(options: CaptureHookOptions): Promise<void
     ],
   }
 
-  const index = sessionStart.findIndex((entry) => isOurs(entry, options.scriptPath))
+  const index = sessionStart.findIndex(isOurs)
   if (index === -1) sessionStart.push(ours)
   else sessionStart[index] = ours
 

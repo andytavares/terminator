@@ -3,6 +3,7 @@ import { GitBranch, SquareArrowOutUpRight } from 'lucide-react'
 import { StateIcon } from '../session/StateIcon'
 import { LivePreview } from '../session/LivePreview'
 import { WorkItemCell } from '../session/WorkItemCell'
+import { ResumeButton } from '../session/ResumeButton'
 import { useIssue } from '../session/useSessionFacts'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import type { LedgerColumns } from '../../sidebar/home-prefs'
@@ -20,6 +21,7 @@ interface Props {
   onOpen: (sessionId: string) => void
   onSaveDescription: (facts: SessionFacts, description: string | null) => void
   onLink?: (facts: SessionFacts) => void
+  onResume?: (facts: SessionFacts) => void
   /** Drawn inside the selected row's preview, beside Open: answers to a waiting prompt. */
   renderAnswers?: (facts: SessionFacts) => React.ReactNode
 }
@@ -54,6 +56,7 @@ function Row({
   onOpen,
   onSaveDescription,
   onLink,
+  onResume,
 }: {
   facts: SessionFacts
   columns: LedgerColumns
@@ -63,6 +66,7 @@ function Row({
   onOpen: Props['onOpen']
   onSaveDescription: Props['onSaveDescription']
   onLink?: Props['onLink']
+  onResume?: Props['onResume']
 }): JSX.Element {
   const issue = useIssue(facts.workItem?.ref)
   return (
@@ -108,6 +112,7 @@ function Row({
             onSaveDescription={(text) => onSaveDescription(facts, text)}
             onLink={onLink && !facts.isClosed ? () => onLink(facts) : undefined}
           />
+          {onResume && <ResumeButton facts={facts} onResume={onResume} />}
         </span>
       )}
       {columns.tags && (
@@ -144,6 +149,7 @@ export function LedgerView({
   onOpen,
   onSaveDescription,
   onLink,
+  onResume,
   renderAnswers,
 }: Props): JSX.Element {
   return (
@@ -186,6 +192,7 @@ export function LedgerView({
                   onOpen={onOpen}
                   onSaveDescription={onSaveDescription}
                   onLink={onLink}
+                  onResume={onResume}
                 />
                 {selected && previewSelected && !facts.isClosed && (
                   <div role="row" className="ledger__expand">

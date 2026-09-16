@@ -6,6 +6,7 @@ import { useMetricsStore } from '../../stores/metrics.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
+import { resumeSession } from '../../terminal/start-session'
 import { answersFor } from '../session/answers'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { matchesFilter } from '../../sidebar/session-filter'
@@ -191,6 +192,7 @@ export function OverviewScreen(): JSX.Element {
                 onOpen={navigateToSession}
                 onSaveDescription={saveDescription}
                 onLink={setLinking}
+                onResume={(facts) => void resumeSession(facts)}
                 answers={answersFor(factsById.get(placement.sessionId)!)}
               />
             ))}

@@ -170,4 +170,34 @@ describe('installing the hook in the operator’s Claude settings', () => {
     await expect(install()).rejects.toThrow()
     expect(fs.readFileSync(settingsPath(), 'utf8')).toBe('{ this is not json')
   })
+
+  it('replaces an entry left by another install of this application', async () => {
+    fs.mkdirSync(path.join(home, '.claude'), { recursive: true })
+    fs.writeFileSync(
+      settingsPath(),
+      JSON.stringify({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: '*',
+              hooks: [{ type: 'command', command: '/some/old/profile/agent-session-hook.cjs x' }],
+            },
+          ],
+        },
+      })
+    )
+    await install()
+    const hooks = read().hooks as { SessionStart: Array<{ hooks: Array<{ command: string }> }> }
+    expect(hooks.SessionStart).toHaveLength(1)
+    expect(hooks.SessionStart[0].hooks[0].command).not.toContain('/some/old/profile/')
+  })
+
+  it('does nothing rather than failing when its script has gone', async () => {
+    const mod = await load()
+    const scriptPath = await mod.installCaptureScript(userData)
+    const command = mod.captureCommand({ execPath: process.execPath, scriptPath })
+    fs.rmSync(scriptPath)
+    // Exactly as a shell would run it from the settings file.
+    expect(() => execFileSync('/bin/sh', ['-c', command], { encoding: 'utf8' })).not.toThrow()
+  })
 })

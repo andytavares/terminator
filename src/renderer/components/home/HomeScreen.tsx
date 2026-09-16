@@ -9,7 +9,11 @@ import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { navigateToSession } from '../../terminal/navigate-to-session'
-import { startScratchSession, startSessionInBranch } from '../../terminal/start-session'
+import {
+  resumeSession,
+  startScratchSession,
+  startSessionInBranch,
+} from '../../terminal/start-session'
 import { answersFor } from '../session/answers'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import {
@@ -178,6 +182,7 @@ export function HomeScreen(): JSX.Element {
               onSaveDescription={saveDescription}
               onLinkIssue={linkIssue}
               onLink={setLinking}
+              onResume={(facts) => void resumeSession(facts)}
               renderAnswers={answersFor}
             />
           ) : (
@@ -191,6 +196,7 @@ export function HomeScreen(): JSX.Element {
               onOpen={navigateToSession}
               onSaveDescription={saveDescription}
               onLink={setLinking}
+              onResume={(facts) => void resumeSession(facts)}
               renderAnswers={answersFor}
             />
           ))
