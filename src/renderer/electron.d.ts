@@ -254,6 +254,10 @@ interface ElectronAPI {
       fromSessionId: string
       session: SessionSnapshot
     }): Promise<{ data: SessionRecordListing | null } | { error: string; message: string }>
+    /** Drops a closed session's record for good. */
+    forget(input: {
+      sessionId: string
+    }): Promise<{ data: boolean } | { error: string; message: string }>
     onChanged(
       handler: (payload: { sessionId: string; record: SessionRecordListing | null }) => void
     ): () => void

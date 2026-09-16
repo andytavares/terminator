@@ -22,6 +22,7 @@ interface Props {
   onLink?: (facts: SessionFacts) => void
   onResume?: (facts: SessionFacts) => void
   onCloseSession?: (facts: SessionFacts) => void
+  onForgetSession?: (facts: SessionFacts) => void
   /** Buttons answering a waiting prompt, drawn in the footer. */
   answers?: React.ReactNode
 }
@@ -56,6 +57,7 @@ export function WallTile({
   onLink,
   onResume,
   onCloseSession,
+  onForgetSession,
   answers,
 }: Props): JSX.Element {
   const issue = useIssue(facts.workItem?.ref)
@@ -93,7 +95,9 @@ export function WallTile({
         >
           <SquareArrowOutUpRight aria-hidden="true" />
         </button>
-        {onCloseSession && <CloseSessionButton facts={facts} onClose={onCloseSession} />}
+        {onCloseSession && (
+          <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
+        )}
       </div>
 
       <LivePreview sessionId={facts.sessionId} className="wall-tile__preview" />

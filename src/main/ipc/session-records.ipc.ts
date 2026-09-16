@@ -4,12 +4,14 @@ import { handleChannel } from './channel-registrar.js'
 import { sendToWindow } from '../safe-send.js'
 import * as fs from 'node:fs'
 import {
+  ForgetInputSchema,
   SetDescriptionInputSchema,
   SetLinkInputSchema,
   TransferInputSchema,
 } from '../../shared/schemas/session-records.schema.js'
 import { pruneRecords } from '../../shared/session-records/retention.js'
 import {
+  forget,
   listRecords,
   onRecordChange,
   setDescription,
@@ -78,6 +80,13 @@ export function registerSessionRecordsHandlers(
       schema: SetLinkInputSchema,
       invalid,
       run: async ({ session, link }) => ({ data: listing(await setLink(session, link)) }),
+      onError: fail,
+    }),
+    invokeSpec({
+      channel: 'session-records:forget',
+      schema: ForgetInputSchema,
+      invalid,
+      run: async ({ sessionId }) => ({ data: await forget(sessionId) }),
       onError: fail,
     }),
     invokeSpec({

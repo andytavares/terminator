@@ -241,6 +241,24 @@ export async function markClosed(sessionId: string, at: Date): Promise<void> {
   announce(sessionId)
 }
 
+/**
+ * Drop a closed session's record for good.
+ *
+ * Only a closed one: a live session's record is what Home draws it from, and
+ * forgetting it while the terminal runs would make the session disappear from
+ * the list it is running in. Everything a record holds — the description, the
+ * link, the conversation — goes with it, which is what being asked to forget a
+ * session means.
+ */
+export async function forget(sessionId: string): Promise<boolean> {
+  const existing = records.get(sessionId)
+  if (existing === undefined || existing.closedAt === undefined) return false
+  records.delete(sessionId)
+  await persist()
+  announce(sessionId)
+  return true
+}
+
 export function onRecordChange(handler: RecordChangeHandler): () => void {
   handlers.add(handler)
   return () => {

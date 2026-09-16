@@ -13,11 +13,33 @@ describe('CloseSessionButton', () => {
     expect(onClose).toHaveBeenCalledWith(facts)
   })
 
-  it('draws nothing for a session that has already closed', () => {
+  it('draws nothing for a closed session where nothing can be removed', () => {
     const { container } = render(
       <CloseSessionButton facts={fact({ isClosed: true })} onClose={vi.fn()} />
     )
     expect(container.innerHTML).toBe('')
+  })
+
+  // The same control, answering the same question: take this off my list.
+  it('removes a closed session from the list rather than ending it', () => {
+    const onForget = vi.fn()
+    const onClose = vi.fn()
+    const facts = fact({ isClosed: true, name: 'pnpm build' })
+    render(<CloseSessionButton facts={facts} onClose={onClose} onForget={onForget} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove pnpm build from the list' }))
+    expect(onForget).toHaveBeenCalledWith(facts)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('still ends a live session when removing is also possible', () => {
+    const onForget = vi.fn()
+    const onClose = vi.fn()
+    render(
+      <CloseSessionButton facts={fact({ name: 'zsh' })} onClose={onClose} onForget={onForget} />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Close zsh' }))
+    expect(onClose).toHaveBeenCalled()
+    expect(onForget).not.toHaveBeenCalled()
   })
 
   it('does not open the row or tile it sits on', () => {

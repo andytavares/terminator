@@ -25,6 +25,7 @@ interface Props {
   onLink?: (facts: SessionFacts) => void
   onResume?: (facts: SessionFacts) => void
   onCloseSession?: (facts: SessionFacts) => void
+  onForgetSession?: (facts: SessionFacts) => void
   renderAnswers?: (facts: SessionFacts) => React.ReactNode
 }
 
@@ -72,6 +73,7 @@ function Detail({
   onLink,
   onResume,
   onCloseSession,
+  onForgetSession,
   renderAnswers,
 }: Omit<Props, 'groups' | 'selected' | 'titles' | 'onSelect'> & {
   facts: SessionFacts
@@ -110,7 +112,9 @@ function Detail({
             Open terminal
           </button>
         )}
-        {onCloseSession && <CloseSessionButton facts={facts} onClose={onCloseSession} />}
+        {onCloseSession && (
+          <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
+        )}
       </div>
 
       <div className="logbook__main">

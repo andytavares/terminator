@@ -369,6 +369,12 @@ Home has two layouts. Switch between them with **Ledger** and **Logbook** at the
 
 A session with no ticket shows **What is this session doing?**. Type an answer and press `Enter` — on Home, on its Overview tile, or from its tab (right-click → **Add description…**, or `Cmd+I`). The description is saved at once and survives a restart. When the session ends, it moves to **Closed** and stays findable by the filter for 30 days.
 
+### Ending a session, and clearing it away
+
+Every row on Home, every entry in the Logbook and every tile on Overview carries a **×**. On a running session it ends the terminal, exactly as closing its tab would; the session then moves to **Closed** with its description and ticket intact. On a session already under **Closed** the same **×** reads **Remove from the list** and deletes what is left of it — description, link and captured conversation — so you can clear history without waiting out the 30 days. Neither asks for confirmation.
+
+**New terminal** on Home and on Overview starts one on any branch, or a scratch terminal, without going to the sidebar.
+
 ### Linking a session to a ticket
 
 A session shows its branch's linked ticket by default. **Link** on any row, tile or the Logbook pins a different Linear or Jira ticket to that one session, which matters when two terminals on one branch serve different tickets. **Remove session link** hands the session back to its branch's ticket; the branch's own link is never changed from here. With no tracker connected, the dialog tells you to connect one in **Settings → Integrations**. The ticket an agent is briefed with at start-up still comes from the branch (see [What your agent sessions are told](#what-your-agent-sessions-are-told)).

@@ -38,3 +38,5 @@ export const TransferInputSchema = z.object({
   fromSessionId: z.string().min(1),
   session: SessionSnapshotSchema,
 })
+
+export const ForgetInputSchema = z.object({ sessionId: z.string().min(1) })

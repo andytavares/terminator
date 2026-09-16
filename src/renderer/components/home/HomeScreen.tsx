@@ -44,6 +44,7 @@ export function HomeScreen(): JSX.Element {
   const facts = useSessionFacts()
   const titles = useIssueTitles()
   const setDescription = useSessionRecordsStore((s) => s.setDescription)
+  const forgetSession = useSessionRecordsStore((s) => s.forget)
   const setLink = useSessionRecordsStore((s) => s.setLink)
 
   const [prefs, setPrefs] = useState<HomePrefs>(loadHomePrefs)
@@ -185,6 +186,7 @@ export function HomeScreen(): JSX.Element {
               onLink={setLinking}
               onResume={(facts) => void resumeSession(facts)}
               onCloseSession={(facts) => void closeSessionFromFacts(facts)}
+              onForgetSession={(facts) => void forgetSession(facts.sessionId)}
               renderAnswers={answersFor}
             />
           ) : (
@@ -200,6 +202,7 @@ export function HomeScreen(): JSX.Element {
               onLink={setLinking}
               onResume={(facts) => void resumeSession(facts)}
               onCloseSession={(facts) => void closeSessionFromFacts(facts)}
+              onForgetSession={(facts) => void forgetSession(facts.sessionId)}
               renderAnswers={answersFor}
             />
           ))

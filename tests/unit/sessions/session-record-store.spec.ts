@@ -381,3 +381,41 @@ describe('session-record-store — transfer', () => {
     ])
   })
 })
+
+describe('session-record-store — forgetting', () => {
+  // Asked to forget a session: everything the record held goes with it.
+  it('forgets a closed record for good', async () => {
+    const store = await load()
+    await store.setDescription(SNAP, 'why')
+    await store.markClosed('s1', new Date('2026-09-15T19:00:00.000Z'))
+    expect(await store.forget('s1')).toBe(true)
+    expect(store.listRecords()).toEqual([])
+
+    const reloaded = await load()
+    await reloaded.loadRecords()
+    expect(reloaded.listRecords()).toEqual([])
+  })
+
+  it('refuses to forget a session that is still open', async () => {
+    const store = await load()
+    await store.setDescription(SNAP, 'why')
+    expect(await store.forget('s1')).toBe(false)
+    expect(store.listRecords()).toHaveLength(1)
+  })
+
+  it('has nothing to forget for a session it never recorded', async () => {
+    const store = await load()
+    expect(await store.forget('nope')).toBe(false)
+  })
+
+  it('tells every surface the forgotten record has gone', async () => {
+    const seen: Array<[string, unknown]> = []
+    const store = await load()
+    await store.setDescription(SNAP, 'why')
+    await store.markClosed('s1', new Date('2026-09-15T19:00:00.000Z'))
+    const off = store.onRecordChange((id, record) => seen.push([id, record]))
+    await store.forget('s1')
+    off()
+    expect(seen).toEqual([['s1', null]])
+  })
+})

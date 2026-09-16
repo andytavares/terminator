@@ -13,6 +13,8 @@ interface SessionRecordsState {
   setLink: (session: SessionSnapshot, link: WorkItemRef | null) => Promise<boolean>
   /** Moves a session's context onto the session that resumed it. */
   transfer: (fromSessionId: string, session: SessionSnapshot) => Promise<boolean>
+  /** Drops a closed session's record, taking it out of the list for good. */
+  forget: (sessionId: string) => Promise<boolean>
 }
 
 type WriteResult = { data: SessionRecordListing | null } | { error: string; message: string }
@@ -72,6 +74,17 @@ export const useSessionRecordsStore = create<SessionRecordsState>((set) => {
         const records = new Map(state.records)
         records.delete(fromSessionId)
         if (result.data !== null) records.set(session.sessionId, result.data)
+        return { records }
+      })
+      return true
+    },
+
+    forget: async (sessionId) => {
+      const result = await api().forget?.({ sessionId })
+      if (result === undefined || 'error' in result || result.data !== true) return false
+      set((state) => {
+        const records = new Map(state.records)
+        records.delete(sessionId)
         return { records }
       })
       return true

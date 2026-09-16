@@ -50,6 +50,7 @@ export function OverviewScreen(): JSX.Element {
   const facts = useSessionFacts()
   const titles = useIssueTitles()
   const setDescription = useSessionRecordsStore((s) => s.setDescription)
+  const forgetSession = useSessionRecordsStore((s) => s.forget)
   const { processesBySessionId, startPolling, stopPolling } = useMetricsStore()
 
   const [prefs, setPrefs] = useState<WallPrefs>(loadWallPrefs)
@@ -204,7 +205,7 @@ export function OverviewScreen(): JSX.Element {
                 onLink={setLinking}
                 onResume={(facts) => void resumeSession(facts)}
                 onCloseSession={(facts) => void closeSessionFromFacts(facts)}
-                onCloseSession={(facts) => void closeSessionFromFacts(facts)}
+                onForgetSession={(facts) => void forgetSession(facts.sessionId)}
                 answers={answersFor(factsById.get(placement.sessionId)!)}
               />
             ))}

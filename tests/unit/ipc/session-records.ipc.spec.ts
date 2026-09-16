@@ -22,6 +22,7 @@ vi.mock('../../../src/main/ipc/channel-registrar', () => ({
 
 const store = vi.hoisted(() => ({
   records: [] as unknown[],
+  forget: vi.fn(),
   change: null as null | ((id: string, record: unknown) => void),
   setDescription: vi.fn(),
   setLink: vi.fn(),
@@ -30,6 +31,7 @@ const store = vi.hoisted(() => ({
 
 vi.mock('../../../src/main/sessions/session-record-store', () => ({
   listRecords: () => store.records,
+  forget: store.forget,
   setDescription: store.setDescription,
   setLink: store.setLink,
   transfer: store.transfer,
@@ -322,5 +324,22 @@ describe('session-records:transfer', () => {
     }
     expect(result.error).toBe('VALIDATION_ERROR')
     expect(store.transfer).not.toHaveBeenCalled()
+  })
+
+  it('forgets a record the operator removed from the list', async () => {
+    store.forget.mockResolvedValue(true)
+    expect(await invoke('session-records:forget', { sessionId: 's1' })).toEqual({ data: true })
+    expect(store.forget).toHaveBeenCalledWith('s1')
+  })
+
+  it('says so when there was nothing to forget', async () => {
+    store.forget.mockResolvedValue(false)
+    expect(await invoke('session-records:forget', { sessionId: 'nope' })).toEqual({ data: false })
+  })
+
+  it('refuses a forget with no session', async () => {
+    expect(await invoke('session-records:forget', { sessionId: '' })).toMatchObject({
+      error: 'VALIDATION_ERROR',
+    })
   })
 })

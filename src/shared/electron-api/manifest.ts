@@ -539,6 +539,7 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
   },
   { path: 'sessionRecords.setLink', kind: 'invoke', channel: 'session-records:set-link' },
   { path: 'sessionRecords.transfer', kind: 'invoke', channel: 'session-records:transfer' },
+  { path: 'sessionRecords.forget', kind: 'invoke', channel: 'session-records:forget' },
   { path: 'sessionRecords.onChanged', kind: 'event', channel: 'session-records:changed' },
 
   // ── integrations (issue trackers) ─────────────────────────────────────────

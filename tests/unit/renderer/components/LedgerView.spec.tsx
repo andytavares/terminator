@@ -93,6 +93,8 @@ describe('LedgerView', () => {
   it('draws a header for each visible column', () => {
     render(<LedgerView {...props} />)
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent)
+    // The last names nothing: it is the close control's own track, at the end
+    // of the line.
     expect(headers).toEqual([
       '',
       'Session',
@@ -100,6 +102,7 @@ describe('LedgerView', () => {
       'Work item or description',
       'Latest output',
       'Age',
+      '',
     ])
   })
 
@@ -174,7 +177,11 @@ describe('LedgerView', () => {
         columns={{ branch: false, workItem: false, tags: false, latestLine: false, age: false }}
       />
     )
-    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['', 'Session'])
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
+      '',
+      'Session',
+      '',
+    ])
     const row = screen.getByRole('row', { name: 'claude' })
     expect(within(row).queryByText('nw-88-rate-limits')).toBeNull()
     expect(within(row).queryByText('Make this edit?')).toBeNull()
@@ -321,6 +328,14 @@ describe('LedgerView', () => {
     }
     render(<LedgerView {...props} groups={[closed]} onCloseSession={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /^Close / })).toBeNull()
+  })
+
+  // Thirty days is a long time to keep something you are done with.
+  it('removes a closed session from the list', () => {
+    const onForgetSession = vi.fn()
+    render(<LedgerView {...props} onCloseSession={vi.fn()} onForgetSession={onForgetSession} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove pnpm build from the list' }))
+    expect(onForgetSession).toHaveBeenCalledWith(groups[1].facts[0])
   })
 
   it('offers no Resume on a running session', () => {

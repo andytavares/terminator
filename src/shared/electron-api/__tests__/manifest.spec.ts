@@ -129,6 +129,7 @@ describe('remoteAccessibleCoreChannels()', () => {
     'session-records:set-description',
     'session-records:set-link',
     'session-records:transfer',
+    'session-records:forget',
     'session-records:changed',
   ]
 

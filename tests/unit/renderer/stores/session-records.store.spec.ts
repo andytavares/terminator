@@ -7,6 +7,7 @@ let changed:
 
 const api = {
   list: vi.fn(),
+  forget: vi.fn(),
   setDescription: vi.fn(),
   setLink: vi.fn(),
   transfer: vi.fn(),
@@ -130,5 +131,20 @@ describe('session records store', () => {
       await useSessionRecordsStore.getState().transfer('s1', { ...SNAP, sessionId: 's2' })
     ).toBe(false)
     expect([...useSessionRecordsStore.getState().records.keys()]).toEqual(['s1'])
+  })
+
+  it('forgets a closed record and takes it out of the list', async () => {
+    useSessionRecordsStore.setState({ records: new Map([['s1', record()]]) })
+    api.forget.mockResolvedValue({ data: true })
+    expect(await useSessionRecordsStore.getState().forget('s1')).toBe(true)
+    expect(api.forget).toHaveBeenCalledWith({ sessionId: 's1' })
+    expect(useSessionRecordsStore.getState().records.size).toBe(0)
+  })
+
+  it('keeps the record when the main process refused to forget it', async () => {
+    useSessionRecordsStore.setState({ records: new Map([['s1', record()]]) })
+    api.forget.mockResolvedValue({ data: false })
+    expect(await useSessionRecordsStore.getState().forget('s1')).toBe(false)
+    expect(useSessionRecordsStore.getState().records.size).toBe(1)
   })
 })

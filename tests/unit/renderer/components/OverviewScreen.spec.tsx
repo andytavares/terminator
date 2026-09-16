@@ -10,6 +10,7 @@ const setDescription = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const setActiveGlobalTab = vi.hoisted(() => vi.fn())
 const startScratch = vi.hoisted(() => vi.fn())
 const closeFromFacts = vi.hoisted(() => vi.fn())
+const forgetRecord = vi.hoisted(() => vi.fn())
 const metrics = vi.hoisted(() => ({
   processesBySessionId: new Map(),
   startPolling: vi.fn(),
@@ -30,7 +31,8 @@ vi.mock('../../../../src/renderer/stores/metrics.store', () => ({
   useMetricsStore: () => metrics,
 }))
 vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: (select: (s: unknown) => unknown) => select({ setDescription }),
+  useSessionRecordsStore: (select: (s: unknown) => unknown) =>
+    select({ setDescription, forget: forgetRecord }),
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
   navigateToSession: navigate,
