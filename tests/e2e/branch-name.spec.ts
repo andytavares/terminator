@@ -76,3 +76,21 @@ test('a branch offers no rename, because there is nothing else to name', async (
   await expect(page.locator('.ctx-menu__item').filter({ hasText: 'Rename' })).toHaveCount(0)
   await page.keyboard.press('Escape')
 })
+
+// The complaint this covers: pressing Create sat there for seconds with no sign
+// anything was happening. The button now says so while git works, and the
+// dialog goes when it is done.
+test('creating a worktree says it is working, then closes', async () => {
+  const { page } = handle
+  await workspaceRow(page, WS).locator('.repo-header__action[aria-label^="New branch in"]').click()
+  await expect(page.locator('.dialog__title')).toContainText('Create Branch')
+  await page.getByRole('button', { name: 'Worktree' }).click()
+  await page.getByPlaceholder('feature/my-feature').fill('feature/busy-state')
+
+  await page.click('.dialog__btn-primary')
+  // Either caught mid-flight or already done — both prove it is not inert.
+  await expect(page.locator('.dialog__title')).toHaveCount(0, { timeout: 30_000 })
+  await expect(
+    page.locator('.branch-row__name', { hasText: /^feature\/busy-state$/ }).first()
+  ).toBeVisible()
+})

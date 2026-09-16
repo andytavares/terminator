@@ -171,9 +171,16 @@
     color 0.12s;
 }
 
-.dialog__btn-secondary:hover {
+.dialog__btn-secondary:hover:not(:disabled) {
   background: var(--bg-card-hover);
   color: var(--text-primary);
+}
+
+/* Matches the primary, so a dialog busy with work reads as busy on both
+   buttons rather than on one. */
+.dialog__btn-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ── Toggle label (checkbox) ─────────────────────────────────── */

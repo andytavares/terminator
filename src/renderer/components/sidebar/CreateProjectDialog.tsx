@@ -30,6 +30,9 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   const [worktreePath, setWorktreePath] = useState('')
   const [gitRoot, setGitRoot] = useState<string | null>(null)
   const [error, setError] = useState('')
+  // Creating a worktree is seconds of git work. Without this the dialog sits
+  // there looking untouched, and a second press starts the whole thing again.
+  const [busy, setBusy] = useState(false)
   // Set when the operator started from an issue; drives the prefill and the
   // link made once the project exists.
   const [issue, setIssue] = useState<IssueSummary | null>(null)
@@ -123,20 +126,31 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    try {
+      if (await create()) onClose()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** The work itself. True when the branch exists and the dialog can go. */
+  async function create(): Promise<boolean> {
     // Only a non-repo folder carries a name of its own; everywhere else the
     // branch chosen below is the name, and it is validated where it is chosen.
     if (!gitRoot) {
       const nameErr = validateName(name)
       if (nameErr) {
         setNameError(nameErr)
-        return
+        return false
       }
     }
     setError('')
 
     if (branchMode === 'existing' && hasNonWorktreeProject) {
       setError('A branch-based entry already exists in this repo')
-      return
+      return false
     }
 
     if (!gitRoot || branchMode === 'existing') {
@@ -145,7 +159,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         const branchTrimmed = newBranchName.trim()
         if (!branchTrimmed) {
           setError('Enter a branch name')
-          return
+          return false
         }
         const created = await window.electronAPI.git.createBranch(
           workspace!.folderPath,
@@ -153,7 +167,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         )
         if ('error' in created) {
           setError(`Could not create branch: ${created.error}`)
-          return
+          return false
         }
         branch = branchTrimmed
       }
@@ -161,7 +175,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       // be a card with no name.
       if (gitRoot && !branch) {
         setError('Select or enter a branch name')
-        return
+        return false
       }
       const result = await createProject({
         workspaceId,
@@ -175,7 +189,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         if (duplicate && !gitRoot) setNameError('A branch with this name already exists')
         else
           setError(duplicate ? 'This repo already has that branch' : 'Could not create the branch')
-        return
+        return false
       }
       await attachIssue(result)
     } else {
@@ -183,7 +197,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       const branch = worktreeIsNewBranch ? newBranchName.trim() : selectedBranch
       if (!branch) {
         setError('Select or enter a branch name')
-        return
+        return false
       }
       const wt = await window.electronAPI.git.createWorktree({
         repoRoot: gitRoot,
@@ -193,7 +207,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       })
       if ('error' in wt) {
         setError(`Worktree error: ${wt.error}`)
-        return
+        return false
       }
       const result = await createProject({
         workspaceId,
@@ -209,11 +223,11 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         if (duplicate && !gitRoot) setNameError('A branch with this name already exists')
         else
           setError(duplicate ? 'This repo already has that branch' : 'Could not create the branch')
-        return
+        return false
       }
       await attachIssue(result)
     }
-    onClose()
+    return true
   }
 
   const defaultBranchName =
@@ -232,7 +246,9 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   const worktreeBranchName = worktreeIsNewBranch ? newBranchName : selectedBranch
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
+    // Dismissing mid-flight would leave git finishing a worktree nothing is
+    // waiting for, so the overlay stops answering until the work is done.
+    <div className="dialog-overlay" onClick={() => !busy && onClose()}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <h2 className="dialog__title">Create Branch</h2>
         <form onSubmit={handleSubmit}>
@@ -376,11 +392,16 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
           {error && <p className="dialog__error">{error}</p>}
 
           <div className="dialog__actions">
-            <button type="button" className="dialog__btn-secondary" onClick={onClose}>
+            <button
+              type="button"
+              className="dialog__btn-secondary"
+              onClick={onClose}
+              disabled={busy}
+            >
               Cancel
             </button>
-            <button type="submit" className="dialog__btn-primary" disabled={!!nameError}>
-              Create
+            <button type="submit" className="dialog__btn-primary" disabled={!!nameError || busy}>
+              {busy ? 'Creating…' : 'Create'}
             </button>
           </div>
         </form>
