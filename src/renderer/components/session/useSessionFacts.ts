@@ -14,6 +14,14 @@ export function useSessionFacts(): SessionFacts[] {
   const records = useSessionRecordsStore((s) => s.records)
   const projectLinks = useIntegrationsStore((s) => s.links)
 
+  // Whether a conversation can still be resumed is only true as of the moment
+  // the main process looked, and the transcript belongs to the agent — it can
+  // be deleted while the app is open. Asking again whenever a surface that
+  // draws Resume appears is what stops it offering a button that would fail.
+  useEffect(() => {
+    void useSessionRecordsStore.getState().load()
+  }, [])
+
   return useMemo(
     () =>
       buildSessionFacts({

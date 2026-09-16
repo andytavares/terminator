@@ -195,7 +195,9 @@ describe('installing the hook in the operator’s Claude settings', () => {
   it('does nothing rather than failing when its script has gone', async () => {
     const mod = await load()
     const scriptPath = await mod.installCaptureScript(userData)
-    const command = mod.captureCommand({ execPath: process.execPath, scriptPath })
+    await mod.installUserHook({ execPath: process.execPath, scriptPath })
+    const hooks = read().hooks as { SessionStart: Array<{ hooks: Array<{ command: string }> }> }
+    const command = hooks.SessionStart[0].hooks[0].command
     fs.rmSync(scriptPath)
     // Exactly as a shell would run it from the settings file.
     expect(() => execFileSync('/bin/sh', ['-c', command], { encoding: 'utf8' })).not.toThrow()

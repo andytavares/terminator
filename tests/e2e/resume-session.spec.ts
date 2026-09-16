@@ -135,6 +135,37 @@ test('a conversation whose transcript has gone says so instead', async () => {
   await expect(page.getByRole('button', { name: /^Resume/ })).toHaveCount(0)
 })
 
+// Whether a transcript is there is only true as of the moment it was read, and
+// the agent owns that file: it can go while Home is on screen. Coming back to
+// Home has to ask again, or the operator is offered a button that cannot work.
+test('a conversation that goes while the app is running stops being offered', async () => {
+  handle = await launchApp()
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+  reportConversation(
+    handle.userDataDir,
+    await openTerminalId(page, 'Repo One / feature-a'),
+    'conv-e2e-4',
+    transcript
+  )
+  await goToTerminal(page)
+  await page.locator('.terminal-pane').click()
+  await page.keyboard.type('exit')
+  await page.keyboard.press('Enter')
+  await openHome(page)
+  await expect(page.getByRole('button', { name: /^Resume/ }).first()).toBeVisible({
+    timeout: 15_000,
+  })
+
+  rmSync(transcript)
+  await goToTerminal(page)
+  await openHome(page)
+  await expect(page.getByText('Conversation no longer available').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Resume/ })).toHaveCount(0)
+})
+
 test('a conversation from the last run is offered under Closed, and nothing restarted itself', async () => {
   handle = await launchApp()
   const profile = handle.userDataDir
@@ -169,10 +200,16 @@ test('a conversation from the last run is offered under Closed, and nothing rest
   // Resuming it takes it out of the history: it is a live session again, not a
   // live session beside a ghost of itself.
   await openHome(restarted)
-  await restarted
+  // Resumed from the keyboard, with a focus ring to show where it is: this is
+  // the one control that brings work back, and it must not need a mouse.
+  const resume = restarted
     .getByRole('rowgroup', { name: 'Closed' })
     .getByRole('button', { name: /^Resume/ })
-    .click()
+  await resume.focus()
+  expect(
+    await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
+  ).not.toBe('0px')
+  await restarted.keyboard.press('Enter')
   // The terminal that took the conversation over carries its description.
   await expect(restarted.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()
   await openHome(restarted)

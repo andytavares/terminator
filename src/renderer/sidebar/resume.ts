@@ -22,7 +22,7 @@ export interface ResumePlan {
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
 /** How an agent is asked to carry a conversation on, or nothing when it cannot be. */
-export function resumeCommand(agent: AgentConversation | null): string | null {
+function resumeCommand(agent: AgentConversation | null): string | null {
   if (agent === null || !ID.test(agent.sessionId)) return null
   if (agent.provider !== 'claude') return null
   return `claude --resume ${agent.sessionId}`

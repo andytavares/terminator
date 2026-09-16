@@ -117,7 +117,7 @@ function quote(value: string): string {
  * neither a `node` on `PATH` nor whatever a login shell exported — the same
  * reasoning as the issue-context hook.
  */
-export function captureCommand(options: CaptureHookOptions): string {
+function captureCommand(options: CaptureHookOptions): string {
   const run = [
     'ELECTRON_RUN_AS_NODE=1',
     quote(options.execPath),

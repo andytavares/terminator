@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planResume, resumeCommand } from '../../../../src/renderer/sidebar/resume'
+import { planResume } from '../../../../src/renderer/sidebar/resume'
 import { fact } from './fixtures/facts'
 import type { AgentConversation } from '../../../../src/shared/types/index'
 
@@ -14,19 +14,19 @@ const conversation: AgentConversation = {
 const exited = (patch = {}) =>
   fact({ state: 'exited', agent: conversation, resumable: true, ...patch })
 
-describe('resumeCommand', () => {
+// The command is reached through planResume, the only way the application
+// asks for one.
+describe('the command a resume runs', () => {
   it('asks Claude Code to carry on the conversation', () => {
-    expect(resumeCommand(conversation)).toBe('claude --resume b610a882-41f3-4833-a6a3-dc3a33aea060')
-  })
-
-  it('has nothing to say about no conversation', () => {
-    expect(resumeCommand(null)).toBeNull()
+    expect(planResume(exited())?.command).toBe(
+      'claude --resume b610a882-41f3-4833-a6a3-dc3a33aea060'
+    )
   })
 
   it.each([['id with spaces'], ['id;rm -rf /'], ['$(whoami)'], ['a`b`'], ['--flag']])(
     'refuses an id that is not one: %s',
     (sessionId) => {
-      expect(resumeCommand({ ...conversation, sessionId })).toBeNull()
+      expect(planResume(exited({ agent: { ...conversation, sessionId } }))).toBeNull()
     }
   )
 })
