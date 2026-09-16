@@ -31,6 +31,17 @@ vi.mock('../../../../src/renderer/stores/settings.store', () => ({
 vi.mock('../../../../src/renderer/terminal/session-controller', () => ({
   createTerminalSession: create,
 }))
+const records = vi.hoisted(() => ({ transfer: vi.fn().mockResolvedValue(true) }))
+const sessions = vi.hoisted(() => ({
+  sessions: new Map<string, unknown>(),
+  closeSession: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
+  useSessionRecordsStore: { getState: () => records },
+}))
+vi.mock('../../../../src/renderer/stores/session.store', () => ({
+  useSessionStore: { getState: () => sessions },
+}))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
   navigateToSession: navigate,
 }))
@@ -41,7 +52,9 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
 import {
   startSessionInBranch,
   startScratchSession,
+  resumeSession,
 } from '../../../../src/renderer/terminal/start-session'
+import { fact } from '../sidebar/fixtures/facts'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 
 beforeEach(() => {
@@ -101,5 +114,78 @@ describe('startScratchSession', () => {
     await startScratchSession()
     expect(workspace.setScratchActive).not.toHaveBeenCalled()
     expect(registry.setActiveGlobalTab).not.toHaveBeenCalled()
+  })
+})
+
+describe('resumeSession', () => {
+  const conversation = {
+    provider: 'claude' as const,
+    sessionId: 'conv-1',
+    transcriptPath: '/t/conv-1.jsonl',
+    cwd: '/code/repo-wt',
+    capturedAt: '2026-09-15T18:00:00.000Z',
+  }
+  const stopped = (patch = {}) =>
+    fact({
+      sessionId: 'old',
+      name: 'claude',
+      state: 'exited',
+      agent: conversation,
+      resumable: true,
+      snapshot: { ...fact().snapshot, sessionId: 'old', projectId: 'p1' },
+      ...patch,
+    })
+
+  beforeEach(() => {
+    sessions.sessions = new Map([['old', { id: 'old', status: 'active' }]])
+    records.transfer.mockResolvedValue(true)
+  })
+
+  it('opens a terminal that carries the conversation on, where it ran', async () => {
+    await resumeSession(stopped())
+    expect(create).toHaveBeenCalledWith(
+      'p1',
+      'human',
+      '',
+      '/code/repo-wt',
+      4242,
+      undefined,
+      'claude --resume conv-1'
+    )
+    expect(navigate).toHaveBeenCalledWith('new-session')
+  })
+
+  it('moves the old session’s context onto the resumed one, then closes it', async () => {
+    await resumeSession(stopped())
+    expect(records.transfer).toHaveBeenCalledWith(
+      'old',
+      expect.objectContaining({ sessionId: 'new-session' })
+    )
+    expect(sessions.closeSession).toHaveBeenCalledWith('old')
+    expect(records.transfer.mock.invocationCallOrder[0]).toBeLessThan(
+      sessions.closeSession.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('closes nothing for a session whose terminal has already gone', async () => {
+    sessions.sessions = new Map()
+    await resumeSession(stopped({ isClosed: true }))
+    expect(records.transfer).toHaveBeenCalled()
+    expect(sessions.closeSession).not.toHaveBeenCalled()
+  })
+
+  it('does nothing at all for a session that cannot be resumed', async () => {
+    await resumeSession(stopped({ resumable: false }))
+    expect(create).not.toHaveBeenCalled()
+    expect(records.transfer).not.toHaveBeenCalled()
+    expect(sessions.closeSession).not.toHaveBeenCalled()
+  })
+
+  it('leaves the old session alone when the terminal will not open', async () => {
+    create.mockRejectedValueOnce(new Error('CWD_MISSING'))
+    await resumeSession(stopped())
+    expect(records.transfer).not.toHaveBeenCalled()
+    expect(sessions.closeSession).not.toHaveBeenCalled()
+    expect(navigate).not.toHaveBeenCalled()
   })
 })

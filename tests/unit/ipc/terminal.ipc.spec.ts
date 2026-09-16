@@ -168,6 +168,47 @@ describe('registerTerminalHandlers', () => {
       expect(spawned.cwd.startsWith('/')).toBe(true)
     })
 
+    it('names the terminal in its environment, so an agent in it can be placed', () => {
+      const { sessionId } = invokeHandler('terminal:create')({}, VALID_CREATE) as {
+        sessionId: string
+      }
+      const spawned = ptyManager.spawnSession.mock.calls[0][0] as { env: Record<string, string> }
+      expect(spawned.env.TERMINATOR_SESSION_ID).toBe(sessionId)
+    })
+
+    it('names it beside the linked issue, not instead of it', () => {
+      issues.link = { projectId: VALID_CREATE.projectId, tracker: 'linear', key: 'TAV-42' }
+      invokeHandler('terminal:create')({}, VALID_CREATE)
+      const spawned = ptyManager.spawnSession.mock.calls[0][0] as { env: Record<string, string> }
+      expect(spawned.env).toMatchObject({
+        TERMINATOR_ISSUE_KEY: 'TAV-42',
+        TERMINATOR_SESSION_ID: expect.any(String),
+      })
+      issues.link = null
+    })
+
+    it('runs an initial command in the terminal it opened', () => {
+      const { sessionId } = invokeHandler('terminal:create')(
+        {},
+        { ...VALID_CREATE, initialCommand: 'claude --resume abc-123' }
+      ) as { sessionId: string }
+      expect(ptyManager.write).toHaveBeenCalledWith(sessionId, 'claude --resume abc-123\n')
+    })
+
+    it('writes nothing when no initial command was asked for', () => {
+      invokeHandler('terminal:create')({}, VALID_CREATE)
+      expect(ptyManager.write).not.toHaveBeenCalled()
+    })
+
+    it('refuses an initial command carrying a second line', () => {
+      const result = invokeHandler('terminal:create')(
+        {},
+        { ...VALID_CREATE, initialCommand: 'claude --resume abc\nrm -rf /' }
+      ) as { error: string }
+      expect(result.error).toBe('VALIDATION_ERROR')
+      expect(ptyManager.spawnSession).not.toHaveBeenCalled()
+    })
+
     it('returns the shell it actually spawned', () => {
       const fromSettings = invokeHandler('terminal:create')({}, VALID_CREATE) as { shell: string }
       expect(fromSettings.shell).toBe('/bin/zsh')
@@ -339,16 +380,22 @@ describe('terminal:create — linked issue', () => {
 
     expect(ptyManager.spawnSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        env: { TERMINATOR_ISSUE_KEY: 'TAV-42', TERMINATOR_ISSUE_TRACKER: 'linear' },
+        env: {
+          TERMINATOR_ISSUE_KEY: 'TAV-42',
+          TERMINATOR_ISSUE_TRACKER: 'linear',
+          TERMINATOR_SESSION_ID: expect.any(String),
+        },
       })
     )
   })
 
-  it('passes no environment for an unlinked project', async () => {
+  // Every terminal names itself, linked or not (ADR 055): that is how an agent
+  // started in it is matched to this session.
+  it('passes only the terminal’s own name for an unlinked project', async () => {
     const ptyManager = makeFakePtyManager()
     await createTerminal(ptyManager)
     expect(ptyManager.spawnSession).toHaveBeenCalledWith(
-      expect.objectContaining({ env: undefined })
+      expect.objectContaining({ env: { TERMINATOR_SESSION_ID: expect.any(String) } })
     )
   })
 

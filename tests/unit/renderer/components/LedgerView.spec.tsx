@@ -93,6 +93,8 @@ describe('LedgerView', () => {
   it('draws a header for each visible column', () => {
     render(<LedgerView {...props} />)
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent)
+    // The last names nothing: it is the close control's own track, at the end
+    // of the line.
     expect(headers).toEqual([
       '',
       'Session',
@@ -100,6 +102,7 @@ describe('LedgerView', () => {
       'Work item or description',
       'Latest output',
       'Age',
+      '',
     ])
   })
 
@@ -174,7 +177,11 @@ describe('LedgerView', () => {
         columns={{ branch: false, workItem: false, tags: false, latestLine: false, age: false }}
       />
     )
-    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['', 'Session'])
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
+      '',
+      'Session',
+      '',
+    ])
     const row = screen.getByRole('row', { name: 'claude' })
     expect(within(row).queryByText('nw-88-rate-limits')).toBeNull()
     expect(within(row).queryByText('Make this edit?')).toBeNull()
@@ -225,5 +232,114 @@ describe('LedgerView', () => {
     const bare = { ...groups[0], facts: [{ ...groups[0].facts[1], branch: null }] }
     const { container } = render(<LedgerView {...props} groups={[bare]} />)
     expect(container.querySelector('.ledger__branch svg')).toBeNull()
+  })
+
+  it('offers Resume on a stopped session whose conversation is still there', () => {
+    const onResume = vi.fn()
+    const stopped = {
+      ...groups[0],
+      facts: [
+        {
+          ...groups[0].facts[0],
+          state: 'exited' as const,
+          agent: {
+            provider: 'claude' as const,
+            sessionId: 'conv-1',
+            transcriptPath: '/t/c.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: true,
+        },
+      ],
+    }
+    render(<LedgerView {...props} groups={[stopped]} onResume={onResume} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(onResume).toHaveBeenCalledWith(stopped.facts[0])
+    expect(props.onSelect).not.toHaveBeenCalled()
+  })
+
+  // The case a restart leaves behind: the tab has gone and the session lives
+  // only as a record under Closed, which is exactly where its conversation is
+  // most worth picking up.
+  it('offers Resume on a closed session, whose description stays readable', () => {
+    const onResume = vi.fn()
+    const closed = {
+      ...groups[0],
+      facts: [
+        {
+          ...groups[0].facts[0],
+          isClosed: true,
+          state: 'exited' as const,
+          description: 'chasing the flaky test',
+          closedAt: '2026-09-15T19:00:00.000Z',
+          agent: {
+            provider: 'claude' as const,
+            sessionId: 'conv-1',
+            transcriptPath: '/t/c.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: true,
+        },
+      ],
+    }
+    render(<LedgerView {...props} groups={[closed]} onResume={onResume} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(onResume).toHaveBeenCalledWith(closed.facts[0])
+    expect(screen.getByText('chasing the flaky test')).toBeTruthy()
+  })
+
+  it('says when a stopped session’s conversation has gone', () => {
+    const gone = {
+      ...groups[0],
+      facts: [
+        {
+          ...groups[0].facts[0],
+          state: 'exited' as const,
+          agent: {
+            provider: 'claude' as const,
+            sessionId: 'conv-1',
+            transcriptPath: '/t/gone.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: false,
+        },
+      ],
+    }
+    render(<LedgerView {...props} groups={[gone]} onResume={vi.fn()} />)
+    expect(screen.getByText('Conversation no longer available')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
+  })
+
+  it('ends a session from its row', () => {
+    const onCloseSession = vi.fn()
+    render(<LedgerView {...props} onCloseSession={onCloseSession} />)
+    fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
+    expect(onCloseSession).toHaveBeenCalled()
+    expect(props.onSelect).not.toHaveBeenCalled()
+  })
+
+  it('offers no way to close a session that has already closed', () => {
+    const closed = {
+      ...groups[0],
+      facts: [{ ...groups[0].facts[0], isClosed: true, state: 'exited' as const }],
+    }
+    render(<LedgerView {...props} groups={[closed]} onCloseSession={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /^Close / })).toBeNull()
+  })
+
+  // Thirty days is a long time to keep something you are done with.
+  it('removes a closed session from the list', () => {
+    const onForgetSession = vi.fn()
+    render(<LedgerView {...props} onCloseSession={vi.fn()} onForgetSession={onForgetSession} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove pnpm build from the list' }))
+    expect(onForgetSession).toHaveBeenCalledWith(groups[1].facts[0])
+  })
+
+  it('offers no Resume on a running session', () => {
+    render(<LedgerView {...props} onResume={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
 })

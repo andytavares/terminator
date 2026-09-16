@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Link, SquareArrowOutUpRight } from 'lucide-react'
 import { StateIcon } from '../session/StateIcon'
 import { LivePreview } from '../session/LivePreview'
+import { ResumeButton } from '../session/ResumeButton'
+import { CloseSessionButton } from '../session/CloseSessionButton'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import { headlineOf, suggestWorkItems, type LogbookGroup } from '../../sidebar/logbook-groups'
@@ -21,6 +23,9 @@ interface Props {
   onSaveDescription: (facts: SessionFacts, description: string | null) => void
   onLinkIssue: (facts: SessionFacts, issue: IssueSummary) => void
   onLink?: (facts: SessionFacts) => void
+  onResume?: (facts: SessionFacts) => void
+  onCloseSession?: (facts: SessionFacts) => void
+  onForgetSession?: (facts: SessionFacts) => void
   renderAnswers?: (facts: SessionFacts) => React.ReactNode
 }
 
@@ -66,6 +71,9 @@ function Detail({
   onSaveDescription,
   onLinkIssue,
   onLink,
+  onResume,
+  onCloseSession,
+  onForgetSession,
   renderAnswers,
 }: Omit<Props, 'groups' | 'selected' | 'titles' | 'onSelect'> & {
   facts: SessionFacts
@@ -92,6 +100,7 @@ function Detail({
       <div className="logbook__crumb">
         <StateIcon state={facts.state} />
         <span className="logbook__where">{locationOf(facts)}</span>
+        {onResume && <ResumeButton facts={facts} onResume={onResume} />}
         {!facts.isClosed && (
           <button
             type="button"
@@ -102,6 +111,9 @@ function Detail({
             <SquareArrowOutUpRight aria-hidden="true" />
             Open terminal
           </button>
+        )}
+        {onCloseSession && (
+          <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
         )}
       </div>
 

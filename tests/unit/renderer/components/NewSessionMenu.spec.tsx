@@ -12,7 +12,7 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   useWorkspaceStore: (select: (s: unknown) => unknown) => select(workspace),
 }))
 
-import { NewSessionMenu } from '../../../../src/renderer/components/home/NewSessionMenu'
+import { NewSessionMenu } from '../../../../src/renderer/components/session/NewSessionMenu'
 
 const repo = (id: string, name: string): Workspace => ({ id, name }) as Workspace
 const branch = (id: string, workspaceId: string, name: string): Project =>

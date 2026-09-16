@@ -10,6 +10,9 @@ import { registerIntegrationsHandlers } from './ipc/integrations.ipc.js'
 import { migrateLegacyCredentials } from './integrations/tracker-store.js'
 import { loadLinks, registerLinkGarbageCollection } from './integrations/issue-link-store.js'
 import { loadRecords, sweepOpenRecords } from './sessions/session-record-store.js'
+import { installCaptureScript, installUserHook } from './agents/agent-session-hook.js'
+import { startAgentSessionWatcher } from './agents/agent-session-watcher.js'
+import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
@@ -385,7 +388,20 @@ app.whenReady().then(async () => {
   registerLinkGarbageCollection()
   // Nothing can be open at startup: sessions die with the app, so whatever the
   // last run left open is closed at its last update before anyone reads it.
-  void loadRecords().then(sweepOpenRecords)
+  void loadRecords()
+    .then(sweepOpenRecords)
+    .then(() => startAgentSessionWatcher({ snapshotFor: makeSnapshotFor(ptyManager) }))
+    .catch((error) =>
+      logger.error('agent session capture failed to start', { error: String(error) })
+    )
+
+  // Lets an agent — including one the operator starts by hand — report the
+  // conversation it is having, so the session can be resumed later (ADR 055).
+  void installCaptureScript(join(app.getPath('userData'), 'integrations'))
+    .then((scriptPath) => installUserHook({ execPath: process.execPath, scriptPath }))
+    .catch((error) =>
+      logger.error('could not install the agent session hook', { error: String(error) })
+    )
   // Written at startup rather than shipped beside the bundle: a loose script
   // survives development and vanishes from the packaged app (ADR-026).
   void ensureHookScript()

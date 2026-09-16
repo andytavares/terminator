@@ -3,6 +3,8 @@ import { GitBranch, SquareArrowOutUpRight } from 'lucide-react'
 import { StateIcon } from '../session/StateIcon'
 import { LivePreview } from '../session/LivePreview'
 import { WorkItemCell } from '../session/WorkItemCell'
+import { ResumeButton } from '../session/ResumeButton'
+import { CloseSessionButton } from '../session/CloseSessionButton'
 import { useIssue } from '../session/useSessionFacts'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import type { LedgerColumns } from '../../sidebar/home-prefs'
@@ -20,6 +22,9 @@ interface Props {
   onOpen: (sessionId: string) => void
   onSaveDescription: (facts: SessionFacts, description: string | null) => void
   onLink?: (facts: SessionFacts) => void
+  onResume?: (facts: SessionFacts) => void
+  onCloseSession?: (facts: SessionFacts) => void
+  onForgetSession?: (facts: SessionFacts) => void
   /** Drawn inside the selected row's preview, beside Open: answers to a waiting prompt. */
   renderAnswers?: (facts: SessionFacts) => React.ReactNode
 }
@@ -40,6 +45,8 @@ function template(columns: LedgerColumns): string {
     columns.tags && 'minmax(0, 0.7fr)',
     columns.latestLine && 'minmax(0, 1.3fr)',
     columns.age && '44px',
+    // The close control's own track, last on the line.
+    '24px',
   ]
     .filter(Boolean)
     .join(' ')
@@ -54,6 +61,9 @@ function Row({
   onOpen,
   onSaveDescription,
   onLink,
+  onResume,
+  onCloseSession,
+  onForgetSession,
 }: {
   facts: SessionFacts
   columns: LedgerColumns
@@ -63,6 +73,9 @@ function Row({
   onOpen: Props['onOpen']
   onSaveDescription: Props['onSaveDescription']
   onLink?: Props['onLink']
+  onResume?: Props['onResume']
+  onCloseSession?: Props['onCloseSession']
+  onForgetSession?: Props['onForgetSession']
 }): JSX.Element {
   const issue = useIssue(facts.workItem?.ref)
   return (
@@ -108,6 +121,7 @@ function Row({
             onSaveDescription={(text) => onSaveDescription(facts, text)}
             onLink={onLink && !facts.isClosed ? () => onLink(facts) : undefined}
           />
+          {onResume && <ResumeButton facts={facts} onResume={onResume} />}
         </span>
       )}
       {columns.tags && (
@@ -129,6 +143,9 @@ function Row({
           {formatRelativeTime(facts.lastActivityAt, now)}
         </span>
       )}
+      {onCloseSession && (
+        <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
+      )}
     </div>
   )
 }
@@ -144,6 +161,9 @@ export function LedgerView({
   onOpen,
   onSaveDescription,
   onLink,
+  onResume,
+  onCloseSession,
+  onForgetSession,
   renderAnswers,
 }: Props): JSX.Element {
   return (
@@ -165,6 +185,7 @@ export function LedgerView({
             Age
           </span>
         )}
+        <span role="columnheader" />
       </div>
 
       {groups.map((group) => (
@@ -186,6 +207,9 @@ export function LedgerView({
                   onOpen={onOpen}
                   onSaveDescription={onSaveDescription}
                   onLink={onLink}
+                  onResume={onResume}
+                  onCloseSession={onCloseSession}
+                  onForgetSession={onForgetSession}
                 />
                 {selected && previewSelected && !facts.isClosed && (
                   <div role="row" className="ledger__expand">

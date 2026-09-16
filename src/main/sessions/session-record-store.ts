@@ -1,7 +1,12 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { app } from 'electron'
-import type { SessionRecord, SessionSnapshot, WorkItemRef } from '../../shared/types/index.js'
+import type {
+  AgentConversation,
+  SessionRecord,
+  SessionSnapshot,
+  WorkItemRef,
+} from '../../shared/types/index.js'
 import { pruneRecords } from '../../shared/session-records/retention.js'
 import { DESCRIPTION_MAX_LENGTH } from '../../shared/schemas/session-records.schema.js'
 
@@ -49,6 +54,22 @@ async function persist(): Promise<void> {
 
 const stringOrNull = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
+function agentOf(value: unknown): AgentConversation | null {
+  if (typeof value !== 'object' || value === null) return null
+  const a = value as Partial<AgentConversation>
+  // An agent this version cannot resume loses its conversation, not the record.
+  if (a.provider !== 'claude') return null
+  if (typeof a.sessionId !== 'string' || a.sessionId === '') return null
+  if (typeof a.transcriptPath !== 'string' || typeof a.cwd !== 'string') return null
+  return {
+    provider: 'claude',
+    sessionId: a.sessionId,
+    transcriptPath: a.transcriptPath,
+    cwd: a.cwd,
+    capturedAt: typeof a.capturedAt === 'string' ? a.capturedAt : new Date().toISOString(),
+  }
+}
+
 function linkOf(value: unknown): WorkItemRef | null {
   if (typeof value !== 'object' || value === null) return null
   const link = value as Partial<WorkItemRef>
@@ -84,6 +105,7 @@ export async function loadRecords(): Promise<void> {
       shell: stringOrNull(r.shell),
       description: stringOrNull(r.description),
       link: linkOf(r.link),
+      agent: agentOf(r.agent),
       startedAt: r.startedAt,
       updatedAt: r.updatedAt,
       ...(typeof r.closedAt === 'string' ? { closedAt: r.closedAt } : {}),
@@ -114,7 +136,7 @@ export function listRecords(): SessionRecord[] {
 
 async function write(
   session: SessionSnapshot,
-  patch: Pick<Partial<SessionRecord>, 'description' | 'link'>
+  patch: Pick<Partial<SessionRecord>, 'description' | 'link' | 'agent'>
 ): Promise<SessionRecord | null> {
   const existing = records.get(session.sessionId)
   if (existing?.closedAt !== undefined) {
@@ -122,8 +144,9 @@ async function write(
   }
   const description = 'description' in patch ? patch.description! : (existing?.description ?? null)
   const link = 'link' in patch ? patch.link! : (existing?.link ?? null)
+  const agent = 'agent' in patch ? patch.agent! : (existing?.agent ?? null)
 
-  if (description === null && link === null) {
+  if (description === null && link === null && agent === null) {
     if (existing === undefined) return null
     records.delete(session.sessionId)
     await persist()
@@ -135,6 +158,7 @@ async function write(
     ...session,
     description,
     link,
+    agent,
     updatedAt: new Date().toISOString(),
   }
   records.set(session.sessionId, record)
@@ -166,6 +190,48 @@ export async function setLink(
   return write(session, { link })
 }
 
+/**
+ * Record the agent conversation running in a session, or forget it.
+ *
+ * A conversation is context in its own right: a session with nothing but one
+ * still gets a record, because that is what Resume reads after a restart.
+ */
+export async function setAgent(
+  session: SessionSnapshot,
+  agent: AgentConversation | null
+): Promise<SessionRecord | null> {
+  return write(session, { agent })
+}
+
+/**
+ * Move one session's context onto another, in a single write.
+ *
+ * Resuming ends with the conversation in a new terminal; its description, link
+ * and conversation belong there now. Two writes could half-fail and leave the
+ * same context on both.
+ */
+export async function transfer(
+  fromSessionId: string,
+  session: SessionSnapshot
+): Promise<SessionRecord | null> {
+  const existing = records.get(fromSessionId)
+  if (existing === undefined) return null
+
+  records.delete(fromSessionId)
+  const record: SessionRecord = {
+    ...session,
+    description: existing.description,
+    link: existing.link,
+    agent: existing.agent,
+    updatedAt: new Date().toISOString(),
+  }
+  records.set(session.sessionId, record)
+  await persist()
+  announce(fromSessionId)
+  announce(session.sessionId)
+  return record
+}
+
 /** Stamp a session's close time, once. A session without a record has nothing to keep. */
 export async function markClosed(sessionId: string, at: Date): Promise<void> {
   const existing = records.get(sessionId)
@@ -173,6 +239,24 @@ export async function markClosed(sessionId: string, at: Date): Promise<void> {
   records.set(sessionId, { ...existing, closedAt: at.toISOString() })
   await persist()
   announce(sessionId)
+}
+
+/**
+ * Drop a closed session's record for good.
+ *
+ * Only a closed one: a live session's record is what Home draws it from, and
+ * forgetting it while the terminal runs would make the session disappear from
+ * the list it is running in. Everything a record holds — the description, the
+ * link, the conversation — goes with it, which is what being asked to forget a
+ * session means.
+ */
+export async function forget(sessionId: string): Promise<boolean> {
+  const existing = records.get(sessionId)
+  if (existing === undefined || existing.closedAt === undefined) return false
+  records.delete(sessionId)
+  await persist()
+  announce(sessionId)
+  return true
 }
 
 export function onRecordChange(handler: RecordChangeHandler): () => void {

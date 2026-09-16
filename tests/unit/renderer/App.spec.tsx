@@ -77,24 +77,19 @@ vi.mock('../../../src/renderer/components/CommandPalette', () => ({
   },
 }))
 
-type GlobalTabCallback = (id: string) => void
-let capturedOnSelectGlobalTab: GlobalTabCallback | null = null
 let capturedOnSelectSession: ((sessionId: string) => void) | null = null
 let capturedOnSelectProject: (() => void) | null = null
 let capturedEditNoteSessionId: string | null = null
 vi.mock('../../../src/renderer/components/sidebar/UnifiedSidebar', () => ({
   UnifiedSidebar: ({
-    onSelectGlobalTab,
     onSelectScratchSession,
     onSelectProject,
     visible,
   }: {
-    onSelectGlobalTab: GlobalTabCallback
     onSelectScratchSession: (sessionId: string) => void
     onSelectProject?: () => void
     visible: boolean
   }) => {
-    capturedOnSelectGlobalTab = onSelectGlobalTab
     capturedOnSelectSession = onSelectScratchSession
     capturedOnSelectProject = onSelectProject ?? null
     return (
@@ -194,6 +189,8 @@ const defaultExtensionRegistry = {
   keyboardShortcuts: [],
   commands: [],
   overlays: [],
+  // App draws the app band itself now, which reads the contributed items.
+  sidebarButtons: [],
 }
 
 function setupMocks(
@@ -269,7 +266,6 @@ beforeEach(() => {
 
   vi.clearAllMocks()
   capturedPaletteCommands = []
-  capturedOnSelectGlobalTab = null
   capturedOnSelectSession = null
   capturedOnSelectProject = null
   mockUnsubscribe = vi.fn()
@@ -772,7 +768,8 @@ describe('App', () => {
       setActiveGlobalTab: mockSetActiveGlobalTab,
     } as unknown as ReturnType<typeof useExtensionRegistry>)
     render(<App />)
-    capturedOnSelectGlobalTab?.('task-vault')
+    // Pressed on the app band itself, which is where these destinations live.
+    fireEvent.click(screen.getByRole('button', { name: 'Tasks' }))
     expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
   })
 

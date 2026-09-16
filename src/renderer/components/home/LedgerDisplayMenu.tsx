@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from './use-menu-placement'
+import { useMenuPlacement } from '../use-menu-placement'
 import type { HomePrefs, LedgerColumns, LedgerGroupBy, LedgerSort } from '../../sidebar/home-prefs'
 import '../sidebar/SidebarMenu.css'
 

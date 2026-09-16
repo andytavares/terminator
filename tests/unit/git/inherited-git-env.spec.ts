@@ -29,7 +29,9 @@ describe('the environment a spec runs git in', () => {
         realpathSync(join(fixture, '.git'))
       )
     } finally {
-      rmSync(fixture, { recursive: true, force: true })
+      // git's own background work can still hold a file here; without the
+      // retries this cleanup fails as ENOTEMPTY under a loaded suite.
+      rmSync(fixture, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
     }
   })
 })

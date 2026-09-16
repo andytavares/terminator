@@ -68,6 +68,16 @@ describe('useSessionFacts', () => {
     expect(result.current[0].workspaceName).toBe('Personal')
   })
 
+  // A transcript can be deleted while the app is open, so whether a
+  // conversation can still be resumed has to be asked again each time a
+  // surface that offers Resume appears.
+  it('asks the main process for the records again when it appears', () => {
+    const load = vi.fn().mockResolvedValue(undefined)
+    useSessionRecordsStore.setState({ load } as never)
+    renderHook(() => useSessionFacts())
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
   it('follows a change in the session store', () => {
     const { result } = renderHook(() => useSessionFacts())
     act(() => {

@@ -1,8 +1,12 @@
 import { useWorkspaceStore } from '../stores/workspace.store'
+import { useSessionStore } from '../stores/session.store'
+import { useSessionRecordsStore } from '../stores/session-records.store'
 import { useSettingsStore } from '../stores/settings.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { createTerminalSession } from './session-controller'
 import { navigateToSession } from './navigate-to-session'
+import { planResume } from '../sidebar/resume'
+import type { SessionFacts } from '../sidebar/session-facts'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 
 // Starting work from Home. The sidebar starts a terminal by selecting the
@@ -51,4 +55,46 @@ export async function startScratchSession(): Promise<void> {
   } catch {
     // Nothing started, so there is nothing to show.
   }
+}
+
+/**
+ * Bring a stopped conversation back in a terminal of its own.
+ *
+ * The order matters: open the terminal first, because if it will not open
+ * there is nothing to move context onto and the old session must be left
+ * exactly as it was. Then move the context, and only then close the terminal
+ * the conversation used to have — the operator chose one terminal per
+ * conversation, not a graveyard of exited tabs (ADR 055).
+ */
+export async function resumeSession(facts: SessionFacts): Promise<void> {
+  const plan = planResume(facts)
+  if (plan === null) return
+
+  const { scrollbackLimit } = useSettingsStore
+    .getState()
+    .resolveSettings(useWorkspaceStore.getState().activeWorkspaceId ?? null).terminal
+
+  let sessionId: string
+  try {
+    sessionId = await createTerminalSession(
+      plan.projectId,
+      'human',
+      '',
+      plan.cwd,
+      scrollbackLimit,
+      undefined,
+      plan.command
+    )
+  } catch {
+    // The controller has already said why. Nothing has moved.
+    return
+  }
+
+  const snapshot = { ...facts.snapshot, sessionId }
+  await useSessionRecordsStore.getState().transfer(plan.fromSessionId, snapshot)
+
+  const previous = useSessionStore.getState().sessions.get(plan.fromSessionId)
+  if (previous !== undefined) await useSessionStore.getState().closeSession(plan.fromSessionId)
+
+  navigateToSession(sessionId)
 }

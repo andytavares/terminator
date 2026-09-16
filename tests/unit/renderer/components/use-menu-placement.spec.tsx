@@ -1,7 +1,7 @@
 import React, { useRef } from 'react'
 import { describe, it, expect } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
-import { useMenuPlacement } from '../../../../src/renderer/components/home/use-menu-placement'
+import { useMenuPlacement } from '../../../../src/renderer/components/use-menu-placement'
 
 const VIEWPORT = { width: 1000, height: 800 }
 

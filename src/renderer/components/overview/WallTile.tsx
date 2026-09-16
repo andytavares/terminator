@@ -3,6 +3,8 @@ import { SquareArrowOutUpRight } from 'lucide-react'
 import { StateIcon } from '../session/StateIcon'
 import { LivePreview } from '../session/LivePreview'
 import { WorkItemCell } from '../session/WorkItemCell'
+import { ResumeButton } from '../session/ResumeButton'
+import { CloseSessionButton } from '../session/CloseSessionButton'
 import { useIssue } from '../session/useSessionFacts'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import type { SessionFacts } from '../../sidebar/session-facts'
@@ -18,6 +20,9 @@ interface Props {
   onOpen: (sessionId: string) => void
   onSaveDescription: (facts: SessionFacts, description: string | null) => void
   onLink?: (facts: SessionFacts) => void
+  onResume?: (facts: SessionFacts) => void
+  onCloseSession?: (facts: SessionFacts) => void
+  onForgetSession?: (facts: SessionFacts) => void
   /** Buttons answering a waiting prompt, drawn in the footer. */
   answers?: React.ReactNode
 }
@@ -50,6 +55,9 @@ export function WallTile({
   onOpen,
   onSaveDescription,
   onLink,
+  onResume,
+  onCloseSession,
+  onForgetSession,
   answers,
 }: Props): JSX.Element {
   const issue = useIssue(facts.workItem?.ref)
@@ -87,6 +95,9 @@ export function WallTile({
         >
           <SquareArrowOutUpRight aria-hidden="true" />
         </button>
+        {onCloseSession && (
+          <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
+        )}
       </div>
 
       <LivePreview sessionId={facts.sessionId} className="wall-tile__preview" />
@@ -99,6 +110,7 @@ export function WallTile({
           onSaveDescription={(text) => onSaveDescription(facts, text)}
           onLink={onLink ? () => onLink(facts) : undefined}
         />
+        {onResume && <ResumeButton facts={facts} onResume={onResume} />}
         {answers}
         {metrics && (
           <span className="wall-tile__metrics">

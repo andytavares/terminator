@@ -1,11 +1,12 @@
 import { resolveWorkItem, type WorkItem } from './work-item'
 import { BellAndBusySource } from './agent-state'
 import type {
+  AgentConversation,
   AgentState,
   ChoicePrompt,
   IssueLink,
   Project,
-  SessionRecord,
+  SessionRecordListing,
   SessionSnapshot,
   TerminalSession,
   Workspace,
@@ -38,13 +39,17 @@ export interface SessionFacts {
   closedAt: string | null
   latestLine: string
   choicePrompt: ChoicePrompt | null
+  /** The agent conversation that ran in this session, when one was reported. */
+  agent: AgentConversation | null
+  /** Whether that conversation can be brought back on this machine right now. */
+  resumable: boolean
   /** What a write to this session's record carries. */
   snapshot: SessionSnapshot
 }
 
 export interface SessionFactsInput {
   sessions: readonly TerminalSession[]
-  records: readonly SessionRecord[]
+  records: readonly SessionRecordListing[]
   projects: readonly Project[]
   workspaces: readonly Workspace[]
   projectLinks: ReadonlyMap<string, IssueLink | null>
@@ -58,7 +63,7 @@ const stateSource = new BellAndBusySource()
 function openFacts(
   session: TerminalSession,
   input: SessionFactsInput,
-  record: SessionRecord | undefined
+  record: SessionRecordListing | undefined
 ): SessionFacts {
   const project = input.projects.find((p) => p.id === session.projectId)
   const workspace = project && input.workspaces.find((w) => w.id === project.workspaceId)
@@ -96,12 +101,22 @@ function openFacts(
     closedAt: null,
     latestLine: session.latestLine ?? '',
     choicePrompt: session.choicePrompt ?? null,
+    agent: record?.agent ?? null,
+    resumable: record?.resumable === true,
     snapshot,
   }
 }
 
-function closedFacts(record: SessionRecord & { closedAt: string }): SessionFacts {
-  const { description, link, updatedAt: _updatedAt, closedAt, ...snapshot } = record
+function closedFacts(record: SessionRecordListing & { closedAt: string }): SessionFacts {
+  const {
+    description,
+    link,
+    agent,
+    resumable,
+    updatedAt: _updatedAt,
+    closedAt,
+    ...snapshot
+  } = record
   return {
     sessionId: record.sessionId,
     name: record.tabTitle,
@@ -121,6 +136,8 @@ function closedFacts(record: SessionRecord & { closedAt: string }): SessionFacts
     closedAt,
     latestLine: '',
     choicePrompt: null,
+    agent,
+    resumable,
     snapshot,
   }
 }
@@ -136,7 +153,7 @@ export function buildSessionFacts(input: SessionFactsInput): SessionFacts[] {
   const open = input.sessions.map((s) => openFacts(s, input, recordById.get(s.id)))
   const openIds = new Set(input.sessions.map((s) => s.id))
   const closed = input.records
-    .filter((r): r is SessionRecord & { closedAt: string } => r.closedAt !== undefined)
+    .filter((r): r is SessionRecordListing & { closedAt: string } => r.closedAt !== undefined)
     .filter((r) => !openIds.has(r.sessionId))
     .map(closedFacts)
   return [...open, ...closed]

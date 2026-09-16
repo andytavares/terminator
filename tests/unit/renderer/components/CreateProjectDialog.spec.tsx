@@ -615,4 +615,83 @@ describe('CreateProjectDialog — from an issue', () => {
     await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
     expect(linkIssue).not.toHaveBeenCalled()
   })
+
+  // Creating a worktree takes seconds of git work. Without a busy state the
+  // dialog just sits there, and a second press starts the whole thing again.
+  describe('while it is working', () => {
+    /** A createWorktree that stays unresolved until the test lets it finish. */
+    function pending(): { finish: () => void } {
+      let release = (): void => {}
+      const gate = new Promise((resolve) => {
+        release = () => resolve({ success: true })
+      })
+      ;(
+        window.electronAPI as unknown as { git: { createWorktree: ReturnType<typeof vi.fn> } }
+      ).git.createWorktree.mockReturnValue(gate)
+      return { finish: () => release() }
+    }
+
+    async function submitWorktree(): Promise<{ finish: () => void }> {
+      setupGitWorkspace()
+      render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+      await vi.waitFor(() => screen.getByRole('button', { name: 'Worktree' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Worktree' }))
+      fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
+        target: { value: 'feature/x' },
+      })
+      const gate = pending()
+      fireEvent.click(screen.getByText('Create'))
+      return gate
+    }
+
+    it('says it is working and refuses a second press', async () => {
+      const gate = await submitWorktree()
+      const button = await screen.findByRole('button', { name: 'Creating…' })
+      expect((button as HTMLButtonElement).disabled).toBe(true)
+
+      fireEvent.click(button)
+      const git = window.electronAPI as unknown as {
+        git: { createWorktree: ReturnType<typeof vi.fn> }
+      }
+      expect(git.git.createWorktree).toHaveBeenCalledTimes(1)
+      gate.finish()
+    })
+
+    it('cannot be dismissed while git is still working', async () => {
+      setupGitWorkspace()
+      const onClose = vi.fn()
+      render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
+      await vi.waitFor(() => screen.getByRole('button', { name: 'Worktree' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Worktree' }))
+      fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
+        target: { value: 'feature/x' },
+      })
+      const gate = pending()
+      fireEvent.click(screen.getByText('Create'))
+      await screen.findByRole('button', { name: 'Creating…' })
+
+      fireEvent.click(screen.getByText('Cancel'))
+      fireEvent.click(document.querySelector('.dialog-overlay')!)
+      expect(onClose).not.toHaveBeenCalled()
+      gate.finish()
+    })
+
+    it('offers Create again when git refused, so the operator can fix and retry', async () => {
+      setupGitWorkspace()
+      ;(
+        window.electronAPI as unknown as { git: { createWorktree: ReturnType<typeof vi.fn> } }
+      ).git.createWorktree.mockResolvedValue({ error: 'already exists' })
+      render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+      await vi.waitFor(() => screen.getByRole('button', { name: 'Worktree' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Worktree' }))
+      fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
+        target: { value: 'feature/x' },
+      })
+      fireEvent.click(screen.getByText('Create'))
+
+      await screen.findByText(/already exists/)
+      const button = screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement
+      expect(button.disabled).toBe(false)
+    })
+  })
 })

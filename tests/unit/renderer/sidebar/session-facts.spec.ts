@@ -4,7 +4,7 @@ import {
   SCRATCH_PROJECT_ID,
   type IssueLink,
   type Project,
-  type SessionRecord,
+  type SessionRecordListing,
   type TerminalSession,
   type Workspace,
 } from '../../../../src/shared/types/index'
@@ -42,7 +42,7 @@ const session: TerminalSession = {
   shell: '/bin/zsh',
 }
 
-function record(patch: Partial<SessionRecord> = {}): SessionRecord {
+function record(patch: Partial<SessionRecordListing> = {}): SessionRecordListing {
   return {
     sessionId: 's1',
     projectId: 'p1',
@@ -53,6 +53,8 @@ function record(patch: Partial<SessionRecord> = {}): SessionRecord {
     shell: '/bin/zsh',
     description: 'Reproducing the staging 429s',
     link: null,
+    agent: null,
+    resumable: false,
     startedAt: '2026-09-15T10:00:00.000Z',
     updatedAt: '2026-09-15T10:30:00.000Z',
     ...patch,
@@ -61,7 +63,7 @@ function record(patch: Partial<SessionRecord> = {}): SessionRecord {
 
 const empty = {
   sessions: [] as TerminalSession[],
-  records: [] as SessionRecord[],
+  records: [] as SessionRecordListing[],
   projects: [project],
   workspaces: [workspace],
   projectLinks: new Map<string, IssueLink | null>(),
@@ -252,5 +254,65 @@ describe('buildSessionFacts', () => {
       sessions: [{ ...session, choicePrompt: prompt }],
     })
     expect(facts.choicePrompt).toEqual(prompt)
+  })
+
+  it('carries the conversation that ran in the session, and whether it can come back', () => {
+    const conversation = {
+      provider: 'claude' as const,
+      sessionId: 'conv-1',
+      transcriptPath: '/t/conv-1.jsonl',
+      cwd: '/code/northwind-api',
+      capturedAt: '2026-09-15T10:30:00.000Z',
+    }
+    const [facts] = buildSessionFacts({
+      ...empty,
+      sessions: [session],
+      records: [record({ agent: conversation, resumable: true })],
+    })
+    expect(facts.agent).toEqual(conversation)
+    expect(facts.resumable).toBe(true)
+  })
+
+  it('has no conversation for a session nothing reported one for', () => {
+    const [facts] = buildSessionFacts({ ...empty, sessions: [session] })
+    expect(facts.agent).toBeNull()
+    expect(facts.resumable).toBe(false)
+  })
+
+  it("carries a closed session's conversation from its record", () => {
+    const conversation = {
+      provider: 'claude' as const,
+      sessionId: 'conv-2',
+      transcriptPath: '/t/conv-2.jsonl',
+      cwd: '/code/northwind-api',
+      capturedAt: '2026-09-15T10:30:00.000Z',
+    }
+    const [facts] = buildSessionFacts({
+      ...empty,
+      records: [
+        record({ closedAt: '2026-09-15T11:00:00.000Z', agent: conversation, resumable: true }),
+      ],
+    })
+    expect(facts).toMatchObject({ isClosed: true, agent: conversation, resumable: true })
+  })
+
+  // What resuming leaves behind: the record moved off the closed session onto
+  // the terminal that took it over. It must read as one open session, not as a
+  // live one beside a ghost of itself under Closed.
+  it('leaves Closed once its record has moved to the session that resumed it', () => {
+    const conversation = {
+      provider: 'claude' as const,
+      sessionId: 'conv-3',
+      transcriptPath: '/t/conv-3.jsonl',
+      cwd: '/code/northwind-api',
+      capturedAt: '2026-09-15T10:30:00.000Z',
+    }
+    const facts = buildSessionFacts({
+      ...empty,
+      sessions: [{ ...session, id: 's2' }],
+      records: [record({ sessionId: 's2', description: 'why', agent: conversation })],
+    })
+    expect(facts).toHaveLength(1)
+    expect(facts[0]).toMatchObject({ sessionId: 's2', isClosed: false, description: 'why' })
   })
 })

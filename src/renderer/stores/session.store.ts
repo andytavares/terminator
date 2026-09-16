@@ -111,7 +111,9 @@ interface SessionState {
     title: string,
     cwd: string,
     scrollbackLimit: number,
-    parentSessionId?: string
+    parentSessionId?: string,
+    /** One line run in the terminal once it opens, for a terminal that resumes a conversation. */
+    initialCommand?: string
   ) => Promise<string>
   /**
    * Takes ownership of a terminal the main process already spawned.
@@ -194,7 +196,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   terminalInstances: new Map(),
   projectViews: new Map(),
 
-  createSession: async (projectId, type, title, cwd, scrollbackLimit, parentSessionId) => {
+  createSession: async (
+    projectId,
+    type,
+    title,
+    cwd,
+    scrollbackLimit,
+    parentSessionId,
+    initialCommand
+  ) => {
     let resolvedTitle = title
     if (!resolvedTitle) {
       const next = viewOf(get().projectViews, projectId).terminalCounter + 1
@@ -208,6 +218,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       tabTitle: resolvedTitle,
       scrollbackLimit,
       cwd,
+      ...(initialCommand === undefined ? {} : { initialCommand }),
     })
     // The message when there is one: 'CWD_MISSING' names the failure, but only
     // the message names the folder, and the folder is the whole answer.

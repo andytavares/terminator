@@ -113,7 +113,9 @@ export async function createTerminalSession(
   title: string,
   cwd: string,
   scrollbackLimit: number,
-  parentSessionId?: string
+  parentSessionId?: string,
+  /** One line run in the terminal once it opens, for a terminal that resumes a conversation. */
+  initialCommand?: string
 ): Promise<string> {
   const store = useSessionStore.getState()
   let sessionId: string
@@ -124,7 +126,8 @@ export async function createTerminalSession(
       title,
       cwd,
       scrollbackLimit,
-      parentSessionId
+      parentSessionId,
+      initialCommand
     )
   } catch (error) {
     reportStartFailure(error)

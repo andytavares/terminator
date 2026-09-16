@@ -19,7 +19,11 @@ vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   LivePreview: () => <div />,
 }))
 vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: (select: (s: unknown) => unknown) => select({ setDescription, setLink }),
+  useSessionRecordsStore: (select: (s: unknown) => unknown) =>
+    select({ forget, setDescription, setLink }),
+}))
+vi.mock('../../../../src/renderer/terminal/close-session', () => ({
+  closeSessionFromFacts: closeSession,
 }))
 // One object for every render, as a real store's actions are: a fresh function
 // per render would re-run every effect that depends on one, for ever.
@@ -35,6 +39,8 @@ vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
   useIntegrationsStore: (select: (s: unknown) => unknown) => select(integrations),
 }))
 const started = vi.hoisted(() => ({ inBranch: vi.fn(), scratch: vi.fn() }))
+const forget = vi.hoisted(() => vi.fn())
+const closeSession = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   startSessionInBranch: started.inBranch,
   startScratchSession: started.scratch,
@@ -139,6 +145,28 @@ describe('HomeScreen', () => {
     expect(screen.getByText('No terminals are open')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Go to terminals' }))
     expect(setActiveGlobalTab).toHaveBeenCalledWith(null)
+  })
+
+  // Both ends of a session's life are on the row it is drawn on.
+  it('ends a session from its row', () => {
+    render(<HomeScreen />)
+    fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
+    expect(closeSession).toHaveBeenCalled()
+  })
+
+  it('removes a closed session from the list', () => {
+    state.facts = [
+      fact({
+        sessionId: 'c',
+        name: 'old',
+        isClosed: true,
+        state: 'exited',
+        closedAt: '2026-09-15T00:00:00.000Z',
+      }),
+    ]
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove old from the list' }))
+    expect(forget).toHaveBeenCalledWith('c')
   })
 
   it('still shows closed history when no terminal is open', () => {

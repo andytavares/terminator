@@ -33,3 +33,10 @@ export const SetLinkInputSchema = z.object({
   session: SessionSnapshotSchema,
   link: WorkItemRefSchema.nullable(),
 })
+
+export const TransferInputSchema = z.object({
+  fromSessionId: z.string().min(1),
+  session: SessionSnapshotSchema,
+})
+
+export const ForgetInputSchema = z.object({ sessionId: z.string().min(1) })

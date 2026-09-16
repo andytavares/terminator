@@ -100,20 +100,22 @@ Extension ──── contributes to ──── GlobalSettings.extensions[ext
 
 ### Persistence boundaries
 
-| Entity                    | Stored? | Where                                                    |
-| ------------------------- | ------- | -------------------------------------------------------- |
-| Workspace, Project        | Yes     | electron-store (`workspaces.json`)                       |
-| GlobalSettings            | Yes     | electron-store (`settings.json`)                         |
-| WorkspaceSettings         | Yes     | electron-store (`settings.json`)                         |
-| Extension registry        | Yes     | electron-store (`extensions.json`)                       |
-| TerminalSession metadata  | No      | In-memory (Zustand)                                      |
-| SessionRecord             | Yes     | Main process, `session-records.json`; 30 days past close |
-| xterm.js buffer           | No      | In-memory (xterm.js Terminal instance)                   |
-| PTY process               | No      | OS process (killed on tab close or app quit)             |
-| Tracker credentials       | Yes     | `safeStorage`-encrypted (`integrations.json`)            |
-| Tracker connection config | Yes     | Plaintext beside the credential (`integrations.json`)    |
+| Entity                    | Stored? | Where                                                          |
+| ------------------------- | ------- | -------------------------------------------------------------- |
+| Workspace, Project        | Yes     | electron-store (`workspaces.json`)                             |
+| GlobalSettings            | Yes     | electron-store (`settings.json`)                               |
+| WorkspaceSettings         | Yes     | electron-store (`settings.json`)                               |
+| Extension registry        | Yes     | electron-store (`extensions.json`)                             |
+| TerminalSession metadata  | No      | In-memory (Zustand)                                            |
+| SessionRecord             | Yes     | Main process, `session-records.json`; 30 days past close       |
+| AgentConversation         | Yes     | On its `SessionRecord`; the transcript itself is the agent's   |
+| Agent session reports     | Yes     | `userData/agent-sessions/<terminal id>.json`, one per terminal |
+| xterm.js buffer           | No      | In-memory (xterm.js Terminal instance)                         |
+| PTY process               | No      | OS process (killed on tab close or app quit)                   |
+| Tracker credentials       | Yes     | `safeStorage`-encrypted (`integrations.json`)                  |
+| Tracker connection config | Yes     | Plaintext beside the credential (`integrations.json`)          |
 
-Sessions do not survive app restart. This is an explicit Phase 1 scope decision. What the operator wrote about a session does: its description and its own work item link are a `SessionRecord`, kept until 30 days after the session closes (see [Home and the Monitor wall](#home-and-the-monitor-wall), ADR 054).
+Sessions do not survive app restart. This is an explicit Phase 1 scope decision. What the operator wrote about a session does: its description and its own work item link are a `SessionRecord`, kept until 30 days after the session closes (see [Home and the Monitor wall](#home-and-the-monitor-wall), ADR 054). So does the agent conversation that ran in it, which can be picked up again afterwards (see [Resuming an agent session](#resuming-an-agent-session), ADR 055).
 
 See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision.
 
@@ -128,6 +130,8 @@ createSession() called
 terminal:create IPC ──► PtyManager.spawn()
       │                      │
       │                      ├─ spawns node-pty process
+      │                      │  (env carries TERMINATOR_SESSION_ID, which is how
+      │                      │   an agent's conversation is paired to this terminal)
       │                      ├─ registers onData → webContents.send('terminal:output')
       │                      └─ registers onExit → webContents.send('terminal:process-exit')
       ▼
@@ -665,11 +669,23 @@ Clicking a branch resolves to exactly one terminal: one that is waiting on you, 
 
 Two core global tabs draw every session from one view model. `useSessionFacts` builds `SessionFacts` from the session, workspace, session-records and integrations stores through `buildSessionFacts`, which is pure.
 
+- **Ending and starting** are on the surfaces themselves: `CloseSessionButton` ends a live session through `closeSessionFromFacts` (leave the split, then close, as Cmd+W does) and removes a closed one through `session-records:forget`; `NewSessionMenu` starts one on Home and on the wall. Both live in `components/session/`, since Home and Overview share them.
 - **Home** (`core.home`, `components/home/`) is the launch view: `App.tsx` activates it on mount and keeps its app-band badge at the count of sessions waiting on you. `HomeScreen` switches between `LedgerView` (rows from `buildLedger`, arranged by `LedgerDisplayMenu`) and `LogbookView` (a list from `buildLogbook` and one session's detail). The layout and the Ledger's arrangement persist; the text and Needs you filters do not.
 - **The Monitor wall** (`core.overview`, `OverviewScreen`) draws a `WallTile` per open session. **Every tile and both band headings are direct children of one grid**, and `placeWall` emits placements in session id order with position carried by CSS `order` and `grid-column: span`. That is load-bearing: `LivePreview` calls `mountPreview`, which moves the session's single xterm element into the tile, and a re-parented or reordered tile would tear the live terminal out. ADR 036's invariant, kept by ADR 054.
 - **Live previews** fill their box's width and follow the cursor (`terminal/preview-window.ts`), re-placed on every xterm render.
-- **Descriptions and session links** live in `src/main/sessions/session-record-store.ts`, beside `issue-link-store` and in its shape: in memory, mirrored to `userData/session-records.json` with a tmp-then-rename write, exposed as `session-records:*` on `window.electronAPI.sessionRecords`. A record exists only while a session has a description or its own link. `terminal:close` closes it, a startup sweep closes anything the last run left open (a quit closes no terminals one by one), and `pruneRecords` drops records 30 days after close. A session's work item is its own link, else its branch's. The branch link, and the agent context injected from it, are untouched.
+- **Descriptions and session links** live in `src/main/sessions/session-record-store.ts`, beside `issue-link-store` and in its shape: in memory, mirrored to `userData/session-records.json` with a tmp-then-rename write, exposed as `session-records:*` on `window.electronAPI.sessionRecords`. A record exists only while a session has a description or its own link. `terminal:close` closes it, a startup sweep closes anything the last run left open (a quit closes no terminals one by one), and `pruneRecords` drops records 30 days after close. A session's work item is its own link, else its branch's. The branch link, and the agent context injected from it, are untouched. `forget` deletes a **closed** record outright, which is how the operator clears one from Home before retention does; it refuses an open one, whose record is what Home draws the session from.
 - **Answering in place.** `session-controller` reads a terminal's visible rows once per busy → idle transition, stores `latestLine` and `parseChoicePrompt`'s result as view state, and clears the prompt on the next output. `answerChoice` re-reads the screen and types the option's digit only when `samePrompt` still holds. A bare digit answers a Claude Code select prompt, verified live on 2.1.273 (`tests/e2e/live/choice-prompt.spec.ts`).
+
+### Resuming an agent session
+
+A terminal dies with the app; the conversation that ran in it does not. Claude Code keeps a transcript per conversation and resumes one by id, so Terminator captures that id and offers to bring the conversation back. ADR 055.
+
+- **Capture is a hook in the operator's own Claude settings.** At startup `installCaptureScript` writes `agent-session-hook.cjs` beside the profile (ADR 026's pattern: a loose script survives development and vanishes from a packaged bundle) and `installUserHook` merges one `SessionStart` entry into `~/.claude/settings.json`. The entry is matched by script _name_, so re-installing from a packaged app, a development run or a test profile replaces it rather than stacking copies, and its command is guarded with `test -f <script> … || true` so an entry whose script has gone does nothing instead of failing before every agent session on the machine. Removing the feature is removing that block; the user guide says so.
+- **The terminal is named by the environment.** `terminal:create` exports `TERMINATOR_SESSION_ID` into the PTY. The hook runs beneath the agent, reads `session_id`, `transcript_path` and `cwd` from its stdin payload, and writes `userData/agent-sessions/<terminal id>.json`. This is exact where matching on folder or time is a guess, and it captures a `claude` the operator typed themselves. A conversation in a terminal outside Terminator names no terminal and is ignored.
+- **The watcher folds reports into records.** `agent-session-watcher.ts` sweeps that directory once a second (a sweep, not `fs.watch`, which proved unreliable under load), parses each file with the pure `parseHookReport`, and calls `setAgent` with the snapshot `makeSnapshotFor` builds from the PTY registry and the workspace store. `lastSeen` keeps it from rewriting an unchanged report.
+- **Resumability is read at answer time, never cached.** `session-records:list` stats the transcript for every record, because the file belongs to the agent and can be deleted at any moment; `useSessionFacts` asks again whenever a surface that draws Resume appears.
+- **Resuming replaces the terminal.** `planResume` (pure) turns the facts into a plan, refusing anything that is not a conversation id rather than escaping it. `resumeSession` opens a terminal on the same branch in the recorded folder with `claude --resume <id>` as its `initialCommand`, calls `session-records:transfer` to move the description, link and conversation onto it, then closes the exited one. One terminal per conversation.
+- **Proved live** on Claude Code 2.1.273 by `tests/e2e/live/resume-live.spec.ts`, which runs a real conversation, ends it, presses Resume, and asks it what it was told.
 
 ### Colour propagation
 

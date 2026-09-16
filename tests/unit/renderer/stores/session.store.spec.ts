@@ -820,3 +820,23 @@ describe('setSessionScreen', () => {
     expect(useSessionStore.getState().sessions).toBe(before)
   })
 })
+
+describe('createSession — resuming', () => {
+  it('asks for the command the terminal should run when it opens', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'res-1' })
+    await useSessionStore
+      .getState()
+      .createSession('proj-1', 'human', '', '/repo', 10000, undefined, 'claude --resume abc')
+    expect(mockElectronAPI.terminal.create).toHaveBeenCalledWith(
+      expect.objectContaining({ initialCommand: 'claude --resume abc' })
+    )
+  })
+
+  it('asks for no command when there is none', async () => {
+    mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'res-2' })
+    await useSessionStore.getState().createSession('proj-1', 'human', '', '/repo', 10000)
+    expect(mockElectronAPI.terminal.create.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      'initialCommand'
+    )
+  })
+})

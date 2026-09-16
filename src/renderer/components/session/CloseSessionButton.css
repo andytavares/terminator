@@ -1,0 +1,36 @@
+/*
+ * Ending a session, wherever it is shown.
+ *
+ * Quiet until wanted: at rest it is the row's muted weight, and it takes the
+ * full text colour on hover and focus. State by opacity and the shared text
+ * tokens only — no colour of its own.
+ */
+.close-session {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.close-session:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.close-session:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.close-session svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
