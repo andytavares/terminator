@@ -1,0 +1,24 @@
+src/main/agents/agent-session-hook.ts
+  s_cf6284d326023a::t_293afea8bcfa5e 188-193
+tests/unit/agents/agent-session-hook.spec.ts
+  s_cf6284d326023a::t_527f6a9bb1f50d 195-214
+specs/055-resume-agent-session/tasks.md
+  s_cf6284d326023a::t_0e239f492fdb13 121,126,130,136,143-147
+  s_cf6284d326023a::t_3f3049829ccfaf 148,162-163,167-169,181-182,186-187,199-200,204-205,211-216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d2856b602e663b12f5837c7dcbfea3f22d2222bc",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
