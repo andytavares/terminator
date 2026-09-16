@@ -385,6 +385,20 @@ Tile size (**S**, **M**, **L**), **Pin sessions that need you** and **Then by** 
 
 "Waiting on you" is worked out from what the terminal does: a bell, or a numbered choice left on screen when output stops. An agent that waits without either reads as idle.
 
+### Picking a Claude Code conversation back up
+
+When a Claude Code session ends — you typed `/exit`, the terminal closed, or you quit Terminator — the conversation itself is still on disk. A **Resume** button appears on that session wherever it is shown: its Ledger row, its Logbook entry, and its Overview tile. Press it and Terminator opens a terminal on the same branch, in the same folder, running `claude --resume` for that conversation. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
+
+After a restart, conversations from the last run sit under **Closed** on Home with their Resume button. Nothing is resumed for you: a restart never starts agents on its own, so you choose which threads to pick up.
+
+Resume appears only where it can work:
+
+- Only for **Claude Code** sessions. A plain shell has nothing to resume, and no button.
+- Only once the conversation has been seen. Terminator learns it from Claude Code itself, so it appears a second or two after the agent starts — including a `claude` you typed yourself.
+- If the conversation's transcript has been deleted, or the record came from another machine, the session says **Conversation no longer available** in place of the button.
+
+**How Terminator learns the conversation.** On first launch it adds one `SessionStart` entry to your own `~/.claude/settings.json`. The entry runs a small script that records which conversation is running in which Terminator terminal, and writes nothing else. To turn the feature off, open that file and delete the entry under `hooks.SessionStart` whose command mentions `agent-session-hook.cjs`, then restart Claude Code sessions. Terminator will add it again the next time it starts, so remove it after quitting Terminator if you want it to stay gone. Nothing else in the file is touched, and a settings file Terminator cannot parse is never overwritten.
+
 ---
 
 ## 12. Notification Center & Activity Indicators

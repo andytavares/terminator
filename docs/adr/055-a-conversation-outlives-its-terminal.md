@@ -25,6 +25,12 @@ Three things were checked live against Claude Code 2.1.273 before any of this wa
 5. **Resuming replaces the exited terminal.** A new terminal opens on the same branch in the recorded folder, `claude --resume <id>` is written into it, one call moves the description, link and conversation across, and the exited tab closes. One terminal per conversation.
 6. **The provider is named, not assumed.** `provider: 'claude'` on the record, and one pure function turning a conversation into a command line, so a second agent is a branch rather than a rewrite.
 
+## What building it added
+
+- **The entry outlives the install that wrote it.** The operator's settings hold one entry naming a script inside an application data directory, which differs between a packaged app, a development run and a test profile. So the entry is matched by script _name_, not path — one entry, whichever install last wrote it — and the command is guarded (`test -f <script> && … || true`) so a hook whose script has gone does nothing rather than failing before every agent session on the machine.
+- **Resumability is a fact about right now.** Whether a transcript exists was first read once, at launch; deleting a transcript then left Home offering a Resume that could not work. Every surface that draws Resume asks again as it appears. The identical before/after screenshots are what found this — no test did.
+- **Proved live against Claude Code 2.1.273**: a conversation started by hand, told to remember a number, captured by the hook, ended with `/exit`, resumed from Home's wall, and asked again — it answered. `tests/e2e/live/resume-live.spec.ts` is that run, and it restores the operator's `~/.claude/settings.json` afterwards.
+
 ## Alternatives considered
 
 - **Install the hook in every repository** (today's per-project mechanism, widened): covers hand-started sessions, but writes `.claude/settings.local.json` into every repo Terminator knows. The operator chose the single user-level entry.
