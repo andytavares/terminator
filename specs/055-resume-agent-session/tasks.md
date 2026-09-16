@@ -214,8 +214,8 @@ description: 'Task list for Resume an agent session'
 - [x] T050 Accessibility pass: Resume is reachable by keyboard with a visible focus ring on all three surfaces, and its accessible name says which session it resumes.
 - [x] T051 Verify reachability: every export this feature adds has a caller outside tests. Delete anything that does not.
 - [x] T052 Screenshot the running app: an exited session offering Resume, and the unavailable state. Look at the images.
-- [ ] T053 Run `quickstart.md` §1–§6 and put each command and its exit code in the PR description, including the live run's answer.
-- [ ] T054 Open the PR from `055-resume-agent-session`, noting it depends on #182. The body names the settings file the feature writes into, how to remove it, and what is out of scope. Check `git log --oneline -1` after the last commit to confirm the gate did not refuse it.
+- [x] T053 Run `quickstart.md` §1–§6 and put each command and its exit code in the PR description, including the live run's answer.
+- [x] T054 Open the PR from `055-resume-agent-session`, noting it depends on #182. The body names the settings file the feature writes into, how to remove it, and what is out of scope. Check `git log --oneline -1` after the last commit to confirm the gate did not refuse it.
 
 ---
 
