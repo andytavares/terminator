@@ -165,4 +165,58 @@ test('a conversation from the last run is offered under Closed, and nothing rest
 
   // And the branch it belonged to is still the one it would come back in.
   await selectProject(restarted, 'Repo One', 'feature-a')
+
+  // Resuming it takes it out of the history: it is a live session again, not a
+  // live session beside a ghost of itself.
+  await openHome(restarted)
+  await restarted
+    .getByRole('rowgroup', { name: 'Closed' })
+    .getByRole('button', { name: /^Resume/ })
+    .click()
+  // The terminal that took the conversation over carries its description.
+  await expect(restarted.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()
+  await openHome(restarted)
+  await expect(restarted.getByRole('rowgroup', { name: 'Closed' })).toHaveCount(0)
+})
+
+test('two conversations on one branch each come back to their own session', async () => {
+  handle = await launchApp()
+  const profile = handle.userDataDir
+  const { page } = handle
+  await createWorkspace(page, 'Repo One', folder)
+  await addAndSelectProject(page, 'Repo One', 'feature-a')
+  const second = join(folder, 'second.jsonl')
+  writeFileSync(second, '{}\n')
+
+  // Two terminals on the one branch, each reporting its own conversation. The
+  // report names the terminal it ran in, which is the whole of the pairing —
+  // nothing here depends on how the agent was started.
+  await openHome(page)
+  const first = await openTerminalId(page, 'Repo One / feature-a')
+  reportConversation(profile, first, 'conv-first', transcript)
+  await goToTerminal(page)
+  await page.getByRole('button', { name: 'New terminal' }).click()
+  await openHome(page)
+  const box = page
+    .getByRole('rowgroup', { name: 'Repo One / feature-a' })
+    .getByRole('textbox', { name: 'What is this session doing?' })
+    .last()
+  await box.fill('the other one')
+  await box.press('Enter')
+  const ids = await page.evaluate(async () => {
+    const { data } = await window.electronAPI.sessionRecords.list()
+    return data.map((r) => r.sessionId)
+  })
+  const other = ids.find((id) => id !== first)!
+  reportConversation(profile, other, 'conv-second', second)
+  await page.waitForTimeout(1500)
+
+  const conversationOf = async (sessionId: string): Promise<string | null> =>
+    page.evaluate(async (id) => {
+      const { data } = await window.electronAPI.sessionRecords.list()
+      return data.find((r) => r.sessionId === id)?.agent?.sessionId ?? null
+    }, sessionId)
+
+  expect(await conversationOf(first)).toBe('conv-first')
+  expect(await conversationOf(other)).toBe('conv-second')
 })

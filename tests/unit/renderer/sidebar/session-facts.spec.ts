@@ -295,4 +295,24 @@ describe('buildSessionFacts', () => {
     })
     expect(facts).toMatchObject({ isClosed: true, agent: conversation, resumable: true })
   })
+
+  // What resuming leaves behind: the record moved off the closed session onto
+  // the terminal that took it over. It must read as one open session, not as a
+  // live one beside a ghost of itself under Closed.
+  it('leaves Closed once its record has moved to the session that resumed it', () => {
+    const conversation = {
+      provider: 'claude' as const,
+      sessionId: 'conv-3',
+      transcriptPath: '/t/conv-3.jsonl',
+      cwd: '/code/northwind-api',
+      capturedAt: '2026-09-15T10:30:00.000Z',
+    }
+    const facts = buildSessionFacts({
+      ...empty,
+      sessions: [{ ...session, id: 's2' }],
+      records: [record({ sessionId: 's2', description: 'why', agent: conversation })],
+    })
+    expect(facts).toHaveLength(1)
+    expect(facts[0]).toMatchObject({ sessionId: 's2', isClosed: false, description: 'why' })
+  })
 })

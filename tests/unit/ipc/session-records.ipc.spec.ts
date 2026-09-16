@@ -263,6 +263,19 @@ describe('whether a conversation can still be resumed', () => {
     expect(result.data[0].resumable).toBe(false)
   })
 
+  // The transcript belongs to the agent: it can go at any moment, including
+  // between two looks at Home. The answer has to follow the file system rather
+  // than whatever the first list happened to say.
+  it('stops being resumable between one list and the next', async () => {
+    store.records = [{ ...base('s1'), agent: conversation(transcript) }]
+    const list = async () =>
+      ((await invoke('session-records:list')) as { data: Array<{ resumable: boolean }> }).data[0]
+        .resumable
+    expect(await list()).toBe(true)
+    fs.rmSync(transcript)
+    expect(await list()).toBe(false)
+  })
+
   it('is not resumable when there was never a conversation', async () => {
     store.records = [base('s1')]
     const result = (await invoke('session-records:list')) as {

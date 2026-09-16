@@ -252,6 +252,60 @@ describe('LedgerView', () => {
     expect(props.onSelect).not.toHaveBeenCalled()
   })
 
+  // The case a restart leaves behind: the tab has gone and the session lives
+  // only as a record under Closed, which is exactly where its conversation is
+  // most worth picking up.
+  it('offers Resume on a closed session, whose description stays readable', () => {
+    const onResume = vi.fn()
+    const closed = {
+      ...groups[0],
+      facts: [
+        {
+          ...groups[0].facts[0],
+          isClosed: true,
+          state: 'exited' as const,
+          description: 'chasing the flaky test',
+          closedAt: '2026-09-15T19:00:00.000Z',
+          agent: {
+            provider: 'claude' as const,
+            sessionId: 'conv-1',
+            transcriptPath: '/t/c.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: true,
+        },
+      ],
+    }
+    render(<LedgerView {...props} groups={[closed]} onResume={onResume} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(onResume).toHaveBeenCalledWith(closed.facts[0])
+    expect(screen.getByText('chasing the flaky test')).toBeTruthy()
+  })
+
+  it('says when a stopped session’s conversation has gone', () => {
+    const gone = {
+      ...groups[0],
+      facts: [
+        {
+          ...groups[0].facts[0],
+          state: 'exited' as const,
+          agent: {
+            provider: 'claude' as const,
+            sessionId: 'conv-1',
+            transcriptPath: '/t/gone.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: false,
+        },
+      ],
+    }
+    render(<LedgerView {...props} groups={[gone]} onResume={vi.fn()} />)
+    expect(screen.getByText('Conversation no longer available')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
+  })
+
   it('offers no Resume on a running session', () => {
     render(<LedgerView {...props} onResume={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()

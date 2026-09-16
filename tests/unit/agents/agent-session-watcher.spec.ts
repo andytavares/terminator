@@ -99,6 +99,25 @@ describe('the agent session watcher', () => {
     )
   })
 
+  // Two agents on one branch is the ordinary case, not an edge: the reports
+  // are keyed by terminal, so each conversation lands on its own session and
+  // neither takes the other's.
+  it('keeps two terminals on one branch apart', async () => {
+    const mod = await load()
+    stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id), intervalMs: 10 })
+    await write('sess-1', 'conv-1')
+    await write('sess-2', 'conv-2')
+    await folded(2)
+    expect(store.setAgent).toHaveBeenCalledWith(
+      snapshot('sess-1'),
+      expect.objectContaining({ sessionId: 'conv-1' })
+    )
+    expect(store.setAgent).toHaveBeenCalledWith(
+      snapshot('sess-2'),
+      expect.objectContaining({ sessionId: 'conv-2' })
+    )
+  })
+
   it('ignores a report for a session it cannot place', async () => {
     const mod = await load()
     stop = mod.startAgentSessionWatcher({ snapshotFor: () => null, intervalMs: 10 })

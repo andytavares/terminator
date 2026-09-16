@@ -160,6 +160,29 @@ describe('WallTile', () => {
     expect(props.onOpen).not.toHaveBeenCalled()
   })
 
+  it('says when a stopped session’s conversation has gone', () => {
+    render(
+      <WallTile
+        {...props}
+        facts={{
+          ...facts,
+          state: 'exited',
+          agent: {
+            provider: 'claude',
+            sessionId: 'conv-1',
+            transcriptPath: '/t/gone.jsonl',
+            cwd: '/code/repo',
+            capturedAt: '2026-09-15T18:00:00.000Z',
+          },
+          resumable: false,
+        }}
+        onResume={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Conversation no longer available')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
+  })
+
   it('offers no Resume while the session is running', () => {
     render(<WallTile {...props} onResume={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()

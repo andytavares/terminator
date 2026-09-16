@@ -307,6 +307,20 @@ describe('session-record-store — the conversation that ran in a session', () =
     expect(second.listRecords()[0]?.agent).toEqual(CONVERSATION)
   })
 
+  // The case a restart actually looks like: the app went away without closing
+  // anything, so the sweep is what closes the session. The conversation has to
+  // survive that, or every restart loses exactly the work worth resuming.
+  it('keeps the conversation of a session the sweep closes after a crash', async () => {
+    const first = await load()
+    await first.setAgent(SNAP, CONVERSATION)
+    const second = await load()
+    await second.loadRecords()
+    await second.sweepOpenRecords()
+    const swept = second.listRecords()[0]
+    expect(swept?.closedAt).toBeDefined()
+    expect(swept?.agent).toEqual(CONVERSATION)
+  })
+
   it('drops an unreadable conversation on load rather than the record', async () => {
     const first = await load()
     await first.setDescription(SNAP, 'why')
