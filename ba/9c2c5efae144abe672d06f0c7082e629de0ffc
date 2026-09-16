@@ -1,0 +1,81 @@
+src/shared/electron-api/manifest.ts
+  s_cf6284d326023a::t_5f19784bb57ee0 542
+src/renderer/components/session/CloseSessionButton.tsx
+  s_cf6284d326023a::t_56d04afdce8391 9-10,14,16-20,22-25,30-31,34-35
+src/renderer/components/home/LogbookView.tsx
+  s_cf6284d326023a::t_939a3ab6fc58d9 115-117
+  s_cf6284d326023a::t_79092dc741dc19 28,76
+docs/user-guide/USER-GUIDE.md
+  s_cf6284d326023a::t_3478e8eb7e2393 372-377
+src/renderer/electron.d.ts
+  s_cf6284d326023a::t_5a469e446c43b5 257-260
+tests/unit/sessions/session-record-store.spec.ts
+  s_cf6284d326023a::t_914dde815fede1 385,388,400,407,413
+  s_cf6284d326023a::t_f58e857ff4f79f 384,386-387,389-399,401-406,408-412,414-420
+  s_cf6284d326023a::t_b6399f395f9072 421
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_cf6284d326023a::t_939a3ab6fc58d9 22
+  s_cf6284d326023a::t_7aee5483475c8d 23-26,42-43,150-170
+  s_cf6284d326023a::t_92f0939556167f 171
+tests/unit/ipc/session-records.ipc.spec.ts
+  s_cf6284d326023a::t_d9d4ba60c6505a 25,34,328-344
+docs/ARCHITECTURE.md
+  s_cf6284d326023a::t_3478e8eb7e2393 672,676
+src/renderer/components/overview/WallTile.tsx
+  s_cf6284d326023a::t_939a3ab6fc58d9 98-100
+  s_cf6284d326023a::t_79092dc741dc19 25,60
+tests/unit/git/inherited-git-env.spec.ts
+  s_cf6284d326023a::t_6915a1f03c2e3b 32-34
+src/main/ipc/session-records.ipc.ts
+  s_cf6284d326023a::t_c042eced14c06e 7,14,85-89
+  s_cf6284d326023a::t_6334e76a889608 90-91
+tests/e2e/close-session.spec.ts
+  s_cf6284d326023a::t_1033d446be23db 1-45,48-85
+  s_cf6284d326023a::t_761edacbb792cf 46-47
+tests/unit/renderer/components/CloseSessionButton.spec.tsx
+  s_cf6284d326023a::t_939a3ab6fc58d9 37-39
+  s_cf6284d326023a::t_56d04afdce8391 16,23-36,40-43
+  s_cf6284d326023a::t_b0569cb64d4300 44
+tests/unit/renderer/stores/session-records.store.spec.ts
+  s_cf6284d326023a::t_4810b8e1f67fbb 10,135-149
+src/renderer/stores/session-records.store.ts
+  s_cf6284d326023a::t_4810b8e1f67fbb 16-17,81-87
+  s_cf6284d326023a::t_f7190a4c9b0f9d 88-91
+src/renderer/components/home/LedgerView.tsx
+  s_cf6284d326023a::t_44ab6af8207961 48-49,188
+  s_cf6284d326023a::t_939a3ab6fc58d9 146-148
+  s_cf6284d326023a::t_79092dc741dc19 27,66,78,166,212
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_cf6284d326023a::t_939a3ab6fc58d9 13,34-35
+tests/unit/renderer/components/LedgerView.spec.tsx
+  s_cf6284d326023a::t_e9a04a03f15ff6 96-97,105,180-184
+  s_cf6284d326023a::t_939a3ab6fc58d9 333-340
+src/renderer/components/overview/OverviewScreen.tsx
+  s_cf6284d326023a::t_79092dc741dc19 208
+  s_cf6284d326023a::t_eaf19a6b9d5cba 53
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_cf6284d326023a::t_fa79958e4d6321 132
+src/shared/schemas/session-records.schema.ts
+  s_cf6284d326023a::t_c042eced14c06e 41-42
+src/main/sessions/session-record-store.ts
+  s_cf6284d326023a::t_87c217f50137b0 244-261
+src/renderer/components/home/HomeScreen.tsx
+  s_cf6284d326023a::t_79092dc741dc19 189,205
+  s_cf6284d326023a::t_eaf19a6b9d5cba 47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ba9c2c5efae144abe672d06f0c7082e629de0ffc",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
