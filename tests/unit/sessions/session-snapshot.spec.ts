@@ -13,6 +13,11 @@ vi.mock('../../../src/main/storage/workspace-store.js', () => ({
   listWorkspaces: () => workspace.workspaces,
 }))
 
+const store = vi.hoisted(() => ({ records: [] as Array<Record<string, unknown>> }))
+vi.mock('../../../src/main/sessions/session-record-store.js', () => ({
+  listRecords: () => store.records,
+}))
+
 import { makeSnapshotFor } from '../../../src/main/sessions/session-snapshot'
 
 const session = (patch: Record<string, unknown> = {}) => ({
@@ -63,7 +68,40 @@ describe('makeSnapshotFor', () => {
     })
   })
 
-  it('is nothing for a terminal that has gone', () => {
+  // The premise of the whole feature: a conversation outlives its terminal. A
+  // report that lands after the terminal died — the agent's own exit is what
+  // ends it — must still attach to the session it names.
+  it('falls back to what is already recorded about a terminal that has gone', () => {
+    store.records = [
+      {
+        sessionId: 's1',
+        projectId: 'p1',
+        workspaceName: 'terminator',
+        projectName: 'session-home',
+        branch: '054-session-home-wall',
+        tabTitle: 'claude',
+        shell: '/bin/zsh',
+        startedAt: '2026-09-15T10:00:00.000Z',
+        description: 'why',
+        link: null,
+        agent: null,
+        updatedAt: '2026-09-15T10:00:00.000Z',
+      },
+    ]
+    expect(snapshotFor(undefined)).toEqual({
+      sessionId: 's1',
+      projectId: 'p1',
+      workspaceName: 'terminator',
+      projectName: 'session-home',
+      branch: '054-session-home-wall',
+      tabTitle: 'claude',
+      shell: '/bin/zsh',
+      startedAt: '2026-09-15T10:00:00.000Z',
+    })
+    store.records = []
+  })
+
+  it('is nothing for a terminal that has gone and was never recorded', () => {
     expect(snapshotFor(undefined)).toBeNull()
   })
 })

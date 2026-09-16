@@ -87,6 +87,20 @@ async function openTerminalId(page: Page, group: string): Promise<string> {
   })
 }
 
+/** Waits until the main process has folded the reported conversation onto the record. */
+async function awaitCaptured(page: Page, sessionId: string): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async (id) => {
+          const { data } = await window.electronAPI.sessionRecords.list()
+          return data.find((r) => r.sessionId === id)?.agent?.sessionId ?? null
+        }, sessionId),
+      { timeout: 15_000 }
+    )
+    .not.toBeNull()
+}
+
 test('a stopped session offers Resume once its conversation is known', async () => {
   handle = await launchApp()
   const { page } = handle
@@ -99,6 +113,7 @@ test('a stopped session offers Resume once its conversation is known', async () 
 
   const terminalId = await openTerminalId(page, 'Repo One / feature-a')
   reportConversation(handle.userDataDir, terminalId, 'conv-e2e-1', transcript)
+  await awaitCaptured(page, terminalId)
 
   // A running session still offers nothing: there is nothing to bring back.
   await expect(page.getByRole('button', { name: /^Resume/ })).toHaveCount(0)
@@ -122,6 +137,7 @@ test('a conversation whose transcript has gone says so instead', async () => {
   await openHome(page)
   const terminalId = await openTerminalId(page, 'Repo One / feature-a')
   reportConversation(handle.userDataDir, terminalId, 'conv-e2e-2', join(folder, 'missing.jsonl'))
+  await awaitCaptured(page, terminalId)
 
   await goToTerminal(page)
   await page.locator('.terminal-pane').click()
@@ -144,12 +160,9 @@ test('a conversation that goes while the app is running stops being offered', as
   await createWorkspace(page, 'Repo One', folder)
   await addAndSelectProject(page, 'Repo One', 'feature-a')
   await openHome(page)
-  reportConversation(
-    handle.userDataDir,
-    await openTerminalId(page, 'Repo One / feature-a'),
-    'conv-e2e-4',
-    transcript
-  )
+  const captured = await openTerminalId(page, 'Repo One / feature-a')
+  reportConversation(handle.userDataDir, captured, 'conv-e2e-4', transcript)
+  await awaitCaptured(page, captured)
   await goToTerminal(page)
   await page.locator('.terminal-pane').click()
   await page.keyboard.type('exit')
@@ -173,14 +186,9 @@ test('a conversation from the last run is offered under Closed, and nothing rest
   await createWorkspace(page, 'Repo One', folder)
   await addAndSelectProject(page, 'Repo One', 'feature-a')
   await openHome(page)
-  reportConversation(
-    profile,
-    await openTerminalId(page, 'Repo One / feature-a'),
-    'conv-e2e-3',
-    transcript
-  )
-  // Give the sweep time to fold the report into the session's record.
-  await page.waitForTimeout(1500)
+  const before = await openTerminalId(page, 'Repo One / feature-a')
+  reportConversation(profile, before, 'conv-e2e-3', transcript)
+  await awaitCaptured(page, before)
 
   await closeApp(handle, { keepProfile: true })
   handle = await launchApp(profile)
@@ -246,7 +254,8 @@ test('two conversations on one branch each come back to their own session', asyn
   })
   const other = ids.find((id) => id !== first)!
   reportConversation(profile, other, 'conv-second', second)
-  await page.waitForTimeout(1500)
+  await awaitCaptured(page, first)
+  await awaitCaptured(page, other)
 
   const conversationOf = async (sessionId: string): Promise<string | null> =>
     page.evaluate(async (id) => {
