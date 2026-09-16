@@ -44,9 +44,12 @@ export function AppBand({
       {tabs.map((tab) => (
         <Entry
           key={tab.id}
-          label={tab.label}
+          label={
+            (tab.badge ?? 0) > 0 && tab.badgeLabel ? `${tab.label}, ${tab.badgeLabel}` : tab.label
+          }
           icon={tab.icon}
           active={activeId === tab.id}
+          badge={tab.badge}
           onClick={() => onSelect(tab.id)}
         />
       ))}

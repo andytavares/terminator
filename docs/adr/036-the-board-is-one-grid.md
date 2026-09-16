@@ -1,6 +1,6 @@
 # ADR 036: The board is one grid; a lane is a column
 
-**Status**: Accepted
+**Status**: Accepted. Layout superseded by [ADR 054](054-overview-is-a-wall-sessions-carry-context.md); the one-grid invariant is kept.
 
 **Date**: 2026-09-05
 

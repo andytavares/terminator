@@ -1,0 +1,305 @@
+/* The Logbook: a list headlined by what each session is for, and one in depth. */
+
+.logbook {
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.logbook__list {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding-bottom: var(--space-3);
+  outline: none;
+}
+
+.logbook__group-label {
+  display: flex;
+  gap: 6px;
+  padding: 14px var(--space-4) var(--space-1);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.logbook__item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 2px 10px;
+  padding: 8px var(--space-4) 9px 14px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: inset 2px 0 0 var(--rail, transparent);
+  cursor: pointer;
+  outline: none;
+}
+
+.logbook__item:hover {
+  background: var(--bg-card-hover);
+}
+
+.logbook__item--selected {
+  background: var(--accent-dim);
+}
+
+.logbook__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.logbook__item .state-icon {
+  padding-top: 3px;
+}
+
+.logbook__headline {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logbook__headline--blank {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.logbook__meta {
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: 12px;
+}
+
+.logbook__key {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.logbook__where {
+  min-width: 0;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logbook__age {
+  margin-left: auto;
+  flex: none;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.logbook__placeholder {
+  margin: 0;
+  padding: var(--space-6);
+  color: var(--text-secondary);
+}
+
+.logbook__detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-4) 28px;
+  align-content: start;
+  padding: 20px 28px;
+  overflow-y: auto;
+}
+
+.logbook__crumb {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.logbook__crumb .logbook__where {
+  flex: 1;
+}
+
+.logbook__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.logbook__work {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.logbook__source,
+.logbook__muted {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.logbook__closed-text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.logbook__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.logbook__edit label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.logbook__textarea {
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.logbook__textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.logbook__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.logbook__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.logbook__button--primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
+}
+
+.logbook__button:focus-visible,
+.logbook__suggest button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.logbook__button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.logbook__suggest h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.logbook__suggest ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.logbook__suggest button {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.logbook__suggest button:hover {
+  background: var(--bg-card-hover);
+}
+
+.logbook__title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logbook__preview {
+  height: 280px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.logbook__facts dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-size: 12.5px;
+}
+
+.logbook__facts dt {
+  color: var(--text-muted);
+}
+
+.logbook__facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logbook__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.logbook__tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}

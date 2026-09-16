@@ -1,6 +1,7 @@
 import { Terminal, IBufferCell, ILinkProvider, ILink } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
+import { previewWindow } from '../../terminal/preview-window'
 
 const IDLE_DEBOUNCE_MS = 1500
 
@@ -468,6 +469,21 @@ export class TerminalInstance {
   // Mount the live xterm element into a preview container (e.g. an Overview tile).
   // Scales the element to fit the container without sending a PTY resize event.
   // Returns a cleanup function that restores the element and removes it from the container.
+  /** The rows currently on screen, top to bottom, each trimmed on the right. */
+  readVisibleRows(): string[] {
+    const { buffer, rows } = this.terminal
+    const top = buffer.active.viewportY
+    return Array.from(
+      { length: rows },
+      (_, i) => buffer.active.getLine(top + i)?.translateToString(true) ?? ''
+    )
+  }
+
+  /** The cursor's row on screen, 0 at the top. */
+  cursorRow(): number {
+    return this.terminal.buffer.active.cursorY
+  }
+
   mountPreview(container: HTMLElement): (() => void) | null {
     if (!this.opened) return null
     const { cols, rows } = this.terminal
@@ -480,18 +496,34 @@ export class TerminalInstance {
     const naturalW = Math.ceil(cols * charW + 12)
     const naturalH = rows * lineHeight + 8
 
-    const containerW = container.offsetWidth || 220
-    const containerH = container.offsetHeight || 150
-    const scale = Math.min(containerW / naturalW, containerH / naturalH)
+    const place = (): void => {
+      const { scale, translateY } = previewWindow({
+        rows,
+        cursorY: this.terminal.buffer.active.cursorY,
+        lineHeight,
+        naturalW,
+        naturalH,
+        containerW: container.offsetWidth || 220,
+        containerH: container.offsetHeight || 150,
+      })
+      this.element.style.transform = `translateY(${translateY}px) scale(${scale})`
+    }
 
     this.element.style.width = `${naturalW}px`
     this.element.style.height = `${naturalH}px`
-    this.element.style.transform = `scale(${scale})`
     this.element.style.transformOrigin = 'top left'
     this.element.style.pointerEvents = 'none'
+    // A preview is for reading. Its xterm input stays out of the tab order, or
+    // tabbing through Home would type into the session behind a thumbnail.
+    this.terminal.textarea?.setAttribute('tabindex', '-1')
+    place()
     container.appendChild(this.element)
+    // The cursor moves as output arrives; the window follows it on each render.
+    const following = this.terminal.onRender(place)
 
     return () => {
+      following.dispose()
+      this.terminal.textarea?.removeAttribute('tabindex')
       this.element.style.width = '100%'
       this.element.style.height = '100%'
       this.element.style.transform = ''

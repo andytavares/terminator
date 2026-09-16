@@ -11,6 +11,7 @@ const api = {
   linkClear: vi.fn(),
   listMine: vi.fn(),
   search: vi.fn(),
+  getIssue: vi.fn(),
   onStatusChanged: vi.fn(() => () => {}),
   onLinkChanged: vi.fn(() => () => {}),
 }
@@ -44,6 +45,7 @@ beforeEach(() => {
     connections: [],
     links: new Map(),
     issues: new Map(),
+    issuesByKey: new Map(),
     loading: false,
     connectError: {},
   })
@@ -393,5 +395,40 @@ describe('integrations store — partial transports', () => {
     })
     expect(() => useIntegrationsStore.getState().subscribe()()).not.toThrow()
     restore()
+  })
+})
+
+describe('integrations store — issues by key', () => {
+  const ISSUE = { tracker: 'linear', key: 'NW-88', title: 'Rate limit per API key' }
+
+  it('is undefined before anything is loaded', () => {
+    expect(useIntegrationsStore.getState().issueByKey('linear', 'NW-88')).toBeUndefined()
+  })
+
+  it('reads an issue once, however many surfaces ask for it', async () => {
+    let resolve: (value: unknown) => void = () => {}
+    api.getIssue.mockReturnValue(new Promise((r) => (resolve = r)))
+    const { loadIssue } = useIntegrationsStore.getState()
+    const first = loadIssue('linear', 'NW-88')
+    const second = loadIssue('linear', 'NW-88')
+    expect(useIntegrationsStore.getState().issueByKey('linear', 'NW-88')).toBeUndefined()
+    resolve({ issue: ISSUE })
+    await Promise.all([first, second])
+    await loadIssue('linear', 'NW-88')
+    expect(api.getIssue).toHaveBeenCalledTimes(1)
+    expect(api.getIssue).toHaveBeenCalledWith({ tracker: 'linear', key: 'NW-88' })
+    expect(useIntegrationsStore.getState().issueByKey('linear', 'NW-88')).toEqual(ISSUE)
+  })
+
+  it('keeps the same key apart across trackers', async () => {
+    api.getIssue.mockResolvedValue({ issue: ISSUE })
+    await useIntegrationsStore.getState().loadIssue('linear', 'NW-88')
+    expect(useIntegrationsStore.getState().issueByKey('jira', 'NW-88')).toBeUndefined()
+  })
+
+  it('records an issue that could not be read as null', async () => {
+    api.getIssue.mockResolvedValue({ error: 'network', message: 'offline' })
+    await useIntegrationsStore.getState().loadIssue('linear', 'NW-88')
+    expect(useIntegrationsStore.getState().issueByKey('linear', 'NW-88')).toBeNull()
   })
 })

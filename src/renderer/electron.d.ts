@@ -16,6 +16,9 @@ import type {
   MineSelector,
   TrackerConnection,
   TrackerId,
+  SessionRecord,
+  SessionSnapshot,
+  WorkItemRef,
 } from '../shared/types/index'
 import type { ChangeStats } from '../shared/schemas/git.schema'
 
@@ -36,7 +39,9 @@ export interface SerializedNotification {
 
 interface ElectronAPI {
   terminal: {
-    create(payload: unknown): Promise<{ sessionId: string } | { error: string; message?: string }>
+    create(
+      payload: unknown
+    ): Promise<{ sessionId: string; shell?: string } | { error: string; message?: string }>
     close(sessionId: string): Promise<{ success: boolean }>
     /** Says a terminal is on screen; delivers anything held back until now. */
     attach(sessionId: string): Promise<{ released: boolean }>
@@ -233,6 +238,20 @@ interface ElectronAPI {
   }
   logger: {
     write(level: string, namespace: string, message: string): void
+  }
+  sessionRecords: {
+    list(): Promise<{ data: SessionRecord[] }>
+    setDescription(input: {
+      session: SessionSnapshot
+      description: string | null
+    }): Promise<{ data: SessionRecord | null } | { error: string; message: string }>
+    setLink(input: {
+      session: SessionSnapshot
+      link: WorkItemRef | null
+    }): Promise<{ data: SessionRecord | null } | { error: string; message: string }>
+    onChanged(
+      handler: (payload: { sessionId: string; record: SessionRecord | null }) => void
+    ): () => void
   }
   integrations: {
     status(input: {

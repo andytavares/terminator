@@ -8,6 +8,8 @@ export interface GlobalTabRegistration {
   component: ComponentType<Record<string, never>>
   permanent?: boolean
   badge?: number
+  /** What the badge counts, for a reader: the entry is named "<label>, <badgeLabel>" while badged. */
+  badgeLabel?: string
   /** When true the tab is not shown as an icon in the WorkspaceRail. */
   hidden?: boolean
   /** Higher values sort later in the sidebar. Core tabs default to 0, extensions to 1. */

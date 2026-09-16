@@ -2,6 +2,8 @@ import { useSessionStore } from '../stores/session.store'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
 import { dispatchNotification } from '../lib/notifications'
+import { latestLineOf } from '../sidebar/screen'
+import { parseChoicePrompt, samePrompt } from '../sidebar/choice-prompt'
 import type { PaneSplitDirection } from '../../shared/types/index'
 
 // The single owner of "a live terminal tab": composes the store record, the
@@ -44,28 +46,49 @@ export function resetActivityThrottle(): void {
   lastStampedAt.clear()
 }
 
-function stampActivity(sessionId: string, force = false): void {
+/** Returns whether it stamped, so a caller can do its own throttled work on the same beat. */
+function stampActivity(sessionId: string, force = false): boolean {
   const at = now()
   const last = lastStampedAt.get(sessionId)
-  if (!force && last !== undefined && at - last < ACTIVITY_STAMP_INTERVAL_MS) return
+  if (!force && last !== undefined && at - last < ACTIVITY_STAMP_INTERVAL_MS) return false
   lastStampedAt.set(sessionId, at)
   useSessionStore.getState().stampActivity(sessionId, at)
+  return true
 }
 
 function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInstance {
-  return new TerminalInstance(sessionId, scrollbackLimit, {
+  const instance: TerminalInstance = new TerminalInstance(sessionId, scrollbackLimit, {
     onBell: () => handleBell(sessionId),
     onBusy: () => {
-      stampActivity(sessionId)
-      useSessionStore.getState().setSessionBusy(sessionId)
+      const stamped = stampActivity(sessionId)
+      const store = useSessionStore.getState()
+      store.setSessionBusy(sessionId)
+      // Output moving means a question was answered or redrawn; the next
+      // settle reads it again. A session that never settles still gets its
+      // latest line refreshed, on the activity stamp's once-a-second beat.
+      const session = store.sessions.get(sessionId)
+      if (stamped || session?.choicePrompt !== undefined) {
+        store.setSessionScreen(sessionId, {
+          latestLine: latestLineOf(instance.readVisibleRows(), instance.cursorRow()),
+          choicePrompt: null,
+        })
+      }
     },
     onIdle: () => {
       // Unthrottled: idle is the end of a burst, and its timestamp is the one
       // that decides how stale the session looks from here on.
       stampActivity(sessionId, true)
       useSessionStore.getState().setSessionIdle(sessionId)
+      // Read once per burst, when the screen has stopped moving, rather than
+      // per output chunk across every live terminal.
+      const rows = instance.readVisibleRows()
+      useSessionStore.getState().setSessionScreen(sessionId, {
+        latestLine: latestLineOf(rows, instance.cursorRow()),
+        choicePrompt: parseChoicePrompt(rows),
+      })
     },
   })
+  return instance
 }
 
 /**
@@ -174,4 +197,27 @@ export async function splitTerminalSession(
   const instance = buildInstance(sessionId, scrollbackLimit)
   store.setTerminalInstance(sessionId, instance)
   store.activateSplit(projectId, focusedId, sessionId, direction)
+}
+
+/**
+ * Answers a session's numbered prompt as if its number were typed.
+ *
+ * The screen is read again first: the prompt the button was drawn from may
+ * have been answered in the terminal, or replaced, since. Only the same options
+ * on screen now get the keypress; otherwise nothing is sent and the buttons go.
+ * A bare digit answers a Claude Code select prompt (verified live on 2.1.273).
+ */
+export function answerChoice(sessionId: string, number: number): boolean {
+  const store = useSessionStore.getState()
+  const session = store.sessions.get(sessionId)
+  const instance = store.getTerminalInstance(sessionId)
+  if (session === undefined || instance === undefined) return false
+  const onScreen = parseChoicePrompt(instance.readVisibleRows())
+  const offered = onScreen?.options.some((o) => o.number === number) === true
+  if (!samePrompt(session.choicePrompt ?? null, onScreen) || !offered) {
+    store.setSessionScreen(sessionId, { latestLine: session.latestLine ?? '', choicePrompt: null })
+    return false
+  }
+  window.electronAPI.terminal.input(sessionId, String(number))
+  return true
 }

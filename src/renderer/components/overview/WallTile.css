@@ -1,0 +1,126 @@
+/* One live terminal on the wall. The workspace colour is the left edge only. */
+
+.wall-tile {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 2px 0 0 var(--rail, transparent);
+  overflow: hidden;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.12s ease;
+}
+
+.wall-tile:hover {
+  background: var(--bg-card-hover);
+}
+
+.wall-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.wall-tile[data-band='needs'] {
+  border-color: var(--border-strong);
+}
+
+.wall-tile__cap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 6px 6px 6px 12px;
+  font-size: 12px;
+}
+
+.wall-tile__where {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wall-tile__name {
+  flex: none;
+  max-width: 40%;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wall-tile__age {
+  flex: none;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wall-tile__open {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.wall-tile__open:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.wall-tile__open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.wall-tile__open svg {
+  width: 12px;
+  height: 12px;
+}
+
+.wall-tile__preview {
+  height: var(--tile-preview-h, 160px);
+  border-block: 1px solid var(--border);
+}
+
+.wall-tile[data-band='needs'] .wall-tile__preview {
+  height: var(--tile-preview-needs-h, 240px);
+}
+
+.wall-tile__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 6px 10px 7px 12px;
+  cursor: default;
+}
+
+.wall-tile__foot > .work-item {
+  flex: 1;
+}
+
+.wall-tile__metrics {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-tile {
+    transition: none;
+  }
+}

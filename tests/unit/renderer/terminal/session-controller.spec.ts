@@ -6,6 +6,8 @@ vi.mock('../../../../src/renderer/lib/notifications', () => ({
 }))
 
 // Capture constructor args + hooks so tests can drive bell/busy/idle events.
+let screenRows: string[] = []
+let screenCursor = 99
 let capturedCtorArgs: Array<{
   sessionId: string
   scrollbackLimit: number
@@ -19,6 +21,12 @@ vi.mock('../../../../src/renderer/components/terminal/TerminalSession', () => ({
       hooks?: { onBell?: () => void; onBusy?: () => void; onIdle?: () => void }
     ) {
       capturedCtorArgs.push({ sessionId, scrollbackLimit, hooks })
+    }
+    readVisibleRows(): string[] {
+      return screenRows
+    }
+    cursorRow(): number {
+      return screenCursor
     }
   },
 }))
@@ -38,6 +46,7 @@ import {
   splitTerminalSession,
   setActivityClock,
   resetActivityThrottle,
+  answerChoice,
 } from '../../../../src/renderer/terminal/session-controller'
 
 const mockCreateSession = vi.fn()
@@ -51,15 +60,26 @@ const mockGetFocusedSession = vi.fn()
 const mockGetActiveSessionForProject = vi.fn()
 const mockAdoptSession = vi.fn()
 const mockStampActivity = vi.fn()
+const mockSetSessionScreen = vi.fn()
+const mockGetTerminalInstance = vi.fn()
+const mockInput = vi.fn()
 
 const sessions = new Map<
   string,
-  { projectId: string; tabTitle: string; parentSessionId?: string }
+  {
+    projectId: string
+    tabTitle: string
+    parentSessionId?: string
+    latestLine?: string
+    choicePrompt?: unknown
+  }
 >()
 
 beforeEach(() => {
   vi.clearAllMocks()
   capturedCtorArgs = []
+  screenRows = []
+  screenCursor = 99
   sessions.clear()
   mockCreateSession.mockResolvedValue('session-123')
   vi.mocked(useSessionStore.getState).mockReturnValue({
@@ -75,6 +95,8 @@ beforeEach(() => {
     getActiveSessionForProject: mockGetActiveSessionForProject,
     adoptSession: mockAdoptSession,
     stampActivity: mockStampActivity,
+    setSessionScreen: mockSetSessionScreen,
+    getTerminalInstance: mockGetTerminalInstance,
   } as unknown as ReturnType<typeof useSessionStore.getState>)
   resetActivityThrottle()
   setActivityClock(() => 0)
@@ -147,6 +169,16 @@ describe('createTerminalSession', () => {
     expect(mockSetSessionBusy).toHaveBeenCalledWith('session-123')
     hooks!.onIdle!()
     expect(mockSetSessionIdle).toHaveBeenCalledWith('session-123')
+  })
+
+  it('reads the screen when output settles, and records its last line', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    screenRows = ['$ pnpm test', '  14 passed, 2 failed', '', '']
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith(
+      'session-123',
+      expect.objectContaining({ latestLine: '14 passed, 2 failed' })
+    )
   })
 })
 
@@ -405,5 +437,114 @@ describe('activity stamping throttle (FR-002)', () => {
     mockStampActivity.mockClear()
     hooks.onIdle!()
     expect(mockStampActivity).toHaveBeenCalledWith('s1', 9_000)
+  })
+})
+
+const PROMPT_ROWS = [
+  '⏺ Write(a.txt)',
+  ' Do you want to create a.txt?',
+  ' ❯ 1. Yes',
+  '   2. No',
+  ' Esc to cancel',
+  '',
+]
+const PROMPT = {
+  question: 'Do you want to create a.txt?',
+  options: [
+    { number: 1, label: 'Yes' },
+    { number: 2, label: 'No' },
+  ],
+}
+
+describe('reading a choice prompt off the screen (054)', () => {
+  it('records the prompt a settled screen shows', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    screenRows = PROMPT_ROWS
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('session-123', {
+      latestLine: 'Esc to cancel',
+      choicePrompt: PROMPT,
+    })
+  })
+
+  it('forgets the prompt as soon as output moves again', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    capturedCtorArgs[0].hooks!.onBusy!()
+    mockSetSessionScreen.mockClear()
+    sessions.set('session-123', { projectId: 'proj-1', tabTitle: 'T', choicePrompt: PROMPT })
+    screenRows = ['⏺ Wrote 1 line to a.txt', '']
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('session-123', {
+      latestLine: '⏺ Wrote 1 line to a.txt',
+      choicePrompt: null,
+    })
+  })
+
+  it('refreshes the latest line of a session that never settles, once a second', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    sessions.set('session-123', { projectId: 'proj-1', tabTitle: 'T' })
+    screenRows = ['17:02:21 14 passed', '']
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('session-123', {
+      latestLine: '17:02:21 14 passed',
+      choicePrompt: null,
+    })
+    mockSetSessionScreen.mockClear()
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(mockSetSessionScreen).not.toHaveBeenCalled()
+    setActivityClock(() => 1000)
+    capturedCtorArgs[0].hooks!.onBusy!()
+    expect(mockSetSessionScreen).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the latest line from above the cursor', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    screenRows = ['$ pnpm test', '14 passed, 2 failed', 'me@host $ ', '']
+    screenCursor = 2
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith(
+      'session-123',
+      expect.objectContaining({ latestLine: '14 passed, 2 failed' })
+    )
+  })
+})
+
+describe('answerChoice (054)', () => {
+  beforeEach(() => {
+    // A node-project spec: the controller only reaches window.electronAPI.
+    vi.stubGlobal('window', { electronAPI: { terminal: { input: mockInput } } })
+    sessions.set('s1', { projectId: 'p', tabTitle: 'claude', latestLine: '', choicePrompt: PROMPT })
+    mockGetTerminalInstance.mockReturnValue({ readVisibleRows: () => screenRows })
+  })
+
+  it('types the option number when the prompt is still on screen', () => {
+    screenRows = PROMPT_ROWS
+    expect(answerChoice('s1', 2)).toBe(true)
+    expect(mockInput).toHaveBeenCalledWith('s1', '2')
+  })
+
+  it('sends nothing and drops the buttons when the prompt has changed', () => {
+    screenRows = PROMPT_ROWS.map((r) => r.replace('2. No', '2. No, and tell Claude why'))
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(mockInput).not.toHaveBeenCalled()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('s1', { latestLine: '', choicePrompt: null })
+  })
+
+  it('sends nothing when the prompt has gone', () => {
+    screenRows = ['⏺ Done.', '']
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(mockInput).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing for a number the prompt does not offer', () => {
+    screenRows = PROMPT_ROWS
+    expect(answerChoice('s1', 3)).toBe(false)
+    expect(mockInput).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing for a session without a terminal', () => {
+    mockGetTerminalInstance.mockReturnValue(undefined)
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(mockInput).not.toHaveBeenCalled()
   })
 })
