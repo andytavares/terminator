@@ -1,26 +1,28 @@
 import { create } from 'zustand'
-import type { SessionRecord, SessionSnapshot, WorkItemRef } from '../../shared/types/index'
+import type { SessionRecordListing, SessionSnapshot, WorkItemRef } from '../../shared/types/index'
 
 // The renderer's mirror of the main process's session records: what the
 // operator wrote about each session and the ticket they pinned to it.
 
 interface SessionRecordsState {
-  records: Map<string, SessionRecord>
+  records: Map<string, SessionRecordListing>
   load: () => Promise<void>
   subscribe: () => () => void
   /** Resolves false when the write was refused, leaving the mirror as it was. */
   setDescription: (session: SessionSnapshot, description: string | null) => Promise<boolean>
   setLink: (session: SessionSnapshot, link: WorkItemRef | null) => Promise<boolean>
+  /** Moves a session's context onto the session that resumed it. */
+  transfer: (fromSessionId: string, session: SessionSnapshot) => Promise<boolean>
 }
 
-type WriteResult = { data: SessionRecord | null } | { error: string; message: string }
+type WriteResult = { data: SessionRecordListing | null } | { error: string; message: string }
 
 function api(): Partial<Window['electronAPI']['sessionRecords']> {
   return window.electronAPI?.sessionRecords ?? {}
 }
 
 export const useSessionRecordsStore = create<SessionRecordsState>((set) => {
-  function apply(sessionId: string, record: SessionRecord | null): void {
+  function apply(sessionId: string, record: SessionRecordListing | null): void {
     set((state) => {
       const records = new Map(state.records)
       if (record === null) records.delete(sessionId)
@@ -62,5 +64,17 @@ export const useSessionRecordsStore = create<SessionRecordsState>((set) => {
       write(session.sessionId, api().setDescription?.({ session, description })),
 
     setLink: (session, link) => write(session.sessionId, api().setLink?.({ session, link })),
+
+    transfer: async (fromSessionId, session) => {
+      const result = await api().transfer?.({ fromSessionId, session })
+      if (result === undefined || 'error' in result) return false
+      set((state) => {
+        const records = new Map(state.records)
+        records.delete(fromSessionId)
+        if (result.data !== null) records.set(session.sessionId, result.data)
+        return { records }
+      })
+      return true
+    },
   }
 })

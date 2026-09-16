@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
 const handlers = new Map<string, (event: unknown, payload: unknown) => Promise<unknown>>()
 const sent: Array<{ channel: string; data: unknown }> = []
@@ -22,12 +25,14 @@ const store = vi.hoisted(() => ({
   change: null as null | ((id: string, record: unknown) => void),
   setDescription: vi.fn(),
   setLink: vi.fn(),
+  transfer: vi.fn(),
 }))
 
 vi.mock('../../../src/main/sessions/session-record-store', () => ({
   listRecords: () => store.records,
   setDescription: store.setDescription,
   setLink: store.setLink,
+  transfer: store.transfer,
   onRecordChange: (handler: (id: string, record: unknown) => void) => {
     store.change = handler
     return () => {}
@@ -51,10 +56,19 @@ function base(id: string, closedAt?: string) {
     sessionId: id,
     description: 'd',
     link: null,
+    agent: null,
     updatedAt: SNAP.startedAt,
     ...(closedAt ? { closedAt } : {}),
   }
 }
+
+const conversation = (transcriptPath: string) => ({
+  provider: 'claude' as const,
+  sessionId: 'conv-1',
+  transcriptPath,
+  cwd: '/code/repo',
+  capturedAt: SNAP.startedAt,
+})
 
 async function register() {
   handlers.clear()
@@ -112,7 +126,7 @@ describe('session-records:set-description', () => {
       description: 'd',
     })
     expect(store.setDescription).toHaveBeenCalledWith(SNAP, 'd')
-    expect(result).toEqual({ data: base('s1') })
+    expect(result).toEqual({ data: { ...base('s1'), resumable: false } })
   })
 
   it('returns null data when the write removed the record', async () => {
@@ -215,8 +229,85 @@ describe('session-records:changed', () => {
     store.change?.('s1', base('s1'))
     store.change?.('s1', null)
     expect(sent).toEqual([
-      { channel: 'session-records:changed', data: { sessionId: 's1', record: base('s1') } },
+      {
+        channel: 'session-records:changed',
+        data: { sessionId: 's1', record: { ...base('s1'), resumable: false } },
+      },
       { channel: 'session-records:changed', data: { sessionId: 's1', record: null } },
     ])
+  })
+})
+
+describe('whether a conversation can still be resumed', () => {
+  let transcript: string
+
+  beforeEach(() => {
+    transcript = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ipc-transcript-')), 'c.jsonl')
+    fs.writeFileSync(transcript, '{}')
+  })
+
+  it('is resumable while the transcript is there', async () => {
+    store.records = [{ ...base('s1'), agent: conversation(transcript) }]
+    const result = (await invoke('session-records:list')) as {
+      data: Array<{ resumable: boolean }>
+    }
+    expect(result.data[0].resumable).toBe(true)
+  })
+
+  it('is not resumable once the transcript has gone', async () => {
+    store.records = [{ ...base('s1'), agent: conversation(transcript) }]
+    fs.rmSync(transcript)
+    const result = (await invoke('session-records:list')) as {
+      data: Array<{ resumable: boolean }>
+    }
+    expect(result.data[0].resumable).toBe(false)
+  })
+
+  it('is not resumable when there was never a conversation', async () => {
+    store.records = [base('s1')]
+    const result = (await invoke('session-records:list')) as {
+      data: Array<{ resumable: boolean }>
+    }
+    expect(result.data[0].resumable).toBe(false)
+  })
+
+  it('says so on a pushed change too', () => {
+    store.change?.('s1', { ...base('s1'), agent: conversation(transcript) })
+    const pushed = sent.at(-1)?.data as { record: { resumable: boolean } }
+    expect(pushed.record.resumable).toBe(true)
+  })
+
+  it('says nothing extra when a record is pushed as gone', () => {
+    store.change?.('s1', null)
+    expect(sent.at(-1)?.data).toEqual({ sessionId: 's1', record: null })
+  })
+})
+
+describe('session-records:transfer', () => {
+  it('moves a record to the resumed session', async () => {
+    store.transfer.mockResolvedValue(base('s2'))
+    const result = await invoke('session-records:transfer', {
+      fromSessionId: 's1',
+      session: { ...SNAP, sessionId: 's2' },
+    })
+    expect(store.transfer).toHaveBeenCalledWith('s1', { ...SNAP, sessionId: 's2' })
+    expect(result).toEqual({ data: { ...base('s2'), resumable: false } })
+  })
+
+  it('returns nothing when the old session had no record', async () => {
+    store.transfer.mockResolvedValue(null)
+    expect(
+      await invoke('session-records:transfer', { fromSessionId: 's1', session: SNAP })
+    ).toEqual({
+      data: null,
+    })
+  })
+
+  it('refuses a payload with no session to transfer to', async () => {
+    const result = (await invoke('session-records:transfer', { fromSessionId: 's1' })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+    expect(store.transfer).not.toHaveBeenCalled()
   })
 })

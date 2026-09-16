@@ -26,7 +26,7 @@ description: 'Task list for Resume an agent session'
 
 ## Phase 1: Setup
 
-- [ ] T001 Record the current line coverage of every existing file this feature edits in `specs/055-resume-agent-session/coverage-baseline.md`, from `npx vitest run --coverage`:
+- [x] T001 Record the current line coverage of every existing file this feature edits in `specs/055-resume-agent-session/coverage-baseline.md`, from `npx vitest run --coverage`:
 
   - `src/main/sessions/session-record-store.ts`
   - `src/main/ipc/session-records.ipc.ts`
@@ -40,7 +40,7 @@ description: 'Task list for Resume an agent session'
 
   Name any file below 80% as debt the phase touching it must pay.
 
-- [ ] T002 Confirm the pre-commit gate runs here: `git config core.hooksPath` resolves to an existing `.husky/_`, else `npm run prepare`.
+- [x] T002 Confirm the pre-commit gate runs here: `git config core.hooksPath` resolves to an existing `.husky/_`, else `npm run prepare`.
 
 ---
 
@@ -50,28 +50,28 @@ description: 'Task list for Resume an agent session'
 
 ### Tests first
 
-- [ ] T003 [P] Write failing specs for the report parser in `tests/unit/shared/agent-sessions/report.spec.ts`:
+- [x] T003 [P] Write failing specs for the report parser in `tests/unit/shared/agent-sessions/report.spec.ts`:
   - A full payload plus `TERMINATOR_SESSION_ID` becomes a report.
   - A payload with no session id, no transcript path, or no terminal yields `null`.
   - An unknown `hook_event_name` yields `null`.
   - `source` is carried through, and anything not `startup` or `resume` is carried as given rather than rejected.
-- [ ] T004 [P] Write failing specs for the hook script in `tests/unit/agents/agent-session-hook.spec.ts`. Run the script as a child process, as `tests/unit/integrations` does for the context hook:
+- [x] T004 [P] Write failing specs for the hook script in `tests/unit/agents/agent-session-hook.spec.ts`. Run the script as a child process, as `tests/unit/integrations` does for the context hook:
   - Given a payload on stdin and `TERMINATOR_SESSION_ID` set, it writes `<dir>/<terminal>.json` with the report and exits 0 printing nothing.
   - A second conversation in the same terminal replaces the file.
   - With no `TERMINATOR_SESSION_ID`, it writes nothing and exits 0.
   - Malformed stdin, an unwritable directory, or no stdin at all: exits 0, prints nothing, writes nothing.
-- [ ] T005 [P] Write failing specs for the user-settings install in `tests/unit/agents/agent-session-hook.spec.ts` (same file, its own describe), with `HOME` pointed at a tmp dir:
+- [x] T005 [P] Write failing specs for the user-settings install in `tests/unit/agents/agent-session-hook.spec.ts` (same file, its own describe), with `HOME` pointed at a tmp dir:
   - Creates `~/.claude/settings.json` with one `SessionStart` entry when there is none.
   - Merges into an existing file: other `SessionStart` entries and every other key survive.
   - Installing twice leaves exactly one entry of ours (idempotent, matched on our script path).
   - A settings file that cannot be parsed is left untouched and the failure is reported, never overwritten.
-- [ ] T006 [P] Write failing specs for the watcher in `tests/unit/agents/agent-session-watcher.spec.ts`:
+- [x] T006 [P] Write failing specs for the watcher in `tests/unit/agents/agent-session-watcher.spec.ts`:
   - A report file appearing calls the record store with the session it names.
   - A replaced file updates that session's conversation.
   - A file naming a session with no record creates one.
   - A malformed file is ignored and the watcher keeps running.
   - Stopping the watcher removes the listener.
-- [ ] T007 [P] Extend `tests/unit/sessions/session-record-store.spec.ts`:
+- [x] T007 [P] Extend `tests/unit/sessions/session-record-store.spec.ts`:
   - `setAgent` creates a record for a session with no description and no link.
   - Clearing the description and link on a record that has a conversation keeps the record.
   - Clearing everything, conversation included, deletes it.
@@ -80,31 +80,31 @@ description: 'Task list for Resume an agent session'
   - Pruning removes a closed record with a conversation like any other.
   - `transfer` moves description, link and conversation to the new session and deletes the old record, in one write.
   - `transfer` from a session with no record returns `null` and writes nothing.
-- [ ] T008 [P] Extend `tests/unit/ipc/session-records.ipc.spec.ts`:
+- [x] T008 [P] Extend `tests/unit/ipc/session-records.ipc.spec.ts`:
   - `list` reports `resumable: true` when the transcript exists, `false` when it does not, and `false` when there is no conversation.
   - `changed` carries the conversation and `resumable`.
   - `session-records:transfer` calls the store and returns the new record; a bad payload is `VALIDATION_ERROR`.
-- [ ] T009 [P] Extend `tests/unit/ipc/terminal.ipc.spec.ts`:
+- [x] T009 [P] Extend `tests/unit/ipc/terminal.ipc.spec.ts`:
   - `terminal:create` puts `TERMINATOR_SESSION_ID` in the spawned environment, beside the issue variables, for a project with and without a link.
   - With `initialCommand`, the line is written into the PTY once, followed by a newline.
   - An `initialCommand` containing a newline is refused with `VALIDATION_ERROR` and nothing is spawned.
-- [ ] T010 [P] Extend `tests/unit/renderer/sidebar/session-facts.spec.ts`: facts carry `agent` and `resumable` from the record, and both are absent for a session with no record.
-- [ ] T011 [P] Extend `tests/unit/renderer/stores/session-records.store.spec.ts`: `transfer` calls the channel and applies the returned record, dropping the old one.
+- [x] T010 [P] Extend `tests/unit/renderer/sidebar/session-facts.spec.ts`: facts carry `agent` and `resumable` from the record, and both are absent for a session with no record.
+- [x] T011 [P] Extend `tests/unit/renderer/stores/session-records.store.spec.ts`: `transfer` calls the channel and applies the returned record, dropping the old one.
 
 ### Implementation
 
-- [ ] T012 Add `AgentConversation` to `src/shared/types/index.ts`, put `agent: AgentConversation | null` on `SessionRecord`, and add `resumable` to what the list and change events carry. Shapes in `data-model.md`.
-- [ ] T013 [P] Implement the pure report parser in `src/shared/agent-sessions/report.ts` (T003).
-- [ ] T014 [P] Add `TransferInputSchema` and the conversation shape to `src/shared/schemas/session-records.schema.ts`.
-- [ ] T015 Implement `src/main/agents/agent-session-hook.ts` (T004, T005): the script source as a string, `installHookScript`-style write into `userData/integrations/agent-session-hook.cjs`, and `installUserHook()` merging one entry into `~/.claude/settings.json` in the shape of `installProjectHook`. The script reads stdin, uses the parser, writes one file, prints nothing, exits 0.
-- [ ] T016 Implement `src/main/agents/agent-session-watcher.ts` (T006): `startAgentSessionWatcher()` watches `userData/agent-sessions/`, folds each report into the record store, returns a stop function.
-- [ ] T017 In `src/main/sessions/session-record-store.ts` (T007): add `setAgent`, widen the delete-when-empty rule to include the conversation, and add `transfer(fromSessionId, session)`.
-- [ ] T018 In `src/main/ipc/session-records.ipc.ts` (T008): stat transcripts to report `resumable` on `list` and on `changed`, and register `session-records:transfer`.
-- [ ] T019 In `src/main/ipc/terminal.ipc.ts` (T009): add `TERMINATOR_SESSION_ID` to the spawn environment, and accept `initialCommand`, written into the PTY after spawn. Reject a command containing a newline in the schema.
-- [ ] T020 In `src/main/index.ts`: write the hook script, install the user hook, and start the watcher at startup, beside the existing integrations wiring. A failure to install is logged and does not stop startup.
-- [ ] T021 [P] Expose `sessionRecords.transfer` in `src/shared/electron-api/manifest.ts` and `src/renderer/electron.d.ts`, and add it to the expected remote surface in `src/shared/electron-api/__tests__/manifest.spec.ts`.
-- [ ] T022 [P] Carry `agent` and `resumable` through `buildSessionFacts` in `src/renderer/sidebar/session-facts.ts` (T010).
-- [ ] T023 [P] Add `transfer` to `src/renderer/stores/session-records.store.ts` (T011).
+- [x] T012 Add `AgentConversation` to `src/shared/types/index.ts`, put `agent: AgentConversation | null` on `SessionRecord`, and add `resumable` to what the list and change events carry. Shapes in `data-model.md`.
+- [x] T013 [P] Implement the pure report parser in `src/shared/agent-sessions/report.ts` (T003).
+- [x] T014 [P] Add `TransferInputSchema` and the conversation shape to `src/shared/schemas/session-records.schema.ts`.
+- [x] T015 Implement `src/main/agents/agent-session-hook.ts` (T004, T005): the script source as a string, `installHookScript`-style write into `userData/integrations/agent-session-hook.cjs`, and `installUserHook()` merging one entry into `~/.claude/settings.json` in the shape of `installProjectHook`. The script reads stdin, uses the parser, writes one file, prints nothing, exits 0.
+- [x] T016 Implement `src/main/agents/agent-session-watcher.ts` (T006): `startAgentSessionWatcher()` watches `userData/agent-sessions/`, folds each report into the record store, returns a stop function.
+- [x] T017 In `src/main/sessions/session-record-store.ts` (T007): add `setAgent`, widen the delete-when-empty rule to include the conversation, and add `transfer(fromSessionId, session)`.
+- [x] T018 In `src/main/ipc/session-records.ipc.ts` (T008): stat transcripts to report `resumable` on `list` and on `changed`, and register `session-records:transfer`.
+- [x] T019 In `src/main/ipc/terminal.ipc.ts` (T009): add `TERMINATOR_SESSION_ID` to the spawn environment, and accept `initialCommand`, written into the PTY after spawn. Reject a command containing a newline in the schema.
+- [x] T020 In `src/main/index.ts`: write the hook script, install the user hook, and start the watcher at startup, beside the existing integrations wiring. A failure to install is logged and does not stop startup.
+- [x] T021 [P] Expose `sessionRecords.transfer` in `src/shared/electron-api/manifest.ts` and `src/renderer/electron.d.ts`, and add it to the expected remote surface in `src/shared/electron-api/__tests__/manifest.spec.ts`.
+- [x] T022 [P] Carry `agent` and `resumable` through `buildSessionFacts` in `src/renderer/sidebar/session-facts.ts` (T010).
+- [x] T023 [P] Add `transfer` to `src/renderer/stores/session-records.store.ts` (T011).
 
 **Checkpoint**: run quickstart §3 by hand — start `claude` in a terminal, see the report file appear, and the record gain a conversation.
 

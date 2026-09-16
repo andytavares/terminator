@@ -19,6 +19,16 @@ const CreateTerminalSchema = z.object({
   scrollbackLimit: z.number().int().min(1000).max(100000).optional(),
   cwd: z.string().min(1),
   shell: z.string().optional(),
+  /**
+   * One line to run in the terminal once it is open, for a terminal opened to
+   * carry on an agent conversation. One line, so nothing can be smuggled in
+   * behind the command that was asked for.
+   */
+  initialCommand: z
+    .string()
+    .min(1)
+    .refine((value) => !/[\r\n]/.test(value), { message: 'An initial command is one line' })
+    .optional(),
 })
 
 const TerminalInputSchema = z.object({
@@ -96,7 +106,7 @@ export function registerTerminalHandlers(
       return { error: 'VALIDATION_ERROR', message: parsed.error.message }
     }
 
-    const { projectId, tabTitle, type, cwd, shell } = parsed.data
+    const { projectId, tabTitle, type, cwd, shell, initialCommand } = parsed.data
     const globalSettings = getGlobalSettings()
     const defaultShell = shell ?? globalSettings.terminal.defaultShell
     const sessionId = randomUUID()
@@ -111,7 +121,9 @@ export function registerTerminalHandlers(
         origin: 'app',
         projectId,
         tabTitle,
-        env: issueEnvFor(projectId),
+        // The terminal names itself, so an agent started in it — by this
+        // application or by hand — can be placed against this session (ADR 055).
+        env: { ...issueEnvFor(projectId), TERMINATOR_SESSION_ID: sessionId },
       })
     } catch (err) {
       // Reported rather than thrown, so the renderer can say which folder is
@@ -133,6 +145,11 @@ export function registerTerminalHandlers(
     })
 
     void announceIssueContext(projectId, sessionId, getWindow)
+
+    // Written straight in: the line discipline holds it until the shell reads
+    // it, and a resume command is far inside the 1024-byte canonical limit that
+    // mangled a long launch line before.
+    if (initialCommand !== undefined) ptyManager.write(sessionId, `${initialCommand}\n`)
 
     return { sessionId, shell: defaultShell }
   })

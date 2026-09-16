@@ -16,7 +16,7 @@ import type {
   MineSelector,
   TrackerConnection,
   TrackerId,
-  SessionRecord,
+  SessionRecordListing,
   SessionSnapshot,
   WorkItemRef,
 } from '../shared/types/index'
@@ -240,17 +240,22 @@ interface ElectronAPI {
     write(level: string, namespace: string, message: string): void
   }
   sessionRecords: {
-    list(): Promise<{ data: SessionRecord[] }>
+    list(): Promise<{ data: SessionRecordListing[] }>
     setDescription(input: {
       session: SessionSnapshot
       description: string | null
-    }): Promise<{ data: SessionRecord | null } | { error: string; message: string }>
+    }): Promise<{ data: SessionRecordListing | null } | { error: string; message: string }>
     setLink(input: {
       session: SessionSnapshot
       link: WorkItemRef | null
-    }): Promise<{ data: SessionRecord | null } | { error: string; message: string }>
+    }): Promise<{ data: SessionRecordListing | null } | { error: string; message: string }>
+    /** Moves one session's description, link and conversation onto another, resuming it. */
+    transfer(input: {
+      fromSessionId: string
+      session: SessionSnapshot
+    }): Promise<{ data: SessionRecordListing | null } | { error: string; message: string }>
     onChanged(
-      handler: (payload: { sessionId: string; record: SessionRecord | null }) => void
+      handler: (payload: { sessionId: string; record: SessionRecordListing | null }) => void
     ): () => void
   }
   integrations: {

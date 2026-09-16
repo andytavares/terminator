@@ -22,6 +22,8 @@ export function fact(patch: Partial<SessionFacts> = {}): SessionFacts {
     closedAt: null,
     latestLine: '',
     choicePrompt: null,
+    agent: null,
+    resumable: false,
     snapshot: {
       sessionId,
       projectId: 'p1',

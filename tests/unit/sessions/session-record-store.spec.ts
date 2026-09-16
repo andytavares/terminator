@@ -257,3 +257,113 @@ describe('session-record-store — announcing', () => {
     expect(seen).toEqual([null])
   })
 })
+
+const CONVERSATION = {
+  provider: 'claude' as const,
+  sessionId: 'b610a882-41f3-4833-a6a3-dc3a33aea060',
+  transcriptPath: '/transcripts/b610a882.jsonl',
+  cwd: '/code/northwind-api',
+  capturedAt: '2026-09-15T18:00:00.000Z',
+}
+
+describe('session-record-store — the conversation that ran in a session', () => {
+  it('keeps a record for a session whose only context is its conversation', async () => {
+    const store = await load()
+    const record = await store.setAgent(SNAP, CONVERSATION)
+    expect(record).toMatchObject({ ...SNAP, description: null, link: null, agent: CONVERSATION })
+    expect(store.listRecords()).toHaveLength(1)
+  })
+
+  it('replaces the conversation when a second one runs in the same terminal', async () => {
+    const store = await load()
+    await store.setAgent(SNAP, CONVERSATION)
+    const record = await store.setAgent(SNAP, { ...CONVERSATION, sessionId: 'second' })
+    expect(record?.agent?.sessionId).toBe('second')
+    expect(store.listRecords()).toHaveLength(1)
+  })
+
+  it('keeps the record when the description and link go but the conversation stays', async () => {
+    const store = await load()
+    await store.setAgent(SNAP, CONVERSATION)
+    await store.setDescription(SNAP, 'why')
+    expect(await store.setDescription(SNAP, null)).toMatchObject({ agent: CONVERSATION })
+    expect(store.listRecords()).toHaveLength(1)
+  })
+
+  it('deletes the record only when nothing at all is left', async () => {
+    const store = await load()
+    await store.setAgent(SNAP, CONVERSATION)
+    expect(await store.setAgent(SNAP, null)).toBeNull()
+    expect(store.listRecords()).toEqual([])
+  })
+
+  it('survives a reload, a close and the startup sweep', async () => {
+    const first = await load()
+    await first.setAgent(SNAP, CONVERSATION)
+    await first.markClosed('s1', new Date('2026-09-15T19:00:00.000Z'))
+    const second = await load()
+    await second.loadRecords()
+    await second.sweepOpenRecords()
+    expect(second.listRecords()[0]?.agent).toEqual(CONVERSATION)
+  })
+
+  it('drops an unreadable conversation on load rather than the record', async () => {
+    const first = await load()
+    await first.setDescription(SNAP, 'why')
+    const onDisk = JSON.parse(fs.readFileSync(FILE(), 'utf8'))
+    onDisk[0].agent = { provider: 'some-other-agent', sessionId: 'x' }
+    fs.writeFileSync(FILE(), JSON.stringify(onDisk))
+    const second = await load()
+    await second.loadRecords()
+    expect(second.listRecords()[0]).toMatchObject({ description: 'why', agent: null })
+  })
+
+  it('refuses a conversation for a closed session', async () => {
+    const store = await load()
+    await store.setDescription(SNAP, 'why')
+    await store.markClosed('s1', new Date())
+    await expect(store.setAgent(SNAP, CONVERSATION)).rejects.toMatchObject({
+      code: 'RECORD_CLOSED',
+    })
+  })
+})
+
+describe('session-record-store — transfer', () => {
+  const RESUMED: SessionSnapshot = { ...SNAP, sessionId: 's2', tabTitle: 'claude' }
+
+  it('moves everything the old session held to the new one, and forgets the old', async () => {
+    const store = await load()
+    await store.setAgent(SNAP, CONVERSATION)
+    await store.setDescription(SNAP, 'Reproducing the staging 429s')
+    await store.setLink(SNAP, { tracker: 'linear', key: 'NW-88' })
+    await store.markClosed('s1', new Date())
+
+    const moved = await store.transfer('s1', RESUMED)
+    expect(moved).toMatchObject({
+      sessionId: 's2',
+      description: 'Reproducing the staging 429s',
+      link: { tracker: 'linear', key: 'NW-88' },
+      agent: CONVERSATION,
+    })
+    expect(moved?.closedAt).toBeUndefined()
+    expect(store.listRecords().map((r) => r.sessionId)).toEqual(['s2'])
+  })
+
+  it('does nothing for a session that had no record', async () => {
+    const store = await load()
+    expect(await store.transfer('nobody', RESUMED)).toBeNull()
+    expect(store.listRecords()).toEqual([])
+  })
+
+  it('announces both the new record and the old one going', async () => {
+    const store = await load()
+    await store.setAgent(SNAP, CONVERSATION)
+    const seen: Array<[string, boolean]> = []
+    store.onRecordChange((id, record) => seen.push([id, record !== null]))
+    await store.transfer('s1', RESUMED)
+    expect(seen).toEqual([
+      ['s1', false],
+      ['s2', true],
+    ])
+  })
+})

@@ -370,14 +370,38 @@ export interface SessionSnapshot {
   startedAt: string
 }
 
+/** Agents whose conversations can be brought back by id. */
+export type AgentProvider = 'claude'
+
 /**
- * The retained context of one session: the operator's description of it and
- * its own work item link. Exists only while one of the two is set, and for 30
- * days after the session closes.
+ * One agent conversation, as the agent itself reported it.
+ *
+ * `sessionId` is the agent's own identifier and survives resuming; the
+ * transcript is the agent's file, and its existence is what makes the
+ * conversation resumable on this machine.
+ */
+export interface AgentConversation {
+  provider: AgentProvider
+  sessionId: string
+  transcriptPath: string
+  cwd: string
+  capturedAt: string
+}
+
+/**
+ * The retained context of one session: the operator's description of it, its
+ * own work item link, and the agent conversation that ran in it. Exists while
+ * any of the three is set, and for 30 days after the session closes.
  */
 export interface SessionRecord extends SessionSnapshot {
   description: string | null
   link: WorkItemRef | null
+  agent: AgentConversation | null
   updatedAt: string
   closedAt?: string
+}
+
+/** A record as a surface reads it: with whether its conversation can be brought back now. */
+export interface SessionRecordListing extends SessionRecord {
+  resumable: boolean
 }
