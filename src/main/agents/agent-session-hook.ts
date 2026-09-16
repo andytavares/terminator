@@ -185,11 +185,12 @@ export async function installUserHook(options: CaptureHookOptions): Promise<void
     ],
   }
 
-  const index = sessionStart.findIndex(isOurs)
-  if (index === -1) sessionStart.push(ours)
-  else sessionStart[index] = ours
-
-  settings.hooks = { ...hooks, SessionStart: sessionStart }
+  // Every entry of ours goes, then one comes back. Replacing only the first
+  // would leave the rest stacked, and they do stack: each install writes a path
+  // into its own data directory, and development and test profiles make a new
+  // one every run.
+  const theirs = sessionStart.filter((entry) => !isOurs(entry))
+  settings.hooks = { ...hooks, SessionStart: [...theirs, ours] }
 
   await fs.mkdir(path.dirname(userSettingsPath()), { recursive: true })
   await fs.writeFile(userSettingsPath(), `${JSON.stringify(settings, null, 2)}\n`, 'utf8')

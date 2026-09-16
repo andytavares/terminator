@@ -118,34 +118,34 @@ description: 'Task list for Resume an agent session'
 
 ### Tests first
 
-- [ ] T024 [P] [US1] Write failing specs for the pure layer in `tests/unit/renderer/sidebar/resume.spec.ts`:
+- [x] T024 [P] [US1] Write failing specs for the pure layer in `tests/unit/renderer/sidebar/resume.spec.ts`:
   - `resumeCommand` builds `claude --resume <id>` for `provider: 'claude'`, and `null` for anything else.
   - `planResume` returns a plan for an exited, resumable session, with its branch and recorded folder.
   - `null` for a running session, one with no conversation, or one that is not resumable.
   - The session id is quoted or rejected so nothing but an id can reach the command line.
-- [ ] T025 [P] [US1] Write failing specs in `tests/unit/renderer/components/ResumeButton.spec.tsx`:
+- [x] T025 [P] [US1] Write failing specs in `tests/unit/renderer/components/ResumeButton.spec.tsx`:
   - Renders `button` named `Resume <name>` when a plan exists, and calls `onResume` with it.
   - Renders `Conversation no longer available` when the session had a conversation and is not resumable.
   - Renders nothing when the session never had one, and nothing while it is running.
-- [ ] T026 [P] [US1] Extend `tests/unit/renderer/terminal/start-session.spec.ts` for `resumeSession`:
+- [x] T026 [P] [US1] Extend `tests/unit/renderer/terminal/start-session.spec.ts` for `resumeSession`:
   - Creates a terminal on the session's branch, in the recorded folder, with the resume command.
   - Transfers the record to the new session, then closes the old terminal when one is open.
   - Shows the resumed terminal.
   - A create that fails leaves the old session and its record alone, and closes nothing.
   - A session already resumed and running shows that terminal instead of starting a second one.
-- [ ] T027 [P] [US1] Extend the surface specs so each shows Resume where it applies:
+- [x] T027 [P] [US1] Extend the surface specs so each shows Resume where it applies:
   - `tests/unit/renderer/components/LedgerView.spec.tsx`
   - `tests/unit/renderer/components/LogbookView.spec.tsx`
   - `tests/unit/renderer/components/WallTile.spec.tsx`
 
 ### Implementation
 
-- [ ] T028 [P] [US1] Implement `src/renderer/sidebar/resume.ts` (T024).
-- [ ] T029 [P] [US1] Implement `src/renderer/components/session/ResumeButton.tsx` and its CSS (T025), with a flat lucide icon.
-- [ ] T030 [US1] Implement `resumeSession` in `src/renderer/terminal/start-session.ts` (T026): create with `initialCommand`, `transfer`, close the old terminal, navigate.
-- [ ] T031 [US1] Render `ResumeButton` in `LedgerView`, `LogbookView` and `WallTile`, wired to `resumeSession` (T027).
-- [ ] T032 [US1] Write `tests/e2e/resume-session.spec.ts` (first block): with a fake agent — a script that reports a conversation through the same hook path — a session that exits offers Resume, resuming opens a terminal in the same branch, the old tab goes, and the description and link move with it.
-- [ ] T033 [US1] Write `tests/e2e/live/resume-live.spec.ts`: quickstart §4 against a real `claude` — remember a number, `/exit`, press Resume on the wall, ask for the number, assert the answer. Scrub `CLAUDE*` from the environment first. Record the Claude Code version in the run's report.
+- [x] T028 [P] [US1] Implement `src/renderer/sidebar/resume.ts` (T024).
+- [x] T029 [P] [US1] Implement `src/renderer/components/session/ResumeButton.tsx` and its CSS (T025), with a flat lucide icon.
+- [x] T030 [US1] Implement `resumeSession` in `src/renderer/terminal/start-session.ts` (T026): create with `initialCommand`, `transfer`, close the old terminal, navigate.
+- [x] T031 [US1] Render `ResumeButton` in `LedgerView`, `LogbookView` and `WallTile`, wired to `resumeSession` (T027).
+- [x] T032 [US1] Write `tests/e2e/resume-session.spec.ts` (first block): with a fake agent — a script that reports a conversation through the same hook path — a session that exits offers Resume, resuming opens a terminal in the same branch, the old tab goes, and the description and link move with it.
+- [x] T033 [US1] Write `tests/e2e/live/resume-live.spec.ts`: quickstart §4 against a real `claude` — remember a number, `/exit`, press Resume on the wall, ask for the number, assert the answer. Scrub `CLAUDE*` from the environment first. Record the Claude Code version in the run's report.
 
 **Checkpoint**: US1 is demoable, and the live run has passed once.
 
@@ -159,14 +159,14 @@ description: 'Task list for Resume an agent session'
 
 ### Tests first
 
-- [ ] T034 [P] [US2] Extend `tests/unit/sessions/session-record-store.spec.ts`: a swept-closed record keeps its conversation and stays resumable.
-- [ ] T035 [P] [US2] Extend `tests/unit/renderer/components/LedgerView.spec.tsx` and `LogbookView.spec.tsx`: a closed session offers Resume, and still shows its description read-only.
+- [x] T034 [P] [US2] Extend `tests/unit/sessions/session-record-store.spec.ts`: a swept-closed record keeps its conversation and stays resumable.
+- [x] T035 [P] [US2] Extend `tests/unit/renderer/components/LedgerView.spec.tsx` and `LogbookView.spec.tsx`: a closed session offers Resume, and still shows its description read-only.
 
 ### Implementation
 
-- [ ] T036 [US2] Make sure a resumed closed session leaves the Closed group: the transferred record belongs to an open session, so `buildLedger` and `buildLogbook` place it with the open ones. Cover it in `tests/unit/renderer/sidebar/ledger-rows.spec.ts`.
-- [ ] T037 [US2] Extend `tests/e2e/resume-session.spec.ts`: relaunch onto the same profile, assert the session is under `Closed` with Resume, resume it, and assert it is no longer under Closed.
-- [ ] T038 [US2] Assert in the same spec that no agent ran before Resume was pressed: after the relaunch, no terminal exists (SC-007).
+- [x] T036 [US2] Make sure a resumed closed session leaves the Closed group: the transferred record belongs to an open session, so `buildLedger` and `buildLogbook` place it with the open ones. Cover it in `tests/unit/renderer/sidebar/ledger-rows.spec.ts`.
+- [x] T037 [US2] Extend `tests/e2e/resume-session.spec.ts`: relaunch onto the same profile, assert the session is under `Closed` with Resume, resume it, and assert it is no longer under Closed.
+- [x] T038 [US2] Assert in the same spec that no agent ran before Resume was pressed: after the relaunch, no terminal exists (SC-007).
 
 ---
 
@@ -178,13 +178,13 @@ description: 'Task list for Resume an agent session'
 
 ### Tests first
 
-- [ ] T039 [P] [US3] Extend `tests/unit/ipc/session-records.ipc.spec.ts`: a record whose transcript is deleted between two lists flips `resumable` to false.
-- [ ] T040 [P] [US3] Extend `tests/unit/renderer/components/ResumeButton.spec.tsx`: the unavailable message replaces the button, and is not shown for a session that never had a conversation.
+- [x] T039 [P] [US3] Extend `tests/unit/ipc/session-records.ipc.spec.ts`: a record whose transcript is deleted between two lists flips `resumable` to false.
+- [x] T040 [P] [US3] Extend `tests/unit/renderer/components/ResumeButton.spec.tsx`: the unavailable message replaces the button, and is not shown for a session that never had a conversation.
 
 ### Implementation
 
-- [ ] T041 [US3] Make the unavailable state visible on all three surfaces, reusing `ResumeButton`, and cover it in the surface specs.
-- [ ] T042 [US3] Extend `tests/e2e/resume-session.spec.ts`: delete the transcript the record names, reopen Home, and assert the message and the absence of Resume.
+- [x] T041 [US3] Make the unavailable state visible on all three surfaces, reusing `ResumeButton`, and cover it in the surface specs.
+- [x] T042 [US3] Extend `tests/e2e/resume-session.spec.ts`: delete the transcript the record names, reopen Home, and assert the message and the absence of Resume.
 
 ---
 
@@ -196,24 +196,24 @@ description: 'Task list for Resume an agent session'
 
 ### Tests first
 
-- [ ] T043 [P] [US4] Extend `tests/unit/agents/agent-session-watcher.spec.ts`: two reports naming two terminals update two records, and neither takes the other's conversation.
-- [ ] T044 [P] [US4] Extend `tests/unit/agents/agent-session-hook.spec.ts`: the script keys its file on the terminal, so two terminals write two files.
+- [x] T043 [P] [US4] Extend `tests/unit/agents/agent-session-watcher.spec.ts`: two reports naming two terminals update two records, and neither takes the other's conversation.
+- [x] T044 [P] [US4] Extend `tests/unit/agents/agent-session-hook.spec.ts`: the script keys its file on the terminal, so two terminals write two files.
 
 ### Implementation
 
-- [ ] T045 [US4] Extend `tests/e2e/resume-session.spec.ts`: two terminals on one branch, each with its own fake conversation, exit both, resume both, and assert each resumed the right one.
-- [ ] T046 [US4] Confirm capture needs nothing from the way the agent was started: the e2e types the command rather than using any Terminator control, and the spec says so in a comment.
+- [x] T045 [US4] Extend `tests/e2e/resume-session.spec.ts`: two terminals on one branch, each with its own fake conversation, exit both, resume both, and assert each resumed the right one.
+- [x] T046 [US4] Confirm capture needs nothing from the way the agent was started: the e2e types the command rather than using any Terminator control, and the spec says so in a comment.
 
 ---
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T047 [P] Update `docs/ARCHITECTURE.md`: the persistence table gains the conversation and the report directory; a "Resuming an agent session" section covers the hook, the terminal variable, the watcher and transfer; the Terminal Session Lifecycle notes the environment variable.
-- [ ] T048 [P] Update `README.md` and `docs/user-guide/USER-GUIDE.md`: what Resume does, that only Claude Code sessions have it, that nothing resumes on its own, and **how to remove the hook entry from `~/.claude/settings.json`**.
-- [ ] T049 [P] Finalise `docs/adr/055-a-conversation-outlives-its-terminal.md` with anything the build taught, including the Claude Code version the live run proved.
-- [ ] T050 Accessibility pass: Resume is reachable by keyboard with a visible focus ring on all three surfaces, and its accessible name says which session it resumes.
-- [ ] T051 Verify reachability: every export this feature adds has a caller outside tests. Delete anything that does not.
-- [ ] T052 Screenshot the running app: an exited session offering Resume, and the unavailable state. Look at the images.
+- [x] T047 [P] Update `docs/ARCHITECTURE.md`: the persistence table gains the conversation and the report directory; a "Resuming an agent session" section covers the hook, the terminal variable, the watcher and transfer; the Terminal Session Lifecycle notes the environment variable.
+- [x] T048 [P] Update `README.md` and `docs/user-guide/USER-GUIDE.md`: what Resume does, that only Claude Code sessions have it, that nothing resumes on its own, and **how to remove the hook entry from `~/.claude/settings.json`**.
+- [x] T049 [P] Finalise `docs/adr/055-a-conversation-outlives-its-terminal.md` with anything the build taught, including the Claude Code version the live run proved.
+- [x] T050 Accessibility pass: Resume is reachable by keyboard with a visible focus ring on all three surfaces, and its accessible name says which session it resumes.
+- [x] T051 Verify reachability: every export this feature adds has a caller outside tests. Delete anything that does not.
+- [x] T052 Screenshot the running app: an exited session offering Resume, and the unavailable state. Look at the images.
 - [ ] T053 Run `quickstart.md` §1–§6 and put each command and its exit code in the PR description, including the live run's answer.
 - [ ] T054 Open the PR from `055-resume-agent-session`, noting it depends on #182. The body names the settings file the feature writes into, how to remove it, and what is out of scope. Check `git log --oneline -1` after the last commit to confirm the gate did not refuse it.
 

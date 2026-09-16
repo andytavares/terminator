@@ -192,6 +192,26 @@ describe('installing the hook in the operator’s Claude settings', () => {
     expect(hooks.SessionStart[0].hooks[0].command).not.toContain('/some/old/profile/')
   })
 
+  // Found in a real settings file: eight entries, one per development profile,
+  // because only the first was ever replaced.
+  it('collapses every entry left by earlier installs into one, keeping the rest', async () => {
+    const stale = (n: number) => ({
+      matcher: '*',
+      hooks: [{ type: 'command', command: `/profile-${n}/agent-session-hook.cjs x` }],
+    })
+    const theirs = { hooks: [{ type: 'command', command: '/Users/me/.claude/hooks/weekly.sh' }] }
+    fs.mkdirSync(path.join(home, '.claude'), { recursive: true })
+    fs.writeFileSync(
+      settingsPath(),
+      JSON.stringify({ hooks: { SessionStart: [theirs, stale(1), stale(2), stale(3)] } })
+    )
+    await install()
+    const hooks = read().hooks as { SessionStart: Array<{ hooks: Array<{ command: string }> }> }
+    expect(hooks.SessionStart).toHaveLength(2)
+    expect(hooks.SessionStart[0]).toEqual(theirs)
+    expect(hooks.SessionStart[1].hooks[0].command).not.toContain('/profile-')
+  })
+
   it('does nothing rather than failing when its script has gone', async () => {
     const mod = await load()
     const scriptPath = await mod.installCaptureScript(userData)
