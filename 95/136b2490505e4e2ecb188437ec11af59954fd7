@@ -1,0 +1,35 @@
+tests/unit/renderer/components/WallTile.spec.tsx
+  s_cf6284d326023a::t_a03dbf5f3eca24 163-185
+tests/unit/sessions/session-record-store.spec.ts
+  s_cf6284d326023a::t_ab1049d9c55171 310-323
+tests/unit/renderer/components/LedgerView.spec.tsx
+  s_cf6284d326023a::t_e3d32e796f483e 255-308
+tests/unit/renderer/sidebar/session-facts.spec.ts
+  s_cf6284d326023a::t_71f67108a24dae 298-317
+tests/unit/ipc/session-records.ipc.spec.ts
+  s_cf6284d326023a::t_609d046e031670 266-278
+tests/unit/agents/agent-session-watcher.spec.ts
+  s_cf6284d326023a::t_f04b2debfb52ca 102-120
+tests/e2e/resume-session.spec.ts
+  s_cf6284d326023a::t_aee5fbc316bdc0 199-205
+  s_cf6284d326023a::t_215377193b1a25 176
+  s_cf6284d326023a::t_7e914935eb7d79 177
+  s_cf6284d326023a::t_e03e86e30a28eb 168-175,179-198,206-221
+  s_cf6284d326023a::t_51d33ac30c9468 178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "95136b2490505e4e2ecb188437ec11af59954fd7",
+  "prompts": {},
+  "sessions": {
+    "s_cf6284d326023a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba571c0-52db-479b-bc2c-554b8d35b4a2",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
