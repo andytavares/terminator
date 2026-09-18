@@ -354,6 +354,31 @@ describe('useExtensionRegistry', () => {
     })
   })
 
+  describe('dismissSurfaces', () => {
+    it('clears a core global tab such as Home, which the Escape exit leaves alone', () => {
+      useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+      expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(true)
+      expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    })
+
+    it('clears the workspace and project tab slots too', () => {
+      useExtensionRegistry.setState({
+        activeWorkspaceTabId: 'foundry',
+        activeProjectTabId: 'git',
+      })
+      expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(true)
+      const state = useExtensionRegistry.getState()
+      expect(state.activeWorkspaceTabId).toBeNull()
+      expect(state.activeProjectTabId).toBeNull()
+    })
+
+    it('reports false and leaves sidebar panels open when no surface is showing', () => {
+      useExtensionRegistry.setState({ openPanels: new Set(['git-panel']) })
+      expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(false)
+      expect(useExtensionRegistry.getState().openPanels.has('git-panel')).toBe(true)
+    })
+  })
+
   describe('exitExtensionToTerminal', () => {
     it('clears an active global tab and reports that it exited', () => {
       useExtensionRegistry.getState().setActiveGlobalTab('notepad')

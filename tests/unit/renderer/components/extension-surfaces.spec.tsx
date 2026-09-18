@@ -113,7 +113,10 @@ const mockRegistryState = {
   projectTabs: new Map([[projectTab.id, projectTab]]),
   sidebarButtons: [sidebarItem],
   activeGlobalTabId: null,
+  activeWorkspaceTabId: null,
+  activeProjectTabId: null,
   setActiveGlobalTab: vi.fn(),
+  dismissSurfaces: vi.fn(),
   registerCommand: vi.fn(() => vi.fn()),
 }
 
@@ -163,6 +166,7 @@ beforeEach(() => {
         ? selector(mockRegistryState)
         : mockRegistryState) as unknown as typeof useExtensionRegistry
   )
+  Object.assign(useExtensionRegistry, { getState: () => mockRegistryState })
 })
 
 const renderSidebar = (groupBy: GroupKey) =>

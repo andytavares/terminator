@@ -168,7 +168,10 @@ const mockSessionStore = {
 const mockRegistryState = {
   globalTabs: new Map(),
   workspaceTabs: new Map(),
-  activeGlobalTabId: null,
+  activeGlobalTabId: null as string | null,
+  activeWorkspaceTabId: null,
+  activeProjectTabId: null,
+  dismissSurfaces: vi.fn(),
   sidebarButtons: [] as Array<{ id: string; label: string; action: () => void }>,
   setActiveGlobalTab: vi.fn(),
   registerCommand: vi.fn(() => vi.fn()),
@@ -244,6 +247,9 @@ beforeEach(() => {
         ? selector(mockRegistryState)
         : mockRegistryState) as unknown as typeof useExtensionRegistry
   )
+  mockRegistryState.activeGlobalTabId = null
+  mockRegistryState.dismissSurfaces.mockReset()
+  Object.assign(useExtensionRegistry, { getState: () => mockRegistryState })
 })
 
 const renderSidebar = (props = {}) => render(<UnifiedSidebar {...defaultProps} {...props} />)
@@ -399,6 +405,22 @@ describe('UnifiedSidebar — collapse', () => {
     const { container } = renderSidebar()
     fireEvent.click(container.querySelector('.repo-header')!)
     expect(container.querySelector('.repo-header__needs-you')).toBeTruthy()
+  })
+})
+
+describe('UnifiedSidebar — a click here dismisses what covers the terminal', () => {
+  it('dismisses Home when a click in the sidebar opens nothing else', () => {
+    mockRegistryState.activeGlobalTabId = 'core.home'
+    const { container } = renderSidebar()
+    fireEvent.click(container.querySelector('.repo-header')!)
+    expect(mockRegistryState.dismissSurfaces).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves it showing while the sidebar is being resized', () => {
+    mockRegistryState.activeGlobalTabId = 'core.home'
+    const { container } = renderSidebar()
+    fireEvent.click(container.querySelector('.unified-sidebar__resize-handle')!)
+    expect(mockRegistryState.dismissSurfaces).not.toHaveBeenCalled()
   })
 })
 

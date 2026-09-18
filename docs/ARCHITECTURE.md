@@ -407,6 +407,8 @@ Extension WebContentsView            Host renderer chrome
 
 The listeners are passive and bubble-phase, so an extension's own single-`Esc` dismissals are untouched. Core surfaces (`core.*` ids) are never exited, the host-side listener stands down inside a terminal, a text field, or an open modal, and remote `/app/` clients get the same gesture through a same-origin listener on the extension iframe. See [ADR-026](adr/026-double-escape-extension-exit.md).
 
+A click in the sidebar dismisses the same way, and there core surfaces go too: `useDismissSurfaceOnClick` compares the global/workspace/project tab slots across the click and, if the click chose nothing itself, calls `registry.dismissSurfaces()` to clear all three. A click that opened or toggled a surface is left to stand; sidebar panels, which sit beside the terminal, stay open.
+
 ### Contribution rendering
 
 The renderer queries contributions via IPC on mount:
