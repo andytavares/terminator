@@ -69,7 +69,7 @@ Verification commands (`npm test`, `pytest`, …) do **not** run through `api.sh
 
 ## NPM Dependencies
 
-Declared in `extensions/foundry/package.json` only. npm workspaces hoist them. Extension-owned dependencies, in full: **`zod`** (schema validation at every boundary) and **`js-yaml`** (recipes, roles and rules are hand-authored and need comments). That is the whole list.
+Declared in `extensions/foundry/package.json` only. npm workspaces hoist them. Extension-owned dependencies, in full: **`zod`** (schema validation at every boundary), **`js-yaml`** (recipes, roles and rules are hand-authored and need comments) and **`highlight.js`** (the review diff, at the git extension's version so one copy is hoisted; only `lib/common` is imported). That is the whole list.
 
 `diff`, `marked`, `@dnd-kit/*` and `@terminator/extension-ui` were declared here and imported by nothing — carried over from the extension this replaced, which had a drag-and-drop board and rendered markdown. Foundry parses its own hunks and renders its own markup.
 

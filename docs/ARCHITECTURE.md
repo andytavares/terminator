@@ -1177,8 +1177,11 @@ App
   │            raised it and what happens if it is ignored
   ├─ Orders  — the door
   │    ├─ Forge  — steps (intent → hand off), five checks, at most three questions
-  │    └─ Floor  — the run graph, the merge order, held tool calls, the live
-  │                transcript, and a way into the terminal
+  │    └─ Floor  — the standing band with each running agent's last few
+  │                transcript lines, the run graph, the merge order, held tool
+  │                calls, review hunks as highlighted diffs (`HunkLines`,
+  │                highlight.js on the --tm-syntax-* tokens), and a way into
+  │                the terminal
   ├─ Ledger  — every decision, filtered by order / actor / action; the one
   │            button that asks the curator
   └─ Settings — the model picker; everything else is registered through the

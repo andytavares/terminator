@@ -287,18 +287,27 @@ describe('a held tool call', () => {
   })
 })
 
+/** A transcript line as `foundry:run-transcript` returns it, not as a string. */
+function said(text: string, secondsAgo = 5) {
+  return { role: 'assistant', text, at: Date.now() - secondsAgo * 1000 }
+}
+
 describe('watching a run', () => {
-  it('shows nothing until a unit is chosen', async () => {
-    mount(reply(), { lines: ['reading src/auth/session.ts'] })
+  it('opens no watch panel until a unit is chosen', async () => {
+    mount(reply(), { lines: [said('reading src/auth/session.ts')] })
     await waitFor(() => screen.getByText(/WO-1/))
-    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:run-transcript')).toHaveLength(0)
+    expect(screen.queryByLabelText('Tell it what to do instead')).toBeNull()
   })
 
+  // The channel returns lines as objects; the panel joined them as strings
+  // and printed "[object Object]" — the fixture was a string array.
   it('shows what the agent has been saying', async () => {
-    mount(reply(), { lines: ['reading src/auth/session.ts'] })
+    mount(reply(), { lines: [said('reading src/auth/session.ts')] })
     await waitFor(() => screen.getByText(/WO-1/))
     fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
-    await waitFor(() => expect(screen.getByText(/reading src\/auth/)).toBeTruthy())
+    const panel = await screen.findByRole('region', { name: 's-1' })
+    await waitFor(() => expect(within(panel).getByText(/reading src\/auth/)).toBeTruthy())
+    expect(panel.textContent).not.toContain('[object Object]')
   })
 
   it('says so when there is nothing yet, rather than showing an empty box', async () => {
@@ -408,8 +417,23 @@ describe('finished work nobody has looked at', () => {
     fireEvent.click(screen.getByRole('button', { name: /Review/ }))
 
     await waitFor(() => expect(screen.getByText('src/auth/session.ts')).toBeTruthy())
-    expect(screen.getByText(/if \(expired\) return null/)).toBeTruthy()
-    expect(screen.getByText(/console\.log\(token\)/)).toBeTruthy()
+    const hunks = Array.from(document.querySelectorAll('.fdry-hunk')).map((h) => h.textContent)
+    expect(hunks).toHaveLength(2)
+    expect(hunks[0]).toContain('if (expired) return null')
+    expect(hunks[1]).toContain('console.log(token)')
+  })
+
+  // Reported: the review needed "syntax highlighting and change highlighting
+  // similar to how the git plugin works". It was one grey block.
+  it('shows each hunk as a diff: added lines marked, the code highlighted', async () => {
+    mount(reply(), { review: [REVIEW], hunks: HUNKS })
+    await waitFor(() => screen.getByText('To review — 1'))
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
+    await waitFor(() => screen.getByText('src/auth/session.ts'))
+
+    const added = document.querySelector('.fdry-hunk .fdry-diff-line.is-add') as HTMLElement
+    expect(added.querySelector('.fdry-diff-num')?.textContent).toBe('10')
+    expect(added.querySelector('.hljs-keyword')?.textContent).toBe('if')
   })
 
   it('accepts and rejects one at a time', async () => {
@@ -938,6 +962,13 @@ describe('a run whose agents are gone', () => {
     expect(within(band).getByText(/builder · U-1/)).toBeTruthy()
   })
 
+  it('does not list an orphaned step as an agent starting up', async () => {
+    mount(ORPHANED)
+    await screen.findByText(/Nothing is running this/)
+    expect(screen.queryByText(/Starting — nothing yet/)).toBeNull()
+    expect(invoke.mock.calls.some((c) => c[0] === 'foundry:run-transcript')).toBe(false)
+  })
+
   it('says why, so it does not read as a bug in the surface', async () => {
     mount(ORPHANED)
     await waitFor(() => screen.getByText(/Nothing is running this/))
@@ -1101,6 +1132,41 @@ describe('the standing band', () => {
     await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
     expect(screen.getByText('Make all text in the application red')).toBeTruthy()
     expect(screen.getByText('1 agent is working — 0 of 6 steps done.')).toBeTruthy()
+  })
+
+  // Reported: "the status is basically always blank". A single build step
+  // runs for many minutes at 0 of 3, and the band said nothing else.
+  it('shows what each running agent is doing, without choosing one to watch', async () => {
+    mount(reply({ standing: standing() }), {
+      lines: [said('Read: src/forge/intake.ts', 40), said('Bash: npm test', 3)],
+    })
+    const band = await screen.findByRole('region', { name: 'Building' })
+    await waitFor(() => expect(within(band).getByText('Bash: npm test')).toBeTruthy())
+    expect(within(band).getByText('Read: src/forge/intake.ts')).toBeTruthy()
+    expect(within(band).getByText('N-1')).toBeTruthy()
+    expect(within(band).getByText(/\d+s ago/)).toBeTruthy()
+    expect(invoke).toHaveBeenCalledWith(
+      'foundry:run-transcript',
+      expect.objectContaining({ sessionId: 's-1' })
+    )
+  })
+
+  it('says a running agent has not said anything yet, rather than nothing', async () => {
+    mount(reply({ standing: standing() }))
+    const band = await screen.findByRole('region', { name: 'Building' })
+    await waitFor(() => expect(within(band).getByText(/Starting — nothing yet/)).toBeTruthy())
+  })
+
+  it('asks only about agents that are running', async () => {
+    mount(reply({ standing: standing() }))
+    await screen.findByRole('region', { name: 'Building' })
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-transcript', expect.anything())
+    )
+    const asked = invoke.mock.calls
+      .filter((c) => c[0] === 'foundry:run-transcript')
+      .map((c) => (c[1] as { sessionId: string }).sessionId)
+    expect(new Set(asked)).toEqual(new Set(['s-1']))
   })
 
   it('says how far along the run is', async () => {
