@@ -1098,50 +1098,33 @@ describe('setting one order’s budgets', () => {
     const { order } = await seed()
     const r = (await channels().setBudgets({
       id: order.id,
-      budgets: { agents: 1, wallClockMinutes: null, filesTouched: 60 },
+      budgets: { agents: 1, wallClockMinutes: null },
     })) as OrderView
-    const expected = { agents: 1, wallClockMinutes: null, filesTouched: 60, tokens: null }
+    const expected = { agents: 1, wallClockMinutes: null, tokens: null }
     expect(r.order.budgets).toEqual(expected)
     expect((await store.load(order.id))?.budgets).toEqual(expected)
   })
 
-  it('re-runs the checks, so a budget that now fits the plan clears its check', async () => {
+  // ADR 056: there is no files budget to set.
+  it('refuses a files budget', async () => {
     const { order } = await seed()
-    await store.save({
-      ...order,
-      budgets: { ...order.budgets, filesTouched: 1 },
-      plan: {
-        ...order.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'u',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: [],
-            touches: ['a', 'b', 'c'],
-            verify: [],
-          },
-        ],
-      },
-    })
-    const r = (await channels().setBudgets({
-      id: order.id,
-      budgets: { agents: 3, wallClockMinutes: 45, filesTouched: null },
-    })) as OrderView
-    expect(r.compile.failures.map((f) => f.check)).not.toContain('budgets')
+    expect(
+      await channels().setBudgets({
+        id: order.id,
+        budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25 },
+      })
+    ).toEqual({ error: 'Malformed request.' })
   })
 
   it('records the choice in words', async () => {
     const { order } = await seed()
     await channels().setBudgets({
       id: order.id,
-      budgets: { agents: 2, wallClockMinutes: 30, filesTouched: null },
+      budgets: { agents: 2, wallClockMinutes: 30 },
     })
     const ledger = fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('budgets.configured')
-    expect(ledger).toContain('2 agents · 30 minutes · files unlimited')
+    expect(ledger).toContain('2 agents · 30 minutes')
   })
 
   it('refuses a limit of zero', async () => {
@@ -1149,7 +1132,7 @@ describe('setting one order’s budgets', () => {
     expect(
       await channels().setBudgets({
         id: order.id,
-        budgets: { agents: 0, wallClockMinutes: 45, filesTouched: 25 },
+        budgets: { agents: 0, wallClockMinutes: 45 },
       })
     ).toEqual({ error: 'Malformed request.' })
   })
@@ -1161,7 +1144,7 @@ describe('setting one order’s budgets', () => {
     await store.save({ ...order, status: 'running' })
     const r = (await channels().setBudgets({
       id: order.id,
-      budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25 },
+      budgets: { agents: 3, wallClockMinutes: 45 },
     })) as { error: string }
     expect(r.error).toContain('running')
   })
@@ -1170,7 +1153,7 @@ describe('setting one order’s budgets', () => {
     expect(
       await channels().setBudgets({
         id: 'WO-nope',
-        budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25 },
+        budgets: { agents: 3, wallClockMinutes: 45 },
       })
     ).toEqual({ error: 'No order WO-nope.' })
   })
@@ -1192,25 +1175,21 @@ describe('what configuration a new order starts with', () => {
 
   it('takes the budgets the operator configured (FR-030)', async () => {
     const r = await seeded({
-      budgetDefaults: () => ({ agents: 1, wallClockMinutes: 10, filesTouched: 4 }),
+      budgetDefaults: () => ({ agents: 1, wallClockMinutes: 10 }),
     })
-    expect(r.order.budgets).toMatchObject({ agents: 1, wallClockMinutes: 10, filesTouched: 4 })
+    expect(r.order.budgets).toMatchObject({ agents: 1, wallClockMinutes: 10 })
   })
 
   it('takes a configured budget of no limit', async () => {
     const r = await seeded({
-      budgetDefaults: () => ({ agents: null, wallClockMinutes: 10, filesTouched: null }),
+      budgetDefaults: () => ({ agents: null, wallClockMinutes: 10 }),
     })
-    expect(r.order.budgets).toMatchObject({
-      agents: null,
-      wallClockMinutes: 10,
-      filesTouched: null,
-    })
+    expect(r.order.budgets).toMatchObject({ agents: null, wallClockMinutes: 10 })
   })
 
   it('falls back to the schema defaults when nothing is configured', async () => {
     const r = await seeded({})
-    expect(r.order.budgets).toMatchObject({ agents: 3, wallClockMinutes: 45, filesTouched: 25 })
+    expect(r.order.budgets).toMatchObject({ agents: 3, wallClockMinutes: 45 })
   })
 
   it('reads the budgets on every order, not once when the extension started', async () => {
@@ -1218,7 +1197,7 @@ describe('what configuration a new order starts with', () => {
     const c = createForgeChannels({
       store,
       now: () => NOW,
-      budgetDefaults: () => ({ agents, wallClockMinutes: 45, filesTouched: 25 }),
+      budgetDefaults: () => ({ agents, wallClockMinutes: 45 }),
     })
     const first = (await c.create({
       source: { kind: 'typed', text: 'first' },

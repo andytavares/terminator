@@ -431,7 +431,6 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const budgets = order?.budgets ?? {
       agents: 3,
       wallClockMinutes: 45,
-      filesTouched: 25,
       tokens: null,
     }
 

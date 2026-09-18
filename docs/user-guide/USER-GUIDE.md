@@ -602,7 +602,7 @@ with **Back** and **Next** at the bottom:
 4. **Shape** — the shape of work. Shown while the order is a draft.
 5. **Tracker** — what goes back to the issue. Shown only for an order seeded
    from a tracker issue.
-6. **Hand off** — the six checks, and **Compile & hand off**.
+6. **Hand off** — the five checks, and **Compile & hand off**.
 
 Any step can be opened from the step list at any time. A step that is holding
 hand-off up shows a **cross** in place of its number, and a dot appears beside a
@@ -627,14 +627,16 @@ wrong, and it redrafts. **Attach**, beside it, takes you into the terminal the
 architect is working in — the same conversation, whether it is still running
 or you came back to it after a restart.
 
-**Six checks**, and it will not hand off until all six pass — no open
+**Five checks**, and it will not hand off until all five pass — no open
 questions, every acceptance criterion falsifiable, coverage complete in both
-directions, risk graded against _this_ plan, adversarial findings resolved,
-budgets set. A failing check is shown at the top of the step that clears it,
-and all six are listed on **Hand off**. Each failure names the specific
+directions, risk graded against _this_ plan, adversarial findings resolved.
+A failing check is shown at the top of the step that clears it, and all five
+are listed on **Hand off**. Each failure names the specific
 criterion, unit or question responsible, **and what to do about it**: either a
 button that takes you to the control that clears it — on its own step — or one
-that redrafts with the instruction the architect needs.
+that redrafts with the instruction the architect needs. Once you press one of
+those, the button becomes **Asked — the architect is working on it** until the
+redraft lands, and no other ask is offered in the meantime.
 
 The one that catches people is **criteria falsifiable** on a change somebody
 can see: a plan that touches a `.tsx`, `.css` or `.html` file and has no
@@ -646,11 +648,10 @@ Plan step. That costs a written reason, which travels with the order and shows
 in the ledger.
 
 **Budgets** are yours to set, not the architect's. Each new order starts with
-the limits in Settings → Foundry: agents at once, minutes, and files touched.
-In Settings, 0 means no limit. To change the limits for one order, use the
+the limits in Settings → Foundry: agents at once and minutes. There is no
+limit on how many files an order touches. In Settings, 0 means no limit. To change the limits for one order, use the
 **Budgets** section at the bottom of the Plan step: enter a number or tick
-**No limit**, then press **Save budgets**. If a plan does not fit its budgets,
-the budgets check offers **Change the budget** or **Ask it to cut the plan**.
+**No limit**, then press **Save budgets**.
 
 If a run goes past a budget, it stops and asks you what to do. **Raise the
 budget** asks for the new limit. It suggests about a quarter more than the run
@@ -658,8 +659,11 @@ has already used, and won't accept less than what the run has already used.
 The new limit is saved to the order and the run resumes. You can tick **No
 limit** there as well.
 
-**Red team** findings are each either **Fixed** or **Accepted**, and accepting
-one costs a written reason. Nothing hands off while one is open.
+**Red team** findings are each cleared one of three ways. **Ask the architect**
+has it change the order so the finding no longer holds; a finding the checks can
+re-run, like an order that excludes nothing, closes itself when the redraft
+lands. **Fixed** marks it done yourself, and **Accept** keeps it at the cost of a
+written reason. Nothing hands off while one is open.
 
 **Shape** offers the shapes this repository can actually support, each with its
 whole description — one that cannot run here says which requirement it does not

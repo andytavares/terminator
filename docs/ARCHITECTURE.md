@@ -905,7 +905,7 @@ assumptions, the open questions, the adversarial findings, and the provenance
 of every decision taken about it.
 
 `src/order/schema.ts` answers _shape_; `src/order/compile.ts` answers
-_completeness_. Six checks, none of which can be waved through:
+_completeness_. Five checks, none of which can be waved through:
 
 | Check        | Fails when                                                                                                     |
 | ------------ | -------------------------------------------------------------------------------------------------------------- |
@@ -914,7 +914,6 @@ _completeness_. Six checks, none of which can be waved through:
 | `coverage`   | a criterion has no unit, a unit satisfies no criterion, or two lanes change one file with no declared producer |
 | `risk`       | the plan touches something outside the blast radius the grade was taken over                                   |
 | `redTeam`    | an adversarial finding is neither resolved nor accepted with a reason                                          |
-| `budgets`    | the plan cannot fit inside the budgets it declares, **with room to spare** (ADR-049)                           |
 
 A check names what is missing **and what is enough**, because one that names
 only the first gets over-served (ADR-049). `verifiable`'s picture rule says one
@@ -922,18 +921,15 @@ criterion closes it, of a surface the plan already touches: coverage runs both
 ways, so every surface a criterion names is one the plan then has to touch, and
 an architect that answered "no criterion asks for a picture" with three of them
 across five extension panels turned a one-line ask into a 41-file plan.
-`budgets` refuses a budget the plan already fills for the same reason it
-refuses one the plan overflows — a budget with no room cannot tell an agent
-going wide from an estimate a few files short, and fires once the work is done
-rather than before it starts. About a quarter more than the plan declares.
 
-Budgets are the operator's (ADR 052). The architect's proposal never changes
+Budgets are the operator's (ADR 052), and there are two: agents at once and
+minutes. A count of files is not one (ADR 056). The architect's proposal never changes
 them. A draft's budgets are set on the Forge's Plan step
 (`foundry:order.budgets`). On a running order, the one budget it went past is
 raised at its `budget.exceeded` gate: the gate carries the `breach`, and
 `foundry:inbox.decide` writes the new limit to the order before resuming. Any
-enforced budget may be `null`, meaning no limit, which the breach check, the
-scheduler and the `budgets` check all treat as unbounded. In Settings, no limit
+enforced budget may be `null`, meaning no limit, which the breach check and the
+scheduler treat as unbounded. In Settings, no limit
 is written as `0`.
 
 `agreeOrder` is the only thing that may set an order to `agreed`, which is what
@@ -954,7 +950,7 @@ surfaced at once.
 every turn after the first is amending an order that already exists, so the
 brief says so and carries the order to be amended. The architect's `reads:`
 names `order`, which is what puts the rendered order — criteria, units, the
-coverage matrix, and which of the six checks refuse it — into the brief, and
+coverage matrix, and which of the checks refuse it — into the brief, and
 `convergeBrief` adds the framing that tells it this turn changes that document
 rather than deriving one. Both halves were missing and each cost a turn on
 their own: measured on WO-0910-6ea, "Ask for the gap to be closed" produced
@@ -998,7 +994,7 @@ reviewer's finding is judgement and stays with the operator.
   what makes a verdict independent of the work; fresh context _per unit_ adds
   nothing on top of that and doubled the session count of every order.
 - **No recipe re-plans an agreed order.** The Forge's `converge` is the
-  architect, and its plan is what the six compile checks agreed. `direct` and
+  architect, and its plan is what the compile checks agreed. `direct` and
   `standard` used to open with a `plan` step that ran the architect again over
   an order it may not change — `applyRungOutput` refuses a `plan` from a rung —
   so it could only end in silence or a halt. It cost 8.2 minutes doing neither.
@@ -1085,14 +1081,12 @@ reviewer's finding is judgement and stays with the operator.
   one. The checker is its own session now, held against the recorded session that
   produced the work, and absence reads as "not measured" in both the ladder and
   the pull-request body.
-- **The regrade and the budgets read the world, not the plan.** `inspectionFor`
-  and `regrade` answer for "the change the work turned out to be", and the
-  files-touched budget exists to catch an agent going wide — and all three were
-  handed `plan.units.flatMap(u => u.touches)`, the files the plan _predicted_,
-  with `linesChanged` hardcoded to zero. So no change could grade worse than it
-  was planned as, the `outside_blast_radius` trigger could only fire on an order
-  inconsistent with itself, and the files-touched budget was a constant. They
-  read the working copies now, through the `readChangedFiles` and
+- **The regrade reads the world, not the plan.** `inspectionFor` and `regrade`
+  answer for "the change the work turned out to be", and both were handed
+  `plan.units.flatMap(u => u.touches)`, the files the plan _predicted_, with
+  `linesChanged` hardcoded to zero. So no change could grade worse than it was
+  planned as, and the `outside_blast_radius` trigger could only fire on an order
+  inconsistent with itself. They read the working copies now, through the `readChangedFiles` and
   `readDiffSummary` that were already written and already correct and that the
   Line had never asked anything.
 - **The ladder** (`verify/ladder.ts`) stops at the first failure, so a run does
@@ -1182,7 +1176,7 @@ App
   │            work each decision unblocks, every row naming the rule that
   │            raised it and what happens if it is ignored
   ├─ Orders  — the door
-  │    ├─ Forge  — steps (intent → hand off), six checks, at most three questions
+  │    ├─ Forge  — steps (intent → hand off), five checks, at most three questions
   │    └─ Floor  — the run graph, the merge order, held tool calls, the live
   │                transcript, and a way into the terminal
   ├─ Ledger  — every decision, filtered by order / actor / action; the one
@@ -1216,6 +1210,7 @@ App
 - [ADR-042: Foundry installs nothing](adr/042-foundry-installs-nothing.md) — the data root, the three rungs, and the toolchain probe.
 - [ADR-043: an agent proposes the order](adr/043-an-agent-proposes-the-order-and-never-writes-it.md) — intake is an agent turn, and what it may and may not write.
 - [ADR-049: an accidental question costs five minutes](adr/049-an-accidental-question-costs-five-minutes.md) — why a policy that asks by accident is a latency defect, and the eight changes measured against one live run.
+- [ADR-056: a file count is not a budget](adr/056-a-file-count-is-not-a-budget.md) — budgets are agents and minutes; the files budget and the `budgets` check are gone.
 
 The feature's own design documents are in
 [`specs/037-foundry-software-factory/`](../specs/037-foundry-software-factory/):

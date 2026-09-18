@@ -36,7 +36,7 @@ describe('what a proposal may contain', () => {
     const proposal = parseProposal({
       acceptance: [CRITERION],
       risk: { grade: 'P1', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-      budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 12, tokens: null },
+      budgets: { agents: 2, wallClockMinutes: 45, tokens: null },
       note: 'first draft',
     })
     expect(proposal.acceptance).toHaveLength(1)
@@ -82,12 +82,12 @@ describe('merging one in', () => {
     // The architect's contract carried an example budget, and whatever it
     // wrote replaced the configured one: an operator who set 25 files got 10.
     const before = order({
-      budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25, tokens: null },
+      budgets: { agents: 3, wallClockMinutes: 45, tokens: null },
     })
     const after = applyProposal(
       before,
       parseProposal({
-        budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 10, tokens: null },
+        budgets: { agents: 2, wallClockMinutes: 45, tokens: null },
       }),
       NOW
     )

@@ -82,10 +82,9 @@ const CHECK_LABELS: Record<CheckId, string> = {
   coverage: 'Coverage both ways',
   risk: 'Risk graded',
   redTeam: 'Red team resolved',
-  budgets: 'Budgets set',
 }
 
-const CHECK_ORDER: CheckId[] = ['questions', 'verifiable', 'coverage', 'risk', 'redTeam', 'budgets']
+const CHECK_ORDER: CheckId[] = ['questions', 'verifiable', 'coverage', 'risk', 'redTeam']
 
 const STEP_LABELS: Record<StepId, string> = {
   intent: 'Intent',
@@ -167,15 +166,6 @@ const CHECK_REMEDIES: Record<CheckId, readonly Remedy[]> = {
     },
   ],
   redTeam: [{ kind: 'goto', label: 'Clear them', step: 'redTeam', target: STEP_HEADING }],
-  budgets: [
-    { kind: 'goto', label: 'Change the budget', step: 'plan', target: 'fdry-budgets' },
-    {
-      kind: 'ask',
-      label: 'Ask it to cut the plan',
-      message:
-        'The plan does not fit its budgets, and the budgets are the operator’s to set. Cut the plan down until it fits the budgets the order has.',
-    },
-  ],
 }
 
 /** What the architect is told when asked to clear one red team finding. */
@@ -498,7 +488,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       ? `Nothing under an acceptance heading in ${order.source.key ?? 'the ticket'}. Press “Draft the plan” and the architect will write the criteria from what it does say.`
       : 'No criteria yet. Nothing writes them but the architect — press “Draft the plan”.'
 
-  /** One of the six checks: what is wrong, and the move that clears it. */
+  /** One of the checks: what is wrong, and the move that clears it. */
   const renderCheck = (id: CheckId): JSX.Element => {
     const failure = compile.failures.find((f) => f.check === id)
     const bad = failure !== undefined
@@ -911,11 +901,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                           label: 'Minutes',
                           value: order.budgets.wallClockMinutes,
                         },
-                        {
-                          key: 'filesTouched',
-                          label: 'Files touched',
-                          value: order.budgets.filesTouched,
-                        },
                       ]}
                       submitLabel="Save budgets"
                       disabled={busy}
@@ -1125,7 +1110,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
             {step.id === 'handOff' ? (
               <>
                 <p className="fdry-step-intro">
-                  All six must pass. Handing off agrees the order and starts the work.
+                  All of them must pass. Handing off agrees the order and starts the work.
                 </p>
                 <div className="fdry-checks">{CHECK_ORDER.map(renderCheck)}</div>
                 {view.unavailableChecks !== undefined && view.unavailableChecks.length > 0 ? (

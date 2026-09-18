@@ -1152,54 +1152,43 @@ describe('a failing check says how to clear it', () => {
 // Budgets came from settings and could be changed nowhere on an order, and
 // the architect could replace them. They are the operator's, on the Plan step.
 describe('an order’s budgets', () => {
-  const TIGHT = { agents: 3, wallClockMinutes: 45, filesTouched: 1, tokens: null }
+  const SET = { agents: 3, wallClockMinutes: 45, tokens: null }
 
   it('shows them on the Plan step and saves what the operator sets', async () => {
-    mountBlocked({ budgets: { agents: 2, wallClockMinutes: null, filesTouched: 25, tokens: null } })
+    mountBlocked({ budgets: { agents: 2, wallClockMinutes: null, tokens: null } })
     await openStep('Plan')
     const section = await waitFor(() => screen.getByRole('region', { name: 'Budgets' }))
-    expect(
-      (within(section).getByRole('spinbutton', { name: 'Agents at once' }) as HTMLInputElement)
-        .value
-    ).toBe('2')
     expect(
       (within(section).getByRole('checkbox', { name: 'No limit on minutes' }) as HTMLInputElement)
         .checked
     ).toBe(true)
 
-    fireEvent.change(within(section).getByRole('spinbutton', { name: 'Files touched' }), {
-      target: { value: '60' },
+    fireEvent.change(within(section).getByRole('spinbutton', { name: 'Agents at once' }), {
+      target: { value: '4' },
     })
     fireEvent.click(within(section).getByRole('button', { name: 'Save budgets' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.budgets', {
         id: 'WO-1',
-        budgets: { agents: 2, wallClockMinutes: null, filesTouched: 60 },
+        budgets: { agents: 4, wallClockMinutes: null },
       })
     )
   })
 
-  it('takes a plan that does not fit to the budget, and asks the architect only to cut it', async () => {
-    mountBlocked({ budgets: TIGHT })
+  // ADR 056: agents and minutes are budgets; a count of files is not.
+  it('offers no files budget, and no check that a plan fits one', async () => {
+    mountBlocked({ budgets: SET })
     await openStep('Plan')
-    const change = await waitFor(() => screen.getByRole('button', { name: 'Change the budget' }))
-    fireEvent.click(change)
-    await waitFor(() => expect(document.activeElement?.id).toBe('fdry-budgets'))
-
-    fireEvent.click(screen.getByRole('button', { name: 'Ask it to cut the plan' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith(
-        'foundry:order.converge',
-        expect.objectContaining({ message: expect.not.stringContaining('propose budgets') })
-      )
-    )
+    const section = await waitFor(() => screen.getByRole('region', { name: 'Budgets' }))
+    expect(within(section).queryByRole('spinbutton', { name: 'Files touched' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Change the budget' })).toBeNull()
   })
 
   it('shows them without controls once the order is no longer a draft', async () => {
-    mountBlocked({ status: 'running' as const, budgets: TIGHT })
+    mountBlocked({ status: 'running' as const, budgets: SET })
     await openStep('Plan')
     const section = await waitFor(() => screen.getByRole('region', { name: 'Budgets' }))
-    expect(within(section).getByText('3 agents · 45 minutes · 1 files')).toBeTruthy()
+    expect(within(section).getByText('3 agents · 45 minutes')).toBeTruthy()
     expect(within(section).queryByRole('button', { name: 'Save budgets' })).toBeNull()
   })
 })

@@ -152,19 +152,8 @@ export interface ExecutorDeps {
    */
   readonly runStep?: (step: LadderStep) => Promise<number | null>
 
-  /** Minutes elapsed and files touched, for the budget rules. */
-  /**
-   * What the run has spent so far, read against the world rather than the plan.
-   *
-   * May answer asynchronously, because counting the files a run has touched
-   * means asking git. It used to be handed `plan.units.flatMap(touches).size`
-   * — the files the plan *predicted* — so the files-touched budget measured
-   * the plan and could not be exceeded by an agent going wide, which is the
-   * only thing a files-touched budget is for.
-   */
-  readonly observe?: () =>
-    | { elapsedMinutes: number; filesTouched: number }
-    | Promise<{ elapsedMinutes: number; filesTouched: number }>
+  /** Minutes elapsed, for the wall-clock budget. */
+  readonly observe?: () => { elapsedMinutes: number } | Promise<{ elapsedMinutes: number }>
 
   /** Write a line to the order's record. */
   readonly record?: (action: string, subject: string, reason: string) => Promise<void>
@@ -468,7 +457,7 @@ export async function execute(
 
   /** The budget, read against what is happening right now. */
   async function currentBreach(): Promise<ReturnType<typeof budgetBreach>> {
-    const observed = (await deps.observe?.()) ?? { elapsedMinutes: 0, filesTouched: 0 }
+    const observed = (await deps.observe?.()) ?? { elapsedMinutes: 0 }
     return budgetBreach(budgets, {
       ...observed,
       agents: current.nodes.filter((n) => n.state === 'running').length,

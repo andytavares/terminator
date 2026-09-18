@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { smallestBudgetFor } from '../order/compile.js'
 import type { BudgetBreach } from '../line/scheduler.js'
 
 // A budget is a whole number or no limit. Used to set an order's budgets in the
@@ -115,13 +114,20 @@ export function BudgetForm({
 
 const BREACH_LABEL: Record<BudgetBreach['kind'], string> = {
   wall_clock: 'Minutes',
-  files_touched: 'Files touched',
   agents: 'Agents at once',
 }
 
 /**
+ * The limit a raise is offered at: a quarter above where the run already is,
+ * rounded up, since a limit it reaches on the next poll stops it again.
+ */
+export function raisedLimitFor(reached: number): number {
+  return reached + Math.ceil(reached * 0.25)
+}
+
+/**
  * The new limit for the budget a run stopped at. Offered with room above where
- * the run already is, since a limit it reaches on the next file stops it again.
+ * the run already is, since a limit it reaches straight away stops it again.
  */
 export function RaiseBudgetForm({
   breach,
@@ -141,7 +147,7 @@ export function RaiseBudgetForm({
         {
           key: breach.kind,
           label: BREACH_LABEL[breach.kind],
-          value: smallestBudgetFor(reached),
+          value: raisedLimitFor(reached),
           min: reached,
         },
       ]}

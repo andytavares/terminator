@@ -508,9 +508,7 @@ describe('offering shapes of work', () => {
   })
 
   it('observes with the order own budgets rather than a guessed default', async () => {
-    await store.save(
-      order({ budgets: { agents: 1, wallClockMinutes: 5, filesTouched: 2, tokens: null } })
-    )
+    await store.save(order({ budgets: { agents: 1, wallClockMinutes: 5, tokens: null } }))
     await channels().start({ id: 'WO-1' })
     const r = (await channels().observe({ id: 'WO-1' })) as { ready: string[] }
     expect(r.ready.length).toBeLessThanOrEqual(2)

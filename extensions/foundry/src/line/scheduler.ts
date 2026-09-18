@@ -170,8 +170,11 @@ export function hasStalled(graph: RunGraph, budgets: Budgets): boolean {
   )
 }
 
+/** The budgets a run is held to. ADR 056 retired `files_touched`. */
+export const BUDGET_KINDS = ['wall_clock', 'agents'] as const
+
 export interface BudgetBreach {
-  readonly kind: 'wall_clock' | 'files_touched' | 'agents'
+  readonly kind: (typeof BUDGET_KINDS)[number]
   readonly limit: number
   readonly actual: number
 }
@@ -184,14 +187,13 @@ export interface BudgetBreach {
  */
 export function budgetBreach(
   budgets: Budgets,
-  observed: { elapsedMinutes: number; filesTouched: number; agents: number }
+  observed: { elapsedMinutes: number; agents: number }
 ): BudgetBreach | null {
   const actual: Record<BudgetBreach['kind'], number> = {
     wall_clock: observed.elapsedMinutes,
-    files_touched: observed.filesTouched,
     agents: observed.agents,
   }
-  for (const kind of ['wall_clock', 'files_touched', 'agents'] as const) {
+  for (const kind of BUDGET_KINDS) {
     const limit = budgets[BUDGET_FIELD[kind]]
     if (limit !== null && actual[kind] > limit) return { kind, limit, actual: actual[kind] }
   }
@@ -200,7 +202,6 @@ export function budgetBreach(
 
 const BUDGET_FIELD = {
   wall_clock: 'wallClockMinutes',
-  files_touched: 'filesTouched',
   agents: 'agents',
 } as const satisfies Record<BudgetBreach['kind'], keyof Budgets>
 
