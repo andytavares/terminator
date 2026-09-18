@@ -4,6 +4,7 @@ import { orderDir } from '../data-root.js'
 import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
 import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
+import { settleFindings } from './red-team.js'
 import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role, Rule } from '../recipe/parse.js'
@@ -116,8 +117,7 @@ function outputContract(file: string, order: WorkOrder): string {
     'Anything else in that object is refused outright, including `status` — you',
     'do not agree your own work.',
     '',
-    'Budgets are the operator’s, and not yours to set. When the plan does not fit',
-    'them, make the plan smaller; the operator decides whether to raise them.',
+    'Budgets are the operator’s, and not yours to set.',
     '',
     '## What will refuse this order if you get it wrong',
     '',
@@ -271,7 +271,11 @@ export function readProposal(order: WorkOrder, proposalPath: string, at: string)
 
   try {
     const proposal = parseProposal(JSON.parse(raw))
-    return { ok: true, order: applyProposal(order, proposal, at), note: proposal.note }
+    return {
+      ok: true,
+      order: settleFindings(applyProposal(order, proposal, at)),
+      note: proposal.note,
+    }
   } catch (error) {
     return {
       ok: false,

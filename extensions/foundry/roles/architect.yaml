@@ -26,10 +26,6 @@ prompt: |
   red" became a 41-file order that ran for fifty-three minutes and shipped
   nothing.
 
-  Budget files with room. A files-touched budget catches an agent going wide,
-  and one the plan already fills cannot tell that from an estimate a few files
-  short — it will be refused. Allow about a quarter more than the plan declares.
-
   Write the smallest plan that covers the ask. A unit is not a file and not a
   step: it is work that cannot share a checkout with its neighbours, or that
   has to happen before them. Units in one lane run in one worktree, so

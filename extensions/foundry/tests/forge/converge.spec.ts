@@ -275,6 +275,25 @@ describe('reading back what it wrote', () => {
     expect(fs.existsSync(bad)).toBe(false)
   })
 
+  it('closes a finding the redraft cleared, so asking for it is enough', () => {
+    const file = write({
+      intent: { problem: 'p', outcome: 'o', nonGoals: ['the settings screen'] },
+    })
+    const before = order({
+      redTeam: [
+        {
+          id: 'RT-no-non-goals',
+          severity: 'low',
+          text: 'The order excludes nothing.',
+          status: 'open',
+          reason: '',
+        },
+      ],
+    })
+    const result = readProposal(before, file, 'now')
+    expect(result.ok && result.order.redTeam[0].status).toBe('resolved')
+  })
+
   it('leaves the order a draft — converging is not agreeing', () => {
     const file = write({ acceptance: [CRITERION] })
     const result = readProposal(order(), file, 'now')

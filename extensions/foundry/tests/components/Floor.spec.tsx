@@ -1147,9 +1147,9 @@ describe('the standing band', () => {
   describe('raising the budget it stopped at', () => {
     const RECORDED = {
       ...GATE,
-      summary: 'Make all text red has gone past its files touched budget',
-      why: 'The order budgets 10 and this run is at 47.',
-      breach: { kind: 'files_touched', limit: 10, actual: 47 },
+      summary: 'Make all text red has gone past its wall clock budget',
+      why: 'The order budgets 10 minutes and this run is at 47.',
+      breach: { kind: 'wall_clock', limit: 10, actual: 47 },
     }
 
     function halted() {
@@ -1165,7 +1165,7 @@ describe('the standing band', () => {
       halted()
       await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
       fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      const field = screen.getByRole('spinbutton', { name: 'Files touched' }) as HTMLInputElement
+      const field = screen.getByRole('spinbutton', { name: 'Minutes' }) as HTMLInputElement
       expect(Number(field.value)).toBeGreaterThanOrEqual(47)
       expect(screen.getByText('At least 47.')).toBeTruthy()
       expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
@@ -1175,7 +1175,7 @@ describe('the standing band', () => {
       halted()
       await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
       fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      fireEvent.change(screen.getByRole('spinbutton', { name: 'Files touched' }), {
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
         target: { value: '80' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
@@ -1192,7 +1192,7 @@ describe('the standing band', () => {
       halted()
       await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
       fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      fireEvent.click(screen.getByRole('checkbox', { name: 'No limit on files touched' }))
+      fireEvent.click(screen.getByRole('checkbox', { name: 'No limit on minutes' }))
       fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
       await waitFor(() =>
         expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
@@ -1208,7 +1208,7 @@ describe('the standing band', () => {
       await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
       fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-      expect(screen.queryByRole('spinbutton', { name: 'Files touched' })).toBeNull()
+      expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
       expect(screen.getByRole('button', { name: /Stop here/ })).toBeTruthy()
     })
   })

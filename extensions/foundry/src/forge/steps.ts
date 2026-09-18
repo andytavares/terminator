@@ -17,7 +17,7 @@ export interface ForgeStep {
 
 const STEP_CHECKS: Record<StepId, readonly CheckId[]> = {
   intent: [],
-  plan: ['verifiable', 'coverage', 'risk', 'budgets'],
+  plan: ['verifiable', 'coverage', 'risk'],
   redTeam: ['redTeam'],
   shape: [],
   tracker: [],

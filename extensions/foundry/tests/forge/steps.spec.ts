@@ -60,9 +60,9 @@ describe('the steps of the Forge', () => {
   })
 
   it('puts each failing check on the step that clears it', () => {
-    const steps = forgeSteps(failing('verifiable', 'budgets', 'redTeam'), ALL)
+    const steps = forgeSteps(failing('verifiable', 'coverage', 'redTeam'), ALL)
     const blocking = Object.fromEntries(steps.map((s) => [s.id, s.blocking]))
-    expect(blocking.plan).toEqual(['verifiable', 'budgets'])
+    expect(blocking.plan).toEqual(['verifiable', 'coverage'])
     expect(blocking.redTeam).toEqual(['redTeam'])
     expect(blocking.intent).toEqual([])
     expect(blocking.shape).toEqual([])

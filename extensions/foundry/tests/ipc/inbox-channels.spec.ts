@@ -342,11 +342,11 @@ describe('acting on the decision', () => {
 // "Raise the budget" resumed the run with the budget it had, so the run went
 // straight back past it and stopped again. Raising now takes the new limit.
 describe('raising a budget', () => {
-  const breach = { kind: 'files_touched' as const, limit: 10, actual: 47 }
+  const breach = { kind: 'wall_clock' as const, limit: 10, actual: 47 }
 
   async function halted() {
     await createOrderStore(root).save(
-      order({ budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 10, tokens: null } })
+      order({ budgets: { agents: 3, wallClockMinutes: 10, tokens: null } })
     )
     await createGateStore(root).save(gate({ rule: 'budget.exceeded', breach }))
   }
@@ -360,15 +360,15 @@ describe('raising a budget', () => {
     const r = await channels('standard', act).decide({ gateId: 'G-1', option: 'raise', limit: 60 })
     expect(r).toMatchObject({ ok: true })
     expect(act).toHaveBeenCalledWith(expect.objectContaining({ id: 'G-1' }), 'raise')
-    expect(budgetsWhenActed).toMatchObject({ filesTouched: 60, agents: 3, wallClockMinutes: 45 })
-    expect(record).toHaveBeenCalledWith('WO-1', 'budget.raised', 'files_touched', '10 -> 60')
+    expect(budgetsWhenActed).toMatchObject({ wallClockMinutes: 60, agents: 3 })
+    expect(record).toHaveBeenCalledWith('WO-1', 'budget.raised', 'wall_clock', '10 -> 60')
   })
 
   it('takes no limit', async () => {
     await halted()
     await channels().decide({ gateId: 'G-1', option: 'raise', limit: null })
-    expect((await createOrderStore(root).load('WO-1'))?.budgets.filesTouched).toBeNull()
-    expect(record).toHaveBeenCalledWith('WO-1', 'budget.raised', 'files_touched', '10 -> no limit')
+    expect((await createOrderStore(root).load('WO-1'))?.budgets.wallClockMinutes).toBeNull()
+    expect(record).toHaveBeenCalledWith('WO-1', 'budget.raised', 'wall_clock', '10 -> no limit')
   })
 
   it('refuses a limit the run is already past, and decides nothing', async () => {
@@ -382,7 +382,7 @@ describe('raising a budget', () => {
     expect(r.error).toContain('47')
     expect(act).not.toHaveBeenCalled()
     expect((await createGateStore(root).get('G-1'))?.decision).toBeNull()
-    expect((await createOrderStore(root).load('WO-1'))?.budgets.filesTouched).toBe(10)
+    expect((await createOrderStore(root).load('WO-1'))?.budgets.wallClockMinutes).toBe(10)
   })
 
   it('refuses a raise that does not say what to raise it to', async () => {
@@ -390,6 +390,22 @@ describe('raising a budget', () => {
     const r = (await channels().decide({ gateId: 'G-1', option: 'raise' })) as { error: string }
     expect(r.error).toContain('limit')
     expect((await createGateStore(root).get('G-1'))?.decision).toBeNull()
+  })
+
+  // ADR 056 retired the files budget. A run halted on it before then has a
+  // gate naming a budget that no longer exists, so there is nothing to raise.
+  it('resumes a gate stopped at the retired files budget, and changes no budget', async () => {
+    await createOrderStore(root).save(order())
+    const retired = { kind: 'files_touched', limit: 10, actual: 47 } as unknown as typeof breach
+    await createGateStore(root).save(gate({ rule: 'budget.exceeded', breach: retired }))
+    expect((await createGateStore(root).get('G-1'))?.breach).toBeNull()
+
+    const act = vi.fn(async () => undefined)
+    expect(
+      await channels('standard', act).decide({ gateId: 'G-1', option: 'raise' })
+    ).toMatchObject({ ok: true })
+    expect(act).toHaveBeenCalled()
+    expect((await createOrderStore(root).load('WO-1'))?.budgets).toEqual(order().budgets)
   })
 
   // Raised before gates carried their breach. Resuming raises a fresh gate

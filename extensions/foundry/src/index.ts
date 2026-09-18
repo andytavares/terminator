@@ -737,7 +737,6 @@ function defaultBudgets(api: ExtensionAPI): Omit<Budgets, 'tokens'> {
   return {
     agents: num('terminator.foundry.budgets.agents', 3),
     wallClockMinutes: num('terminator.foundry.budgets.wallClockMinutes', 45),
-    filesTouched: num('terminator.foundry.budgets.filesTouched', 25),
   }
 }
 
@@ -960,20 +959,11 @@ async function executeRun(
   // way through and fails has already spent lane 1's agent budget.
   const checkouts = await ensureCheckouts(order, { exec, root })
 
-  /**
-   * What the working copies have actually changed, against their base.
-   *
-   * Two callers with the same question: the regrade, which asks once at the
-   * end, and the files-touched budget, which asks on every poll. Cached for a
-   * few seconds so the second one does not run `git diff` every fifteen.
-   */
-  let lastChange: { at: number; value: { changedFiles: string[]; linesChanged: number } } | null =
-    null
+  /** What the working copies have actually changed, against their base. */
   const readObservedChange = async (): Promise<{
     changedFiles: string[]
     linesChanged: number
   }> => {
-    if (lastChange !== null && Date.now() - lastChange.at < 5_000) return lastChange.value
     const changedFiles: string[] = []
     let linesChanged = 0
     for (const checkout of checkouts.values()) {
@@ -983,9 +973,7 @@ async function executeRun(
       const summary = await readDiffSummary(checkout.path, against, diffCommand)
       linesChanged += summary.added + summary.removed
     }
-    const value = { changedFiles, linesChanged }
-    lastChange = { at: Date.now(), value }
-    return value
+    return { changedFiles, linesChanged }
   }
 
   const workspaceId = api.workspace?.list()[0]?.id ?? ''
@@ -1385,11 +1373,6 @@ async function executeRun(
       // deadline was the budget never saw the gate at all. The gate rounds it
       // for the sentence it prints; the comparison is exact.
       elapsedMinutes: (Date.now() - startedAt) / 60_000,
-      // Counted from the working copies, not from `plan.units.flatMap(touches)`
-      // — which is the files the plan predicted, so the budget measured the
-      // plan and could never be exceeded by an agent going wide. That is the
-      // only thing a files-touched budget is for.
-      filesTouched: new Set((await readObservedChange()).changedFiles).size,
     }),
     onEvent: (event) => {
       if (event.type !== 'verdict') return
@@ -2517,14 +2500,6 @@ export function activate(api: ExtensionAPI): void {
           description:
             'Exceeding a budget pauses the work and raises a decision. It never continues silently, and it never dies silently. 0 means no limit.',
           default: 45,
-          min: 0,
-        },
-        'terminator.foundry.budgets.filesTouched': {
-          type: 'number',
-          label: 'Files an order may touch before it pauses and asks',
-          description:
-            '0 means no limit. Each new order starts with this, and you can change it on the order.',
-          default: 25,
           min: 0,
         },
         // Three booleans rather than a list: the settings surface has no array

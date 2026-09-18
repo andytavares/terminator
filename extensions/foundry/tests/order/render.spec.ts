@@ -134,7 +134,7 @@ describe('renderOrder', () => {
   })
 
   it('reports a passing order as ready to hand off', () => {
-    expect(renderOrder(order())).toContain('All six checks pass')
+    expect(renderOrder(order())).toContain('All checks pass')
   })
 
   it('lists each failing check with what is wrong', () => {
@@ -189,9 +189,10 @@ describe('renderOrder', () => {
 
   it('says a budget has no limit rather than printing null', () => {
     const out = renderOrder(
-      order({ budgets: { agents: null, wallClockMinutes: 30, filesTouched: null, tokens: null } })
+      order({ budgets: { agents: null, wallClockMinutes: 30, tokens: null } })
     )
-    expect(out).toContain('agents unlimited · 30 minutes · files unlimited')
+    expect(out).toContain('agents unlimited · 30 minutes')
+    expect(out).not.toContain('files')
     expect(out).not.toContain('null')
   })
 

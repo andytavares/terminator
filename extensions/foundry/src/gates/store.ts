@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import type { Gate } from './rules.js'
+import { BUDGET_KINDS } from '../line/scheduler.js'
 
 // Gates on disk, one file per order.
 //
@@ -19,11 +20,22 @@ function gatesPath(root: string, orderId: string): string {
   return path.join(orderDir(root, orderId), 'gates.json')
 }
 
+/**
+ * A gate halted on a budget that no longer exists reads as one that never
+ * recorded its breach, so raising it resumes the run rather than setting a
+ * limit on nothing.
+ */
+function withoutRetiredBreach(gate: Gate): Gate {
+  const kind = gate.breach?.kind
+  if (kind === undefined || (BUDGET_KINDS as readonly string[]).includes(kind)) return gate
+  return { ...gate, breach: null }
+}
+
 async function read(root: string, orderId: string): Promise<Gate[]> {
   try {
     const raw = await fs.promises.readFile(gatesPath(root, orderId), 'utf8')
     const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as Gate[]) : []
+    return Array.isArray(parsed) ? (parsed as Gate[]).map(withoutRetiredBreach) : []
   } catch {
     // A missing or unreadable file is no gates, never a thrown surface.
     return []

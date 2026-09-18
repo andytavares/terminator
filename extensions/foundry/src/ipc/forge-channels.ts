@@ -96,9 +96,7 @@ const StatesPayload = z.object({ id: z.string() })
 
 const BudgetsPayload = z.object({
   id: z.string(),
-  budgets: WorkOrderSchema.shape.budgets
-    .pick({ agents: true, wallClockMinutes: true, filesTouched: true })
-    .strict(),
+  budgets: WorkOrderSchema.shape.budgets.pick({ agents: true, wallClockMinutes: true }).strict(),
 })
 
 export interface ForgeDeps {
@@ -461,7 +459,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       actor: 'operator',
       action: 'order.agreed',
       subject: id,
-      reason: 'all six checks pass',
+      reason: 'all checks pass',
       evidence: [],
     })
 

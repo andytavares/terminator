@@ -30,15 +30,11 @@ function verifyLine(order: WorkOrder, criterionId: string): string {
   }
 }
 
-/** The three enforced budgets, e.g. "3 agents · 45 minutes · files unlimited". */
+/** The two enforced budgets, e.g. "3 agents · 45 minutes". */
 export function budgetsInWords(budgets: Budgets): string {
   const limit = (value: number | null, unit: string): string =>
     value === null ? `${unit} unlimited` : `${value} ${unit}`
-  return [
-    limit(budgets.agents, 'agents'),
-    limit(budgets.wallClockMinutes, 'minutes'),
-    limit(budgets.filesTouched, 'files'),
-  ].join(' · ')
+  return [limit(budgets.agents, 'agents'), limit(budgets.wallClockMinutes, 'minutes')].join(' · ')
 }
 
 function coverageTable(order: WorkOrder): string[] {
@@ -135,7 +131,7 @@ export function renderOrder(order: WorkOrder): string {
 
   lines.push('## Convergence', '')
   if (result.ok) {
-    lines.push('All six checks pass. This order can be handed off.', '')
+    lines.push('All checks pass. This order can be handed off.', '')
   } else {
     for (const failure of result.failures) {
       lines.push(`- **${failure.check}** — ${failure.detail}`)

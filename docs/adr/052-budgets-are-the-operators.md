@@ -1,6 +1,6 @@
 # ADR 052: Budgets are the operator's
 
-**Status**: Accepted
+**Status**: Accepted. The files budget is superseded by [ADR 056](056-a-file-count-is-not-a-budget.md).
 
 **Date**: 2026-09-13
 

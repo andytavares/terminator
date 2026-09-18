@@ -50,7 +50,7 @@ function valid(): unknown {
       },
     ],
     risk: { grade: 'P2', triggers: [], blastRadius: [], criticalPaths: [] },
-    budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25, tokens: null },
+    budgets: { agents: 3, wallClockMinutes: 45, tokens: null },
     plan: {
       units: [
         {
@@ -227,18 +227,25 @@ describe('parseWorkOrder', () => {
 
   it('takes no limit on any enforced budget', () => {
     const o = valid() as Record<string, unknown>
-    o.budgets = { agents: null, wallClockMinutes: null, filesTouched: null, tokens: null }
+    o.budgets = { agents: null, wallClockMinutes: null, tokens: null }
     expect(parseWorkOrder(o).budgets).toEqual({
       agents: null,
       wallClockMinutes: null,
-      filesTouched: null,
       tokens: null,
     })
   })
 
+  // Orders written before ADR 056 carry a files budget. They still open, and
+  // the limit they carried is gone rather than enforced.
+  it('opens an order that still carries a files budget, and drops it', () => {
+    const o = valid() as Record<string, unknown>
+    o.budgets = { agents: 3, wallClockMinutes: 45, filesTouched: 10, tokens: null }
+    expect(parseWorkOrder(o).budgets).toEqual({ agents: 3, wallClockMinutes: 45, tokens: null })
+  })
+
   it('refuses a budget of zero, which would stop the run before it started', () => {
     const o = valid() as Record<string, unknown>
-    o.budgets = { agents: 0, wallClockMinutes: 45, filesTouched: 25, tokens: null }
+    o.budgets = { agents: 0, wallClockMinutes: 45, tokens: null }
     expect(() => parseWorkOrder(o)).toThrow()
   })
 

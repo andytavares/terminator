@@ -158,6 +158,39 @@ export function applyFindings(order: WorkOrder, at: string): WorkOrder {
   })
 }
 
+/** Every rule `structuralFindings` can raise, which is what it can take back. */
+const STRUCTURAL_RULES = [
+  'outcome-restates-problem',
+  'no-non-goals',
+  'unfalsifiable-statement',
+  'p0-judged-not-run',
+  'unit-touches-nothing',
+  'fully-serial-plan',
+  'touches-release-machinery',
+  'no-runnable-check',
+] as const
+
+/**
+ * Resolve every open structural finding the order no longer trips.
+ *
+ * A redraft the architect was asked for is only an answer if it closes what it
+ * cleared. The structural pass is deterministic, so whether its finding still
+ * holds is decided by running it again. A reviewer's finding is judgement and
+ * stays with the operator.
+ */
+export function settleFindings(order: WorkOrder): WorkOrder {
+  const holding = new Set(structuralFindings(order).map((f) => `RT-${f.rule}`))
+  const settled = new Set(STRUCTURAL_RULES.map((rule) => `RT-${rule}`))
+  return {
+    ...order,
+    redTeam: order.redTeam.map((f) =>
+      f.status === 'open' && settled.has(f.id) && !holding.has(f.id)
+        ? { ...f, status: 'resolved' as const }
+        : f
+    ),
+  }
+}
+
 export function resolveFinding(order: WorkOrder, id: string): WorkOrder {
   return {
     ...order,

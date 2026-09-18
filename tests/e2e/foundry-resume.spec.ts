@@ -81,7 +81,7 @@ function order(): unknown {
       },
     ],
     risk: { grade: 'P2', triggers: [], blastRadius: [], criticalPaths: [] },
-    budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25, tokens: null },
+    budgets: { agents: 3, wallClockMinutes: 45, tokens: null },
     plan: {
       units: [
         {

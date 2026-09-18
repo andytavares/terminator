@@ -1,6 +1,6 @@
 import { Markdown } from './Markdown.js'
 import React, { useCallback, useEffect, useState } from 'react'
-import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle } from 'lucide-react'
+import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle, LoaderCircle } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
@@ -82,10 +82,9 @@ const CHECK_LABELS: Record<CheckId, string> = {
   coverage: 'Coverage both ways',
   risk: 'Risk graded',
   redTeam: 'Red team resolved',
-  budgets: 'Budgets set',
 }
 
-const CHECK_ORDER: CheckId[] = ['questions', 'verifiable', 'coverage', 'risk', 'redTeam', 'budgets']
+const CHECK_ORDER: CheckId[] = ['questions', 'verifiable', 'coverage', 'risk', 'redTeam']
 
 const STEP_LABELS: Record<StepId, string> = {
   intent: 'Intent',
@@ -167,15 +166,27 @@ const CHECK_REMEDIES: Record<CheckId, readonly Remedy[]> = {
     },
   ],
   redTeam: [{ kind: 'goto', label: 'Clear them', step: 'redTeam', target: STEP_HEADING }],
-  budgets: [
-    { kind: 'goto', label: 'Change the budget', step: 'plan', target: 'fdry-budgets' },
-    {
-      kind: 'ask',
-      label: 'Ask it to cut the plan',
-      message:
-        'The plan does not fit its budgets, and the budgets are the operator’s to set. Cut the plan down until it fits the budgets the order has.',
-    },
-  ],
+}
+
+/** What the architect is told when asked to clear one red team finding. */
+function findingAsk(finding: { readonly id: string; readonly text: string }): string {
+  return `The red team finding ${finding.id} is open: "${finding.text}" Change the order so it no longer holds, and change nothing else.`
+}
+
+/**
+ * Where the operator asked, in place of the button they pressed.
+ *
+ * The button used to go faintly disabled and keep its label, and the only word
+ * that anything had started was in the header, out of view. So the ask becomes
+ * the answer on the spot, and while it runs nothing offers a second one.
+ */
+function Asked(): JSX.Element {
+  return (
+    <span role="status" aria-label="Asked" className="fdry-asked">
+      <LoaderCircle aria-hidden="true" />
+      Asked — the architect is working on it. This clears when the redraft lands.
+    </span>
+  )
 }
 
 /**
@@ -377,6 +388,8 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
    */
   const intake: IntakeOutcome = view?.intake ?? { kind: 'none' }
   const drafting = intake.kind === 'running'
+  /** The instruction the running turn was started with, to find the ask it answers. */
+  const asked = intake.kind === 'running' ? intake.asked : null
 
   // The architect answers in minutes, not in the call that started it, so the
   // document is refetched while it works and the outcome — a redraft, or the
@@ -475,7 +488,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       ? `Nothing under an acceptance heading in ${order.source.key ?? 'the ticket'}. Press “Draft the plan” and the architect will write the criteria from what it does say.`
       : 'No criteria yet. Nothing writes them but the architect — press “Draft the plan”.'
 
-  /** One of the six checks: what is wrong, and the move that clears it. */
+  /** One of the checks: what is wrong, and the move that clears it. */
   const renderCheck = (id: CheckId): JSX.Element => {
     const failure = compile.failures.find((f) => f.check === id)
     const bad = failure !== undefined
@@ -491,23 +504,28 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
               one the operator stares at. */}
           {bad && isDraft ? (
             <span className="fdry-remedy">
-              {CHECK_REMEDIES[id].map((remedy) => (
-                <button
-                  key={remedy.label}
-                  type="button"
-                  disabled={busy || (remedy.kind === 'ask' && drafting)}
-                  onClick={() => {
-                    if (remedy.kind === 'ask') {
-                      void converge(remedy.message)
-                      return
-                    }
-                    if (remedy.step !== null) setPicked(remedy.step)
-                    setFocusTarget(remedy.target)
-                  }}
-                >
-                  {remedy.label}
-                </button>
-              ))}
+              {CHECK_REMEDIES[id].map((remedy) => {
+                if (remedy.kind === 'ask' && drafting) {
+                  return asked === remedy.message ? <Asked key={remedy.label} /> : null
+                }
+                return (
+                  <button
+                    key={remedy.label}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (remedy.kind === 'ask') {
+                        void converge(remedy.message)
+                        return
+                      }
+                      if (remedy.step !== null) setPicked(remedy.step)
+                      setFocusTarget(remedy.target)
+                    }}
+                  >
+                    {remedy.label}
+                  </button>
+                )
+              })}
             </span>
           ) : null}
         </span>
@@ -883,11 +901,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                           label: 'Minutes',
                           value: order.budgets.wallClockMinutes,
                         },
-                        {
-                          key: 'filesTouched',
-                          label: 'Files touched',
-                          value: order.budgets.filesTouched,
-                        },
                       ]}
                       submitLabel="Save budgets"
                       disabled={busy}
@@ -905,15 +918,31 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 <p className="fdry-step-intro">
                   {openFindings.length === 0
                     ? 'Nothing is open. An adversarial pass read the plan and left nothing to clear.'
-                    : `${openFindings.length} open. Mark each one fixed, or accept it with a reason — nothing hands off while one is open.`}
+                    : `${openFindings.length} open. Ask the architect to clear each one, mark it fixed, or accept it with a reason — nothing hands off while one is open.`}
                 </p>
                 <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
                   {openFindings.map((finding) => (
                     <div key={finding.id} className="fdry-finding">
                       <CircleDot aria-hidden="true" />
-                      <span>{finding.text}</span>
+                      <span>
+                        {finding.text}
+                        {/* Under the finding rather than beside it: in the
+                            button row it squeezed the finding to one word a
+                            line. */}
+                        {isDraft && drafting && asked === findingAsk(finding) ? <Asked /> : null}
+                      </span>
                       {isDraft ? (
                         <span className="fdry-finding-actions">
+                          {drafting ? null : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              title="Have the architect change the order so this no longer holds"
+                              onClick={() => void converge(findingAsk(finding))}
+                            >
+                              Ask the architect
+                            </button>
+                          )}
                           <button
                             type="button"
                             disabled={busy}
@@ -1083,7 +1112,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
             {step.id === 'handOff' ? (
               <>
                 <p className="fdry-step-intro">
-                  All six must pass. Handing off agrees the order and starts the work.
+                  All of them must pass. Handing off agrees the order and starts the work.
                 </p>
                 <div className="fdry-checks">{CHECK_ORDER.map(renderCheck)}</div>
                 {view.unavailableChecks !== undefined && view.unavailableChecks.length > 0 ? (

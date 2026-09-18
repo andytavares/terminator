@@ -194,7 +194,7 @@ describe('execute', () => {
       return { sessionId: `s-${input.node.id}`, exitCode: 0 }
     })
     const o = order([unit('U-1'), unit('U-2'), unit('U-3'), unit('U-4')], {
-      budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 25, tokens: null },
+      budgets: { agents: 2, wallClockMinutes: 45, tokens: null },
     })
     await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
     expect(peak).toBeLessThanOrEqual(2)
@@ -510,57 +510,6 @@ describe('what the change turned out to be', () => {
   })
 })
 
-// The files-touched budget was handed `plan.units.flatMap(touches).size` — the
-// files the plan predicted — so it measured the plan and could never be
-// exceeded by an agent going wide, which is the only thing it is for.
-describe('the files-touched budget', () => {
-  it('is exceeded by the files the work actually touched', async () => {
-    const raised: Gate[] = []
-    const o = order([unit('U-1', { touches: ['src/one.ts'] })], {
-      budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 2, tokens: null },
-    })
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
-      ...deps(ok),
-      observe: async () => ({ elapsedMinutes: 1, filesTouched: 9 }),
-      raise: async (gate: Gate) => {
-        raised.push(gate)
-      },
-    })
-    expect(raised.map((g) => g.rule)).toContain('budget.exceeded')
-  })
-
-  it('is not exceeded by a plan that merely declared a lot', async () => {
-    const raised: Gate[] = []
-    const o = order([unit('U-1', { touches: ['a.ts', 'b.ts', 'c.ts', 'd.ts'] })], {
-      budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 2, tokens: null },
-    })
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
-      ...deps(ok),
-      // The work touched one file. What the plan wrote down is not spending.
-      observe: async () => ({ elapsedMinutes: 1, filesTouched: 1 }),
-      raise: async (gate: Gate) => {
-        raised.push(gate)
-      },
-    })
-    expect(raised.map((g) => g.rule)).not.toContain('budget.exceeded')
-  })
-
-  it('still takes a synchronous answer, which is all a test needs', async () => {
-    const raised: Gate[] = []
-    const o = order([unit('U-1')], {
-      budgets: { agents: 2, wallClockMinutes: 45, filesTouched: 1, tokens: null },
-    })
-    await execute(o, recipe(), buildRunGraph(o, recipe()), {
-      ...deps(ok),
-      observe: () => ({ elapsedMinutes: 1, filesTouched: 5 }),
-      raise: async (gate: Gate) => {
-        raised.push(gate)
-      },
-    })
-    expect(raised.map((g) => g.rule)).toContain('budget.exceeded')
-  })
-})
-
 describe('executor edge cases', () => {
   it('runs a plain shell step with its command as the prompt', async () => {
     const run = vi.fn(ok)
@@ -714,7 +663,7 @@ describe('the budget is part of the agreement', () => {
     const o = order([unit('U-1'), unit('U-2')])
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(run),
-      observe: () => ({ elapsedMinutes: 10_000, filesTouched: 0 }),
+      observe: () => ({ elapsedMinutes: 10_000 }),
     })
 
     expect(run).not.toHaveBeenCalled()
@@ -727,20 +676,20 @@ describe('the budget is part of the agreement', () => {
     const o = order([unit('U-1')])
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(vi.fn(ok)),
-      observe: () => ({ elapsedMinutes: 0, filesTouched: 10_000 }),
+      observe: () => ({ elapsedMinutes: 10_000 }),
     })
-    expect(outcome.gates[0].summary).toContain('files touched')
+    expect(outcome.gates[0].summary).toContain('wall clock')
   })
 
   it('records which budget it stopped at, with the limit and the count', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(vi.fn(ok)),
-      observe: () => ({ elapsedMinutes: 0, filesTouched: 10_000 }),
+      observe: () => ({ elapsedMinutes: 10_000 }),
     })
     expect(outcome.gates[0].breach).toEqual({
-      kind: 'files_touched',
-      limit: o.budgets.filesTouched,
+      kind: 'wall_clock',
+      limit: o.budgets.wallClockMinutes,
       actual: 10_000,
     })
   })
@@ -750,7 +699,7 @@ describe('the budget is part of the agreement', () => {
     const o = order([unit('U-1')])
     await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(run),
-      observe: () => ({ elapsedMinutes: 1, filesTouched: 1 }),
+      observe: () => ({ elapsedMinutes: 1 }),
     })
     expect(run).toHaveBeenCalled()
   })
@@ -1514,7 +1463,7 @@ describe('a budget exceeded while agents are still running', () => {
   function clock() {
     let minutes = 0
     return {
-      observe: () => ({ elapsedMinutes: minutes, filesTouched: 0 }),
+      observe: () => ({ elapsedMinutes: minutes }),
       wait: async (_ms: number) => {
         minutes += 10
       },
@@ -1524,7 +1473,7 @@ describe('a budget exceeded while agents are still running', () => {
 
   it('stops the run rather than waiting for the wave that will not end', async () => {
     const o = order([unit('U-1')], {
-      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+      budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(hangs as never),
@@ -1536,7 +1485,7 @@ describe('a budget exceeded while agents are still running', () => {
 
   it('says the agents were not thrown away, because they were not', async () => {
     const o = order([unit('U-1')], {
-      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+      budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(hangs as never),
@@ -1549,7 +1498,7 @@ describe('a budget exceeded while agents are still running', () => {
 
   it('stops even where the setting silences the rule — a budget is not a preference', async () => {
     const o = order([unit('U-1')], {
-      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+      budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(hangs as never),
@@ -1568,7 +1517,7 @@ describe('a budget exceeded while agents are still running', () => {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
-      observe: () => ({ elapsedMinutes: 1, filesTouched: 1 }),
+      observe: () => ({ elapsedMinutes: 1 }),
       wait: async () => undefined,
       budgetPollMs: 1,
     })
@@ -1603,7 +1552,7 @@ describe('when exactly the budget is exceeded', () => {
   function from(minutes: number) {
     let now = minutes
     return {
-      observe: () => ({ elapsedMinutes: now, filesTouched: 0 }),
+      observe: () => ({ elapsedMinutes: now }),
       wait: async (_ms: number) => {
         now += 0.5
       },
@@ -1613,7 +1562,7 @@ describe('when exactly the budget is exceeded', () => {
 
   async function runFrom(minutes: number) {
     const o = order([unit('U-1')], {
-      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+      budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
     return execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(hangs as never),
@@ -1639,13 +1588,13 @@ describe('when exactly the budget is exceeded', () => {
 
   it('never fires for a run comfortably inside its budget', async () => {
     const o = order([unit('U-1')], {
-      budgets: { agents: 2, wallClockMinutes: 20, filesTouched: 25, tokens: null },
+      budgets: { agents: 2, wallClockMinutes: 20, tokens: null },
     })
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
-      observe: () => ({ elapsedMinutes: 19.98, filesTouched: 0 }),
+      observe: () => ({ elapsedMinutes: 19.98 }),
       wait: async () => undefined,
       budgetPollMs: 1,
     })

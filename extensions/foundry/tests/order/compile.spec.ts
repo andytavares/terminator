@@ -70,8 +70,8 @@ describe('compileOrder', () => {
     expect(result.failures).toEqual([])
   })
 
-  it('knows exactly six checks', () => {
-    expect(CHECK_IDS).toHaveLength(6)
+  it('knows exactly five checks', () => {
+    expect(CHECK_IDS).toHaveLength(5)
   })
 
   describe('1 — no open questions', () => {
@@ -272,80 +272,13 @@ describe('compileOrder', () => {
     })
   })
 
-  describe('6 — the plan fits its budget', () => {
-    it('fails when the plan touches more files than the budget allows', () => {
-      const order = complete()
-      order.budgets = { ...order.budgets, filesTouched: 2 }
-      order.plan.units[0].touches = ['src/a', 'src/b', 'src/c']
-      order.risk.blastRadius = ['src/']
-      expect(failures(order)).toContain('budgets')
-    })
-
-    it('counts a file touched by two units once', () => {
-      const order = complete()
-      // Two, not one: a plan needs room past what it predicts (below), and at
-      // two this still discriminates — one distinct file fits, and two would
-      // not, which is what a missing de-duplication would produce.
-      order.budgets = { ...order.budgets, filesTouched: 2 }
-      order.risk.blastRadius = ['src/']
-      order.plan.units[0].touches = ['src/a']
-      order.plan.units.push({
-        id: 'U-2',
-        title: 'also a',
-        role: 'builder',
-        lane: 1,
-        dependsOn: [],
-        satisfies: ['AC-1'],
-        touches: ['src/a'],
-        verify: [],
-      })
-      expect(failures(order)).not.toContain('budgets')
-    })
-
-    it('passes a plan inside its budget', () => {
-      expect(failures(complete())).not.toContain('budgets')
-    })
-
-    // Measured on WO-0910-1fb, an order whose whole content was "make all text
-    // red". Its plan declared 41 files and its budget was 42, so the check
-    // passed — and then the builder found seven files the plan had not, went
-    // to 48, and the budget rule halted a run that had already finished its
-    // work. Fifty-three minutes, nothing shipped.
-    //
-    // A budget the plan already fills cannot tell an agent going wide from an
-    // estimate that was one file short, which is the only thing it is for.
-    it('fails a budget the plan already fills, which is a tripwire and not a budget', () => {
-      const order = complete()
-      order.risk.blastRadius = ['src/']
-      order.plan.units[0].touches = Array.from({ length: 41 }, (_, i) => `src/f${i}.css`)
-      order.budgets = { ...order.budgets, filesTouched: 42 }
-      expect(failures(order)).toContain('budgets')
-    })
-
-    it('passes the same plan once the budget has room for what it did not foresee', () => {
-      const order = complete()
-      order.risk.blastRadius = ['src/']
-      order.plan.units[0].touches = Array.from({ length: 41 }, (_, i) => `src/f${i}.css`)
-      order.budgets = { ...order.budgets, filesTouched: 52 }
-      expect(failures(order)).not.toContain('budgets')
-    })
-
-    it('passes any plan when files touched has no limit', () => {
-      const order = complete()
-      order.risk.blastRadius = ['src/']
-      order.plan.units[0].touches = Array.from({ length: 41 }, (_, i) => `src/f${i}.css`)
-      order.budgets = { ...order.budgets, filesTouched: null }
-      expect(failures(order)).not.toContain('budgets')
-    })
-
-    it('says how much room the plan is short of, so the number is not a guess', () => {
-      const order = complete()
-      order.risk.blastRadius = ['src/']
-      order.plan.units[0].touches = Array.from({ length: 41 }, (_, i) => `src/f${i}.css`)
-      order.budgets = { ...order.budgets, filesTouched: 42 }
-      const detail = compileOrder(order).failures.find((f) => f.check === 'budgets')?.detail ?? ''
-      expect(detail).toContain('52')
-    })
+  // ADR 056: a count of files is not a budget. It refused plans for being
+  // honest about their size and halted runs that had already done the work.
+  it('does not hold a plan to a count of files, however many it touches', () => {
+    const order = complete()
+    order.risk.blastRadius = ['src/']
+    order.plan.units[0].touches = Array.from({ length: 200 }, (_, i) => `src/f${i}.css`)
+    expect(compileOrder(order).ok).toBe(true)
   })
 
   it('reports every failing check at once, not the first', () => {

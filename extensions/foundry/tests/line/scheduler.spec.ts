@@ -45,7 +45,7 @@ steps:
     after: [integrate]
 `
 
-const BUDGETS: Budgets = { agents: 2, wallClockMinutes: 45, filesTouched: 25, tokens: null }
+const BUDGETS: Budgets = { agents: 2, wallClockMinutes: 45, tokens: null }
 
 function unit(id: string, dependsOn: string[] = []) {
   return {
@@ -249,44 +249,32 @@ describe('isComplete and hasStalled', () => {
 
 describe('budgetBreach', () => {
   it('sees nothing wrong inside the budget', () => {
-    expect(budgetBreach(BUDGETS, { elapsedMinutes: 10, filesTouched: 3, agents: 1 })).toBeNull()
+    expect(budgetBreach(BUDGETS, { elapsedMinutes: 10, agents: 1 })).toBeNull()
   })
 
   it('catches the wall clock', () => {
-    const breach = budgetBreach(BUDGETS, { elapsedMinutes: 60, filesTouched: 3, agents: 1 })
+    const breach = budgetBreach(BUDGETS, { elapsedMinutes: 60, agents: 1 })
     expect(breach?.kind).toBe('wall_clock')
     expect(breach?.limit).toBe(45)
     expect(breach?.actual).toBe(60)
   })
 
-  it('catches files touched', () => {
-    expect(budgetBreach(BUDGETS, { elapsedMinutes: 1, filesTouched: 99, agents: 1 })?.kind).toBe(
-      'files_touched'
-    )
-  })
-
   it('catches too many agents', () => {
-    expect(budgetBreach(BUDGETS, { elapsedMinutes: 1, filesTouched: 1, agents: 9 })?.kind).toBe(
-      'agents'
-    )
+    expect(budgetBreach(BUDGETS, { elapsedMinutes: 1, agents: 9 })?.kind).toBe('agents')
   })
 
   it('does not fire exactly at the limit — the budget is what is allowed', () => {
-    expect(budgetBreach(BUDGETS, { elapsedMinutes: 45, filesTouched: 25, agents: 2 })).toBeNull()
+    expect(budgetBreach(BUDGETS, { elapsedMinutes: 45, agents: 2 })).toBeNull()
   })
 
   it('never fires on a budget with no limit', () => {
-    const open: Budgets = { agents: null, wallClockMinutes: null, filesTouched: null, tokens: null }
-    expect(
-      budgetBreach(open, { elapsedMinutes: 10_000, filesTouched: 10_000, agents: 99 })
-    ).toBeNull()
+    const open: Budgets = { agents: null, wallClockMinutes: null, tokens: null }
+    expect(budgetBreach(open, { elapsedMinutes: 10_000, agents: 99 })).toBeNull()
   })
 
   it('still fires on the budgets that kept a limit', () => {
-    const filesOnly: Budgets = { ...BUDGETS, wallClockMinutes: null }
-    expect(
-      budgetBreach(filesOnly, { elapsedMinutes: 10_000, filesTouched: 99, agents: 1 })?.kind
-    ).toBe('files_touched')
+    const agentsOnly: Budgets = { ...BUDGETS, wallClockMinutes: null }
+    expect(budgetBreach(agentsOnly, { elapsedMinutes: 10_000, agents: 9 })?.kind).toBe('agents')
   })
 })
 
@@ -303,14 +291,13 @@ describe('an agent budget with no limit', () => {
 
 describe('withLimit', () => {
   it('sets the budget the breach named and leaves the others', () => {
-    expect(withLimit(BUDGETS, 'files_touched', 60)).toEqual({ ...BUDGETS, filesTouched: 60 })
     expect(withLimit(BUDGETS, 'wall_clock', 90)).toEqual({ ...BUDGETS, wallClockMinutes: 90 })
     expect(withLimit(BUDGETS, 'agents', null)).toEqual({ ...BUDGETS, agents: null })
   })
 })
 
 describe('raisedLimitProblem', () => {
-  const breach = { kind: 'files_touched' as const, limit: 10, actual: 47 }
+  const breach = { kind: 'wall_clock' as const, limit: 10, actual: 47 }
 
   it('takes a limit the run is inside, which the breach allows up to and including', () => {
     expect(raisedLimitProblem(breach, 47)).toBeNull()

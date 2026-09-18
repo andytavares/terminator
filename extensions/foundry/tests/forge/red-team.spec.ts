@@ -4,6 +4,7 @@ import {
   applyFindings,
   resolveFinding,
   acceptFinding,
+  settleFindings,
 } from '../../src/forge/red-team.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -242,5 +243,45 @@ describe('resolveFinding and acceptFinding', () => {
   it('ignores an unknown finding id rather than throwing', () => {
     const o = applyFindings(dirty(), '2026-09-06T12:00:00.000Z')
     expect(() => resolveFinding(o, 'RT-nope')).not.toThrow()
+  })
+})
+
+// Asking the architect to clear a finding is only worth something if the
+// redraft that clears it also closes it. The structural pass is deterministic,
+// so whether one of its findings still holds is a fact, not an opinion.
+describe('settleFindings', () => {
+  function raised(over: Partial<WorkOrder> = {}): WorkOrder {
+    return applyFindings(order({ intent: { ...order().intent, nonGoals: [] }, ...over }), 'now')
+  }
+
+  it('resolves a structural finding the order no longer trips', () => {
+    const before = raised()
+    expect(before.redTeam.find((f) => f.id === 'RT-no-non-goals')?.status).toBe('open')
+    const fixed = { ...before, intent: { ...before.intent, nonGoals: ['scrollbar styling'] } }
+    expect(settleFindings(fixed).redTeam.find((f) => f.id === 'RT-no-non-goals')?.status).toBe(
+      'resolved'
+    )
+  })
+
+  it('leaves one open that still holds', () => {
+    const before = raised()
+    expect(settleFindings(before).redTeam.find((f) => f.id === 'RT-no-non-goals')?.status).toBe(
+      'open'
+    )
+  })
+
+  // A reviewer's finding is judgement, not a rule this pass can re-run.
+  it('leaves a reviewer’s finding open, since nothing here can decide it', () => {
+    const before = order({
+      redTeam: [{ id: 'RT-reviewer-1', severity: 'high', text: 'x', status: 'open', reason: '' }],
+    })
+    expect(settleFindings(before).redTeam[0].status).toBe('open')
+  })
+
+  it('does not reopen one the operator accepted', () => {
+    const before = acceptFinding(raised(), 'RT-no-non-goals', 'the ask is one line')
+    expect(settleFindings(before).redTeam.find((f) => f.id === 'RT-no-non-goals')?.status).toBe(
+      'accepted'
+    )
   })
 })

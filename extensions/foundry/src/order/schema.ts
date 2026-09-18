@@ -149,7 +149,6 @@ const RiskSchema = z.object({
 const BudgetsSchema = z.object({
   agents: z.number().int().min(1).nullable(),
   wallClockMinutes: z.number().int().min(1).nullable(),
-  filesTouched: z.number().int().min(1).nullable(),
   // Deliberately nullable: a token ceiling that fires part-way through leaves a
   // half-finished change, which is worse than an expensive one.
   tokens: z.number().int().min(1).nullable().default(null),
@@ -353,7 +352,7 @@ export function draftOrder(input: DraftOrderInput): WorkOrder {
     },
     acceptance: [],
     risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
-    budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25, tokens: null },
+    budgets: { agents: 3, wallClockMinutes: 45, tokens: null },
     plan: {
       units: [],
       lanes: repos.map((repo) => ({

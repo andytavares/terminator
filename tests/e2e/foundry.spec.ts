@@ -480,7 +480,7 @@ test('a run cuts a worktree and launches a supervised agent in a visible termina
         },
       ],
       risk: { grade: 'P3', triggers: [], blastRadius: ['README.md'], criticalPaths: [] },
-      budgets: { agents: 1, wallClockMinutes: 60, filesTouched: 5, tokens: null },
+      budgets: { agents: 1, wallClockMinutes: 60, tokens: null },
       plan: {
         units: [
           {
@@ -735,7 +735,11 @@ test('an order’s budgets are set on the Plan step, and raised at the gate that
   expect(plan, 'no Plan step').toBe(true)
   await handle.page.waitForTimeout(600)
 
-  expect(await fillByName('Files touched', '60'), 'no files-touched field').toBe(true)
+  // ADR 056: agents and minutes are the budgets; a count of files is not one.
+  expect(await fillByName('Files touched', '60'), 'a files-touched field is still offered').toBe(
+    false
+  )
+  expect(await fillByName('Agents at once', '4'), 'no agents field').toBe(true)
   expect(
     await inFoundry<boolean>(`(function () {
       var box = document.querySelector('input[aria-label="No limit on minutes"]')
@@ -749,18 +753,18 @@ test('an order’s budgets are set on the Plan step, and raised at the gate that
   await expect
     .poll(() => budgetsOf(id), { timeout: 10_000 })
     .toMatchObject({
-      filesTouched: 60,
+      agents: 4,
       wallClockMinutes: null,
     })
 
-  // A gate the Line raised when the run went past 60 files.
+  // A gate the Line raised when the run had more agents going than it allows.
   const gate = {
     id: `${id}-budget.exceeded-1`,
     rule: 'budget.exceeded',
     orderId: id,
     nodeId: null,
-    summary: 'budgets are the operator’s to set has gone past its files touched budget',
-    why: 'The order budgets 60 and this run is at 75.',
+    summary: 'budgets are the operator’s to set has gone past its agents budget',
+    why: 'The order budgets 4 and this run is at 6.',
     evidence: [],
     options: [
       { id: 'raise', label: 'Raise the budget', consequence: 'Work continues with more room.' },
@@ -773,7 +777,7 @@ test('an order’s budgets are set on the Plan step, and raised at the gate that
     riskGrade: 'P3',
     raisedAt: new Date().toISOString(),
     decision: null,
-    breach: { kind: 'files_touched', limit: 60, actual: 75 },
+    breach: { kind: 'agents', limit: 4, actual: 6 },
   }
   writeFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), JSON.stringify([gate]))
 
@@ -781,11 +785,11 @@ test('an order’s budgets are set on the Plan step, and raised at the gate that
   await expect.poll(bodyText, { timeout: 10_000 }).toContain(gate.summary)
   expect(await clickByName('button', 'Raise the budget')).toBe(true)
   await handle.page.waitForTimeout(400)
-  expect(await bodyText()).toContain('At least 75.')
+  expect(await bodyText()).toContain('At least 6.')
 
-  expect(await fillByName('Files touched', '100')).toBe(true)
+  expect(await fillByName('Agents at once', '8')).toBe(true)
   expect(await clickByName('button', 'Raise and resume')).toBe(true)
-  await expect.poll(async () => (await budgetsOf(id)).filesTouched, { timeout: 10_000 }).toBe(100)
+  await expect.poll(async () => (await budgetsOf(id)).agents, { timeout: 10_000 }).toBe(8)
   const decided = JSON.parse(
     readFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), 'utf8')
   ) as { decision: { option: string } | null }[]

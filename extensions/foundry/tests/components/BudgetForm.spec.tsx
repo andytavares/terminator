@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BudgetForm } from '../../src/components/BudgetForm.js'
 
-// One budget or three, each a whole number or no limit. The same control sets an
+// One budget or two, each a whole number or no limit. The same control sets an
 // order's budgets in the Forge and raises the one a run stopped at.
 
 function setup(over: Partial<Parameters<typeof BudgetForm>[0]> = {}) {
@@ -12,7 +12,7 @@ function setup(over: Partial<Parameters<typeof BudgetForm>[0]> = {}) {
     <BudgetForm
       rows={[
         { key: 'agents', label: 'Agents at once', value: 3 },
-        { key: 'filesTouched', label: 'Files touched', value: null },
+        { key: 'wallClockMinutes', label: 'Minutes', value: null },
       ]}
       submitLabel="Save budgets"
       onSubmit={onSubmit}
@@ -29,10 +29,9 @@ describe('BudgetForm', () => {
       (screen.getByRole('spinbutton', { name: 'Agents at once' }) as HTMLInputElement).value
     ).toBe('3')
     expect(
-      (screen.getByRole('checkbox', { name: 'No limit on files touched' }) as HTMLInputElement)
-        .checked
+      (screen.getByRole('checkbox', { name: 'No limit on minutes' }) as HTMLInputElement).checked
     ).toBe(true)
-    expect(screen.queryByRole('spinbutton', { name: 'Files touched' })).toBeNull()
+    expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
   })
 
   it('submits every row, a number or null', async () => {
@@ -41,33 +40,33 @@ describe('BudgetForm', () => {
     await user.clear(agents)
     await user.type(agents, '5')
     await user.click(screen.getByRole('button', { name: 'Save budgets' }))
-    expect(onSubmit).toHaveBeenCalledWith({ agents: 5, filesTouched: null })
+    expect(onSubmit).toHaveBeenCalledWith({ agents: 5, wallClockMinutes: null })
   })
 
   it('takes a limit off, and puts one back', async () => {
     const { onSubmit, user } = setup()
     await user.click(screen.getByRole('checkbox', { name: 'No limit on agents at once' }))
-    await user.click(screen.getByRole('checkbox', { name: 'No limit on files touched' }))
-    await user.type(screen.getByRole('spinbutton', { name: 'Files touched' }), '40')
+    await user.click(screen.getByRole('checkbox', { name: 'No limit on minutes' }))
+    await user.type(screen.getByRole('spinbutton', { name: 'Minutes' }), '40')
     await user.click(screen.getByRole('button', { name: 'Save budgets' }))
-    expect(onSubmit).toHaveBeenCalledWith({ agents: null, filesTouched: 40 })
+    expect(onSubmit).toHaveBeenCalledWith({ agents: null, wallClockMinutes: 40 })
   })
 
   it('will not submit a limit below the smallest it allows, and says what that is', async () => {
     const { onSubmit, user } = setup({
-      rows: [{ key: 'files_touched', label: 'Files touched', value: 10, min: 47 }],
+      rows: [{ key: 'wall_clock', label: 'Minutes', value: 10, min: 47 }],
       submitLabel: 'Raise and resume',
     })
     const button = screen.getByRole('button', { name: 'Raise and resume' })
     expect((button as HTMLButtonElement).disabled).toBe(true)
     expect(screen.getByText('At least 47.')).toBeTruthy()
 
-    const files = screen.getByRole('spinbutton', { name: 'Files touched' })
-    await user.clear(files)
-    await user.type(files, '47')
+    const minutes = screen.getByRole('spinbutton', { name: 'Minutes' })
+    await user.clear(minutes)
+    await user.type(minutes, '47')
     expect((button as HTMLButtonElement).disabled).toBe(false)
     await user.click(button)
-    expect(onSubmit).toHaveBeenCalledWith({ files_touched: 47 })
+    expect(onSubmit).toHaveBeenCalledWith({ wall_clock: 47 })
   })
 
   it('will not submit an empty or fractional limit', async () => {
