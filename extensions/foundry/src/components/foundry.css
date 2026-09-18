@@ -504,6 +504,12 @@
 }
 
 /* An ask the architect is working on, in place of the button that sent it. */
+.fdry-finding .fdry-asked {
+  display: flex;
+  width: fit-content;
+  margin-top: 6px;
+}
+
 .fdry-asked {
   display: inline-flex;
   align-items: center;
@@ -862,8 +868,13 @@
    clear them is what blocked the compile gate for ever. */
 .fdry-finding-actions {
   display: inline-flex;
+  flex: none;
   gap: 6px;
   margin-left: auto;
+}
+
+.fdry-finding-actions button {
+  white-space: nowrap;
 }
 
 .fdry-accept {
@@ -1512,7 +1523,7 @@
   border-bottom: 1px solid var(--tm-border);
 }
 
-.fdry-finding svg {
+.fdry-finding > svg {
   width: 12px;
   height: 12px;
   flex: none;

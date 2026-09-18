@@ -924,14 +924,16 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                   {openFindings.map((finding) => (
                     <div key={finding.id} className="fdry-finding">
                       <CircleDot aria-hidden="true" />
-                      <span>{finding.text}</span>
+                      <span>
+                        {finding.text}
+                        {/* Under the finding rather than beside it: in the
+                            button row it squeezed the finding to one word a
+                            line. */}
+                        {isDraft && drafting && asked === findingAsk(finding) ? <Asked /> : null}
+                      </span>
                       {isDraft ? (
                         <span className="fdry-finding-actions">
-                          {drafting ? (
-                            asked === findingAsk(finding) ? (
-                              <Asked />
-                            ) : null
-                          ) : (
+                          {drafting ? null : (
                             <button
                               type="button"
                               disabled={busy}
