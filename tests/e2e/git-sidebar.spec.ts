@@ -6,8 +6,7 @@ import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
 
 // Exercises the git-integration extension against a REAL temporary repo:
-// the Git Changes sidebar panel, the Git project tab, and the extension's
-// settings section. PR-creation flows are intentionally not covered — they
+// the Git project tab and the extension's settings section. PR-creation flows are intentionally not covered — they
 // require `gh` auth and a real GitHub remote, which aren't available in CI.
 
 let handle: AppHandle
@@ -44,17 +43,13 @@ test.afterAll(async () => {
   if (gitRepoDir) rmSync(gitRepoDir, { recursive: true, force: true })
 })
 
-test('Git Changes sidebar toggles open and lists uncommitted files', async () => {
+test('there is no Git Changes side panel to toggle', async () => {
   const { page } = handle
+  await expect(page.getByRole('button', { name: 'Git Changes' })).toHaveCount(0)
   await page.keyboard.press('Meta+Shift+G')
-  // The git panel opens — the core renders a portal container for the extension view.
-  const panel = page.locator(
-    '[data-extension-panel="terminator.git-integration"][data-view-param="sidebar"]'
-  )
-  await expect(panel).toBeVisible()
-  // Toggling again closes the panel.
-  await page.keyboard.press('Meta+Shift+G')
-  await expect(panel).toHaveCount(0)
+  await expect(
+    page.locator('[data-extension-panel="terminator.git-integration"][data-view-param="sidebar"]')
+  ).toHaveCount(0)
 })
 
 test('the Git project tab renders the full git view', async () => {

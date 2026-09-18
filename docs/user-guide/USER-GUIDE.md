@@ -67,11 +67,11 @@ npm run dev
 
 The window is divided into three zones:
 
-| Zone             | Description                                                                                                                                                                                                                                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                                                                                                                                                                                    |
-| **Main sidebar** | A compact row of app icons at the top (Home, Overview, Notes, Remote Control, Task Vault, Git Changes, and the notification bell), then search with the Filter and Display menus, then every repo with its branches. Terminals are not listed here — they are tabs above the terminal, rows on Home, and tiles on the Overview wall. |
-| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, Foundry, Git).                                                                                                                                                                                                                            |
+| Zone             | Description                                                                                                                                                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Left rail**    | Collapsed workspace group names. Click to expand a workspace in the main sidebar.                                                                                                                                                                                                                                       |
+| **Main sidebar** | A compact row of app icons at the top (Home, Overview, Notes, Remote Control, Task Vault, and the notification bell), then search with the Filter and Display menus, then every repo with its branches. Terminals are not listed here — they are tabs above the terminal, rows on Home, and tiles on the Overview wall. |
+| **Content area** | Tabbed area on the right showing the active terminal session and extension tabs (Terminal, Foundry, Git).                                                                                                                                                                                                               |
 
 The **status bar** at the bottom of the window shows live CPU, Memory, and Network figures when the global metrics bar is enabled in Settings.
 
@@ -443,7 +443,6 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Clear terminal                       | `Cmd+K`                  |
 | Command palette                      | `Cmd+P`                  |
 | Settings                             | `Cmd+,`                  |
-| Toggle Git sidebar                   | `Cmd+Shift+G`            |
 | Toggle Overview screen               | `Cmd+Shift+E`            |
 | Send newline (always)                | `Cmd+Enter`              |
 | Send newline (bracketed paste mode)  | `Shift+Enter`            |
@@ -451,7 +450,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 
 ### Leaving an extension
 
-Press `Esc` twice in quick succession (within half a second) inside any extension — Notes, Task Vault, Git Integration, Foundry, Remote Control — and Terminator returns you to the terminal session you were last in. Extension sidebar panels close in place; full-screen extension tabs close and reveal the terminal behind them.
+Press `Esc` twice in quick succession (within half a second) inside any extension — Notes, Task Vault, Git Integration, Foundry, Remote Control — and Terminator returns you to the terminal session you were last in. Extension side panels close in place; full-screen extension tabs close and reveal the terminal behind them.
 
 It takes two presses because extensions use a single `Esc` for their own dismissals — closing a dropdown, cancelling a rename, dismissing a dialog. The first press still goes to the extension, so nothing is stolen; the second is what leaves. `Esc` inside a terminal always goes to the shell and never exits anything.
 
@@ -463,13 +462,13 @@ Extensions install from any directory on disk via a `manifest.json`. They contri
 
 Terminator ships five built-in extensions:
 
-| Extension           | What it adds                                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Git Integration** | Live git status sidebar, staging/committing, PR creation, MergeFlow conflict resolver, Code Reviews tab |
-| **Foundry**         | A software factory: an idea becomes a work order that compiles, then a draft pull request               |
-| **Notepad**         | Markdown notes, live preview, diagrams, tags, folders, full-text search                                 |
-| **Task Vault**      | GTD+BuJo+PARA productivity vault with kanban, recurring tasks, weekly review                            |
-| **Remote Control**  | Local HTTP/WebSocket server + optional ngrok tunnel for browser-based terminal access                   |
+| Extension           | What it adds                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------ |
+| **Git Integration** | Git tab for staging/committing, PR creation, MergeFlow conflict resolver, Code Reviews tab |
+| **Foundry**         | A software factory: an idea becomes a work order that compiles, then a draft pull request  |
+| **Notepad**         | Markdown notes, live preview, diagrams, tags, folders, full-text search                    |
+| **Task Vault**      | GTD+BuJo+PARA productivity vault with kanban, recurring tasks, weekly review               |
+| **Remote Control**  | Local HTTP/WebSocket server + optional ngrok tunnel for browser-based terminal access      |
 
 ---
 
@@ -477,29 +476,11 @@ Terminator ships five built-in extensions:
 
 The Git integration is a workspace-scoped extension that surfaces git tooling directly inside the terminal window.
 
-### Git sidebar
-
-![Git sidebar](screenshots/06-git-sidebar.png)
-
-Press **`Cmd+Shift+G`** or choose **View → Toggle Git Sidebar** to open a right-side panel showing:
-
-- Live git status — auto-refreshes on file changes. Each file's state is named: **Changed**,
-  **New**, **Added**, **Deleted**, **Renamed**, **Conflict**. (These used to be git's porcelain
-  letters — `M`, `A`, `??`.)
-- Stage/unstage individual files or all files.
-- Commit message field with one primary **Commit & push**. The alternatives — commit without
-  pushing, commit and open a PR, amend — are behind the caret beside it, so there is one obvious
-  action rather than four of equal weight. When the button is disabled it says why: nothing
-  staged, or no message yet.
-- The header states where the branch stands against its remote — **2 ahead**, **1 behind**,
-  **up to date**, or **not pushed yet** — so you know what pushing will do before you press it.
-- PR creation via the `gh` CLI (requires `gh auth login`).
-
 ### Git tab
 
 ![Git tab](screenshots/07-git-tab.png)
 
-The **Git** tab in the content area shows a full diff view with syntax-highlighted changes (red for removed lines, green for added). Use this for reviewing changes before committing.
+The **Git** tab above the terminal is where git lives. It lists the changed files, each state named (**Changed**, **New**, **Added**, **Deleted**, **Renamed**, **Conflict**); stages and unstages them; commits; and shows a syntax-highlighted diff of the selected file (red for removed lines, green for added). It refreshes on file changes.
 
 ### The pull request queue
 
@@ -516,7 +497,7 @@ their own — there is no "load more" to press.
 
 ### MergeFlow conflict resolver
 
-When a `git merge` produces conflicts, a **"Resolve conflicts →"** button appears in the git sidebar. MergeFlow presents each conflict as a two-panel diff (yours vs. theirs) with author info and commit context for each side.
+When a `git merge` produces conflicts, a **"Resolve conflicts →"** button appears in the Git tab. MergeFlow presents each conflict as a two-panel diff (yours vs. theirs) with author info and commit context for each side.
 
 **Resolution actions per conflict:**
 

@@ -2,11 +2,6 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 
-vi.mock('../../../src/components/GitSidebarPanel', () => ({
-  GitSidebarPanel: ({ repoRoot }: { repoRoot: string | null }) => (
-    <div data-testid="git-sidebar-panel" data-repo-root={repoRoot ?? ''} />
-  ),
-}))
 vi.mock('../../../src/components/GitFullView', () => ({
   GitFullView: ({ repoRoot }: { repoRoot: string | null }) => (
     <div data-testid="git-full-view" data-repo-root={repoRoot ?? ''} />
@@ -45,20 +40,11 @@ afterEach(() => {
 })
 
 describe('git-integration renderer App', () => {
-  it('renders GitSidebarPanel for ?view=sidebar', async () => {
-    setSearch({ view: 'sidebar', repoRoot: '/my/repo' })
+  it('passes repoRoot from URL to GitFullView', async () => {
+    setSearch({ view: 'project', repoRoot: '/my/repo' })
     const { App } = await import('../../../src/renderer/App')
     render(<App />)
-    expect(screen.getByTestId('git-sidebar-panel')).toBeDefined()
-    expect(screen.queryByTestId('git-full-view')).toBeNull()
-  })
-
-  it('passes repoRoot from URL to GitSidebarPanel', async () => {
-    setSearch({ view: 'sidebar', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
-    render(<App />)
-    const el = screen.getByTestId('git-sidebar-panel')
-    expect(el.getAttribute('data-repo-root')).toBe('/my/repo')
+    expect(screen.getByTestId('git-full-view').getAttribute('data-repo-root')).toBe('/my/repo')
   })
 
   it('renders GitFullView for ?view=project', async () => {
@@ -83,21 +69,21 @@ describe('git-integration renderer App', () => {
   })
 
   it('subscribes to workspace:changed for live repoRoot updates', async () => {
-    setSearch({ view: 'sidebar', repoRoot: '/my/repo' })
+    setSearch({ view: 'project', repoRoot: '/my/repo' })
     const { App } = await import('../../../src/renderer/App')
     render(<App />)
     expect(mockBridgeOn).toHaveBeenCalledWith('workspace:changed', expect.any(Function))
   })
 
   it('updates repoRoot when workspace:changed fires', async () => {
-    setSearch({ view: 'sidebar', repoRoot: '/initial/repo' })
+    setSearch({ view: 'project', repoRoot: '/initial/repo' })
     const { App } = await import('../../../src/renderer/App')
     render(<App />)
     const handler = mockBridgeOn.mock.calls.find(([ch]) => ch === 'workspace:changed')?.[1]
     act(() => {
       handler?.({ repoRoot: '/new/repo' })
     })
-    const el = screen.getByTestId('git-sidebar-panel')
+    const el = screen.getByTestId('git-full-view')
     expect(el.getAttribute('data-repo-root')).toBe('/new/repo')
   })
 })

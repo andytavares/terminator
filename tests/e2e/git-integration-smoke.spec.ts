@@ -11,10 +11,7 @@ import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
  *
  * Git Integration contributes no global tab, so the smoke suite never opened
  * it — which is why its unstyled caret button and its overlapping status badge
- * both shipped. Its own file rather than a case inside `merge-flow.spec.ts`,
- * because showing and hiding the sidebar is shared state and toggling it
- * mid-file broke the tests either side.
- *
+ * both shipped. *
  * Each view is measured only while it is on screen: a WebContentsView the host
  * has hidden stops recalculating style, and every control in it then reads as
  * unstyled — a property of the measurement, not of the CSS.
@@ -133,14 +130,6 @@ function assertClean(view: string, report: Report): void {
     `${view} has a dialog that scrolls sideways: ${report.sideScrollers.join(', ')}`
   ).toHaveLength(0)
 }
-
-test('the git sidebar renders, and everything on it is styled', async () => {
-  const sidebar = handle.page.locator(`${PANEL}[data-view-param="sidebar"]`)
-  if ((await sidebar.count()) === 0) await handle.page.keyboard.press('Meta+Shift+G')
-  await expect(sidebar).toHaveCount(1, { timeout: 15000 })
-  await handle.page.waitForTimeout(2500)
-  assertClean('sidebar', await inGit('sidebar', PROBE))
-})
 
 test('the git project view renders, and everything on it is styled', async () => {
   await handle.page
