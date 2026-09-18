@@ -15,8 +15,10 @@ import {
 import type { RunGraph, RunNode } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
+import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
+import { HunkLines } from './HunkLines.js'
 
 // Where you watch, not where you act.
 //
@@ -183,6 +185,22 @@ function stallInWords(firing: StallFiring['firing']): string {
  *  enough that an agent is not left holding a tool call for a visible pause. */
 const LIVE_POLL_MS = 2000
 
+/** How many of a running agent's last lines the standing band shows. */
+const LIVE_LINES = 5
+
+/** A node an agent is working on now. An orphan says running and is not. */
+function isLive(node: RunNode, orphaned: readonly string[]): boolean {
+  return node.state === 'running' && node.sessionId !== null && !orphaned.includes(node.id)
+}
+
+/** "12s ago", "4m ago": how stale the newest line is, which is the question. */
+function ago(at: number, now: number): string {
+  const seconds = Math.max(0, Math.floor((now - at) / 1000))
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  return minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`
+}
+
 const STATE_LABEL: Record<RunNode['state'], string> = {
   waiting: 'waiting',
   ready: 'ready',
@@ -221,7 +239,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const [view, setView] = useState<FloorView | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAsk[]>([])
-  const [transcript, setTranscript] = useState<string[]>([])
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([])
+  /** The last few things each running agent said, by session. */
+  const [live, setLive] = useState<Record<string, TranscriptLine[]>>({})
   const [watching, setWatching] = useState<string | null>(null)
   const [redirect, setRedirect] = useState('')
   const [review, setReview] = useState<ReviewItem[]>([])
@@ -292,7 +312,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       const tail = (await invoke('foundry:run-transcript', {
         sessionId: watching,
         limit: 40,
-      })) as { lines?: string[] }
+      })) as { lines?: TranscriptLine[] }
       setTranscript(tail.lines ?? [])
     }
   }, [watching])
@@ -524,6 +544,41 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     [refresh]
   )
 
+  // Every running agent's tail, without choosing one to watch. The band read
+  // "0 of 3 steps done" for the whole of a build step, which is most of a run,
+  // and said nothing else: reported as "basically always blank".
+  const runningSessions = (view?.graph.nodes ?? [])
+    .filter((n) => isLive(n, view?.orphaned ?? []))
+    .map((n) => n.sessionId)
+    .join(' ')
+  useEffect(() => {
+    const sessions = runningSessions === '' ? [] : runningSessions.split(' ')
+    if (sessions.length === 0) {
+      setLive({})
+      return
+    }
+    let cancelled = false
+    const poll = async (): Promise<void> => {
+      const next: Record<string, TranscriptLine[]> = {}
+      for (const sessionId of sessions) {
+        const tail = (await invoke('foundry:run-transcript', {
+          sessionId,
+          limit: LIVE_LINES * 3,
+        })) as { lines?: TranscriptLine[] }
+        // The agent's own words and calls. The user side is the brief and
+        // tool results, which are either enormous or empty here.
+        next[sessionId] = (tail.lines ?? []).filter((l) => l.role === 'assistant')
+      }
+      if (!cancelled) setLive(next)
+    }
+    void poll()
+    const timer = setInterval(() => void poll(), LIVE_POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [runningSessions])
+
   if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
   if (view === null) return <div className="fdry-empty">Loading the run…</div>
 
@@ -596,6 +651,43 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               <span style={{ width: `${(standing.done / standing.total) * 100}%` }} />
             </div>
           )}
+
+          {view.graph.nodes.some((n) => isLive(n, orphaned)) ? (
+            <ul className="fdry-live" aria-label="What the agents are doing">
+              {view.graph.nodes
+                .filter((n) => isLive(n, orphaned))
+                .map((node) => {
+                  const lines = (live[node.sessionId ?? ''] ?? []).slice(-LIVE_LINES)
+                  const last = lines.at(-1)
+                  return (
+                    <li key={node.id} className="fdry-live-agent">
+                      <div className="fdry-live-head">
+                        <b>{view.labels?.[node.id] ?? node.id}</b>
+                        {last === undefined ? null : (
+                          <time dateTime={new Date(last.at).toISOString()}>
+                            {ago(last.at, Date.now())}
+                          </time>
+                        )}
+                      </div>
+                      {lines.length === 0 ? (
+                        <p className="fdry-live-empty">Starting — nothing yet.</p>
+                      ) : (
+                        <ol className="fdry-live-lines">
+                          {lines.map((line, index) => (
+                            <li
+                              key={`${line.at}-${index}`}
+                              className={index === lines.length - 1 ? 'is-latest' : undefined}
+                            >
+                              {line.text.split('\n')[0]}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </li>
+                  )
+                })}
+            </ul>
+          ) : null}
 
           {/* An agent stopped at a prompt only a person can clear.
 
@@ -891,10 +983,12 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       {/* What the agent has been saying, and the three things you can do to it
           without leaving. */}
       {watching !== null ? (
-        <section className="fdry-panel" style={{ marginTop: 12 }}>
-          <h3 className="fdry-panel-h">{watching}</h3>
+        <section className="fdry-panel" style={{ marginTop: 12 }} aria-labelledby="fdry-watching-h">
+          <h3 className="fdry-panel-h" id="fdry-watching-h">
+            {watching}
+          </h3>
           <pre className="fdry-transcript">
-            {transcript.length === 0 ? 'Nothing yet.' : transcript.join('\n')}
+            {transcript.length === 0 ? 'Nothing yet.' : transcript.map((l) => l.text).join('\n')}
           </pre>
           <form
             className="fdry-redirect"
@@ -991,7 +1085,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                 <code>{file.file}</code>
                 {file.hunks.map((hunk) => (
                   <div key={hunk.id} className={`fdry-hunk is-${hunk.decision ?? 'undecided'}`}>
-                    <pre>{hunk.lines.join('\n')}</pre>
+                    <HunkLines file={file.file} newStart={hunk.newStart} lines={hunk.lines} />
                     <div className="fdry-hunk-actions">
                       <button
                         type="button"

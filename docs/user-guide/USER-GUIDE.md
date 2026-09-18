@@ -714,6 +714,15 @@ The run graph by repository, what is ready, what is blocked and why. When an
 order spans several repositories there is a **merge order** section naming the
 files the lanes share and which lane must land first.
 
+The band at the top says where the run stands and, while agents are working,
+what each one is doing: its last few tool calls and messages, newest last, with
+how long ago it last did anything. It refreshes every two seconds. An agent that
+has just started says **Starting — nothing yet.**
+
+**To review** opens finished work hunk by hunk. Each hunk is shown as a diff,
+with line numbers from the new file, added and removed lines tinted, and the
+code syntax-highlighted, in the same colours as the Git view.
+
 Two things you can do without leaving:
 
 - **Waiting on you** sits above the run graph and lists every tool call an
