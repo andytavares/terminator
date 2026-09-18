@@ -1,0 +1,38 @@
+extensions/foundry/tests/components/HunkLines.spec.tsx
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 1-84
+docs/user-guide/USER-GUIDE.md
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 713-721
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 290-294,296-297,299,302-303,305,308-310,420-436,965-971,1137-1171
+extensions/foundry/src/components/Floor.tsx
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 18,21,188-203,242-244,315,547-581,655-691,986-989,991,1088
+extensions/foundry/CLAUDE.md
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 72
+docs/ARCHITECTURE.md
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 1176-1180
+extensions/foundry/src/components/foundry.css
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 1024-1027,1031,1033-1035,1037-1046,1050-1145,2501-2548
+  s_0ef8abf7960b58::t_244878ff59a343 2549
+extensions/foundry/package.json
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 10
+extensions/foundry/src/components/HunkLines.tsx
+  s_0ef8abf7960b58::t_21ea6168ba5fc4 1-112
+package-lock.json
+  s_0ef8abf7960b58::t_3bd59f5420f8b2 78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fa79a63b3a370845a6d3ccc971bc88ac52b6db66",
+  "prompts": {},
+  "sessions": {
+    "s_0ef8abf7960b58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06d1c8ed-9716-40ff-808e-632e7152ef1d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
