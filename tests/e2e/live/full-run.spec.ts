@@ -163,7 +163,7 @@ function writeOrder(): void {
         // live run raised it, halted, left its agents in their terminals and
         // wrote "not every node finished" — and it is not what this test is
         // named after.
-        budgets: { agents: 1, wallClockMinutes: 30, filesTouched: 4, tokens: null },
+        budgets: { agents: 1, wallClockMinutes: 30, tokens: null },
         plan: {
           units: [
             {
