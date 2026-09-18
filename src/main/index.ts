@@ -212,6 +212,17 @@ function setupMenu(): void {
       label: 'Window',
       submenu: [
         {
+          label: 'Home',
+          accelerator: 'CmdOrCtrl+`',
+          click: () => mainWindow?.webContents.send('menu:open-home'),
+        },
+        {
+          label: 'Home',
+          accelerator: 'CmdOrCtrl+Shift+`',
+          visible: false,
+          click: () => mainWindow?.webContents.send('menu:open-home'),
+        },
+        {
           label: 'Close Tab',
           accelerator: 'CmdOrCtrl+W',
           click: () => mainWindow?.webContents.send('menu:close-tab'),

@@ -420,6 +420,12 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toHandlerArgs: () => [],
   },
   {
+    path: 'extensionEvents.onMenuOpenHome',
+    kind: 'event',
+    channel: 'menu:open-home',
+    toHandlerArgs: () => [],
+  },
+  {
     path: 'extensionEvents.onMenuToggleSidebar',
     kind: 'event',
     channel: 'menu:toggle-sidebar',

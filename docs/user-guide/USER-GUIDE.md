@@ -444,6 +444,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Command palette                      | `Cmd+P`                  |
 | Settings                             | `Cmd+,`                  |
 | Toggle Overview screen               | `Cmd+Shift+E`            |
+| Open Home                            | `Cmd+~`                  |
 | Send newline (always)                | `Cmd+Enter`              |
 | Send newline (bracketed paste mode)  | `Shift+Enter`            |
 | Leave an extension, back to terminal | `Esc` `Esc`              |

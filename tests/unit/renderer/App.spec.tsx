@@ -513,6 +513,25 @@ describe('App', () => {
     expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
   })
 
+  it('activates core.home when the menu:open-home event fires', () => {
+    const mockSetActiveGlobalTab = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      setActiveGlobalTab: mockSetActiveGlobalTab,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    let openHomeCb: (() => void) | null = null
+    ;(window.electronAPI as unknown as Record<string, unknown>).extensionEvents = {
+      onMenuOpenHome: (cb: () => void) => {
+        openHomeCb = cb
+        return vi.fn()
+      },
+    }
+    render(<App />)
+    mockSetActiveGlobalTab.mockClear()
+    openHomeCb!()
+    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith('core.home')
+  })
+
   it('renders overlay components from extension registry', () => {
     const MockOverlay = () => <div data-testid="mock-overlay">Overlay</div>
     vi.mocked(useExtensionRegistry).mockReturnValue({

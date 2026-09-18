@@ -187,6 +187,7 @@ export function App(): JSX.Element {
     onToggleLog: handleToggleLog,
     onOpenCommandPalette: handleOpenCommandPalette,
     onToggleOverview: handleToggleOverview,
+    onOpenHome: () => setActiveGlobalTab('core.home'),
     onNewScratch: handleNewScratch,
     onNewTab: handleNewTab,
     scratchProjectId: scratchActive ? SCRATCH_PROJECT_ID : null,
@@ -541,6 +542,13 @@ export function App(): JSX.Element {
       permanent: true,
     })
   }, [])
+
+  // A menu accelerator, not a renderer keydown: macOS claims Cmd+` for window
+  // cycling before the keydown is ever dispatched to the page.
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuOpenHome) return
+    return window.electronAPI.extensionEvents.onMenuOpenHome(() => setActiveGlobalTab('core.home'))
+  }, [setActiveGlobalTab])
 
   // Home is where the app opens.
   useEffect(() => {

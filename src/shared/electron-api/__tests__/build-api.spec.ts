@@ -99,6 +99,16 @@ describe('buildElectronApi — native mode', () => {
     expect(handler).toHaveBeenCalledWith()
   })
 
+  it('delivers menu:open-home to onMenuOpenHome with no args', () => {
+    const t = makeTransport()
+    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const handler = vi.fn()
+    api.extensionEvents.onMenuOpenHome(handler)
+    t.push('menu:open-home')
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith()
+  })
+
   it('uses the supplied local implementations', () => {
     const t = makeTransport()
     const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
