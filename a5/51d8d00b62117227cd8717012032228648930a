@@ -1,0 +1,24 @@
+extensions/foundry/src/components/foundry.css
+  s_0ef8abf7960b58::t_bcb467733dba6f 507-512,878
+  s_0ef8abf7960b58::t_25ef066233ead5 871,876-877
+  s_0ef8abf7960b58::t_802d2ccd5c43bc 1526
+  s_0ef8abf7960b58::t_69217968cefc93 879
+extensions/foundry/src/components/Forge.tsx
+  s_0ef8abf7960b58::t_bcb467733dba6f 927-933,936
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a551d8d00b62117227cd8717012032228648930a",
+  "prompts": {},
+  "sessions": {
+    "s_0ef8abf7960b58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06d1c8ed-9716-40ff-808e-632e7152ef1d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
