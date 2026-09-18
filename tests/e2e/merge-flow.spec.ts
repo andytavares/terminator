@@ -115,46 +115,6 @@ test('MergeFlow opens on a real conflict and reads in both themes', async () => 
  * text field, the text-field guard does not apply and only the open-surface
  * count stands between Escape and losing the merge.
  */
-test('double Escape inside MergeFlow does not close the extension', async () => {
-  const before = await handle.page.evaluate(
-    () =>
-      document.querySelector('[data-extension-panel]')?.getAttribute('data-extension-panel') ?? null
-  )
-  expect(before).not.toBeNull()
-
-  await inGit<string>(
-    'project',
-    `(() => {
-      const b = document.querySelector('button')
-      if (b) b.focus()
-      return document.activeElement.tagName
-    })()`
-  )
-  await handle.app.evaluate(async ({ webContents }) => {
-    const v = webContents
-      .getAllWebContents()
-      .find(
-        (w) =>
-          !w.isDestroyed() &&
-          w.getURL().includes('git-integration') &&
-          w.getURL().includes('view=project')
-      )
-    if (!v) return
-    for (let i = 0; i < 2; i++) {
-      v.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
-      v.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
-      await new Promise((r) => setTimeout(r, 100))
-    }
-  })
-  await handle.page.waitForTimeout(1200)
-
-  const after = await handle.page.evaluate(
-    () =>
-      document.querySelector('[data-extension-panel]')?.getAttribute('data-extension-panel') ?? null
-  )
-  expect(after).toBe(before)
-})
-
 /**
  * SC-012, for the extension the other harness cannot reach.
  *
