@@ -1,0 +1,44 @@
+extensions/git-integration/tests/unit/manifest.spec.ts
+  s_6929d235ed58e1::t_2b2767c38824e3 1-13
+docs/ARCHITECTURE.md
+  s_6929d235ed58e1::t_917dc04cde93d2 793
+extensions/git-integration/tests/unit/renderer/App.spec.tsx
+  s_6929d235ed58e1::t_2b2767c38824e3 43-44,47,72,79,86
+extensions/git-integration/src/renderer/App.tsx
+  s_6929d235ed58e1::t_1dcd3158d6975a 24
+extensions/git-integration/README.md
+  s_6929d235ed58e1::t_917dc04cde93d2 3,11,20
+  s_6929d235ed58e1::t_c3c3521a7127d8 30-35
+tests/e2e/merge-flow.spec.ts
+  s_6929d235ed58e1::t_768929db6e2de7 78
+  s_6929d235ed58e1::t_917dc04cde93d2 162-163,193,196
+README.md
+  s_6929d235ed58e1::t_917dc04cde93d2 19-20
+  s_6929d235ed58e1::t_20267d92731053 25,45
+tests/e2e/git-sidebar.spec.ts
+  s_6929d235ed58e1::t_2b2767c38824e3 9,46,48,50-52
+tests/e2e/git-integration-smoke.spec.ts
+  s_6929d235ed58e1::t_917dc04cde93d2 14
+extensions/git-integration/manifest.json
+  s_6929d235ed58e1::t_1dcd3158d6975a 5,19
+docs/user-guide/USER-GUIDE.md
+  s_6929d235ed58e1::t_c3c3521a7127d8 70-72,74,465-466,468-471,483
+  s_6929d235ed58e1::t_20267d92731053 453,467
+  s_6929d235ed58e1::t_917dc04cde93d2 73,500
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "368dd80a74c6603e2d7430a40db532880e7cc772",
+  "prompts": {},
+  "sessions": {
+    "s_6929d235ed58e1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d88553a-4c2e-4a20-b65f-eef6c4c451ff",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
