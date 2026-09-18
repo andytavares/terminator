@@ -92,6 +92,7 @@ interface ExtensionRegistry {
   updateGlobalTab(id: string, patch: Partial<Omit<GlobalTabRegistration, 'id' | 'component'>>): void
   togglePanel(panelId: string): void
   exitExtensionToTerminal(sidebarPanelId?: string): boolean
+  dismissSurfaces(): boolean
   setActiveProjectTab(tabId: string | null): void
   setActiveGlobalTab(tabId: string | null): void
   setActiveWorkspaceTab(tabId: string | null): void
@@ -288,6 +289,18 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
         : prev.activeWorkspaceTabId,
       activeProjectTabId: isExitable(prev.activeProjectTabId) ? null : prev.activeProjectTabId,
     }))
+    return true
+  },
+
+  /**
+   * Dismisses whatever is showing in place of the terminal, core screens such
+   * as Home and Overview included — the user has moved on to something else.
+   * Sidebar panels sit beside the terminal rather than over it, so they stay.
+   */
+  dismissSurfaces() {
+    const s = get()
+    if (!s.activeGlobalTabId && !s.activeWorkspaceTabId && !s.activeProjectTabId) return false
+    set({ activeGlobalTabId: null, activeWorkspaceTabId: null, activeProjectTabId: null })
     return true
   },
 

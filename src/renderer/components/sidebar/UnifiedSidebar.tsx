@@ -20,6 +20,7 @@ import {
   TERMINALS_NAMESPACE,
 } from '../../sidebar/collapse-state'
 import { useDragReorder, type DragItemProps } from '../../hooks/useDragReorder'
+import { useDismissSurfaceOnClick } from '../../hooks/useDismissSurfaceOnClick'
 import { mergeReorder } from '../../sidebar/manual-order'
 import { TerminalRow } from './TerminalRow'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -494,6 +495,7 @@ export function UnifiedSidebar({
   }
 
   const workspaceTabList = Array.from(workspaceTabs.values())
+  const dismissSurfaceHandlers = useDismissSurfaceOnClick()
 
   // ── Attached issues ───────────────────────────────────────────────────────
   //
@@ -654,6 +656,7 @@ export function UnifiedSidebar({
         ref={sidebarRef}
         className={`unified-sidebar${visible ? '' : ' unified-sidebar--hidden'}`}
         style={{ width }}
+        {...dismissSurfaceHandlers}
       >
         <SidebarHeader
           onSearchFocus={() => {}}
@@ -789,6 +792,8 @@ export function UnifiedSidebar({
           className="unified-sidebar__resize-handle"
           onMouseDown={handleResizeMouseDown}
           onDoubleClick={handleResizeDblClick}
+          // Resizing the sidebar is not a move away from what the main area shows.
+          onClick={(e) => e.stopPropagation()}
         />
       </div>
 
