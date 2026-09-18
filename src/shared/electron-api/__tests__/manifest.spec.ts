@@ -103,6 +103,7 @@ describe('remoteAccessibleCoreChannels()', () => {
     'extension:toggle-panel',
     'extension:select-project-tab',
     'menu:open-settings',
+    'menu:open-home',
     'menu:toggle-sidebar',
     'menu:close-tab',
     'menu:open-about',

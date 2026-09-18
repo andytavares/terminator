@@ -192,6 +192,7 @@ interface ElectronAPI {
     onTogglePanel(handler: (panelId: string) => void): () => void
     onSelectProjectTab(handler: (tabId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
+    onMenuOpenHome(handler: () => void): () => void
     onMenuToggleSidebar(handler: () => void): () => void
     onMenuCloseTab(handler: () => void): () => void
     onMenuOpenAbout(handler: () => void): () => void
