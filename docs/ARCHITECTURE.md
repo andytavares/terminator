@@ -971,6 +971,16 @@ plan the architect wrote, so neither is mistaken for work to amend — telling a
 architect it wrote something it did not is the same class of defect in the
 other direction.
 
+**An ask is answered where it was asked.** A failing check's "Ask for…"
+button, and the "Ask the architect" button on each open red team finding, start
+a turn whose instruction the ledger's `converge.started` line keeps; `lastIntake`
+hands it back as `asked`, so the row that sent it shows "Asked — the architect
+is working on it" in place of its button, across leaving the step and coming
+back. While any turn runs, no ask is offered, because a second turn would race
+the first. A redraft closes the structural findings it cleared
+(`settleFindings`, run by `readProposal` on every applied proposal); a
+reviewer's finding is judgement and stays with the operator.
+
 ### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
 
 - **Recipes** (`recipe/parse.ts`, `recipe/resolve.ts`) are YAML: a list of steps

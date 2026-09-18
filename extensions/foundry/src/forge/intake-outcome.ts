@@ -27,7 +27,13 @@ export type IntakeOutcome =
   /** Intake has never run on this order. */
   | { readonly kind: 'none' }
   /** An architect is working now: a start with nothing after it. */
-  | { readonly kind: 'running'; readonly at: string; readonly sessionId: string }
+  | {
+      readonly kind: 'running'
+      readonly at: string
+      readonly sessionId: string
+      /** What the operator asked for, so the surface can say which ask this is. */
+      readonly asked: string
+    }
   /** It finished and the order moved. */
   | { readonly kind: 'redrafted'; readonly at: string; readonly note: string }
   /** It finished and nothing moved, because the proposal was not accepted. */
@@ -45,7 +51,9 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
     const entry = entries[i]
     if (entry.action === REFUSED) return { kind: 'refused', at: entry.at, reason: entry.reason }
     if (entry.action === REDRAFTED) return { kind: 'redrafted', at: entry.at, note: entry.reason }
-    if (entry.action === STARTED) return { kind: 'running', at: entry.at, sessionId: entry.subject }
+    if (entry.action === STARTED) {
+      return { kind: 'running', at: entry.at, sessionId: entry.subject, asked: entry.reason }
+    }
   }
   return { kind: 'none' }
 }

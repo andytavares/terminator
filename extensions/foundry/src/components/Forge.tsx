@@ -1,6 +1,6 @@
 import { Markdown } from './Markdown.js'
 import React, { useCallback, useEffect, useState } from 'react'
-import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle } from 'lucide-react'
+import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle, LoaderCircle } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
@@ -176,6 +176,27 @@ const CHECK_REMEDIES: Record<CheckId, readonly Remedy[]> = {
         'The plan does not fit its budgets, and the budgets are the operator’s to set. Cut the plan down until it fits the budgets the order has.',
     },
   ],
+}
+
+/** What the architect is told when asked to clear one red team finding. */
+function findingAsk(finding: { readonly id: string; readonly text: string }): string {
+  return `The red team finding ${finding.id} is open: "${finding.text}" Change the order so it no longer holds, and change nothing else.`
+}
+
+/**
+ * Where the operator asked, in place of the button they pressed.
+ *
+ * The button used to go faintly disabled and keep its label, and the only word
+ * that anything had started was in the header, out of view. So the ask becomes
+ * the answer on the spot, and while it runs nothing offers a second one.
+ */
+function Asked(): JSX.Element {
+  return (
+    <span role="status" aria-label="Asked" className="fdry-asked">
+      <LoaderCircle aria-hidden="true" />
+      Asked — the architect is working on it. This clears when the redraft lands.
+    </span>
+  )
 }
 
 /**
@@ -377,6 +398,8 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
    */
   const intake: IntakeOutcome = view?.intake ?? { kind: 'none' }
   const drafting = intake.kind === 'running'
+  /** The instruction the running turn was started with, to find the ask it answers. */
+  const asked = intake.kind === 'running' ? intake.asked : null
 
   // The architect answers in minutes, not in the call that started it, so the
   // document is refetched while it works and the outcome — a redraft, or the
@@ -491,23 +514,28 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
               one the operator stares at. */}
           {bad && isDraft ? (
             <span className="fdry-remedy">
-              {CHECK_REMEDIES[id].map((remedy) => (
-                <button
-                  key={remedy.label}
-                  type="button"
-                  disabled={busy || (remedy.kind === 'ask' && drafting)}
-                  onClick={() => {
-                    if (remedy.kind === 'ask') {
-                      void converge(remedy.message)
-                      return
-                    }
-                    if (remedy.step !== null) setPicked(remedy.step)
-                    setFocusTarget(remedy.target)
-                  }}
-                >
-                  {remedy.label}
-                </button>
-              ))}
+              {CHECK_REMEDIES[id].map((remedy) => {
+                if (remedy.kind === 'ask' && drafting) {
+                  return asked === remedy.message ? <Asked key={remedy.label} /> : null
+                }
+                return (
+                  <button
+                    key={remedy.label}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (remedy.kind === 'ask') {
+                        void converge(remedy.message)
+                        return
+                      }
+                      if (remedy.step !== null) setPicked(remedy.step)
+                      setFocusTarget(remedy.target)
+                    }}
+                  >
+                    {remedy.label}
+                  </button>
+                )
+              })}
             </span>
           ) : null}
         </span>
@@ -905,7 +933,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 <p className="fdry-step-intro">
                   {openFindings.length === 0
                     ? 'Nothing is open. An adversarial pass read the plan and left nothing to clear.'
-                    : `${openFindings.length} open. Mark each one fixed, or accept it with a reason — nothing hands off while one is open.`}
+                    : `${openFindings.length} open. Ask the architect to clear each one, mark it fixed, or accept it with a reason — nothing hands off while one is open.`}
                 </p>
                 <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
                   {openFindings.map((finding) => (
@@ -914,6 +942,20 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                       <span>{finding.text}</span>
                       {isDraft ? (
                         <span className="fdry-finding-actions">
+                          {drafting ? (
+                            asked === findingAsk(finding) ? (
+                              <Asked />
+                            ) : null
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              title="Have the architect change the order so this no longer holds"
+                              onClick={() => void converge(findingAsk(finding))}
+                            >
+                              Ask the architect
+                            </button>
+                          )}
                           <button
                             type="button"
                             disabled={busy}

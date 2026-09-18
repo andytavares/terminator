@@ -739,10 +739,16 @@ describe('foundry:order.converge — the half that was missing', () => {
     })
     // On this call and not only on the next poll: the surface reads whether a
     // turn is in flight from here, and would otherwise sit idle.
-    const started = (await c.converge({ id: seed.order.id })) as {
+    const started = (await c.converge({ id: seed.order.id, message: 'close the gap' })) as {
       intake: { kind: string; sessionId?: string }
     }
-    expect(started.intake).toEqual({ kind: 'running', at: NOW, sessionId: 'sess-arch' })
+    // With what it was asked, so the surface can show the ask that started it.
+    expect(started.intake).toEqual({
+      kind: 'running',
+      at: NOW,
+      sessionId: 'sess-arch',
+      asked: 'close the gap',
+    })
 
     const polled = (await c.compile({ id: seed.order.id, commit: false })) as {
       intake: { kind: string }

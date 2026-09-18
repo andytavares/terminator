@@ -4,6 +4,7 @@ import { orderDir } from '../data-root.js'
 import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
 import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
+import { settleFindings } from './red-team.js'
 import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role, Rule } from '../recipe/parse.js'
@@ -271,7 +272,11 @@ export function readProposal(order: WorkOrder, proposalPath: string, at: string)
 
   try {
     const proposal = parseProposal(JSON.parse(raw))
-    return { ok: true, order: applyProposal(order, proposal, at), note: proposal.note }
+    return {
+      ok: true,
+      order: settleFindings(applyProposal(order, proposal, at)),
+      note: proposal.note,
+    }
   } catch (error) {
     return {
       ok: false,

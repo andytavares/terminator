@@ -27,8 +27,15 @@ describe('lastIntake', () => {
   })
 
   it('is running while a start is the last thing that happened', () => {
-    const out = lastIntake([entry({ action: 'converge.started', subject: 'sess-1' })])
-    expect(out).toEqual({ kind: 'running', at: '2026-09-09T19:30:00Z', sessionId: 'sess-1' })
+    const out = lastIntake([
+      entry({ action: 'converge.started', subject: 'sess-1', reason: 'close the gap' }),
+    ])
+    expect(out).toEqual({
+      kind: 'running',
+      at: '2026-09-09T19:30:00Z',
+      sessionId: 'sess-1',
+      asked: 'close the gap',
+    })
   })
 
   it('is redrafted once the architect has saved one', () => {
@@ -82,7 +89,12 @@ describe('lastIntake', () => {
       entry({ action: 'converge.refused', reason: 'first go' }),
       entry({ action: 'converge.started', at: '2026-09-09T19:40:00Z', subject: 'sess-2' }),
     ])
-    expect(out).toEqual({ kind: 'running', at: '2026-09-09T19:40:00Z', sessionId: 'sess-2' })
+    expect(out).toEqual({
+      kind: 'running',
+      at: '2026-09-09T19:40:00Z',
+      sessionId: 'sess-2',
+      asked: '',
+    })
   })
 })
 

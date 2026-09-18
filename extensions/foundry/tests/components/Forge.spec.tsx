@@ -558,6 +558,45 @@ describe('clearing an adversarial finding', () => {
     )
   })
 
+  // Reported: "I should be able to ask the agent to close the red team
+  // findings too." Fixed and Accept were the only moves, and both are the
+  // operator doing the work.
+  it('asks the architect to clear it', async () => {
+    withFinding()
+    await openStep('Red team')
+    fireEvent.click(screen.getByRole('button', { name: 'Ask the architect' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        expect.objectContaining({
+          id: 'WO-1',
+          message: expect.stringContaining('the outcome restates the problem'),
+        })
+      )
+    )
+  })
+
+  it('says the architect is on it, and cannot be asked twice', async () => {
+    mountAsking({
+      ...order(),
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'high' as const,
+          text: 'the outcome restates the problem',
+          status: 'open' as const,
+          reason: '',
+        },
+      ],
+    })
+    await openStep('Red team')
+    fireEvent.click(screen.getByRole('button', { name: 'Ask the architect' }))
+    const status = await screen.findByRole('status', { name: /Asked/ })
+    expect(status.textContent).toMatch(/the architect is working on it/)
+    expect(screen.queryByRole('button', { name: 'Ask the architect' })).toBeNull()
+    expect(converges()).toBe(1)
+  })
+
   it('asks for the reason before accepting one', async () => {
     withFinding()
     await openStep('Red team')
@@ -921,6 +960,84 @@ function mountBlocked(over: Record<string, unknown> = {}) {
   render(<Forge orderId="WO-1" />)
   return current
 }
+
+/**
+ * The order refuses on `current`, and a converge starts a turn that is still
+ * running on every read after it — carrying what it was asked, as the ledger
+ * does.
+ */
+function mountAsking(current: WorkOrder) {
+  let running: Record<string, unknown> | null = null
+  invoke = vi.fn(async (channel: string, payload: { message?: string }) => {
+    const intake = running ?? { kind: 'none' }
+    if (channel === 'foundry:order.compile') {
+      return { order: current, compile: compileOrder(current), intake }
+    }
+    if (channel === 'foundry:order.converge') {
+      running = {
+        kind: 'running',
+        at: '2026-09-17T23:05:42Z',
+        sessionId: 'sess-1',
+        asked: payload.message ?? '',
+      }
+      return {
+        order: current,
+        compile: compileOrder(current),
+        converging: 'sess-1',
+        intake: running,
+      }
+    }
+    return {}
+  })
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+  }
+  render(<Forge orderId="WO-1" />)
+}
+
+function converges(): number {
+  return invoke.mock.calls.filter((c) => c[0] === 'foundry:order.converge').length
+}
+
+// Reported: "I clicked ask for the gap to be closed but there's no indication
+// it's working." The button went faintly disabled and kept its label; the only
+// word that anything had started was in the header, out of view.
+describe('an ask the architect is working on', () => {
+  it('says so on the check it was asked about, in place of the button', async () => {
+    mountAsking(orderBlockedOnPictures() as WorkOrder)
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+
+    const status = await screen.findByRole('status', { name: /Asked/ })
+    expect(status.textContent).toMatch(/the architect is working on it/)
+    expect(screen.queryByRole('button', { name: 'Ask for proof' })).toBeNull()
+    expect(converges()).toBe(1)
+  })
+
+  it('offers no other ask while one is running — a second turn would race the first', async () => {
+    const blocked = orderBlockedOnPictures()
+    // Fails coverage as well: a unit that satisfies nothing.
+    mountAsking({
+      ...blocked,
+      plan: {
+        ...blocked.plan,
+        units: [...blocked.plan.units, { ...blocked.plan.units[0], id: 'U-2', satisfies: [] }],
+      },
+    } as WorkOrder)
+    await openStep('Hand off')
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+    await screen.findByRole('status', { name: /Asked/ })
+    expect(screen.queryByRole('button', { name: 'Ask for the gap to be closed' })).toBeNull()
+  })
+
+  it('says so again after leaving the step and coming back, from the record', async () => {
+    mountAsking(orderBlockedOnPictures() as WorkOrder)
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+    await screen.findByRole('status', { name: /Asked/ })
+    await openStep('Intent')
+    await openStep('Plan')
+    expect(await screen.findByRole('status', { name: /Asked/ })).toBeTruthy()
+  })
+})
 
 describe('a failing check says how to clear it', () => {
   it('shows the falsifiable check failing, on the case an operator actually meets', async () => {
