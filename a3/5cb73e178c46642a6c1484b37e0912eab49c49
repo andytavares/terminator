@@ -1,0 +1,25 @@
+extensions/foundry/tests/ipc/issues-mine-ipc.spec.ts
+  s_4d23610f30cc5d::t_9580048ec9ca83 1-144,153-164
+  s_4d23610f30cc5d::t_94282280aababb 145-152
+extensions/foundry/src/index.ts
+  s_4d23610f30cc5d::t_9059aabc5c9de7 1893-1897
+  s_4d23610f30cc5d::t_94282280aababb 1898-1902
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_4d23610f30cc5d::t_6c2e22f113702b 68-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a35cb73e178c46642a6c1484b37e0912eab49c49",
+  "prompts": {},
+  "sessions": {
+    "s_4d23610f30cc5d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f69e0e15-9750-4c64-8fc4-a326f1a3456e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
