@@ -1,0 +1,19 @@
+briefs/TAV-16.md
+  s_bb70744b31bb29::t_28951cc01ec175 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e3110289df5ec437c6dd8d7d1eb324271fe57589",
+  "prompts": {},
+  "sessions": {
+    "s_bb70744b31bb29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37c46304-0b8f-490a-ac74-c05e5ab026aa",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
