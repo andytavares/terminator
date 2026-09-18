@@ -116,20 +116,6 @@ export function activate(api: ExtensionAPI): void {
           default: true,
           workspaceScoped: true,
         },
-        'terminator.git-integration.git.sidebar.defaultOpen': {
-          type: 'boolean',
-          label: 'Open sidebar by default',
-          default: false,
-          workspaceScoped: true,
-        },
-        'terminator.git-integration.git.sidebar.refreshIntervalMs': {
-          type: 'number',
-          label: 'Sidebar refresh interval (ms)',
-          default: 3000,
-          min: 500,
-          max: 60000,
-          workspaceScoped: true,
-        },
         'terminator.git-integration.git.ghCliPath': {
           type: 'string',
           label: 'gh CLI path',
@@ -158,29 +144,6 @@ export function activate(api: ExtensionAPI): void {
           max: 5000,
         },
         ...buildNotificationSettingProperties(),
-      },
-    })
-  )
-
-  disposables.push(
-    api.sidebar.registerItem({
-      id: 'git-sidebar-toggle',
-      label: 'Git Changes',
-      tooltip: 'Toggle Git Changes sidebar',
-      icon: 'git-branch',
-      onClick: () => api.sidebar.togglePanel(),
-    })
-  )
-
-  disposables.push(
-    api.nativeMenu.addViewMenuItem({
-      id: 'git-sidebar-toggle',
-      label: 'Toggle Git Changes',
-      accelerator: 'CmdOrCtrl+Shift+G',
-      type: 'checkbox',
-      panelId: 'terminator.git-integration',
-      onClick: () => {
-        api.window.broadcast('extension:toggle-panel', 'terminator.git-integration')
       },
     })
   )

@@ -790,8 +790,7 @@ MergeFlow is a subsystem of the `git-integration` extension that provides an int
 
 ### Entry Points
 
-- `GitSidebarPanel.tsx` shows a "Resolve conflicts →" button when `status.hasConflicts === true`, setting `gitStore.view = 'merge-flow'`.
-- `GitFullView.tsx` renders `<MergeFlowView>` when `view === 'merge-flow'`.
+- `GitFullView.tsx` shows a "Resolve conflicts →" button when `status.hasConflicts === true`, setting `gitStore.view = 'merge-flow'`, and renders `<MergeFlowView>` when `view === 'merge-flow'`.
 
 ### Session Lifecycle
 

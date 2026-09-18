@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { GitSidebarPanel } from '../components/GitSidebarPanel'
 import { GitFullView } from '../components/GitFullView'
 import { PrReviewTab } from '../components/pr-review/PrReviewTab'
 
@@ -19,11 +18,8 @@ export function App(): JSX.Element {
     return off
   }, [])
 
-  if (view === 'project') {
-    return <GitFullView repoRoot={repoRoot} />
-  }
   if (view === 'code-reviews' || view === 'pr-review') {
     return <PrReviewTab repoRoot={repoRoot} />
   }
-  return <GitSidebarPanel repoRoot={repoRoot} onClose={() => {}} />
+  return <GitFullView repoRoot={repoRoot} />
 }

@@ -2,16 +2,11 @@
   "id": "terminator.git-integration",
   "name": "Git Integration",
   "version": "0.1.0",
-  "description": "Git & GitHub integration: sidebar, staging, commit, and PR creation via gh CLI.",
+  "description": "Git & GitHub integration: staging, commit, and PR creation via gh CLI.",
   "main": "src/index.js",
   "renderer": "dist/index.html",
   "minAppVersion": "0.1.0",
   "contributes": {
-    "sidebarPanel": {
-      "label": "Git Changes",
-      "defaultOpen": false,
-      "view": "sidebar"
-    },
     "projectTab": {
       "label": "Git",
       "view": "project"
@@ -21,14 +16,6 @@
       "icon": "git-pull-request",
       "view": "code-reviews"
     },
-    "windowViews": [{ "id": "pr-review", "view": "pr-review" }],
-    "commands": [
-      {
-        "id": "git:toggle-panel",
-        "label": "Toggle Git Changes Panel",
-        "shortcut": "CmdOrCtrl+Shift+G",
-        "description": "Show or hide the Git Changes sidebar panel"
-      }
-    ]
+    "windowViews": [{ "id": "pr-review", "view": "pr-review" }]
   }
 }

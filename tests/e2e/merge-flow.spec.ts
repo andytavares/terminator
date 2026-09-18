@@ -74,24 +74,8 @@ test.afterAll(async () => {
   if (repo) rmSync(repo, { recursive: true, force: true })
 })
 
-test('the sidebar names the conflict and refuses to commit, saying why', async () => {
-  await handle.page.keyboard.press('Meta+Shift+G')
-  await handle.page.waitForTimeout(2500)
-  const text = await inGit<string>('sidebar', 'document.body.innerText')
-
-  // The file's state is a word, not a porcelain code (FR-036).
-  expect(text).toContain('Conflict')
-  expect(text).not.toMatch(/\bUU\b/)
-  // One primary commit control, and it says what would enable it (FR-037).
-  expect(text).toContain('Commit & push')
-  expect(text).toMatch(/Stage a file/)
-  // Where the branch stands, in words.
-  expect(text).toContain('No upstream branch yet')
-})
-
 test('MergeFlow opens on a real conflict and reads in both themes', async () => {
-  // The Git project tab is where MergeFlow renders; the sidebar's button asks
-  // the host to bring it up.
+  // The Git project tab is where MergeFlow renders.
   await handle.page
     .locator('.tab-bar--primary .tab-bar__tab')
     .filter({ hasText: 'Git' })
@@ -175,8 +159,8 @@ test('double Escape inside MergeFlow does not close the extension', async () => 
  * SC-012, for the extension the other harness cannot reach.
  *
  * `extension-themes.spec.ts` opens each extension from its global tab button.
- * Git Integration has no global tab — it contributes a sidebar panel and
- * project/workspace tabs — and its merge surfaces do not exist at all until a
+ * Git Integration has no global tab — it contributes project/workspace tabs —
+ * and its merge surfaces do not exist at all until a
  * repository is mid-merge. So its contrast is measured here, where that state
  * has already been built, rather than left unmeasured because the harness
  * shape did not fit.
@@ -206,10 +190,10 @@ async function openGitProjectTab(): Promise<void> {
   }
 }
 
-for (const viewParam of ['sidebar', 'project'] as const) {
+for (const viewParam of ['project'] as const) {
   for (const theme of ['dark', 'light'] as const) {
     test(`Git Integration (${viewParam}) meets WCAG AA in the ${theme} theme`, async () => {
-      if (viewParam === 'project') await openGitProjectTab()
+      await openGitProjectTab()
       await setTheme(theme)
       const probes = await inGit<Probe[]>(viewParam, CONTRAST_PROBE)
       expect(probes.length, `${viewParam} rendered no text to measure`).toBeGreaterThan(0)
