@@ -76,6 +76,16 @@ export function QuickActions({
     if (mode === 'search') inputRef.current?.focus()
   }, [mode])
 
+  // Move DOM focus into the panel as soon as it mounts. Without this, focus
+  // stays on whatever was focused before ⌘P (most often the terminal), and
+  // xterm attaches its own Escape handling directly to its textarea in the
+  // capture phase — which stops propagation before this component's
+  // window-level keydown listener ever sees the event. The panel would then
+  // never close on Escape while a terminal had focus.
+  useEffect(() => {
+    if (mode !== 'search') panelRef.current?.focus()
+  }, [mode])
+
   const contextRows = useMemo<Row[]>(() => {
     if (!contextGroupId) return []
     const group = groupById.get(contextGroupId)
@@ -303,8 +313,14 @@ export function QuickActions({
     onTogglePin,
   ])
 
-  function renderKeyLabel(keyLabel: string): JSX.Element | null {
-    if (!keyLabel) return null
+  function renderKeyLabel(keyLabel: string): JSX.Element {
+    // `.qa-row` is a 3-column grid (`24px 1fr auto`). Omitting this element
+    // entirely for a mnemonic-less action (a direct-shortcut-only action, or
+    // one surfaced dynamically) left only 2 grid children, so the label
+    // landed in the 24px key column and clipped to a single letter. An empty,
+    // invisible placeholder keeps every row's children aligned to the same
+    // three columns.
+    if (!keyLabel) return <span className="qa-key qa-key--empty" aria-hidden="true" />
     return <span className={`qa-key${keyLabel.length > 1 ? ' qa-key--wide' : ''}`}>{keyLabel}</span>
   }
 
@@ -423,6 +439,7 @@ export function QuickActions({
         role="dialog"
         aria-modal="true"
         aria-label="Quick actions"
+        tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
       >
         {mode === 'search' ? (

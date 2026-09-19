@@ -292,6 +292,11 @@
   min-width: 22px;
 }
 
+.qa-key--empty {
+  background: none;
+  border-color: transparent;
+}
+
 /* ── Footer ───────────────────────────────────────────────────── */
 
 .qa-footer {

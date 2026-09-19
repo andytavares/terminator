@@ -42,6 +42,16 @@ function makeActions(): QuickAction[] {
       run: vi.fn(),
     },
     { id: 'top.home', label: 'Home', group: 'top', mnemonic: 'h', shortcut: '⌘`', run: vi.fn() },
+    // Legitimately mnemonic-less: a direct-shortcut-only action (e.g. Toggle
+    // log window) or a dynamically surfaced one (e.g. a per-notification
+    // action) never gets a letter.
+    {
+      id: 'top.no-mnemonic',
+      label: 'Toggle log window',
+      group: 'top',
+      shortcut: '⌘⇧L',
+      run: vi.fn(),
+    },
   ]
 }
 
@@ -258,6 +268,40 @@ describe('QuickActions — closing', () => {
     const panel = container.querySelector('.qa-panel')!
     fireEvent.mouseDown(panel)
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('QuickActions — rows with no mnemonic', () => {
+  it('still reserves the key column, so the label is not squeezed into a 24px cell', () => {
+    // `.qa-row` is `display: grid; grid-template-columns: 24px 1fr auto`. When
+    // renderKeyLabel returned null for an empty mnemonic, the <li> had only
+    // two children — the label landed in the 24px column and clipped to a
+    // single letter ("T…"), and the shortcut inherited the 1fr column meant
+    // for the label. Every row must render three grid children regardless.
+    renderPanel()
+    const row = screen.getByText('Toggle log window').closest('.qa-row')!
+    expect(row.children).toHaveLength(3)
+  })
+})
+
+describe('QuickActions — focus', () => {
+  it('moves focus into the panel on mount, so a focused element underneath cannot swallow Escape first', () => {
+    // A focused element that stops propagation on keydown (like xterm's textarea,
+    // which xterm attaches its own capture-phase Escape handler to) would
+    // otherwise prevent the panel's window-level Escape listener from ever
+    // firing — the panel closing only worked by coincidence of nothing else
+    // being focused. Regression for that: opening the panel while a terminal
+    // has focus must move focus in, exactly as every other dialog in the app does.
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    outside.focus()
+    expect(document.activeElement).toBe(outside)
+
+    const { container } = renderPanel()
+    const panel = container.querySelector('.qa-panel')!
+    expect(panel.contains(document.activeElement)).toBe(true)
+
+    outside.remove()
   })
 })
 
