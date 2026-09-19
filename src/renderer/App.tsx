@@ -489,11 +489,6 @@ export function App(): JSX.Element {
     ]
   )
 
-  const surfaceActions = useMemo(
-    () => buildSurfaceActions(surfaces, quickActionGroupsAll, activateSurface),
-    [surfaces, quickActionGroupsAll, activateSurface]
-  )
-
   const extActions = useMemo(
     () =>
       buildExtensionActions(
@@ -511,6 +506,15 @@ export function App(): JSX.Element {
         }))
       ),
     [registeredCommands, declaredCommands, quickActionGroupsAll, actionContext, extensionCommands]
+  )
+
+  const surfaceActions = useMemo(
+    () =>
+      buildSurfaceActions(surfaces, quickActionGroupsAll, activateSurface, [
+        ...coreActions,
+        ...extActions,
+      ]),
+    [surfaces, quickActionGroupsAll, activateSurface, coreActions, extActions]
   )
 
   const customEnv = useMemo(

@@ -30,6 +30,22 @@ describe('buildSurfaceActions', () => {
   it('falls back to group "top" with no mnemonic when the extension has no allocated group', () => {
     const actions = buildSurfaceActions([surface({ extensionId: 'unmapped' })], [gitGroup], vi.fn())
     expect(actions[0].group).toBe('top')
+    expect(actions[0].mnemonic).toBeUndefined()
+  })
+
+  it('never takes a letter another action in its group already uses', () => {
+    const taken = [
+      {
+        id: 'ext:git.command.open',
+        label: 'Open thing',
+        group: 'ext:git',
+        mnemonic: 'o',
+        run: vi.fn(),
+      },
+      { id: 'ext:git.command.g', label: 'Go', group: 'ext:git', mnemonic: 'g', run: vi.fn() },
+    ]
+    const actions = buildSurfaceActions([surface({ label: 'Git' })], [gitGroup], vi.fn(), taken)
+    expect(actions[0].mnemonic).toBe('i')
   })
 
   it('activates the surface when run', () => {

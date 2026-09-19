@@ -25,15 +25,22 @@ function firstFreeLetter(label: string, used: Set<string>): string | undefined {
 export function buildSurfaceActions(
   surfaces: SurfaceRegistration[],
   groups: QuickActionGroup[],
-  activate: (surface: SurfaceRegistration) => void
+  activate: (surface: SurfaceRegistration) => void,
+  taken: QuickAction[] = []
 ): QuickAction[] {
   const groupIdByOwner = new Map(groups.filter((g) => g.owner).map((g) => [g.owner!, g.id]))
   const mnemonicsUsed = new Map<string, Set<string>>()
+  for (const action of taken) {
+    if (!action.mnemonic) continue
+    const used = mnemonicsUsed.get(action.group) ?? new Set<string>()
+    mnemonicsUsed.set(action.group, used.add(action.mnemonic))
+  }
 
   return surfaces.map((surface) => {
     const group = groupIdByOwner.get(surface.extensionId) ?? 'top'
     const used = mnemonicsUsed.get(group) ?? new Set<string>()
-    const mnemonic = used.has('o') ? firstFreeLetter(surface.label, used) : 'o'
+    const mnemonic =
+      group === 'top' ? undefined : used.has('o') ? firstFreeLetter(surface.label, used) : 'o'
     if (mnemonic) used.add(mnemonic)
     mnemonicsUsed.set(group, used)
 
