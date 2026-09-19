@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Command, Search } from 'lucide-react'
 import { LedgerView } from './LedgerView'
 import { LogbookView } from './LogbookView'
 import { LedgerDisplayMenu } from './LedgerDisplayMenu'
@@ -40,7 +40,11 @@ const LAYOUTS: Array<{ value: HomeLayout; label: string }> = [
  * Filters are held here and never persisted — opening Home narrowed to
  * yesterday's search would read as sessions having gone missing.
  */
-export function HomeScreen(): JSX.Element {
+export interface HomeScreenProps {
+  onOpenQuickActions?: () => void
+}
+
+export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.Element {
   const facts = useSessionFacts()
   const titles = useIssueTitles()
   const setDescription = useSessionRecordsStore((s) => s.setDescription)
@@ -135,6 +139,18 @@ export function HomeScreen(): JSX.Element {
           />
         </label>
         {prefs.layout === 'ledger' && <LedgerDisplayMenu prefs={prefs} onChange={update} />}
+        {onOpenQuickActions && (
+          <button
+            type="button"
+            className="home__quick-actions"
+            aria-label="Quick actions (⌘P)"
+            onClick={onOpenQuickActions}
+          >
+            <Command aria-hidden="true" />
+            Quick actions
+            <kbd className="home__quick-actions-shortcut">⌘P</kbd>
+          </button>
+        )}
       </div>
 
       <div className="home__body">
