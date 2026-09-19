@@ -273,6 +273,20 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       'globalShortcutTaken'
     )
   }
+
+  // Registered unconditionally: the quick-actions command must not depend on
+  // the global hotkey above having claimed its accelerator.
+  disposables.push(
+    api.commands.register(
+      {
+        id: 'task-vault:capture-to-inbox',
+        label: 'Capture to inbox',
+        mnemonic: 'c',
+        description: 'Quick-capture a task to the vault inbox',
+      },
+      () => openCaptureOverlay(api)
+    )
+  )
 }
 
 let reviewNudgeInterval: ReturnType<typeof setInterval> | null = null

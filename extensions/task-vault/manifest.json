@@ -21,9 +21,11 @@
     "commands": [
       {
         "id": "task-vault:capture-to-inbox",
-        "label": "Task Vault: Capture to Inbox",
-        "description": "Quick-capture a task to the vault inbox"
+        "label": "Capture to inbox",
+        "description": "Quick-capture a task to the vault inbox",
+        "mnemonic": "c"
       }
-    ]
+    ],
+    "quickActions": { "group": { "mnemonic": "v", "label": "Task Vault" } }
   }
 }
