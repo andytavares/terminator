@@ -1,0 +1,69 @@
+src/main/extensions/api.ts
+  s_5682ffb0bffee4::t_605cd7e8f38c8e 533-534
+  s_5682ffb0bffee4::t_1f98f3cc6745ad 1245-1246
+  s_5682ffb0bffee4::t_758ba2b92d3185 427-431
+  s_5682ffb0bffee4::t_b63ce83a25d1fb 101-111
+  s_5682ffb0bffee4::t_07834fa7cf8333 555
+  s_5682ffb0bffee4::t_8c105925dab473 458-463
+  s_5682ffb0bffee4::t_4ad452e18daadc 676,682-684,688,694-696,700-708
+  s_5682ffb0bffee4::t_fafb2e7f1bba29 1044-1047,1054,1057-1063
+  s_5682ffb0bffee4::t_8401e58e95ddb7 1064,1247
+src/shared/electron-api/manifest.ts
+  s_5682ffb0bffee4::t_47c2d9bc047726 476-485
+  s_5682ffb0bffee4::t_e67e1f3decf6bf 312-315
+  s_5682ffb0bffee4::t_10315ae6c4f042 486-488
+src/main/preload-webview.ts
+  s_5682ffb0bffee4::t_e363346923473d 141-144
+  s_5682ffb0bffee4::t_afaf70f81784a9 20
+tests/unit/main/extensions/extension-view-host.spec.ts
+  s_5682ffb0bffee4::t_d65ee2ced7e7a5 455,464-481,485-512,516-553
+  s_5682ffb0bffee4::t_bd7365df53ac63 56
+  s_5682ffb0bffee4::t_f77778efc0be1a 456-463,482-484,513-515
+  s_5682ffb0bffee4::t_9388088c218310 554
+tests/unit/main/extensions/api.spec.ts
+  s_5682ffb0bffee4::t_7bd84d833e4417 1-96,98-238
+  s_5682ffb0bffee4::t_f77778efc0be1a 97
+src/renderer/electron.d.ts
+  s_5682ffb0bffee4::t_b9b03e22ff0507 210-211
+  s_5682ffb0bffee4::t_e5760e2d4f83d8 169,175-177,180-183
+  s_5682ffb0bffee4::t_a3d92a40ef6bab 212
+tests/unit/shared/schemas/extension.schema.spec.ts
+  s_5682ffb0bffee4::t_93ae342db38b6d 1-71
+src/shared/schemas/extension.schema.ts
+  s_5682ffb0bffee4::t_f77778efc0be1a 41-58
+  s_5682ffb0bffee4::t_3037643c811ada 13-17,32-33,37
+src/main/extensions/extension-view-host.ts
+  s_5682ffb0bffee4::t_a477bdf8a6e30e 475-483
+  s_5682ffb0bffee4::t_ec002dfaf0c11c 9-15,24-31
+  s_5682ffb0bffee4::t_f77778efc0be1a 16-23
+  s_5682ffb0bffee4::t_e23881b4b94368 484
+packages/extension-sdk/types/renderer.d.ts
+  s_5682ffb0bffee4::t_afaf70f81784a9 113-116,119-122
+src/shared/electron-api/__tests__/build-api.spec.ts
+  s_5682ffb0bffee4::t_b46d58359a8ae9 110-180
+  s_5682ffb0bffee4::t_0d1f0626fafba8 184
+tests/unit/main/ipc/extension.ipc.spec.ts
+  s_5682ffb0bffee4::t_cfc60df642eb6b 13-30,32-37,41-44,46-47,53-65,70,75,82-243
+  s_5682ffb0bffee4::t_cdfa77e18c6509 1-12,31,38-40,45,48-52,66-69,71-74,76-81,244-245
+packages/extension-sdk/types/api.d.ts
+  s_5682ffb0bffee4::t_01d6f12d8da406 102-109,217-221,241
+src/main/ipc/extension.ipc.ts
+  s_5682ffb0bffee4::t_d4ce914aed8262 90-95
+  s_5682ffb0bffee4::t_44e63313d1ade3 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0fb49051788d973afd20db11331d6c0a7ae1326a",
+  "prompts": {},
+  "sessions": {
+    "s_5682ffb0bffee4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba31684-026e-4ec2-b089-00fbe0f2c129",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
