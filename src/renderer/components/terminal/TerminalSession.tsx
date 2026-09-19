@@ -611,6 +611,10 @@ export class TerminalInstance {
     this.element.parentElement?.removeChild(this.element)
   }
 
+  getSelection(): string {
+    return this.terminal.getSelection()
+  }
+
   dispose(): void {
     if (this.busyTimer !== null) {
       clearTimeout(this.busyTimer)

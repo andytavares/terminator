@@ -1,0 +1,83 @@
+/* ── Quick Actions Settings ──────────────────────────────────── */
+.qa-settings-list {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.qa-settings-list__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.qa-settings-list__key {
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  width: 18px;
+  text-align: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.qa-settings-list__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.qa-settings-list__chip {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.qa-settings-list__target {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.qa-settings-list__body {
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qa-settings-list__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.qa-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.qa-settings-form__mono {
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+}
+
+.qa-settings-form__error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 0;
+}
+
+.qa-settings-form__actions {
+  display: flex;
+  gap: 8px;
+}
