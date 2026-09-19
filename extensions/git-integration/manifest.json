@@ -16,6 +16,9 @@
       "icon": "git-pull-request",
       "view": "code-reviews"
     },
-    "windowViews": [{ "id": "pr-review", "view": "pr-review" }]
+    "windowViews": [{ "id": "pr-review", "view": "pr-review" }],
+    "quickActions": {
+      "group": { "mnemonic": "g", "label": "Git" }
+    }
   }
 }

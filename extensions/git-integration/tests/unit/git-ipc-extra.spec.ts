@@ -1,17 +1,12 @@
 /**
  * Additional coverage for extensions/git-integration/src/ipc/git.ipc.ts
- * Covers the uncovered lines: 50-51 (git:stage error), 62-63 (git:unstage validation),
- * 74-75 (git:unstage error), and 96-110 (git:push handler).
+ * Covers: git:status, git:diff-file, git:stage (error and success), git:unstage
+ * (validation and error), git:commit, git:commit-output-poll, and git:push
+ * (which delegates to git-service's pushBranch()).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── hoisted mocks ─────────────────────────────────────────────────────────────
-
-const { mockExecFile } = vi.hoisted(() => ({ mockExecFile: vi.fn() }))
-
-vi.mock('child_process', () => ({
-  execFile: mockExecFile,
-}))
 
 vi.mock('../../src/git/git-service', () => ({
   getStatus: vi.fn(),
@@ -19,6 +14,7 @@ vi.mock('../../src/git/git-service', () => ({
   stageFiles: vi.fn(),
   unstageFiles: vi.fn(),
   commitChanges: vi.fn(),
+  pushBranch: vi.fn(),
 }))
 
 import * as gitService from '../../src/git/git-service'
@@ -27,7 +23,6 @@ import { registerGitExtensionHandlers } from '../../src/ipc/git.ipc'
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 type Handler = (payload: unknown) => Promise<unknown>
-type ExecCallback = (err: Error | null, result?: { stdout: string; stderr: string }) => void
 
 function buildRegistry(): {
   register: (channel: string, handler: Handler) => void
@@ -44,22 +39,9 @@ function buildRegistry(): {
   }
 }
 
-function mockExecSuccess(stdout: string) {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-      cb(null, { stdout, stderr: '' })
-  )
-}
-
-function mockExecError(message: string) {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) => cb(new Error(message))
-  )
-}
-
 // ── tests ─────────────────────────────────────────────────────────────────────
 
-describe('git:stage — error path (line 50-51)', () => {
+describe('git:status', () => {
   let getHandler: (channel: string) => Handler
 
   beforeEach(() => {
@@ -67,6 +49,104 @@ describe('git:stage — error path (line 50-51)', () => {
     const registry = buildRegistry()
     registerGitExtensionHandlers(registry.register)
     getHandler = registry.getHandler
+  })
+
+  it('returns VALIDATION_ERROR for a missing path', async () => {
+    const result = (await getHandler('git:status')({})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns the status from getStatus, defaulting maxFiles to 500', async () => {
+    vi.mocked(gitService.getStatus).mockResolvedValue({
+      branch: 'main',
+      files: [],
+      hasConflicts: false,
+      truncated: false,
+    })
+    const result = await getHandler('git:status')({ path: '/repo' })
+    expect(gitService.getStatus).toHaveBeenCalledWith('/repo', 500)
+    expect(result).toEqual({ branch: 'main', files: [], hasConflicts: false, truncated: false })
+  })
+
+  it('forwards a caller-supplied maxFiles', async () => {
+    vi.mocked(gitService.getStatus).mockResolvedValue({
+      branch: 'main',
+      files: [],
+      hasConflicts: false,
+      truncated: false,
+    })
+    await getHandler('git:status')({ path: '/repo', maxFiles: 10 })
+    expect(gitService.getStatus).toHaveBeenCalledWith('/repo', 10)
+  })
+
+  it('returns an error when getStatus throws', async () => {
+    vi.mocked(gitService.getStatus).mockRejectedValue(new Error('not a git repository'))
+    const result = (await getHandler('git:status')({ path: '/repo' })) as { error: string }
+    expect(result.error).toContain('not a git repository')
+  })
+})
+
+describe('git:diff-file', () => {
+  let getHandler: (channel: string) => Handler
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const registry = buildRegistry()
+    registerGitExtensionHandlers(registry.register)
+    getHandler = registry.getHandler
+  })
+
+  it('returns VALIDATION_ERROR when staged is missing', async () => {
+    const result = (await getHandler('git:diff-file')({
+      repoRoot: '/repo',
+      path: 'a.ts',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('wraps the diff from getDiff, passing staged and isUntracked through', async () => {
+    vi.mocked(gitService.getDiff).mockResolvedValue({
+      path: 'a.ts',
+      hunks: [],
+      isBinary: false,
+      truncated: false,
+    })
+    const result = await getHandler('git:diff-file')({
+      repoRoot: '/repo',
+      path: 'a.ts',
+      staged: true,
+      isUntracked: false,
+    })
+    expect(gitService.getDiff).toHaveBeenCalledWith('/repo', 'a.ts', true, false)
+    expect(result).toEqual({ diff: { path: 'a.ts', hunks: [], isBinary: false, truncated: false } })
+  })
+
+  it('returns an error when getDiff throws', async () => {
+    vi.mocked(gitService.getDiff).mockRejectedValue(new Error('no such path'))
+    const result = (await getHandler('git:diff-file')({
+      repoRoot: '/repo',
+      path: 'a.ts',
+      staged: false,
+    })) as { error: string }
+    expect(result.error).toContain('no such path')
+  })
+})
+
+describe('git:stage', () => {
+  let getHandler: (channel: string) => Handler
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const registry = buildRegistry()
+    registerGitExtensionHandlers(registry.register)
+    getHandler = registry.getHandler
+  })
+
+  it('returns success when stageFiles succeeds', async () => {
+    vi.mocked(gitService.stageFiles).mockResolvedValue(undefined)
+    const result = await getHandler('git:stage')({ repoRoot: '/repo', paths: ['src/main.ts'] })
+    expect(gitService.stageFiles).toHaveBeenCalledWith('/repo', ['src/main.ts'])
+    expect(result).toEqual({ success: true })
   })
 
   it('returns error when stageFiles throws', async () => {
@@ -120,6 +200,103 @@ describe('git:unstage — validation error (line 62-63) and error path (line 74-
   })
 })
 
+describe('git:commit', () => {
+  let getHandler: (channel: string) => Handler
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const registry = buildRegistry()
+    registerGitExtensionHandlers(registry.register)
+    getHandler = registry.getHandler
+  })
+
+  it('returns VALIDATION_ERROR for a missing repoRoot', async () => {
+    const result = (await getHandler('git:commit')({ message: 'msg' })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns EMPTY_MESSAGE for a blank message and never calls commitChanges', async () => {
+    const result = (await getHandler('git:commit')({
+      repoRoot: '/repo',
+      message: '   ',
+    })) as { error: string }
+    expect(result.error).toBe('EMPTY_MESSAGE')
+    expect(gitService.commitChanges).not.toHaveBeenCalled()
+  })
+
+  it('forwards the trimmed args to commitChanges and returns its result', async () => {
+    vi.mocked(gitService.commitChanges).mockResolvedValue({ commitHash: 'abc123' })
+    const result = await getHandler('git:commit')({
+      repoRoot: '/repo',
+      message: 'feat: add x',
+      signOff: true,
+      noVerify: true,
+    })
+    expect(gitService.commitChanges).toHaveBeenCalledWith(
+      '/repo',
+      'feat: add x',
+      true,
+      true,
+      expect.any(Function)
+    )
+    expect(result).toEqual({ commitHash: 'abc123' })
+  })
+
+  it('defaults signOff and noVerify to false when omitted', async () => {
+    vi.mocked(gitService.commitChanges).mockResolvedValue({ commitHash: 'abc123' })
+    await getHandler('git:commit')({ repoRoot: '/repo', message: 'msg' })
+    expect(gitService.commitChanges).toHaveBeenCalledWith(
+      '/repo',
+      'msg',
+      false,
+      false,
+      expect.any(Function)
+    )
+  })
+
+  it('buffers onOutput lines so a poll during the commit can read them, then clears the buffer once the commit resolves', async () => {
+    let captured: ((line: string) => void) | undefined
+    vi.mocked(gitService.commitChanges).mockImplementation(
+      async (_root, _msg, _s, _n, onOutput) => {
+        captured = onOutput
+        captured?.('running pre-commit hook')
+        const poll = getHandler('git:commit-output-poll')
+        const midCommit = (await poll({ repoRoot: '/repo' })) as { lines: string[] }
+        expect(midCommit.lines).toEqual(['running pre-commit hook'])
+        return { commitHash: 'abc123' }
+      }
+    )
+
+    await getHandler('git:commit')({ repoRoot: '/repo', message: 'msg' })
+
+    const afterCommit = (await getHandler('git:commit-output-poll')({
+      repoRoot: '/repo',
+    })) as { lines: string[] }
+    expect(afterCommit.lines).toEqual([])
+  })
+})
+
+describe('git:commit-output-poll', () => {
+  let getHandler: (channel: string) => Handler
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const registry = buildRegistry()
+    registerGitExtensionHandlers(registry.register)
+    getHandler = registry.getHandler
+  })
+
+  it('returns an empty lines array for a missing repoRoot', async () => {
+    const result = await getHandler('git:commit-output-poll')({})
+    expect(result).toEqual({ lines: [] })
+  })
+
+  it('returns an empty lines array when no commit is in progress for that repo', async () => {
+    const result = await getHandler('git:commit-output-poll')({ repoRoot: '/never-committed' })
+    expect(result).toEqual({ lines: [] })
+  })
+})
+
 describe('git:push handler (lines 96-110)', () => {
   let getHandler: (channel: string) => Handler
 
@@ -135,28 +312,21 @@ describe('git:push handler (lines 96-110)', () => {
     expect(result.error).toBe('VALIDATION_ERROR')
   })
 
-  it('returns success when git push succeeds', async () => {
-    mockExecSuccess('')
+  it('delegates to pushBranch with the repo root', async () => {
+    vi.mocked(gitService.pushBranch).mockResolvedValue({
+      success: true,
+      branch: 'main',
+      remote: 'origin',
+    })
     const result = await getHandler('git:push')({ repoRoot: '/repo' })
-    expect(result).toMatchObject({ success: true })
+    expect(gitService.pushBranch).toHaveBeenCalledWith('/repo')
+    expect(result).toEqual({ success: true, branch: 'main', remote: 'origin' })
   })
 
-  it('returns NO_UPSTREAM error when branch has no upstream', async () => {
-    mockExecError('error: The current branch has no upstream branch')
+  it('returns pushBranch errors unchanged', async () => {
+    vi.mocked(gitService.pushBranch).mockResolvedValue({ error: 'NO_UPSTREAM' })
     const result = (await getHandler('git:push')({ repoRoot: '/repo' })) as { error: string }
     expect(result.error).toBe('NO_UPSTREAM')
-  })
-
-  it('returns REJECTED error when push is rejected', async () => {
-    mockExecError('! [rejected] main -> main (fetch first)')
-    const result = (await getHandler('git:push')({ repoRoot: '/repo' })) as { error: string }
-    expect(result.error).toBe('REJECTED')
-  })
-
-  it('returns the error message string for other push errors', async () => {
-    mockExecError('network unreachable')
-    const result = (await getHandler('git:push')({ repoRoot: '/repo' })) as { error: string }
-    expect(result.error).toContain('network unreachable')
   })
 })
 
