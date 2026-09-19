@@ -1,0 +1,24 @@
+src/renderer/quick-actions/surface-actions.ts
+  s_5682ffb0bffee4::t_d2d5c3c82aa80c 28-29,33-37,42-43
+src/renderer/App.tsx
+  s_5682ffb0bffee4::t_c0bde5b16e6289 511-517
+  s_5682ffb0bffee4::t_a2e4e5db4bb2a2 518-519
+tests/unit/renderer/quick-actions/surface-actions.spec.ts
+  s_5682ffb0bffee4::t_1cf9401e7ed63c 33-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f2e7017b269411c4e3797b83e85c406ae7a9a67f",
+  "prompts": {},
+  "sessions": {
+    "s_5682ffb0bffee4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba31684-026e-4ec2-b089-00fbe0f2c129",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
