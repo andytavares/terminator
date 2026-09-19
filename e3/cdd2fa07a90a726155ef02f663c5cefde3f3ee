@@ -1,0 +1,70 @@
+tests/unit/renderer/quick-actions/search.spec.ts
+  s_5682ffb0bffee4::t_b74f49f7472907 1-35,41,43-64
+  s_5682ffb0bffee4::t_0b48c2e790e594 36-40,42
+src/renderer/stores/settings.store.ts
+  s_5682ffb0bffee4::t_a05a1136ff978b 32-33
+  s_5682ffb0bffee4::t_1d7e738bf558f9 3,6
+  s_5682ffb0bffee4::t_f1e6cfb4c69582 196-211
+  s_5682ffb0bffee4::t_114f9a360a019e 48
+tests/unit/renderer/quick-actions/variables.spec.ts
+  s_5682ffb0bffee4::t_098bb809d0c432 1-57
+src/renderer/quick-actions/types.ts
+  s_5682ffb0bffee4::t_d770e8d30b9c6f 1-29
+tests/unit/renderer/quick-actions/groups.spec.ts
+  s_5682ffb0bffee4::t_8af167c9ee0d2c 1-34,38-46,50-57,60,65-134
+  s_5682ffb0bffee4::t_cea56be7cf3e1f 47-49,58-59,61-64
+  s_5682ffb0bffee4::t_274bfd1ad3677a 35-37
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_5682ffb0bffee4::t_4477befc637258 326-364
+  s_5682ffb0bffee4::t_a6c52934042900 31
+tests/unit/renderer/quick-actions/rank.spec.ts
+  s_5682ffb0bffee4::t_274bfd1ad3677a 2-6
+  s_5682ffb0bffee4::t_4f8bee9ca07070 1,7-103
+src/renderer/quick-actions/usage.ts
+  s_5682ffb0bffee4::t_f5108f3d540110 1-33
+src/renderer/quick-actions/rank.ts
+  s_5682ffb0bffee4::t_963ffaaaae3a86 1-44
+src/renderer/quick-actions/search.ts
+  s_5682ffb0bffee4::t_274bfd1ad3677a 26-27
+  s_5682ffb0bffee4::t_f43a93a04c7f98 1-24,28,34-42
+  s_5682ffb0bffee4::t_b27a8edc0d70b1 25,29-33
+tests/unit/renderer/quick-actions/usage.spec.ts
+  s_5682ffb0bffee4::t_8cd5e82ba8f6d9 1-93
+src/shared/schemas/settings.schema.ts
+  s_5682ffb0bffee4::t_af53a68729a0e0 5-26
+  s_5682ffb0bffee4::t_4af91ad2ea1b30 99-104
+  s_5682ffb0bffee4::t_09fe9c8cc63a0a 75
+  s_5682ffb0bffee4::t_a3af32dee0d1c0 126-131
+tests/unit/schemas/settings.schema.spec.ts
+  s_5682ffb0bffee4::t_b9cc8ec8169a0d 375-532
+src/shared/types/index.ts
+  s_5682ffb0bffee4::t_7a412c1b1938b2 147-176
+  s_5682ffb0bffee4::t_e444f0b87926c1 208,213-216
+  s_5682ffb0bffee4::t_075f5cb45663de 111-119
+src/renderer/quick-actions/custom-actions.ts
+  s_5682ffb0bffee4::t_88dcbe4562d911 1-60
+src/renderer/quick-actions/groups.ts
+  s_5682ffb0bffee4::t_274bfd1ad3677a 66-68,75-80,86-89,113-115
+  s_5682ffb0bffee4::t_06b134043f8ae4 1-65,69-74,81-85,90-112,116-121
+tests/unit/renderer/quick-actions/custom-actions.spec.ts
+  s_5682ffb0bffee4::t_ad074ba1afc4e3 1,6-183
+  s_5682ffb0bffee4::t_274bfd1ad3677a 2-5
+src/renderer/quick-actions/variables.ts
+  s_5682ffb0bffee4::t_2d5b4ee9dcf0b0 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e3cdd2fa07a90a726155ef02f663c5cefde3f3ee",
+  "prompts": {},
+  "sessions": {
+    "s_5682ffb0bffee4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba31684-026e-4ec2-b089-00fbe0f2c129",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
