@@ -1,0 +1,57 @@
+tests/unit/renderer/components/WorkspaceSettings.spec.tsx
+  s_5682ffb0bffee4::t_2b11be01b93c3d 224-235
+  s_5682ffb0bffee4::t_4f612cae57468e 21,28
+  s_5682ffb0bffee4::t_572ed2da336ea3 45
+  s_5682ffb0bffee4::t_e525702bd72396 236
+src/renderer/quick-actions/custom-runtime.ts
+  s_5682ffb0bffee4::t_0d1f0626fafba8 16-20
+  s_5682ffb0bffee4::t_adaeb5006b564c 1-15,21-55
+src/renderer/components/terminal/TerminalSession.tsx
+  s_5682ffb0bffee4::t_b71f0dc009fa9a 614-617
+src/renderer/components/settings/QuickActionsSettings.tsx
+  s_5682ffb0bffee4::t_3401e33eaa9951 1-115,119-260
+  s_5682ffb0bffee4::t_0d1f0626fafba8 116-118
+src/renderer/components/settings/QuickActionsSettings.css
+  s_5682ffb0bffee4::t_e63049d0a859e8 1-83
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_5682ffb0bffee4::t_d56237970807ea 60
+  s_5682ffb0bffee4::t_c7e57994e1d4d7 268-272
+  s_5682ffb0bffee4::t_40b4d266e7b060 273-274
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_5682ffb0bffee4::t_de7630a23e75de 53-54
+  s_5682ffb0bffee4::t_8f4dc67526c585 35,38
+  s_5682ffb0bffee4::t_ad0f6dbcef3c9d 212-216
+  s_5682ffb0bffee4::t_9bb50aac331380 39,217
+tests/unit/renderer/quick-actions/custom-runtime.spec.ts
+  s_5682ffb0bffee4::t_5f0b3557e26251 1-146
+src/renderer/components/settings/WorkspaceSettings.tsx
+  s_5682ffb0bffee4::t_ffdd41b2ef457e 161-162
+  s_5682ffb0bffee4::t_0d1f0626fafba8 45-46,48-62,65-70,72,74,77-89,92-94,98,100-159
+  s_5682ffb0bffee4::t_10c1f7162f722f 43-44
+  s_5682ffb0bffee4::t_0865c12f2de067 4
+tests/unit/renderer/components/QuickActionsSettings.spec.tsx
+  s_5682ffb0bffee4::t_0d1f0626fafba8 43-50,84-91,114-121,159-166,200-203
+  s_5682ffb0bffee4::t_c4bfa3dda25ad8 1-42,51-83,92-113,122-147,149-153,155-158,167-199,204-211
+  s_5682ffb0bffee4::t_4e0cdfd78f848e 148,154
+src/renderer/components/settings/GlobalSettings.tsx
+  s_5682ffb0bffee4::t_6dfa4f44c49d1b 271-272
+  s_5682ffb0bffee4::t_0d1f0626fafba8 60,62-76,79-81,83-96,98-99,101-109,111-130,132-144,146-149,151-163,165-169,171-173,175-188,190-210,212-214,216-237,240-260,262-269
+  s_5682ffb0bffee4::t_7837956469dfd5 58-59
+  s_5682ffb0bffee4::t_ff2156adbd4890 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8bc3814ba63bd79287f6c2a58973450233276879",
+  "prompts": {},
+  "sessions": {
+    "s_5682ffb0bffee4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fba31684-026e-4ec2-b089-00fbe0f2c129",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
