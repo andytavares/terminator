@@ -409,6 +409,10 @@ let stallWatcher: StallWatcher | null = null
 let paletteRegistrations: Disposable[] = []
 let paletteSignature = ''
 let paletteTimer: NodeJS.Timeout | null = null
+// Auto-expires so a late manual visit to the Forge doesn't surprise the
+// operator with an intake that opened itself for no reason they can see.
+let pendingNewOrder = false
+let pendingNewOrderTimer: NodeJS.Timeout | null = null
 // What is running, what it changed, what needs looking at, and what must not
 // start yet.
 let supervision: Supervision | null = null
@@ -2557,6 +2561,43 @@ export function activate(api: ExtensionAPI): void {
       },
     })
   )
+
+  // Renderer calls this on mount to pick up an intake request triggered
+  // before the main view existed.
+  reg(api, 'foundry:ui.consume-pending-new-order', () => {
+    const pending = pendingNewOrder
+    pendingNewOrder = false
+    if (pendingNewOrderTimer !== null) {
+      clearTimeout(pendingNewOrderTimer)
+      pendingNewOrderTimer = null
+    }
+    return { pending }
+  })
+
+  disposables.push(
+    api.commands.register(
+      {
+        id: 'new-order',
+        label: 'New work order…',
+        category: 'Foundry',
+        mnemonic: 'n',
+      },
+      () => {
+        api.window.showSelf('main')
+        // Broadcast to an already-running view immediately, and set a pending
+        // flag for one that has not been created yet — the same shape as
+        // Notepad's quick-create, because a command run before the extension's
+        // own view exists is otherwise silently dropped.
+        api.window.broadcast('foundry:ui.open-new-order', {})
+        pendingNewOrder = true
+        if (pendingNewOrderTimer !== null) clearTimeout(pendingNewOrderTimer)
+        pendingNewOrderTimer = setTimeout(() => {
+          pendingNewOrder = false
+          pendingNewOrderTimer = null
+        }, 5000)
+      }
+    )
+  )
 }
 
 /**
@@ -2602,17 +2643,25 @@ function refreshPalette(api: ExtensionAPI): void {
   paletteSignature = signature
 
   for (const registration of paletteRegistrations) registration.dispose()
-  paletteRegistrations = entries.map((entry) =>
-    api.commands.register(
+  paletteRegistrations = entries.map((entry, index) => {
+    // Only the single most urgent entry — already worst-state-first — gets the
+    // group's 'w' mnemonic; the rest are reachable through search.
+    const urgent = index === 0
+    const label =
+      urgent && (entry.state === 'waiting' || entry.state === 'stalled')
+        ? 'Go to the run waiting on you'
+        : entry.label
+    return api.commands.register(
       {
         id: entry.id,
-        label: entry.label,
+        label,
         description: entry.description,
         category: entry.category,
+        mnemonic: urgent ? 'w' : undefined,
       },
       () => gotoRun(api, entry.kind, entry.sessionId)
     )
-  )
+  })
 }
 
 export function deactivate(): void {
@@ -2633,6 +2682,9 @@ export function deactivate(): void {
   for (const registration of paletteRegistrations) registration.dispose()
   paletteRegistrations = []
   paletteSignature = ''
+  if (pendingNewOrderTimer !== null) clearTimeout(pendingNewOrderTimer)
+  pendingNewOrderTimer = null
+  pendingNewOrder = false
   supervisedRunner?.dispose()
   supervisedRunner = null
   void control?.close()

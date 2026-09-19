@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
@@ -43,12 +43,19 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
 
 export interface OrdersProps {
   readonly repoRoot: string | null
+  /**
+   * Bumped by the "New work order…" quick action. Every change — not the
+   * value itself — means "put the cursor in the idea box", which is why it is
+   * a counter rather than a boolean: two requests in a row must focus twice.
+   */
+  readonly focusIdeaSignal?: number
 }
 
-export function Orders({ repoRoot }: OrdersProps): JSX.Element {
+export function Orders({ repoRoot, focusIdeaSignal }: OrdersProps): JSX.Element {
   const [rows, setRows] = useState<OrderRow[]>([])
   const [open, setOpen] = useState<string | null>(null)
   const [idea, setIdea] = useState('')
+  const ideaInputRef = useRef<HTMLInputElement | null>(null)
   // An order starts from something you typed or from a ticket. The second was
   // built end to end — read the issue, refuse a duplicate, write back to it —
   // and had no way in: the only control here sent `kind: 'typed'`, so the half
@@ -95,6 +102,21 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
   useEffect(() => {
     if (from === 'tracker' && tickets === null) void loadTickets('')
   }, [from, tickets, loadTickets])
+
+  // 0 is "never asked" — the counter the quick action bumps starts there, and
+  // a mount must not steal focus nobody requested. Switching `from` unmounts
+  // the ticket-search input and mounts this one, so the focus itself has to
+  // wait for that render rather than fire on the same pass as the switch.
+  const handledFocusSignal = useRef(0)
+  useEffect(() => {
+    if (!focusIdeaSignal || focusIdeaSignal === handledFocusSignal.current) return
+    if (from !== 'typed') {
+      setFrom('typed')
+      return
+    }
+    handledFocusSignal.current = focusIdeaSignal
+    ideaInputRef.current?.focus()
+  }, [focusIdeaSignal, from])
 
   const seedFromTicket = useCallback(
     async (ticket: Ticket) => {
@@ -284,6 +306,7 @@ export function Orders({ repoRoot }: OrdersProps): JSX.Element {
 
         {from === 'typed' ? (
           <input
+            ref={ideaInputRef}
             aria-label="Describe what you want built or fixed"
             placeholder="Describe what you want built or fixed…"
             value={idea}

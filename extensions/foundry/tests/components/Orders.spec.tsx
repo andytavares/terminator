@@ -8,7 +8,7 @@ import { Orders } from '../../src/components/Orders.js'
 // is spent. Without it the number sends you to a list of identical rows and
 // you open them one at a time to find out which two it meant.
 
-function mount(orders: unknown[]) {
+function mount(orders: unknown[], props: Record<string, unknown> = {}) {
   const invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:order.list') return { orders }
     return {}
@@ -16,7 +16,7 @@ function mount(orders: unknown[]) {
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
   }
-  return { ...render(<Orders repoRoot="/repos/app" />), invoke }
+  return { ...render(<Orders repoRoot="/repos/app" {...props} />), invoke }
 }
 
 function row(over: Record<string, unknown> = {}) {
@@ -94,5 +94,31 @@ describe('the orders list', () => {
     const first = invoke.mock.calls.length
     await vi.advanceTimersByTimeAsync(4100)
     expect(invoke.mock.calls.length).toBeGreaterThan(first)
+  })
+})
+
+describe('the New work order quick action', () => {
+  it('leaves the idea box alone until asked', async () => {
+    mount([], { focusIdeaSignal: 0 })
+    await waitFor(() => screen.getByLabelText('Describe what you want built or fixed'))
+    expect(document.activeElement).not.toBe(
+      screen.getByLabelText('Describe what you want built or fixed')
+    )
+  })
+
+  it('focuses the idea box when the signal changes, and switches away from ticket search', async () => {
+    const { rerender } = mount([], { focusIdeaSignal: 0 })
+    await waitFor(() => screen.getByLabelText('Describe what you want built or fixed'))
+    // Leave the "typed" tab so the effect is proven to switch back to it.
+    screen.getByRole('button', { name: 'Ticket' }).click()
+    await waitFor(() => screen.getByLabelText('Search your tickets'))
+
+    rerender(<Orders repoRoot="/repos/app" focusIdeaSignal={1} />)
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByLabelText('Describe what you want built or fixed')
+      )
+    )
   })
 })

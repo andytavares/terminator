@@ -41,6 +41,31 @@ export function App(): JSX.Element {
   const [surface, setSurface] = useState<Surface>('inbox')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [waiting, setWaiting] = useState<Attention>({ inbox: 0, forge: 0 })
+  const [focusIdeaSignal, setFocusIdeaSignal] = useState(0)
+
+  // The "New work order…" quick action's target: bring the Forge into view
+  // with the cursor already in the idea box, whether the extension's own view
+  // was open when it ran or not.
+  const openNewOrder = (): void => {
+    setSettingsOpen(false)
+    setSurface('forge')
+    setFocusIdeaSignal((n) => n + 1)
+  }
+
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('foundry:ui.open-new-order', () => openNewOrder())
+  }, [])
+
+  // On first mount, pick up a request that fired before this view existed.
+  useEffect(() => {
+    window.electronAPI.extensionBridge
+      .invoke('foundry:ui.consume-pending-new-order')
+      .then((result: unknown) => {
+        if ((result as { pending?: boolean }).pending) openNewOrder()
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // The counts, on the one piece of chrome that is on screen whatever surface
   // you are looking at. Everything Foundry holds for a person lives behind one
@@ -142,7 +167,7 @@ export function App(): JSX.Element {
         ) : surface === 'ledger' ? (
           <Ledger />
         ) : (
-          <Orders repoRoot={repoRoot} />
+          <Orders repoRoot={repoRoot} focusIdeaSignal={focusIdeaSignal} />
         )}
       </div>
     </div>

@@ -54,6 +54,18 @@ describe('what goes in the palette', () => {
     expect(paletteEntries([run()], [])[0]).toMatchObject({ sessionId: 'session-1', kind: 'run' })
   })
 
+  it('groups under Foundry, so it reads as part of the quick-actions group', () => {
+    expect(paletteEntries([run()], [])[0].category).toBe('Foundry')
+  })
+
+  it('carries the run state, which is what the mnemonic rule keys on', () => {
+    expect(paletteEntries([run({ state: 'waiting' })], [])[0].state).toBe('waiting')
+  })
+
+  it('leaves state off a review entry, which has no run state', () => {
+    expect(paletteEntries([], [item()])[0].state).toBeUndefined()
+  })
+
   it('keeps an id that does not move between refreshes', () => {
     // Re-registering on every state change would otherwise shuffle the list
     // under the cursor.

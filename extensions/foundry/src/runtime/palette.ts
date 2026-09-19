@@ -20,9 +20,11 @@ export interface PaletteEntry {
   /** What the entry acts on, which is all the handler needs. */
   readonly sessionId: string
   readonly kind: 'run' | 'review'
+  /** Set for a run entry only — the label rule for the most urgent one keys on this. */
+  readonly state?: Run['state']
 }
 
-const CATEGORY = 'Pilot'
+const CATEGORY = 'Foundry'
 
 /** The card's name, which is what a person searches by. */
 function cardName(featureDir: string): string {
@@ -58,6 +60,7 @@ export function paletteEntries(
       category: CATEGORY,
       sessionId: run.sessionId,
       kind: 'run',
+      state: run.state,
     }))
 
   // Already worst-first — the queue is kept in that order, and re-sorting here
