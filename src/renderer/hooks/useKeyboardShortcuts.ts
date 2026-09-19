@@ -4,7 +4,16 @@ import { useSessionStore } from '../stores/session.store'
 import { useTerminalSession } from './useTerminalSession'
 import { useSettingsStore } from '../stores/settings.store'
 import { useExtensionRegistry, matchesAccelerator } from '../extensions/registry'
-import { dispatchNotification } from '../lib/notifications'
+import {
+  cycleMostRecentlyAttended,
+  jumpToNextAwaitingInput,
+  cycleWorkspace,
+  cycleTab,
+  clearTerminal,
+  newTerminalTab,
+  splitPane,
+  closeFocusedPane,
+} from '../quick-actions/shortcut-behaviors'
 
 interface Options {
   onOpenSettings?: () => void
@@ -15,8 +24,14 @@ interface Options {
   onNewTab?: () => void
   /** Opens the inline description editor for the focused session. */
   onEditSessionNote?: () => void
+  /** A menu accelerator, not a renderer keydown on macOS: Cmd+` is claimed by
+   * the OS for window cycling before the page ever sees it. Kept here so
+   * `core-actions.ts` shares the same callback the "Home" quick action runs. */
+  onOpenHome?: () => void
   /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
   scratchProjectId?: string | null
+  /** Called with the CORE_SHORTCUTS action id whenever this hook handles a direct shortcut. */
+  onDirectShortcut?: (actionId: string) => void
 }
 
 export function useKeyboardShortcuts({
@@ -28,6 +43,7 @@ export function useKeyboardShortcuts({
   onNewTab,
   onEditSessionNote,
   scratchProjectId,
+  onDirectShortcut,
 }: Options = {}): void {
   const {
     workspaces,
@@ -53,52 +69,25 @@ export function useKeyboardShortcuts({
   const effectiveProjectId = scratchProjectId ?? activeProjectId
 
   useEffect(() => {
-    function selectSessionEverywhere(session: { id: string; projectId: string }): void {
-      // Keep activeProjectId in step, exactly as sidebar selection does, or the
-      // project tab bar and per-project auto-open lose their footing.
-      useWorkspaceStore.getState().setActiveProject(session.projectId)
-      setActiveSessionForProject(session.projectId, session.id)
+    const workspaceCycleDeps = {
+      workspaces,
+      activeWorkspaceId,
+      setActiveWorkspace,
+      setExpandedWorkspaceIds,
     }
-
-    function cycleMostRecentlyAttended(delta: number): void {
-      const all = [...useSessionStore.getState().sessions.values()]
-        .filter((s) => s.status !== 'closed')
-        .sort((a, b) => (b.lastAttendedAt ?? 0) - (a.lastAttendedAt ?? 0))
-      if (all.length < 2) return
-      const currentId = effectiveProjectId
-        ? getActiveSessionForProject(effectiveProjectId)
-        : all[0].id
-      const index = all.findIndex((s) => s.id === currentId)
-      const next =
-        all[((((index === -1 ? 0 : index) + delta) % all.length) + all.length) % all.length]
-      selectSessionEverywhere(next)
+    const tabCycleDeps = {
+      getSessionsForProject,
+      getActiveSessionForProject,
+      setActiveSessionForProject,
     }
-
-    function jumpToNextAwaitingInput(): void {
-      const waiting = [...useSessionStore.getState().sessions.values()].filter(
-        (s) => s.agentState === 'awaiting-input'
-      )
-      if (waiting.length === 0) return
-      const currentId = effectiveProjectId ? getActiveSessionForProject(effectiveProjectId) : null
-      const index = waiting.findIndex((s) => s.id === currentId)
-      selectSessionEverywhere(waiting[(index + 1) % waiting.length])
-    }
-
-    function cycleWorkspace(delta: number): void {
-      if (workspaces.length === 0) return
-      const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId)
-      const next = (idx + delta + workspaces.length) % workspaces.length
-      setActiveWorkspace(workspaces[next].id)
-      setExpandedWorkspaceIds(new Set([workspaces[next].id]))
-    }
-
-    function cycleTab(projectId: string, delta: number): void {
-      const sessions = getSessionsForProject(projectId)
-      if (sessions.length === 0) return
-      const activeId = getActiveSessionForProject(projectId)
-      const idx = sessions.findIndex((s) => s.id === activeId)
-      const next = (idx + delta + sessions.length) % sessions.length
-      setActiveSessionForProject(projectId, sessions[next].id)
+    const newTabDeps = { resolveSettings, resolveActiveCwd, activeWorkspaceId, createSession }
+    const splitDeps = { resolveSettings, resolveActiveCwd, activeWorkspaceId, splitSession }
+    const closePaneDeps = {
+      getPaneLayout,
+      getFocusedSession,
+      closeSplitLeaf,
+      closeSession,
+      getActiveSessionForProject,
     }
 
     function handleKeyDown(e: KeyboardEvent): void {
@@ -112,6 +101,7 @@ export function useKeyboardShortcuts({
 
       if (isMeta && e.key === ',') {
         e.preventDefault()
+        onDirectShortcut?.('core.open-settings')
         onOpenSettings?.()
         return
       }
@@ -126,6 +116,7 @@ export function useKeyboardShortcuts({
       // Cmd+Shift+L: toggle log window
       if (isMeta && e.shiftKey && e.key === 'l') {
         e.preventDefault()
+        onDirectShortcut?.('core.toggle-log')
         onToggleLog?.()
         return
       }
@@ -135,6 +126,7 @@ export function useKeyboardShortcuts({
       // the renderer ever sees it, which made this branch unreachable.
       if (isMeta && e.shiftKey && e.key === 'e') {
         e.preventDefault()
+        onDirectShortcut?.('core.toggle-overview')
         onToggleOverview?.()
         return
       }
@@ -142,6 +134,7 @@ export function useKeyboardShortcuts({
       // Cmd+Shift+T: new scratch terminal
       if (isMeta && e.shiftKey && e.key === 't') {
         e.preventDefault()
+        onDirectShortcut?.('core.new-scratch')
         onNewScratch?.()
         return
       }
@@ -169,6 +162,7 @@ export function useKeyboardShortcuts({
         e.preventDefault()
         const idx = parseInt(e.key, 10) - 1
         if (workspaces[idx]) {
+          onDirectShortcut?.('core.switch-workspace')
           setActiveWorkspace(workspaces[idx].id)
           setExpandedWorkspaceIds(new Set([workspaces[idx].id]))
         }
@@ -178,44 +172,35 @@ export function useKeyboardShortcuts({
       // Cmd+= or Cmd++: next workspace
       if (isMeta && (e.key === '=' || e.key === '+')) {
         e.preventDefault()
-        cycleWorkspace(1)
+        onDirectShortcut?.('core.cycle-workspace-next')
+        cycleWorkspace(1, workspaceCycleDeps)
         return
       }
 
       // Cmd+-: previous workspace
       if (isMeta && e.key === '-') {
         e.preventDefault()
-        cycleWorkspace(-1)
+        onDirectShortcut?.('core.cycle-workspace-prev')
+        cycleWorkspace(-1, workspaceCycleDeps)
         return
       }
 
       // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields)
       if (isMeta && e.key === 'k' && !inTextField) {
         e.preventDefault()
-        if (effectiveProjectId) {
-          const activeSessionId = getActiveSessionForProject(effectiveProjectId)
-          if (activeSessionId) {
-            window.electronAPI.terminal.input(activeSessionId, '\x0c')
-          }
-        }
+        onDirectShortcut?.('core.clear')
+        clearTerminal(effectiveProjectId, { getActiveSessionForProject })
         return
       }
 
       // Cmd+T: new tab
       if (isMeta && e.key === 't') {
         e.preventDefault()
+        onDirectShortcut?.('core.new-tab')
         if (onNewTab) {
           onNewTab()
-        } else if (effectiveProjectId) {
-          const settings = resolveSettings(activeWorkspaceId)
-          const cwd = resolveActiveCwd()
-          void createSession(
-            effectiveProjectId,
-            'human',
-            'Terminal',
-            cwd,
-            settings.terminal.scrollbackLimit
-          ).catch(() => {})
+        } else {
+          newTerminalTab(effectiveProjectId, newTabDeps)
         }
         return
       }
@@ -226,70 +211,24 @@ export function useKeyboardShortcuts({
       // having been removed rather than as not applying.
       if (isMeta && !e.shiftKey && e.key === 'd') {
         e.preventDefault()
-        if (effectiveProjectId) {
-          const settings = resolveSettings(activeWorkspaceId)
-          const cwd = resolveActiveCwd()
-          splitSession(
-            effectiveProjectId,
-            'vertical',
-            cwd,
-            settings.terminal.scrollbackLimit
-          ).catch((error: unknown) =>
-            dispatchNotification({
-              type: 'error',
-              title: 'Split pane failed',
-              message: error instanceof Error ? error.message : 'Could not create split pane',
-              key: 'splitPaneFailed',
-            })
-          )
-        }
+        onDirectShortcut?.('core.split-vertical')
+        splitPane(effectiveProjectId, 'vertical', splitDeps)
         return
       }
 
       // Cmd+Shift+D: split horizontally (top / bottom).
       if (isMeta && e.shiftKey && e.key === 'd') {
         e.preventDefault()
-        if (effectiveProjectId) {
-          const settings = resolveSettings(activeWorkspaceId)
-          const cwd = resolveActiveCwd()
-          splitSession(
-            effectiveProjectId,
-            'horizontal',
-            cwd,
-            settings.terminal.scrollbackLimit
-          ).catch((error: unknown) =>
-            dispatchNotification({
-              type: 'error',
-              title: 'Split pane failed',
-              message: error instanceof Error ? error.message : 'Could not create split pane',
-              key: 'splitPaneFailed',
-            })
-          )
-        }
+        onDirectShortcut?.('core.split-horizontal')
+        splitPane(effectiveProjectId, 'horizontal', splitDeps)
         return
       }
 
       // Cmd+W: close focused split pane (or active tab if not in split mode)
       if (isMeta && e.key === 'w') {
         e.preventDefault()
-        if (effectiveProjectId) {
-          const layout = getPaneLayout(effectiveProjectId)
-          const focusedId = getFocusedSession(effectiveProjectId)
-          if (layout && focusedId) {
-            closeSplitLeaf(effectiveProjectId, focusedId)
-            closeSession(focusedId).catch(() =>
-              dispatchNotification({
-                type: 'error',
-                title: 'Close terminal failed',
-                message: 'Could not close terminal',
-                key: 'closeTerminalFailed',
-              })
-            )
-          } else {
-            const activeId = getActiveSessionForProject(effectiveProjectId)
-            if (activeId) closeSession(activeId)
-          }
-        }
+        onDirectShortcut?.('core.close-tab')
+        closeFocusedPane(effectiveProjectId, closePaneDeps)
         return
       }
 
@@ -298,20 +237,29 @@ export function useKeyboardShortcuts({
       // this is its only consumer.
       if (isMeta && (e.key === ']' || e.key === '[') && !inTextField) {
         e.preventDefault()
-        cycleMostRecentlyAttended(e.key === ']' ? 1 : -1)
+        onDirectShortcut?.(e.key === ']' ? 'core.cycle-recent-next' : 'core.cycle-recent-prev')
+        cycleMostRecentlyAttended(effectiveProjectId, e.key === ']' ? 1 : -1, {
+          getActiveSessionForProject,
+          setActiveSessionForProject,
+        })
         return
       }
 
       // Cmd+Shift+A: jump to the next session waiting on you.
       if (isMeta && e.shiftKey && (e.key === 'a' || e.key === 'A') && !inTextField) {
         e.preventDefault()
-        jumpToNextAwaitingInput()
+        onDirectShortcut?.('core.next-waiting')
+        jumpToNextAwaitingInput(effectiveProjectId, {
+          getActiveSessionForProject,
+          setActiveSessionForProject,
+        })
         return
       }
 
       // Cmd+I: edit the focused session's description.
       if (isMeta && !e.shiftKey && (e.key === 'i' || e.key === 'I') && !inTextField) {
         e.preventDefault()
+        onDirectShortcut?.('core.edit-note')
         onEditSessionNote?.()
         return
       }
@@ -319,14 +267,16 @@ export function useKeyboardShortcuts({
       // Cmd+Left: previous tab (skip if typing — Cmd+Left/Right navigates within text)
       if (isMeta && e.key === 'ArrowLeft' && !inTextField) {
         e.preventDefault()
-        if (effectiveProjectId) cycleTab(effectiveProjectId, -1)
+        onDirectShortcut?.('core.prev-tab')
+        if (effectiveProjectId) cycleTab(effectiveProjectId, -1, tabCycleDeps)
         return
       }
 
       // Cmd+Right: next tab (skip if typing)
       if (isMeta && e.key === 'ArrowRight' && !inTextField) {
         e.preventDefault()
-        if (effectiveProjectId) cycleTab(effectiveProjectId, 1)
+        onDirectShortcut?.('core.next-tab')
+        if (effectiveProjectId) cycleTab(effectiveProjectId, 1, tabCycleDeps)
         return
       }
     }
@@ -360,5 +310,6 @@ export function useKeyboardShortcuts({
     onOpenCommandPalette,
     onToggleOverview,
     onNewScratch,
+    onDirectShortcut,
   ])
 }
