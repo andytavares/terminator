@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import type {
+  CustomAction,
   GlobalSettings,
   NotificationTarget,
+  QuickActionsSettings,
   WorkspaceSettings,
 } from '../../shared/types/index'
 
@@ -27,6 +29,8 @@ interface SettingsState {
   updatePromptForName: (enabled: boolean) => Promise<void>
   updateNotificationDefaultTargets: (targets: NotificationTarget[]) => Promise<void>
   updateNotificationOverride: (key: string, targets: NotificationTarget[]) => Promise<void>
+  updateQuickActions: (patch: Partial<QuickActionsSettings>) => Promise<void>
+  updateWorkspaceQuickActions: (workspaceId: string, custom: CustomAction[]) => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
@@ -41,6 +45,7 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   extensions: {},
   ui: { hasSeenWelcome: false },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
+  quickActions: { pins: [], usage: [], directUse: [], custom: [] },
 }
 
 function mergeSettings(
@@ -186,6 +191,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       notifications: { overrides: { [key]: targets } },
     })
     set({ globalSettings: result.settings })
+  },
+
+  updateQuickActions: async (patch) => {
+    const result = await window.electronAPI.settings.updateGlobal({ quickActions: patch })
+    set({ globalSettings: result.settings })
+  },
+
+  updateWorkspaceQuickActions: async (workspaceId, custom) => {
+    const result = await window.electronAPI.settings.updateWorkspace(workspaceId, {
+      quickActions: { custom },
+    })
+    set((s) => {
+      const map = new Map(s.workspaceSettings)
+      map.set(workspaceId, result.settings)
+      return { workspaceSettings: map }
+    })
   },
 
   resolveSettings: (workspaceId) => {

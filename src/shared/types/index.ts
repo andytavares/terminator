@@ -108,7 +108,15 @@ export interface ExtensionContributes {
   projectTab?: ExtensionSurfaceContribution
   sidebarPanel?: ExtensionSurfaceContribution
   windowViews?: Array<{ id: string; view: string }>
-  commands?: Array<{ id: string; label: string; shortcut?: string; description?: string }>
+  commands?: Array<{
+    id: string
+    label: string
+    shortcut?: string
+    description?: string
+    mnemonic?: string
+    requires?: 'repo' | 'session'
+  }>
+  quickActions?: { group?: { mnemonic?: string; label: string } }
 }
 
 export interface Extension {
@@ -134,6 +142,36 @@ export interface ExtensionManifest {
   main: string
   renderer?: string
   minAppVersion: string
+}
+
+export type CustomActionKind = 'shell' | 'prompt'
+export type CustomActionTarget = 'focused' | 'new-tab' | 'agent'
+
+export interface CustomAction {
+  id: string
+  label: string
+  mnemonic?: string
+  kind: CustomActionKind
+  target: CustomActionTarget
+  body: string
+}
+
+export interface ActionUsage {
+  id: string
+  count: number
+  lastUsedAt: number
+}
+
+export interface DirectUse {
+  id: string
+  count: number
+}
+
+export interface QuickActionsSettings {
+  pins: string[]
+  usage: ActionUsage[]
+  directUse: DirectUse[]
+  custom: CustomAction[]
 }
 
 export interface GlobalSettings {
@@ -167,11 +205,15 @@ export interface GlobalSettings {
       [notificationKey: string]: NotificationTarget[]
     }
   }
+  quickActions: QuickActionsSettings
 }
 
 export interface WorkspaceSettings {
   workspaceId: string
-  overrides: Partial<Omit<GlobalSettings, 'extensions'>>
+  overrides: Partial<Omit<GlobalSettings, 'extensions' | 'quickActions'>> & {
+    /** A workspace override carries only its own custom actions, never usage or pins. */
+    quickActions?: { custom: CustomAction[] }
+  }
   extensions: {
     [extensionId: string]: Record<string, unknown>
   }
