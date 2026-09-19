@@ -309,7 +309,10 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     path: 'extension.executeCommand',
     kind: 'send',
     channel: 'extension:execute-command',
-    toPayload: (key: string) => ({ key }),
+    toPayload: (
+      key: string,
+      ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }
+    ) => ({ key, ctx }),
   },
   // Remote stub: WebContentsView positioning is an Electron-only concept.
   {
@@ -341,11 +344,6 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toPayload: (theme: 'dark' | 'light') => ({ theme }),
     remote: 'omit',
   },
-
-  // ── keyboard ──────────────────────────────────────────────────────────────
-  // Local on both transports: native checks the reserved-shortcut set, remote
-  // has no Electron accelerators so nothing is reserved.
-  { path: 'keyboard.isReserved', kind: 'local' },
 
   // ── shell ─────────────────────────────────────────────────────────────────
   { path: 'shell.exec', kind: 'invoke', channel: 'shell:exec' },
@@ -472,6 +470,19 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     kind: 'event',
     channel: 'extension:exit-to-terminal',
     toHandlerArgs: (args) => [args[0]],
+    remote: 'omit',
+  },
+
+  // ── quickActions ──────────────────────────────────────────────────────────
+  // Sent from extension-view-host.ts when ⌘P is pressed inside an extension
+  // WebContentsView. Native only: an extension view is a WebContentsView, a
+  // concept the remote `/app/` surface (a plain iframe host page) has no
+  // equivalent for.
+  {
+    path: 'quickActions.onOpen',
+    kind: 'event',
+    channel: 'quick-actions:open',
+    toHandlerArgs: () => [],
     remote: 'omit',
   },
 

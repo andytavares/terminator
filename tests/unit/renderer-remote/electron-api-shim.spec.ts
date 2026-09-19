@@ -561,11 +561,6 @@ describe('electron-api-shim other APIs', () => {
     expect(hasMsg(ws, 'log:write')).toBe(true)
   })
 
-  it('keyboard.isReserved always returns false', async () => {
-    const { api } = await loadShim()
-    expect(api.keyboard.isReserved()).toBe(false)
-  })
-
   it('extension.list invokes extension:list', async () => {
     const { api, ws } = await loadShim()
     void api.extension.list()

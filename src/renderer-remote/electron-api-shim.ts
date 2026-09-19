@@ -144,8 +144,6 @@ import { buildElectronApi, type ApiTransport } from '../shared/electron-api/buil
   ;(window as any).electronAPI = buildElectronApi(transport, {
     mode: 'remote',
     locals: {
-      // No Electron accelerators in a browser — nothing is reserved.
-      'keyboard.isReserved': () => false,
       // A browser client cannot open a native directory picker.
       'dialog.openDirectory': () => Promise.resolve({ cancelled: true }),
       // Open in a new browser tab instead of the host OS.

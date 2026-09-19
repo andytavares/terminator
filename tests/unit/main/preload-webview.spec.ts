@@ -20,10 +20,6 @@ vi.mock('electron', () => ({
   },
 }))
 
-vi.mock('../../../src/main/shared/reserved-shortcuts.js', () => ({
-  RESERVED_SHORTCUTS: new Set<string>(),
-}))
-
 describe('preload-webview', () => {
   beforeEach(async () => {
     Object.keys(exposed).forEach((k) => delete exposed[k])
@@ -46,7 +42,6 @@ describe('preload-webview', () => {
       'settings',
       'dialog',
       'extension',
-      'keyboard',
       'shell',
       'fs',
       'extensionEvents',

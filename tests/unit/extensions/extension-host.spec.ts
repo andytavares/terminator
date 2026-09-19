@@ -28,40 +28,6 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   getAllExtensionSettings: () => ({}),
 }))
 
-describe('ExtensionAPI keyboard', () => {
-  beforeEach(() => {
-    vi.resetModules()
-  })
-
-  it('keyboard.register with non-reserved accelerator returns Disposable', async () => {
-    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
-    const api = createExtensionAPI('com.test.ext', '0.1.0')
-    const handler = vi.fn()
-    const disposable = api.keyboard.register('CmdOrCtrl+Shift+K', handler)
-    expect(disposable).toBeDefined()
-    expect(typeof disposable.dispose).toBe('function')
-  })
-
-  it('keyboard.register throws synchronously for reserved shortcut CmdOrCtrl+T', async () => {
-    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
-    const api = createExtensionAPI('com.test.ext2', '0.1.0')
-    expect(() => api.keyboard.register('CmdOrCtrl+T', vi.fn())).toThrow()
-  })
-
-  it('disposing the returned Disposable removes the handler', async () => {
-    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
-    const api = createExtensionAPI('com.test.ext3', '0.1.0')
-    const disposable = api.keyboard.register('CmdOrCtrl+Shift+J', vi.fn())
-    expect(globalRegistry.keyboardHandlers.has('com.test.ext3.keyboard.CmdOrCtrl+Shift+J')).toBe(
-      true
-    )
-    disposable.dispose()
-    expect(globalRegistry.keyboardHandlers.has('com.test.ext3.keyboard.CmdOrCtrl+Shift+J')).toBe(
-      false
-    )
-  })
-})
-
 describe('ExtensionHost', () => {
   beforeEach(() => {
     vi.resetModules()

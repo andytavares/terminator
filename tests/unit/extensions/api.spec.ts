@@ -455,21 +455,6 @@ describe('api.contextMenu.registerItem', () => {
   })
 })
 
-describe('api.keyboard.register', () => {
-  it('registers a shortcut and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const handler = vi.fn()
-    const disposable = api.keyboard.register('Ctrl+Shift+Z', handler)
-    expect(disposable).toHaveProperty('dispose')
-    disposable.dispose()
-  })
-
-  it('throws when accelerator is reserved', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(() => api.keyboard.register('CmdOrCtrl+T', vi.fn())).toThrow('reserved')
-  })
-})
-
 describe('api.commands.register', () => {
   it('registers command and returns disposable', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')

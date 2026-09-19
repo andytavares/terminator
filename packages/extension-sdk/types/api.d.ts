@@ -99,6 +99,14 @@ export interface CommandContribution {
   description?: string
   shortcut?: string
   category?: string
+  mnemonic?: string
+  requires?: 'repo' | 'session'
+}
+
+export interface CommandContext {
+  projectId: string | null
+  sessionId: string | null
+  repoRoot: string | null
 }
 
 export interface GlobalTabContribution {
@@ -205,11 +213,12 @@ export interface ExtensionAPI {
   contextMenu: {
     registerItem(target: ContextMenuTarget, item: MenuItemContribution): Disposable
   }
-  keyboard: {
-    register(accelerator: string, handler: () => void): Disposable
-  }
   commands: {
-    register(command: CommandContribution, handler: () => void): Disposable
+    register(
+      command: CommandContribution,
+      handler: (ctx: CommandContext) => void | Promise<void>
+    ): Disposable
+    setEnabled(id: string, enabled: boolean, reason?: string): void
   }
   ipc: {
     registerHandler(
@@ -229,5 +238,6 @@ export interface ExtensionAPI {
   window: {
     openAuxiliary(view: string, params?: Record<string, string>): void
     broadcast(channel: string, data: unknown): void
+    showSelf(view?: string): void
   }
 }

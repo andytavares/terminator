@@ -6,6 +6,29 @@ import { sendToView } from '../safe-send.js'
 
 const logger = makeLogger('extension-view-host')
 
+/**
+ * Whether a `before-input-event` from an extension WebContentsView is the
+ * quick-actions leader (⌘P on mac, Ctrl+P elsewhere). Exported as a pure
+ * function so the mac/other-platform branches are unit-testable without an
+ * Electron WebContentsView.
+ */
+export function isQuickActionsOpenShortcut(
+  input: {
+    type: string
+    key: string
+    meta: boolean
+    control: boolean
+    shift: boolean
+    alt: boolean
+  },
+  platform: NodeJS.Platform = process.platform
+): boolean {
+  if (input.type !== 'keyDown') return false
+  if (input.key.toLowerCase() !== 'p') return false
+  if (input.shift || input.alt) return false
+  return platform === 'darwin' ? input.meta : input.control
+}
+
 // Injected into every extension WebContentsView so --tm-* CSS variables are defined.
 // Extensions use these to match the app's theme without sharing the main
 // renderer context. Both palettes have to be here: an extension view is a
@@ -448,6 +471,16 @@ export class ExtensionViewHost {
 
     const viewKey = `${ext.id}:${viewParam}`
     view.webContents.on('focus', () => this.noteFocused(viewKey))
+
+    // ⌘P (mac) / Ctrl+P (else) is the quick-actions leader everywhere else in
+    // the app, but an extension view is a separate WebContentsView with its
+    // own webContents — the main window's own keydown listener never sees it.
+    view.webContents.on('before-input-event', (event, input) => {
+      if (!isQuickActionsOpenShortcut(input)) return
+      event.preventDefault()
+      this.mainWindow.webContents.focus()
+      this.mainWindow.webContents.send('quick-actions:open')
+    })
 
     view.webContents.on('did-finish-load', () => {
       view.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})

@@ -20,10 +20,6 @@ function activate(api) {
       console.log('Sample action triggered for workspace:', targetId)
     },
   })
-
-  api.keyboard.register('CmdOrCtrl+Shift+S', () => {
-    console.log('Sample keyboard shortcut triggered')
-  })
 }
 
 function deactivate() {

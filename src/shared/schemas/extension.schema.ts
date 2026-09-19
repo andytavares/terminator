@@ -10,6 +10,11 @@ const SurfaceContributionSchema = z.object({
   defaultOpen: z.boolean().optional(),
 })
 
+const QuickActionsGroupSchema = z.object({
+  mnemonic: z.string().length(1).optional(),
+  label: z.string().min(1),
+})
+
 export const ExtensionContributesSchema = z
   .object({
     globalTab: SurfaceContributionSchema.optional(),
@@ -24,14 +29,33 @@ export const ExtensionContributesSchema = z
           label: z.string().min(1),
           shortcut: z.string().optional(),
           description: z.string().optional(),
+          mnemonic: z.string().length(1).optional(),
+          requires: z.enum(['repo', 'session']).optional(),
         })
       )
       .optional(),
+    quickActions: z.object({ group: QuickActionsGroupSchema.optional() }).optional(),
   })
   .passthrough()
   .transform((data) => {
-    const { globalTab, workspaceTab, projectTab, sidebarPanel, windowViews, commands } = data
-    return { globalTab, workspaceTab, projectTab, sidebarPanel, windowViews, commands }
+    const {
+      globalTab,
+      workspaceTab,
+      projectTab,
+      sidebarPanel,
+      windowViews,
+      commands,
+      quickActions,
+    } = data
+    return {
+      globalTab,
+      workspaceTab,
+      projectTab,
+      sidebarPanel,
+      windowViews,
+      commands,
+      quickActions,
+    }
   })
 
 export type ExtensionContributes = z.infer<typeof ExtensionContributesSchema>

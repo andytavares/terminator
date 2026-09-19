@@ -53,6 +53,7 @@ vi.mock('../../../src/main/logger.js', () => ({
 import {
   ExtensionViewHost,
   EXTENSION_BASE_CSS,
+  isQuickActionsOpenShortcut,
 } from '../../../../src/main/extensions/extension-view-host.js'
 import type { Extension } from '../../../../src/shared/types/index.js'
 
@@ -448,6 +449,106 @@ describe('ExtensionViewHost focus restoration', () => {
     it('returns null for webContents that belong to no extension view', () => {
       expect(host.findViewByWebContents({} as never)).toBeNull()
     })
+  })
+})
+
+describe('isQuickActionsOpenShortcut', () => {
+  const keyDownP = {
+    type: 'keyDown',
+    key: 'p',
+    meta: false,
+    control: false,
+    shift: false,
+    alt: false,
+  }
+
+  it('matches Cmd+P on darwin', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, meta: true }, 'darwin')).toBe(true)
+  })
+
+  it('matches Ctrl+P on non-darwin', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, control: true }, 'win32')).toBe(true)
+  })
+
+  it('does not match Ctrl+P on darwin', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, control: true }, 'darwin')).toBe(false)
+  })
+
+  it('does not match Cmd+P on non-darwin', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, meta: true }, 'win32')).toBe(false)
+  })
+
+  it('does not match with Shift held', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, meta: true, shift: true }, 'darwin')).toBe(
+      false
+    )
+  })
+
+  it('does not match with Alt held', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, meta: true, alt: true }, 'darwin')).toBe(false)
+  })
+
+  it('does not match a keyUp event', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, type: 'keyUp', meta: true }, 'darwin')).toBe(
+      false
+    )
+  })
+
+  it('does not match a different key', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, key: 'o', meta: true }, 'darwin')).toBe(false)
+  })
+
+  it('matches regardless of key case', () => {
+    expect(isQuickActionsOpenShortcut({ ...keyDownP, key: 'P', meta: true }, 'darwin')).toBe(true)
+  })
+})
+
+describe('ExtensionViewHost quick-actions leader', () => {
+  let host: ExtensionViewHost
+  let mainWindow: ReturnType<typeof makeMainWindow>
+
+  function inputHandlers(): Array<(event: { preventDefault: () => void }, input: unknown) => void> {
+    return mockOn.mock.calls
+      .filter(([event]) => event === 'before-input-event')
+      .map(
+        ([, handler]) => handler as (event: { preventDefault: () => void }, input: unknown) => void
+      )
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mainWindow = makeMainWindow()
+    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
+  })
+
+  it('registers a before-input-event handler on the extension view', async () => {
+    await host.createView(makeExt(), 'main')
+    expect(inputHandlers()).toHaveLength(1)
+  })
+
+  it('opens quick actions and focuses the main window on the leader shortcut', async () => {
+    await host.createView(makeExt(), 'main')
+    const preventDefault = vi.fn()
+    inputHandlers()[0](
+      { preventDefault },
+      { type: 'keyDown', key: 'p', meta: true, control: false, shift: false, alt: false }
+    )
+
+    expect(preventDefault).toHaveBeenCalled()
+    expect(mockMainWebContentsFocus).toHaveBeenCalled()
+    expect(mockSend).toHaveBeenCalledWith('quick-actions:open')
+  })
+
+  it('ignores other keys', async () => {
+    await host.createView(makeExt(), 'main')
+    const preventDefault = vi.fn()
+    inputHandlers()[0](
+      { preventDefault },
+      { type: 'keyDown', key: 'o', meta: true, control: false, shift: false, alt: false }
+    )
+
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(mockMainWebContentsFocus).not.toHaveBeenCalled()
   })
 })
 
