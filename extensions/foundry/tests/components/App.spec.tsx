@@ -8,6 +8,7 @@ import { App } from '../../src/renderer/App.js'
 // what is left to assert here is small — which is the point.
 
 const bridgeHandlers: Record<string, (data: unknown) => void> = {}
+let pendingNewOrder = false
 
 const mockBridgeInvoke = vi.fn(async (channel: string) => {
   if (channel === 'foundry:order.list') return { orders: [] }
@@ -23,11 +24,15 @@ const mockBridgeInvoke = vi.fn(async (channel: string) => {
       summary: { waiting: 0, orders: 0, automatic: 0, building: 0, converging: 0 },
     }
   }
+  if (channel === 'foundry:ui.consume-pending-new-order') {
+    return { pending: pendingNewOrder }
+  }
   return {}
 })
 
 beforeEach(() => {
   vi.clearAllMocks()
+  pendingNewOrder = false
   for (const key of Object.keys(bridgeHandlers)) delete bridgeHandlers[key]
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: {
@@ -146,5 +151,47 @@ describe('the Ledger surface', () => {
     await waitFor(() => screen.getByText('Nothing recorded yet.'))
     fireEvent.click(screen.getByRole('button', { name: 'Inbox' }))
     await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+  })
+})
+
+describe('the New work order quick action', () => {
+  it('brings the Forge forward and focuses the idea box when the extension asks', async () => {
+    render(<App />)
+    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+    bridgeHandlers['foundry:ui.open-new-order']({})
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe(
+        'true'
+      )
+    )
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByLabelText('Describe what you want built or fixed')
+      )
+    )
+  })
+
+  it('leaves settings open on a surface the operator can see', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await waitFor(() => screen.getByRole('button', { name: /back/i }))
+    bridgeHandlers['foundry:ui.open-new-order']({})
+    await waitFor(() => expect(screen.queryByRole('button', { name: /back/i })).toBeNull())
+    expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('picks up a request made before this view existed', async () => {
+    pendingNewOrder = true
+    render(<App />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe(
+        'true'
+      )
+    )
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByLabelText('Describe what you want built or fixed')
+      )
+    )
   })
 })

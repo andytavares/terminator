@@ -11,6 +11,9 @@
       "label": "Foundry",
       "icon": "brain",
       "view": "main"
+    },
+    "quickActions": {
+      "group": { "mnemonic": "f", "label": "Foundry" }
     }
   }
 }

@@ -372,6 +372,164 @@ describe('GlobalSettingsSchema — sidebar staleness (FR-020)', () => {
   })
 })
 
+describe('GlobalSettingsSchema — quick actions (057)', () => {
+  it('defaults quickActions to empty arrays when omitted', () => {
+    const result = GlobalSettingsSchema.safeParse(validGlobal)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.quickActions).toEqual({ pins: [], usage: [], directUse: [], custom: [] })
+    }
+  })
+
+  it('accepts a custom shell action', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      quickActions: {
+        pins: ['core.new-tab'],
+        usage: [{ id: 'core.new-tab', count: 3, lastUsedAt: 1000 }],
+        directUse: [{ id: 'core.split-right', count: 1 }],
+        custom: [
+          {
+            id: 'custom-1',
+            label: 'Echo branch',
+            mnemonic: 'e',
+            kind: 'shell',
+            target: 'new-tab',
+            body: 'echo {branch}',
+          },
+        ],
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects a mnemonic longer than one character', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      quickActions: {
+        pins: [],
+        usage: [],
+        directUse: [],
+        custom: [
+          {
+            id: 'custom-1',
+            label: 'Echo branch',
+            mnemonic: 'ab',
+            kind: 'shell',
+            target: 'new-tab',
+            body: 'echo hi',
+          },
+        ],
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an empty body', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      quickActions: {
+        pins: [],
+        usage: [],
+        directUse: [],
+        custom: [
+          { id: 'custom-1', label: 'Echo branch', kind: 'shell', target: 'new-tab', body: '' },
+        ],
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an unknown kind', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      quickActions: {
+        pins: [],
+        usage: [],
+        directUse: [],
+        custom: [
+          {
+            id: 'custom-1',
+            label: 'Echo branch',
+            kind: 'bogus',
+            target: 'new-tab',
+            body: 'echo hi',
+          },
+        ],
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an unknown target', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      quickActions: {
+        pins: [],
+        usage: [],
+        directUse: [],
+        custom: [
+          {
+            id: 'custom-1',
+            label: 'Echo branch',
+            kind: 'shell',
+            target: 'bogus',
+            body: 'echo hi',
+          },
+        ],
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('ships the default in DEFAULT_GLOBAL_SETTINGS', () => {
+    expect(DEFAULT_GLOBAL_SETTINGS.quickActions).toEqual({
+      pins: [],
+      usage: [],
+      directUse: [],
+      custom: [],
+    })
+  })
+})
+
+describe('WorkspaceSettingsSchema — quick actions custom overrides (057)', () => {
+  const validWorkspace = {
+    workspaceId: '550e8400-e29b-41d4-a716-446655440000',
+    overrides: {},
+    extensions: {},
+  }
+
+  it('accepts overrides.quickActions with a custom action list', () => {
+    const result = WorkspaceSettingsSchema.safeParse({
+      ...validWorkspace,
+      overrides: {
+        quickActions: {
+          custom: [
+            {
+              id: 'custom-1',
+              label: 'Echo branch',
+              kind: 'shell',
+              target: 'new-tab',
+              body: 'echo {branch}',
+            },
+          ],
+        },
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects overrides.quickActions carrying pins or usage', () => {
+    const result = WorkspaceSettingsSchema.safeParse({
+      ...validWorkspace,
+      overrides: {
+        quickActions: { custom: [], pins: ['core.new-tab'] },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
 describe('GlobalSettingsSchema — the editor override', () => {
   it('defaults to empty, which means detect rather than a choice you must make', () => {
     const { ui: _ui, ...withoutUi } = validGlobal

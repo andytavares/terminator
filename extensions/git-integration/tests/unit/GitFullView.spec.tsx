@@ -46,6 +46,11 @@ const mockGitPush = vi.fn()
 const mockGitPrStatus = vi.fn()
 const mockGitDiffFile = vi.fn()
 const mockInvoke = vi.fn()
+const channelHandlers = new Map<string, (data: unknown) => void>()
+const mockOn = vi.fn((channel: string, cb: (data: unknown) => void) => {
+  channelHandlers.set(channel, cb)
+  return () => channelHandlers.delete(channel)
+})
 
 function setupStore(overrides: Record<string, unknown> = {}) {
   vi.mocked(useGitStore).mockReturnValue({
@@ -62,6 +67,7 @@ function setupStore(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  channelHandlers.clear()
   setupStore()
   mockGitDiffFile.mockResolvedValue({ diff: { hunks: [] } })
   mockGitCommit.mockResolvedValue({ commitHash: 'abc123' })
@@ -76,7 +82,7 @@ beforeEach(() => {
     return Promise.resolve({})
   })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: mockInvoke, on: vi.fn().mockReturnValue(() => {}) },
+    extensionBridge: { invoke: mockInvoke, on: mockOn },
   }
 })
 
@@ -305,5 +311,33 @@ describe('GitFullView', () => {
     await waitFor(() =>
       expect(screen.getByText('Committed but push rejected — pull changes first.')).toBeTruthy()
     )
+  })
+
+  it('focuses the commit message box on git:focus-commit-message for this repo', async () => {
+    await renderView('/repo')
+    const textarea = screen.getByPlaceholderText('Commit message…')
+    expect(document.activeElement).not.toBe(textarea)
+    channelHandlers.get('git:focus-commit-message')?.({ repoRoot: '/repo' })
+    await waitFor(() => expect(document.activeElement).toBe(textarea))
+  })
+
+  it('ignores git:focus-commit-message for a different repo', async () => {
+    await renderView('/repo')
+    const textarea = screen.getByPlaceholderText('Commit message…')
+    channelHandlers.get('git:focus-commit-message')?.({ repoRoot: '/other-repo' })
+    expect(document.activeElement).not.toBe(textarea)
+  })
+
+  it('opens the PR dialog on git:open-pr-dialog for this repo', async () => {
+    await renderView('/repo')
+    expect(screen.queryByTestId('pr-dialog')).toBeNull()
+    channelHandlers.get('git:open-pr-dialog')?.({ repoRoot: '/repo' })
+    await waitFor(() => expect(screen.getByTestId('pr-dialog')).toBeTruthy())
+  })
+
+  it('ignores git:open-pr-dialog for a different repo', async () => {
+    await renderView('/repo')
+    channelHandlers.get('git:open-pr-dialog')?.({ repoRoot: '/other-repo' })
+    expect(screen.queryByTestId('pr-dialog')).toBeNull()
   })
 })

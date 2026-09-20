@@ -280,6 +280,7 @@ describe('the extension API surface is unchanged', () => {
       'commands',
       'globalTab',
       'projectTab',
+      'quickActions',
       'sidebarPanel',
       'windowViews',
       'workspaceTab',

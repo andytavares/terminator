@@ -1,5 +1,5 @@
 import React from 'react'
-import { Bell, Puzzle } from 'lucide-react'
+import { Bell, Command, Puzzle } from 'lucide-react'
 import type { GlobalTabRegistration, SidebarButtonRegistration } from '../../extensions/registry'
 import './AppBand.css'
 
@@ -11,6 +11,7 @@ export interface AppBandProps {
   /** The notification bell, which is app-level like everything else here. */
   unreadNotifications?: number
   onBellClick?: () => void
+  onOpenQuickActions?: () => void
 }
 
 /**
@@ -35,9 +36,16 @@ export function AppBand({
   onSelect,
   unreadNotifications = 0,
   onBellClick,
+  onOpenQuickActions,
 }: AppBandProps): JSX.Element | null {
   const tabs = globalTabs.filter((t) => !t.hidden)
-  if (tabs.length === 0 && sidebarItems.length === 0 && onBellClick === undefined) return null
+  if (
+    tabs.length === 0 &&
+    sidebarItems.length === 0 &&
+    onBellClick === undefined &&
+    onOpenQuickActions === undefined
+  )
+    return null
 
   return (
     <div className="app-band">
@@ -56,16 +64,17 @@ export function AppBand({
       {sidebarItems.map((item) => (
         <Entry key={item.id} label={item.label} icon={item.icon} onClick={item.action} />
       ))}
+      {(onOpenQuickActions || onBellClick) && <span className="app-band__spacer" />}
+      {onOpenQuickActions && (
+        <Entry label="Quick actions (⌘P)" icon={<Command />} onClick={onOpenQuickActions} />
+      )}
       {onBellClick && (
-        <>
-          <span className="app-band__spacer" />
-          <Entry
-            label={`Notifications${unreadNotifications > 0 ? ` (${unreadNotifications} unread)` : ''}`}
-            icon={<Bell />}
-            badge={unreadNotifications}
-            onClick={onBellClick}
-          />
-        </>
+        <Entry
+          label={`Notifications${unreadNotifications > 0 ? ` (${unreadNotifications} unread)` : ''}`}
+          icon={<Bell />}
+          badge={unreadNotifications}
+          onClick={onBellClick}
+        />
       )}
     </div>
   )

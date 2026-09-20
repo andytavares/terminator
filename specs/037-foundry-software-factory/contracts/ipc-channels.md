@@ -424,3 +424,11 @@ Thirty channels serve the Floor: the live runs, their permissions, their transcr
 | --------------------- | ------------------- | --------------------------------- |
 | `foundry:models-list` | `{}`                | `{ models, selected }`            |
 | `foundry:model-set`   | `{ model: string }` | `{ ok, selected }` or `{ error }` |
+
+### Quick actions (057)
+
+The "New work order…" quick action calls `api.window.showSelf('main')` and broadcasts `foundry:ui.open-new-order`, which the main view answers immediately if it is already open. This channel is how a not-yet-created view picks the request back up on its first mount.
+
+| Channel                                | Payload | Response      |
+| -------------------------------------- | ------- | ------------- |
+| `foundry:ui.consume-pending-new-order` | `{}`    | `{ pending }` |

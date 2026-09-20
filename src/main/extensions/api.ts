@@ -98,6 +98,17 @@ export interface CommandContribution {
   description?: string
   shortcut?: string
   category?: string
+  /** One-character mnemonic shown in the quick-actions panel. */
+  mnemonic?: string
+  /** Dims the action, with a stock reason, when the focused context lacks this. */
+  requires?: 'repo' | 'session'
+}
+
+/** Core-owned focus context, passed outbound to a command's handler. */
+export interface CommandContext {
+  projectId: string | null
+  sessionId: string | null
+  repoRoot: string | null
 }
 
 // v1.2.0 types
@@ -412,11 +423,12 @@ export interface ExtensionAPI {
   contextMenu: {
     registerItem(target: ContextMenuTarget, item: MenuItemContribution): Disposable
   }
-  keyboard: {
-    register(accelerator: string, handler: () => void): Disposable
-  }
   commands: {
-    register(command: CommandContribution, handler: () => void): Disposable
+    register(
+      command: CommandContribution,
+      handler: (ctx: CommandContext) => void | Promise<void>
+    ): Disposable
+    setEnabled(id: string, enabled: boolean, reason?: string): void
   }
   ipc: {
     /**
@@ -443,6 +455,12 @@ export interface ExtensionAPI {
     openAuxiliary(view: string, params?: Record<string, string>): void
     broadcast(channel: string, data: unknown): void
     focusSelf(viewParam?: string): void
+    /**
+     * Asks core to bring forward whichever surface this extension registered
+     * for `view` (global, workspace, project tab or sidebar panel) and focus
+     * it. Core's own "Open <surface>" quick actions use this same path.
+     */
+    showSelf(view?: string): void
   }
 }
 
@@ -480,7 +498,6 @@ import {
   onLinkChange as onIssueLinkChange,
   setLink as setIssueLink,
 } from '../integrations/issue-link-store.js'
-import { RESERVED_SHORTCUTS } from '../shared/reserved-shortcuts.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
 
 /**
@@ -512,9 +529,9 @@ interface Registry {
   /** Maps panel ID → Electron menu item id for checkbox menu items registered by extensions. */
   panelMenuItemIds: Map<string, string>
   contextMenuItems: Map<string, { target: ContextMenuTarget; item: MenuItemContribution }>
-  keyboardHandlers: Map<string, () => void>
   commandContributions: Map<string, CommandContribution>
-  commandHandlers: Map<string, () => void>
+  commandHandlers: Map<string, (ctx: CommandContext) => void | Promise<void>>
+  commandDisabledReasons: Map<string, string>
   sessionCreateHandlers: Set<(session: Readonly<SessionSnapshot>) => void>
   sessionCloseHandlers: Set<(sessionId: string) => void>
 }
@@ -533,9 +550,9 @@ export const globalRegistry: Registry = {
   nativeMenuItems: new Map(),
   panelMenuItemIds: new Map(),
   contextMenuItems: new Map(),
-  keyboardHandlers: new Map(),
   commandContributions: new Map(),
   commandHandlers: new Map(),
+  commandDisabledReasons: new Map(),
   sessionCreateHandlers: new Set(),
   sessionCloseHandlers: new Set(),
 }
@@ -656,24 +673,39 @@ export function dispatchSidebarItemClick(itemId: string): void {
 
 export function listExtensionCommands(): Array<{
   key: string
+  extensionId: string
   id: string
   label: string
   description?: string
   shortcut?: string
   category?: string
+  mnemonic?: string
+  requires?: 'repo' | 'session'
+  disabledReason?: string
 }> {
   return [...globalRegistry.commandContributions.entries()].map(([key, cmd]) => ({
     key,
+    extensionId: key.slice(0, key.indexOf('.command.')),
     id: cmd.id,
     label: cmd.label,
     description: cmd.description,
     shortcut: cmd.shortcut,
     category: cmd.category,
+    mnemonic: cmd.mnemonic,
+    requires: cmd.requires,
+    disabledReason: globalRegistry.commandDisabledReasons.get(key),
   }))
 }
 
-export function executeExtensionCommand(key: string): void {
-  globalRegistry.commandHandlers.get(key)?.()
+export async function executeExtensionCommand(key: string, ctx: CommandContext): Promise<void> {
+  if (globalRegistry.commandDisabledReasons.has(key)) return
+  const handler = globalRegistry.commandHandlers.get(key)
+  if (!handler) return
+  try {
+    await handler(ctx)
+  } catch (error) {
+    apiLog.error(`Command "${key}" threw: ${String(error)}`)
+  }
 }
 
 /**
@@ -1008,25 +1040,27 @@ export function createExtensionAPI(
         return disposable(() => globalRegistry.contextMenuItems.delete(key))
       },
     },
-    keyboard: {
-      register(accelerator: string, handler: () => void): Disposable {
-        if (RESERVED_SHORTCUTS.has(accelerator)) {
-          throw new Error(`Accelerator "${accelerator}" is reserved by the application`)
-        }
-        const key = `${extensionId}.keyboard.${accelerator}`
-        globalRegistry.keyboardHandlers.set(key, handler)
-        return disposable(() => globalRegistry.keyboardHandlers.delete(key))
-      },
-    },
     commands: {
-      register(command: CommandContribution, handler: () => void): Disposable {
+      register(
+        command: CommandContribution,
+        handler: (ctx: CommandContext) => void | Promise<void>
+      ): Disposable {
         const key = `${extensionId}.command.${command.id}`
         globalRegistry.commandContributions.set(key, command)
         globalRegistry.commandHandlers.set(key, handler)
         return disposable(() => {
           globalRegistry.commandContributions.delete(key)
           globalRegistry.commandHandlers.delete(key)
+          globalRegistry.commandDisabledReasons.delete(key)
         })
+      },
+      setEnabled(id: string, enabled: boolean, reason?: string): void {
+        const key = `${extensionId}.command.${id}`
+        if (enabled) {
+          globalRegistry.commandDisabledReasons.delete(key)
+        } else {
+          globalRegistry.commandDisabledReasons.set(key, reason ?? 'Disabled')
+        }
       },
     },
     ipc: {
@@ -1207,6 +1241,9 @@ export function createExtensionAPI(
       },
       focusSelf(viewParam = 'main'): void {
         deps?.focusExtensionView?.(extensionId, viewParam)
+      },
+      showSelf(view = 'main'): void {
+        api.window.broadcast('extension:show-surface', { extensionId, view })
       },
     },
   }

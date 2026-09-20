@@ -188,22 +188,39 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       id: 'notepad-new-note',
       label: 'New Note',
       accelerator: 'CmdOrCtrl+Shift+N',
-      onClick: () => {
-        // Broadcast to any already-running extension view immediately.
-        api.window.broadcast('terminator.notepad:ui.openQuickCreate', {})
-        // Activate the notepad tab — this creates the WebContentsView if it doesn't exist yet.
-        api.window.broadcast('extension:activate-global-tab', 'terminator.notepad')
-        // Set pending flag so the renderer shows the overlay on first load.
-        // Auto-expire after 5 s so a late manual panel open doesn't surprise the user.
-        _pendingQuickCreate = true
-        if (_pendingQuickCreateTimer !== null) clearTimeout(_pendingQuickCreateTimer)
-        _pendingQuickCreateTimer = setTimeout(() => {
-          _pendingQuickCreate = false
-          _pendingQuickCreateTimer = null
-        }, 5000)
-      },
+      onClick: () => newNote(api),
     })
   )
+
+  // Same path as the View-menu item, reachable from the quick-actions panel (⌘P).
+  disposables.push(
+    api.commands.register(
+      {
+        id: 'notepad:quick-create',
+        label: 'New note',
+        mnemonic: 'n',
+        shortcut: '⌘⇧N',
+        category: 'Notes',
+        description: 'Open quick-create overlay',
+      },
+      () => newNote(api)
+    )
+  )
+}
+
+function newNote(api: ExtensionAPI): void {
+  // Broadcast to any already-running extension view immediately.
+  api.window.broadcast('terminator.notepad:ui.openQuickCreate', {})
+  // Activate the notepad tab — this creates the WebContentsView if it doesn't exist yet.
+  api.window.broadcast('extension:activate-global-tab', 'terminator.notepad')
+  // Set pending flag so the renderer shows the overlay on first load.
+  // Auto-expire after 5 s so a late manual panel open doesn't surprise the user.
+  _pendingQuickCreate = true
+  if (_pendingQuickCreateTimer !== null) clearTimeout(_pendingQuickCreateTimer)
+  _pendingQuickCreateTimer = setTimeout(() => {
+    _pendingQuickCreate = false
+    _pendingQuickCreateTimer = null
+  }, 5000)
 }
 
 export function deactivate(): void {

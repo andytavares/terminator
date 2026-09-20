@@ -309,4 +309,16 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'New scratch terminal' }))
     expect(started.scratch).toHaveBeenCalled()
   })
+
+  it('hides the quick actions hint when no handler is given', () => {
+    render(<HomeScreen />)
+    expect(screen.queryByRole('button', { name: 'Quick actions (⌘P)' })).toBeNull()
+  })
+
+  it('offers the quick actions hint and calls the handler on click', () => {
+    const onOpenQuickActions = vi.fn()
+    render(<HomeScreen onOpenQuickActions={onOpenQuickActions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
+    expect(onOpenQuickActions).toHaveBeenCalledOnce()
+  })
 })

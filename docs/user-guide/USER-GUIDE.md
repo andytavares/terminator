@@ -13,7 +13,7 @@ An end-to-end reference for every feature and extension in Terminator — an ext
 5. [Terminal Sessions](#5-terminal-sessions)
 6. [Split Panes](#6-split-panes)
 7. [Scratch Terminals](#7-scratch-terminals)
-8. [Command Palette](#8-command-palette)
+8. [Quick Actions](#8-quick-actions)
 9. [Settings](#9-settings)
 10. [Issue Tracking](#10-issue-tracking)
 11. [Home and the Overview Wall](#11-home-and-the-overview-wall)
@@ -167,11 +167,61 @@ Scratch terminals give you an instant shell without selecting any repo or branch
 
 ---
 
-## 8. Command Palette
+## 8. Quick Actions
 
-![Command palette](screenshots/04-command-palette.png)
+![Quick actions](screenshots/04-quick-actions.png)
 
-Press **`Cmd+P`** to open the command palette. Type to filter available actions — create sessions, navigate workspaces, toggle panels, and trigger extension commands. Press `Enter` to execute or `Esc` to close.
+Press **`Cmd+P`** from anywhere — a terminal, Home, Overview, or any extension view — to open Quick Actions: a panel of every action on screen, grouped, with a one-letter mnemonic for each. It works the same way whether you remember the letter or not.
+
+### The letter map
+
+At the top level, each row is a group or a direct action, and its box shows the letter that reaches it:
+
+| Key                 | Opens                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------- |
+| `t`                 | **Terminal…** — new tab, split right/down, close, clear, new scratch terminal, edit note, prev/next tab |
+| `s`                 | **Sessions…** — jump to any open session, searchable                                                    |
+| `w`                 | **Workspace…** — switch workspace, cycle, link/view/open the linked issue                               |
+| `x`                 | **Custom…** — your own shell and prompt actions (below)                                                 |
+| `g`                 | **Git** — commit, push, pull, create PR, open Git, open Code Reviews                                    |
+| `n`                 | **Notes** — new note, open Notes                                                                        |
+| `v`                 | **Task Vault** — capture to inbox, open Task Vault, open the calendar                                   |
+| `f`                 | **Foundry** — new work order, open Foundry, jump to the run that needs you                              |
+| `h` `o` `a` `b` `,` | Home, Overview, next session waiting on you, toggle sidebar, Settings — direct, one press               |
+
+A letter acts immediately: `g` then `p` pushes the focused branch, with no `Enter` needed. `Backspace` steps back up a level. An action you can't run right now (no repository focused, no linked issue, …) still shows — dimmed, with the reason in place of its description — rather than disappearing; pressing it shows the reason at the bottom of the panel instead of running.
+
+### Search
+
+Press **`/`** (or `Cmd+P` again while the panel is open) to switch to fuzzy search. It matches against the action's label, its group, and its description — typing "push" finds **Git: Push** even though "push" isn't in the group name. Arrow keys move the highlight, `Enter` runs it, `Backspace` on an empty query goes back to the letter map.
+
+### Pins and recent
+
+The actions you actually use rise to a **Pinned & recent** row at the top, before any group: your pins, then your most-used actions by recency and frequency. Highlight a row and press **`Cmd+.`** to pin or unpin it, or hover a row and click its pin icon. Pins and usage are saved locally and survive a restart.
+
+If the surface you're on has its own group — Foundry's tab, the Git view, Notes — that group's actions rank first, above the pinned/recent row, because that's almost always what you want next.
+
+### Learning the direct shortcuts
+
+Every action that also has a direct keyboard shortcut shows it (`⌘D` next to Split right, for example). Run one from the panel three times and it stops reminding you — until then, running it shows a small "Next time: `⌘D`" toast, so the shortcut sticks without you having to look it up twice.
+
+### Custom actions
+
+Add your own actions in **Settings → Quick actions** (global, or per-workspace to scope one to a repo). Each one has:
+
+- A **label** and an optional one-character **key**.
+- A **kind** — a **shell command**, or a **Claude prompt**.
+- A **target** — a shell command runs in the **focused terminal** or opens a **new tab on the branch**; a prompt always goes to the **focused Claude session**.
+- A **body**, with variables filled in when the action runs: `{cwd}` `{branch}` `{worktree}` `{repo}` `{issue}` `{selection}`.
+
+They show up under **`x`** (Custom) in the panel, alongside everything else.
+
+**When a custom action won't run:**
+
+- A variable with nothing to fill it (no linked issue, no text selected, …) disables the action with the specific reason — the body never runs with a variable silently left empty.
+- A shell action aimed at the focused terminal is refused if that terminal is running Claude ("use a new tab" instead).
+- A prompt action is refused if the focused session isn't a Claude session, or if Claude is mid-turn ("Claude is mid-turn") — sending a prompt into the middle of a response would just get typed over.
+- A shell command longer than 1024 bytes after its variables are filled in is refused outright, rather than sent — a line that long gets silently mangled by the terminal, so Terminator would rather tell you than corrupt it.
 
 ---
 
@@ -245,8 +295,7 @@ Type to search, or type an issue key exactly (`TAV-42`) to jump straight to it. 
 which tracker it came from, because two trackers can both have a `TAV-42` and they are different
 issues.
 
-You can also reach it from the command palette (`⌘K`) with **Link Issue to Project**, scoped to
-whichever branch you are in.
+You can also reach it from [Quick Actions](#8-quick-actions) (`⌘P` → `w` → `l`) with **Link issue to project**, scoped to whichever branch you are in.
 
 **The key.** Once attached, the branch's row in the sidebar carries the issue key as plain text — click it to open the issue drawer. It used to be a bordered badge with its own state dot; the key alone already said what those said. The paragraph below describes the state colours as they appear in the drawer and the picker.
 
@@ -441,7 +490,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Split pane horizontally              | `Cmd+Shift+D`            |
 | Cycle tabs left/right                | `Cmd+Left` / `Cmd+Right` |
 | Clear terminal                       | `Cmd+K`                  |
-| Command palette                      | `Cmd+P`                  |
+| Quick actions                        | `Cmd+P`                  |
 | Settings                             | `Cmd+,`                  |
 | Toggle Overview screen               | `Cmd+Shift+E`            |
 | Open Home                            | `Cmd+~`                  |

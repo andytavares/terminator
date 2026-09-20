@@ -9,6 +9,7 @@ import {
   listExtensionCommands,
   executeExtensionCommand,
 } from '../extensions/api.js'
+import type { CommandContext } from '../extensions/api.js'
 import {
   getAllExtensionSettings,
   setExtensionSetting,
@@ -86,7 +87,10 @@ export function registerExtensionHandlers(
     return { commands: listExtensionCommands() }
   })
 
-  onChannel('extension:execute-command', (_event, { key }: { key: string }) => {
-    executeExtensionCommand(key)
-  })
+  onChannel(
+    'extension:execute-command',
+    (_event, { key, ctx }: { key: string; ctx: CommandContext }) => {
+      void executeExtensionCommand(key, ctx)
+    }
+  )
 }

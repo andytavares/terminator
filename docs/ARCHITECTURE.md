@@ -210,7 +210,6 @@ ExtensionHost.load(directoryPath)
       │           api.ipc.onWindowEvent()           → subscribes to EventEmitter events from renderer (v1.4.0)
       │           api.commands.register()           → globalRegistry.commandContributions / commandHandlers (v1.1.0)
       │           api.contextMenu.registerItem()    → globalRegistry.contextMenuItems
-      │           api.keyboard.register()           → globalRegistry.keyboardHandlers (throws on reserved)
       │           api.terminal.onSessionCreate()    → globalRegistry.sessionCreateHandlers
       │           api.sidebar.registerGlobalTab()   → globalRegistry.globalTabs (v1.2.0)
       │           api.globalShortcut.register()     → electron globalShortcut (v1.2.0)
@@ -249,7 +248,7 @@ Security constraints: command allowlist `['git', 'gh']`, CWD pinned to project r
 
 ### Reserved keyboard shortcuts
 
-Extensions cannot claim: `Cmd+1–9`, `Cmd++/-`, `Cmd+Left/Right`, `Cmd+T`, `Cmd+W`, `Cmd+,`. Attempting to register these throws synchronously from `keyboard.register()`.
+There is no extension-facing shortcut registration API. `api.keyboard.register()` existed through feature 056 but was never read by anything and is deleted as of feature 057 (see [ADR-057](adr/057-quick-actions-are-a-leader-panel.md)) — an extension cannot bind a global accelerator. `CommandContribution.shortcut` (`api.commands.register`) is a **display hint only**: it renders next to the action in the Quick Actions panel, and setting it does not make the key combination do anything. The only real key bindings left are core's own, in `useKeyboardShortcuts.ts` and the menu accelerators in `src/main/index.ts` — both are enumerated in `src/renderer/quick-actions/shortcut-behaviors.ts`'s `CORE_SHORTCUTS`, and a unit test fails if either source gains an accelerator with no matching action.
 
 ### Webview Renderer System (v2.0.0)
 
@@ -417,6 +416,44 @@ The renderer queries contributions via IPC on mount:
 - `extension:get-context-menu-items(target)` → merged into right-click menus
 
 Full API surface: [`specs/001-extension-first-terminal/contracts/extension-api.md`](../specs/001-extension-first-terminal/contracts/extension-api.md)
+
+---
+
+## Quick Actions
+
+Feature 057 replaced the command palette (`⌘P`, label-only fuzzy search) with a leader + which-key panel: `⌘P` opens a panel of grouped actions with one-letter mnemonics; a letter acts immediately; `/`, or `⌘P` again, switches to fuzzy search over label, category and description. See [ADR-057](adr/057-quick-actions-are-a-leader-panel.md) for the decision and alternatives considered.
+
+### Data flow: builders → rank → panel
+
+```
+core-actions.ts         (terminal/session/workspace/top actions, from CORE_SHORTCUTS)
+surface-actions.ts      ("Open <label>" for every registered global/workspace/project/sidebar surface)
+extension-actions.ts    (manifest `contributes.commands` + api.commands.register, per extension)
+custom-runtime.ts       (user-defined shell/prompt actions from settings)
+        │
+        ▼
+App.tsx: allQuickActions = [...core, ...surface, ...extension, ...custom]
+        │
+        ▼
+quick-actions/rank.ts: rankFirstScreen(actions, {pins, usage, now})
+        │            → { pinned, recent } for the "Pinned & recent" row
+        ▼
+components/QuickActions.tsx (role="dialog", aria-label="Quick actions")
+```
+
+Every action is a single `QuickAction` (`quick-actions/types.ts`): `{ id, label, group, mnemonic?, shortcut?, description?, disabledReason?, run(ctx) }`. `disabledReason` renders the row dimmed with the reason in place of its description, and Enter/click sets the footer message instead of running it — an action that cannot run is always visible, never hidden (Constitution-adjacent design decision D5 in the spec). Groups (`quick-actions/groups.ts`) reserve `t`/`s`/`w`/`x` for core and allocate the rest to extensions: an extension names a `mnemonic` in its manifest, and if another extension already holds it, the loser gets the first free letter of its own label (`allocateExtensionGroups` in `groups.ts`, load order decides who wins, a warning goes to the renderer logger), never a core letter.
+
+### The extension command contract
+
+A manifest can declare `contributes.commands[]` (`{ id, label, description?, shortcut?, mnemonic? }`) and `contributes.quickActions.group` (`{ mnemonic, label }`). A declared command that the extension never calls `api.commands.register(...)` for shows dimmed with "Extension did not register this command" — declaring it in the manifest only reserves its place in the panel; the handler is what makes it real. `api.commands.register` takes a `CommandContribution` (`id`, `label`, `mnemonic?`, `shortcut?`, `category?`, `requires?: 'repo' | 'session'`) and a handler `(ctx: CommandContext) => void | Promise<void>`, where `ctx` is core-owned focus state (`projectId`, `sessionId`, `repoRoot`) passed outbound — extensions never reach into core to read it. `requires` dims the action from that context alone ("No repository focused" / "No terminal focused"), so most extensions never call `api.commands.setEnabled` by hand; it exists for cases `requires` cannot express. `shortcut` is a **display hint only** (see "Reserved keyboard shortcuts" above) — it does not bind a key.
+
+### Reaching the panel from an extension's own view
+
+An extension's UI is a separate `WebContentsView` with its own `webContents`; the host window's `⌘P` keydown listener never sees a keystroke that originated there. `extension-view-host.ts` attaches a `before-input-event` listener to every extension view (`isQuickActionsOpenShortcut`, unit-tested for both the mac and non-mac branches); on `⌘P`/`Ctrl+P` it calls `preventDefault()`, focuses the main window, and sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
+
+### Persistence
+
+Pins, usage (for frecency) and direct-shortcut-use counts live in `GlobalSettings.quickActions: { pins: string[], usage: ActionUsage[], directUse: DirectUse[], custom: CustomAction[] }` — all arrays, not records, because `deepMerge` in `settings-store.ts` replaces arrays wholesale but cannot delete record keys, and pruning entries for an uninstalled extension or a deleted custom action needs deletes. `quick-actions/usage.ts` prunes any entry whose id is no longer a live action before every save. Workspace-scoped custom actions live in `WorkspaceSettings.overrides.quickActions.custom[]`, listed after global ones, not merged by id.
 
 ---
 
@@ -588,7 +625,7 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 - `nodeIntegration: false` — renderer script cannot `require()` Node modules.
 - All user input that crosses the IPC boundary is Zod-validated before use.
 - Extensions are loaded via `require()` in the main process — they run with full Node.js privileges. Phase 1 does not sandbox extensions. This is a known limitation documented for Phase 2 consideration (see ADR-002).
-- Reserved keyboard shortcuts are enforced in both preload.ts (renderer guard) and the extension API (main process throw).
+- There is no extension-facing keyboard-shortcut API (`api.keyboard.register` is deleted, feature 057) — an extension cannot bind a global accelerator, so there is nothing left to reserve against.
 - The remote-control bridge is default-deny: only channels in `src/main/remote/remote-accessible-channels.ts` are reachable from any browser client. Internal channels (`dialog:*`, `remote:*` server controls, `db:health`, all extension-registered handlers) are unreachable remotely by default.
 
 ---

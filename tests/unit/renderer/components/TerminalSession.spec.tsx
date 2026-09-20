@@ -57,6 +57,7 @@ vi.mock('xterm', () => {
       dispose: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
+      getSelection: vi.fn().mockReturnValue(''),
       registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       onRender: vi.fn().mockReturnValue({ dispose: mockRenderDispose }),
       buffer: makeMockBuffer(24, 80),
@@ -262,6 +263,13 @@ describe('TerminalInstance', () => {
     const instance = new TerminalInstance('ses-1', 1000)
     expect(instance.element).toBeInstanceOf(HTMLDivElement)
     expect(instance.element.style.cssText).toContain('width')
+  })
+
+  it('returns the xterm selection', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const mockTerminal = vi.mocked(Terminal).mock.results[0].value
+    mockTerminal.getSelection.mockReturnValue('selected text')
+    expect(instance.getSelection()).toBe('selected text')
   })
 
   it('accepts an optional onBell hook', () => {

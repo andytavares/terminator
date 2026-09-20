@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 2.1.0 (an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
+**Current API version**: 2.4.0 (`api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
 
 ---
 
@@ -267,20 +267,70 @@ const disposable = api.contextMenu.registerItem('workspace', {
 
 ---
 
-### `api.keyboard` — Keyboard Shortcuts
+### `api.commands` — Quick Actions Commands _(mnemonic, requires and ctx handler since v2.4.0)_
 
-Register a keyboard shortcut. Throws synchronously if the accelerator conflicts with a reserved core shortcut.
+Register a command so it appears in the core quick-actions panel (`⌘P`). The handler receives a `CommandContext` — core-owned focus data, passed outbound — the focus at the moment the action runs:
 
 ```typescript
-const disposable = api.keyboard.register('CmdOrCtrl+Shift+G', () => {
-  // Handle shortcut
-})
+const disposable = api.commands.register(
+  {
+    id: 'push',
+    label: 'Push',
+    mnemonic: 'p', // one character, shown in the quick-actions panel
+    requires: 'repo', // 'repo' | 'session' — core dims the action with a stock
+    // reason when the focused context lacks this, so you don't have to call
+    // setEnabled() for ordinary focus changes
+  },
+  (ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }) => {
+    // ctx.repoRoot is guaranteed non-null here because requires: 'repo' dims
+    // the action otherwise
+  }
+)
 ```
 
-**Reserved shortcuts** (cannot be claimed by extensions):
-`Cmd+1–9`, `Cmd++`, `Cmd+-`, `Cmd+Left`, `Cmd+Right`, `Cmd+T`, `Cmd+W`, `Cmd+,`
+Dim or re-enable a registered command for a reason `requires` cannot express (a mid-flight operation, a missing remote, …):
 
-Use [Electron accelerator syntax](https://www.electronjs.org/docs/latest/api/accelerator).
+```typescript
+api.commands.setEnabled('push', false, 'Push already in progress')
+api.commands.setEnabled('push', true)
+```
+
+Disposing a command clears any `setEnabled` reason along with the registration.
+
+---
+
+### `api.window.showSelf` — Bring Your Surface Forward _(v2.4.0)_
+
+Asks core to bring forward whichever surface your extension registered for `view` (global tab, workspace tab, project tab, or sidebar panel) and focus it — the same path core's own generated "Open `<surface>`" quick actions use.
+
+```typescript
+api.window.showSelf() // your 'main' view
+api.window.showSelf('sidebar') // a specific view param
+```
+
+---
+
+### `contributes.quickActions.group` — Your Group in the Quick-Actions Panel _(v2.4.0)_
+
+Declare a mnemonic and label for your extension's top-level group in the quick-actions panel (`manifest.json`):
+
+```json
+{
+  "contributes": {
+    "quickActions": { "group": { "mnemonic": "g", "label": "Git" } }
+  }
+}
+```
+
+Core letters (`t s w x h o a b , /`) are reserved and cannot be claimed. Between extensions, load order wins a contested letter; the loser falls back to the first free letter of its own label, and a warning is logged.
+
+---
+
+### `Deleted`: `api.keyboard.register` _(removed in v2.4.0)_
+
+`api.keyboard.register` stored a handler nothing ever dispatched — no core surface called it, and no extension used it. To bind a key, add a View-menu item with an `accelerator` through `api.nativeMenu.addViewMenuItem` (fires while Terminator is focused) or use `api.globalShortcut.register` (fires from any app). Register the same action with `api.commands.register` so it also appears in the quick-actions panel.
+
+`shortcut` on a command is a display hint (e.g. `'⌘⇧N'`) shown beside the action in the panel. It does not bind anything.
 
 #### `Esc` and the exit gesture
 
@@ -472,7 +522,7 @@ const disposable = api.nativeMenu.addViewMenuItem({
 })
 ```
 
-Items appear in registration order within the View submenu. Disposing removes the item and rebuilds the menu. Use this alongside `api.keyboard.register()` for the same action — the native menu item gives discoverability at the OS level; the keyboard shortcut gives speed.
+Items appear in registration order within the View submenu. Disposing removes the item and rebuilds the menu. Use this alongside `api.commands.register()` with a `shortcut` for the same action — the native menu item gives discoverability at the OS level; the shortcut gives speed.
 
 ---
 
@@ -725,7 +775,7 @@ const disposables: Array<{ dispose(): void }> = []
 
 export function activate(api: ExtensionAPI): void {
   disposables.push(api.sidebar.registerItem({ ... }))
-  disposables.push(api.keyboard.register('CmdOrCtrl+Shift+H', () => {}))
+  disposables.push(api.commands.register({ id: 'help', label: 'Help', shortcut: 'CmdOrCtrl+Shift+H' }, () => {}))
   disposables.push(api.fs.watch((event) => { ... }))
 }
 
@@ -745,7 +795,7 @@ Some extensions need to contribute UI directly into the renderer: sidebar panels
 
 - Your extension contributes a **sidebar panel** (React component in the right sidebar)
 - Your extension contributes a **project tab** (a new tab in the project view)
-- Your extension needs **renderer-side keyboard shortcuts** (beyond the main-process bindings from `api.keyboard`)
+- Your extension needs **renderer-side keyboard shortcuts** — `api.commands.register` does not bind a key at all; its `shortcut` field is a display-only hint shown in the Quick Actions panel (see [Commands and the Quick Actions panel](#commands-and-the-quick-actions-panel))
 
 ### Structure
 
@@ -1283,14 +1333,14 @@ Add to `package.json`:
 
 ### `manifest.contributes` reference
 
-| Key            | Type                                            | Description                                  |
-| -------------- | ----------------------------------------------- | -------------------------------------------- |
-| `globalTab`    | `{ label, icon?, view? }`                       | Top-level tab in the global tab bar          |
-| `workspaceTab` | `{ label, icon?, view? }`                       | Tab scoped to the active workspace           |
-| `projectTab`   | `{ label, view? }`                              | Tab scoped to a project                      |
-| `sidebarPanel` | `{ label, icon?, defaultOpen?, view? }`         | Collapsible sidebar panel                    |
-| `windowViews`  | `Array<{ id: string; view: string }>`           | Auxiliary window views                       |
-| `commands`     | `Array<{ id, label, shortcut?, description? }>` | Keyboard shortcuts / command palette entries |
+| Key            | Type                                                       | Description                             |
+| -------------- | ---------------------------------------------------------- | --------------------------------------- |
+| `globalTab`    | `{ label, icon?, view? }`                                  | Top-level tab in the global tab bar     |
+| `workspaceTab` | `{ label, icon?, view? }`                                  | Tab scoped to the active workspace      |
+| `projectTab`   | `{ label, view? }`                                         | Tab scoped to a project                 |
+| `sidebarPanel` | `{ label, icon?, defaultOpen?, view? }`                    | Collapsible sidebar panel               |
+| `windowViews`  | `Array<{ id: string; view: string }>`                      | Auxiliary window views                  |
+| `commands`     | `Array<{ id, label, description?, shortcut?, mnemonic? }>` | Quick Actions panel entries (see below) |
 
 The `view` string is passed as `?view=VALUE` in the webview URL. One `index.html` serves all surfaces.
 
@@ -1314,17 +1364,38 @@ useEffect(() => {
 }, [])
 ```
 
-### Commands and keyboard shortcuts
+### Commands and the Quick Actions panel
 
-Commands declared in `contributes.commands` are registered by the core app. When a shortcut fires, the core broadcasts `ext:command:<id>` to the extension's webview:
+A manifest `contributes.commands` entry only reserves the action's place in the Quick Actions panel (`⌘P`) — its label, mnemonic and display-only `shortcut`. It does nothing on its own. To make the entry real, register a matching handler from `activate(api)` in your **main-process** entry point:
 
 ```typescript
+api.commands.register(
+  { id: 'my-ext:action', label: 'Do the thing', mnemonic: 'd', description: '…' },
+  (ctx: CommandContext) => {
+    // ctx: { projectId, sessionId, repoRoot } — core-owned focus state, read-only.
+    // ...
+  }
+)
+```
+
+A command declared in the manifest with no matching `api.commands.register` call shows dimmed in the panel: "Extension did not register this command". There is no generic `ext:command:<id>` broadcast — the handler runs entirely in your main-process code, exactly like any other `api.commands.register` call. If the handler needs to update your extension's own webview (open an overlay, focus a field), it broadcasts your extension's own channel, the same way any other main-to-renderer notification works:
+
+```typescript
+// main process (activate(api)):
+api.commands.register({ id: 'my-ext:quick-create', label: 'New thing', mnemonic: 'n' }, () => {
+  api.window.broadcast('my-ext:ui.open-quick-create', {})
+  api.window.showSelf('main') // bring your surface forward if it isn't already
+})
+
+// renderer (your webview):
 useEffect(() => {
-  return window.electronAPI.extensionBridge.on('ext:command:my-ext:action', () => {
-    // Handle command
+  return window.electronAPI.extensionBridge.on('my-ext:ui.open-quick-create', () => {
+    setShowQuickCreate(true)
   })
 }, [])
 ```
+
+See `extensions/notepad/src/index.ts` (`notepad:quick-create`) and `extensions/task-vault/src/index.ts` (`task-vault:capture-to-inbox`) for the pattern working end to end, including the "pending" flag each reads on mount to catch a command that fired before the view existed.
 
 ### Calling extension IPC handlers
 
@@ -1345,8 +1416,8 @@ If you have an existing extension using the `renderer.tsx` + registry import pat
 5. **Run** `npm run build:renderer` to verify `dist/index.html` is produced.
 6. **Delete** `src/renderer.tsx` (old bundled renderer).
 7. **Replace** `useExtensionRegistry` imports in renderer code with `window.electronAPI.extensionBridge` calls.
-8. **Replace** registry keyboard shortcuts with `contributes.commands` entries in the manifest.
-9. **Replace** overlay components with `extensionBridge.on('ext:command:<id>', ...)` handlers.
+8. **Replace** registry keyboard shortcuts with `contributes.commands` entries in the manifest, each backed by an `api.commands.register` call in your main-process `activate(api)` — the manifest entry alone does nothing (see [Commands and the Quick Actions panel](#commands-and-the-quick-actions-panel)).
+9. **Replace** overlay components with your own `extensionBridge.on('<your-channel>', ...)` handler, wired from the command's `api.commands.register` callback via `api.window.broadcast`.
 
 Key behavioural differences in the webview model:
 

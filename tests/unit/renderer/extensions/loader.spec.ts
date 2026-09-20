@@ -14,6 +14,7 @@ const mockTogglePanel = vi.fn()
 const mockRegisterSidebarButton = vi.fn()
 const mockGetSidebarItems = vi.fn()
 const mockSidebarItemClick = vi.fn()
+const mockSetQuickActionGroups = vi.fn()
 
 const mockRegistry = {
   registerGlobalTab: mockRegisterGlobalTab,
@@ -24,6 +25,7 @@ const mockRegistry = {
   registerKeyboardShortcut: mockRegisterKeyboardShortcut,
   togglePanel: mockTogglePanel,
   registerSidebarButton: mockRegisterSidebarButton,
+  setQuickActionGroups: mockSetQuickActionGroups,
 }
 
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
@@ -366,5 +368,39 @@ describe('contributed sidebar items reach the renderer (FR-028)', () => {
       undefined
     await expect(callInit([])).resolves.toBeUndefined()
     expect(mockRegisterSidebarButton).not.toHaveBeenCalled()
+  })
+})
+
+describe('Quick Actions group allocation at init', () => {
+  it('allocates groups from contributes.quickActions.group, in load order', async () => {
+    await callInit([
+      {
+        id: 'git-integration',
+        contributes: { quickActions: { group: { mnemonic: 'g', label: 'Git' } } },
+      },
+      {
+        id: 'notepad',
+        contributes: { quickActions: { group: { mnemonic: 'n', label: 'Notes' } } },
+      },
+    ])
+    expect(mockSetQuickActionGroups).toHaveBeenCalledWith([
+      { id: 'ext:git-integration', mnemonic: 'g', label: 'Git', owner: 'git-integration' },
+      { id: 'ext:notepad', mnemonic: 'n', label: 'Notes', owner: 'notepad' },
+    ])
+  })
+
+  it('sets an empty list when no extension declares a quickActions group', async () => {
+    await callInit([{ id: 'com.test.ext' }])
+    expect(mockSetQuickActionGroups).toHaveBeenCalledWith([])
+  })
+
+  it('reassigns a colliding mnemonic rather than dropping the group', async () => {
+    await callInit([
+      { id: 'one', contributes: { quickActions: { group: { mnemonic: 'g', label: 'One' } } } },
+      { id: 'two', contributes: { quickActions: { group: { mnemonic: 'g', label: 'Two' } } } },
+    ])
+    const groups = mockSetQuickActionGroups.mock.calls[0][0]
+    expect(groups).toHaveLength(2)
+    expect(groups[1].mnemonic).not.toBe('g')
   })
 })

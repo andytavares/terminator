@@ -24,14 +24,12 @@ function makeTransport() {
 }
 
 const NATIVE_LOCALS = {
-  'keyboard.isReserved': (accelerator: string) => accelerator === 'CmdOrCtrl+T',
   getFilePath: () => '/tmp/file',
   'extensionBridge.invoke': vi.fn(),
   'extensionBridge.on': vi.fn(),
 }
 
 const REMOTE_LOCALS = {
-  'keyboard.isReserved': () => false,
   'dialog.openDirectory': () => Promise.resolve({ cancelled: true }),
   'shell.openExternal': vi.fn(),
   'extension.updatePanelBounds': () => {},
@@ -109,11 +107,81 @@ describe('buildElectronApi — native mode', () => {
     expect(handler).toHaveBeenCalledWith()
   })
 
+  it.each([
+    ['terminal.attach', ['s1'], 'invoke', 'terminal:attach', { sessionId: 's1' }],
+    ['git.changeStats', ['/repo'], 'invoke', 'git:change-stats', { path: '/repo' }],
+    [
+      'extension.sidebarItemClick',
+      ['item-1'],
+      'invoke',
+      'extension:sidebar-item-click',
+      { itemId: 'item-1' },
+    ],
+    ['extension.setBottomInset', [280], 'send', 'extension:set-bottom-inset', { inset: 280 }],
+    ['extension.setLeftInset', [44], 'send', 'extension:set-left-inset', { inset: 44 }],
+    [
+      'extensionEvents.notifyPanelState',
+      ['p1', true],
+      'send',
+      'menu:set-panel-checked',
+      { panelId: 'p1', open: true },
+    ],
+  ] as const)('%s puts its arguments on the wire', async (path, args, kind, channel, payload) => {
+    const t = makeTransport()
+    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const [ns, method] = path.split('.')
+    await api[ns][method](...args)
+    expect(t[kind]).toHaveBeenCalledWith(channel, payload)
+  })
+
+  it('wraps the url when opening an external link natively', async () => {
+    const t = makeTransport()
+    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    await api.shell.openExternal('https://example.com')
+    expect(t.invoke).toHaveBeenCalledWith('shell:open-external', { url: 'https://example.com' })
+  })
+
+  it.each([
+    [
+      'project.onAdded',
+      'workspace:project-added',
+      [{ id: 'p1', name: 'app' }, 'extra'],
+      [{ id: 'p1', name: 'app' }],
+    ],
+    ['project.onRemoved', 'workspace:project-removed', [{ id: 'p1' }], ['p1']],
+    [
+      'extensionEvents.onExtensionPanelLoaded',
+      'extension:panel-loaded',
+      [{ id: 'ext.a', viewParam: 'main' }],
+      ['ext.a'],
+    ],
+    [
+      'extensionEvents.onExtensionRendererReload',
+      'extension:renderer-reload',
+      [{ id: 'ext.a' }],
+      ['ext.a'],
+    ],
+    [
+      'extensionEvents.onExtensionExitToTerminal',
+      'extension:exit-to-terminal',
+      ['panel-1', 'extra'],
+      ['panel-1'],
+    ],
+    ['quickActions.onOpen', 'quick-actions:open', [{ ignored: true }], []],
+  ] as const)('%s hands its handler only what it needs', (path, channel, pushed, expected) => {
+    const t = makeTransport()
+    const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
+    const [ns, method] = path.split('.')
+    const handler = vi.fn()
+    api[ns][method](handler)
+    t.push(channel, ...pushed)
+    expect(handler).toHaveBeenCalledWith(...expected)
+  })
+
   it('uses the supplied local implementations', () => {
     const t = makeTransport()
     const api = buildElectronApi(t, { mode: 'native', locals: NATIVE_LOCALS }) as any
-    expect(api.keyboard.isReserved('CmdOrCtrl+T')).toBe(true)
-    expect(api.keyboard.isReserved('CmdOrCtrl+Q')).toBe(false)
+    expect(api.getFilePath()).toBe('/tmp/file')
   })
 
   it('includes native-only methods', () => {

@@ -110,9 +110,16 @@ export interface ElectronAPI {
         description?: string
         shortcut?: string
         category?: string
+        extensionId: string
+        mnemonic?: string
+        requires?: 'repo' | 'session'
+        disabledReason?: string
       }>
     }>
-    executeCommand(key: string): void
+    executeCommand(
+      key: string,
+      ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }
+    ): void
     updatePanelBounds(payload: {
       extensionId: string
       viewParam: string
@@ -120,9 +127,6 @@ export interface ElectronAPI {
       visible: boolean
       dpr: number
     }): Promise<void>
-  }
-  keyboard: {
-    isReserved(accelerator: string): boolean
   }
   extensionEvents: {
     onToast(handler: (payload: { type: string; message: string }) => void): () => void

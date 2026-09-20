@@ -98,6 +98,61 @@ export async function unstageFiles(repoRoot: string, paths: string[]): Promise<v
   await git(['restore', '--staged', '--', ...paths], repoRoot)
 }
 
+export interface PushSuccess {
+  success: true
+  branch: string
+  remote: string
+}
+
+export interface PushError {
+  error: string
+}
+
+// Shared by git.ipc.ts (renderer-triggered push) and the Git quick action
+// (main-process-triggered push), so the git CLI invocation lives once.
+export async function pushBranch(repoRoot: string): Promise<PushSuccess | PushError> {
+  try {
+    await execFile('git', ['push'], {
+      cwd: repoRoot,
+      timeout: GIT_TIMEOUT,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    })
+  } catch (e) {
+    const msg = String(e)
+    if (msg.includes('has no upstream')) return { error: 'NO_UPSTREAM' }
+    if (msg.includes('rejected')) return { error: 'REJECTED' }
+    return { error: msg }
+  }
+  const branch = await git(['branch', '--show-current'], repoRoot).catch(() => '')
+  let remote = 'origin'
+  try {
+    const upstream = await git(
+      ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
+      repoRoot
+    )
+    remote = upstream.split('/')[0] || 'origin'
+  } catch {
+    // No upstream to read a remote name from — origin is the git default.
+  }
+  return { success: true, branch, remote }
+}
+
+export async function pullFastForward(
+  repoRoot: string
+): Promise<{ success: true; branch: string } | { error: string }> {
+  try {
+    await execFile('git', ['pull', '--ff-only'], {
+      cwd: repoRoot,
+      timeout: GIT_TIMEOUT,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    })
+  } catch (e) {
+    return { error: String(e) }
+  }
+  const branch = await git(['branch', '--show-current'], repoRoot).catch(() => '')
+  return { success: true, branch }
+}
+
 export function commitChanges(
   repoRoot: string,
   message: string,

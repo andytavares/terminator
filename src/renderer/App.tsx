@@ -8,7 +8,29 @@ import { SettingsPanel } from './components/settings/SettingsPanel'
 import { ToastContainer } from './components/ToastContainer'
 import { LogWindow } from './components/LogWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { CommandPalette } from './components/CommandPalette'
+import { QuickActions } from './components/QuickActions'
+import type { QuickAction } from './quick-actions/types'
+import { buildCoreActions } from './quick-actions/core-actions'
+import {
+  buildSurfaceActions,
+  findSurface,
+  type SurfaceRegistration,
+} from './quick-actions/surface-actions'
+import {
+  buildExtensionActions,
+  type RegisteredCommand,
+  type DeclaredCommand,
+} from './quick-actions/extension-actions'
+import { CORE_GROUPS } from './quick-actions/groups'
+import { buildCustomQuickActions } from './quick-actions/custom-runtime'
+import { rankFirstScreen } from './quick-actions/rank'
+import {
+  recordUsage,
+  pruneUsage,
+  togglePin,
+  recordDirectUse,
+  shouldShowHint,
+} from './quick-actions/usage'
 import { useWorkspaceStore } from './stores/workspace.store'
 import { useSettingsStore } from './stores/settings.store'
 import { useIntegrationsStore } from './stores/integrations.store'
@@ -24,7 +46,6 @@ import { dispatchNotification } from './lib/notifications'
 import { useNotificationStore } from './stores/notification.store'
 import { NotificationPanel } from './components/NotificationPanel'
 import { useExtensionRegistry } from './extensions/registry'
-import type { CommandRegistration } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
 import { OverviewScreen } from './components/overview/OverviewScreen'
 import { HomeScreen } from './components/home/HomeScreen'
@@ -53,7 +74,9 @@ export function App(): JSX.Element {
   } | null>(null)
   const [logOpen, setLogOpen] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
-  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false)
+  const [searchSignal, setSearchSignal] = useState(0)
+  const [registeredCommands, setRegisteredCommands] = useState<RegisteredCommand[]>([])
   const {
     loadWorkspaces,
     activeWorkspaceId,
@@ -72,6 +95,11 @@ export function App(): JSX.Element {
   const {
     handleProcessExit,
     getSessionsForProject,
+    getActiveSessionForProject,
+    getFocusedSession,
+    getPaneLayout,
+    closeSplitLeaf,
+    getTerminalInstance,
     closeSession,
     projectViews,
     sessions,
@@ -102,6 +130,7 @@ export function App(): JSX.Element {
     commands: extensionCommands,
     overlays,
     sidebarButtons,
+    quickActionGroups,
   } = useExtensionRegistry()
 
   /**
@@ -135,7 +164,19 @@ export function App(): JSX.Element {
     () => setLogOpenWithInset(!logOpen),
     [logOpen, setLogOpenWithInset]
   )
-  const handleOpenCommandPalette = useCallback(() => setPaletteOpen(true), [])
+  const handleOpenQuickActions = useCallback(() => {
+    setQuickActionsOpen((open) => {
+      if (open) setSearchSignal((n) => n + 1)
+      return true
+    })
+  }, [])
+
+  const handleDirectShortcut = useCallback((actionId: string) => {
+    const current = useSettingsStore.getState().globalSettings?.quickActions?.directUse ?? []
+    void useSettingsStore
+      .getState()
+      .updateQuickActions({ directUse: recordDirectUse(current, actionId) })
+  }, [])
   const handleToggleOverview = useCallback(() => {
     setActiveGlobalTab(activeGlobalTabId === 'core.overview' ? null : 'core.overview')
   }, [activeGlobalTabId, setActiveGlobalTab])
@@ -185,144 +226,16 @@ export function App(): JSX.Element {
     },
     onOpenSettings: handleOpenSettings,
     onToggleLog: handleToggleLog,
-    onOpenCommandPalette: handleOpenCommandPalette,
+    onOpenCommandPalette: handleOpenQuickActions,
     onToggleOverview: handleToggleOverview,
     onOpenHome: () => setActiveGlobalTab('core.home'),
     onNewScratch: handleNewScratch,
     onNewTab: handleNewTab,
     scratchProjectId: scratchActive ? SCRATCH_PROJECT_ID : null,
+    onDirectShortcut: handleDirectShortcut,
   })
 
   useExtensionEscapeExit()
-
-  function builtinCommands(): CommandRegistration[] {
-    const cmds: CommandRegistration[] = [
-      {
-        id: 'core.open-settings',
-        label: 'Open Settings',
-        shortcut: '⌘,',
-        category: 'App',
-        action: () => setSettingsOpen(true),
-      },
-      {
-        id: 'core.toggle-sidebar',
-        label: 'Toggle Sidebar',
-        category: 'App',
-        action: () => setSidebarVisible((v) => !v),
-      },
-      {
-        id: 'core.toggle-log',
-        label: 'Toggle Log Window',
-        shortcut: '⌘⇧L',
-        category: 'App',
-        action: () => setLogOpenWithInset(!logOpen),
-      },
-      {
-        id: 'core.toggle-overview',
-        label: 'Toggle Overview',
-        shortcut: '⌘⇧E',
-        category: 'App',
-        action: () => {
-          setActiveGlobalTab(activeGlobalTabId === 'core.overview' ? null : 'core.overview')
-        },
-      },
-    ]
-
-    cmds.push({
-      id: 'core.new-scratch',
-      label: 'New Scratch Terminal',
-      shortcut: '⌘⇧T',
-      category: 'Terminal',
-      action: handleNewScratch,
-    })
-
-    if (activeProjectId || scratchActive) {
-      cmds.push({
-        id: 'core.new-tab',
-        label: 'New Terminal Tab',
-        shortcut: '⌘T',
-        category: 'Terminal',
-        action: handleNewTab,
-      })
-    }
-
-    // Scratch terminals split too. Gated on `activeProjectId` alone, these
-    // were simply absent from the palette on a scratch terminal — the same
-    // silence the shortcut had.
-    const splitProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
-    if (splitProjectId) {
-      const settings = resolveSettings(activeWorkspaceId)
-      const cwd = resolveActiveCwd()
-      cmds.push({
-        id: 'core.split-vertical',
-        label: 'Split pane vertically',
-        shortcut: '⌘D',
-        category: 'Terminal',
-        action: () => {
-          void splitSession(splitProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit)
-        },
-      })
-      cmds.push({
-        id: 'core.split-horizontal',
-        label: 'Split pane horizontally',
-        shortcut: '⌘⇧D',
-        category: 'Terminal',
-        action: () => {
-          void splitSession(splitProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit)
-        },
-      })
-    }
-
-    // Issue-tracker actions, scoped to the project you are in. Absent when
-    // there is no project, and pared back to "link" when nothing is attached —
-    // three dead rows would be worse than none.
-    if (activeProjectId) {
-      const link = issueLinkFor(activeProjectId)
-      const issue = issueFor(activeProjectId)
-      cmds.push({
-        id: 'core.link-issue',
-        label: link === null ? 'Link Issue to Project' : 'Change Linked Issue',
-        category: 'Issues',
-        action: () => openLinkDialog(activeProjectId),
-      })
-      if (link !== null) {
-        cmds.push({
-          id: 'core.view-issue',
-          label: `View ${link.key}`,
-          category: 'Issues',
-          action: () => openDrawer(activeProjectId),
-        })
-        cmds.push({
-          id: 'core.copy-issue-key',
-          label: `Copy Issue Key (${link.key})`,
-          category: 'Issues',
-          action: () => void navigator.clipboard?.writeText(link.key),
-        })
-        if (issue !== null) {
-          cmds.push({
-            id: 'core.open-issue',
-            label: `Open ${link.key} in ${link.tracker === 'linear' ? 'Linear' : 'Jira'}`,
-            category: 'Issues',
-            action: () => void window.electronAPI.shell.openExternal(issue.url),
-          })
-        }
-      }
-    }
-
-    workspaces.forEach((ws, i) => {
-      cmds.push({
-        id: `core.switch-workspace-${ws.id}`,
-        label: `Switch to Workspace: ${ws.name}`,
-        shortcut: i < 9 ? `⌘${i + 1}` : undefined,
-        category: 'Workspaces',
-        action: () => setActiveWorkspace(ws.id),
-      })
-    })
-
-    return cmds
-  }
-
-  const paletteCommands = [...builtinCommands(), ...extensionCommands]
 
   /**
    * A card is named by its branch, so the branch it names has to be the one its
@@ -360,6 +273,378 @@ export function App(): JSX.Element {
         projectName: projectName.get(s.projectId) ?? '',
       }))
   }, [sessions, projectsByWorkspaceId, workspaces])
+
+  // Every non-core surface an extension registered, generic over the four
+  // registration kinds — core never names an extension (Constitution II).
+  const surfaces: SurfaceRegistration[] = useMemo(() => {
+    const list: SurfaceRegistration[] = []
+    for (const tab of globalTabs.values()) {
+      if (tab.id.startsWith('core.')) continue
+      list.push({ extensionId: tab.id, view: tab.view ?? 'main', label: tab.label, kind: 'global' })
+    }
+    for (const tab of workspaceTabs.values()) {
+      list.push({
+        extensionId: tab.id,
+        view: tab.view ?? 'workspace',
+        label: tab.label,
+        kind: 'workspace',
+      })
+    }
+    for (const tab of projectTabs.values()) {
+      list.push({
+        extensionId: tab.id,
+        view: tab.view ?? 'project',
+        label: tab.label,
+        kind: 'project',
+      })
+    }
+    for (const panel of sidebarPanels.values()) {
+      list.push({
+        extensionId: panel.id,
+        view: panel.view ?? 'sidebar',
+        label: panel.label,
+        kind: 'sidebar',
+      })
+    }
+    return list
+  }, [globalTabs, workspaceTabs, projectTabs, sidebarPanels])
+
+  const activateSurface = useCallback(
+    (surface: SurfaceRegistration) => {
+      if (surface.kind === 'global') setActiveGlobalTab(surface.extensionId)
+      else if (surface.kind === 'workspace') setActiveWorkspaceTab(surface.extensionId)
+      else if (surface.kind === 'project') setActiveProjectTab(surface.extensionId)
+      else if (!useExtensionRegistry.getState().openPanels.has(surface.extensionId))
+        togglePanel(surface.extensionId)
+    },
+    [setActiveGlobalTab, setActiveWorkspaceTab, setActiveProjectTab, togglePanel]
+  )
+
+  const qaProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
+  const focusedSessionId = qaProjectId
+    ? (getFocusedSession?.(qaProjectId) ?? getActiveSessionForProject?.(qaProjectId) ?? null)
+    : null
+  const focusedSession = focusedSessionId ? sessions.get(focusedSessionId) : undefined
+
+  const [declaredCommands, setDeclaredCommands] = useState<DeclaredCommand[]>([])
+
+  useEffect(() => {
+    if (!quickActionsOpen) return
+    void window.electronAPI.extension.getCommands().then((r) => setRegisteredCommands(r.commands))
+    void window.electronAPI.extension.list().then((r) => {
+      const declared: DeclaredCommand[] = []
+      for (const ext of r.extensions) {
+        for (const cmd of ext.contributes?.commands ?? []) {
+          declared.push({
+            extensionId: ext.id,
+            id: cmd.id,
+            label: cmd.label,
+            mnemonic: cmd.mnemonic,
+            shortcut: cmd.shortcut,
+            description: cmd.description,
+            requires: cmd.requires,
+          })
+        }
+      }
+      setDeclaredCommands(declared)
+    })
+  }, [quickActionsOpen])
+
+  const surfaceOwner = [activeGlobalTabId, activeWorkspaceTabId, activeProjectTabId].find(
+    (id): id is string => !!id && !id.startsWith('core.')
+  )
+
+  const actionContext = useMemo(
+    () => ({
+      projectId: qaProjectId,
+      sessionId: focusedSessionId,
+      repoRoot,
+      agentState: focusedSession?.agentState ?? null,
+      isAgentSession: focusedSession?.type === 'agent',
+      surfaceOwner: surfaceOwner ?? null,
+    }),
+    [qaProjectId, focusedSessionId, repoRoot, focusedSession, surfaceOwner]
+  )
+
+  const quickActionGroupsAll = useMemo(
+    () => [...CORE_GROUPS, ...quickActionGroups],
+    [quickActionGroups]
+  )
+
+  const contextGroupId = surfaceOwner
+    ? (quickActionGroupsAll.find((g) => g.owner === surfaceOwner)?.id ?? null)
+    : null
+
+  const contextLabel = contextGroupId
+    ? `in ${quickActionGroupsAll.find((g) => g.id === contextGroupId)?.label ?? surfaceOwner}`
+    : focusedSession
+      ? `in terminal · ${focusedSession.tabTitle}`
+      : undefined
+
+  const activeIssueLink = activeProjectId ? issueLinkFor(activeProjectId) : null
+  const activeIssue = activeProjectId ? issueFor(activeProjectId) : null
+
+  const coreActions = useMemo(
+    () =>
+      buildCoreActions({
+        hasProjectFocused: !!qaProjectId,
+        hasTerminalFocused: !!focusedSessionId,
+        activeWorkspaceId,
+        workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
+        sessions: paletteSessions,
+        issueLink: activeIssueLink,
+        issue: activeIssue,
+        onNewTab: handleNewTab,
+        onSplit: (direction) => {
+          if (!qaProjectId) return
+          const settings = resolveSettings(activeWorkspaceId)
+          void splitSession(
+            qaProjectId,
+            direction,
+            resolveActiveCwd(),
+            settings.terminal.scrollbackLimit
+          )
+        },
+        onClosePane: () => {
+          if (!qaProjectId) return
+          const layout = getPaneLayout?.(qaProjectId)
+          const focusedId = getFocusedSession?.(qaProjectId)
+          if (layout && focusedId) {
+            closeSplitLeaf(qaProjectId, focusedId)
+            void closeSession(focusedId)
+          } else {
+            const activeId = getActiveSessionForProject?.(qaProjectId)
+            if (activeId) void closeSession(activeId)
+          }
+        },
+        onClear: () => {
+          if (focusedSessionId) window.electronAPI.terminal.input(focusedSessionId, '\x0c')
+        },
+        onNewScratch: handleNewScratch,
+        onEditNote: () => {
+          setEditNoteSessionId(focusedSessionId)
+          queueMicrotask(() => setEditNoteSessionId(null))
+        },
+        onCycleTab: (delta) => {
+          if (!qaProjectId) return
+          const list = getSessionsForProject(qaProjectId)
+          if (list.length === 0) return
+          const idx = list.findIndex((s) => s.id === getActiveSessionForProject?.(qaProjectId))
+          const next = list[(((idx + delta) % list.length) + list.length) % list.length]
+          setActiveSessionForProject(qaProjectId, next.id)
+        },
+        onCycleRecentSession: (delta) => {
+          const all = [...sessions.values()]
+            .filter((s) => s.status !== 'closed')
+            .sort((a, b) => (b.lastAttendedAt ?? 0) - (a.lastAttendedAt ?? 0))
+          if (all.length < 2) return
+          const idx = all.findIndex((s) => s.id === focusedSessionId)
+          const next = all[((idx === -1 ? 0 : idx) + delta + all.length) % all.length]
+          setActiveProject(next.projectId)
+          setActiveSessionForProject(next.projectId, next.id)
+        },
+        onSelectSession: (session) => {
+          setActiveProject(session.projectId)
+          setActiveSessionForProject(session.projectId, session.id)
+        },
+        onNextWaiting: () => {
+          const waiting = [...sessions.values()].filter((s) => s.agentState === 'awaiting-input')
+          if (waiting.length === 0) return
+          const idx = waiting.findIndex((s) => s.id === focusedSessionId)
+          const next = waiting[(idx + 1) % waiting.length]
+          setActiveProject(next.projectId)
+          setActiveSessionForProject(next.projectId, next.id)
+        },
+        onResume: () => setActiveGlobalTab('core.home'),
+        onSwitchWorkspace: (id) => setActiveWorkspace(id),
+        onCycleWorkspace: (delta) => {
+          if (workspaces.length === 0) return
+          const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId)
+          const next = workspaces[(idx + delta + workspaces.length) % workspaces.length]
+          setActiveWorkspace(next.id)
+        },
+        onLinkIssue: () => activeProjectId && openLinkDialog(activeProjectId),
+        onViewIssue: () => activeProjectId && openDrawer(activeProjectId),
+        onCopyIssueKey: () =>
+          activeIssueLink && void navigator.clipboard?.writeText(activeIssueLink.key),
+        onOpenIssue: () =>
+          activeIssue && void window.electronAPI.shell.openExternal(activeIssue.url),
+        onHome: () => setActiveGlobalTab('core.home'),
+        onOverview: handleToggleOverview,
+        onToggleSidebar: () => setSidebarVisible((v) => !v),
+        onOpenSettings: handleOpenSettings,
+        onToggleLog: handleToggleLog,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      qaProjectId,
+      focusedSessionId,
+      activeWorkspaceId,
+      workspaces,
+      paletteSessions,
+      activeIssueLink,
+      activeIssue,
+      sessions,
+      activeProjectId,
+    ]
+  )
+
+  const extActions = useMemo(
+    () =>
+      buildExtensionActions(
+        registeredCommands,
+        declaredCommands,
+        quickActionGroupsAll,
+        actionContext,
+        (key, ctx) => void window.electronAPI.extension.executeCommand(key, ctx),
+        extensionCommands.map((c) => ({
+          id: c.id,
+          label: c.label,
+          description: c.description,
+          shortcut: c.shortcut,
+          action: c.action,
+        }))
+      ),
+    [registeredCommands, declaredCommands, quickActionGroupsAll, actionContext, extensionCommands]
+  )
+
+  const surfaceActions = useMemo(
+    () =>
+      buildSurfaceActions(surfaces, quickActionGroupsAll, activateSurface, [
+        ...coreActions,
+        ...extActions,
+      ]),
+    [surfaces, quickActionGroupsAll, activateSurface, coreActions, extActions]
+  )
+
+  const customEnv = useMemo(
+    () => ({
+      focused: focusedSession
+        ? {
+            sessionId: focusedSession.id,
+            isAgent: focusedSession.type === 'agent',
+            agentState: focusedSession.agentState,
+          }
+        : null,
+      projectId: qaProjectId,
+      vars: {
+        cwd: resolveActiveCwd(),
+        branch: activeProject?.gitBranch ?? null,
+        worktree: activeProject?.worktreePath ?? null,
+        repo: activeWorkspace?.folderPath ?? null,
+        issue: activeIssueLink?.key ?? null,
+        selection: focusedSessionId
+          ? getTerminalInstance?.(focusedSessionId)?.getSelection() || null
+          : null,
+      },
+    }),
+    [
+      focusedSession,
+      qaProjectId,
+      resolveActiveCwd,
+      activeProject,
+      activeWorkspace,
+      activeIssueLink,
+      focusedSessionId,
+      getTerminalInstance,
+    ]
+  )
+
+  const customActions = useMemo(() => {
+    const global = globalSettings?.quickActions?.custom ?? []
+    const workspaceCustom = activeWorkspaceId
+      ? (useSettingsStore.getState().workspaceSettings.get(activeWorkspaceId)?.overrides
+          .quickActions?.custom ?? [])
+      : []
+    return buildCustomQuickActions([...global, ...workspaceCustom], customEnv, {
+      input: (sessionId, data) => window.electronAPI.terminal.input(sessionId, data),
+      openTab: async (projectId) => {
+        const settings = resolveSettings(activeWorkspaceId)
+        const id = await createSession(
+          projectId,
+          'human',
+          '',
+          resolveActiveCwd(),
+          settings.terminal.scrollbackLimit
+        )
+        return id as string
+      },
+      notify: (message) => addToast({ type: 'error', message }),
+    })
+  }, [
+    globalSettings,
+    activeWorkspaceId,
+    customEnv,
+    resolveSettings,
+    resolveActiveCwd,
+    createSession,
+    addToast,
+  ])
+
+  const allQuickActions: QuickAction[] = useMemo(
+    () => [...coreActions, ...surfaceActions, ...extActions, ...customActions],
+    [coreActions, surfaceActions, extActions, customActions]
+  )
+
+  const quickActionsSettings = globalSettings?.quickActions
+  const { pinned, recent } = useMemo(
+    () =>
+      rankFirstScreen(allQuickActions, {
+        pins: quickActionsSettings?.pins ?? [],
+        usage: quickActionsSettings?.usage ?? [],
+        now: Date.now(),
+      }),
+    [allQuickActions, quickActionsSettings]
+  )
+
+  const handleRunQuickAction = useCallback(
+    (action: QuickAction) => {
+      setQuickActionsOpen(false)
+      const settings = useSettingsStore.getState().globalSettings?.quickActions ?? {
+        pins: [],
+        usage: [],
+        directUse: [],
+        custom: [],
+      }
+      const liveIds = new Set(allQuickActions.map((a) => a.id))
+      const usage = pruneUsage(recordUsage(settings.usage, action.id, Date.now()), liveIds)
+      const pins = pruneUsage(
+        settings.pins.map((id) => ({ id })),
+        liveIds
+      ).map((p) => p.id)
+      const directUse = pruneUsage(settings.directUse, liveIds)
+      void useSettingsStore.getState().updateQuickActions({ usage, pins, directUse })
+      if (shouldShowHint(action, settings.directUse)) {
+        addToast({ type: 'info', message: `Next time: ${action.shortcut}` })
+      }
+      // `action.run()` can throw synchronously (most core actions are sync) or
+      // return a rejected promise (custom/extension actions). Only wrapping
+      // the call in an async function catches both — Promise.resolve(fn())
+      // still lets a synchronous throw escape before it ever wraps anything.
+      void (async () => {
+        try {
+          await action.run()
+        } catch (error: unknown) {
+          addToast({
+            type: 'error',
+            message: error instanceof Error ? error.message : 'Action failed',
+          })
+        }
+      })()
+    },
+    [allQuickActions, addToast]
+  )
+
+  const handleToggleQuickActionPin = useCallback((id: string) => {
+    const settings = useSettingsStore.getState().globalSettings?.quickActions
+    const pins = togglePin(settings?.pins ?? [], id)
+    void useSettingsStore.getState().updateQuickActions({ pins })
+  }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI.quickActions?.onOpen) return
+    return window.electronAPI.quickActions.onOpen(() => handleOpenQuickActions())
+  }, [handleOpenQuickActions])
 
   useEffect(() => {
     loadWorkspaces()
@@ -443,8 +728,11 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuOpenSettings) return
-    return window.electronAPI.extensionEvents.onMenuOpenSettings(() => setSettingsOpen(true))
-  }, [])
+    return window.electronAPI.extensionEvents.onMenuOpenSettings(() => {
+      handleDirectShortcut('core.open-settings')
+      setSettingsOpen(true)
+    })
+  }, [handleDirectShortcut])
 
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuOpenAbout) return
@@ -453,10 +741,11 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuToggleSidebar) return
-    return window.electronAPI.extensionEvents.onMenuToggleSidebar(() =>
+    return window.electronAPI.extensionEvents.onMenuToggleSidebar(() => {
+      handleDirectShortcut('core.toggle-sidebar')
       setSidebarVisible((v) => !v)
-    )
-  }, [])
+    })
+  }, [handleDirectShortcut])
 
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onTogglePanel) return
@@ -503,13 +792,14 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuCloseTab) return
     return window.electronAPI.extensionEvents.onMenuCloseTab(() => {
+      handleDirectShortcut('core.close-tab')
       const effectiveProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
       const sessionId = projectViews.get(effectiveProjectId ?? '')?.activeSessionId
       if (effectiveProjectId && sessionId) {
         void closeSession(sessionId)
       }
     })
-  }, [scratchActive, activeProjectId, projectViews, closeSession])
+  }, [scratchActive, activeProjectId, projectViews, closeSession, handleDirectShortcut])
 
   // Keep a ref so the effect always sees the latest openPanels without re-running on every change
   const openPanelsRef = useRef(openPanels)
@@ -538,17 +828,20 @@ export function App(): JSX.Element {
       id: 'core.home',
       label: 'Home',
       icon: createElement(House),
-      component: HomeScreen,
+      component: () => <HomeScreen onOpenQuickActions={handleOpenQuickActions} />,
       permanent: true,
     })
-  }, [])
+  }, [handleOpenQuickActions])
 
   // A menu accelerator, not a renderer keydown: macOS claims Cmd+` for window
   // cycling before the keydown is ever dispatched to the page.
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuOpenHome) return
-    return window.electronAPI.extensionEvents.onMenuOpenHome(() => setActiveGlobalTab('core.home'))
-  }, [setActiveGlobalTab])
+    return window.electronAPI.extensionEvents.onMenuOpenHome(() => {
+      handleDirectShortcut('core.open-home')
+      setActiveGlobalTab('core.home')
+    })
+  }, [setActiveGlobalTab, handleDirectShortcut])
 
   // Home is where the app opens.
   useEffect(() => {
@@ -585,6 +878,14 @@ export function App(): JSX.Element {
       if (typeof tabId === 'string') setActiveGlobalTab(tabId)
     })
   }, [setActiveGlobalTab])
+
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('extension:show-surface', (data) => {
+      const { extensionId, view } = data as { extensionId: string; view: string }
+      const surface = findSurface(surfaces, extensionId, view)
+      if (surface) activateSurface(surface)
+    })
+  }, [surfaces, activateSurface])
 
   // A terminal an extension opened. The renderer owns the tab list, so without
   // adopting it the process runs and nothing on screen ever shows it — and its
@@ -656,6 +957,7 @@ export function App(): JSX.Element {
             onSelect={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
             unreadNotifications={unreadCount}
             onBellClick={toggleNotificationPanel}
+            onOpenQuickActions={handleOpenQuickActions}
           />
 
           <UnifiedSidebar
@@ -742,6 +1044,7 @@ export function App(): JSX.Element {
                     title="Welcome to Terminator"
                     subtitle="A keyboard-first terminal for developers. Open a project to get started."
                     actions={[
+                      { label: 'Quick actions', shortcut: '⌘P', onClick: handleOpenQuickActions },
                       { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
                       {
                         label: 'Open Settings',
@@ -758,6 +1061,9 @@ export function App(): JSX.Element {
                         ? 'Select or create a project'
                         : 'Select a workspace to get started'
                     }
+                    actions={[
+                      { label: 'Quick actions', shortcut: '⌘P', onClick: handleOpenQuickActions },
+                    ]}
                   />
                 )}
               </div>
@@ -802,16 +1108,19 @@ export function App(): JSX.Element {
             />
           )}
           {logOpen && <LogWindow onClose={() => setLogOpenWithInset(false)} />}
-          {paletteOpen && (
-            <CommandPalette
-              commands={paletteCommands}
-              sessions={paletteSessions}
-              onSelectSession={(session) => {
-                setActiveProject(session.projectId)
-                setActiveSessionForProject(session.projectId, session.id)
-                setPaletteOpen(false)
-              }}
-              onClose={() => setPaletteOpen(false)}
+          {quickActionsOpen && (
+            <QuickActions
+              groups={quickActionGroupsAll}
+              actions={allQuickActions}
+              pinned={pinned}
+              recent={recent}
+              pins={quickActionsSettings?.pins ?? []}
+              contextGroupId={contextGroupId}
+              contextLabel={contextLabel}
+              searchSignal={searchSignal}
+              onRun={handleRunQuickAction}
+              onTogglePin={handleToggleQuickActionPin}
+              onClose={() => setQuickActionsOpen(false)}
             />
           )}
           <ToastContainer />

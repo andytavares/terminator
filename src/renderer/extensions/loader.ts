@@ -4,6 +4,10 @@ import { useExtensionRegistry } from './registry'
 import { ExtensionPanelPortal } from '../components/ExtensionPanelPortal'
 import { iconFromName } from './icon-from-name'
 import type { Extension } from '../../shared/types/index'
+import { allocateExtensionGroups } from '../quick-actions/groups'
+import { makeRendererLogger } from '../logger'
+
+const log = makeRendererLogger('quick-actions')
 
 function makePortalComponent(
   extensionId: string,
@@ -34,6 +38,7 @@ export function registerWebviewExtension(
       icon: globalTab.icon ? iconFromName(globalTab.icon) : undefined,
       component: makePortalComponent(ext.id, viewParam) as ComponentType<Record<string, never>>,
       sortOrder: 1,
+      view: viewParam,
     })
   }
 
@@ -44,6 +49,7 @@ export function registerWebviewExtension(
       label: workspaceTab.label,
       icon: workspaceTab.icon ? iconFromName(workspaceTab.icon) : undefined,
       component: makePortalComponent(ext.id, viewParam),
+      view: viewParam,
     })
   }
 
@@ -55,6 +61,7 @@ export function registerWebviewExtension(
       component: makePortalComponent(ext.id, viewParam) as ComponentType<{
         repoRoot: string | null
       }>,
+      view: viewParam,
     })
   }
 
@@ -122,6 +129,18 @@ export async function initExtensions(): Promise<void> {
   for (const ext of activeExtensions) {
     registerWebviewExtension(ext, registry)
   }
+
+  const { groups, warnings } = allocateExtensionGroups(
+    activeExtensions
+      .filter((ext) => ext.contributes?.quickActions?.group)
+      .map((ext) => ({
+        extensionId: ext.id,
+        mnemonic: ext.contributes!.quickActions!.group!.mnemonic,
+        label: ext.contributes!.quickActions!.group!.label,
+      }))
+  )
+  registry.setQuickActionGroups(groups)
+  for (const warning of warnings) log.warn(warning)
 
   await registerContributedSidebarItems(registry)
 }

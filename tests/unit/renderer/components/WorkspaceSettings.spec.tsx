@@ -18,12 +18,14 @@ const mockUpdateWorktreeDir = vi.fn()
 const mockUpdateBranchExcludePatterns = vi.fn()
 const mockLoadSettings = vi.fn()
 const mockUpdateWorkspace = vi.fn()
+const mockUpdateWorkspaceQuickActions = vi.fn()
 
 const globalSettings = {
   appearance: { theme: 'dark' as const },
   terminal: { scrollbackLimit: 5000, defaultShell: '/bin/zsh' },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] as string[] },
   extensions: {},
+  quickActions: { pins: [], usage: [], directUse: [], custom: [] },
 }
 
 beforeEach(() => {
@@ -40,6 +42,7 @@ beforeEach(() => {
     updateWorkspaceScrollback: mockUpdateScrollback,
     updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
     updateWorkspaceBranchExcludePatterns: mockUpdateBranchExcludePatterns,
+    updateWorkspaceQuickActions: mockUpdateWorkspaceQuickActions,
     loadSettings: mockLoadSettings,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -217,5 +220,18 @@ describe('WorkspaceSettings', () => {
     expect(globalDefaults.length).toBeGreaterThanOrEqual(1)
     fireEvent.click(globalDefaults[globalDefaults.length - 1])
     expect(mockUpdateBranchExcludePatterns).toHaveBeenCalledWith('ws-1', undefined)
+  })
+
+  it('mounts the Quick actions section scoped to the workspace', () => {
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    expect(screen.getByText('Quick actions')).toBeTruthy()
+    fireEvent.click(screen.getByText('Add action'))
+    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Deploy' } })
+    fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'echo deploy' } })
+    fireEvent.click(screen.getByText('Save'))
+    expect(mockUpdateWorkspaceQuickActions).toHaveBeenCalledWith(
+      'ws-1',
+      expect.arrayContaining([expect.objectContaining({ label: 'Deploy' })])
+    )
   })
 })

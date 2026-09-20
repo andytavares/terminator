@@ -1,10 +1,13 @@
 import { z } from 'zod'
-import { execFile as execFileCb } from 'child_process'
-import { promisify } from 'util'
-import { getStatus, getDiff, stageFiles, unstageFiles, commitChanges } from '../git/git-service.js'
+import {
+  getStatus,
+  getDiff,
+  stageFiles,
+  unstageFiles,
+  commitChanges,
+  pushBranch,
+} from '../git/git-service.js'
 import { registerMergeFlowHandlers } from './merge-flow.ipc.js'
-
-const execFile = promisify(execFileCb)
 
 type RegisterFn = (
   channel: string,
@@ -117,19 +120,7 @@ export function registerGitExtensionHandlers(register: RegisterFn): void {
     const schema = z.object({ repoRoot: z.string().min(1) })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      await execFile('git', ['push'], {
-        cwd: parsed.data.repoRoot,
-        timeout: 60_000,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-      })
-      return { success: true }
-    } catch (e) {
-      const msg = String(e)
-      if (msg.includes('has no upstream')) return { error: 'NO_UPSTREAM' }
-      if (msg.includes('rejected')) return { error: 'REJECTED' }
-      return { error: msg }
-    }
+    return pushBranch(parsed.data.repoRoot)
   })
 
   register('git:pr-status', (_payload) => {

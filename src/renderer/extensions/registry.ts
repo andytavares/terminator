@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ComponentType, ReactNode } from 'react'
+import type { QuickActionGroup } from '../quick-actions/types'
 
 export interface GlobalTabRegistration {
   id: string
@@ -14,6 +15,8 @@ export interface GlobalTabRegistration {
   hidden?: boolean
   /** Higher values sort later in the sidebar. Core tabs default to 0, extensions to 1. */
   sortOrder?: number
+  /** Resolved manifest `view` param, used to tell this surface from the extension's others. */
+  view?: string
 }
 
 export interface WorkspaceTabRegistration {
@@ -21,6 +24,8 @@ export interface WorkspaceTabRegistration {
   label: string
   icon?: ReactNode
   component: ComponentType<{ repoRoot?: string | null }>
+  /** Resolved manifest `view` param, used to tell this surface from the extension's others. */
+  view?: string
 }
 
 export interface SidebarPanelRegistration {
@@ -36,6 +41,8 @@ export interface ProjectTabRegistration {
   id: string
   label: string
   component: ComponentType<{ repoRoot: string | null }>
+  /** Resolved manifest `view` param, used to tell this surface from the extension's others. */
+  view?: string
 }
 
 export interface KeyboardShortcutRegistration {
@@ -78,6 +85,9 @@ interface ExtensionRegistry {
   openPanels: Set<string>
   activeProjectTabId: string | null
   pendingNavigations: Map<string, unknown>
+  /** Quick Actions groups allocated to extensions at init, in load order (see `loader.ts`). */
+  quickActionGroups: QuickActionGroup[]
+  setQuickActionGroups(groups: QuickActionGroup[]): void
 
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
@@ -133,6 +143,11 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   openPanels: new Set(),
   activeProjectTabId: null,
   pendingNavigations: new Map(),
+  quickActionGroups: [],
+
+  setQuickActionGroups(groups) {
+    set({ quickActionGroups: groups })
+  },
 
   registerSidebarPanel(panel) {
     set((s) => {

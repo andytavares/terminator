@@ -174,6 +174,39 @@ describe('AppBand — icons', () => {
   })
 })
 
+describe('AppBand — quick actions', () => {
+  it('renders nothing when the prop is absent', () => {
+    const { container } = renderBand({ globalTabs: [], sidebarItems: [] })
+    expect(container.querySelector('.app-band')).toBeNull()
+  })
+
+  it('renders the band for this entry alone', () => {
+    const onOpenQuickActions = vi.fn()
+    const { container } = renderBand({ globalTabs: [], sidebarItems: [], onOpenQuickActions })
+    expect(container.querySelector('.app-band')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Quick actions (⌘P)' })).toBeTruthy()
+  })
+
+  it('calls the handler on click', () => {
+    const onOpenQuickActions = vi.fn()
+    renderBand({ onOpenQuickActions })
+    fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
+    expect(onOpenQuickActions).toHaveBeenCalledOnce()
+  })
+
+  it('sits before the notification bell', () => {
+    renderBand({ onOpenQuickActions: vi.fn(), onBellClick: vi.fn() })
+    const names = [...screen.getAllByRole('button')].map((el) => el.getAttribute('aria-label'))
+    expect(names.indexOf('Quick actions (⌘P)')).toBeLessThan(names.indexOf('Notifications'))
+  })
+
+  it('draws the icon with no inline colour', () => {
+    renderBand({ onOpenQuickActions: vi.fn() })
+    const icon = screen.getByRole('button', { name: 'Quick actions (⌘P)' }).querySelector('svg')!
+    expect(icon.getAttribute('style')).toBeNull()
+  })
+})
+
 describe('AppBand — a tab badge', () => {
   it('counts on the entry and names the count for a reader', () => {
     renderBand({

@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS = {
   extensions: {},
   ui: { hasSeenWelcome: false },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
+  quickActions: { pins: [], usage: [], directUse: [], custom: [] },
 }
 
 function resetStore() {
@@ -320,6 +321,45 @@ describe('useSettingsStore', () => {
       expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
         notifications: { overrides: { branchSwitchFailed: [] } },
       })
+    })
+  })
+
+  describe('updateQuickActions', () => {
+    it('calls updateGlobal with the quickActions patch and updates store', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        quickActions: { pins: ['core.new-tab'], usage: [], directUse: [], custom: [] },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updateQuickActions({ pins: ['core.new-tab'] })
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        quickActions: { pins: ['core.new-tab'] },
+      })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    })
+  })
+
+  describe('updateWorkspaceQuickActions', () => {
+    it('calls updateWorkspace with the custom action list and updates workspace settings', async () => {
+      const custom = [
+        {
+          id: 'custom-1',
+          label: 'Echo branch',
+          kind: 'shell' as const,
+          target: 'new-tab' as const,
+          body: 'echo {branch}',
+        },
+      ]
+      const wsSettings = { overrides: { quickActions: { custom } } }
+      mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+
+      await useSettingsStore.getState().updateWorkspaceQuickActions('ws-1', custom)
+      expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
+        quickActions: { custom },
+      })
+      const stored = useSettingsStore.getState().workspaceSettings.get('ws-1')
+      expect(stored).toEqual(wsSettings)
     })
   })
 })

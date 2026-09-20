@@ -10,25 +10,6 @@ import { buildElectronApi, type ApiTransport } from '../shared/electron-api/buil
 // entries sharing a module would make Rollup emit a shared chunk, which Electron's
 // sandboxed require cannot resolve.
 
-const RESERVED_SHORTCUTS = new Set([
-  'CmdOrCtrl+1',
-  'CmdOrCtrl+2',
-  'CmdOrCtrl+3',
-  'CmdOrCtrl+4',
-  'CmdOrCtrl+5',
-  'CmdOrCtrl+6',
-  'CmdOrCtrl+7',
-  'CmdOrCtrl+8',
-  'CmdOrCtrl+9',
-  'CmdOrCtrl+=',
-  'CmdOrCtrl+-',
-  'CmdOrCtrl+Left',
-  'CmdOrCtrl+Right',
-  'CmdOrCtrl+T',
-  'CmdOrCtrl+W',
-  'CmdOrCtrl+,',
-])
-
 const transport: ApiTransport = {
   invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
   send: (channel, payload) => ipcRenderer.send(channel, payload),
@@ -44,7 +25,6 @@ contextBridge.exposeInMainWorld(
   buildElectronApi(transport, {
     mode: 'native',
     locals: {
-      'keyboard.isReserved': (accelerator: string) => RESERVED_SHORTCUTS.has(accelerator),
       getFilePath: (file: File): string => webUtils.getPathForFile(file),
       // Dynamic passthrough for extension-owned channels.
       'extensionBridge.invoke': (channel: string, payload?: unknown) =>

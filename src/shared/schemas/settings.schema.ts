@@ -2,6 +2,28 @@ import { z } from 'zod'
 
 export const ThemeSchema = z.enum(['dark', 'light'])
 export const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
+export const CustomActionKindSchema = z.enum(['shell', 'prompt'])
+export const CustomActionTargetSchema = z.enum(['focused', 'new-tab', 'agent'])
+
+export const CustomActionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  mnemonic: z.string().max(1).optional(),
+  kind: CustomActionKindSchema,
+  target: CustomActionTargetSchema,
+  body: z.string().min(1),
+})
+
+export const QuickActionsSettingsSchema = z
+  .object({
+    pins: z.array(z.string()).default([]),
+    usage: z
+      .array(z.object({ id: z.string(), count: z.number(), lastUsedAt: z.number() }))
+      .default([]),
+    directUse: z.array(z.object({ id: z.string(), count: z.number() })).default([]),
+    custom: z.array(CustomActionSchema).default([]),
+  })
+  .default({ pins: [], usage: [], directUse: [], custom: [] })
 
 export const GlobalSettingsSchema = z.object({
   appearance: z.object({
@@ -50,6 +72,7 @@ export const GlobalSettingsSchema = z.object({
       overrides: z.record(z.string(), z.array(NotificationTargetSchema)).default({}),
     })
     .default({ defaultTargets: ['system', 'center', 'toast'], overrides: {} }),
+  quickActions: QuickActionsSettingsSchema,
 })
 
 export const WorkspaceSettingsSchema = z.object({
@@ -73,6 +96,12 @@ export const WorkspaceSettingsSchema = z.object({
           branchExcludePatterns: z.array(z.string()).optional(),
         })
         .optional(),
+      quickActions: z
+        .object({
+          custom: z.array(CustomActionSchema),
+        })
+        .strict()
+        .optional(),
     })
     .optional()
     .default({}),
@@ -93,6 +122,12 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   notifications: {
     defaultTargets: ['system', 'center', 'toast'] as ('system' | 'center' | 'toast')[],
     overrides: {} as Record<string, ('system' | 'center' | 'toast')[]>,
+  },
+  quickActions: {
+    pins: [] as string[],
+    usage: [] as { id: string; count: number; lastUsedAt: number }[],
+    directUse: [] as { id: string; count: number }[],
+    custom: [] as z.infer<typeof CustomActionSchema>[],
   },
 }
 

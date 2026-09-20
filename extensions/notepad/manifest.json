@@ -19,9 +19,12 @@
     "commands": [
       {
         "id": "notepad:quick-create",
-        "label": "New Note",
-        "description": "Open quick-create overlay"
+        "label": "New note",
+        "description": "Open quick-create overlay",
+        "shortcut": "⌘⇧N",
+        "mnemonic": "n"
       }
-    ]
+    ],
+    "quickActions": { "group": { "mnemonic": "n", "label": "Notes" } }
   }
 }

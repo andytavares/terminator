@@ -48,6 +48,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const [hookLines, setHookLines] = useState<string[]>([])
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const commitMessageRef = useRef<HTMLTextAreaElement | null>(null)
 
   const selectedDiff: FileDiff | null = selectedFile ? (diffCache.get(selectedFile) ?? null) : null
 
@@ -58,6 +59,23 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       if (!targetRoot || targetRoot === repoRoot) setView('merge-flow')
     })
   }, [repoRoot, setView])
+
+  // Quick action "Commit…" (extensions/git-integration/src/commands.ts) brings this
+  // view forward via api.window.showSelf, then broadcasts this to focus the box.
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('git:focus-commit-message', (data) => {
+      const { repoRoot: targetRoot } = (data ?? {}) as { repoRoot?: string }
+      if (!targetRoot || targetRoot === repoRoot) commitMessageRef.current?.focus()
+    })
+  }, [repoRoot])
+
+  // Quick action "Create PR…" — same broadcast pattern as focus-commit-message.
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('git:open-pr-dialog', (data) => {
+      const { repoRoot: targetRoot } = (data ?? {}) as { repoRoot?: string }
+      if (!targetRoot || targetRoot === repoRoot) setShowPrDialog(true)
+    })
+  }, [repoRoot])
 
   const handleFileSelect = useCallback(
     async (path: string, staged: boolean) => {
@@ -243,6 +261,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
 
         <div className="git-full-view__commit-section">
           <textarea
+            ref={commitMessageRef}
             className="git-view__commit-message"
             placeholder="Commit message…"
             value={commitMessage}

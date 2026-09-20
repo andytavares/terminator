@@ -166,14 +166,21 @@ interface ElectronAPI {
     getCommands(): Promise<{
       commands: Array<{
         key: string
+        extensionId: string
         id: string
         label: string
         description?: string
         shortcut?: string
         category?: string
+        mnemonic?: string
+        requires?: 'repo' | 'session'
+        disabledReason?: string
       }>
     }>
-    executeCommand(key: string): void
+    executeCommand(
+      key: string,
+      ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }
+    ): void
     updatePanelBounds(payload: {
       extensionId: string
       viewParam: string
@@ -184,9 +191,6 @@ interface ElectronAPI {
     setBottomInset(inset: number): void
     setLeftInset(inset: number): void
     setTheme(theme: 'dark' | 'light'): void
-  }
-  keyboard: {
-    isReserved(accelerator: string): boolean
   }
   extensionEvents: {
     onTogglePanel(handler: (panelId: string) => void): () => void
@@ -202,6 +206,9 @@ interface ElectronAPI {
     onExtensionExitToTerminal(
       handler: (payload: { extensionId: string; sidebarPanelId: string | null }) => void
     ): () => void
+  }
+  quickActions: {
+    onOpen(handler: () => void): () => void
   }
   app: {
     getInfo(): Promise<{

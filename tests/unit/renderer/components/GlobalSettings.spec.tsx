@@ -32,7 +32,10 @@ const globalSettings = {
     defaultTargets: ['system', 'center', 'toast'] as const,
     overrides: {},
   },
+  quickActions: { pins: [], usage: [], directUse: [], custom: [] },
 }
+
+const mockUpdateQuickActions = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -47,6 +50,8 @@ beforeEach(() => {
     updatePromptForName: mockUpdatePromptForName,
     updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
     updateNotificationOverride: mockUpdateNotificationOverride,
+    updateQuickActions: mockUpdateQuickActions,
+    workspaceSettings: new Map(),
   } as unknown as ReturnType<typeof useSettingsStore>)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateGlobal: mockUpdateGlobal },
@@ -203,6 +208,12 @@ describe('GlobalSettings', () => {
       render(<GlobalSettings />)
       expect(screen.queryByText('Per-Extension Overrides')).toBeNull()
     })
+  })
+
+  it('mounts the Quick actions section', () => {
+    render(<GlobalSettings />)
+    expect(screen.getByText('Quick actions')).toBeTruthy()
+    expect(screen.getByText('Add action')).toBeTruthy()
   })
 })
 

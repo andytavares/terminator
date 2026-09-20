@@ -10,4 +10,8 @@ describe('git-integration manifest', () => {
     expect(manifest.contributes).not.toHaveProperty('sidebarPanel')
     expect(manifest.contributes).not.toHaveProperty('commands')
   })
+
+  it('declares the Git quick-actions group with mnemonic g', () => {
+    expect(manifest.contributes.quickActions).toEqual({ group: { mnemonic: 'g', label: 'Git' } })
+  })
 })

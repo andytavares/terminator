@@ -1,6 +1,7 @@
 import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
+import { registerQuickActionCommands } from './commands.js'
 
 // Every notification kind this extension ever raises, so the user can
 // independently choose its delivery target(s) (system/in-app/toast) in this
@@ -18,6 +19,10 @@ const NOTIFICATION_KEYS: { key: string; label: string }[] = [
   { key: 'resetFailed', label: 'Could not reset merge session' },
   { key: 'reloadConflictsFailed', label: 'Could not reload conflicts' },
   { key: 'startOverFailed', label: 'Start over failed' },
+  { key: 'pushSucceeded', label: 'Push succeeded' },
+  { key: 'pushFailed', label: 'Push failed' },
+  { key: 'pullSucceeded', label: 'Pull succeeded' },
+  { key: 'pullFailed', label: 'Pull failed' },
 ]
 
 function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
@@ -55,6 +60,7 @@ export function activate(api: ExtensionAPI): void {
     disposables.push(api.ipc.registerHandler(channel, handler))
   }
   registerGitExtensionHandlers(registerFn)
+  disposables.push(...registerQuickActionCommands(api))
   registerGithubHandlers(
     registerFn,
     {

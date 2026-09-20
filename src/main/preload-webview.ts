@@ -5,27 +5,6 @@ import {
   shouldSuppressExitGesture,
 } from '../shared/double-escape'
 
-// Inlined to keep the preload self-contained (no shared Rollup chunks that
-// Electron's sandboxed require cannot resolve).
-const RESERVED_SHORTCUTS = new Set([
-  'CmdOrCtrl+1',
-  'CmdOrCtrl+2',
-  'CmdOrCtrl+3',
-  'CmdOrCtrl+4',
-  'CmdOrCtrl+5',
-  'CmdOrCtrl+6',
-  'CmdOrCtrl+7',
-  'CmdOrCtrl+8',
-  'CmdOrCtrl+9',
-  'CmdOrCtrl+=',
-  'CmdOrCtrl+-',
-  'CmdOrCtrl+Left',
-  'CmdOrCtrl+Right',
-  'CmdOrCtrl+T',
-  'CmdOrCtrl+W',
-  'CmdOrCtrl+,',
-])
-
 // Escape twice in quick succession exits the extension and returns the user to
 // their terminal. The listener is deliberately passive and bubble-phase: the
 // page sees every Escape first, so an extension's own dismissals (dropdowns,
@@ -38,8 +17,7 @@ const RESERVED_SHORTCUTS = new Set([
 // closed the extension and discarded the draft. Importing keeps them honest.
 //
 // Only this preload entry imports it, so Rollup inlines it into webview.js
-// rather than hoisting a shared chunk the sandboxed require cannot resolve —
-// the same constraint that keeps RESERVED_SHORTCUTS inline above.
+// rather than hoisting a shared chunk the sandboxed require cannot resolve.
 const escapeDetector = createDoubleEscapeDetector()
 
 // How many dialogs the page currently has open. The page cannot simply publish
@@ -160,10 +138,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     contextMenuClick: (target: string, itemId: string, targetId: string) =>
       ipcRenderer.send('extension:context-menu-click', { target, itemId, targetId }),
     getCommands: () => ipcRenderer.invoke('extension:get-commands'),
-    executeCommand: (key: string) => ipcRenderer.send('extension:execute-command', { key }),
-  },
-  keyboard: {
-    isReserved: (accelerator: string) => RESERVED_SHORTCUTS.has(accelerator),
+    executeCommand: (
+      key: string,
+      ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }
+    ) => ipcRenderer.send('extension:execute-command', { key, ctx }),
   },
   shell: {
     exec: (options: unknown) => ipcRenderer.invoke('shell:exec', options),
