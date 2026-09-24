@@ -1,7 +1,7 @@
 import { matchesFilter, type IssueTitles } from './session-filter'
 import type { HomePrefs } from './home-prefs'
 import type { SessionFacts } from './session-facts'
-import { STATUS_ORDER } from './view-model'
+import { standingRank } from './view-model'
 
 export interface LedgerGroup {
   key: string
@@ -19,6 +19,7 @@ export const NO_FILTERS: LedgerFilters = { needsYou: false, text: '' }
 const NO_BRANCH = 'No branch'
 const ALL_SESSIONS = 'All sessions'
 const CLOSED = 'Closed'
+const NEEDS_YOU = 'needs-you'
 
 function groupLabel(facts: SessionFacts, groupBy: HomePrefs['groupBy']): string {
   if (groupBy === 'none') return ALL_SESSIONS
@@ -27,13 +28,21 @@ function groupLabel(facts: SessionFacts, groupBy: HomePrefs['groupBy']): string 
   return `${facts.workspaceName ?? NO_BRANCH} / ${facts.projectName}`
 }
 
+const byStarted = (a: SessionFacts, b: SessionFacts): number =>
+  Date.parse(a.startedAt) - Date.parse(b.startedAt)
+
+/** Most recently opened first, a session that has never been attended sorting last. */
+const byRecentlyOpened = (a: SessionFacts, b: SessionFacts): number => {
+  if (a.lastAttendedAt === null && b.lastAttendedAt === null) return byStarted(a, b)
+  if (a.lastAttendedAt === null) return 1
+  if (b.lastAttendedAt === null) return -1
+  return b.lastAttendedAt - a.lastAttendedAt || byStarted(a, b)
+}
+
 function compare(sort: HomePrefs['sort']) {
   return (a: SessionFacts, b: SessionFacts): number => {
-    if (sort === 'needs-you') {
-      const byState = STATUS_ORDER.indexOf(a.state) - STATUS_ORDER.indexOf(b.state)
-      if (byState !== 0) return byState
-    }
-    return b.lastActivityAt - a.lastActivityAt
+    if (sort === 'recent') return byRecentlyOpened(a, b)
+    return standingRank(a.state) - standingRank(b.state) || byStarted(a, b)
   }
 }
 
@@ -57,8 +66,13 @@ export function buildLedger(
       matchesFilter(f, filters.text, titles)
   )
 
+  const openVisible = visible.filter((f) => !f.isClosed)
+  const liftNeedsYou = prefs.sort === 'needs-you'
+  const needsYou = liftNeedsYou ? openVisible.filter((f) => f.state === 'awaiting-input') : []
+  const rest = liftNeedsYou ? openVisible.filter((f) => f.state !== 'awaiting-input') : openVisible
+
   const byLabel = new Map<string, SessionFacts[]>()
-  for (const f of visible.filter((f) => !f.isClosed)) {
+  for (const f of rest) {
     const label = groupLabel(f, prefs.groupBy)
     byLabel.set(label, [...(byLabel.get(label) ?? []), f])
   }
@@ -71,9 +85,17 @@ export function buildLedger(
     })
     .map(([label, rows]) => ({ key: label, label, facts: rows.sort(compare(prefs.sort)) }))
 
+  const needsYouGroup: LedgerGroup[] =
+    needsYou.length === 0
+      ? []
+      : [{ key: NEEDS_YOU, label: 'Needs you', facts: needsYou.sort(compare(prefs.sort)) }]
+
   const closed = visible
     .filter((f) => f.isClosed)
     .sort((a, b) => Date.parse(b.closedAt ?? '') - Date.parse(a.closedAt ?? ''))
 
-  return closed.length === 0 ? open : [...open, { key: CLOSED, label: CLOSED, facts: closed }]
+  const closedGroup: LedgerGroup[] =
+    closed.length === 0 ? [] : [{ key: CLOSED, label: CLOSED, facts: closed }]
+
+  return [...needsYouGroup, ...open, ...closedGroup]
 }

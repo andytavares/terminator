@@ -36,7 +36,7 @@ const SIZES: Array<{ value: TileSize; label: string; short: string }> = [
 const THEN_BY: Array<{ value: WallThenBy; label: string }> = [
   { value: 'state', label: 'State' },
   { value: 'workspace-project', label: 'Repo and branch' },
-  { value: 'recent', label: 'Recent activity' },
+  { value: 'recent', label: 'Recently opened' },
 ]
 
 /**

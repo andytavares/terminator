@@ -228,6 +228,25 @@ describe('buildSessionFacts', () => {
     expect(facts.branch).toBeNull()
   })
 
+  it('carries lastAttendedAt from an open session, and null when it never attended', () => {
+    const [attended] = buildSessionFacts({
+      ...empty,
+      sessions: [{ ...session, lastAttendedAt: 12345 }],
+    })
+    expect(attended.lastAttendedAt).toBe(12345)
+
+    const [never] = buildSessionFacts({ ...empty, sessions: [session] })
+    expect(never.lastAttendedAt).toBeNull()
+  })
+
+  it('has no lastAttendedAt for a closed record', () => {
+    const [facts] = buildSessionFacts({
+      ...empty,
+      records: [record({ closedAt: '2026-09-15T11:00:00.000Z' })],
+    })
+    expect(facts.lastAttendedAt).toBeNull()
+  })
+
   it('leaves the shell out when it is not known', () => {
     const [facts] = buildSessionFacts({ ...empty, sessions: [{ ...session, shell: undefined }] })
     expect(facts.shell).toBeNull()
