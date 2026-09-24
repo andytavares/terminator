@@ -36,6 +36,8 @@ import { useSettingsStore } from './stores/settings.store'
 import { useIntegrationsStore } from './stores/integrations.store'
 import { useSessionRecordsStore } from './stores/session-records.store'
 import { useSessionStore } from './stores/session.store'
+import { useSessionFacts, useIssue } from './components/session/useSessionFacts'
+import { SessionLinkDialog } from './components/session/SessionLinkDialog'
 import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useExtensionEscapeExit } from './hooks/useExtensionEscapeExit'
@@ -214,6 +216,7 @@ export function App(): JSX.Element {
   }, [activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
 
   const [editNoteSessionId, setEditNoteSessionId] = useState<string | null>(null)
+  const [linkSessionId, setLinkSessionId] = useState<string | null>(null)
 
   useKeyboardShortcuts({
     onEditSessionNote: () => {
@@ -384,6 +387,18 @@ export function App(): JSX.Element {
   const activeIssueLink = activeProjectId ? issueLinkFor(activeProjectId) : null
   const activeIssue = activeProjectId ? issueFor(activeProjectId) : null
 
+  // Quick Actions' issue actions follow the focused terminal's own resolved
+  // ticket — its own link, else its branch's — rather than always the branch's.
+  const sessionFacts = useSessionFacts()
+  const focusedFacts = focusedSessionId
+    ? sessionFacts.find((f) => f.sessionId === focusedSessionId)
+    : undefined
+  const focusedWorkItem = focusedFacts?.workItem ?? null
+  const focusedIssue = useIssue(focusedWorkItem?.ref ?? null)
+  const focusedIssueLink = focusedWorkItem
+    ? { key: focusedWorkItem.ref.key, tracker: focusedWorkItem.ref.tracker }
+    : null
+
   const coreActions = useMemo(
     () =>
       buildCoreActions({
@@ -392,8 +407,8 @@ export function App(): JSX.Element {
         activeWorkspaceId,
         workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
         sessions: paletteSessions,
-        issueLink: activeIssueLink,
-        issue: activeIssue,
+        issueLink: focusedIssueLink,
+        issue: focusedIssue ?? null,
         onNewTab: handleNewTab,
         onSplit: (direction) => {
           if (!qaProjectId) return
@@ -468,12 +483,13 @@ export function App(): JSX.Element {
           const next = workspaces[(idx + delta + workspaces.length) % workspaces.length]
           setActiveWorkspace(next.id)
         },
-        onLinkIssue: () => activeProjectId && openLinkDialog(activeProjectId),
+        onLinkIssue: () => focusedSessionId && setLinkSessionId(focusedSessionId),
+        onLinkIssueBranch: () => activeProjectId && openLinkDialog(activeProjectId),
         onViewIssue: () => activeProjectId && openDrawer(activeProjectId),
         onCopyIssueKey: () =>
-          activeIssueLink && void navigator.clipboard?.writeText(activeIssueLink.key),
+          focusedIssueLink && void navigator.clipboard?.writeText(focusedIssueLink.key),
         onOpenIssue: () =>
-          activeIssue && void window.electronAPI.shell.openExternal(activeIssue.url),
+          focusedIssue && void window.electronAPI.shell.openExternal(focusedIssue.url),
         onHome: () => setActiveGlobalTab('core.home'),
         onOverview: handleToggleOverview,
         onToggleSidebar: () => setSidebarVisible((v) => !v),
@@ -489,6 +505,8 @@ export function App(): JSX.Element {
       paletteSessions,
       activeIssueLink,
       activeIssue,
+      focusedIssueLink,
+      focusedIssue,
       sessions,
       activeProjectId,
     ]
@@ -1100,6 +1118,12 @@ export function App(): JSX.Element {
             />
           )}
           {logOpen && <LogWindow onClose={() => setLogOpenWithInset(false)} />}
+          {linkSessionId !== null &&
+            (() => {
+              const facts = sessionFacts.find((f) => f.sessionId === linkSessionId)
+              if (!facts) return null
+              return <SessionLinkDialog facts={facts} onClose={() => setLinkSessionId(null)} />
+            })()}
           {quickActionsOpen && (
             <QuickActions
               groups={quickActionGroupsAll}

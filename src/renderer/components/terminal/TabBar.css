@@ -105,6 +105,17 @@
   text-overflow: ellipsis;
 }
 
+/* Plain text, same treatment as the sidebar's own issue keys — the key alone
+   is the whole fact. */
+.tab-bar__key {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
 /* ── Agent badge ─────────────────────────────────────────────── */
 .tab-bar__badge--agent {
   font-size: 8px;

@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { X } from 'lucide-react'
 import { ICON_FOR_STATE, STATUS_ICON } from '../../sidebar/state-icons'
 import type { BranchTerminal } from '../../sidebar/branch-rows'
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import './TerminalRow.css'
 
 export interface TerminalRowProps {
@@ -11,6 +12,22 @@ export interface TerminalRowProps {
   selected: boolean
   onSelect: () => void
   onClose: () => void
+  /**
+   * Opens the link dialog for this terminal's own session — absent when
+   * nothing links it. Present in both directions: linking a fresh one and
+   * changing an existing one open the same dialog.
+   */
+  onLinkIssue?: () => void
+  /** Removes this session's own link, handing it back to its branch's. */
+  onRemoveLink?: () => void
+}
+
+/**
+ * The row's own session link, else null — an inherited branch link is drawn
+ * one line up already and is not this row's to repeat.
+ */
+function ownKey(terminal: BranchTerminal): string | null {
+  return terminal.workItem?.source === 'session' ? terminal.workItem.ref.key : null
 }
 
 /**
@@ -31,8 +48,25 @@ export function TerminalRow({
   selected,
   onSelect,
   onClose,
+  onLinkIssue,
+  onRemoveLink,
 }: TerminalRowProps): JSX.Element {
   const Glyph = STATUS_ICON[ICON_FOR_STATE[terminal.state]]
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const key = ownKey(terminal)
+
+  function items(): ContextMenuItem[] {
+    if (onLinkIssue === undefined) return []
+    const run = (fn?: () => void) => () => {
+      setMenu(null)
+      fn?.()
+    }
+    if (key === null) return [{ label: 'Link issue…', onSelect: run(onLinkIssue) }]
+    return [
+      { label: 'Change linked issue…', onSelect: run(onLinkIssue) },
+      { label: 'Remove session link', danger: true, onSelect: run(onRemoveLink) },
+    ]
+  }
 
   return (
     <div
@@ -48,6 +82,15 @@ export function TerminalRow({
           onSelect()
         }
       }}
+      onContextMenu={
+        onLinkIssue === undefined
+          ? undefined
+          : (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setMenu({ x: e.clientX, y: e.clientY })
+            }
+      }
     >
       <span className={`terminal-row__gutter terminal-row__state--${terminal.state}`}>
         <Glyph aria-hidden="true" data-state={terminal.state} />
@@ -56,6 +99,8 @@ export function TerminalRow({
       <span className="terminal-row__name" title={terminal.title}>
         {terminal.title}
       </span>
+
+      {key !== null && <span className="terminal-row__key">{key}</span>}
 
       {terminal.bellCount > 0 && (
         <span className="terminal-row__bell" aria-label={`${terminal.bellCount} unseen`}>
@@ -75,6 +120,10 @@ export function TerminalRow({
       >
         <X aria-hidden="true" />
       </button>
+
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={items()} onDismiss={() => setMenu(null)} />
+      )}
     </div>
   )
 }

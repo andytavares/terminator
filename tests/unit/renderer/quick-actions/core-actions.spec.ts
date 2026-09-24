@@ -29,6 +29,7 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
     onSwitchWorkspace: vi.fn(),
     onCycleWorkspace: vi.fn(),
     onLinkIssue: vi.fn(),
+    onLinkIssueBranch: vi.fn(),
     onViewIssue: vi.fn(),
     onCopyIssueKey: vi.fn(),
     onOpenIssue: vi.fn(),
@@ -89,6 +90,41 @@ describe('buildCoreActions', () => {
     )
     expect(actions.find((a) => a.id === 'core.close-tab')).toBeDefined()
     expect(actions.find((a) => a.id === 'core.link-issue')).toBeDefined()
+  })
+
+  describe('linking issues to a session vs a branch', () => {
+    it('targets the focused terminal, disabled by "No terminal focused" rather than project', () => {
+      const actions = buildCoreActions(
+        makeDeps({ hasTerminalFocused: false, hasProjectFocused: true })
+      )
+      expect(actions.find((a) => a.id === 'core.link-issue')!.disabledReason).toBe(
+        'No terminal focused'
+      )
+    })
+
+    it('runs onLinkIssue, not onLinkIssueBranch', () => {
+      const deps = makeDeps()
+      buildCoreActions(deps)
+        .find((a) => a.id === 'core.link-issue')!
+        .run()
+      expect(deps.onLinkIssue).toHaveBeenCalledOnce()
+      expect(deps.onLinkIssueBranch).not.toHaveBeenCalled()
+    })
+
+    it('offers a separate "Link issue to branch" action, disabled by "No project focused"', () => {
+      const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
+      const branch = actions.find((a) => a.id === 'core.link-issue-branch')!
+      expect(branch.label).toBe('Link issue to branch')
+      expect(branch.disabledReason).toBe('No project focused')
+    })
+
+    it('runs onLinkIssueBranch for the branch action', () => {
+      const deps = makeDeps()
+      buildCoreActions(deps)
+        .find((a) => a.id === 'core.link-issue-branch')!
+        .run()
+      expect(deps.onLinkIssueBranch).toHaveBeenCalledOnce()
+    })
   })
 
   it('runs the matching dep callback', () => {

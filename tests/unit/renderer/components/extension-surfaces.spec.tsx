@@ -38,6 +38,9 @@ vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
 vi.mock('../../../../src/renderer/stores/settings.store', () => ({
   useSettingsStore: () => ({ resolveSettings: () => ({ terminal: { scrollbackLimit: 5000 } }) }),
 }))
+vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
+  useSessionFacts: () => [],
+}))
 
 const NOW = 1_000_000_000
 const GROUPINGS: GroupKey[] = ['workspace', 'none']

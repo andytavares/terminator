@@ -75,6 +75,16 @@
   white-space: nowrap;
 }
 
+/* Plain text, the same treatment the branch row's own issue key gets — the
+   key alone is the whole fact, so a badge or border would say it twice. */
+.terminal-row__key {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .terminal-row__bell {
   flex: 0 0 auto;
   font-family: var(--font-mono);

@@ -36,6 +36,26 @@ vi.mock('../../../src/renderer/extensions/registry', () => {
   return { useExtensionRegistry }
 })
 vi.mock('../../../src/renderer/extensions/loader', () => ({}))
+const mockUseSessionFacts = vi.fn(() => [] as Array<{ sessionId: string; workItem: unknown }>)
+const mockUseIssue = vi.fn(() => null as { url: string } | null)
+vi.mock('../../../src/renderer/components/session/useSessionFacts', () => ({
+  useSessionFacts: () => mockUseSessionFacts(),
+  useIssue: (ref: unknown) => mockUseIssue(ref),
+}))
+vi.mock('../../../src/renderer/components/session/SessionLinkDialog', () => ({
+  SessionLinkDialog: ({
+    facts,
+    onClose,
+  }: {
+    facts: { sessionId: string }
+    onClose: () => void
+  }) => (
+    <div data-testid="session-link-dialog">
+      {facts.sessionId}
+      <button onClick={onClose}>close-session-link</button>
+    </div>
+  ),
+}))
 type ShortcutCallbacks = {
   onOpenSettings?: () => void
   onToggleLog?: () => void
@@ -301,6 +321,8 @@ beforeEach(() => {
   capturedEditNoteSessionId = null
 
   vi.clearAllMocks()
+  mockUseSessionFacts.mockReturnValue([])
+  mockUseIssue.mockReturnValue(null)
   capturedPaletteCommands = []
   capturedOnSelectSession = null
   capturedOnSelectProject = null
@@ -1801,12 +1823,38 @@ describe('App — Quick Actions integration (feature 057)', () => {
     run('core.cycle-workspace-next')
     expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-2')
 
+    mockUseSessionFacts.mockReturnValue([{ sessionId: 's1', workItem: null }])
     run('core.link-issue')
+    // Targets the focused terminal's own session, not the branch — the
+    // session dialog opens rather than the branch's LinkIssueDialog.
+    expect(screen.getByTestId('session-link-dialog').textContent).toContain('s1')
+
     run('core.view-issue')
     run('core.copy-issue-key')
     run('core.open-issue')
     run('core.resume')
     expect(mockSetActiveWorkspace).toHaveBeenCalled()
+  })
+
+  it('"Link issue to branch" opens the branch dialog rather than the session one', async () => {
+    mockUseSessionFacts.mockReturnValue([{ sessionId: 's1', workItem: null }])
+    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    vi.mocked(useSessionStore).mockReturnValue({
+      getFocusedSession: vi.fn().mockReturnValue('s1'),
+      getActiveSessionForProject: vi.fn().mockReturnValue('s1'),
+      sessions: new Map([['s1', { id: 's1', projectId: 'proj-1', status: 'active' }]]),
+      getSessionsForProject: vi.fn().mockReturnValue([]),
+      getScratchSessions: vi.fn().mockReturnValue([]),
+      projectViews: new Map(),
+    } as unknown as ReturnType<typeof useSessionStore>)
+    render(<App />)
+    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
+    await waitFor(() => screen.getByTestId('quick-actions'))
+
+    act(() => capturedPaletteCommands.find((a) => a.id === 'core.link-issue-branch')?.run())
+
+    expect(useIntegrationsStore.getState().linkDialogProjectId).toBe('proj-1')
+    expect(screen.queryByTestId('session-link-dialog')).toBeNull()
   })
 
   it('pinning an action via onTogglePin persists through updateQuickActions', async () => {

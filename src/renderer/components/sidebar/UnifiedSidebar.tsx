@@ -32,6 +32,10 @@ import { SidebarHeader } from './SidebarHeader'
 import { LinkIssueDialog } from '../integrations/LinkIssueDialog'
 import { IssueDrawer } from '../integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../stores/integrations.store'
+import { useSessionFacts } from '../session/useSessionFacts'
+import { SessionLinkDialog } from '../session/SessionLinkDialog'
+import { useSessionRecordsStore } from '../../stores/session-records.store'
+import type { WorkItem } from '../../sidebar/work-item'
 import { FilterMenu } from './FilterMenu'
 import { DisplayMenu } from './DisplayMenu'
 import { RepoHeader } from './RepoHeader'
@@ -334,9 +338,37 @@ export function UnifiedSidebar({
   }, [sessionList, invalidateStats])
 
   const clock = now ?? Date.now()
+
+  // A session's own link, keyed by session id, so a terminal row can draw it
+  // without the pure branch-rows layer knowing trackers exist (ADR-031).
+  const sessionFacts = useSessionFacts()
+  const factsBySessionId = useMemo(
+    () => new Map(sessionFacts.map((f) => [f.sessionId, f])),
+    [sessionFacts]
+  )
+  const workItemsBySession = useMemo(
+    () => new Map<string, WorkItem | null>(sessionFacts.map((f) => [f.sessionId, f.workItem])),
+    [sessionFacts]
+  )
+  const [linkSessionId, setLinkSessionId] = useState<string | null>(null)
+
+  function removeSessionLink(sessionId: string): void {
+    const facts = factsBySessionId.get(sessionId)
+    if (facts) void useSessionRecordsStore.getState().setLink(facts.snapshot, null)
+  }
+
   const { groups, scratch, shown, total } = useMemo(
-    () => buildBranchRows(sessionList, allProjects, workspaces, view, clock, staleAfterMs),
-    [sessionList, allProjects, workspaces, view, clock, staleAfterMs]
+    () =>
+      buildBranchRows(
+        sessionList,
+        allProjects,
+        workspaces,
+        view,
+        clock,
+        staleAfterMs,
+        workItemsBySession
+      ),
+    [sessionList, allProjects, workspaces, view, clock, staleAfterMs, workItemsBySession]
   )
 
   // What each view would show, so a chip can say "Needs me · 6" without the
@@ -631,6 +663,8 @@ export function UnifiedSidebar({
                 selected={activeSessionIdFor(row.projectId) === terminal.sessionId}
                 onSelect={() => selectSession(row.projectId, terminal.sessionId)}
                 onClose={() => closeTerminal(row.projectId, terminal.sessionId)}
+                onLinkIssue={() => setLinkSessionId(terminal.sessionId)}
+                onRemoveLink={() => removeSessionLink(terminal.sessionId)}
               />
               {terminal.panes.map((pane) => (
                 <TerminalRow
@@ -640,6 +674,8 @@ export function UnifiedSidebar({
                   selected={activeSessionIdFor(row.projectId) === pane.sessionId}
                   onSelect={() => selectSession(row.projectId, pane.sessionId)}
                   onClose={() => closeTerminal(row.projectId, pane.sessionId)}
+                  onLinkIssue={() => setLinkSessionId(pane.sessionId)}
+                  onRemoveLink={() => removeSessionLink(pane.sessionId)}
                 />
               ))}
             </React.Fragment>
@@ -766,6 +802,7 @@ export function UnifiedSidebar({
                         state: pane.agentState,
                         bellCount: pane.bellCount ?? 0,
                         panes: [],
+                        workItem: null,
                       })),
                     lastActivityAt: session.lastActivityAt,
                     workspaceId: '',
@@ -826,6 +863,13 @@ export function UnifiedSidebar({
               />
             </div>
           )
+        })()}
+
+      {linkSessionId !== null &&
+        (() => {
+          const facts = factsBySessionId.get(linkSessionId)
+          if (!facts) return null
+          return <SessionLinkDialog facts={facts} onClose={() => setLinkSessionId(null)} />
         })()}
 
       {createWsOpen && <CreateWorkspaceDialog onClose={() => setCreateWsOpen(false)} />}

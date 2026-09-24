@@ -10,6 +10,7 @@ const terminal = (patch: Partial<BranchTerminal> = {}): BranchTerminal => ({
   state: 'idle',
   bellCount: 0,
   panes: [],
+  workItem: null,
   ...patch,
 })
 
@@ -84,5 +85,53 @@ describe('TerminalRow', () => {
   it('marks the terminal currently on screen', () => {
     const { container } = renderRow({}, { selected: true })
     expect(container.querySelector('.terminal-row')!.className).toContain('terminal-row--selected')
+  })
+
+  describe('work item', () => {
+    it('draws its own session link as a key', () => {
+      renderRow({ workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-1' } } })
+      expect(screen.getByText('ENG-1')).toBeTruthy()
+    })
+
+    it('does not draw an inherited branch link — the branch row above already shows it', () => {
+      const { container } = renderRow({
+        workItem: { source: 'project', ref: { tracker: 'linear', key: 'ENG-1' } },
+      })
+      expect(container.querySelector('.terminal-row__key')).toBeNull()
+    })
+
+    it('draws nothing when there is no work item', () => {
+      const { container } = renderRow()
+      expect(container.querySelector('.terminal-row__key')).toBeNull()
+    })
+
+    it('offers only "Link issue…" when the session has no link', () => {
+      const onLinkIssue = vi.fn()
+      const { container } = renderRow({}, { onLinkIssue })
+      fireEvent.contextMenu(container.querySelector('.terminal-row')!)
+      expect(screen.getByText('Link issue…')).toBeTruthy()
+      expect(screen.queryByText('Change linked issue…')).toBeNull()
+      fireEvent.click(screen.getByText('Link issue…'))
+      expect(onLinkIssue).toHaveBeenCalledOnce()
+    })
+
+    it('offers change and remove when the session has its own link', () => {
+      const onLinkIssue = vi.fn()
+      const onRemoveLink = vi.fn()
+      const { container } = renderRow(
+        { workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-1' } } },
+        { onLinkIssue, onRemoveLink }
+      )
+      fireEvent.contextMenu(container.querySelector('.terminal-row')!)
+      expect(screen.getByText('Change linked issue…')).toBeTruthy()
+      fireEvent.click(screen.getByText('Remove session link'))
+      expect(onRemoveLink).toHaveBeenCalledOnce()
+    })
+
+    it('draws no menu at all when nothing can link', () => {
+      const { container } = renderRow()
+      fireEvent.contextMenu(container.querySelector('.terminal-row')!)
+      expect(container.querySelector('.ctx-menu')).toBeNull()
+    })
   })
 })

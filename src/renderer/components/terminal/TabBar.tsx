@@ -10,6 +10,7 @@ import { statusPresentationFor, type StatusIcon } from '../../sidebar/session-st
 import './TabBar.css'
 import { useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
+import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { DESCRIPTION_MAX_LENGTH } from '../../../shared/schemas/session-records.schema'
 
 /**
@@ -68,6 +69,7 @@ export function TabBar({
   const [renameValue, setRenameValue] = useState('')
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; sessionId: string } | null>(null)
   const [moveDialogSessionId, setMoveDialogSessionId] = useState<string | null>(null)
+  const [linkSessionId, setLinkSessionId] = useState<string | null>(null)
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const { workspaces, activeWorkspaceId, projectsByWorkspaceId } = useWorkspaceStore()
@@ -133,6 +135,11 @@ export function TabBar({
     setNoteValue(factsById.get(editNoteSessionId)?.description ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editNoteSessionId])
+
+  function removeSessionLink(sessionId: string): void {
+    const facts = factsById.get(sessionId)
+    if (facts) void useSessionRecordsStore.getState().setLink(facts.snapshot, null)
+  }
 
   function commitNote(sessionId: string): void {
     const facts = factsById.get(sessionId)
@@ -260,7 +267,14 @@ export function TabBar({
                   autoFocus
                 />
               ) : (
-                <span className="tab-bar__title">{session.tabTitle}</span>
+                <>
+                  <span className="tab-bar__title">{session.tabTitle}</span>
+                  {factsById.get(session.id)?.workItem?.source === 'session' && (
+                    <span className="tab-bar__key">
+                      {factsById.get(session.id)!.workItem!.ref.key}
+                    </span>
+                  )}
+                </>
               )}
               {session.id !== effectiveActiveId && renamingId !== session.id && (
                 <AlertBadge
@@ -295,6 +309,11 @@ export function TabBar({
           sessionId={ctxMenu.sessionId}
           currentTitle={sessions.find((s) => s.id === ctxMenu.sessionId)?.tabTitle ?? ''}
           currentNote={factsById.get(ctxMenu.sessionId)?.description ?? ''}
+          ownLinkKey={
+            factsById.get(ctxMenu.sessionId)?.workItem?.source === 'session'
+              ? (factsById.get(ctxMenu.sessionId)!.workItem!.ref.key ?? null)
+              : null
+          }
           onRename={(id, title) => {
             setCtxMenu(null)
             setRenamingId(id)
@@ -308,6 +327,14 @@ export function TabBar({
             setCtxMenu(null)
             setNotingId(id)
             setNoteValue(note)
+          }}
+          onLinkIssue={(id) => {
+            setCtxMenu(null)
+            setLinkSessionId(id)
+          }}
+          onRemoveLink={(id) => {
+            setCtxMenu(null)
+            removeSessionLink(id)
           }}
           onClose={() => setCtxMenu(null)}
           onCloseTab={(id) => {
@@ -327,6 +354,13 @@ export function TabBar({
           }}
         />
       )}
+
+      {linkSessionId !== null &&
+        (() => {
+          const facts = factsById.get(linkSessionId)
+          if (!facts) return null
+          return <SessionLinkDialog facts={facts} onClose={() => setLinkSessionId(null)} />
+        })()}
     </div>
   )
 }
@@ -337,9 +371,12 @@ function SessionTabCtxMenu({
   sessionId,
   currentTitle,
   currentNote,
+  ownLinkKey,
   onRename,
   onMove,
   onNote,
+  onLinkIssue,
+  onRemoveLink,
   onClose,
   onCloseTab,
 }: {
@@ -348,9 +385,13 @@ function SessionTabCtxMenu({
   sessionId: string
   currentTitle: string
   currentNote: string
+  /** This session's own linked ticket key, or null when it has none. */
+  ownLinkKey: string | null
   onRename: (id: string, title: string) => void
   onMove: (id: string) => void
   onNote: (id: string, note: string) => void
+  onLinkIssue: (id: string) => void
+  onRemoveLink: (id: string) => void
   onClose: () => void
   onCloseTab: (id: string) => void
 }): JSX.Element {
@@ -372,6 +413,18 @@ function SessionTabCtxMenu({
       <button className="ctx-menu__item" onClick={() => onMove(sessionId)}>
         Move to branch…
       </button>
+      <div className="ctx-menu__separator" />
+      <button className="ctx-menu__item" onClick={() => onLinkIssue(sessionId)}>
+        {ownLinkKey === null ? 'Link issue…' : 'Change linked issue…'}
+      </button>
+      {ownLinkKey !== null && (
+        <button
+          className="ctx-menu__item ctx-menu__item--danger"
+          onClick={() => onRemoveLink(sessionId)}
+        >
+          Remove session link
+        </button>
+      )}
       <div className="ctx-menu__separator" />
       <button
         className="ctx-menu__item ctx-menu__item--danger"

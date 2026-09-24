@@ -3,6 +3,10 @@ import { aggregateBranchState, countInState } from './branch-state'
 import { branchLabel } from './branch-display'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 import type { AgentState, Project, TerminalSession, Workspace } from '../../shared/types/index'
+import type { WorkItem } from './work-item'
+
+/** A terminal's own work item, keyed by session id. Absent when nothing links it. */
+export type WorkItemsBySession = ReadonlyMap<string, WorkItem | null>
 
 /**
  * One terminal under a branch, and the panes split off it.
@@ -18,6 +22,8 @@ export interface BranchTerminal {
   bellCount: number
   /** Panes split off this terminal. Empty for an unsplit one. */
   panes: BranchTerminal[]
+  /** This terminal's own linked ticket, or the one it inherits from its branch. Null when neither has one. */
+  workItem: WorkItem | null
 }
 
 /** One branch, as the sidebar draws it. */
@@ -196,7 +202,8 @@ export function buildBranchRows(
   workspaces: Workspace[],
   view: SessionView,
   now: number,
-  staleAfterMs: number
+  staleAfterMs: number,
+  workItems: WorkItemsBySession = new Map()
 ): BranchRowsResult {
   const workspaceById = new Map(workspaces.map((w) => [w.id, w]))
   const { query, states, projectIds, hideStale, staleOnly } = view.filters
@@ -230,7 +237,7 @@ export function buildBranchRows(
       state,
       stateCount: countInState(own, state),
       sessionCount: own.length,
-      terminals: buildTerminals(own),
+      terminals: buildTerminals(own, workItems),
       lastActivityAt: own.length === 0 ? null : Math.max(...own.map((s) => s.lastActivityAt)),
       workspaceId: project.workspaceId,
     }
@@ -290,7 +297,10 @@ export function buildBranchRows(
 }
 
 /** Roots first, each carrying the panes pinned to it. */
-function buildTerminals(sessions: TerminalSession[]): BranchTerminal[] {
+function buildTerminals(
+  sessions: TerminalSession[],
+  workItems: WorkItemsBySession
+): BranchTerminal[] {
   const panesByParent = new Map<string, TerminalSession[]>()
   for (const s of sessions) {
     if (s.parentSessionId === undefined) continue
@@ -304,6 +314,7 @@ function buildTerminals(sessions: TerminalSession[]): BranchTerminal[] {
     state: s.agentState,
     bellCount: s.bellCount ?? 0,
     panes,
+    workItem: workItems.get(s.id) ?? null,
   })
   return sessions
     .filter((s) => s.parentSessionId === undefined)
