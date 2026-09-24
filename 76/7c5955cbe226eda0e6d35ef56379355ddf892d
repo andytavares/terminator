@@ -1,0 +1,115 @@
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_9126708f68ed92::t_a9de98813b96a6 238
+  s_9126708f68ed92::t_34bd7426e627b9 101
+  s_9126708f68ed92::t_6a9f8d1552ae2a 66
+  s_9126708f68ed92::t_cb6b80c2c08d90 214-217
+  s_9126708f68ed92::t_72cd24575890a9 218
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_9126708f68ed92::t_70e2c363fa58d3 246-247
+  s_9126708f68ed92::t_7105fae407794c 178-179
+  s_9126708f68ed92::t_8f146dedea26b8 166
+src/renderer/electron.d.ts
+  s_9126708f68ed92::t_5704199e70a5f7 231
+src/renderer/lib/notifications.ts
+  s_9126708f68ed92::t_fcba05585bc741 15-16
+src/renderer/components/terminal/TabBar.tsx
+  s_9126708f68ed92::t_cc50c89a1a2769 61
+  s_9126708f68ed92::t_2b5e1497b5bf7a 93
+src/renderer/terminal/session-controller.ts
+  s_9126708f68ed92::t_a9fe403db446fd 169
+  s_9126708f68ed92::t_c4a3f06c47c33b 27
+tests/unit/terminal/notification.ipc.spec.ts
+  s_9126708f68ed92::t_d62270240a6680 6-7,10
+  s_9126708f68ed92::t_eaac20d2615a0a 102-120
+  s_9126708f68ed92::t_0b26a1aa8ac33f 121-141
+src/main/notifications/notification-manager.ts
+  s_9126708f68ed92::t_30c1f460db1e85 123-130
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_9126708f68ed92::t_0db459963cf21e 108,120-121
+  s_9126708f68ed92::t_be82e209b7bcaf 173-174
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_9126708f68ed92::t_832e7efddaea46 458-459
+  s_9126708f68ed92::t_aea26dc8c60fd6 7
+tests/unit/renderer/App.spec.tsx
+  s_9126708f68ed92::t_3d393713116005 283-286
+  s_9126708f68ed92::t_7c5280ff8c5716 265,278-282
+  s_9126708f68ed92::t_48388af832280f 1754-1782
+  s_9126708f68ed92::t_900781d6fec415 1291-1292,1318-1319,1333-1334,1351-1352,1366-1367,1379-1380,1395-1396,1419-1420
+  s_9126708f68ed92::t_f627e5ff6e225d 1120-1121,1123,1125-1128,1134,1137
+  s_9126708f68ed92::t_dd2196b375a028 12
+  s_9126708f68ed92::t_829cdd2597da07 21-23
+  s_9126708f68ed92::t_41aaa573e7a700 15-17
+  s_9126708f68ed92::t_959c5ca2da6699 247-250
+  s_9126708f68ed92::t_8066e0bfca390f 32-33
+src/renderer/components/terminal/TerminalPane.tsx
+  s_9126708f68ed92::t_3a206444c731fa 25,27
+  s_9126708f68ed92::t_773a2dfe5566a9 76-81,83-90,92
+  s_9126708f68ed92::t_15e4807e735c1a 3,7
+tests/unit/notifications/notification-manager.spec.ts
+  s_9126708f68ed92::t_cf72346394fde5 222-253
+tests/unit/renderer/quick-actions/shortcut-conflict-guard.spec.tsx
+  s_9126708f68ed92::t_568f83ddd84a2d 18
+  s_9126708f68ed92::t_24ec525c3c98c3 54,62-66
+src/renderer/terminal/navigate-to-session.ts
+  s_9126708f68ed92::t_74bbd7fb789f2c 6-16,19-23,29,41,43-45
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_9126708f68ed92::t_bbf78173c6f207 75-76,79,87-88
+  s_9126708f68ed92::t_a75e64c636ce7c 10-14
+  s_9126708f68ed92::t_4ceac6c0c0c3f4 270-362
+  s_9126708f68ed92::t_4bbe7cffeb243d 363-364
+src/renderer/quick-actions/shortcut-behaviors.ts
+  s_9126708f68ed92::t_90543957270905 31,34
+  s_9126708f68ed92::t_1be2adbfc022ee 3,6-13
+  s_9126708f68ed92::t_08390a9f453bb6 104-107
+  s_9126708f68ed92::t_25dddfc493f787 14
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_9126708f68ed92::t_aeaf222006aaf9 203
+  s_9126708f68ed92::t_28f688cb7b7c26 40
+  s_9126708f68ed92::t_8201cbdf5f6a68 72
+  s_9126708f68ed92::t_e64c27794ded44 568
+src/renderer/stores/session.store.ts
+  s_9126708f68ed92::t_15312f13443670 170-178
+  s_9126708f68ed92::t_b4f591ee859906 207
+  s_9126708f68ed92::t_8b855accd18b8c 530-532
+  s_9126708f68ed92::t_84665646651688 533
+tests/integration/ipc/notification.ipc.spec.ts
+  s_9126708f68ed92::t_fa817026ec2ce6 105-107,111-116
+  s_9126708f68ed92::t_2138b10586cdad 2,11
+  s_9126708f68ed92::t_748515328729a2 87-104,108-110,117-123
+tests/unit/renderer/quick-actions/shortcut-behaviors.spec.ts
+  s_9126708f68ed92::t_5f2a4289f27a8d 153-154
+  s_9126708f68ed92::t_c7025f21e7c796 6-11,14,19-20
+  s_9126708f68ed92::t_011f3e1f9d38f5 73-76
+  s_9126708f68ed92::t_b82ba6af642dbd 21
+src/main/ipc/notification.ipc.ts
+  s_9126708f68ed92::t_b62ed4eb1f01f3 1,6,10-25,38,41-44
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_9126708f68ed92::t_4b19c2abb21e0b 17
+  s_9126708f68ed92::t_34821bd6348003 78,86-90
+  s_9126708f68ed92::t_b794f5c636d42b 39-42
+tests/unit/renderer/terminal/navigate-to-session.spec.ts
+  s_9126708f68ed92::t_fa817026ec2ce6 31-34
+  s_9126708f68ed92::t_38fce9c03060f3 6,15-19,47-48,50,52-53,61,67,71,75,81,84-95
+src/renderer/App.tsx
+  s_9126708f68ed92::t_24057247f14180 912-913,915
+  s_9126708f68ed92::t_e13940baf26a53 59
+  s_9126708f68ed92::t_53a724ee4eb145 974
+  s_9126708f68ed92::t_06c4dba529005c 434-440,442
+  s_9126708f68ed92::t_0d237bff2f5fda 451,454,461
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "767c5955cbe226eda0e6d35ef56379355ddf892d",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
