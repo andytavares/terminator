@@ -50,6 +50,15 @@ afterEach(() => {
 })
 
 describe('SettingsPanel', () => {
+  it('takes focus from the terminal when it opens, so its Escape is not swallowed', () => {
+    const terminalInput = document.createElement('textarea')
+    document.body.appendChild(terminalInput)
+    terminalInput.focus()
+    render(<SettingsPanel onClose={vi.fn()} />)
+    expect(document.activeElement).toBe(screen.getByRole('dialog', { name: 'Settings' }))
+    terminalInput.remove()
+  })
+
   it('renders Settings title', () => {
     render(<SettingsPanel onClose={vi.fn()} />)
     expect(screen.getByText('Settings')).toBeTruthy()

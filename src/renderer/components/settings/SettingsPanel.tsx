@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { GlobalSettings } from './GlobalSettings'
 import { IntegrationsSettings } from './IntegrationsSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
@@ -17,6 +17,13 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
   useModalEffect()
   const [section, setSection] = useState<Section>('global')
   const { activeWorkspaceId } = useWorkspaceStore()
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // The terminal's xterm stops Escape from propagating, so while it holds
+  // focus the window listener below never sees Escape.
+  useEffect(() => {
+    panelRef.current?.focus()
+  }, [])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -28,7 +35,14 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
 
   return (
     <div className="settings-overlay" onClick={onClose}>
-      <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={panelRef}
+        className="settings-panel"
+        role="dialog"
+        aria-label="Settings"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="settings-panel__sidebar">
           <h2 className="settings-panel__title">Settings</h2>
           <nav className="settings-panel__nav">
