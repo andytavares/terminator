@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const { mockDispatchNotification } = vi.hoisted(() => ({ mockDispatchNotification: vi.fn() }))
 vi.mock('../../../../src/renderer/lib/notifications', () => ({
@@ -184,13 +184,20 @@ describe('createTerminalSession', () => {
     expect(hooks?.onIdle).toBeTypeOf('function')
   })
 
-  it('routes busy/idle events into the session store', async () => {
-    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
-    const { hooks } = capturedCtorArgs[0]
-    hooks!.onBusy!()
-    expect(mockSetSessionBusy).toHaveBeenCalledWith('session-123')
-    hooks!.onIdle!()
-    expect(mockSetSessionIdle).toHaveBeenCalledWith('session-123')
+  it('routes busy events into the session store, and idle after the working hold', async () => {
+    vi.useFakeTimers()
+    try {
+      await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+      const { hooks } = capturedCtorArgs[0]
+      hooks!.onBusy!()
+      expect(mockSetSessionBusy).toHaveBeenCalledWith('session-123')
+      hooks!.onIdle!()
+      expect(mockSetSessionIdle).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(3500)
+      expect(mockSetSessionIdle).toHaveBeenCalledWith('session-123')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reads the screen when output settles, and records its last line', async () => {
@@ -368,11 +375,17 @@ describe('adoptTerminalSession', () => {
   })
 
   it('wires bell, busy and idle exactly as a terminal the operator opened', () => {
-    adoptTerminalSession(adopted)
-    capturedCtorArgs[0].hooks?.onBusy?.()
-    capturedCtorArgs[0].hooks?.onIdle?.()
-    expect(mockSetSessionBusy).toHaveBeenCalledWith('terminal-1')
-    expect(mockSetSessionIdle).toHaveBeenCalledWith('terminal-1')
+    vi.useFakeTimers()
+    try {
+      adoptTerminalSession(adopted)
+      capturedCtorArgs[0].hooks?.onBusy?.()
+      capturedCtorArgs[0].hooks?.onIdle?.()
+      expect(mockSetSessionBusy).toHaveBeenCalledWith('terminal-1')
+      vi.advanceTimersByTime(3500)
+      expect(mockSetSessionIdle).toHaveBeenCalledWith('terminal-1')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -528,6 +541,61 @@ describe('reading a choice prompt off the screen (054)', () => {
       'session-123',
       expect.objectContaining({ latestLine: '14 passed, 2 failed' })
     )
+  })
+})
+
+describe('working hold before idle (058)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('reads the screen at settle but stays busy until the hold elapses', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    screenRows = ['$ pnpm test', '  14 passed, 2 failed', '', '']
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith(
+      'session-123',
+      expect.objectContaining({ latestLine: '14 passed, 2 failed' })
+    )
+    expect(mockSetSessionIdle).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(3499)
+    expect(mockSetSessionIdle).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(mockSetSessionIdle).toHaveBeenCalledWith('session-123')
+  })
+
+  it('a choice prompt on screen is reported immediately at settle, before the hold', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    screenRows = PROMPT_ROWS
+    capturedCtorArgs[0].hooks!.onIdle!()
+    expect(mockSetSessionScreen).toHaveBeenCalledWith('session-123', {
+      latestLine: 'Esc to cancel',
+      choicePrompt: PROMPT,
+    })
+    expect(mockSetSessionIdle).not.toHaveBeenCalled()
+  })
+
+  it('a busy event inside the hold cancels the pending idle', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    const { hooks } = capturedCtorArgs[0]
+    hooks!.onIdle!()
+    vi.advanceTimersByTime(2000)
+    hooks!.onBusy!()
+    vi.advanceTimersByTime(3500)
+    expect(mockSetSessionIdle).not.toHaveBeenCalled()
+  })
+
+  it('disposing the instance clears its pending idle timer', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    const { hooks } = capturedCtorArgs[0]
+    hooks!.onIdle!()
+    hooks!.onDispose!()
+    vi.advanceTimersByTime(3500)
+    expect(mockSetSessionIdle).not.toHaveBeenCalled()
   })
 })
 
