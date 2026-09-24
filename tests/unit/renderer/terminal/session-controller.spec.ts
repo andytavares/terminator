@@ -63,6 +63,7 @@ const mockStampActivity = vi.fn()
 const mockSetSessionScreen = vi.fn()
 const mockGetTerminalInstance = vi.fn()
 const mockInput = vi.fn()
+const mockRequestFocus = vi.fn()
 
 const sessions = new Map<
   string,
@@ -97,6 +98,7 @@ beforeEach(() => {
     stampActivity: mockStampActivity,
     setSessionScreen: mockSetSessionScreen,
     getTerminalInstance: mockGetTerminalInstance,
+    requestFocus: mockRequestFocus,
   } as unknown as ReturnType<typeof useSessionStore.getState>)
   resetActivityThrottle()
   setActivityClock(() => 0)
@@ -209,6 +211,11 @@ describe('createTerminalSession', () => {
       expect.objectContaining({ latestLine: '14 passed, 2 failed' })
     )
   })
+
+  it('requests focus for the new session, so its pane grabs the keyboard', async () => {
+    await createTerminalSession('proj-1', 'human', 'T', '/repo', 5000)
+    expect(mockRequestFocus).toHaveBeenCalledWith('session-123')
+  })
 })
 
 describe('bell handling', () => {
@@ -228,6 +235,7 @@ describe('bell handling', () => {
       title: 'Terminator',
       message: 'My Tab needs attention',
       key: 'terminalBell',
+      sessionId: 'session-123',
     })
   })
 

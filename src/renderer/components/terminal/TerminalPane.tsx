@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
+import { useModalStore } from '../../stores/modal.store'
 import type { PaneNode } from '../../../../shared/types/index'
 import { SplitContainer } from './SplitContainer'
 import { LeafPane } from './LeafPane'
+import { leafIds } from '../../utils/pane-tree'
 import './TerminalPane.css'
 
 interface Props {
@@ -20,7 +22,9 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     getPaneLayout,
     setSplitRatio,
     setFocusedSession,
+    focusRequest,
   } = useSessionStore()
+  const modalOpen = useModalStore((s) => s.depth > 0)
 
   const activeSessionId = getActiveSessionForProject(projectId)
   const sessions = getSessionsForProject(projectId)
@@ -69,15 +73,23 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // In split mode, focus the active terminal when it changes (e.g., sidebar click).
-  // layout is intentionally excluded from deps: changes to split ratio should not
-  // clobber focus that activateSplit or the user already set.
+  // Any "go to session" path (sidebar click, Quick Actions, a notification)
+  // bumps focusRequest.nonce, even when the requested session was already
+  // active — which is exactly the case a change to activeSessionId alone
+  // cannot see, so this cannot be keyed off activeSessionId. Only reacts when
+  // the requested session belongs to this pane's project: single mode, it is
+  // the active session; split mode, it is one of the leaves.
   useEffect(() => {
-    if (!layout || !activeSessionId) return
-    setFocusedSession(projectId, activeSessionId)
-    getTerminalInstance(activeSessionId)?.terminal.focus()
+    if (!focusRequest || modalOpen) return
+    const { sessionId } = focusRequest
+    const belongsHere = layout ? leafIds(layout).includes(sessionId) : activeSessionId === sessionId
+    if (!belongsHere) return
+    if (layout) setFocusedSession(projectId, sessionId)
+    requestAnimationFrame(() => {
+      getTerminalInstance(sessionId)?.terminal.focus()
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId, projectId, setFocusedSession, getTerminalInstance])
+  }, [focusRequest?.nonce, modalOpen])
 
   const refocusActive = useCallback(() => {
     if (!activeSessionId) return

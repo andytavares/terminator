@@ -9,13 +9,18 @@ import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { useTerminalSession } from '../../../src/renderer/hooks/useTerminalSession'
 import { useIntegrationsStore } from '../../../src/renderer/stores/integrations.store'
 import { App } from '../../../src/renderer/App'
+import { SCRATCH_PROJECT_ID } from '../../../src/shared/types/index'
 
 // Mock all child components and hooks to focus on App logic
-vi.mock('../../../src/renderer/stores/workspace.store', () => ({ useWorkspaceStore: vi.fn() }))
+vi.mock('../../../src/renderer/stores/workspace.store', () => ({
+  useWorkspaceStore: Object.assign(vi.fn(), { getState: vi.fn() }),
+}))
 vi.mock('../../../src/renderer/stores/settings.store', () => ({
   useSettingsStore: Object.assign(vi.fn(), { getState: vi.fn() }),
 }))
-vi.mock('../../../src/renderer/stores/session.store', () => ({ useSessionStore: vi.fn() }))
+vi.mock('../../../src/renderer/stores/session.store', () => ({
+  useSessionStore: Object.assign(vi.fn(), { getState: vi.fn() }),
+}))
 vi.mock('../../../src/renderer/stores/toast.store', () => ({ useToastStore: vi.fn() }))
 vi.mock('../../../src/renderer/stores/log.store', () => ({ installLogInterceptor: vi.fn() }))
 vi.mock('../../../src/renderer/extensions/registry', () => {
@@ -24,6 +29,8 @@ vi.mock('../../../src/renderer/extensions/registry', () => {
     registerGlobalTab: vi.fn(() => vi.fn()),
     updateGlobalTab: vi.fn(),
     setActiveGlobalTab: vi.fn(),
+    setActiveWorkspaceTab: vi.fn(),
+    setActiveProjectTab: vi.fn(),
     sidebarPanels: new Map(),
   }))
   return { useExtensionRegistry }
@@ -237,6 +244,10 @@ function setupMocks(
   vi.mocked(useWorkspaceStore).mockReturnValue(
     workspaceState as unknown as ReturnType<typeof useWorkspaceStore>
   )
+  // Plain reassignment, not vi.mocked(...).mockReturnValue: several tests below
+  // replace .getState outright with a bare function for a narrower fixture, and
+  // a mockReturnValue call on a getState that is no longer a mock throws.
+  ;(useWorkspaceStore as unknown as { getState: () => unknown }).getState = () => workspaceState
   const settingsState = {
     loadSettings: mockLoadSettings,
     globalSettings,
@@ -251,7 +262,7 @@ function setupMocks(
   vi.mocked(useSettingsStore.getState).mockReturnValue(
     settingsState as unknown as ReturnType<typeof useSettingsStore.getState>
   )
-  vi.mocked(useSessionStore).mockReturnValue({
+  const sessionState = {
     handleProcessExit: mockHandleProcessExit,
     getSessionsForProject: vi.fn().mockReturnValue([]),
     getActiveSessionForProject: vi.fn().mockReturnValue(null),
@@ -264,7 +275,15 @@ function setupMocks(
     setActiveSessionForProject: mockSetActiveSessionForProject,
     closeSession: vi.fn().mockResolvedValue(undefined),
     projectViews: overrides.projectViews ?? new Map(),
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+    requestFocus: vi.fn(),
+  }
+  vi.mocked(useSessionStore).mockReturnValue(
+    sessionState as unknown as ReturnType<typeof useWorkspaceStore>
+  )
+  // Plain reassignment: several tests below replace .getState outright with a
+  // bare function, which would otherwise leave it not a mock for the rest of
+  // the file's tests.
+  ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => sessionState
   vi.mocked(useToastStore).mockReturnValue({
     addToast: mockAddToast,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
@@ -1098,16 +1117,24 @@ describe('App', () => {
   it('UnifiedSidebar onSelectScratchSession activates scratch view for chosen session', async () => {
     setupMocks({ activeWorkspaceId: 'ws-1' })
     const mockSetActiveSessionForProject = vi.fn()
+    const mockSetScratchActive = vi.fn()
+    const mockRequestFocus = vi.fn()
     ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
+      sessions: new Map([['sess-scratch', { projectId: SCRATCH_PROJECT_ID }]]),
       setActiveSessionForProject: mockSetActiveSessionForProject,
+      requestFocus: mockRequestFocus,
+    })
+    ;(useWorkspaceStore as unknown as { getState: () => unknown }).getState = () => ({
+      setScratchActive: mockSetScratchActive,
     })
     render(<App />)
     capturedOnSelectSession?.('sess-scratch')
     await waitFor(() => {
       expect(mockSetActiveSessionForProject).toHaveBeenCalledWith(
-        expect.any(String),
+        SCRATCH_PROJECT_ID,
         'sess-scratch'
       )
+      expect(mockSetScratchActive).toHaveBeenCalledWith(true)
     })
   })
 
@@ -1261,6 +1288,8 @@ describe('App', () => {
       registerGlobalTab: vi.fn(() => vi.fn()),
       updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
+      setActiveWorkspaceTab: vi.fn(),
+      setActiveProjectTab: vi.fn(),
       sidebarPanels: new Map([['git-changes', {}]]),
     }))
     vi.mocked(useExtensionRegistry).mockReturnValue({
@@ -1286,6 +1315,8 @@ describe('App', () => {
       registerGlobalTab: vi.fn(() => vi.fn()),
       updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
+      setActiveWorkspaceTab: vi.fn(),
+      setActiveProjectTab: vi.fn(),
       sidebarPanels: new Map(),
     }))
   })
@@ -1299,6 +1330,8 @@ describe('App', () => {
       registerGlobalTab: vi.fn(() => vi.fn()),
       updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
+      setActiveWorkspaceTab: vi.fn(),
+      setActiveProjectTab: vi.fn(),
       sidebarPanels: new Map(),
       openPanels: new Set<string>(), // 'saved-panel' is NOT open → triggers togglePanel
     }))
@@ -1315,6 +1348,8 @@ describe('App', () => {
       registerGlobalTab: vi.fn(() => vi.fn()),
       updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
+      setActiveWorkspaceTab: vi.fn(),
+      setActiveProjectTab: vi.fn(),
       sidebarPanels: new Map(),
     }))
   })
@@ -1328,6 +1363,8 @@ describe('App', () => {
       registerGlobalTab: vi.fn(() => vi.fn()),
       updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
+      setActiveWorkspaceTab: vi.fn(),
+      setActiveProjectTab: vi.fn(),
       sidebarPanels: new Map([['git-changes', {}]]),
     }))
     vi.mocked(useExtensionRegistry).mockReturnValue({
@@ -1339,6 +1376,8 @@ describe('App', () => {
       registerGlobalTab: vi.fn(() => vi.fn()),
       updateGlobalTab: vi.fn(),
       setActiveGlobalTab: vi.fn(),
+      setActiveWorkspaceTab: vi.fn(),
+      setActiveProjectTab: vi.fn(),
       sidebarPanels: new Map(),
     }))
   })
@@ -1353,6 +1392,8 @@ describe('App', () => {
         }),
         updateGlobalTab: vi.fn(),
         setActiveGlobalTab: vi.fn(),
+        setActiveWorkspaceTab: vi.fn(),
+        setActiveProjectTab: vi.fn(),
         sidebarPanels: new Map(),
       }))
       setupMocks({})
@@ -1375,6 +1416,8 @@ describe('App', () => {
         registerGlobalTab: vi.fn(() => vi.fn()),
         updateGlobalTab,
         setActiveGlobalTab: vi.fn(),
+        setActiveWorkspaceTab: vi.fn(),
+        setActiveProjectTab: vi.fn(),
         sidebarPanels: new Map(),
       }))
       // State is derived, never read from the store: a bell or a visible choice
@@ -1708,6 +1751,35 @@ describe('App — Quick Actions integration (feature 057)', () => {
       closeSession: mockCloseSession,
       projectViews: new Map(),
     } as unknown as ReturnType<typeof useSessionStore>)
+    // revealSession (behind cycle-recent-next / next-waiting) reads sessions and
+    // project membership through getState, not the hook slice above.
+    ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
+      sessions: new Map([
+        ['s1', { id: 's1', projectId: 'proj-1', status: 'active', agentState: 'idle' }],
+        [
+          's2',
+          {
+            id: 's2',
+            projectId: 'proj-2',
+            status: 'active',
+            agentState: 'awaiting-input',
+            lastAttendedAt: 5,
+          },
+        ],
+      ]),
+      setActiveSessionForProject: mockSetActiveSessionForProject,
+      requestFocus: vi.fn(),
+    })
+    ;(useWorkspaceStore as unknown as { getState: () => unknown }).getState = () => ({
+      activeWorkspaceId: 'ws-1',
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [{ id: 'proj-1', workspaceId: 'ws-1' }]],
+        ['ws-2', [{ id: 'proj-2', workspaceId: 'ws-2' }]],
+      ]),
+      setActiveWorkspace: mockSetActiveWorkspace,
+      setActiveProject: mockSetActiveProject,
+      setScratchActive: vi.fn(),
+    })
     render(<App />)
     act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
     await waitFor(() => screen.getByTestId('quick-actions'))

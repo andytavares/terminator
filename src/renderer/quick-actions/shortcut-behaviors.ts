@@ -1,6 +1,16 @@
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { useSessionStore } from '../stores/session.store'
+import { useExtensionRegistry } from '../extensions/registry'
 import { dispatchNotification } from '../lib/notifications'
+
+/** Leaves whatever global/workspace/project tab is showing, the way every
+ * "go to session" path must (see navigate-to-session.ts's revealSession). */
+function clearTabsEverywhere(): void {
+  const registry = useExtensionRegistry.getState()
+  registry.setActiveGlobalTab(null)
+  registry.setActiveWorkspaceTab(null)
+  registry.setActiveProjectTab(null)
+}
 
 /**
  * The imperative bodies behind every direct terminal/session/workspace
@@ -18,8 +28,10 @@ function selectSessionEverywhere(
   session: { id: string; projectId: string },
   deps: SessionNavDeps
 ): void {
+  clearTabsEverywhere()
   useWorkspaceStore.getState().setActiveProject(session.projectId)
   deps.setActiveSessionForProject(session.projectId, session.id)
+  useSessionStore.getState().requestFocus(session.id)
 }
 
 export function cycleMostRecentlyAttended(
@@ -89,8 +101,10 @@ export function cycleTab(projectId: string, delta: number, deps: TabCycleDeps): 
   if (sessions.length === 0) return
   const activeId = getActiveSessionForProject(projectId)
   const idx = sessions.findIndex((s) => s.id === activeId)
-  const next = (idx + delta + sessions.length) % sessions.length
-  setActiveSessionForProject(projectId, sessions[next].id)
+  const next = sessions[(idx + delta + sessions.length) % sessions.length]
+  clearTabsEverywhere()
+  setActiveSessionForProject(projectId, next.id)
+  useSessionStore.getState().requestFocus(next.id)
 }
 
 export function clearTerminal(

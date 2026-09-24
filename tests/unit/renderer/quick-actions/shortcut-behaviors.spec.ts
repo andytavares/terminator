@@ -3,12 +3,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const sessions = new Map<string, Record<string, unknown>>()
 const setActiveProject = vi.fn()
 const dispatchNotification = vi.fn()
+const requestFocus = vi.fn()
+const registry = {
+  setActiveGlobalTab: vi.fn(),
+  setActiveWorkspaceTab: vi.fn(),
+  setActiveProjectTab: vi.fn(),
+}
 
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: { getState: () => ({ sessions }) },
+  useSessionStore: { getState: () => ({ sessions, requestFocus }) },
 }))
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   useWorkspaceStore: { getState: () => ({ setActiveProject }) },
+}))
+vi.mock('../../../../src/renderer/extensions/registry', () => ({
+  useExtensionRegistry: { getState: () => registry },
 }))
 vi.mock('../../../../src/renderer/lib/notifications', () => ({
   dispatchNotification: (...args: unknown[]) => dispatchNotification(...args),
@@ -61,6 +70,10 @@ describe('cycleMostRecentlyAttended', () => {
     cycleMostRecentlyAttended(null, 1, deps)
     expect(setActiveProject).toHaveBeenCalledWith('p2')
     expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p2', 'b')
+    expect(requestFocus).toHaveBeenCalledWith('b')
+    expect(registry.setActiveGlobalTab).toHaveBeenCalledWith(null)
+    expect(registry.setActiveWorkspaceTab).toHaveBeenCalledWith(null)
+    expect(registry.setActiveProjectTab).toHaveBeenCalledWith(null)
   })
 
   it('starts from the first session when the active one is not listed', () => {
@@ -137,6 +150,8 @@ describe('cycleTab', () => {
     }
     cycleTab('p1', -1, deps)
     expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p1', 's3')
+    expect(requestFocus).toHaveBeenCalledWith('s3')
+    expect(registry.setActiveGlobalTab).toHaveBeenCalledWith(null)
   })
 
   it('does nothing on a project with no tabs', () => {

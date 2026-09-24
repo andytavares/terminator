@@ -12,6 +12,8 @@ export function dispatchNotification(opts: {
   title: string
   message?: string
   key: string
+  /** The session clicking this notification should reveal, if any. */
+  sessionId?: string
 }): void {
   void window.electronAPI.notifications.create(opts)
 }

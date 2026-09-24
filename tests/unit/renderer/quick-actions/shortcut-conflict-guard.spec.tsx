@@ -15,7 +15,7 @@ vi.mock('../../../../src/renderer/stores/session.store', () => ({
 }))
 vi.mock('../../../../src/renderer/stores/settings.store', () => ({ useSettingsStore: vi.fn() }))
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: vi.fn(),
+  useExtensionRegistry: Object.assign(vi.fn(), { getState: vi.fn() }),
   matchesAccelerator: vi.fn().mockReturnValue(false),
 }))
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
@@ -51,6 +51,7 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof useWorkspaceStore.getState>)
   vi.mocked(useSessionStore.getState).mockReturnValue({
     sessions: new Map(),
+    requestFocus: vi.fn(),
   } as unknown as ReturnType<typeof useSessionStore.getState>)
   vi.mocked(useSettingsStore).mockReturnValue({
     resolveSettings: vi.fn().mockReturnValue({ terminal: { scrollbackLimit: 5000 } }),
@@ -58,6 +59,11 @@ beforeEach(() => {
   vi.mocked(useExtensionRegistry).mockReturnValue({
     keyboardShortcuts: [],
   } as unknown as ReturnType<typeof useExtensionRegistry>)
+  vi.mocked(useExtensionRegistry.getState).mockReturnValue({
+    setActiveGlobalTab: vi.fn(),
+    setActiveWorkspaceTab: vi.fn(),
+    setActiveProjectTab: vi.fn(),
+  } as unknown as ReturnType<typeof useExtensionRegistry.getState>)
   vi.mocked(useTerminalSession).mockReturnValue({
     createSession: vi.fn().mockResolvedValue('session-id'),
     splitSession: vi.fn().mockResolvedValue(undefined),

@@ -37,6 +37,7 @@ vi.mock('../../../../src/renderer/components/sidebar/MoveSessionDialog', () => (
 
 const mockCloseSession = vi.fn()
 const mockSetActive = vi.fn()
+const mockRequestFocus = vi.fn()
 const mockGetActive = vi.fn()
 const mockGetSessions = vi.fn()
 const mockGetBell = vi.fn()
@@ -68,6 +69,7 @@ beforeEach(() => {
     isSessionBusy: vi.fn().mockReturnValue(false),
     renameSession: mockRenameSession,
     reorderSessions: mockReorderSessions,
+    requestFocus: mockRequestFocus,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useWorkspaceStore).mockReturnValue({
     workspaces: [],
@@ -198,6 +200,7 @@ describe('TabBar', () => {
     renderTabBar()
     fireEvent.click(screen.getByText('zsh'))
     expect(mockSetActive).toHaveBeenCalledWith('proj-1', 'ses-2')
+    expect(mockRequestFocus).toHaveBeenCalledWith('ses-2')
   })
 
   it('double-click on session title shows rename input', () => {
@@ -562,6 +565,7 @@ describe('TabBar — the description, edited from the tab (054 FR-006)', () => {
       isSessionBusy: vi.fn().mockReturnValue(false),
       renameSession: mockRenameSession,
       reorderSessions: mockReorderSessions,
+      requestFocus: mockRequestFocus,
     } as unknown as ReturnType<typeof useSessionStore>)
     mockGetSessions.mockReturnValue([noted()])
     mockGetActive.mockReturnValue('ses-1')

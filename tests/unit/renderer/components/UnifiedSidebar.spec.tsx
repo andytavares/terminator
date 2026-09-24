@@ -163,6 +163,7 @@ const mockSessionStore = {
   ),
   setActiveSessionForProject: vi.fn(),
   renameSession: vi.fn(),
+  requestFocus: vi.fn(),
 }
 
 const mockRegistryState = {
@@ -174,6 +175,8 @@ const mockRegistryState = {
   dismissSurfaces: vi.fn(),
   sidebarButtons: [] as Array<{ id: string; label: string; action: () => void }>,
   setActiveGlobalTab: vi.fn(),
+  setActiveWorkspaceTab: vi.fn(),
+  setActiveProjectTab: vi.fn(),
   registerCommand: vi.fn(() => vi.fn()),
 }
 
@@ -240,6 +243,8 @@ beforeEach(() => {
   vi.mocked(useSessionStore).mockReturnValue(
     mockSessionStore as unknown as ReturnType<typeof useSessionStore>
   )
+  Object.assign(useWorkspaceStore, { getState: () => mockWorkspaceStore })
+  Object.assign(useSessionStore, { getState: () => mockSessionStore })
   vi.mocked(useExtensionRegistry).mockImplementation(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ((selector: any) =>

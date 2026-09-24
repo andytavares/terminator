@@ -105,6 +105,7 @@ const mockSessionStore = {
   getScratchSessions: vi.fn().mockReturnValue([]),
   setActiveSessionForProject: vi.fn(),
   renameSession: vi.fn(),
+  requestFocus: vi.fn(),
 }
 
 const mockRegistryState = {
@@ -116,6 +117,8 @@ const mockRegistryState = {
   activeWorkspaceTabId: null,
   activeProjectTabId: null,
   setActiveGlobalTab: vi.fn(),
+  setActiveWorkspaceTab: vi.fn(),
+  setActiveProjectTab: vi.fn(),
   dismissSurfaces: vi.fn(),
   registerCommand: vi.fn(() => vi.fn()),
 }
@@ -167,6 +170,8 @@ beforeEach(() => {
         : mockRegistryState) as unknown as typeof useExtensionRegistry
   )
   Object.assign(useExtensionRegistry, { getState: () => mockRegistryState })
+  Object.assign(useSessionStore, { getState: () => mockSessionStore })
+  Object.assign(useWorkspaceStore, { getState: () => mockWorkspaceStore })
 })
 
 const renderSidebar = (groupBy: GroupKey) =>

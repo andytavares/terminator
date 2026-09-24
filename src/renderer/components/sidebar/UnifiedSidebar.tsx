@@ -4,6 +4,7 @@ import type { Workspace } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
+import { revealSession } from '../../terminal/navigate-to-session'
 import { useSettingsStore } from '../../stores/settings.store'
 import { useToastStore } from '../../stores/toast.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
@@ -454,11 +455,8 @@ export function UnifiedSidebar({
    * session. Leaving activeProjectId undefined under a non-project grouping
    * would break per-project auto-open and the project tab bar (invariant I4).
    */
-  function selectSession(projectId: string, sessionId: string): void {
-    const project = projectById.get(projectId)
-    if (project) setActiveWorkspace(project.workspaceId)
-    setActiveProject(projectId)
-    sessionStore.setActiveSessionForProject(projectId, sessionId)
+  function selectSession(_projectId: string, sessionId: string): void {
+    revealSession(sessionId)
     onSelectProject?.()
   }
 

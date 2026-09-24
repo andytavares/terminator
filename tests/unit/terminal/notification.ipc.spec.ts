@@ -3,8 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockHandle = vi.fn()
 const mockCreate = vi.fn(() => 'test-uuid')
 
+const mockGetAllWindows = vi.fn(() => [])
+
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle },
+  BrowserWindow: { getAllWindows: mockGetAllWindows },
 }))
 
 vi.mock('../../../src/main/notifications/notification-manager', () => ({
@@ -95,5 +98,45 @@ describe('registerNotificationHandlers', () => {
     const result = await handler(null, { type: 'info', title: 'T' })
     expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
     expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it('sends terminal:navigate-to-session to every window when the onClick from a sessionId fires', async () => {
+    const handler = captureHandle('notifications:create')
+    const win = {
+      isDestroyed: () => false,
+      isMinimized: () => false,
+      restore: vi.fn(),
+      show: vi.fn(),
+      focus: vi.fn(),
+      webContents: { isDestroyed: () => false, send: vi.fn() },
+    }
+    mockGetAllWindows.mockReturnValue([win] as unknown as [])
+    await handler(null, { type: 'info', title: 'T', key: 'tKey', sessionId: 'ses-1' })
+    const passed = mockCreate.mock.calls[0][0] as { onClick?: () => void }
+    expect(passed.onClick).toEqual(expect.any(Function))
+    passed.onClick!()
+    expect(win.webContents.send).toHaveBeenCalledWith('terminal:navigate-to-session', {
+      sessionId: 'ses-1',
+    })
+  })
+
+  it('restores a minimized window and skips a destroyed one when revealing a session', async () => {
+    const handler = captureHandle('notifications:create')
+    const minimized = {
+      isDestroyed: () => false,
+      isMinimized: () => true,
+      restore: vi.fn(),
+      show: vi.fn(),
+      focus: vi.fn(),
+      webContents: { isDestroyed: () => false, send: vi.fn() },
+    }
+    const destroyed = { ...minimized, isDestroyed: () => true, restore: vi.fn(), show: vi.fn() }
+    mockGetAllWindows.mockReturnValue([destroyed, minimized] as unknown as [])
+    await handler(null, { type: 'info', title: 'T', key: 'tKey', sessionId: 'ses-2' })
+    const passed = mockCreate.mock.calls[0][0] as { onClick?: () => void }
+    passed.onClick!()
+    expect(minimized.restore).toHaveBeenCalled()
+    expect(minimized.focus).toHaveBeenCalled()
+    expect(destroyed.show).not.toHaveBeenCalled()
   })
 })

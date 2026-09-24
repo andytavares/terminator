@@ -120,9 +120,14 @@ class NotificationManager {
       notif.on('failed', (_e, error) => {
         console.warn('[notifications] system notification failed:', error)
       })
-      if (actions.length > 0) {
-        const primary = opts.actions![0]
-        notif.on('click', () => primary.handler())
+      if (opts.onClick || actions.length > 0) {
+        notif.on('click', () => {
+          if (opts.onClick) {
+            opts.onClick()
+            return
+          }
+          opts.actions![0].handler()
+        })
       }
       notif.show()
       if (process.platform === 'darwin' && app.dock) {

@@ -58,6 +58,7 @@ export function TabBar({
     getBellCountForSession,
     renameSession,
     reorderSessions,
+    requestFocus,
   } = useSessionStore()
   const factsById = new Map(useSessionFacts().map((f) => [f.sessionId, f]))
   const setDescription = useSessionRecordsStore((s) => s.setDescription)
@@ -89,6 +90,7 @@ export function TabBar({
 
   function handleSessionTabClick(sessionId: string): void {
     setActiveSessionForProject(projectId, sessionId)
+    requestFocus(sessionId)
   }
 
   function startRename(e: React.MouseEvent, sessionId: string, currentTitle: string): void {

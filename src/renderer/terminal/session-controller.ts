@@ -24,6 +24,7 @@ function handleBell(sessionId: string): void {
     title: 'Terminator',
     message: `${session.tabTitle} needs attention`,
     key: 'terminalBell',
+    sessionId,
   })
 }
 
@@ -165,6 +166,7 @@ export async function createTerminalSession(
   // both updates land so getTerminalInstance() is guaranteed to return the instance.
   store.setTerminalInstance(sessionId, instance)
   store.setActiveSessionForProject(projectId, sessionId)
+  store.requestFocus(sessionId)
   return sessionId
 }
 

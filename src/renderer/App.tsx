@@ -56,6 +56,7 @@ import { AboutDialog } from './components/AboutDialog'
 import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 import { adoptTerminalSession } from './terminal/session-controller'
+import { revealSession } from './terminal/navigate-to-session'
 import { qualifiedBranchLabel } from './sidebar/branch-display'
 
 /** Counts the sessions waiting on the operator for Home's badge. */
@@ -83,7 +84,6 @@ export function App(): JSX.Element {
     activeProjectId,
     workspaces,
     setActiveWorkspace,
-    setActiveProject,
     projectsByWorkspaceId,
     resolveActiveCwd,
     scratchActive,
@@ -431,7 +431,15 @@ export function App(): JSX.Element {
           if (list.length === 0) return
           const idx = list.findIndex((s) => s.id === getActiveSessionForProject?.(qaProjectId))
           const next = list[(((idx + delta) % list.length) + list.length) % list.length]
+          // Cycling stays within the project already on screen — unlike the other
+          // "go to session" paths it must not switch to the session's own
+          // projectId — but still has to leave whatever tab is showing and ask
+          // for focus, the way every other path does.
+          useExtensionRegistry.getState().setActiveGlobalTab(null)
+          useExtensionRegistry.getState().setActiveWorkspaceTab(null)
+          useExtensionRegistry.getState().setActiveProjectTab(null)
           setActiveSessionForProject(qaProjectId, next.id)
+          useSessionStore.getState().requestFocus(next.id)
         },
         onCycleRecentSession: (delta) => {
           const all = [...sessions.values()]
@@ -440,20 +448,17 @@ export function App(): JSX.Element {
           if (all.length < 2) return
           const idx = all.findIndex((s) => s.id === focusedSessionId)
           const next = all[((idx === -1 ? 0 : idx) + delta + all.length) % all.length]
-          setActiveProject(next.projectId)
-          setActiveSessionForProject(next.projectId, next.id)
+          revealSession(next.id)
         },
         onSelectSession: (session) => {
-          setActiveProject(session.projectId)
-          setActiveSessionForProject(session.projectId, session.id)
+          revealSession(session.id)
         },
         onNextWaiting: () => {
           const waiting = [...sessions.values()].filter((s) => s.agentState === 'awaiting-input')
           if (waiting.length === 0) return
           const idx = waiting.findIndex((s) => s.id === focusedSessionId)
           const next = waiting[(idx + 1) % waiting.length]
-          setActiveProject(next.projectId)
-          setActiveSessionForProject(next.projectId, next.id)
+          revealSession(next.id)
         },
         onResume: () => setActiveGlobalTab('core.home'),
         onSwitchWorkspace: (id) => setActiveWorkspace(id),
@@ -904,19 +909,10 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('terminal:navigate-to-session', (data) => {
-      const { sessionId, projectId } = data as { sessionId: string; projectId: string }
-      setActiveGlobalTab(null)
-      const { projectsByWorkspaceId } = useWorkspaceStore.getState()
-      for (const [wsId, projects] of projectsByWorkspaceId) {
-        if (projects.some((p) => p.id === projectId)) {
-          useWorkspaceStore.getState().setActiveWorkspace(wsId)
-          break
-        }
-      }
-      useWorkspaceStore.getState().setActiveProject(projectId)
-      useSessionStore.getState().setActiveSessionForProject(projectId, sessionId)
+      const { sessionId } = data as { sessionId: string }
+      revealSession(sessionId)
     })
-  }, [setActiveGlobalTab])
+  }, [])
 
   useEffect(() => {
     const unsubLog = window.electronAPI.extensionBridge.on('log:push', (data) => {
@@ -975,11 +971,7 @@ export function App(): JSX.Element {
             }}
             onNewScratch={handleNewScratch}
             activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
-            onSelectScratchSession={(sessionId) => {
-              setScratchActive(true)
-              if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
-              useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
-            }}
+            onSelectScratchSession={(sessionId) => revealSession(sessionId)}
             visible={sidebarVisible}
           />
 
