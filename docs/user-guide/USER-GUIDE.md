@@ -405,8 +405,8 @@ Terminator opens on **Home**. It answers one question for every terminal you hav
 
 Home has two layouts. Switch between them with **Ledger** and **Logbook** at the top; Terminator remembers which you chose.
 
-- **Ledger** — one row per session, grouped by repo and branch, with sessions waiting on you first. Each row shows the session's state, name, branch, its ticket or your description, its latest line of output and how long since it was active. Click a row to open a live preview with **Open terminal**; press `Enter` to go straight to the terminal. **Display** chooses the grouping, the sort, which columns show, whether the selected row previews, and whether exited sessions are hidden — all remembered.
-- **Logbook** — sessions listed under **Needs you**, **Working**, **Idle**, **Exited** and **Closed**, each headlined by its ticket's title, or your description, or **Add a description**. Select one to see where it lives, edit what it is for (**Save description**, or `Cmd+Enter`), link a ticket, and watch a large live preview. Tickets worth linking are suggested: your branch's own ticket, then open tickets assigned to you.
+- **Ledger** — one row per session, grouped by repo and branch. Sessions waiting on you are lifted into a **Needs you** band at the top, tinted amber. Each state is a labelled chip — amber when a session needs you, green while it works, grey when idle or exited — and a session keeps its place while it prints; it moves only when it starts needing you, exits, or is new, and new ones join at the end. Each row shows the session's state, name, branch, its ticket or your description, its latest line of output and how long since it was active. Click a row to open a live preview with **Open terminal**; press `Enter` to go straight to the terminal. **Display** chooses the grouping, the sort, which columns show, whether the selected row previews, and whether exited sessions are hidden — all remembered.
+- **Logbook** — sessions listed under **Needs you**, **Running**, **Exited** and **Closed**, each headlined by its ticket's title, or your description, or **Add a description**. Select one to see where it lives, edit what it is for (**Save description**, or `Cmd+Enter`), link a ticket, and watch a large live preview. Tickets worth linking are suggested: your branch's own ticket, then open tickets assigned to you.
 
 **New terminal** starts work without leaving Home: pick any branch in any repo, or a scratch terminal that belongs to none. Terminator opens the terminal it started, so you land in it.
 
@@ -432,7 +432,11 @@ A session shows its branch's linked ticket by default. **Link** on any row, tile
 
 ![The Overview wall](screenshots/12-overview-screen.png)
 
-**Overview** (`Cmd+Shift+E`) shows every open terminal as a live tile, named by repo, branch and session, with its ticket or description underneath. Sessions waiting on you are pinned double-width in a **Needs you** band at the top; everything else follows, ordered by state unless **Then by** says otherwise.
+**Overview** (`Cmd+Shift+E`) shows every open terminal as a live tile, named by repo, branch and session, with its ticket or description underneath. Sessions waiting on you are pinned double-width in a **Needs you** band at the top, with an amber border; everything else follows, ordered by state unless **Then by** says otherwise. **Recently opened** orders by when you last opened each one. Output never moves a tile.
+
+Opening a session from anywhere — a Ledger row, a tile, the sidebar, a tab, Quick Actions, or a notification — takes you to its terminal with the cursor in it, ready to type.
+
+A ticket linked to one terminal shows as its key on that terminal's sidebar row and its tab. Right-click either to link, change or remove it; **Quick actions → Link issue** links the focused terminal, and **Link issue to branch** links the branch. An agent started in that terminal is given the terminal's own ticket as context, over the branch's.
 
 When an agent is waiting on a numbered choice — a Claude Code permission prompt, for example — its options appear as buttons on the tile and in the Ledger's preview. Pressing one answers it as if you had typed the number. Terminator reads the screen again first, and sends nothing if the question has changed or been answered in the terminal.
 
