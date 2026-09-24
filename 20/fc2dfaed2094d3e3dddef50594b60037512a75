@@ -1,0 +1,31 @@
+docs/adr/058-standing-orders-sessions-reveal-in-one-place.md
+  s_9126708f68ed92::t_9a6a3272dbde45 1-61
+docs/user-guide/USER-GUIDE.md
+  s_9126708f68ed92::t_292bc7d09af7ea 408-409,435-439
+docs/research/session-surface-repairs.md
+  s_9126708f68ed92::t_8bbd29cf985b1d 253
+  s_9126708f68ed92::t_760751c37c1520 1-33,43-51,53-58,65-75,77-116,118-121,123-125,127-148,161-163,165-205,208,210,212-235,239-251,254-299,302-305,307-314
+  s_9126708f68ed92::t_4e12ca7eb62464 252
+  s_9126708f68ed92::t_84ae89ac426ce1 34-42,52,59-64,76,117,122,126,149-160,164,206-207,209,211,236-238,300-301,306
+README.md
+  s_9126708f68ed92::t_292bc7d09af7ea 8,31
+docs/ARCHITECTURE.md
+  s_9126708f68ed92::t_292bc7d09af7ea 518-519,718-720,723-725
+  s_9126708f68ed92::t_4da34624234f72 726
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "20fc2dfaed2094d3e3dddef50594b60037512a75",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
