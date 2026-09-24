@@ -342,4 +342,46 @@ describe('LedgerView', () => {
     render(<LedgerView {...props} onResume={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
+
+  it('marks a needs-you row so it reads as a band, not just an icon', () => {
+    render(<LedgerView {...props} />)
+    const row = screen.getByRole('row', { name: 'claude' })
+    expect(row.className).toContain('ledger__row--needs')
+    const idleRow = screen.getByRole('row', { name: 'zsh' })
+    expect(idleRow.className).not.toContain('ledger__row--needs')
+  })
+
+  it('marks the Needs you group heading with the same fill', () => {
+    const needsGroup: LedgerGroup = {
+      key: 'needs-you',
+      label: 'Needs you',
+      facts: [groups[0].facts[0]],
+    }
+    const { container } = render(<LedgerView {...props} groups={[needsGroup, ...groups]} />)
+    const heading = within(
+      container.querySelector('.ledger__group[aria-label="Needs you"]') as HTMLElement
+    ).getByText('Needs you')
+    expect(heading.closest('.ledger__group-label')!.className).toContain(
+      'ledger__group-label--needs'
+    )
+  })
+
+  it('draws a workspace swatch on a workspace group heading, not on Needs you', () => {
+    const { container } = render(<LedgerView {...props} />)
+    const workspaceGroup = container.querySelector(
+      '.ledger__group[aria-label="Northwind / northwind-api"] .ledger__group-swatch'
+    ) as HTMLElement
+    expect(workspaceGroup).toBeTruthy()
+    expect(workspaceGroup.style.background).toBe('rgb(92, 107, 192)')
+
+    const needsGroup: LedgerGroup = {
+      key: 'needs-you',
+      label: 'Needs you',
+      facts: [groups[0].facts[0]],
+    }
+    const { container: withNeeds } = render(<LedgerView {...props} groups={[needsGroup]} />)
+    expect(
+      withNeeds.querySelector('.ledger__group[aria-label="Needs you"] .ledger__group-swatch')
+    ).toBeNull()
+  })
 })

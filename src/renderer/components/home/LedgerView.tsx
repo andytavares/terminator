@@ -1,6 +1,6 @@
 import React from 'react'
 import { GitBranch, SquareArrowOutUpRight } from 'lucide-react'
-import { StateIcon } from '../session/StateIcon'
+import { StateChip } from '../session/StateChip'
 import { LivePreview } from '../session/LivePreview'
 import { WorkItemCell } from '../session/WorkItemCell'
 import { ResumeButton } from '../session/ResumeButton'
@@ -38,7 +38,8 @@ interface Props {
  */
 function template(columns: LedgerColumns): string {
   return [
-    '24px',
+    // Wide enough for the full chip's longest label, "Waiting on you".
+    'minmax(96px, 0.7fr)',
     'minmax(72px, 0.9fr)',
     columns.branch && 'minmax(0, 1.1fr)',
     columns.workItem && 'minmax(0, 1.8fr)',
@@ -84,7 +85,9 @@ function Row({
       aria-label={facts.name}
       aria-selected={selected}
       tabIndex={0}
-      className={`ledger__row${selected ? ' ledger__row--selected' : ''}`}
+      className={`ledger__row${selected ? ' ledger__row--selected' : ''}${
+        facts.state === 'awaiting-input' ? ' ledger__row--needs' : ''
+      }`}
       style={facts.workspaceColor ? { ['--rail' as string]: facts.workspaceColor } : undefined}
       onClick={() => onSelect(facts.sessionId)}
       onKeyDown={(e) => {
@@ -96,7 +99,7 @@ function Row({
       }}
     >
       <span role="gridcell" className="ledger__state">
-        <StateIcon state={facts.state} />
+        <StateChip state={facts.state} />
       </span>
       <span role="gridcell" className="ledger__name">
         {facts.name}
@@ -188,57 +191,71 @@ export function LedgerView({
         <span role="columnheader" />
       </div>
 
-      {groups.map((group) => (
-        <div key={group.key} role="rowgroup" aria-label={group.label} className="ledger__group">
-          <div className="ledger__group-label" aria-hidden="true">
-            {group.label}
-            <span className="ledger__group-count">{group.facts.length}</span>
-          </div>
-          {group.facts.map((facts) => {
-            const selected = facts.sessionId === selectedId
-            return (
-              <React.Fragment key={facts.sessionId}>
-                <Row
-                  facts={facts}
-                  columns={columns}
-                  selected={selected}
-                  now={now}
-                  onSelect={onSelect}
-                  onOpen={onOpen}
-                  onSaveDescription={onSaveDescription}
-                  onLink={onLink}
-                  onResume={onResume}
-                  onCloseSession={onCloseSession}
-                  onForgetSession={onForgetSession}
+      {groups.map((group) => {
+        const isNeedsYou = group.key === 'needs-you'
+        const swatchColor = !isNeedsYou ? (group.facts[0]?.workspaceColor ?? null) : null
+        return (
+          <div key={group.key} role="rowgroup" aria-label={group.label} className="ledger__group">
+            <div
+              className={`ledger__group-label${isNeedsYou ? ' ledger__group-label--needs' : ''}`}
+              aria-hidden="true"
+            >
+              {swatchColor !== null && (
+                <span
+                  className="ledger__group-swatch"
+                  aria-hidden="true"
+                  style={{ background: swatchColor }}
                 />
-                {selected && previewSelected && !facts.isClosed && (
-                  <div role="row" className="ledger__expand">
-                    <div
-                      role="region"
-                      aria-label={`Preview of ${facts.name}`}
-                      className="ledger__expand-inner"
-                    >
-                      <LivePreview sessionId={facts.sessionId} className="ledger__preview" />
-                      <div className="ledger__actions">
-                        {renderAnswers?.(facts)}
-                        <button
-                          type="button"
-                          className="ledger__open"
-                          aria-label={`Open ${facts.name}`}
-                          onClick={() => onOpen(facts.sessionId)}
-                        >
-                          <SquareArrowOutUpRight aria-hidden="true" />
-                          Open terminal
-                        </button>
+              )}
+              {group.label}
+              <span className="ledger__group-count">{group.facts.length}</span>
+            </div>
+            {group.facts.map((facts) => {
+              const selected = facts.sessionId === selectedId
+              return (
+                <React.Fragment key={facts.sessionId}>
+                  <Row
+                    facts={facts}
+                    columns={columns}
+                    selected={selected}
+                    now={now}
+                    onSelect={onSelect}
+                    onOpen={onOpen}
+                    onSaveDescription={onSaveDescription}
+                    onLink={onLink}
+                    onResume={onResume}
+                    onCloseSession={onCloseSession}
+                    onForgetSession={onForgetSession}
+                  />
+                  {selected && previewSelected && !facts.isClosed && (
+                    <div role="row" className="ledger__expand">
+                      <div
+                        role="region"
+                        aria-label={`Preview of ${facts.name}`}
+                        className="ledger__expand-inner"
+                      >
+                        <LivePreview sessionId={facts.sessionId} className="ledger__preview" />
+                        <div className="ledger__actions">
+                          {renderAnswers?.(facts)}
+                          <button
+                            type="button"
+                            className="ledger__open"
+                            aria-label={`Open ${facts.name}`}
+                            onClick={() => onOpen(facts.sessionId)}
+                          >
+                            <SquareArrowOutUpRight aria-hidden="true" />
+                            Open terminal
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </React.Fragment>
-            )
-          })}
-        </div>
-      ))}
+                  )}
+                </React.Fragment>
+              )
+            })}
+          </div>
+        )
+      })}
     </div>
   )
 }

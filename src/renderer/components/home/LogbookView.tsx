@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, SquareArrowOutUpRight } from 'lucide-react'
-import { StateIcon } from '../session/StateIcon'
+import { StateChip } from '../session/StateChip'
 import { LivePreview } from '../session/LivePreview'
 import { ResumeButton } from '../session/ResumeButton'
 import { CloseSessionButton } from '../session/CloseSessionButton'
@@ -98,7 +98,7 @@ function Detail({
   return (
     <section role="region" aria-label="Session details" className="logbook__detail">
       <div className="logbook__crumb">
-        <StateIcon state={facts.state} />
+        <StateChip state={facts.state} />
         <span className="logbook__where">{locationOf(facts)}</span>
         {onResume && <ResumeButton facts={facts} onResume={onResume} />}
         {!facts.isClosed && (
@@ -259,7 +259,7 @@ export function LogbookView({ groups, selected, titles, onSelect, ...detail }: P
                     }
                   }}
                 >
-                  <StateIcon state={facts.state} />
+                  <StateChip state={facts.state} compact />
                   <span
                     className={`logbook__headline${headline.blank ? ' logbook__headline--blank' : ''}`}
                   >

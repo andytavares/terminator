@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, GitBranch, Plus } from 'lucide-react'
 import type { BranchRow as BranchRowData } from '../../sidebar/branch-rows'
 import type { DragItemProps } from '../../hooks/useDragReorder'
 import type { ChangeStats } from '../../../shared/schemas/git.schema'
-import { ICON_FOR_STATE, STATUS_ICON } from '../../sidebar/state-icons'
+import { StateChip } from '../session/StateChip'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import { ContextMenu, closeAllContextMenus, type ContextMenuItem } from '../ContextMenu'
 import { issueMenuItems, type IssueMenuActions } from './issue-menu-items'
@@ -107,7 +107,6 @@ export function BranchRow({
   const [renaming, setRenaming] = useState(false)
   const [draft, setDraft] = useState(row.label)
 
-  const Glyph = STATUS_ICON[ICON_FOR_STATE[row.state]]
   const hasStats = changeStats != null && (changeStats.added > 0 || changeStats.removed > 0)
 
   function openMenu(e: React.MouseEvent): void {
@@ -201,8 +200,8 @@ export function BranchRow({
         {/* The status gutter: one fixed column, one glyph, never anything else,
             so finding what needs you is a scan down a single column rather than
             a search across full-width rows. */}
-        <span className={`branch-row__gutter branch-row__state--${row.state}`}>
-          <Glyph aria-hidden="true" data-state={row.state} />
+        <span className="branch-row__gutter">
+          <StateChip state={row.state} compact />
         </span>
 
         <span className="branch-row__kind">

@@ -195,4 +195,14 @@ describe('WallTile', () => {
     render(<WallTile {...props} onResume={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
+
+  it('marks a needs-you tile so its edge reads amber', () => {
+    render(<WallTile {...props} facts={{ ...facts, state: 'awaiting-input' }} />)
+    expect(screen.getByRole('article').className).toContain('wall-tile--needs')
+  })
+
+  it('does not mark a working tile as needs-you', () => {
+    render(<WallTile {...props} facts={{ ...facts, state: 'working' }} />)
+    expect(screen.getByRole('article').className).not.toContain('wall-tile--needs')
+  })
 })

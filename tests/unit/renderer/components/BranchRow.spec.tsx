@@ -68,6 +68,13 @@ describe('BranchRow', () => {
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain(label)
   })
 
+  it('renders the compact chip in the gutter, named for a reader', () => {
+    const { container } = renderRow({ state: 'awaiting-input' })
+    const chip = container.querySelector('.branch-row__gutter .state-chip')!
+    expect(chip.className).toContain('state-chip--compact')
+    expect(chip.getAttribute('aria-label')).toBe('Waiting on you')
+  })
+
   it('distinguishes the four states by shape', () => {
     const shapes = (['awaiting-input', 'working', 'idle', 'exited'] as const).map((state) => {
       const { container, unmount } = renderRow({ state })

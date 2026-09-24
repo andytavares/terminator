@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { X } from 'lucide-react'
-import { ICON_FOR_STATE, STATUS_ICON } from '../../sidebar/state-icons'
+import { StateChip } from '../session/StateChip'
 import type { BranchTerminal } from '../../sidebar/branch-rows'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import './TerminalRow.css'
@@ -51,7 +51,6 @@ export function TerminalRow({
   onLinkIssue,
   onRemoveLink,
 }: TerminalRowProps): JSX.Element {
-  const Glyph = STATUS_ICON[ICON_FOR_STATE[terminal.state]]
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const key = ownKey(terminal)
 
@@ -92,8 +91,8 @@ export function TerminalRow({
             }
       }
     >
-      <span className={`terminal-row__gutter terminal-row__state--${terminal.state}`}>
-        <Glyph aria-hidden="true" data-state={terminal.state} />
+      <span className="terminal-row__gutter">
+        <StateChip state={terminal.state} compact />
       </span>
 
       <span className="terminal-row__name" title={terminal.title}>

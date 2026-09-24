@@ -62,10 +62,13 @@ describe('TerminalRow', () => {
     expect(onSelect).toHaveBeenCalledTimes(3)
   })
 
-  it('draws the state in the gutter, by shape and opacity rather than colour', () => {
+  it('draws the state in the gutter as a compact chip, named for a reader', () => {
     const { container } = renderRow({ state: 'awaiting-input' })
     const gutter = container.querySelector('.terminal-row__gutter')!
-    expect(gutter.className).toContain('terminal-row__state--awaiting-input')
+    const chip = gutter.querySelector('.state-chip')!
+    expect(chip.className).toContain('state-chip--compact')
+    expect(chip.className).toContain('state-chip--awaiting-input')
+    expect(chip.getAttribute('aria-label')).toBe('Waiting on you')
     expect(container.querySelector<HTMLElement>('.terminal-row')!.style.color).toBe('')
   })
 

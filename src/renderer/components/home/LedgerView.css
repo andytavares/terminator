@@ -40,6 +40,24 @@
   color: var(--text-primary);
 }
 
+/* The Needs-you group reads as a band at the top of Home: the same fill the
+   row itself carries, spread across the heading. */
+.ledger__group-label--needs {
+  background: var(--state-needs-fill);
+  margin: 0 0 6px;
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+/* A decorative swatch, not text: answers "what is what" in the workspace's
+   colour without using that colour as a text colour (which fails AA). */
+.ledger__group-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
 .ledger__group-count {
   font-weight: 400;
   color: var(--text-muted);
@@ -61,6 +79,14 @@
 
 .ledger__row--selected {
   background: var(--bg-card);
+}
+
+.ledger__row--needs {
+  background: var(--state-needs-fill);
+}
+
+.ledger__row--needs.ledger__row--selected {
+  background: var(--state-needs-fill);
 }
 
 .ledger__row:focus-visible {
