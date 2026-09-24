@@ -1,0 +1,24 @@
+src/renderer/components/settings/SettingsPanel.css
+  s_9126708f68ed92::t_7d6270b61e8c5f 13-16
+src/renderer/components/settings/SettingsPanel.tsx
+  s_9126708f68ed92::t_964fec8566c4c9 1,20-26,38-45
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_9126708f68ed92::t_e305b620959857 58
+  s_9126708f68ed92::t_e4a204c94f9143 53-57,59-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "63827299c780787f27ea9d9baad0135dfb110541",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
