@@ -18,6 +18,8 @@ import {
   setLink,
   transfer,
 } from '../sessions/session-record-store.js'
+import { syncSessionContext } from '../integrations/session-context.js'
+import { getIssueService } from '../integrations/index.js'
 import type { SessionRecord, SessionRecordListing } from '../../shared/types/index.js'
 
 // Core-only. Not part of the Extension API: a session's description is the
@@ -79,7 +81,15 @@ export function registerSessionRecordsHandlers(
       channel: 'session-records:set-link',
       schema: SetLinkInputSchema,
       invalid,
-      run: async ({ session, link }) => ({ data: listing(await setLink(session, link)) }),
+      run: async ({ session, link }) => {
+        const record = await setLink(session, link)
+        // The session's own link feeds its agent's SessionStart context and
+        // wins over the project's. Best-effort: a tracker outage keeps
+        // whatever context was there rather than costing the operator the
+        // link (syncSessionContext handles that itself).
+        await syncSessionContext(session.sessionId, getIssueService())
+        return { data: listing(record) }
+      },
       onError: fail,
     }),
     invokeSpec({

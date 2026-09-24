@@ -109,6 +109,64 @@ describe('the capture script, executed', () => {
     })
     expect(out).toBe('')
   })
+
+  describe('printing the session’s own agent context', () => {
+    let sessionContextDir: string
+
+    async function runWithSessionContext(
+      env: Record<string, string> = { TERMINATOR_SESSION_ID: 'sess-1' }
+    ): Promise<{ out: string; dir: string }> {
+      const mod = await load()
+      const scriptPath = await mod.installCaptureScript(userData)
+      const dir = path.join(userData, 'agent-sessions')
+      const out = execFileSync(process.execPath, [scriptPath, dir, sessionContextDir], {
+        encoding: 'utf8',
+        input: JSON.stringify(PAYLOAD),
+        env: { ...process.env, ...env },
+      })
+      return { out, dir }
+    }
+
+    beforeEach(() => {
+      sessionContextDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-hook-sctx-'))
+    })
+
+    it('prints additionalContext when the terminal has a session context file', async () => {
+      fs.writeFileSync(
+        path.join(sessionContextDir, 'sess-1.json'),
+        JSON.stringify({ markdown: '# Linked issue: TAV-42', key: 'TAV-42' }),
+        'utf8'
+      )
+      const { out, dir } = await runWithSessionContext()
+      const parsed = JSON.parse(out)
+      expect(parsed.hookSpecificOutput.hookEventName).toBe('SessionStart')
+      expect(parsed.hookSpecificOutput.additionalContext).toBe('# Linked issue: TAV-42')
+      expect(parsed.hookSpecificOutput.sessionTitle).toBe('TAV-42')
+      // The report is still written — printing context is additional, not instead.
+      expect(fs.existsSync(path.join(dir, 'sess-1.json'))).toBe(true)
+    })
+
+    it('prints nothing when the terminal has no session context file', async () => {
+      const { out, dir } = await runWithSessionContext()
+      expect(out).toBe('')
+      expect(fs.existsSync(path.join(dir, 'sess-1.json'))).toBe(true)
+    })
+
+    it('prints nothing when the session context has no markdown', async () => {
+      fs.writeFileSync(
+        path.join(sessionContextDir, 'sess-1.json'),
+        JSON.stringify({ markdown: '', key: 'TAV-42' }),
+        'utf8'
+      )
+      const { out } = await runWithSessionContext()
+      expect(out).toBe('')
+    })
+
+    it('prints nothing for a terminal this app does not own', async () => {
+      const { out } = await runWithSessionContext({ TERMINATOR_SESSION_ID: '' })
+      expect(out).toBe('')
+    })
+  })
 })
 
 describe('installing the hook in the operator’s Claude settings', () => {

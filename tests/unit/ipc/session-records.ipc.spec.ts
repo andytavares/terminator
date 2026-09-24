@@ -41,6 +41,16 @@ vi.mock('../../../src/main/sessions/session-record-store', () => ({
   },
 }))
 
+const sessionContext = vi.hoisted(() => ({ sync: vi.fn().mockResolvedValue(null) }))
+
+vi.mock('../../../src/main/integrations/session-context', () => ({
+  syncSessionContext: sessionContext.sync,
+}))
+
+vi.mock('../../../src/main/integrations/index', () => ({
+  getIssueService: () => 'issue-service',
+}))
+
 const SNAP = {
   sessionId: 's1',
   projectId: 'p1',
@@ -207,6 +217,21 @@ describe('session-records:set-link', () => {
     const result = await invoke('session-records:set-link', { session: SNAP, link: null })
     expect(store.setLink).toHaveBeenCalledWith(SNAP, null)
     expect(result).toEqual({ data: null })
+  })
+
+  it('syncs the session’s own agent context after the write, whatever the link', async () => {
+    store.setLink.mockResolvedValue(base('s1'))
+    await invoke('session-records:set-link', {
+      session: SNAP,
+      link: { tracker: 'linear', key: 'NW-88' },
+    })
+    expect(sessionContext.sync).toHaveBeenCalledWith('s1', 'issue-service')
+  })
+
+  it('syncs (to delete the context file) when the link is cleared too', async () => {
+    store.setLink.mockResolvedValue(null)
+    await invoke('session-records:set-link', { session: SNAP, link: null })
+    expect(sessionContext.sync).toHaveBeenCalledWith('s1', 'issue-service')
   })
 
   it('refuses an unknown tracker', async () => {

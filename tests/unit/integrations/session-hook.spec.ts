@@ -34,12 +34,23 @@ function readSettings(): Record<string, unknown> {
 // receives on stdout, and asserting on the source string would prove nothing.
 
 describe('the hook script, executed', () => {
-  async function runScript(contextFileContents: string | null): Promise<string> {
+  async function runScript(
+    contextFileContents: string | null,
+    options: { sessionContextDir?: string; env?: Record<string, string> } = {}
+  ): Promise<string> {
     const mod = await load()
     const scriptPath = await mod.installHookScript(userData)
     const contextFile = path.join(userData, 'ctx.json')
     if (contextFileContents !== null) fs.writeFileSync(contextFile, contextFileContents, 'utf8')
-    return execFileSync(process.execPath, [scriptPath, contextFile], { encoding: 'utf8' })
+    const args = [
+      scriptPath,
+      contextFile,
+      ...(options.sessionContextDir ? [options.sessionContextDir] : []),
+    ]
+    return execFileSync(process.execPath, args, {
+      encoding: 'utf8',
+      env: options.env ? { ...process.env, ...options.env } : process.env,
+    })
   }
 
   it('emits hookEventName — without it the runtime ignores the whole object', async () => {
@@ -76,6 +87,43 @@ describe('the hook script, executed', () => {
     expect(await runScript('"just a string"')).toBe('')
     expect(await runScript('null')).toBe('')
   })
+
+  describe('when the session has its own link', () => {
+    let sessionContextDir: string
+
+    beforeEach(() => {
+      sessionContextDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-hook-sctx-'))
+    })
+
+    it('stays silent — the session’s own hook already printed its context', async () => {
+      fs.writeFileSync(
+        path.join(sessionContextDir, 'term-1.json'),
+        JSON.stringify({ markdown: '# own link', key: 'OWN-1' }),
+        'utf8'
+      )
+      const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
+        sessionContextDir,
+        env: { TERMINATOR_SESSION_ID: 'term-1' },
+      })
+      expect(out).toBe('')
+    })
+
+    it('prints the project context when the session has no context file of its own', async () => {
+      const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
+        sessionContextDir,
+        env: { TERMINATOR_SESSION_ID: 'term-1' },
+      })
+      expect(JSON.parse(out).hookSpecificOutput.additionalContext).toBe('# project link')
+    })
+
+    it('prints as before when there is no terminal id at all', async () => {
+      const out = await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
+        sessionContextDir,
+        env: { TERMINATOR_SESSION_ID: '' },
+      })
+      expect(JSON.parse(out).hookSpecificOutput.additionalContext).toBe('# project link')
+    })
+  })
 })
 
 describe('hookCommand', () => {
@@ -89,6 +137,16 @@ describe('hookCommand', () => {
     expect(command.startsWith('ELECTRON_RUN_AS_NODE=1 ')).toBe(true)
     expect(command).toContain('/tmp/hook.cjs')
     expect(command).toContain(PROJECT_ID)
+  })
+
+  it('passes the session-context directory, so the project link can defer to the session’s own', async () => {
+    const mod = await load()
+    const command = mod.hookCommand({
+      execPath: '/bin/electron',
+      hookScriptPath: '/tmp/hook.cjs',
+      projectId: PROJECT_ID,
+    })
+    expect(command).toContain(path.join(userData, 'integrations', 'session-context'))
   })
 
   it('quotes paths containing spaces and apostrophes', async () => {

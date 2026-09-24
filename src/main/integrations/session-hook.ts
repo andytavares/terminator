@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { contextFilePath } from './agent-context.js'
+import { sessionContextDirectory } from './session-context.js'
 
 // How an agent session comes to already know the issue.
 //
@@ -28,13 +29,22 @@ import { contextFilePath } from './agent-context.js'
  */
 export const HOOK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
 const fs = require('fs')
+const path = require('path')
 
-const [contextFile] = process.argv.slice(2)
+const [contextFile, sessionContextDir] = process.argv.slice(2)
+const terminal = process.env.TERMINATOR_SESSION_ID
 
 // Anything at all wrong — no file, unreadable, malformed — exits quietly. A
 // session with no issue context is a session; a session that will not start is
 // a regression.
 try {
+  // The session's own link wins over the project's: if this terminal has a
+  // session context file, the user-level hook already printed it, and
+  // printing the project's on top would give the agent two contexts.
+  if (terminal && sessionContextDir && fs.existsSync(path.join(sessionContextDir, terminal + '.json'))) {
+    process.exit(0)
+  }
+
   const raw = fs.readFileSync(contextFile, 'utf8')
   const context = JSON.parse(raw)
   if (context && typeof context.markdown === 'string' && context.markdown.length > 0) {
@@ -99,6 +109,7 @@ export function hookCommand(options: HookCommandOptions): string {
     quote(options.execPath),
     quote(options.hookScriptPath),
     quote(contextFilePath(options.projectId)),
+    quote(sessionContextDirectory()),
   ].join(' ')
 }
 

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { app } from 'electron'
+import { sessionContextDirectory } from '../integrations/session-context.js'
 
 // How a conversation comes to be known.
 //
@@ -23,15 +24,18 @@ const REPORT_DIR_NAME = 'agent-sessions'
  * loose script beside the bundle survives development and vanishes from the
  * packaged app.
  *
- * Its whole authority is: read stdin, write one small file, exit 0. It prints
- * nothing — this hook runs before every agent session in every folder, and a
- * hook that fails loudly would break sessions that have nothing to do with it.
+ * Its whole authority is: read stdin, write one small file, and — if the
+ * terminal's session has its own issue link — print that link's context as
+ * `additionalContext`. Anything that goes wrong writing the report stays
+ * silent, the same as before: this hook runs before every agent session in
+ * every folder, and a hook that fails loudly would break sessions that have
+ * nothing to do with it.
  */
 export const CAPTURE_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
 const fs = require('fs')
 const path = require('path')
 
-const [reportDir] = process.argv.slice(2)
+const [reportDir, sessionContextDir] = process.argv.slice(2)
 const terminal = process.env.TERMINATOR_SESSION_ID
 
 let raw = ''
@@ -64,6 +68,27 @@ process.stdin.on('end', () => {
   } catch {
     // Intentionally silent: a session that starts knowing nothing is a session;
     // a session that will not start is a regression.
+  }
+
+  try {
+    if (terminal && sessionContextDir) {
+      const raw2 = fs.readFileSync(path.join(sessionContextDir, terminal + '.json'), 'utf8')
+      const context = JSON.parse(raw2)
+      if (context && typeof context.markdown === 'string' && context.markdown.length > 0) {
+        process.stdout.write(
+          JSON.stringify({
+            hookSpecificOutput: {
+              // Required. Without it the runtime ignores the whole object.
+              hookEventName: 'SessionStart',
+              additionalContext: context.markdown,
+              sessionTitle: typeof context.key === 'string' ? context.key : undefined,
+            },
+          })
+        )
+      }
+    }
+  } catch {
+    // No session context, or it could not be read — print nothing.
   } finally {
     process.exit(0)
   }
@@ -123,6 +148,7 @@ function captureCommand(options: CaptureHookOptions): string {
     quote(options.execPath),
     quote(options.scriptPath),
     quote(reportDirectory()),
+    quote(sessionContextDirectory()),
   ].join(' ')
   // Guarded by the script's own existence. This entry lives in the operator's
   // settings and outlives any particular install of this application — a
