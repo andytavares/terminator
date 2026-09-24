@@ -18,6 +18,7 @@ export function fact(patch: Partial<SessionFacts> = {}): SessionFacts {
     workItem: null,
     description: null,
     lastActivityAt: 0,
+    lastAttendedAt: null,
     startedAt: '2026-09-15T10:00:00.000Z',
     closedAt: null,
     latestLine: '',

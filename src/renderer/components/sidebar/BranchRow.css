@@ -85,28 +85,18 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: var(--text-primary);
 }
 
-.branch-row__gutter svg {
+/* Sized to fit the fixed gutter column: the fill and edge carry the state
+   (Constitution XII: shape and opacity on the glyph itself, never hue). */
+.branch-row__gutter .state-chip--compact {
+  padding: 1px;
+}
+
+.branch-row__gutter .state-chip__icon svg {
   width: 11px;
   height: 11px;
   display: block;
-}
-
-/* Opacity, never hue — Constitution XII, and it is what keeps the four states
-   readable in greyscale. Waiting is the only one at full strength. */
-.branch-row__state--awaiting-input {
-  opacity: var(--state-op-awaiting);
-}
-.branch-row__state--working {
-  opacity: var(--state-op-working);
-}
-.branch-row__state--idle {
-  opacity: var(--state-op-idle);
-}
-.branch-row__state--exited {
-  opacity: var(--state-op-exited);
 }
 
 /* Always occupied so the name starts in the same place whether or not the row

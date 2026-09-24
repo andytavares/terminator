@@ -10,8 +10,10 @@ import type { IssueSummary } from '../../../../src/shared/types/index'
 const titles = new Map([['linear:NW-88', 'Rate limit per API key']])
 
 describe('buildLogbook', () => {
+  const T1 = '2026-09-15T10:00:00.000Z'
+  const T2 = '2026-09-15T10:01:00.000Z'
   const facts = [
-    fact({ sessionId: 'idle-old', state: 'idle', lastActivityAt: 1 }),
+    fact({ sessionId: 'idle-old', state: 'idle', startedAt: T1 }),
     fact({
       sessionId: 'closed-old',
       isClosed: true,
@@ -19,7 +21,7 @@ describe('buildLogbook', () => {
       closedAt: '2026-09-14T00:00:00.000Z',
     }),
     fact({ sessionId: 'needs', state: 'awaiting-input' }),
-    fact({ sessionId: 'idle-new', state: 'idle', lastActivityAt: 9 }),
+    fact({ sessionId: 'idle-new', state: 'idle', startedAt: T2 }),
     fact({
       sessionId: 'closed-new',
       isClosed: true,
@@ -29,20 +31,34 @@ describe('buildLogbook', () => {
     fact({ sessionId: 'exited', state: 'exited' }),
   ]
 
-  it('groups by what each session is doing, in the order they need attention', () => {
+  it('groups needs you, running, and exited, oldest first within a group', () => {
     expect(
       buildLogbook(facts, '', titles).map((g) => [g.label, g.facts.map((f) => f.sessionId)])
     ).toEqual([
       ['Needs you', ['needs']],
-      ['Idle', ['idle-new', 'idle-old']],
+      ['Running', ['idle-old', 'idle-new']],
       ['Exited', ['exited']],
       ['Closed', ['closed-new', 'closed-old']],
     ])
   })
 
+  it('keeps working and idle sessions in the same Running group, unmoved by a state flip', () => {
+    const T3 = '2026-09-15T10:02:00.000Z'
+    const running = [
+      fact({ sessionId: 'w1', state: 'working', startedAt: T1 }),
+      fact({ sessionId: 'w2', state: 'idle', startedAt: T3 }),
+    ]
+    const before = buildLogbook(running, '', titles)[0].facts.map((f) => f.sessionId)
+    const flipped = running.map((f) =>
+      f.sessionId === 'w1' ? { ...f, state: 'idle' as const } : f
+    )
+    const after = buildLogbook(flipped, '', titles)[0].facts.map((f) => f.sessionId)
+    expect(after).toEqual(before)
+  })
+
   it('leaves out a group with nothing in it', () => {
     expect(buildLogbook([fact({ state: 'working' })], '', titles).map((g) => g.label)).toEqual([
-      'Working',
+      'Running',
     ])
   })
 

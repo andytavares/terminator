@@ -3,6 +3,7 @@ import { buildBranchRows } from '../../../../src/renderer/sidebar/branch-rows'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import type { SessionView } from '../../../../src/renderer/sidebar/view-model'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
+import type { WorkItem } from '../../../../src/renderer/sidebar/work-item'
 
 const NOW = 1_000_000_000
 const STALE_AFTER = 2 * 60 * 60 * 1000
@@ -486,5 +487,54 @@ describe('buildBranchRows', () => {
     const orphan: Project = { ...feature, id: 'p9', workspaceId: 'ws-gone' }
     const result = buildBranchRows([], [...PROJECTS, orphan], REPOS, view(), NOW, STALE_AFTER)
     expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).not.toContain('p9')
+  })
+
+  describe('workItem', () => {
+    const item: WorkItem = { source: 'session', ref: { tracker: 'linear', key: 'ENG-1' } }
+
+    it('threads a terminal work item from the map, keyed by session id', () => {
+      const result = buildBranchRows(
+        [session('a', 'p1')],
+        PROJECTS,
+        REPOS,
+        view(),
+        NOW,
+        STALE_AFTER,
+        new Map([['a', item]])
+      )
+      const terminal = rowFor(result, 'p1')!.terminals[0]
+      expect(terminal.workItem).toEqual(item)
+    })
+
+    it('is null for a session absent from the map', () => {
+      const result = buildBranchRows(
+        [session('a', 'p1')],
+        PROJECTS,
+        REPOS,
+        view(),
+        NOW,
+        STALE_AFTER
+      )
+      expect(rowFor(result, 'p1')!.terminals[0].workItem).toBeNull()
+    })
+
+    it('threads a pane work item independently of its root', () => {
+      const rootItem: WorkItem = { source: 'project', ref: { tracker: 'linear', key: 'ENG-2' } }
+      const result = buildBranchRows(
+        [session('a', 'p1'), session('b', 'p1', { parentSessionId: 'a' })],
+        PROJECTS,
+        REPOS,
+        view(),
+        NOW,
+        STALE_AFTER,
+        new Map([
+          ['a', rootItem],
+          ['b', item],
+        ])
+      )
+      const root = rowFor(result, 'p1')!.terminals[0]
+      expect(root.workItem).toEqual(rootItem)
+      expect(root.panes[0].workItem).toEqual(item)
+    })
   })
 })

@@ -24,6 +24,7 @@ function handleBell(sessionId: string): void {
     title: 'Terminator',
     message: `${session.tabTitle} needs attention`,
     key: 'terminalBell',
+    sessionId,
   })
 }
 
@@ -36,6 +37,21 @@ const ACTIVITY_STAMP_INTERVAL_MS = 1000
 const lastStampedAt = new Map<string, number>()
 let now: () => number = Date.now
 
+// The needs-you read (latestLine/choicePrompt) settles at IDLE_DEBOUNCE_MS so
+// detection stays fast; the state icon itself waits this much longer so a
+// brief pause in output (total 1500 + 3500 = 5s quiet) doesn't flip it to
+// Idle and back.
+const WORKING_HOLD_MS = 3500
+const pendingIdle = new Map<string, ReturnType<typeof setTimeout>>()
+
+function clearPendingIdle(sessionId: string): void {
+  const timer = pendingIdle.get(sessionId)
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    pendingIdle.delete(sessionId)
+  }
+}
+
 /** Test seam: lets a spec drive the throttle without timers. */
 export function setActivityClock(clock: () => number): void {
   now = clock
@@ -44,6 +60,8 @@ export function setActivityClock(clock: () => number): void {
 /** Test seam: clears the per-session throttle state between specs. */
 export function resetActivityThrottle(): void {
   lastStampedAt.clear()
+  for (const timer of pendingIdle.values()) clearTimeout(timer)
+  pendingIdle.clear()
 }
 
 /** Returns whether it stamped, so a caller can do its own throttled work on the same beat. */
@@ -60,6 +78,7 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
   const instance: TerminalInstance = new TerminalInstance(sessionId, scrollbackLimit, {
     onBell: () => handleBell(sessionId),
     onBusy: () => {
+      clearPendingIdle(sessionId)
       const stamped = stampActivity(sessionId)
       const store = useSessionStore.getState()
       store.setSessionBusy(sessionId)
@@ -78,15 +97,24 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
       // Unthrottled: idle is the end of a burst, and its timestamp is the one
       // that decides how stale the session looks from here on.
       stampActivity(sessionId, true)
-      useSessionStore.getState().setSessionIdle(sessionId)
       // Read once per burst, when the screen has stopped moving, rather than
-      // per output chunk across every live terminal.
+      // per output chunk across every live terminal. Needs-you detection must
+      // not wait for the working-hold below.
       const rows = instance.readVisibleRows()
       useSessionStore.getState().setSessionScreen(sessionId, {
         latestLine: latestLineOf(rows, instance.cursorRow()),
         choicePrompt: parseChoicePrompt(rows),
       })
+      clearPendingIdle(sessionId)
+      pendingIdle.set(
+        sessionId,
+        setTimeout(() => {
+          pendingIdle.delete(sessionId)
+          useSessionStore.getState().setSessionIdle(sessionId)
+        }, WORKING_HOLD_MS)
+      )
     },
+    onDispose: () => clearPendingIdle(sessionId),
   })
   return instance
 }
@@ -138,6 +166,7 @@ export async function createTerminalSession(
   // both updates land so getTerminalInstance() is guaranteed to return the instance.
   store.setTerminalInstance(sessionId, instance)
   store.setActiveSessionForProject(projectId, sessionId)
+  store.requestFocus(sessionId)
   return sessionId
 }
 

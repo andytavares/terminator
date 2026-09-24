@@ -47,7 +47,7 @@ describe('LedgerDisplayMenu', () => {
     expect(onChange).toHaveBeenCalledWith({ groupBy: 'project' })
     expect(screen.queryByRole('menu')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Display' }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Recent activity' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Recently opened' }))
     expect(onChange).toHaveBeenCalledWith({ sort: 'recent' })
   })
 

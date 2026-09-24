@@ -46,8 +46,13 @@
   outline-offset: -2px;
 }
 
-.logbook__item .state-icon {
-  padding-top: 3px;
+.logbook__item .state-chip {
+  margin-top: 3px;
+}
+
+.logbook__item .state-chip__icon svg {
+  width: 11px;
+  height: 11px;
 }
 
 .logbook__headline {

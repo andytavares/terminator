@@ -11,6 +11,7 @@ const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
 
 const ROW_CSS = read('../../../src/renderer/components/sidebar/BranchRow.css')
 const ROW_TSX = read('../../../src/renderer/components/sidebar/BranchRow.tsx')
+const CHIP_CSS = read('../../../src/renderer/components/session/StateChip.css')
 
 function ruleBody(css: string, selector: string): string {
   const start = css.indexOf(`${selector} {`)
@@ -45,22 +46,26 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
     expect(Math.abs(scale[2] - scale[3])).toBeGreaterThanOrEqual(0.05)
   })
 
-  it('puts no colour on the status glyph — shape is the only state channel', () => {
-    const statusRules = [...ROW_CSS.matchAll(/\.branch-row__(gutter|state)[^{]*\{([^}]*)\}/g)]
-    expect(statusRules.length).toBeGreaterThan(0)
-    for (const [, , body] of statusRules) {
+  it('puts no colour on the status glyph itself — shape and opacity are the only channels', () => {
+    // The glyph's own rules live in StateChip.css now (BranchRow just sizes
+    // the compact chip to its gutter). The chip's fill/edge colour the row
+    // around the glyph, never the glyph — that boundary is what this checks.
+    const iconRules = [...CHIP_CSS.matchAll(/\.state-chip__icon[^{]*\{([^}]*)\}/g)]
+    expect(iconRules.length).toBeGreaterThan(0)
+    for (const [, body] of iconRules) {
       expect(body).not.toMatch(/(^|\s)fill:/)
-      // The gutter sets a text colour so the glyph inherits currentColor; what
-      // it must never do is vary that colour by state.
       expect(body).not.toMatch(/color:\s*var\(--(danger|success|warning|accent)\)/)
     }
+    expect(ROW_CSS).not.toMatch(
+      /\.branch-row__gutter\s*\{[^}]*color:\s*var\(--(danger|success|warning|accent)\)/
+    )
   })
 
-  it('marks awaiting-input by emphasis in the gutter, not by an edge of its own', () => {
+  it('marks awaiting-input by opacity on the glyph, not by an edge of its own on the row', () => {
     // The needs-you bar used to be a left edge, which meant it overwrote the
     // repo's rail — two signals fighting for the same three pixels. The
-    // emphasis moved into the status gutter, and the edge belongs to the repo.
-    expect(ruleBody(ROW_CSS, '.branch-row__state--awaiting-input')).toMatch(
+    // glyph's own emphasis is opacity; the row's rail belongs to the repo.
+    expect(ruleBody(CHIP_CSS, '.state-chip__icon--awaiting-input')).toMatch(
       /opacity:\s*var\(--state-op-awaiting\)/
     )
     expect(ROW_CSS).not.toMatch(/\.branch-row--needs-you/)
@@ -85,7 +90,7 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
   it('draws its status glyphs from lucide, sized by CSS rather than the size prop', () => {
     expect(ROW_TSX).toMatch(/from 'lucide-react'/)
     expect(ROW_TSX).not.toMatch(/size=\{/)
-    expect(ROW_CSS).toMatch(/\.branch-row__gutter svg\s*\{[^}]*width:/)
+    expect(ROW_CSS).toMatch(/\.branch-row__gutter \.state-chip__icon svg\s*\{[^}]*width:/)
   })
 
   it('never sets an explicit colour on an icon', () => {

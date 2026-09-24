@@ -46,25 +46,16 @@
   place-items: center;
 }
 
-.terminal-row__gutter svg {
+/* Sized to fit the fixed gutter column — the same rule the branch rows
+   follow, so the two columns read as one. */
+.terminal-row__gutter .state-chip--compact {
+  padding: 1px;
+}
+
+.terminal-row__gutter .state-chip__icon svg {
   width: 9px;
   height: 9px;
   display: block;
-}
-
-/* Opacity carries the state, never colour — the same rule the branch rows
-   follow, so the two columns read as one. */
-.terminal-row__state--awaiting-input {
-  opacity: var(--state-op-awaiting);
-}
-.terminal-row__state--working {
-  opacity: var(--state-op-working);
-}
-.terminal-row__state--idle {
-  opacity: var(--state-op-idle);
-}
-.terminal-row__state--exited {
-  opacity: var(--state-op-exited);
 }
 
 .terminal-row__name {
@@ -72,6 +63,16 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Plain text, the same treatment the branch row's own issue key gets — the
+   key alone is the whole fact, so a badge or border would say it twice. */
+.terminal-row__key {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 

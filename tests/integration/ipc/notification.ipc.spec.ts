@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -8,6 +8,7 @@ vi.mock('electron', () => ({
   },
   Notification: { isSupported: () => false },
   app: { dock: null },
+  BrowserWindow: { getAllWindows: vi.fn(() => []) },
 }))
 
 const { mockList, mockDismiss, mockTriggerAction, mockCreate } = vi.hoisted(() => ({
@@ -82,6 +83,43 @@ describe('notification IPC handlers', () => {
         targets: ['system', 'toast'],
       })
       expect(mockCreate).toHaveBeenCalledWith({ type: 'success', title: 'T', key: 'tKey' })
+    })
+
+    it('omits onClick when no sessionId is given', async () => {
+      mockCreate.mockReturnValue('tid')
+      const handler = captureHandle('notifications:create')
+      await handler(null, { type: 'info', title: 'T', key: 'tKey' })
+      expect(mockCreate).toHaveBeenCalledWith({ type: 'info', title: 'T', key: 'tKey' })
+    })
+
+    it('passes an onClick that shows, focuses and navigates every window when sessionId is given', async () => {
+      mockCreate.mockReturnValue('sid')
+      const win = {
+        isDestroyed: () => false,
+        isMinimized: () => false,
+        restore: vi.fn(),
+        show: vi.fn(),
+        focus: vi.fn(),
+        webContents: { isDestroyed: () => false, send: vi.fn() },
+      }
+      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([win] as unknown as ReturnType<
+        typeof BrowserWindow.getAllWindows
+      >)
+      const handler = captureHandle('notifications:create')
+      await handler(null, { type: 'info', title: 'T', key: 'tKey', sessionId: 'ses-1' })
+      const passed = mockCreate.mock.calls[0][0] as { onClick?: () => void }
+      expect(passed).toEqual({
+        type: 'info',
+        title: 'T',
+        key: 'tKey',
+        onClick: expect.any(Function),
+      })
+      passed.onClick!()
+      expect(win.show).toHaveBeenCalled()
+      expect(win.focus).toHaveBeenCalled()
+      expect(win.webContents.send).toHaveBeenCalledWith('terminal:navigate-to-session', {
+        sessionId: 'ses-1',
+      })
     })
   })
 

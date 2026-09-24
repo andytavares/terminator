@@ -1,7 +1,6 @@
 import { matchesFilter, type IssueTitles } from './session-filter'
-import { STATUS_ORDER } from './view-model'
 import type { SessionFacts } from './session-facts'
-import type { AgentState, IssueSummary } from '../../shared/types/index'
+import type { IssueSummary } from '../../shared/types/index'
 
 export interface LogbookGroup {
   key: string
@@ -9,15 +8,17 @@ export interface LogbookGroup {
   facts: SessionFacts[]
 }
 
-const LABEL: Record<AgentState, string> = {
-  'awaiting-input': 'Needs you',
-  working: 'Working',
-  idle: 'Idle',
-  exited: 'Exited',
-}
+const GROUPS: Array<{ key: string; label: string; match: (facts: SessionFacts) => boolean }> = [
+  { key: 'needs-you', label: 'Needs you', match: (f) => f.state === 'awaiting-input' },
+  { key: 'running', label: 'Running', match: (f) => f.state === 'working' || f.state === 'idle' },
+  { key: 'exited', label: 'Exited', match: (f) => f.state === 'exited' },
+]
 
 const CLOSED = 'Closed'
 const SUGGESTIONS = 3
+
+const byStarted = (a: SessionFacts, b: SessionFacts): number =>
+  Date.parse(a.startedAt) - Date.parse(b.startedAt)
 
 /** The Logbook's list: by what each session is doing, then closed history, newest first. */
 export function buildLogbook(
@@ -26,12 +27,10 @@ export function buildLogbook(
   titles: IssueTitles
 ): LogbookGroup[] {
   const shown = facts.filter((f) => matchesFilter(f, text, titles))
-  const open = STATUS_ORDER.map((state) => ({
-    key: state,
-    label: LABEL[state],
-    facts: shown
-      .filter((f) => !f.isClosed && f.state === state)
-      .sort((a, b) => b.lastActivityAt - a.lastActivityAt),
+  const open = GROUPS.map(({ key, label, match }) => ({
+    key,
+    label,
+    facts: shown.filter((f) => !f.isClosed && match(f)).sort(byStarted),
   }))
   const closed = {
     key: CLOSED,

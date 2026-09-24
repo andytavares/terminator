@@ -167,6 +167,15 @@ interface SessionState {
   setSplitRatio: (projectId: string, splitId: string, ratio: number) => void
   getFocusedSession: (projectId: string) => string | null
   setFocusedSession: (projectId: string, sessionId: string) => void
+
+  /**
+   * A session that wants the keyboard, independent of whether it just became
+   * active. The nonce is what a pane's effect keys off — bumping it even when
+   * `sessionId` repeats is how "click the row that's already active" still
+   * moves focus off wherever it was (a div, another pane).
+   */
+  focusRequest: { sessionId: string; nonce: number } | null
+  requestFocus: (sessionId: string) => void
 }
 
 function patchSession(
@@ -195,6 +204,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   sessions: new Map(),
   terminalInstances: new Map(),
   projectViews: new Map(),
+  focusRequest: null,
 
   createSession: async (
     projectId,
@@ -516,5 +526,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setFocusedSession: (projectId, sessionId) => {
     set((s) => patchView(s, projectId, { focusedSessionId: sessionId }))
+  },
+
+  requestFocus: (sessionId) => {
+    set((s) => ({ focusRequest: { sessionId, nonce: (s.focusRequest?.nonce ?? 0) + 1 } }))
   },
 }))

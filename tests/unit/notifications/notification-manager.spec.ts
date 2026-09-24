@@ -219,6 +219,38 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     expect(handler).toHaveBeenCalledTimes(1)
   })
 
+  it('wires onClick to the system notification click event when there are no actions', () => {
+    withDefaultTargets('system')
+    const onClick = vi.fn()
+    notificationManager.create({
+      type: 'info',
+      title: 'Go',
+      key: 'goKey',
+      onClick,
+    })
+    expect(mockNotificationOn).toHaveBeenCalledWith('click', expect.any(Function))
+    const clickHandler = mockNotificationOn.mock.calls.find((c) => c[0] === 'click')![1]
+    clickHandler()
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('prefers onClick over the first action when both are present', () => {
+    withDefaultTargets('system')
+    const onClick = vi.fn()
+    const actionHandler = vi.fn()
+    notificationManager.create({
+      type: 'info',
+      title: 'Approve?',
+      key: 'approveKey',
+      actions: [{ id: 'approve', label: 'Approve', handler: actionHandler }],
+      onClick,
+    })
+    const clickHandler = mockNotificationOn.mock.calls.find((c) => c[0] === 'click')![1]
+    clickHandler()
+    expect(onClick).toHaveBeenCalledTimes(1)
+    expect(actionHandler).not.toHaveBeenCalled()
+  })
+
   it('does not wire a click handler when there are no actions', () => {
     withDefaultTargets('system')
     notificationManager.create({ type: 'info', title: 'No actions', key: 'noActionsKey' })

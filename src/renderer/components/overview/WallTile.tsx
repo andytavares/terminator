@@ -1,6 +1,6 @@
 import React from 'react'
 import { SquareArrowOutUpRight } from 'lucide-react'
-import { StateIcon } from '../session/StateIcon'
+import { StateChip } from '../session/StateChip'
 import { LivePreview } from '../session/LivePreview'
 import { WorkItemCell } from '../session/WorkItemCell'
 import { ResumeButton } from '../session/ResumeButton'
@@ -65,7 +65,7 @@ export function WallTile({
 
   return (
     <article
-      className="wall-tile"
+      className={`wall-tile${facts.state === 'awaiting-input' ? ' wall-tile--needs' : ''}`}
       data-band={placement.band}
       aria-label={`${location}, ${facts.name}`}
       tabIndex={0}
@@ -80,7 +80,7 @@ export function WallTile({
       }}
     >
       <div className="wall-tile__cap">
-        <StateIcon state={facts.state} />
+        <StateChip state={facts.state} />
         <span className="wall-tile__where">{location}</span>
         <span className="wall-tile__name">{facts.name}</span>
         <span className="wall-tile__age">{formatRelativeTime(facts.lastActivityAt, now)}</span>

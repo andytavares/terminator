@@ -41,7 +41,10 @@ export interface CoreActionDeps {
   onResume(): void
   onSwitchWorkspace(workspaceId: string): void
   onCycleWorkspace(delta: number): void
+  /** Links the focused terminal's own session — not its branch. */
   onLinkIssue(): void
+  /** The old "Link issue" behaviour: links the focused branch. */
+  onLinkIssueBranch(): void
   onViewIssue(): void
   onCopyIssueKey(): void
   onOpenIssue(): void
@@ -334,12 +337,22 @@ export function buildCoreActions(deps: CoreActionDeps): QuickAction[] {
       run: () => deps.onCycleWorkspace(-1),
     },
     {
+      // Targets the focused terminal's own session — the branch's link is
+      // "Link issue to branch", below.
       id: 'core.link-issue',
-      label: deps.issueLink ? 'Change linked issue' : 'Link issue to project',
+      label: deps.issueLink ? 'Change linked issue' : 'Link issue',
       group: 'workspace',
       mnemonic: 'l',
-      disabledReason: deps.hasProjectFocused ? undefined : NO_PROJECT,
+      disabledReason: deps.hasTerminalFocused ? undefined : NO_TERMINAL,
       run: deps.onLinkIssue,
+    },
+    {
+      id: 'core.link-issue-branch',
+      label: 'Link issue to branch',
+      group: 'workspace',
+      mnemonic: 'k',
+      disabledReason: deps.hasProjectFocused ? undefined : NO_PROJECT,
+      run: deps.onLinkIssueBranch,
     },
     {
       id: 'core.view-issue',

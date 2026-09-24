@@ -8,6 +8,14 @@ let userData: string
 
 vi.mock('electron', () => ({ app: { getPath: () => userData } }))
 
+const sessionContext = vi.hoisted(() => ({ deleted: [] as string[] }))
+
+vi.mock('../../../src/main/integrations/session-context', () => ({
+  deleteSessionContext: async (sessionId: string) => {
+    sessionContext.deleted.push(sessionId)
+  },
+}))
+
 async function load() {
   vi.resetModules()
   return import('../../../src/main/sessions/session-record-store')
@@ -28,6 +36,7 @@ const SNAP: SessionSnapshot = {
 
 beforeEach(() => {
   userData = fs.mkdtempSync(path.join(os.tmpdir(), 'session-record-store-'))
+  sessionContext.deleted.length = 0
 })
 
 describe('session-record-store — loading', () => {
@@ -201,6 +210,13 @@ describe('session-record-store — closing', () => {
     await store.markClosed('s1', new Date('2026-09-15T11:00:00.000Z'))
     await store.markClosed('s1', new Date('2026-09-15T12:00:00.000Z'))
     expect(store.listRecords()[0]?.closedAt).toBe('2026-09-15T11:00:00.000Z')
+  })
+
+  it('deletes the session’s agent context when it closes', async () => {
+    const store = await load()
+    await store.setDescription(SNAP, 'why')
+    await store.markClosed('s1', new Date('2026-09-15T11:00:00.000Z'))
+    expect(sessionContext.deleted).toContain('s1')
   })
 
   it('closes every open record at its last update when swept', async () => {
@@ -394,6 +410,30 @@ describe('session-record-store — forgetting', () => {
     const reloaded = await load()
     await reloaded.loadRecords()
     expect(reloaded.listRecords()).toEqual([])
+  })
+
+  it('deletes the session’s agent context when it is forgotten', async () => {
+    const store = await load()
+    await store.setDescription(SNAP, 'why')
+    await store.markClosed('s1', new Date('2026-09-15T19:00:00.000Z'))
+    sessionContext.deleted.length = 0
+    await store.forget('s1')
+    expect(sessionContext.deleted).toContain('s1')
+  })
+
+  it('deletes the agent context of a record dropped by retention on load', async () => {
+    const stale = {
+      ...SNAP,
+      sessionId: 'stale',
+      description: 'old',
+      link: null,
+      updatedAt: SNAP.startedAt,
+      closedAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+    fs.writeFileSync(FILE(), JSON.stringify([stale]))
+    const store = await load()
+    await store.loadRecords()
+    expect(sessionContext.deleted).toContain('stale')
   })
 
   it('refuses to forget a session that is still open', async () => {

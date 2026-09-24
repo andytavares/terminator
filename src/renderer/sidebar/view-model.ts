@@ -36,6 +36,17 @@ export interface SessionView {
 export const STATUS_ORDER: AgentState[] = ['awaiting-input', 'working', 'idle', 'exited']
 
 /**
+ * Where a session sits in the three ranks a surface may reorder it across:
+ * needs you, running (working and idle share a rank so a busy↔quiet flip
+ * never moves a row), then exited.
+ */
+export function standingRank(state: AgentState): number {
+  if (state === 'awaiting-input') return 0
+  if (state === 'exited') return 2
+  return 1
+}
+
+/**
  * A session is stale when it has exited, or when it has been quiet for longer
  * than the threshold. A session waiting on you is never stale however long it
  * waits — it is blocked on you, which is the opposite of abandoned.

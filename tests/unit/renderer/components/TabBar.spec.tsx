@@ -9,19 +9,46 @@ import type { ComponentType } from 'react'
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn(),
 }))
-const records = vi.hoisted(() => ({ setDescription: vi.fn().mockResolvedValue(true) }))
-vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: (select: (s: unknown) => unknown) => select(records),
+const records = vi.hoisted(() => ({
+  setDescription: vi.fn().mockResolvedValue(true),
+  setLink: vi.fn().mockResolvedValue(true),
 }))
-// The tab's description comes from the session's facts. Here every session the
-// tab bar lists carries its description on a `description` field for the test.
+vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
+  useSessionRecordsStore: Object.assign((select: (s: unknown) => unknown) => select(records), {
+    getState: () => records,
+  }),
+}))
+vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
+  SessionLinkDialog: ({
+    facts,
+    onClose,
+  }: {
+    facts: { sessionId: string }
+    onClose: () => void
+  }) => (
+    <div data-testid="session-link-dialog">
+      {facts.sessionId}
+      <button onClick={onClose}>close-session-link</button>
+    </div>
+  ),
+}))
+// The tab's description and work item come from the session's facts. Here
+// every session the tab bar lists carries `description` and `workItem`
+// fields directly, for the test.
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () =>
-    (mockGetSessions() ?? []).map((s: { id: string; description?: string }) => ({
-      sessionId: s.id,
-      description: s.description ?? null,
-      snapshot: { sessionId: s.id },
-    })),
+    (mockGetSessions() ?? []).map(
+      (s: {
+        id: string
+        description?: string
+        workItem?: { source: 'session' | 'project'; ref: { tracker: string; key: string } }
+      }) => ({
+        sessionId: s.id,
+        description: s.description ?? null,
+        workItem: s.workItem ?? null,
+        snapshot: { sessionId: s.id },
+      })
+    ),
 }))
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   useWorkspaceStore: vi.fn(),
@@ -37,6 +64,7 @@ vi.mock('../../../../src/renderer/components/sidebar/MoveSessionDialog', () => (
 
 const mockCloseSession = vi.fn()
 const mockSetActive = vi.fn()
+const mockRequestFocus = vi.fn()
 const mockGetActive = vi.fn()
 const mockGetSessions = vi.fn()
 const mockGetBell = vi.fn()
@@ -68,6 +96,7 @@ beforeEach(() => {
     isSessionBusy: vi.fn().mockReturnValue(false),
     renameSession: mockRenameSession,
     reorderSessions: mockReorderSessions,
+    requestFocus: mockRequestFocus,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useWorkspaceStore).mockReturnValue({
     workspaces: [],
@@ -198,6 +227,7 @@ describe('TabBar', () => {
     renderTabBar()
     fireEvent.click(screen.getByText('zsh'))
     expect(mockSetActive).toHaveBeenCalledWith('proj-1', 'ses-2')
+    expect(mockRequestFocus).toHaveBeenCalledWith('ses-2')
   })
 
   it('double-click on session title shows rename input', () => {
@@ -349,6 +379,56 @@ describe('TabBar', () => {
       fireEvent.contextMenu(tab)
       fireEvent.click(screen.getByText('Rename'))
       expect(screen.getByRole('textbox')).toBeTruthy()
+    })
+  })
+
+  describe('session work item', () => {
+    it('draws a key chip for a session with its own link', () => {
+      mockGetSessions.mockReturnValue([
+        {
+          id: 'ses-1',
+          tabTitle: 'bash',
+          type: 'human',
+          agentState: 'idle',
+          workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-4' } },
+        },
+      ])
+      mockGetActive.mockReturnValue('ses-1')
+      renderTabBar()
+      expect(screen.getByText('ENG-4')).toBeTruthy()
+    })
+
+    it('offers only "Link issue…" when the tab has no own link', () => {
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'bash', type: 'human', agentState: 'idle' },
+      ])
+      mockGetActive.mockReturnValue('ses-1')
+      renderTabBar()
+      const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+      fireEvent.contextMenu(tab)
+      expect(screen.getByText('Link issue…')).toBeTruthy()
+      expect(screen.queryByText('Remove session link')).toBeNull()
+      fireEvent.click(screen.getByText('Link issue…'))
+      expect(screen.getByTestId('session-link-dialog')).toBeTruthy()
+    })
+
+    it('offers change and remove, and removes via the records store, when the tab has its own link', () => {
+      mockGetSessions.mockReturnValue([
+        {
+          id: 'ses-1',
+          tabTitle: 'bash',
+          type: 'human',
+          agentState: 'idle',
+          workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-4' } },
+        },
+      ])
+      mockGetActive.mockReturnValue('ses-1')
+      renderTabBar()
+      const tab = screen.getByTitle('Double-click to rename').closest('.tab-bar__tab--session')!
+      fireEvent.contextMenu(tab)
+      expect(screen.getByText('Change linked issue…')).toBeTruthy()
+      fireEvent.click(screen.getByText('Remove session link'))
+      expect(records.setLink).toHaveBeenCalledWith({ sessionId: 'ses-1' }, null)
     })
   })
 
@@ -562,6 +642,7 @@ describe('TabBar — the description, edited from the tab (054 FR-006)', () => {
       isSessionBusy: vi.fn().mockReturnValue(false),
       renameSession: mockRenameSession,
       reorderSessions: mockReorderSessions,
+      requestFocus: mockRequestFocus,
     } as unknown as ReturnType<typeof useSessionStore>)
     mockGetSessions.mockReturnValue([noted()])
     mockGetActive.mockReturnValue('ses-1')

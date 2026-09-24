@@ -42,8 +42,8 @@
   outline-offset: -2px;
 }
 
-.wall-tile[data-band='needs'] {
-  border-color: var(--border-strong);
+.wall-tile--needs {
+  border-color: var(--state-needs);
 }
 
 .wall-tile__cap {

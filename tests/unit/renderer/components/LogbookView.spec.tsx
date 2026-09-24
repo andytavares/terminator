@@ -93,7 +93,7 @@ describe('LogbookView — the list', () => {
     const needs = within(list).getByRole('group', { name: 'Needs you' })
     expect(within(needs).getByRole('option', { name: /Rate limit per API key/ })).toBeTruthy()
     expect(
-      within(within(list).getByRole('group', { name: 'Idle' })).getByRole('option', {
+      within(within(list).getByRole('group', { name: 'Running' })).getByRole('option', {
         name: /Add a description/,
       })
     ).toBeTruthy()

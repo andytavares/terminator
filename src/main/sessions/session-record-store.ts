@@ -9,6 +9,7 @@ import type {
 } from '../../shared/types/index.js'
 import { pruneRecords } from '../../shared/session-records/retention.js'
 import { DESCRIPTION_MAX_LENGTH } from '../../shared/schemas/session-records.schema.js'
+import { deleteSessionContext } from '../integrations/session-context.js'
 
 // What the operator wrote about a session, and the ticket they pinned to it.
 //
@@ -43,9 +44,13 @@ function announce(sessionId: string): void {
 }
 
 async function persist(): Promise<void> {
+  const before = new Set(records.keys())
   const kept = pruneRecords([...records.values()], Date.now())
   records.clear()
   for (const record of kept) records.set(record.sessionId, record)
+  for (const id of before) {
+    if (!records.has(id)) await deleteSessionContext(id)
+  }
   const target = filePath()
   const tmp = `${target}.tmp`
   await fs.writeFile(tmp, JSON.stringify(kept, null, 2), 'utf8')
@@ -111,7 +116,12 @@ export async function loadRecords(): Promise<void> {
       ...(typeof r.closedAt === 'string' ? { closedAt: r.closedAt } : {}),
     })
   }
-  for (const record of pruneRecords(loaded, Date.now())) records.set(record.sessionId, record)
+  const kept = pruneRecords(loaded, Date.now())
+  for (const record of kept) records.set(record.sessionId, record)
+  const keptIds = new Set(kept.map((r) => r.sessionId))
+  for (const record of loaded) {
+    if (!keptIds.has(record.sessionId)) await deleteSessionContext(record.sessionId)
+  }
 }
 
 /**
@@ -238,6 +248,7 @@ export async function markClosed(sessionId: string, at: Date): Promise<void> {
   if (existing === undefined || existing.closedAt !== undefined) return
   records.set(sessionId, { ...existing, closedAt: at.toISOString() })
   await persist()
+  await deleteSessionContext(sessionId)
   announce(sessionId)
 }
 
@@ -255,6 +266,7 @@ export async function forget(sessionId: string): Promise<boolean> {
   if (existing === undefined || existing.closedAt === undefined) return false
   records.delete(sessionId)
   await persist()
+  await deleteSessionContext(sessionId)
   announce(sessionId)
   return true
 }

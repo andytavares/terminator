@@ -7,6 +7,11 @@ import { TerminalPane } from '../../../../src/renderer/components/terminal/Termi
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn(),
 }))
+const mockModalDepth = vi.fn(() => 0)
+vi.mock('../../../../src/renderer/stores/modal.store', () => ({
+  useModalStore: (selector: (s: { depth: number }) => unknown) =>
+    selector({ depth: mockModalDepth() }),
+}))
 vi.mock('../../../../src/renderer/components/terminal/SplitContainer', () => ({
   SplitContainer: ({
     splitId,
@@ -67,8 +72,11 @@ const mockTerminalInput = vi.fn()
 const mockGetPaneLayout = vi.fn(() => null)
 const mockSetSplitRatio = vi.fn()
 
+const mockSetFocusedSession = vi.fn()
+
 beforeEach(() => {
   vi.clearAllMocks()
+  mockModalDepth.mockReturnValue(0)
   vi.mocked(useSessionStore).mockReturnValue({
     getSessionsForProject: mockGetSessions,
     getActiveSessionForProject: mockGetActive,
@@ -76,7 +84,8 @@ beforeEach(() => {
     clearBellCount: mockClearBell,
     getPaneLayout: mockGetPaneLayout,
     setSplitRatio: mockSetSplitRatio,
-    setFocusedSession: vi.fn(),
+    setFocusedSession: mockSetFocusedSession,
+    focusRequest: null,
   } as unknown as ReturnType<typeof useSessionStore>)
   mockGetSessions.mockReturnValue([])
   mockGetActive.mockReturnValue(null)
@@ -256,6 +265,101 @@ describe('TerminalPane', () => {
     mockGetActive.mockReturnValue('ses-2')
     rerender(<TerminalPane projectId="proj-1" />)
     expect(mockUnmount).toHaveBeenCalled()
+  })
+
+  describe('focusRequest', () => {
+    function withRaf(): void {
+      vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+        ;(cb as FrameRequestCallback)(0)
+        return 0
+      })
+    }
+
+    it('focuses the requested instance in single-pane mode', () => {
+      withRaf()
+      const mockFocus = vi.fn()
+      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+      mockGetActive.mockReturnValue('ses-1')
+      mockGetInstance.mockReturnValue({
+        terminal: { focus: mockFocus, scrollToBottom: vi.fn() },
+        mount: vi.fn(),
+        unmount: vi.fn(),
+      })
+      vi.mocked(useSessionStore).mockReturnValue({
+        getSessionsForProject: mockGetSessions,
+        getActiveSessionForProject: mockGetActive,
+        getTerminalInstance: mockGetInstance,
+        clearBellCount: mockClearBell,
+        getPaneLayout: mockGetPaneLayout,
+        setSplitRatio: mockSetSplitRatio,
+        setFocusedSession: mockSetFocusedSession,
+        focusRequest: { sessionId: 'ses-1', nonce: 1 },
+      } as unknown as ReturnType<typeof useSessionStore>)
+      render(<TerminalPane projectId="proj-1" />)
+      expect(mockFocus).toHaveBeenCalled()
+    })
+
+    it('sets the focused leaf and focuses its instance in split mode', () => {
+      withRaf()
+      const mockFocus = vi.fn()
+      const layout = {
+        type: 'split',
+        id: 'split-1',
+        direction: 'vertical',
+        ratio: 0.5,
+        first: { type: 'leaf', sessionId: 'ses-1' },
+        second: { type: 'leaf', sessionId: 'ses-2' },
+      }
+      mockGetPaneLayout.mockReturnValue(layout)
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'T1', type: 'human' },
+        { id: 'ses-2', tabTitle: 'T2', type: 'human' },
+      ])
+      mockGetActive.mockReturnValue('ses-1')
+      mockGetInstance.mockReturnValue({
+        terminal: { focus: mockFocus, scrollToBottom: vi.fn() },
+        mount: vi.fn(),
+        unmount: vi.fn(),
+      })
+      vi.mocked(useSessionStore).mockReturnValue({
+        getSessionsForProject: mockGetSessions,
+        getActiveSessionForProject: mockGetActive,
+        getTerminalInstance: mockGetInstance,
+        clearBellCount: mockClearBell,
+        getPaneLayout: mockGetPaneLayout,
+        setSplitRatio: mockSetSplitRatio,
+        setFocusedSession: mockSetFocusedSession,
+        focusRequest: { sessionId: 'ses-2', nonce: 1 },
+      } as unknown as ReturnType<typeof useSessionStore>)
+      render(<TerminalPane projectId="proj-1" />)
+      expect(mockSetFocusedSession).toHaveBeenCalledWith('proj-1', 'ses-2')
+      expect(mockFocus).toHaveBeenCalled()
+    })
+
+    it('does not focus while a modal is open', () => {
+      withRaf()
+      mockModalDepth.mockReturnValue(1)
+      const mockFocus = vi.fn()
+      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+      mockGetActive.mockReturnValue('ses-1')
+      mockGetInstance.mockReturnValue({
+        terminal: { focus: mockFocus, scrollToBottom: vi.fn() },
+        mount: vi.fn(),
+        unmount: vi.fn(),
+      })
+      vi.mocked(useSessionStore).mockReturnValue({
+        getSessionsForProject: mockGetSessions,
+        getActiveSessionForProject: mockGetActive,
+        getTerminalInstance: mockGetInstance,
+        clearBellCount: mockClearBell,
+        getPaneLayout: mockGetPaneLayout,
+        setSplitRatio: mockSetSplitRatio,
+        setFocusedSession: mockSetFocusedSession,
+        focusRequest: { sessionId: 'ses-1', nonce: 1 },
+      } as unknown as ReturnType<typeof useSessionStore>)
+      render(<TerminalPane projectId="proj-1" />)
+      expect(mockFocus).not.toHaveBeenCalled()
+    })
   })
 
   describe('split mode (layout present)', () => {

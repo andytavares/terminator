@@ -46,6 +46,14 @@
   --state-op-idle: 0.34;
   --state-op-exited: 0.24;
 
+  /* Colour on fills and edges only — never on the glyph or as text (XII). Two
+     hues, spent on the two states that ask something of the operator: amber
+     for needs-you, green for working. Idle and exited stay neutral. */
+  --state-needs: var(--warning);
+  --state-working: var(--success);
+  --state-needs-fill: color-mix(in srgb, var(--warning) 14%, transparent);
+  --state-working-fill: color-mix(in srgb, var(--success) 14%, transparent);
+
   /* diff highlight backgrounds — added/removed line tints. Opacity is low enough
      that every text/syntax token below keeps WCAG AA (>=4.5:1) once composited
      over --bg-base, in both themes (see tests/unit/renderer/diff-syntax-contrast.spec.ts). */
@@ -164,6 +172,13 @@
   --danger: #962d20;
   --success: #0f5c2a;
   --warning: #a85a00;
+
+  /* state fills/edges — recomputed here so the tint stays 14% of the
+     light-theme hue rather than the dark one's. */
+  --state-needs: var(--warning);
+  --state-working: var(--success);
+  --state-needs-fill: color-mix(in srgb, var(--warning) 14%, transparent);
+  --state-working-fill: color-mix(in srgb, var(--success) 14%, transparent);
 
   /* syntax highlighting — light-theme equivalents, WCAG AA verified against
      --bg-base and against the diff tints composited over it. */

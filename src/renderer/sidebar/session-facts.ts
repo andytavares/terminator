@@ -35,6 +35,8 @@ export interface SessionFacts {
   workItem: WorkItem | null
   description: string | null
   lastActivityAt: number
+  /** Epoch ms of when this session last became the visible one, null when it never has. */
+  lastAttendedAt: number | null
   startedAt: string
   closedAt: string | null
   latestLine: string
@@ -97,6 +99,7 @@ function openFacts(
     ),
     description: record?.description ?? null,
     lastActivityAt: session.lastActivityAt,
+    lastAttendedAt: session.lastAttendedAt ?? null,
     startedAt: session.createdAt,
     closedAt: null,
     latestLine: session.latestLine ?? '',
@@ -132,6 +135,7 @@ function closedFacts(record: SessionRecordListing & { closedAt: string }): Sessi
     workItem: resolveWorkItem(link, null),
     description,
     lastActivityAt: Date.parse(closedAt),
+    lastAttendedAt: null,
     startedAt: record.startedAt,
     closedAt,
     latestLine: '',

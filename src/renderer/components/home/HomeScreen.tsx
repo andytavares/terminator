@@ -4,7 +4,7 @@ import { LedgerView } from './LedgerView'
 import { LogbookView } from './LogbookView'
 import { LedgerDisplayMenu } from './LedgerDisplayMenu'
 import { NewSessionMenu } from '../session/NewSessionMenu'
-import { StateIcon } from '../session/StateIcon'
+import { StateChip } from '../session/StateChip'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
@@ -124,7 +124,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
           className="home__toggle"
           onClick={() => setNeedsYou((v) => !v)}
         >
-          <StateIcon state="awaiting-input" />
+          <StateChip state="awaiting-input" compact />
           Needs you
           <span className="home__count">{needsYouCount}</span>
         </button>

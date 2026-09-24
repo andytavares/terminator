@@ -36,6 +36,8 @@ import { useSettingsStore } from './stores/settings.store'
 import { useIntegrationsStore } from './stores/integrations.store'
 import { useSessionRecordsStore } from './stores/session-records.store'
 import { useSessionStore } from './stores/session.store'
+import { useSessionFacts, useIssue } from './components/session/useSessionFacts'
+import { SessionLinkDialog } from './components/session/SessionLinkDialog'
 import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useExtensionEscapeExit } from './hooks/useExtensionEscapeExit'
@@ -56,6 +58,7 @@ import { AboutDialog } from './components/AboutDialog'
 import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 import { adoptTerminalSession } from './terminal/session-controller'
+import { revealSession } from './terminal/navigate-to-session'
 import { qualifiedBranchLabel } from './sidebar/branch-display'
 
 /** Counts the sessions waiting on the operator for Home's badge. */
@@ -83,7 +86,6 @@ export function App(): JSX.Element {
     activeProjectId,
     workspaces,
     setActiveWorkspace,
-    setActiveProject,
     projectsByWorkspaceId,
     resolveActiveCwd,
     scratchActive,
@@ -214,6 +216,7 @@ export function App(): JSX.Element {
   }, [activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
 
   const [editNoteSessionId, setEditNoteSessionId] = useState<string | null>(null)
+  const [linkSessionId, setLinkSessionId] = useState<string | null>(null)
 
   useKeyboardShortcuts({
     onEditSessionNote: () => {
@@ -384,6 +387,18 @@ export function App(): JSX.Element {
   const activeIssueLink = activeProjectId ? issueLinkFor(activeProjectId) : null
   const activeIssue = activeProjectId ? issueFor(activeProjectId) : null
 
+  // Quick Actions' issue actions follow the focused terminal's own resolved
+  // ticket — its own link, else its branch's — rather than always the branch's.
+  const sessionFacts = useSessionFacts()
+  const focusedFacts = focusedSessionId
+    ? sessionFacts.find((f) => f.sessionId === focusedSessionId)
+    : undefined
+  const focusedWorkItem = focusedFacts?.workItem ?? null
+  const focusedIssue = useIssue(focusedWorkItem?.ref ?? null)
+  const focusedIssueLink = focusedWorkItem
+    ? { key: focusedWorkItem.ref.key, tracker: focusedWorkItem.ref.tracker }
+    : null
+
   const coreActions = useMemo(
     () =>
       buildCoreActions({
@@ -392,8 +407,8 @@ export function App(): JSX.Element {
         activeWorkspaceId,
         workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
         sessions: paletteSessions,
-        issueLink: activeIssueLink,
-        issue: activeIssue,
+        issueLink: focusedIssueLink,
+        issue: focusedIssue ?? null,
         onNewTab: handleNewTab,
         onSplit: (direction) => {
           if (!qaProjectId) return
@@ -431,7 +446,15 @@ export function App(): JSX.Element {
           if (list.length === 0) return
           const idx = list.findIndex((s) => s.id === getActiveSessionForProject?.(qaProjectId))
           const next = list[(((idx + delta) % list.length) + list.length) % list.length]
+          // Cycling stays within the project already on screen — unlike the other
+          // "go to session" paths it must not switch to the session's own
+          // projectId — but still has to leave whatever tab is showing and ask
+          // for focus, the way every other path does.
+          useExtensionRegistry.getState().setActiveGlobalTab(null)
+          useExtensionRegistry.getState().setActiveWorkspaceTab(null)
+          useExtensionRegistry.getState().setActiveProjectTab(null)
           setActiveSessionForProject(qaProjectId, next.id)
+          useSessionStore.getState().requestFocus(next.id)
         },
         onCycleRecentSession: (delta) => {
           const all = [...sessions.values()]
@@ -440,20 +463,17 @@ export function App(): JSX.Element {
           if (all.length < 2) return
           const idx = all.findIndex((s) => s.id === focusedSessionId)
           const next = all[((idx === -1 ? 0 : idx) + delta + all.length) % all.length]
-          setActiveProject(next.projectId)
-          setActiveSessionForProject(next.projectId, next.id)
+          revealSession(next.id)
         },
         onSelectSession: (session) => {
-          setActiveProject(session.projectId)
-          setActiveSessionForProject(session.projectId, session.id)
+          revealSession(session.id)
         },
         onNextWaiting: () => {
           const waiting = [...sessions.values()].filter((s) => s.agentState === 'awaiting-input')
           if (waiting.length === 0) return
           const idx = waiting.findIndex((s) => s.id === focusedSessionId)
           const next = waiting[(idx + 1) % waiting.length]
-          setActiveProject(next.projectId)
-          setActiveSessionForProject(next.projectId, next.id)
+          revealSession(next.id)
         },
         onResume: () => setActiveGlobalTab('core.home'),
         onSwitchWorkspace: (id) => setActiveWorkspace(id),
@@ -463,12 +483,13 @@ export function App(): JSX.Element {
           const next = workspaces[(idx + delta + workspaces.length) % workspaces.length]
           setActiveWorkspace(next.id)
         },
-        onLinkIssue: () => activeProjectId && openLinkDialog(activeProjectId),
+        onLinkIssue: () => focusedSessionId && setLinkSessionId(focusedSessionId),
+        onLinkIssueBranch: () => activeProjectId && openLinkDialog(activeProjectId),
         onViewIssue: () => activeProjectId && openDrawer(activeProjectId),
         onCopyIssueKey: () =>
-          activeIssueLink && void navigator.clipboard?.writeText(activeIssueLink.key),
+          focusedIssueLink && void navigator.clipboard?.writeText(focusedIssueLink.key),
         onOpenIssue: () =>
-          activeIssue && void window.electronAPI.shell.openExternal(activeIssue.url),
+          focusedIssue && void window.electronAPI.shell.openExternal(focusedIssue.url),
         onHome: () => setActiveGlobalTab('core.home'),
         onOverview: handleToggleOverview,
         onToggleSidebar: () => setSidebarVisible((v) => !v),
@@ -484,6 +505,8 @@ export function App(): JSX.Element {
       paletteSessions,
       activeIssueLink,
       activeIssue,
+      focusedIssueLink,
+      focusedIssue,
       sessions,
       activeProjectId,
     ]
@@ -904,19 +927,10 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('terminal:navigate-to-session', (data) => {
-      const { sessionId, projectId } = data as { sessionId: string; projectId: string }
-      setActiveGlobalTab(null)
-      const { projectsByWorkspaceId } = useWorkspaceStore.getState()
-      for (const [wsId, projects] of projectsByWorkspaceId) {
-        if (projects.some((p) => p.id === projectId)) {
-          useWorkspaceStore.getState().setActiveWorkspace(wsId)
-          break
-        }
-      }
-      useWorkspaceStore.getState().setActiveProject(projectId)
-      useSessionStore.getState().setActiveSessionForProject(projectId, sessionId)
+      const { sessionId } = data as { sessionId: string }
+      revealSession(sessionId)
     })
-  }, [setActiveGlobalTab])
+  }, [])
 
   useEffect(() => {
     const unsubLog = window.electronAPI.extensionBridge.on('log:push', (data) => {
@@ -975,11 +989,7 @@ export function App(): JSX.Element {
             }}
             onNewScratch={handleNewScratch}
             activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
-            onSelectScratchSession={(sessionId) => {
-              setScratchActive(true)
-              if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
-              useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
-            }}
+            onSelectScratchSession={(sessionId) => revealSession(sessionId)}
             visible={sidebarVisible}
           />
 
@@ -1108,6 +1118,12 @@ export function App(): JSX.Element {
             />
           )}
           {logOpen && <LogWindow onClose={() => setLogOpenWithInset(false)} />}
+          {linkSessionId !== null &&
+            (() => {
+              const facts = sessionFacts.find((f) => f.sessionId === linkSessionId)
+              if (!facts) return null
+              return <SessionLinkDialog facts={facts} onClose={() => setLinkSessionId(null)} />
+            })()}
           {quickActionsOpen && (
             <QuickActions
               groups={quickActionGroupsAll}

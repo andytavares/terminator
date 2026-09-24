@@ -48,6 +48,30 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () 
     </div>
   ),
 }))
+const mockUseSessionFacts = vi.fn(() => [] as Array<{ sessionId: string; workItem: unknown }>)
+vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
+  useSessionFacts: () => mockUseSessionFacts(),
+}))
+const mockSetLink = vi.fn().mockResolvedValue(true)
+vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
+  useSessionRecordsStore: Object.assign(() => ({}), {
+    getState: () => ({ setLink: mockSetLink }),
+  }),
+}))
+vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
+  SessionLinkDialog: ({
+    facts,
+    onClose,
+  }: {
+    facts: { name: string; snapshot: unknown }
+    onClose: () => void
+  }) => (
+    <div data-testid="session-link-dialog">
+      {facts.name}
+      <button onClick={onClose}>close-session-link</button>
+    </div>
+  ),
+}))
 
 const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
@@ -163,6 +187,7 @@ const mockSessionStore = {
   ),
   setActiveSessionForProject: vi.fn(),
   renameSession: vi.fn(),
+  requestFocus: vi.fn(),
 }
 
 const mockRegistryState = {
@@ -174,6 +199,8 @@ const mockRegistryState = {
   dismissSurfaces: vi.fn(),
   sidebarButtons: [] as Array<{ id: string; label: string; action: () => void }>,
   setActiveGlobalTab: vi.fn(),
+  setActiveWorkspaceTab: vi.fn(),
+  setActiveProjectTab: vi.fn(),
   registerCommand: vi.fn(() => vi.fn()),
 }
 
@@ -213,6 +240,8 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  mockUseSessionFacts.mockReturnValue([])
+  mockSetLink.mockResolvedValue(true)
   mockIntegrationsStore.linkDialogProjectId = null
   mockIntegrationsStore.drawerProjectId = null
   mockIntegrationsStore.linkFor.mockReturnValue(null)
@@ -240,6 +269,8 @@ beforeEach(() => {
   vi.mocked(useSessionStore).mockReturnValue(
     mockSessionStore as unknown as ReturnType<typeof useSessionStore>
   )
+  Object.assign(useWorkspaceStore, { getState: () => mockWorkspaceStore })
+  Object.assign(useSessionStore, { getState: () => mockSessionStore })
   vi.mocked(useExtensionRegistry).mockImplementation(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ((selector: any) =>
@@ -1209,5 +1240,36 @@ describe('UnifiedSidebar — a drag is the manual order (Display → Manual)', (
     pickSort('Name')
     expect(repoNames(container)).toEqual(['Aardvark', 'Backend', 'Frontend'])
     mockWorkspaceStore.workspaces = [ws1, ws2]
+  })
+})
+
+describe('a session-level ticket link', () => {
+  it('shows on the terminal row once linked, without a reload', () => {
+    mockUseSessionFacts.mockReturnValue([
+      {
+        sessionId: 's1',
+        workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-9' } },
+      },
+    ])
+    const { container } = renderSidebar()
+    fireEvent.click(screen.getByRole('button', { name: 'Show terminals in main' }))
+    expect(container.querySelector('.terminal-row__key')!.textContent).toBe('ENG-9')
+  })
+
+  it('opens the session link dialog for that terminal and removes the link from its menu', () => {
+    mockUseSessionFacts.mockReturnValue([
+      {
+        sessionId: 's1',
+        name: 'api-shell',
+        snapshot: { sessionId: 's1' },
+        workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-9' } },
+      },
+    ])
+    const { container } = renderSidebar()
+    fireEvent.click(screen.getByRole('button', { name: 'Show terminals in main' }))
+    const row = container.querySelector('.terminal-row')!
+    fireEvent.contextMenu(row)
+    fireEvent.click(screen.getByText('Remove session link'))
+    expect(mockSetLink).toHaveBeenCalledWith({ sessionId: 's1' }, null)
   })
 })

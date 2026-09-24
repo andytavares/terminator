@@ -66,6 +66,7 @@ export interface TerminalInstanceHooks {
   onBell?: () => void
   onBusy?: () => void
   onIdle?: () => void
+  onDispose?: () => void
 }
 
 export class TerminalInstance {
@@ -626,6 +627,7 @@ export class TerminalInstance {
     this.cmdClickCleanup = null
     this.linkOverlay = null
     this.hooks?.onIdle?.()
+    this.hooks?.onDispose?.()
     this.unmount()
     this.outputUnsubscribe?.()
     this.outputUnsubscribe = null

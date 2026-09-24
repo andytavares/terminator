@@ -13,7 +13,7 @@ const GROUPS: Array<[LedgerGroupBy, string]> = [
 
 const SORTS: Array<[LedgerSort, string]> = [
   ['needs-you', 'Needs you first'],
-  ['recent', 'Recent activity'],
+  ['recent', 'Recently opened'],
 ]
 
 const COLUMNS: Array<[keyof LedgerColumns, string]> = [

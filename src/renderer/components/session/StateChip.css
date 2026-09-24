@@ -1,0 +1,72 @@
+/* The chip: glyph + label on a state-tinted fill with a state-coloured left
+   edge. Idle and exited spend no colour — they are the states that ask
+   nothing of the operator. Text stays --text-primary throughout; colour never
+   touches the glyph or the label (Constitution XII). */
+
+.state-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 2px 8px 2px 6px;
+  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.state-chip--awaiting-input {
+  border-left-color: var(--state-needs);
+  background: var(--state-needs-fill);
+}
+
+.state-chip--working {
+  border-left-color: var(--state-working);
+  background: var(--state-working-fill);
+}
+
+.state-chip--idle,
+.state-chip--exited {
+  border-left-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.state-chip__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.state-chip__icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.state-chip__icon--awaiting-input {
+  opacity: var(--state-op-awaiting);
+}
+
+.state-chip__icon--working {
+  opacity: var(--state-op-working);
+}
+
+.state-chip__icon--idle {
+  opacity: var(--state-op-idle);
+}
+
+.state-chip__icon--exited {
+  opacity: var(--state-op-exited);
+}
+
+.state-chip__label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Glyph only, on the same fill and edge — used where there is no room for the
+   label: the tab bar, the sidebar tree. */
+.state-chip--compact {
+  padding: 2px;
+  border-radius: var(--radius-xs);
+}
