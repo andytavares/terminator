@@ -1,0 +1,59 @@
+src/main/integrations/session-context.ts
+  s_9126708f68ed92::t_dba8626bcb2f9e 1-76
+src/main/agents/agent-session-hook.ts
+  s_9126708f68ed92::t_760c752e824844 4
+  s_9126708f68ed92::t_f6d8ebf856f427 151
+  s_9126708f68ed92::t_80766a84943b80 27-32,38,71-91
+src/main/ipc/session-records.ipc.ts
+  s_9126708f68ed92::t_1038e7d4faaf85 21-22
+  s_9126708f68ed92::t_228e24feceaee7 84-92
+tests/unit/ipc/session-records.ipc.spec.ts
+  s_9126708f68ed92::t_1b499b76c3b2a1 44-53
+  s_9126708f68ed92::t_5f96126b0b2ece 222-235
+  s_9126708f68ed92::t_3ee9bdec02aa24 236
+src/main/sessions/session-record-store.ts
+  s_9126708f68ed92::t_43cb7bb1475481 47,51-53,124
+  s_9126708f68ed92::t_1eb0fd2045d0a8 12
+  s_9126708f68ed92::t_f5e3c21fbd81eb 269
+  s_9126708f68ed92::t_bbb73014debaea 251
+  s_9126708f68ed92::t_5da0d40cd2f997 119-123
+tests/unit/sessions/session-record-store.spec.ts
+  s_9126708f68ed92::t_3deae8573b1017 424,434
+  s_9126708f68ed92::t_69f96a0d260bee 215-219
+  s_9126708f68ed92::t_013c0070becb95 39
+  s_9126708f68ed92::t_8f1c800f78e59a 11-18
+  s_9126708f68ed92::t_e9c9b57b096bc4 220,415-423,425-433,435-437
+  s_9126708f68ed92::t_91060581a6e968 221
+  s_9126708f68ed92::t_1205d366343e95 438
+src/main/integrations/session-hook.ts
+  s_9126708f68ed92::t_ab3dbe67f5cc7a 32,34-35,41-47
+  s_9126708f68ed92::t_158254ce5a7bfe 112
+  s_9126708f68ed92::t_acf21f464e1327 4
+tests/unit/agents/agent-session-hook.spec.ts
+  s_9126708f68ed92::t_658a187717fc07 112-169
+tests/unit/integrations/session-context.spec.ts
+  s_9126708f68ed92::t_eeebfb5975d634 98-101,109-112
+  s_9126708f68ed92::t_ab783ce2b514dc 1-97,102-108,113-161
+tests/unit/integrations/session-hook.spec.ts
+  s_9126708f68ed92::t_eeebfb5975d634 45-49
+  s_9126708f68ed92::t_30fcc9d1cc0db2 37-40,50-53
+  s_9126708f68ed92::t_4edccf9b06838d 142-149
+  s_9126708f68ed92::t_8da3b2a3e1011c 90-125
+  s_9126708f68ed92::t_475cc8666d4e93 126,150-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6e1b4aaac71cef339ad3a0c3e3cbd07d59e83a05",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
