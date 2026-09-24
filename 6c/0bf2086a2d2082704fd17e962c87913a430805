@@ -1,0 +1,77 @@
+src/renderer/styles.css
+  s_9126708f68ed92::t_13bb01f410b66f 176-182
+  s_9126708f68ed92::t_7887175b61f007 49-56
+tests/unit/renderer/components/WallTile.spec.tsx
+  s_9126708f68ed92::t_6d30687768a215 198-207
+tests/unit/renderer/sidebar-status-colour-independence.spec.ts
+  s_9126708f68ed92::t_1f84bb2aa0dfa5 59-61
+  s_9126708f68ed92::t_9205d9a4a77e3b 49-55,64,67-68
+  s_9126708f68ed92::t_70a52b3fb6f132 93
+  s_9126708f68ed92::t_049f1135a22f6d 14
+src/renderer/components/home/LedgerView.css
+  s_9126708f68ed92::t_3f4e8711d955b5 43-60
+  s_9126708f68ed92::t_b92b4efd0c61c3 84-91
+src/renderer/components/sidebar/BranchRow.tsx
+  s_9126708f68ed92::t_1b6c2504647934 203-204
+  s_9126708f68ed92::t_c792e3121dd764 6
+src/renderer/components/home/HomeScreen.tsx
+  s_9126708f68ed92::t_376e9e0f92c18d 7
+  s_9126708f68ed92::t_8ffea790d526c6 127
+tests/unit/renderer/components/LedgerView.spec.tsx
+  s_9126708f68ed92::t_1a95c3420dd299 345-374,376-386
+  s_9126708f68ed92::t_554af34b823e00 375
+src/renderer/components/sidebar/TerminalRow.tsx
+  s_9126708f68ed92::t_b247f16839406b 94-95
+  s_9126708f68ed92::t_3a95d1c1827a70 3
+tests/unit/renderer/components/BranchRow.spec.tsx
+  s_9126708f68ed92::t_917d8d4cbb4a66 71-77
+src/renderer/components/session/StateChip.css
+  s_9126708f68ed92::t_c13bb7e2319d33 1-72
+src/renderer/components/overview/WallTile.tsx
+  s_9126708f68ed92::t_376e9e0f92c18d 3,83
+  s_9126708f68ed92::t_b53587f9813109 68
+tests/unit/renderer/components/StateChip.spec.tsx
+  s_9126708f68ed92::t_1f84bb2aa0dfa5 13-22
+  s_9126708f68ed92::t_69a38d90c8ca6c 1-12,23-38
+src/renderer/components/overview/WallTile.css
+  s_9126708f68ed92::t_9212d56bd2fcd1 46
+  s_9126708f68ed92::t_a673fdb35ba7fa 45
+src/renderer/components/home/LogbookView.css
+  s_9126708f68ed92::t_58d2dcda858e3a 49-50
+  s_9126708f68ed92::t_d0624d06d8e711 53-55
+  s_9126708f68ed92::t_da99b1c7c91f66 51-52
+src/renderer/components/sidebar/BranchRow.css
+  s_9126708f68ed92::t_2f165193c26451 90-96
+src/renderer/components/home/LogbookView.tsx
+  s_9126708f68ed92::t_4bc94e688d8ffd 262
+  s_9126708f68ed92::t_376e9e0f92c18d 3,101
+src/renderer/components/session/StateChip.tsx
+  s_9126708f68ed92::t_0731fd9988f2e4 1-35
+tests/unit/renderer/components/TerminalRow.spec.tsx
+  s_9126708f68ed92::t_771e96f2a9c2a2 65,68-71
+src/renderer/components/home/LedgerView.tsx
+  s_9126708f68ed92::t_0838bfb95e17e9 41-42
+  s_9126708f68ed92::t_9c13a163443a9b 88-90
+  s_9126708f68ed92::t_1f84bb2aa0dfa5 198-207,209-249,252-256
+  s_9126708f68ed92::t_376e9e0f92c18d 3,102
+  s_9126708f68ed92::t_1abc859ceccfae 194-197
+  s_9126708f68ed92::t_56553b61d73051 257-258
+src/renderer/components/sidebar/TerminalRow.css
+  s_9126708f68ed92::t_d0130bf35fc0fb 49-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6c0bf2086a2d2082704fd17e962c87913a430805",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
