@@ -1,3 +1,4 @@
+import './claim-profile.js'
 import { handleChannel, onChannel } from './ipc/channel-registrar.js'
 import { app, BrowserWindow, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
@@ -285,6 +286,13 @@ function registerDialogHandlers(): void {
     return { filePath: result.filePaths[0] }
   })
 }
+
+app.on('second-instance', () => {
+  if (!mainWindow) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+})
 
 // Must be called before app.ready so Chromium treats ext:// as a secure standard
 // origin — without this, service worker storage and fetch() fail inside WebContentsViews.

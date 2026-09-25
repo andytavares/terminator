@@ -119,6 +119,8 @@ Sessions do not survive app restart. This is an explicit Phase 1 scope decision.
 
 See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision.
 
+**One process per profile.** `userData/app.pglite` is single-user Postgres with no cross-process locking; two processes on it overwrite each other's catalog (a live DB was found with `diagrams`' row type but no table). `src/main/claim-profile.ts`, the first import of `src/main/index.ts`, takes Electron's single-instance lock (a second launch exits and focuses the first window) and moves an unpackaged run to `<userData>-dev` unless `--user-data-dir` is given, so `npm run dev` never opens the installed app's database.
+
 ---
 
 ## Terminal Session Lifecycle
