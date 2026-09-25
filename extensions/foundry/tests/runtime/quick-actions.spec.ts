@@ -238,3 +238,16 @@ describe('the new work order command', () => {
     expect(api.window.broadcast).toHaveBeenCalledWith('foundry:ui.open-new-order', {})
   })
 })
+
+describe('the toggle factory view command', () => {
+  it('is registered under Foundry with mnemonic v', () => {
+    const command = [...registered.values()]
+      .map((r) => r.command)
+      .find((c) => c.id === 'toggle-view')
+    expect(command).toMatchObject({
+      category: 'Foundry',
+      mnemonic: 'v',
+      label: 'Toggle factory view',
+    })
+  })
+})

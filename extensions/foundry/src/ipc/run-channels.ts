@@ -17,6 +17,7 @@ import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
 import { runFailure } from '../line/run-outcome.js'
 import type { Gate } from '../gates/rules.js'
+import type { ToolActivity } from '../runtime/transcript-tailer.js'
 
 // Starting a run.
 //
@@ -34,6 +35,7 @@ const StartPayload = z.object({
 })
 const ObservePayload = z.object({ id: z.string(), retry: z.array(z.string()).optional() })
 const AttachPayload = z.object({ orderId: z.string(), nodeId: z.string() })
+const ActivityPayload = z.object({ id: z.string() })
 
 export interface RunDeps {
   readonly store: OrderStore
@@ -116,6 +118,13 @@ export interface RunDeps {
    * handed-back call can only be answered in the terminal it was handed to.
    */
   readonly strandedSessions?: (orderId: string) => readonly string[]
+  /**
+   * What an agent's session has been doing, for the Factory view's activity
+   * markers. Absent means no runtime to ask, which reads as "no activity"
+   * rather than an error — a factory hall with nothing lit is still a valid
+   * picture of a run that just started.
+   */
+  readonly activityFor?: (sessionId: string) => readonly ToolActivity[]
 }
 
 export interface RunChannels {
@@ -127,6 +136,8 @@ export interface RunChannels {
   recipes(payload: unknown): Promise<unknown>
   /** The live session behind a running agent, so a surface can go to it. */
   attach(payload: unknown): Promise<unknown>
+  /** What each running node's agent has been doing, for the Factory view. */
+  activity(payload: unknown): Promise<unknown>
 }
 
 function graphPath(dataRoot: string, orderId: string): string {
@@ -645,5 +656,28 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return { terminalSessionId: node.sessionId, nodeId: node.id }
   }
 
-  return { start, resume, observe, recipes, attach }
+  /**
+   * What each node's agent has been doing lately.
+   *
+   * The Factory view draws a station's activity, not its whole transcript —
+   * the last 20 entries are plenty to say "reading" or "running a shell
+   * command" and drop off as soon as the agent moves on.
+   */
+  async function activity(raw: unknown): Promise<unknown> {
+    const parsed = ActivityPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const graph = await loadGraph(parsed.data.id)
+    if (graph === null) return { error: `No run for ${parsed.data.id}.` }
+
+    const activity: Record<string, ToolActivity[]> = {}
+    for (const node of graph.nodes) {
+      if (node.sessionId === null) continue
+      const events = deps.activityFor?.(node.sessionId) ?? []
+      activity[node.id] = events.slice(-20)
+    }
+    return { activity }
+  }
+
+  return { start, resume, observe, recipes, attach, activity }
 }
