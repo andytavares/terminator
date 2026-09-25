@@ -35,11 +35,27 @@ export interface Crate {
   readonly progress: number
 }
 
+/**
+ * A tool call the director has seen open and not yet seen close.
+ *
+ * `direct` is called on every poll with only the *new* events — a long Read
+ * emits `tool_started` exactly once — so "still open ≥1500ms" can only ever
+ * be judged against a call the world remembers, not one just arriving in the
+ * current batch.
+ */
+export interface OpenCall {
+  readonly nodeId: string
+  readonly prop: string
+  readonly callId: string
+  readonly at: number
+}
+
 export interface World {
   readonly map: HallMap
   readonly crew: readonly Crew[]
   readonly crates: readonly Crate[]
   readonly gatesWaiting: readonly string[]
+  readonly openCalls: readonly OpenCall[]
   readonly clockMs: number
 }
 
@@ -142,7 +158,7 @@ export function createWorld(map: HallMap, observation: Observation): World {
     if (nodeId !== null) gatesWaiting.add(nodeId)
   }
 
-  return { map, crew, crates: [], gatesWaiting: [...gatesWaiting], clockMs: 0 }
+  return { map, crew, crates: [], gatesWaiting: [...gatesWaiting], openCalls: [], clockMs: 0 }
 }
 
 function beltDistance(belt: { readonly path: readonly Tile[] }): number {

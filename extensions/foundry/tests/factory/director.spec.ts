@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { direct } from '../../src/factory/director.js'
-import { createWorld, seatOf } from '../../src/factory/sim.js'
+import { createWorld, seatOf, tick } from '../../src/factory/sim.js'
 import type { World, Crew } from '../../src/factory/sim.js'
 import { layoutHall } from '../../src/factory/layout.js'
 import { buildRunGraph, withNode } from '../../src/line/run-graph.js'
@@ -233,30 +233,75 @@ describe('direct: orphaned / stranded', () => {
   })
 })
 
+// In production `direct` is called on every ~2s poll with only the *new*
+// events since the last one: a long Read emits `tool_started` exactly once,
+// when it starts. So a call already open at the time it is first seen does
+// not yet justify a walk (it might close in the next instant); what makes it
+// worth walking for is the call still being open, unclosed, on a *later*
+// poll that carries no new event for it at all. `World.openCalls` is what
+// lets `direct` judge that with nothing but `nowMs` to go on.
 describe('direct: tool coalescing', () => {
-  it('does not walk for a call barely open', () => {
+  it('does not walk the instant a call opens', () => {
     const g = graph()
     const world = worldFor(g)
     const events: FactoryEvent[] = [
-      { kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: true, at: 9800 },
+      { kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: true, at: 0 },
     ]
-    const next = direct(world, events, 10_000)
-    expect(next).toEqual(world)
+    const next = direct(world, events, 0)
+    const crew = next.crew.find((c) => c.nodeId === 'a')!
+    expect(crew.goal).toBe(null)
+    expect(next.openCalls).toEqual([{ nodeId: 'a', prop: 'archive', callId: 'c1', at: 0 }])
   })
 
-  it('walks to the archive for a call already open 1500ms or more', () => {
+  it('reproduces the reported defect: a call open ≥1500ms is walked to on a later poll with no new events', () => {
     const g = graph()
-    const world = worldFor(g)
-    const events: FactoryEvent[] = [
-      { kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: true, at: 8000 },
-    ]
-    const next = direct(world, events, 10_000)
-    const crew = next.crew.find((c) => c.nodeId === 'a')!
+    let world = worldFor(g)
+    // Poll 1: the call starts.
+    world = direct(
+      world,
+      [{ kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: true, at: 0 }],
+      0
+    )
+    expect(world.crew.find((c) => c.nodeId === 'a')!.goal).toBe(null)
+
+    // Poll 2, 2s later: no new events at all — the call is still running.
+    world = direct(world, [], 2000)
+    const crew = world.crew.find((c) => c.nodeId === 'a')!
     expect(crew.goal).toEqual(world.map.anchors.archive)
     expect(crew.then).toBe('reach')
+
+    // The builder actually leaves its seat once ticked.
+    const seat = seatOf(world.map, 'a')!
+    let ticked = world
+    for (let elapsed = 0; elapsed < 3000; elapsed += 100) ticked = tick(ticked, 100)
+    const afterCrew = ticked.crew.find((c) => c.nodeId === 'a')!
+    expect(afterCrew.x === seat.x && afterCrew.y === seat.y).toBe(false)
   })
 
-  it('walks to the rack on a burst of 3 same-prop calls within 10s', () => {
+  it('a call that closes at 1000ms never causes a walk', () => {
+    const g = graph()
+    let world = worldFor(g)
+    world = direct(
+      world,
+      [{ kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: true, at: 0 }],
+      0
+    )
+    world = direct(
+      world,
+      [{ kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: false, at: 1000 }],
+      1000
+    )
+    const crew = world.crew.find((c) => c.nodeId === 'a')!
+    expect(crew.goal).toEqual(seatOf(world.map, 'a'))
+    expect(crew.then).toBe('idle')
+    expect(world.openCalls).toEqual([])
+
+    // and it stays put with nothing left open, however much later we check
+    const later = direct(world, [], 100_000)
+    expect(later.crew.find((c) => c.nodeId === 'a')!.goal).toEqual(seatOf(world.map, 'a'))
+  })
+
+  it('walks to the rack on a burst of 3 same-prop calls, all still open, in one poll', () => {
     const g = graph()
     const world = worldFor(g)
     const events: FactoryEvent[] = [
@@ -269,23 +314,25 @@ describe('direct: tool coalescing', () => {
     expect(crew.goal).toEqual(world.map.anchors.rack)
   })
 
-  it('does not walk for 2 quick calls', () => {
+  it('does not walk for 2 quick, still-open calls', () => {
     const g = graph()
     const world = worldFor(g)
     const events: FactoryEvent[] = [
       { kind: 'tool', nodeId: 'a', prop: 'rack', callId: 'c1', open: true, at: 100 },
       { kind: 'tool', nodeId: 'a', prop: 'rack', callId: 'c2', open: true, at: 200 },
     ]
-    expect(direct(world, events, 300)).toEqual(world)
+    const next = direct(world, events, 300)
+    expect(next.crew.find((c) => c.nodeId === 'a')!.goal).toBe(null)
   })
 
-  it('a desk-prop tool call never moves anyone', () => {
+  it('a desk-prop tool call never moves anyone, and is never remembered', () => {
     const g = graph()
     const world = worldFor(g)
     const events: FactoryEvent[] = [
       { kind: 'tool', nodeId: 'a', prop: 'desk', callId: 'c1', open: true, at: 0 },
     ]
-    expect(direct(world, events, 100_000)).toEqual(world)
+    const next = direct(world, events, 100_000)
+    expect(next).toEqual(world)
   })
 
   it('returns to the seat on close when no other call of that prop is open', () => {
@@ -302,16 +349,37 @@ describe('direct: tool coalescing', () => {
 
   it('stays put on close while another call of that prop is still open', () => {
     const g = graph()
-    const world = worldFor(g)
-    const events: FactoryEvent[] = [
-      { kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c2', open: true, at: 100 },
-      { kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: false, at: 200 },
-    ]
-    const next = direct(world, events, 200)
+    let world = worldFor(g)
+    world = direct(
+      world,
+      [{ kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c2', open: true, at: 100 }],
+      100
+    )
+    const next = direct(
+      world,
+      [{ kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: false, at: 200 }],
+      200
+    )
     const crew = next.crew.find((c) => c.nodeId === 'a')!
-    // c2 is open but not yet 1500ms nor a burst, so the visible effect is: no
-    // walk to the seat happened because c2 is still open.
+    // c1 closing does not send anyone home: c2 is still open.
     expect(crew.goal).not.toEqual(seatOf(world.map, 'a'))
+    expect(next.openCalls).toEqual([{ nodeId: 'a', prop: 'archive', callId: 'c2', at: 100 }])
+  })
+
+  it('does not re-remember a call it has already seen open', () => {
+    const g = graph()
+    let world = worldFor(g)
+    const event: FactoryEvent = {
+      kind: 'tool',
+      nodeId: 'a',
+      prop: 'archive',
+      callId: 'c1',
+      open: true,
+      at: 0,
+    }
+    world = direct(world, [event], 0)
+    world = direct(world, [event], 0)
+    expect(world.openCalls).toEqual([{ nodeId: 'a', prop: 'archive', callId: 'c1', at: 0 }])
   })
 
   it('leaves a crew member with no station untouched when its call closes', () => {

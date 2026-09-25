@@ -1,6 +1,6 @@
 import type { FactoryEvent } from './events.js'
 import { seatOf, loungeSpot } from './sim.js'
-import type { World, Crew, Crate } from './sim.js'
+import type { World, Crew, Crate, OpenCall } from './sim.js'
 
 // Turns events into motion.
 //
@@ -27,42 +27,44 @@ function sendTo(crew: Crew, goal: Crew['goal'], then: Crew['then']): Crew {
 }
 
 /**
- * Whether an open tool call is worth walking for: on its own, once it has run
- * long enough, or as a burst of the same prop.
+ * Whether a node's open calls of one prop are worth walking for: one of them
+ * has run long enough on its own, or there are enough of them at once.
  *
- * The burst count needs no separate 10s window check: every call counted here
- * is one this same batch just saw open, so if none of them is individually
- * ≥1500ms old, the whole batch is well under 10s wide already.
+ * Judged against `World.openCalls`, not the events batch: `direct` is called
+ * on every poll with only the *new* events, and a long-running call emits
+ * `tool_started` exactly once — so "still open ≥1500ms" can only ever be true
+ * of a call the world remembers from an earlier poll, not one arriving now.
+ * The burst count needs no separate 10s window check either: every call
+ * counted here is still open, so if none of them is individually ≥1500ms
+ * old, they are all well under 10s old.
  */
-function toolBurstWalks(
-  events: readonly FactoryEvent[],
-  nodeId: string,
-  prop: string,
-  nowMs: number
-): boolean {
-  const opens = events.filter(
-    (e): e is Extract<FactoryEvent, { kind: 'tool' }> =>
-      e.kind === 'tool' && e.nodeId === nodeId && e.prop === prop && e.open
-  )
-  if (opens.some((e) => nowMs - e.at >= TOOL_OPEN_MS)) return true
-  return opens.length >= TOOL_BURST_COUNT
+function toolBurstWalks(calls: readonly OpenCall[], nowMs: number): boolean {
+  if (calls.some((c) => nowMs - c.at >= TOOL_OPEN_MS)) return true
+  return calls.length >= TOOL_BURST_COUNT
 }
 
-/** Whether any call of this prop is still open for the node, after this event. */
-function toolStillOpen(
-  events: readonly FactoryEvent[],
-  nodeId: string,
-  prop: string,
-  exceptCallId: string
-): boolean {
-  return events.some(
-    (e) =>
-      e.kind === 'tool' &&
-      e.nodeId === nodeId &&
-      e.prop === prop &&
-      e.open &&
-      e.callId !== exceptCallId
-  )
+function openCallKey(nodeId: string, prop: string): string {
+  return `${nodeId}:${prop}`
+}
+
+/** Send every crew member whose remembered open calls now justify a walk. */
+function applyOpenCallWalks(world: World, nowMs: number): World {
+  const groups = new Map<string, OpenCall[]>()
+  for (const call of world.openCalls) {
+    const key = openCallKey(call.nodeId, call.prop)
+    const group = groups.get(key)
+    if (group === undefined) groups.set(key, [call])
+    else group.push(call)
+  }
+
+  let next = world
+  for (const calls of groups.values()) {
+    if (!toolBurstWalks(calls, nowMs)) continue
+    const { nodeId, prop } = calls[0]
+    const anchor = prop === 'archive' ? world.map.anchors.archive : world.map.anchors.rack
+    next = withCrew(next, nodeId, (crew) => sendTo(crew, anchor, 'reach'))
+  }
+  return next
 }
 
 function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node-state' }>): World {
@@ -107,23 +109,36 @@ function applyStranded(world: World, event: Extract<FactoryEvent, { kind: 'stran
   })
 }
 
-function applyTool(
-  world: World,
-  event: Extract<FactoryEvent, { kind: 'tool' }>,
-  events: readonly FactoryEvent[],
-  nowMs: number
-): World {
+/** Record or clear a call in `openCalls`. Walking itself happens in `applyOpenCallWalks`. */
+function applyTool(world: World, event: Extract<FactoryEvent, { kind: 'tool' }>): World {
   if (event.prop === 'desk') return world
-  return withCrew(world, event.nodeId, (crew) => {
-    if (event.open) {
-      if (!toolBurstWalks(events, event.nodeId, event.prop, nowMs)) return crew
-      const anchor = event.prop === 'archive' ? world.map.anchors.archive : world.map.anchors.rack
-      return sendTo(crew, anchor, 'reach')
+
+  if (event.open) {
+    const already = world.openCalls.some(
+      (c) => c.nodeId === event.nodeId && c.prop === event.prop && c.callId === event.callId
+    )
+    if (already) return world
+    const call: OpenCall = {
+      nodeId: event.nodeId,
+      prop: event.prop,
+      callId: event.callId,
+      at: event.at,
     }
-    if (toolStillOpen(events, event.nodeId, event.prop, event.callId)) return crew
-    const seat = seatOf(world.map, event.nodeId)
-    return seat === null ? crew : sendTo(crew, seat, 'idle')
-  })
+    return { ...world, openCalls: [...world.openCalls, call] }
+  }
+
+  const openCalls = world.openCalls.filter(
+    (c) => !(c.nodeId === event.nodeId && c.prop === event.prop && c.callId === event.callId)
+  )
+  const stillOpen = openCalls.some((c) => c.nodeId === event.nodeId && c.prop === event.prop)
+  let next: World = { ...world, openCalls }
+  if (!stillOpen) {
+    next = withCrew(next, event.nodeId, (crew) => {
+      const seat = seatOf(world.map, event.nodeId)
+      return seat === null ? crew : sendTo(crew, seat, 'idle')
+    })
+  }
+  return next
 }
 
 function applyHandoff(world: World, event: Extract<FactoryEvent, { kind: 'handoff' }>): World {
@@ -170,7 +185,7 @@ export function direct(world: World, events: readonly FactoryEvent[], nowMs: num
         next = applyStranded(next, event)
         break
       case 'tool':
-        next = applyTool(next, event, events, nowMs)
+        next = applyTool(next, event)
         break
       case 'handoff':
         next = applyHandoff(next, event)
@@ -185,5 +200,7 @@ export function direct(world: World, events: readonly FactoryEvent[], nowMs: num
       }
     }
   }
-  return next
+  // A call remembered from an earlier poll can cross the ≥1500ms threshold
+  // with no new event at all — this is what makes that case reachable.
+  return applyOpenCallWalks(next, nowMs)
 }
