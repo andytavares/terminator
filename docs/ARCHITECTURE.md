@@ -1053,8 +1053,8 @@ reviewer's finding is judgement and stays with the operator.
 - **Effort is a property of the shape** (ADR-050). A recipe declares
   `effort: low | medium | high | xhigh | max`, every agent step inherits it and
   a step may override it; the executor hands it to the launch beside the model
-  tier and `buildLaunchSpec` passes it as `--effort`. `quick` and `spike` run
-  at `high`, every other built-in at `xhigh`. A recipe that declares none
+  tier and `buildLaunchSpec` passes it as `--effort`. `quick`, `spike`,
+  `research` and `poc` run at `medium`, every other built-in at `high`. A recipe that declares none
   passes no flag, and a fast-tier role is never passed one — the fast model
   does not take it.
 - **Three shapes produce a document or a demonstration, not a code change**:
@@ -1244,9 +1244,10 @@ App
   tool configuration, Makefiles and CI workflows — and never executes them —
   recording the real command or `null`.
 - **It holds no credential.** Tracker access is `ExtensionAPI.issues`, and
-  `api.shell.exec` admits only `git` and `gh`. Verification commands run as
-  steps inside the supervised terminal session, which is what makes their
-  output visible and their tool calls hook-gated.
+  `api.shell.exec` admits only `git` and `gh`. Each verification command runs
+  in a terminal tab of its own in the lane's checkout
+  (`SupervisedRunner.runCommand`): its output is visible, and its verdict is
+  the tab's exit status, with no agent in between (ADR 059).
 - All `foundry:*` IPC channels are extension-owned. The core app has no
   knowledge of them: delete `extensions/foundry/` and core still builds.
 

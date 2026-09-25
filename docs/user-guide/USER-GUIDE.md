@@ -725,12 +725,12 @@ chose it ("2 units of work", "graded P1, which is above the direct shape's
 ceiling"). Pick a different one in a click; the override is recorded alongside
 the proposal it replaced.
 
-Each shape also says how hard its agents think. `quick` and `spike` run at
-the runtime's `high` effort; `direct`, `standard`, `bugfix`, `refactor` and
-`speckit` run at `xhigh`, because a second look, a root cause or a refactor
-that must prove behaviour unchanged is where deeper reasoning pays. A recipe
-of your own sets it with one line, `effort: xhigh`, on the recipe or on a
-single step.
+Each shape also says how hard its agents think. `quick`, `spike`, `research`
+and `poc` run at `medium` effort; `direct`, `standard`, `bugfix`, `refactor`,
+`speckit` and `design-doc` run at `high`, because a second look, a root cause
+or a refactor that must prove behaviour unchanged is where deeper reasoning
+pays. A recipe of your own sets it with one line, `effort: high`, on the recipe
+or on a single step.
 
 Three shapes are never proposed and are there to be picked: **research**
 (a question whose answer is a document), **design-doc** (the order is attacked

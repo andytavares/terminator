@@ -25,9 +25,7 @@ does not decide is **held for `DEFAULT_ASK_AFTER_MS` — five minutes** — befo
 handing back to a terminal that, in an unattended run, nobody is sitting at.
 
 So reading a command correctly is a latency requirement here, not only a
-correctness one. Measured on WO-0910-1fb: thirteen of a builder's 131 calls
-were held and those thirteen ate 16.6 of the run's 26.7 minutes of tool time.
-A held call averages 77 seconds; a taken one averages 5.
+correctness one: a held call costs minutes where a decided one costs seconds.
 
 When you change `shell-split.ts`, `autonomy-policy.ts` or `read-only-policy.ts`,
 the question is not only "does this let the wrong thing through". It is also
@@ -51,7 +49,7 @@ This is a fully isolated extension. The core application knows nothing about it.
 - Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`
 - Use `api.shell.exec` for `git` and `gh` — those are the only two commands the core allowlist admits (`src/main/shell/shell-executor.ts`)
 
-Verification commands (`npm test`, `pytest`, …) do **not** run through `api.shell.exec` and do **not** run as hidden child processes. They run as steps inside the supervised terminal session, which is what makes their output visible and their tool calls hook-gated.
+Verification commands (`npm test`, `pytest`, …) do **not** run through `api.shell.exec` and do **not** run as hidden child processes. Each runs in a terminal tab of its own in the lane's checkout (`SupervisedRunner.runCommand`), so its output is visible, and its verdict is that tab's exit status — no agent runs it and no transcript is read back.
 
 ### What this extension MUST NOT do
 
@@ -71,8 +69,6 @@ Verification commands (`npm test`, `pytest`, …) do **not** run through `api.sh
 
 Declared in `extensions/foundry/package.json` only. npm workspaces hoist them. Extension-owned dependencies, in full: **`zod`** (schema validation at every boundary), **`js-yaml`** (recipes, roles and rules are hand-authored and need comments) and **`highlight.js`** (the review diff, at the git extension's version so one copy is hoisted; only `lib/common` is imported). That is the whole list.
 
-`diff`, `marked`, `@dnd-kit/*` and `@terminator/extension-ui` were declared here and imported by nothing — carried over from the extension this replaced, which had a drag-and-drop board and rendered markdown. Foundry parses its own hunks and renders its own markup.
-
 `react`, `react-dom`, `lucide-react` and `electron` are the application's, not this extension's, and are used through the hoist rather than redeclared.
 
 ## Build
@@ -87,6 +83,4 @@ Extension specs live in `tests/` and are matched by the root `vitest.config.ts`.
 
 The root `tsconfig.json` is `files: []` plus project references with no `--build`, so `npm run typecheck` checks nothing; and even under `--build` the extension is in none of the three referenced projects. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either — both strip types.
 
-What that gap cost: `RULE_ICON` in `Inbox.tsx` is `Record<GateRuleId, …>`. A new gate rule was added without an entry, so `<Icon />` was handed `undefined`; React throws on that and unmounts the whole tree, and **every Foundry surface rendered blank**. The build was green, lint was clean, 2,293 unit tests passed, and the only thing that caught it was an e2e that opened the panel and looked at the screen.
-
-`extensions/foundry/tsconfig.json` did not exist until then, so the script had been failing with "the specified path does not exist" for the whole life of the feature.
+A type error the typecheck would catch — a `Record` keyed by a union missing a member, for example — otherwise ships through a green build, clean lint and passing unit tests, and blanks every Foundry surface at runtime.
