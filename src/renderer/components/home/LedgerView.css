@@ -95,7 +95,7 @@
 }
 
 .ledger__state {
-  justify-self: end;
+  justify-self: start;
   display: flex;
 }
 

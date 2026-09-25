@@ -1,35 +1,34 @@
-/* The chip: glyph + label on a state-tinted fill with a state-coloured left
-   edge. Idle and exited spend no colour — they are the states that ask
-   nothing of the operator. Text stays --text-primary throughout; colour never
-   touches the glyph or the label (Constitution XII). */
+/* The chip: glyph + label in a pill. Needs you is an amber fill with an amber
+   ring, working a green fill; idle and exited draw no pill and a quieter
+   label — they ask nothing of the operator. Colour is only ever a fill or a
+   ring: never the glyph's, never the label's (Constitution XII). */
 
 .state-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   flex: none;
-  padding: 2px 8px 2px 6px;
-  border-left: 2px solid var(--border-strong);
-  border-radius: var(--radius-xs);
-  background: var(--bg-elevated);
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: 999px;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
 .state-chip--awaiting-input {
-  border-left-color: var(--state-needs);
   background: var(--state-needs-fill);
+  box-shadow: inset 0 0 0 1px var(--state-needs);
 }
 
 .state-chip--working {
-  border-left-color: var(--state-working);
   background: var(--state-working-fill);
 }
 
+/* Neutral states draw no pill at all: glyph and a quieter label. */
 .state-chip--idle,
 .state-chip--exited {
-  border-left-color: var(--border-strong);
-  background: var(--bg-elevated);
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .state-chip__icon {
@@ -64,9 +63,25 @@
   font-weight: 500;
 }
 
-/* Glyph only, on the same fill and edge — used where there is no room for the
-   label: the tab bar, the sidebar tree. */
+/* Glyph only, for the sidebar tree and Logbook rows: a small round disc
+   instead of a bar, since a 2px edge on a 16px box reads as a clipped
+   bracket. The disc's size comes from its container (--state-disc); idle and
+   exited get no disc at all, so the column stays quiet until something is
+   running or waiting. */
 .state-chip--compact {
-  padding: 2px;
-  border-radius: var(--radius-xs);
+  display: inline-grid;
+  place-items: center;
+  width: var(--state-disc, 18px);
+  height: var(--state-disc, 18px);
+  padding: 0;
+  border-radius: 50%;
+}
+
+.state-chip--compact.state-chip--awaiting-input {
+  box-shadow: inset 0 0 0 1px var(--state-needs);
+}
+
+.state-chip--compact.state-chip--idle,
+.state-chip--compact.state-chip--exited {
+  background: transparent;
 }

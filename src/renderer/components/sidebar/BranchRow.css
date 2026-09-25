@@ -82,20 +82,22 @@
 .branch-row__gutter {
   width: 16px;
   margin-left: 8px;
+  /* The row has no gap; without this the disc sits against the branch glyph. */
+  margin-right: 6px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
 }
 
-/* Sized to fit the fixed gutter column: the fill and edge carry the state
-   (Constitution XII: shape and opacity on the glyph itself, never hue). */
-.branch-row__gutter .state-chip--compact {
-  padding: 1px;
+/* The disc fills the 16px column exactly, so it never touches the branch
+   glyph beside it; the glyph keeps shape and opacity only (Constitution XII). */
+.branch-row__gutter {
+  --state-disc: 16px;
 }
 
 .branch-row__gutter .state-chip__icon svg {
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   display: block;
 }
 

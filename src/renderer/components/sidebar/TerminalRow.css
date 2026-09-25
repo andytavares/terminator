@@ -46,15 +46,14 @@
   place-items: center;
 }
 
-/* Sized to fit the fixed gutter column — the same rule the branch rows
-   follow, so the two columns read as one. */
-.terminal-row__gutter .state-chip--compact {
-  padding: 1px;
+/* One size down from the branch row's disc, so the two columns read as one. */
+.terminal-row__gutter {
+  --state-disc: 15px;
 }
 
 .terminal-row__gutter .state-chip__icon svg {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   display: block;
 }
 
