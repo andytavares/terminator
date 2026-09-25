@@ -209,6 +209,9 @@ test('a session link made from Home shows on the sidebar terminal row and the se
     if ('error' in result) throw new Error(result.message)
   })
 
+  // Branches start collapsed, so the branch row itself must carry the key.
+  await expect(page.getByRole('button', { name: /^ticket/ }).getByText('ENG-123')).toBeVisible()
+
   await page.locator('.branch-row__disclosure[aria-label^="Show terminals in"]').click()
   const row = sidebarTerminalRow(page, 'Terminal 1')
   await expect(row.getByText('ENG-123')).toBeVisible()

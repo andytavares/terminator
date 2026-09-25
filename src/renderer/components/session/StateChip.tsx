@@ -7,7 +7,7 @@ import './StateChip.css'
 /**
  * A session's state as the sidebar, tabs, Home, the Logbook and the wall all
  * draw it: shape and opacity carry the state on the glyph itself, never hue
- * (Constitution XII). Colour is spent only on the chip's fill and left edge,
+ * (Constitution XII). Colour is spent only on the chip.s fill and ring,
  * for the two states that ask something of the operator — needs-you and
  * working — and never as the glyph's or the label's colour.
  */

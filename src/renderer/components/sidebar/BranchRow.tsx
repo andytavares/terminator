@@ -25,6 +25,8 @@ export interface BranchRowProps {
   issueKey?: string | null
   /** Opens the issue drawer. The key lost its badge, not its behaviour. */
   onIssueClick?: () => void
+  /** Keys its terminals are linked to in their own right, from Home, the wall or the row. */
+  sessionIssueKeys?: string[]
   /**
    * Uncommitted change volume. `undefined` means not asked for yet and `null`
    * means git could not answer — both draw nothing, because change volume is
@@ -89,6 +91,7 @@ export function BranchRow({
   now,
   issueKey,
   onIssueClick,
+  sessionIssueKeys = [],
   changeStats,
   onSelect,
   expanded,
@@ -107,6 +110,11 @@ export function BranchRow({
   const [renaming, setRenaming] = useState(false)
   const [draft, setDraft] = useState(row.label)
 
+  // One key element whatever the count: the branch's own key first, then the
+  // count of other keys its terminals carry, all of them in the tooltip.
+  const branchKey = issueKey != null && issueKey !== '' ? issueKey : null
+  const keys = [...new Set([...(branchKey !== null ? [branchKey] : []), ...sessionIssueKeys])]
+  const keyText = keys.length > 1 ? `${keys[0]} +${keys.length - 1}` : keys[0]
   const hasStats = changeStats != null && (changeStats.added > 0 || changeStats.removed > 0)
 
   function openMenu(e: React.MouseEvent): void {
@@ -230,22 +238,24 @@ export function BranchRow({
         )}
 
         <span className="branch-row__meta">
-          {issueKey != null &&
-            issueKey !== '' &&
-            (onIssueClick ? (
+          {keys.length > 0 &&
+            (branchKey !== null && onIssueClick ? (
               <button
                 type="button"
                 className="branch-row__issue"
-                aria-label={`Open ${issueKey}`}
+                aria-label={`Open ${branchKey}`}
+                title={keys.join(', ')}
                 onClick={(e) => {
                   e.stopPropagation()
                   onIssueClick()
                 }}
               >
-                {issueKey}
+                {keyText}
               </button>
             ) : (
-              <span className="branch-row__issue">{issueKey}</span>
+              <span className="branch-row__issue" title={keys.join(', ')}>
+                {keyText}
+              </span>
             ))}
           {hasStats && (
             <span className="branch-row__stats">

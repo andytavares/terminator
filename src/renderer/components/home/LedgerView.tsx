@@ -38,8 +38,10 @@ interface Props {
  */
 function template(columns: LedgerColumns): string {
   return [
-    // Wide enough for the full chip's longest label, "Waiting on you".
-    'minmax(96px, 0.7fr)',
+    // Fixed, and wide enough for the longest label, "Waiting on you": a track
+    // that grows with the window leaves every chip floating a different
+    // distance from the name beside it.
+    '124px',
     'minmax(72px, 0.9fr)',
     columns.branch && 'minmax(0, 1.1fr)',
     columns.workItem && 'minmax(0, 1.8fr)',
