@@ -1,0 +1,21 @@
+extensions/foundry/src/runtime/transcript-excerpt.ts
+  s_9126708f68ed92::t_d577267d2b9292 60-62
+extensions/foundry/tests/runtime/transcript-excerpt.spec.ts
+  s_9126708f68ed92::t_d577267d2b9292 47-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aa41c4eecb516fb395659661b47e0e614efde162",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
