@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import type { HallMap, PropKind } from '../../factory/layout.js'
 import { TILE_PX } from '../../factory/layout.js'
-import { tick } from '../../factory/sim.js'
+import { cratePosition, tick } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import type { NodeState } from '../../line/run-graph.js'
 import type { Paint, PaintGradient } from '../../factory/art/kit.js'
@@ -113,10 +113,7 @@ function draw(
   for (const crate of world.crates) {
     const belt = map.belts.find((b) => b.id === crate.beltId)
     if (belt === undefined || belt.path.length === 0) continue
-    const index = Math.min(Math.floor(crate.progress * belt.path.length), belt.path.length - 1)
-    const tile = belt.path[index]
-    const x = tile.x * TILE_PX + 8
-    const y = tile.y * TILE_PX + 8
+    const { x, y } = cratePosition(belt, crate.progress)
     drawables.push({ y: y + 4, draw: () => drawCrate(paint, x, y) })
   }
   drawables.sort((a, b) => a.y - b.y).forEach((d) => d.draw())

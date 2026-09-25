@@ -172,16 +172,37 @@ describe('diffObservation', () => {
     const before = withNode(g, 'b', { state: 'ready' })
     const after = withNode(before, 'a', { state: 'passed' })
     const events = diffObservation(obs(before), obs(after))
-    expect(events).toContainEqual({ kind: 'handoff', fromNodeId: 'a', toNodeId: 'b' })
+    expect(events).toContainEqual({
+      kind: 'handoff',
+      fromNodeId: 'a',
+      toNodeId: 'b',
+      targetStarted: false,
+    })
   })
 
-  it('does not emit a handoff when the source passes but the target is not ready or running', () => {
+  it('hands work off to a step that has not started, so it can queue there', () => {
     const g = graph()
-    const before = g
     const after = withNode(g, 'a', { state: 'passed' })
-    // b is still 'waiting' in both — no handoff
+    const events = diffObservation(obs(g), obs(after))
+    expect(events).toContainEqual({
+      kind: 'handoff',
+      fromNodeId: 'a',
+      toNodeId: 'b',
+      targetStarted: false,
+    })
+  })
+
+  it('marks the handoff started when the next step is already running', () => {
+    const g = graph()
+    const before = withNode(g, 'b', { state: 'running' })
+    const after = withNode(before, 'a', { state: 'passed' })
     const events = diffObservation(obs(before), obs(after))
-    expect(events.some((e) => e.kind === 'handoff')).toBe(false)
+    expect(events).toContainEqual({
+      kind: 'handoff',
+      fromNodeId: 'a',
+      toNodeId: 'b',
+      targetStarted: true,
+    })
   })
 
   it('does not re-emit a handoff for a source that was already passed', () => {
@@ -246,7 +267,10 @@ describe('describeEvent', () => {
       { kind: 'tool', nodeId: 'a', prop: 'rack', callId: 'c1', open: false, at: 0 },
       'Builder is done with the rack.',
     ],
-    [{ kind: 'handoff', fromNodeId: 'a', toNodeId: 'b' }, 'Builder handed off to Reviewer.'],
+    [
+      { kind: 'handoff', fromNodeId: 'a', toNodeId: 'b', targetStarted: false },
+      'Builder handed off to Reviewer.',
+    ],
     [{ kind: 'gate', nodeId: 'a', waiting: true }, 'Builder is waiting at the gate.'],
     [{ kind: 'gate', nodeId: 'a', waiting: false }, "Builder's gate cleared."],
   ])('describes %o as %s', (event, sentence) => {

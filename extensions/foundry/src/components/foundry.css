@@ -2815,41 +2815,34 @@
 
 .fdry-hall-shell {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  overflow: auto;
-  height: 100%;
-}
-
-.fdry-hall-band {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: var(--tm-radius-md);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-}
-
-.fdry-hall-band button.is-primary {
-  appearance: none;
-  font: inherit;
-  padding: 6px 13px;
-  border-radius: var(--tm-radius-sm);
-  border: 1px solid var(--tm-accent);
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-  cursor: pointer;
-}
-
-.fdry-hall-stage {
-  position: relative;
-  border-radius: var(--tm-radius-md);
+  justify-content: center;
+  height: 100%;
+  padding: 12px;
   overflow: hidden;
+}
+
+/* The hall and everything drawn over it.
+ *
+ * Inside the frame the palette is the world's, fixed in both themes like the
+ * canvas under it: a nameplate or a pinned card is part of the scene, not app
+ * chrome, and has to read against the same dark floor whatever the theme. */
+.fdry-hall-frame {
+  position: relative;
+  width: min(100%, calc((100vh - 120px) * var(--fdry-hall-aspect, 1.6)));
+  max-height: 100%;
+  overflow: hidden;
+  border-radius: var(--tm-radius-md);
   border: 1px solid var(--tm-border-strong);
+  background: #07090d;
+  font-family: var(--tm-font-mono);
+  /* The layers below stack within the hall, never over the app's own dialogs. */
+  isolation: isolate;
+  color: #e6e9ee;
+}
+
+.fdry-hall-frame canvas {
+  display: block;
 }
 
 .fdry-hall-overlay {
@@ -2863,46 +2856,436 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 1px;
+  padding: 0;
+}
+
+.fdry-hall-station:hover {
+  outline: 1px dashed rgba(114, 216, 242, 0.6);
+  outline-offset: 2px;
+}
+
+.fdry-hall-station:focus-visible,
+.fdry-hall-btn:focus-visible {
+  outline: 2px solid #72d8f2;
+  outline-offset: 2px;
 }
 
 .fdry-hall-flag {
-  width: 12px;
-  height: 12px;
-  color: var(--tm-warning);
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  background: #e0a13a;
+  color: #1a1206;
+  box-shadow: 0 0 0 2px #07090d;
 }
 
-.fdry-hall-ticker {
-  min-height: 1em;
-  font-size: 12.5px;
-  color: var(--tm-text-secondary);
+.fdry-hall-flag svg {
+  width: 11px;
+  height: 11px;
 }
 
-.fdry-hall-drawer {
-  padding: 12px 14px;
-  border-radius: var(--tm-radius-md);
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-}
-
-.fdry-hall-drawer-head {
+/* A station's nameplate: which step, and where it stands. */
+.fdry-plate {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 10px));
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 6px;
+  border: 1px solid #2c3340;
+  border-radius: 2px;
+  background: rgba(8, 10, 14, 0.86);
+  box-shadow: 0 2px 0 0 #07090d;
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
-.fdry-hall-drawer-head button {
+.fdry-plate__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #e6e9ee;
+}
+
+.fdry-plate__state {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #98a2b1;
+  background: #1a1f28;
+}
+
+.fdry-plate[data-state='running'] .fdry-plate__state,
+.fdry-plate[data-state='verifying'] .fdry-plate__state {
+  color: #06202a;
+  background: #72d8f2;
+}
+
+.fdry-plate[data-state='passed'] .fdry-plate__state {
+  color: #0d1a0b;
+  background: #8fe07e;
+}
+
+.fdry-plate[data-state='failed'] .fdry-plate__state,
+.fdry-plate[data-state='blocked'] .fdry-plate__state,
+.fdry-plate[data-state='gone'] .fdry-plate__state {
+  color: #fff4f1;
+  background: #c8432d;
+}
+
+/* A callout rises from the station where something happened, then fades. */
+.fdry-callout {
+  position: absolute;
+  z-index: var(--tm-layer-panel);
+  transform: translate(-50%, calc(-100% - 30px));
+  padding: 3px 8px;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 2px #07090d,
+    0 4px 0 0 rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fdry-callout-rise 5s ease-out forwards;
+}
+
+.fdry-callout::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 6px;
+  height: 6px;
+  transform: translateX(-50%) rotate(45deg);
+  background: inherit;
+}
+
+.fdry-callout[data-tone='done'] {
+  color: #0d1a0b;
+  background: #8fe07e;
+}
+
+.fdry-callout[data-tone='fail'] {
+  color: #fff4f1;
+  background: #d24a33;
+}
+
+.fdry-callout[data-tone='start'] {
+  color: #06202a;
+  background: #72d8f2;
+}
+
+.fdry-callout[data-tone='tool'] {
+  color: #1b1030;
+  background: #c9a2f2;
+}
+
+.fdry-callout[data-tone='handoff'] {
+  color: #231a05;
+  background: #e8c56a;
+}
+
+@keyframes fdry-callout-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 18px));
+  }
+  8% {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 30px));
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 40px));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 50px));
+  }
+}
+
+/* Pinned over the station that is waiting on you, answerable in place. */
+.fdry-card {
+  position: absolute;
+  z-index: var(--tm-layer-overlay);
+  width: min(270px, 42%);
+  transform: translate(-50%, calc(-100% - 34px));
+  padding: 8px 10px;
+  border: 2px solid #e0a13a;
+  border-radius: 3px;
+  background: #15110a;
+  color: #f5e6c8;
+  font-size: 11.5px;
+  line-height: 1.45;
+  box-shadow:
+    0 0 0 2px #07090d,
+    0 0 18px rgba(224, 161, 58, 0.35);
+  animation: fdry-card-pulse 1.6s ease-in-out infinite;
+}
+
+.fdry-card.is-below {
+  transform: translate(-50%, 10px);
+}
+
+.fdry-card__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #e8a93a;
+}
+
+.fdry-card__head svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.fdry-card__detail {
+  margin: 4px 0 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+
+.fdry-card__problem {
+  margin: 4px 0 0;
+  color: #ff9d88;
+}
+
+.fdry-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+@keyframes fdry-card-pulse {
+  50% {
+    box-shadow:
+      0 0 0 2px #07090d,
+      0 0 30px rgba(224, 161, 58, 0.6);
+  }
+}
+
+.fdry-hall-btn {
   appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  background: transparent;
-  color: var(--tm-text-secondary);
+  padding: 4px 9px;
+  border: 1px solid #3a4250;
+  border-radius: 2px;
+  background: #1d222b;
+  color: #e6e9ee;
+  font: inherit;
+  font-size: 11px;
   cursor: pointer;
+}
+
+.fdry-hall-btn:hover {
+  background: #262c37;
+}
+
+.fdry-hall-btn.is-primary {
+  border-color: #e0a13a;
+  background: #e0a13a;
+  color: #1a1206;
+}
+
+.fdry-hall-btn.is-primary:hover {
+  background: #eab155;
+}
+
+.fdry-hall-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fdry-hall-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* The order's own status, on the hall's top edge. */
+.fdry-hall-hud {
+  position: absolute;
+  z-index: var(--tm-layer-modal);
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.fdry-hall-hud > * {
+  pointer-events: auto;
+}
+
+.fdry-hall-hud__order {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 10px;
+  border: 1px solid #2c3340;
+  border-radius: 2px;
+  background: rgba(10, 12, 18, 0.86);
+  font-size: 11px;
+}
+
+.fdry-hall-hud__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 32ch;
+}
+
+.fdry-hall-hud__progress {
+  display: block;
+  flex: none;
+  width: 90px;
+  height: 6px;
+  border-radius: 1px;
+  background: #1d2530;
+  overflow: hidden;
+}
+
+.fdry-hall-hud__progress > span {
+  display: block;
+  height: 100%;
+  background: #8fe07e;
+}
+
+.fdry-hall-hud__steps {
+  font-variant-numeric: tabular-nums;
+  color: #98a2b1;
+}
+
+.fdry-hall-hud__needs {
+  padding: 4px 10px;
+  border-radius: 2px;
+  background: #e0a13a;
+  color: #1a1206;
+  font-size: 11px;
+  font-weight: 600;
+  animation: fdry-card-pulse 1.6s ease-in-out infinite;
+}
+
+.fdry-hall-hud__alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 10px;
+  border: 2px solid #e0a13a;
+  border-radius: 2px;
+  background: #15110a;
+  color: #f5e6c8;
+  font-size: 11px;
+}
+
+/* A station's detail, over the hall's right edge. */
+.fdry-hall-inspector {
+  position: absolute;
+  z-index: var(--tm-layer-modal);
+  top: 46px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(320px, 42%);
+  padding: 10px 12px;
+  border: 1px solid #2c3340;
+  border-radius: 3px;
+  background: rgba(10, 12, 18, 0.95);
+  font-size: 11.5px;
+}
+
+.fdry-hall-inspector__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fdry-hall-inspector__head h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.fdry-hall-inspector__head button {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #3a4250;
+  border-radius: 2px;
+  background: transparent;
+  color: #98a2b1;
+  cursor: pointer;
+}
+
+.fdry-hall-inspector__head button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.fdry-hall-inspector__meta {
+  margin: 0;
+  color: #98a2b1;
+}
+
+.fdry-hall-inspector__log {
+  flex: 1;
+  margin: 0;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 2px;
+  background: #0b0e13;
+  color: #9fb0c4;
+  font-size: 10.5px;
+  white-space: pre-wrap;
+}
+
+.fdry-hall-inspector .fdry-hall-btn {
+  align-self: flex-start;
+}
+
+.fdry-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fdry-callout,
+  .fdry-card,
+  .fdry-hall-hud__needs {
+    animation: none;
+  }
 }

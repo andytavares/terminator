@@ -1,9 +1,9 @@
 import type { HallMap, HallProp, Tile } from './layout.js'
 import { TILE_PX } from './layout.js'
 import { findPath } from './path.js'
-import { gateNodeId } from './events.js'
+import { gateNodeId, hasStarted } from './events.js'
 import type { Observation } from './events.js'
-import type { RunNode } from '../line/run-graph.js'
+import type { NodeState, RunNode } from '../line/run-graph.js'
 import type { StepKind } from '../recipe/parse.js'
 
 // The world a scene renders: crew walking a hall, crates riding belts.
@@ -33,6 +33,8 @@ export interface Crate {
   readonly id: string
   readonly beltId: string
   readonly progress: number
+  /** Waits at the end of its belt until the step it feeds starts, instead of vanishing. */
+  readonly parks: boolean
 }
 
 /**
@@ -158,7 +160,40 @@ export function createWorld(map: HallMap, observation: Observation): World {
     if (nodeId !== null) gatesWaiting.add(nodeId)
   }
 
-  return { map, crew, crates: [], gatesWaiting: [...gatesWaiting], openCalls: [], clockMs: 0 }
+  // Work already finished and not yet taken in shows as a crate waiting at
+  // the step it feeds, so a hall opened mid-run reads the queue at a glance.
+  const states = new Map(observation.graph.nodes.map((n) => [n.id, n.state]))
+  const crates: Crate[] = map.belts
+    .filter(
+      (belt) =>
+        states.get(belt.fromNodeId) === 'passed' &&
+        !hasStarted(states.get(belt.toNodeId) as NodeState)
+    )
+    .map((belt) => ({ id: `${belt.id}@queued`, beltId: belt.id, progress: 1, parks: true }))
+
+  return { map, crew, crates, gatesWaiting: [...gatesWaiting], openCalls: [], clockMs: 0 }
+}
+
+/**
+ * Where a crate is drawn, in world px.
+ *
+ * A belt's path ends on the seat of the step it feeds, so the ride stops one
+ * tile short of it: a parked crate waits beside the station, not under the
+ * chair. Linear between tile centres, so it glides instead of jumping.
+ */
+export function cratePosition(
+  belt: HallMap['belts'][number],
+  progress: number
+): { readonly x: number; readonly y: number } {
+  const stops = belt.path.length > 1 ? belt.path.slice(0, -1) : belt.path
+  const at = Math.min(Math.max(progress, 0), 1) * (stops.length - 1)
+  const from = stops[Math.floor(at)]
+  const to = stops[Math.min(Math.floor(at) + 1, stops.length - 1)]
+  const t = at - Math.floor(at)
+  return {
+    x: (from.x + (to.x - from.x) * t) * TILE_PX + 8,
+    y: (from.y + (to.y - from.y) * t) * TILE_PX + 8,
+  }
 }
 
 function beltDistance(belt: { readonly path: readonly Tile[] }): number {
@@ -169,7 +204,7 @@ function tickCrate(world: World, crate: Crate, dtSec: number): Crate | null {
   const belt = world.map.belts.find((b) => b.id === crate.beltId)
   const distance = belt === undefined ? TILE_PX : beltDistance(belt)
   const progress = crate.progress + (CRATE_PX_PER_S * dtSec) / distance
-  if (progress >= 1) return null
+  if (progress >= 1) return crate.parks ? { ...crate, progress: 1 } : null
   return { ...crate, progress }
 }
 
