@@ -1,0 +1,39 @@
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_9126708f68ed92::t_d577267d2b9292 387-390,397-406
+extensions/foundry/recipes/spike.yaml
+  s_9126708f68ed92::t_d577267d2b9292 4-7
+extensions/foundry/recipes/design-doc.yaml
+  s_9126708f68ed92::t_d577267d2b9292 7
+extensions/foundry/recipes/direct.yaml
+  s_9126708f68ed92::t_d577267d2b9292 4-5
+extensions/foundry/recipes/research.yaml
+  s_9126708f68ed92::t_d577267d2b9292 7
+extensions/foundry/recipes/bugfix.yaml
+  s_9126708f68ed92::t_d577267d2b9292 6
+extensions/foundry/recipes/poc.yaml
+  s_9126708f68ed92::t_d577267d2b9292 7
+extensions/foundry/recipes/refactor.yaml
+  s_9126708f68ed92::t_d577267d2b9292 6
+extensions/foundry/recipes/quick.yaml
+  s_9126708f68ed92::t_d577267d2b9292 7-9
+extensions/foundry/recipes/standard.yaml
+  s_9126708f68ed92::t_d577267d2b9292 4-5
+extensions/foundry/recipes/speckit.yaml
+  s_9126708f68ed92::t_d577267d2b9292 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "19e0c41366ea1a2d654bd78f1b4ee158e7259131",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
