@@ -12,13 +12,16 @@ import {
   Loader,
   CheckCircle2,
 } from 'lucide-react'
-import type { RunGraph, RunNode } from '../line/run-graph.js'
-import type { Standing } from '../order/standing.js'
-import type { Gate } from '../gates/rules.js'
+import type { RunNode } from '../line/run-graph.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
 import { HunkLines } from './HunkLines.js'
+import {
+  useRunObservation,
+  type FloorView,
+  type PendingAsk,
+} from '../renderer/use-run-observation.js'
 
 // Where you watch, not where you act.
 //
@@ -27,70 +30,6 @@ import { HunkLines } from './HunkLines.js'
 // any running agent's live session, because however good a structured view
 // gets, there are moments when the only useful thing is to be in the terminal
 // typing at it.
-
-interface Blocked {
-  id: string
-  reason: string
-}
-
-/** One repository this order spans, and what it is waiting for. */
-interface LaneRow {
-  ord: number
-  repo: string
-  role: 'producer' | 'consumer' | null
-  collisions: string[]
-  blockedBy: number[]
-  /** Why this lane cannot merge yet, in the rule's own words. Null when it can. */
-  hold: string | null
-}
-
-interface FloorView {
-  graph: RunGraph
-  /** What the operator called this order. The heading was two identifiers. */
-  title?: string | null
-  /**
-   * Where the run stands, and whose move it is.
-   *
-   * Optional because this is polled and a host part way through an upgrade
-   * answers without one — the panel draws the run and no band rather than
-   * blanking.
-   */
-  standing?: Standing
-  /** Gates holding this order, undecided. Answerable from here. */
-  waiting?: Gate[]
-  /**
-   * Agents parked at their terminal's own prompt.
-   *
-   * A tool call nobody answered in time is handed back there, and an
-   * unattended run never reaches it — so the agent stops with its process
-   * alive and its node still `running`. The only thing that answers one is
-   * going to that terminal, which is what these are for.
-   */
-  stranded?: string[]
-  /** What to call each node, keyed by id — worked out where the order is. */
-  labels?: Record<string, string>
-  ready: string[]
-  blocked: Blocked[]
-  lanes?: LaneRow[]
-  /**
-   * Steps the graph calls running that nothing is actually running.
-   *
-   * An agent's terminal is a child of the application, so quitting kills every
-   * one while the graph goes on saying `running`. Without this the chips for a
-   * dead run and a working one are the same chips.
-   */
-  orphaned?: string[]
-}
-
-/** A tool call an agent is holding at, waiting for an answer. */
-interface PendingAsk {
-  requestId: string
-  sessionId: string
-  toolName: string
-  summary: string
-  detail: string | null
-  at: number
-}
 
 /** A finished run whose change nobody has looked at yet. */
 interface ReviewItem {
@@ -236,9 +175,12 @@ export interface FloorProps {
 }
 
 export function Floor({ orderId }: FloorProps): JSX.Element {
-  const [view, setView] = useState<FloorView | null>(null)
-  const [problem, setProblem] = useState<string | null>(null)
-  const [pending, setPending] = useState<PendingAsk[]>([])
+  const { view, problem: observeProblem, pending, refresh } = useRunObservation(orderId)
+  // Errors an action raises here — a click that failed, a decision the run
+  // refused — live alongside whatever the observation poll last said, so one
+  // does not silently overwrite the other.
+  const [actionProblem, setProblem] = useState<string | null>(null)
+  const problem = actionProblem ?? observeProblem
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
   /** The last few things each running agent said, by session. */
   const [live, setLive] = useState<Record<string, TranscriptLine[]>>({})
@@ -257,30 +199,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const [stalls, setStalls] = useState<StallFiring[]>([])
   const [shadowMode, setShadowMode] = useState(true)
 
-  const refresh = useCallback(async () => {
-    const next = (await invoke('foundry:run.observe', { id: orderId })) as
-      | FloorView
-      | { error: string }
-    if ('error' in next) {
-      setProblem(next.error)
-      return
-    }
-    setProblem(null)
-    setView(next)
-  }, [orderId])
-
-  // Polled, not fetched once.
-  //
-  // This was a single call on mount, so every state chip on the screen was a
-  // snapshot of whenever the panel happened to open: a run that halted, failed
-  // or finished while you were looking at it went on drawing `building` until
-  // you navigated away and back.
-  useEffect(() => {
-    void refresh()
-    const timer = setInterval(() => void refresh(), LIVE_POLL_MS)
-    return () => clearInterval(timer)
-  }, [refresh])
-
   // The live half: what an agent is holding at, and what it has been saying.
   //
   // Polled rather than pushed because a surface that misses one event shows a
@@ -288,8 +206,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   // of those — the agent is genuinely stopped, waiting on somebody who has
   // been told there is nothing to do.
   const pollLive = useCallback(async () => {
-    const asks = (await invoke('foundry:permissions-list')) as { pending?: PendingAsk[] }
-    setPending(asks.pending ?? [])
     const snapshot = (await invoke('foundry:supervision-snapshot')) as {
       review?: ReviewItem[]
       backpressure?: Backpressure
