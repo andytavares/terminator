@@ -1,0 +1,59 @@
+extensions/foundry/src/factory/director.ts
+  s_10b76946c6f0cb::t_adffa056f1f975 1
+  s_10b76946c6f0cb::t_684929e3db9269 71-80,82-83,161-166
+extensions/foundry/src/factory/sim.ts
+  s_10b76946c6f0cb::t_bf1e20da32b741 177-196
+  s_10b76946c6f0cb::t_adffa056f1f975 4,6
+  s_10b76946c6f0cb::t_684929e3db9269 36-37,163-174,207
+  s_10b76946c6f0cb::t_6210ed500a3b96 175-176
+extensions/foundry/src/components/factory/HallScene.tsx
+  s_10b76946c6f0cb::t_bf1e20da32b741 116
+  s_10b76946c6f0cb::t_d7d4fb798bf5b8 4
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_10b76946c6f0cb::t_25f69714eadb97 44-45,315-317
+  s_10b76946c6f0cb::t_8d8ddd32f819b7 512-517,547-552
+  s_10b76946c6f0cb::t_1feae29c4eba9b 2,4,6,12-13,25-28,38,40-43,51-83,90,93-94,98-99,123-132,134-136,160,162,164-172,174,212-222,224-251,258-265,273-281,283,291,293-296,298-314,318-326,329-365,367-400,403-404,406-464,466-511,518-521,523-546,553,555-556
+  s_10b76946c6f0cb::t_02f8b275760b7a 223
+  s_10b76946c6f0cb::t_b6dbabda38689e 297
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_10b76946c6f0cb::t_ca591ea8977cc6 3,219-335
+  s_10b76946c6f0cb::t_0979f5911fdbe8 336
+extensions/foundry/src/components/foundry.css
+  s_10b76946c6f0cb::t_8d8ddd32f819b7 2818-2819,2821-2822,2825-2834,2837-2841,2844-2845,2859-2870,2874-2884,2887-2889,2892-2913,2916-3041,3044-3046,3049-3084,3089-3241,3243,3246-3289
+  s_10b76946c6f0cb::t_425923bbf53617 3290-3291
+extensions/foundry/src/factory/callouts.ts
+  s_10b76946c6f0cb::t_9030f016d8767e 1-208
+extensions/foundry/tests/factory/callouts.spec.ts
+  s_10b76946c6f0cb::t_ce892ee14fa8c5 1-70,74-80,87-115,119-125,130-143,147-180,182-227
+  s_10b76946c6f0cb::t_c837841580b1f5 71-73,81-86,116-118,126-129,144-146,181
+extensions/foundry/tests/factory/director.spec.ts
+  s_10b76946c6f0cb::t_56ef2f87394338 520
+  s_10b76946c6f0cb::t_a78067eec4b043 401-405,409-426,432
+  s_10b76946c6f0cb::t_d7d4fb798bf5b8 427-431,438-442
+extensions/foundry/tests/factory/events.spec.ts
+  s_10b76946c6f0cb::t_a78067eec4b043 175-180,183,186-198,200-205,270-272
+  s_10b76946c6f0cb::t_598aecce334128 273
+extensions/foundry/src/factory/events.ts
+  s_10b76946c6f0cb::t_684929e3db9269 41-47,58-62,141-146
+extensions/foundry/tests/factory/sim.spec.ts
+  s_10b76946c6f0cb::t_a78067eec4b043 201,209,219-245
+  s_10b76946c6f0cb::t_793831a69472ae 313-342
+  s_10b76946c6f0cb::t_bf1e20da32b741 3
+  s_10b76946c6f0cb::t_d7d4fb798bf5b8 250-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d8481b640fbf298a73875e47383def5d3f26e347",
+  "prompts": {},
+  "sessions": {
+    "s_10b76946c6f0cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e9e2f02b-997e-4bcc-a008-5d8ab6b5f241",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
