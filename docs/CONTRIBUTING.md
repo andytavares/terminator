@@ -30,6 +30,8 @@ pip3 install setuptools --break-system-packages
 npm run dev        # Electron + hot-reload via electron-vite
 ```
 
+A dev run uses its own profile, `…/@andytavares/terminator-dev`, so it can run beside the installed app without sharing its database.
+
 ### Run tests
 
 ```bash
