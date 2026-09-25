@@ -44,6 +44,25 @@ describe('the tail of a conversation', () => {
     ])
   })
 
+  it('shows a progress note carried in a thinking block, and skips an empty one', () => {
+    write(
+      line({
+        type: 'assistant',
+        timestamp: '2026-07-27T10:00:05Z',
+        message: {
+          content: [
+            { type: 'thinking', thinking: '' },
+            { type: 'thinking', thinking: 'Tests pass; checking the lint next.' },
+            { type: 'tool_use', name: 'Bash', input: { command: 'npm run lint' } },
+          ],
+        },
+      })
+    )
+    expect(readTranscriptTail(file).map((l) => l.text)).toEqual([
+      'Tests pass; checking the lint next.\nBash: npm run lint',
+    ])
+  })
+
   it('summarises a tool call rather than printing all of its arguments', () => {
     // Both extremes are useless. The name alone gives fifteen consecutive
     // `[Bash]` rows, which cannot distinguish a run looping on one command

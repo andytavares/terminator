@@ -3,7 +3,7 @@ id: refactor
 description: Change the shape, prove the behaviour did not change.
 # Proving behaviour unchanged across a shape change is cross-cutting by
 # definition.
-effort: xhigh
+effort: high
 requires:
   - toolchain: test
 steps:

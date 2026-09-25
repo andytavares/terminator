@@ -1,9 +1,10 @@
 schemaVersion: 1
 id: spike
 description: A question, not a change. Time-boxed, throwaway, opens no pull request.
-# A question, answered by reading. The default is enough; a spike that
-# thinks at xhigh spends the budget on the answer's certainty, not its reach.
-effort: high
+# A question, answered by reading. The model's default is enough, set
+# explicitly; a spike that thinks harder spends the budget on the answer's
+# certainty, not its reach.
+effort: medium
 requires: []
 steps:
   - id: scout

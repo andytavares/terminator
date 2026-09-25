@@ -57,6 +57,9 @@ function textOf(message: Record<string, unknown>): string {
       if (typeof block !== 'object' || block === null) return ''
       const b = block as Record<string, unknown>
       if (b.type === 'text' && typeof b.text === 'string') return b.text
+      // Some models write their notes between tool calls as thinking blocks;
+      // an empty one is thinking the runtime chose not to show.
+      if (b.type === 'thinking' && typeof b.thinking === 'string') return b.thinking
       if (b.type === 'tool_use' && typeof b.name === 'string') {
         const argument = argumentOf(b.input)
         return argument === '' ? `${b.name}` : `${b.name}: ${argument}`

@@ -725,3 +725,48 @@ describe('when a session is given something new to do', () => {
     expect(supervised.watchable()[0].startedAt).toBe(9 * 60_000)
   })
 })
+
+describe('running one command in a terminal, with no agent', () => {
+  const command = {
+    worktreePath: '/wt/feat-thing',
+    workspaceId: 'ws-1',
+    branch: 'feat/thing',
+    title: 'Lint',
+    command: 'npm run lint',
+  }
+
+  it('opens a plain terminal tab in the worktree project', async () => {
+    void runner().runCommand(command)
+    await Promise.resolve()
+    expect(created[0]).toMatchObject({ worktreePath: '/wt/feat-thing', gitBranch: 'feat/thing' })
+    expect(opened[0]).toMatchObject({
+      projectId: 'project-1',
+      cwd: '/wt/feat-thing',
+      tabTitle: 'Lint',
+      type: 'human',
+    })
+  })
+
+  it('runs the command from a script and exits the shell with its status', async () => {
+    void runner().runCommand(command)
+    await Promise.resolve()
+    expect(launchScriptBody()).toContain('npm run lint')
+    expect(written.map((w) => w.data).join('')).toMatch(/; exit \$\?\r$/)
+    expect(launchScriptBody()).not.toContain('claude')
+  })
+
+  it("resolves with the terminal's exit status, a failure as much as a pass", async () => {
+    const pending = runner().runCommand(command)
+    await Promise.resolve()
+    exitListener!(2)
+    await expect(pending).resolves.toBe(2)
+  })
+
+  it('resolves null when no project or terminal could be opened', async () => {
+    projectId = null
+    await expect(runner().runCommand(command)).resolves.toBeNull()
+    projectId = 'project-1'
+    terminalId = null
+    await expect(runner().runCommand(command)).resolves.toBeNull()
+  })
+})

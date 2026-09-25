@@ -1,6 +1,6 @@
-# MANDATORY: Follow the Project Constitution — No Exceptions
+# Project constitution
 
-The constitution at **`.specify/memory/constitution.md`** is the law of this codebase, any deviation from the constitution requires explicit user approval no exceptions.
+Follow the constitution at `.specify/memory/constitution.md`. It governs every change in this codebase; deviating from it needs the user's explicit approval first.
 
 <!-- SPECKIT START -->
 

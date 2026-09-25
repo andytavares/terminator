@@ -384,27 +384,26 @@ describe('what the architect may read', () => {
   })
 })
 
-// Every shipped shape says how hard its agents work. The ladder is the one
-// the kit's intake uses: a one-lane P3 change at `high`, anything that spans
-// modules, roots a cause, or characterises behaviour before changing it at
-// `xhigh`. A shape with no effort would run at whatever the runtime defaults
-// to, which is the state every order was in before this.
+// Every shipped shape says how hard its agents work: a one-lane P3 change at
+// `medium`, anything that spans modules, roots a cause, or characterises
+// behaviour before changing it one level above, at `high`. Declared rather than
+// left to the runtime, because the default differs between models.
 describe('the effort each built-in shape asks for', () => {
   it.each(recipeFiles)('%s declares one', (file) => {
     expect(recipe(file).effort).toBeDefined()
   })
 
   it.each([
-    ['quick.yaml', 'high'],
-    ['direct.yaml', 'xhigh'],
-    ['standard.yaml', 'xhigh'],
-    ['bugfix.yaml', 'xhigh'],
-    ['refactor.yaml', 'xhigh'],
-    ['speckit.yaml', 'xhigh'],
-    ['spike.yaml', 'high'],
-    ['research.yaml', 'high'],
-    ['design-doc.yaml', 'xhigh'],
-    ['poc.yaml', 'high'],
+    ['quick.yaml', 'medium'],
+    ['direct.yaml', 'high'],
+    ['standard.yaml', 'high'],
+    ['bugfix.yaml', 'high'],
+    ['refactor.yaml', 'high'],
+    ['speckit.yaml', 'high'],
+    ['spike.yaml', 'medium'],
+    ['research.yaml', 'medium'],
+    ['design-doc.yaml', 'high'],
+    ['poc.yaml', 'medium'],
   ])('%s runs at %s', (file, effort) => {
     expect(recipe(file).effort).toBe(effort)
   })

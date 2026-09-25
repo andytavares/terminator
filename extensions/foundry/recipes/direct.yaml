@@ -1,8 +1,8 @@
 schemaVersion: 1
 id: direct
 description: One lane, but something worth a second look. Build it, prove it, inspect it, ship it.
-# Worth a second look means worth thinking harder about.
-effort: xhigh
+# Worth a second look means one level above the model's default.
+effort: high
 requires: []
 steps:
   # No `plan` step. The Forge's converge *is* the architect, and the plan it

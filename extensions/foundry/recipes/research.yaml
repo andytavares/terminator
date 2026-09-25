@@ -4,7 +4,7 @@ description: >
   A question whose answer is a document. Read the ground, write the answer
   with evidence, have a fresh reader check it against the criteria, ship it
   as a pull request so the work is visible.
-effort: high
+effort: medium
 requires: []
 steps:
   - id: scout
