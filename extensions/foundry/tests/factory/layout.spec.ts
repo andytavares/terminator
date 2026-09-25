@@ -146,6 +146,26 @@ describe('layoutHall', () => {
         }
       })
 
+      it('gives archive, rack and wait a clear floor tile', () => {
+        const map = layoutHall(graph)
+        expect(map.solid[map.anchors.archive.y][map.anchors.archive.x]).toBe(false)
+        expect(map.solid[map.anchors.rack.y][map.anchors.rack.x]).toBe(false)
+        expect(map.solid[map.anchors.wait.y][map.anchors.wait.x]).toBe(false)
+      })
+
+      it('spreads the four wall fixtures across the width instead of one bay', () => {
+        const map = layoutHall(graph)
+        const fixtureKinds: HallProp['kind'][] = ['shelves', 'racks', 'statuswall', 'lockers']
+        const fixtures = fixtureKinds.map(
+          (kind) => map.props.find((p) => p.kind === kind) as HallProp
+        )
+        expect(fixtures.every((f) => f !== undefined)).toBe(true)
+        const xs = fixtures.map((f) => f.x)
+        expect(new Set(xs).size).toBe(xs.length)
+        const spread = Math.max(...xs) - Math.min(...xs)
+        expect(spread).toBeGreaterThan(map.width / 3)
+      })
+
       it('reaches every seat and every anchor from the intake', () => {
         const map = layoutHall(graph)
         const targets = [
@@ -296,6 +316,38 @@ describe('layoutHall', () => {
       const withLabels = layoutHall(g, { a: 'Do the thing' })
       const withoutLabels = layoutHall(g)
       expect(withLabels).toEqual(withoutLabels)
+    })
+
+    it('hugs the width to at most a few columns past the last station', () => {
+      const g = graph([
+        rn({ id: 'a', kind: 'agent' }),
+        rn({ id: 'b', kind: 'agent', dependsOn: ['a'] }),
+        rn({ id: 'c', kind: 'agent', dependsOn: ['b'] }),
+        rn({ id: 'd', kind: 'agent', dependsOn: ['c'] }),
+        rn({ id: 'e', kind: 'agent', dependsOn: ['d'] }),
+      ])
+      const map = layoutHall(g)
+      const lastStation = map.props.find((p) => p.nodeId === 'e') as HallProp
+      const rightEdge = lastStation.x + lastStation.w
+      expect(map.width - rightEdge).toBeLessThanOrEqual(3)
+    })
+
+    it('places more than one kind of lounge furniture, spread across the bottom band', () => {
+      const g = graph([
+        rn({ id: 'a', kind: 'agent' }),
+        rn({ id: 'b', kind: 'agent', dependsOn: ['a'] }),
+        rn({ id: 'c', kind: 'agent', dependsOn: ['b'] }),
+        rn({ id: 'd', kind: 'agent', dependsOn: ['c'] }),
+        rn({ id: 'e', kind: 'agent', dependsOn: ['d'] }),
+      ])
+      const map = layoutHall(g)
+      const loungeKinds: HallProp['kind'][] = ['couch', 'coffee', 'plant', 'booth']
+      const lounge = map.props.filter((p) => loungeKinds.includes(p.kind))
+      const kindsSeen = new Set(lounge.map((p) => p.kind))
+      expect(kindsSeen.size).toBeGreaterThan(1)
+      const xs = lounge.map((p) => p.x)
+      expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(map.width / 3)
+      expect(map.anchors.lounge.length).toBeGreaterThanOrEqual(6)
     })
 
     it('lays out an empty graph without throwing', () => {

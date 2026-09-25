@@ -81,8 +81,42 @@ const TOP_WALL_ROWS = 3
 const YARD_ROWS = 3
 const LANE_BAND_ROWS = 4
 const LOUNGE_ROWS = 4
-const BUFFER_COLS = 4
-const MIN_WIDTH = 24
+/** How far the room extends past the last station's column — the hall hugs its content. */
+const CONTENT_MARGIN = 3
+const MIN_WIDTH = 16
+
+type FixtureKind = 'shelves' | 'racks' | 'statuswall' | 'lockers'
+const FIXTURE_KINDS: readonly FixtureKind[] = ['shelves', 'racks', 'statuswall', 'lockers']
+
+type LoungeKind = 'couch' | 'coffee' | 'plant' | 'booth'
+/** Repeats across the lounge band until the room runs out of width. */
+const LOUNGE_PATTERN: readonly { readonly kind: LoungeKind; readonly w: number }[] = [
+  { kind: 'plant', w: 1 },
+  { kind: 'couch', w: 3 },
+  { kind: 'plant', w: 1 },
+  { kind: 'coffee', w: 1 },
+  { kind: 'booth', w: 3 },
+  { kind: 'plant', w: 1 },
+]
+
+/** The nearest column in `row` that isn't solid, scanning outward from `preferred`. */
+function nearestClearColumn(
+  solid: boolean[][],
+  row: number,
+  preferred: number,
+  width: number
+): number {
+  const clamped = Math.min(Math.max(preferred, 1), width - 2)
+  if (!solid[row][clamped]) return clamped
+  for (let offset = 1; offset < width; offset++) {
+    const right = clamped + offset
+    if (right <= width - 2 && !solid[row][right]) return right
+    const left = clamped - offset
+    if (left >= 1 && !solid[row][left]) return left
+  }
+  /* v8 ignore next -- a hall always has floor the perimeter fill leaves clear */
+  return clamped
+}
 
 export function stationKind(kind: StepKind): StationKind {
   switch (kind) {
@@ -159,8 +193,17 @@ function fillRect(
 
 export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, string>>): HallMap {
   const nodeDepths = depths(graph.nodes)
-  const maxDepth = graph.nodes.length === 0 ? 0 : Math.max(...[...nodeDepths.values()])
-  const width = Math.max(MIN_WIDTH, 3 + (maxDepth + 1) * 5 + BUFFER_COLS)
+  // The rightmost edge any station actually occupies — the room hugs this,
+  // rather than a fixed reserved bay past the deepest column.
+  const rightmostStationEdge =
+    graph.nodes.length === 0
+      ? 3 + stationWidth('desk')
+      : Math.max(
+          ...graph.nodes.map(
+            (n) => 3 + (nodeDepths.get(n.id) as number) * 5 + stationWidth(stationKind(n.kind))
+          )
+        )
+  const width = Math.max(MIN_WIDTH, rightmostStationEdge + CONTENT_MARGIN)
 
   const laneValues = [
     ...new Set(graph.nodes.map((n) => n.lane).filter((l): l is number => l !== null)),
@@ -193,70 +236,6 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
   const intake: Tile = { x: 0, y: doorRow }
   const exit: Tile = { x: width - 1, y: doorRow }
 
-  // Wall fixtures live in the reserved buffer columns at the right edge, so
-  // they never collide with a station column (every station sits below
-  // width - BUFFER_COLS).
-  const bayStart = width - BUFFER_COLS - 1
-  const props: HallProp[] = []
-  const fixtureCols: Record<'shelves' | 'racks' | 'statuswall' | 'lockers', number> = {
-    shelves: bayStart,
-    racks: bayStart + 1,
-    statuswall: bayStart + 2,
-    lockers: bayStart + 3,
-  }
-  for (const [kind, col] of Object.entries(fixtureCols) as [keyof typeof fixtureCols, number][]) {
-    props.push({
-      id: `fixture-${kind}`,
-      kind,
-      x: col,
-      y: TOP_WALL_ROWS - 1,
-      w: 1,
-      h: 1,
-      solid: true,
-      nodeId: null,
-      seat: null,
-    })
-  }
-  const archive: Tile = { x: fixtureCols.shelves, y: yardStationRow }
-  const rack: Tile = { x: fixtureCols.racks, y: yardStationRow }
-  const wait: Tile = { x: fixtureCols.statuswall, y: yardSeatRow }
-
-  // Lounge/utility band, in the same reserved bay so it never collides with a
-  // station either.
-  const loungeKinds: PropKind[] = ['couch', 'coffee', 'plant', 'booth']
-  for (const [index, kind] of loungeKinds.entries()) {
-    const col = bayStart + index
-    props.push({
-      id: `lounge-${kind}`,
-      kind,
-      x: col,
-      y: loungeStart,
-      w: 1,
-      h: 1,
-      solid: false,
-      nodeId: null,
-      seat: null,
-    })
-  }
-  // `width` is never less than MIN_WIDTH, so the first row alone always
-  // yields at least 6 columns before the 12-tile cap — the minimum the
-  // `HallAnchors.lounge` contract asks for.
-  const lounge: Tile[] = []
-  for (let row = loungeStart; row < loungeStart + LOUNGE_ROWS; row++) {
-    for (let col = 1; col < bayStart; col += 3) {
-      lounge.push({ x: col, y: row })
-      if (lounge.length >= 12) break
-    }
-    if (lounge.length >= 12) break
-  }
-
-  // Lights: one per ~6 columns, per band.
-  const lights: Tile[] = []
-  const bandRows = [yardBeltRow, ...laneValues.map((_, i) => laneBandStart(i) + 2), loungeStart]
-  for (const row of bandRows) {
-    for (let col = 3; col < width - 1; col += 6) lights.push({ x: col, y: row })
-  }
-
   // Every lane a node can carry came from `laneValues`, which `laneRowOf` was
   // just built from — a node's lane is always a key of this map.
   const laneRowOf = new Map<number, number>()
@@ -266,6 +245,9 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     return { lane, row, label: `Lane ${lane}` }
   })
 
+  // Stations go down first: fixtures and the lounge are dressing placed
+  // *around* them, and need to know which floor tiles are already taken.
+  const props: HallProp[] = []
   for (const node of graph.nodes) {
     const kind = stationKind(node.kind)
     const w = stationWidth(kind)
@@ -304,6 +286,81 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
         seat: null,
       })
     }
+  }
+
+  // Wall fixtures spread across the whole top wall — decor on row
+  // `TOP_WALL_ROWS - 1`, which no station ever touches, so their columns are
+  // free to land anywhere. Their floor-level anchor (where an agent actually
+  // stands to use one) nudges to the nearest clear column when a station
+  // happens to sit directly under the fixture's own column.
+  for (const [index, kind] of FIXTURE_KINDS.entries()) {
+    const col = Math.round(2 + ((width - 4) * (index + 1)) / (FIXTURE_KINDS.length + 1))
+    props.push({
+      id: `fixture-${kind}`,
+      kind,
+      x: col,
+      y: TOP_WALL_ROWS - 1,
+      w: 1,
+      h: 1,
+      solid: true,
+      nodeId: null,
+      seat: null,
+    })
+  }
+  const fixtureCol = (kind: FixtureKind): number => {
+    const prop = props.find((p) => p.id === `fixture-${kind}`) as HallProp
+    return prop.x
+  }
+  const archive: Tile = {
+    x: nearestClearColumn(solid, yardStationRow, fixtureCol('shelves'), width),
+    y: yardStationRow,
+  }
+  const rack: Tile = {
+    x: nearestClearColumn(solid, yardStationRow, fixtureCol('racks'), width),
+    y: yardStationRow,
+  }
+  const wait: Tile = {
+    x: nearestClearColumn(solid, yardSeatRow, fixtureCol('statuswall'), width),
+    y: yardSeatRow,
+  }
+
+  // Lounge/utility band: a repeating strip of furniture across the whole
+  // bottom band, never under a station (the lounge band sits below every
+  // lane), so there is nothing to dodge.
+  const lounge: Tile[] = []
+  let loungeX = 1
+  let loungeIndex = 0
+  while (loungeX < width - 2) {
+    const piece = LOUNGE_PATTERN[loungeIndex % LOUNGE_PATTERN.length]
+    if (loungeX + piece.w > width - 1) break
+    props.push({
+      id: `lounge-${piece.kind}-${loungeIndex}`,
+      kind: piece.kind,
+      x: loungeX,
+      y: loungeStart,
+      w: piece.w,
+      h: 1,
+      solid: false,
+      nodeId: null,
+      seat: null,
+    })
+    if (piece.w >= 3) {
+      lounge.push({ x: loungeX, y: loungeStart }, { x: loungeX + piece.w - 1, y: loungeStart })
+    } else {
+      lounge.push({ x: loungeX, y: loungeStart })
+    }
+    loungeX += piece.w + 1
+    loungeIndex += 1
+  }
+  // `width` is never below `MIN_WIDTH` (16), and one partial cycle of
+  // `LOUNGE_PATTERN` through a 16-column room already seats 7 — the
+  // contract's minimum of 6 needs no separate top-up.
+
+  // Lights: one per ~6 columns, per band (the lounge included).
+  const lights: Tile[] = []
+  const bandRows = [yardBeltRow, ...laneValues.map((_, i) => laneBandStart(i) + 2), loungeStart]
+  for (const row of bandRows) {
+    for (let col = 3; col < width - 1; col += 6) lights.push({ x: col, y: row })
   }
 
   const stationById = new Map(
