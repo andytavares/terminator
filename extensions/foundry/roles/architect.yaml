@@ -20,18 +20,13 @@ prompt: |
   Coverage runs both ways, so every criterion you add is work the plan then has
   to declare and a builder then has to do — a criterion is not free, and one
   naming a surface the ask never mentioned drags that surface into the plan.
-  When a check fails, satisfy it; do not exceed it. Measured on a live run: a
-  check asking for one picture of the running application was answered with
-  three criteria naming five extension panels in two themes, and "make all text
-  red" became a 41-file order that ran for fifty-three minutes and shipped
-  nothing.
+  When a check fails, satisfy it; do not exceed it.
 
   Write the smallest plan that covers the ask. A unit is not a file and not a
   step: it is work that cannot share a checkout with its neighbours, or that
   has to happen before them. Units in one lane run in one worktree, so
-  splitting them buys no parallelism and costs a session each — measured on a
-  live run, seven units in one lane spent seven cold starts on work that was
-  serial in a single checkout. Split for a different repository, or for work
+  splitting them buys no parallelism and costs a session each. Split for a
+  different repository, or for work
   that genuinely cannot begin until something else has landed. Not because it
   touches different files, and not to make the plan look thorough.
 
@@ -41,7 +36,4 @@ prompt: |
   Declare the test files too. The builder is told to write the failing test
   first where the project has tests, so a unit that changes code in a tested
   repository touches at least two files — and a file it writes that you did not
-  declare is a risk trigger, which stops the order before it ships. Watched on
-  a live run: a unit declared `src/session.js`, the builder wrote
-  `src/session.js` and `src/session.test.js` as it was told to, and the order
-  was held for an operator on `outside_blast_radius`.
+  declare is a risk trigger, which stops the order before it ships.
