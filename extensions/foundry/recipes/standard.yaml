@@ -1,9 +1,8 @@
 schemaVersion: 1
 id: standard
 description: The default for work spanning more than one lane, or graded above P2.
-# More than one lane, or graded above P2: the deepest reasoning the runtime
-# offers short of max, which overthinks.
-effort: xhigh
+# More than one lane, or graded above P2: one level above the model's default.
+effort: high
 requires: []
 steps:
   - id: scout

@@ -3,7 +3,7 @@ id: bugfix
 description: Reproduce first, then fix, then prove the reproduction flips.
 # A root cause is the thing effort buys. A fix at the default is the fix
 # that makes the reproduction pass without finding why it failed.
-effort: xhigh
+effort: high
 requires:
   - toolchain: test
 steps:

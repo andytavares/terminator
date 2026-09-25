@@ -4,7 +4,7 @@ description: >
   A design or strategy document. The order is attacked before a word is
   written, the document is written against the checkout, and a fresh reader
   checks it against the criteria before it ships.
-effort: xhigh
+effort: high
 requires: []
 steps:
   - id: scout

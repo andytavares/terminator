@@ -4,7 +4,7 @@ description: >
   A proof of concept. Build the smallest thing that demonstrates the claim,
   check the demonstration in a fresh context, record what was learned, ship
   it as a draft so the result is visible.
-effort: high
+effort: medium
 requires: []
 steps:
   - id: build
