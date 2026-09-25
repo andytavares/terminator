@@ -1,0 +1,64 @@
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_10b76946c6f0cb::t_1eed0338041eca 14,1105-1149
+  s_10b76946c6f0cb::t_1d574134f628af 1150
+extensions/foundry/tests/factory/timeline-store.spec.ts
+  s_10b76946c6f0cb::t_9c06e0676ad0e8 1-39,45-106
+  s_10b76946c6f0cb::t_870b015d6e63af 40-44
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_10b76946c6f0cb::t_9f2b4788399bc9 337-401
+docs/research/foundry-factory-view.md
+  s_10b76946c6f0cb::t_df9014b0e96ca0 198-199
+extensions/foundry/src/factory/replay.ts
+  s_10b76946c6f0cb::t_7740f3312645fd 1-145
+README.md
+  s_10b76946c6f0cb::t_df9014b0e96ca0 22
+extensions/foundry/tests/factory/replay.spec.ts
+  s_10b76946c6f0cb::t_7548905383cb2d 30-34,37-42
+  s_10b76946c6f0cb::t_14da63d26568cd 1-29,35-36,43-155
+extensions/foundry/src/factory/timeline-store.ts
+  s_10b76946c6f0cb::t_271adfa1bfaad9 1-171
+extensions/foundry/src/runtime/stall-watcher.ts
+  s_10b76946c6f0cb::t_87b4c05e450443 44-51,148-149,153
+extensions/foundry/src/index.ts
+  s_10b76946c6f0cb::t_f944929e2d6029 58
+  s_10b76946c6f0cb::t_87b4c05e450443 590-594,1982
+tests/e2e/foundry-factory-view.spec.ts
+  s_10b76946c6f0cb::t_e7be83717bdbba 429-432,436-441
+  s_10b76946c6f0cb::t_dbfb758e08d3dd 427-428,433-435,442-446,488-497,499,510-511
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_10b76946c6f0cb::t_b9c31b853257e9 440-446
+docs/adr/060-a-factory-is-a-projection.md
+  s_10b76946c6f0cb::t_df9014b0e96ca0 39-44
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_10b76946c6f0cb::t_b59ddc4f2392a3 2,10,14-16,18,47-70,129-135,169-186,218-234,236-307,390-392,396,398-401,405
+  s_10b76946c6f0cb::t_b5cc1255aef85a 393-395,746-748,753,755,757-794
+  s_10b76946c6f0cb::t_33458705d0ef1b 71-72,473,475-478,482,489-495
+  s_10b76946c6f0cb::t_dbfb758e08d3dd 479-481
+  s_10b76946c6f0cb::t_bd7093187dd295 415-416,420-425,428,431,441,456-457,460,474,506-508,528-529,531,533,538-588,625-627,629,631,639-640,642,644,648-651,666-674,699-700,715,743-745
+extensions/foundry/tests/runtime/stall-watcher.spec.ts
+  s_10b76946c6f0cb::t_1eed0338041eca 254-279
+extensions/foundry/src/components/factory/HallScene.tsx
+  s_10b76946c6f0cb::t_b59ddc4f2392a3 22-23,157,160-162,206
+extensions/foundry/src/components/foundry.css
+  s_10b76946c6f0cb::t_33458705d0ef1b 2949,3002,3006,3010,3014
+  s_10b76946c6f0cb::t_e2e63c46cb9ca1 3203-3268,3271-3272,3274-3276,3278,3281-3282,3285,3288-3289,3291-3292
+  s_10b76946c6f0cb::t_2d293fdccb5a2b 3269-3270,3273,3277,3279-3280,3283-3284,3286-3287,3290,3293-3294
+extensions/foundry/src/ipc/run-channels.ts
+  s_10b76946c6f0cb::t_87b4c05e450443 21,142-143,164-170,692-711
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a385ddea2b7c12b7d068e0ef50aefafb8553a8a0",
+  "prompts": {},
+  "sessions": {
+    "s_10b76946c6f0cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e9e2f02b-997e-4bcc-a008-5d8ab6b5f241",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
