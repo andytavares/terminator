@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 
 // The Factory surface for one order: a hall drawn from the run graph, a
@@ -214,6 +214,189 @@ describe('FactoryHall', () => {
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 't-1' })
     )
+  })
+
+  it('shows each station its own nameplate, in the hall, saying where it stands', async () => {
+    mount()
+    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    const plate = document.querySelector('.fdry-hall-overlay .fdry-plate') as HTMLElement
+    expect(plate.textContent).toContain('Build the thing')
+    expect(plate.textContent).toContain('Working')
+  })
+
+  it('raises a callout at the station when its state changes, not a line under the picture', async () => {
+    let current = view()
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:run.observe') return current
+      if (channel === 'foundry:permissions-list') return { pending: [] }
+      if (channel === 'foundry:run.activity') return { activity: {} }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(
+      <FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onOpenInList={vi.fn()} onBack={vi.fn()} />
+    )
+    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    current = view({
+      graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
+    })
+    await waitFor(
+      () => {
+        const bubble = document.querySelector('.fdry-hall-overlay .fdry-callout') as HTMLElement
+        expect(bubble.textContent).toBe('Done')
+      },
+      { timeout: 4000 }
+    )
+    expect(document.querySelector('.fdry-hall-ticker')).toBeNull()
+  })
+
+  it('pins a held tool call over its station and answers it there', async () => {
+    mount({
+      pending: [
+        {
+          requestId: 'r-1',
+          sessionId: 's-1',
+          toolName: 'Bash',
+          summary: 'npm test',
+          detail: null,
+          at: 0,
+        },
+      ],
+    })
+    const card = await screen.findByRole('group', { name: 'Wants to run Bash' })
+    expect(card.textContent).toContain('npm test')
+    fireEvent.click(within(card).getByRole('button', { name: 'Allow' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:permission-resolve', {
+        requestId: 'r-1',
+        decision: 'allow',
+      })
+    )
+  })
+
+  it('pins a waiting gate over the gate and decides it with the gate’s own options', async () => {
+    mount({
+      view: view({
+        graph: {
+          orderId: 'WO-1',
+          recipe: 'standard',
+          nodes: [
+            node({ state: 'passed' }),
+            node({
+              id: 'G',
+              kind: 'gate',
+              role: 'foreman',
+              state: 'ready',
+              sessionId: null,
+              dependsOn: ['N-1'],
+            }),
+          ],
+        },
+        waiting: [
+          {
+            id: 'g-1',
+            rule: 'merge',
+            orderId: 'WO-1',
+            nodeId: 'G',
+            summary: 'Merge the pull request?',
+            why: 'Every check passed.',
+            evidence: [],
+            options: [
+              { id: 'approve', label: 'Approve', consequence: 'Merges.' },
+              { id: 'hold', label: 'Hold', consequence: 'Waits.' },
+            ],
+            defaultIfIgnored: 'hold',
+            deadline: null,
+            blockedUnits: 1,
+            riskGrade: 'P2',
+          },
+        ],
+      }),
+    })
+    const card = await screen.findByRole('group', { name: 'Merge the pull request?' })
+    fireEvent.click(within(card).getByRole('button', { name: 'Approve' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: 'g-1',
+        option: 'approve',
+      })
+    )
+  })
+
+  it('pins an agent parked at its terminal and takes you there', async () => {
+    mount({ view: view({ stranded: ['s-1'] }) })
+    const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
+    fireEvent.click(within(card).getByRole('button', { name: 'Go to terminal' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
+    )
+  })
+
+  function replayable(frames: unknown[]) {
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:run.observe') return view()
+      if (channel === 'foundry:permissions-list') return { pending: [] }
+      if (channel === 'foundry:run.activity') return { activity: {} }
+      if (channel === 'foundry:run.timeline')
+        return {
+          graph: view().graph,
+          timeline: { frames, tools: [] },
+          gates: [],
+        }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(
+      <FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onOpenInList={vi.fn()} onBack={vi.fn()} />
+    )
+  }
+
+  const plateText = () =>
+    (document.querySelector('.fdry-hall-overlay .fdry-plate') as HTMLElement).textContent
+
+  it('replays the run from what was recorded, and scrubs to any moment of it', async () => {
+    replayable([
+      { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
+      { at: 9000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
+    ])
+    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    const position = (await screen.findByRole('slider', {
+      name: 'Replay position',
+    })) as HTMLInputElement
+    expect(invoke).toHaveBeenCalledWith('foundry:run.timeline', { id: 'WO-1' })
+    expect(plateText()).toContain('Working')
+    fireEvent.change(position, { target: { value: position.max } })
+    await waitFor(() => expect(plateText()).toContain('Done'))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to live' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('slider', { name: 'Replay position' })).toBeNull()
+    )
+    expect(plateText()).toContain('Working')
+  })
+
+  it('plays, pauses and changes speed', async () => {
+    replayable([
+      { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
+      { at: 3000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
+    ])
+    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    await screen.findByRole('button', { name: 'Pause' })
+    fireEvent.click(screen.getByRole('button', { name: '4x' }))
+    expect(screen.getByRole('button', { name: '4x' }).getAttribute('aria-pressed')).toBe('true')
+    // 2 s of recording at 4x is half a second of replay
+    await waitFor(() => expect(plateText()).toContain('Done'), { timeout: 2500 })
+    await screen.findByRole('button', { name: 'Play' })
+  })
+
+  it('says so when nothing was recorded for this run', async () => {
+    replayable([])
+    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    await screen.findByText('Nothing recorded for this run yet.')
+    expect(screen.queryByRole('slider', { name: 'Replay position' })).toBeNull()
   })
 
   it('goes back to the site', async () => {

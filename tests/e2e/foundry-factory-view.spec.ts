@@ -424,6 +424,26 @@ test('the Factory view draws a real hall: one station per run-graph node, the or
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'order.json'), `${JSON.stringify(hallOrder(), null, 2)}\n`)
   writeFileSync(join(dir, 'run-graph.json'), `${JSON.stringify(hallGraph(), null, 2)}\n`)
+  // What the recorder writes beside the graph as a run goes: two frames, the
+  // architect working and then done, for the replay to play back.
+  const seeded = hallGraph() as {
+    nodes: { id: string; attempts: number; sessionId: string | null }[]
+  }
+  const frame = (at: number, architect: string): string =>
+    JSON.stringify({
+      kind: 'graph',
+      at,
+      nodes: seeded.nodes.map((n, i) => ({
+        id: n.id,
+        state: i === 0 ? architect : 'waiting',
+        attempts: n.attempts,
+        sessionId: n.sessionId,
+      })),
+    })
+  writeFileSync(
+    join(dir, 'run-timeline.jsonl'),
+    `${frame(Date.now() - 60_000, 'running')}\n${frame(Date.now() - 50_000, 'passed')}\n`
+  )
 
   // `handle` is wherever the previous test left it: on the Forge, in List
   // view. Switch to Factory and open the seeded order's hall card.
@@ -465,10 +485,20 @@ test('the Factory view draws a real hall: one station per run-graph node, the or
   // capturing, so the screenshot shows the hall doing something, not the
   // very first frame.
   await handle.page.waitForTimeout(3000)
+  await captureFoundry('foundry-factory-hall.png')
 
+  // The recording plays back in the same hall.
+  expect(await clickByName('button', 'Replay')).toBe(true)
+  await expect.poll(() => bodyText(), { timeout: 10_000 }).toContain('Back to live')
+  await handle.page.waitForTimeout(2500)
+  await captureFoundry('foundry-factory-replay.png')
+  expect(await clickByName('button', 'Back to live')).toBe(true)
+  await expect.poll(() => bodyText(), { timeout: 10_000 }).not.toContain('Back to live')
+})
+
+async function captureFoundry(name: string): Promise<void> {
   const outDir = join(process.cwd(), 'test-results')
   mkdirSync(outDir, { recursive: true })
-  const outPath = join(outDir, 'foundry-factory-hall.png')
   const pngBase64 = await handle.app.evaluate(async ({ webContents }) => {
     const view = webContents
       .getAllWebContents()
@@ -477,5 +507,5 @@ test('the Factory view draws a real hall: one station per run-graph node, the or
     const image = await view.capturePage()
     return image.toPNG().toString('base64')
   })
-  writeFileSync(outPath, Buffer.from(pngBase64, 'base64'))
-})
+  writeFileSync(join(outDir, name), Buffer.from(pngBase64, 'base64'))
+}

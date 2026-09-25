@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import type { HallMap, PropKind } from '../../factory/layout.js'
 import { TILE_PX } from '../../factory/layout.js'
-import { tick } from '../../factory/sim.js'
+import { cratePosition, tick } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import type { NodeState } from '../../line/run-graph.js'
 import type { Paint, PaintGradient } from '../../factory/art/kit.js'
@@ -19,6 +19,8 @@ export interface HallSceneProps {
   readonly worldRef: React.MutableRefObject<World>
   readonly states: Readonly<Record<string, NodeState>>
   readonly reducedMotion?: boolean
+  /** How fast the world moves: 1 live, more when a replay is fast-forwarded. */
+  readonly speed?: number
 }
 
 const DARKNESS = 'rgba(5,8,18,0.42)'
@@ -113,10 +115,7 @@ function draw(
   for (const crate of world.crates) {
     const belt = map.belts.find((b) => b.id === crate.beltId)
     if (belt === undefined || belt.path.length === 0) continue
-    const index = Math.min(Math.floor(crate.progress * belt.path.length), belt.path.length - 1)
-    const tile = belt.path[index]
-    const x = tile.x * TILE_PX + 8
-    const y = tile.y * TILE_PX + 8
+    const { x, y } = cratePosition(belt, crate.progress)
     drawables.push({ y: y + 4, draw: () => drawCrate(paint, x, y) })
   }
   drawables.sort((a, b) => a.y - b.y).forEach((d) => d.draw())
@@ -155,8 +154,12 @@ export function HallScene({
   worldRef,
   states,
   reducedMotion,
+  speed = 1,
 }: HallSceneProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  // Read by the running loop each frame, so a speed change does not restart it.
+  const speedRef = useRef(speed)
+  speedRef.current = speed
   const bakeRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
   const lightRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
 
@@ -200,7 +203,7 @@ export function HallScene({
 
     function frame(now: number): void {
       if (!running) return
-      const dt = Math.min(MAX_FRAME_MS, now - last)
+      const dt = Math.min(MAX_FRAME_MS, now - last) * speedRef.current
       last = now
       worldRef.current = tick(worldRef.current, dt)
       draw(paint, bake, lightLayer, map, worldRef.current, states, worldRef.current.clockMs)

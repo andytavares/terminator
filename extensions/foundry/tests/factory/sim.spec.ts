@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  cratePosition,
   createWorld,
   tick,
   seatOf,
@@ -197,7 +198,7 @@ describe('tick', () => {
     expect(crew.path).toEqual([])
   })
 
-  it('a crate exists only after it is added, advances, and is removed on arrival', () => {
+  it('a crate bound for a started step advances and is consumed on arrival', () => {
     const g = graph()
     const map = layoutHall(g)
     const world = createWorld(map, obs(g))
@@ -205,7 +206,7 @@ describe('tick', () => {
 
     const belt = map.belts[0]
     expect(belt).toBeDefined()
-    let w: World = { ...world, crates: [{ id: 'c1', beltId: belt.id, progress: 0 }] }
+    let w: World = { ...world, crates: [{ id: 'c1', beltId: belt.id, progress: 0, parks: false }] }
     w = tick(w, 1000)
     expect(w.crates).toHaveLength(1)
     expect(w.crates[0].progress).toBeGreaterThan(0)
@@ -215,11 +216,41 @@ describe('tick', () => {
     expect(w.crates).toEqual([])
   })
 
+  it('a crate bound for a step that has not started parks at the end of the belt', () => {
+    const g = graph()
+    const map = layoutHall(g)
+    const belt = map.belts[0]
+    let w: World = {
+      ...createWorld(map, obs(g)),
+      crates: [{ id: 'c1', beltId: belt.id, progress: 0, parks: true }],
+    }
+    for (let i = 0; i < 50; i++) w = tick(w, 1000)
+    expect(w.crates).toEqual([{ id: 'c1', beltId: belt.id, progress: 1, parks: true }])
+  })
+
+  it('shows work already queued on first load: a parked crate per finished-but-unstarted edge', () => {
+    const g = graph()
+    const belt = layoutHall(g).belts[0]
+    const queued = withNode(g, belt.fromNodeId, { state: 'passed' })
+    const world = createWorld(layoutHall(queued), obs(queued))
+    expect(world.crates).toContainEqual({
+      id: `${belt.id}@queued`,
+      beltId: belt.id,
+      progress: 1,
+      parks: true,
+    })
+    // nothing queued where nothing has finished
+    expect(createWorld(layoutHall(g), obs(g)).crates).toEqual([])
+  })
+
   it('a crate on an unknown belt id still advances, using a default distance', () => {
     const g = graph()
     const map = layoutHall(g)
     const world = createWorld(map, obs(g))
-    let w: World = { ...world, crates: [{ id: 'c1', beltId: 'no-such-belt', progress: 0 }] }
+    let w: World = {
+      ...world,
+      crates: [{ id: 'c1', beltId: 'no-such-belt', progress: 0, parks: false }],
+    }
     w = tick(w, 100)
     expect(w.crates[0].progress).toBeGreaterThan(0)
   })
@@ -277,5 +308,35 @@ describe('loungeSpot', () => {
     const map = layoutHall(g)
     const spot = loungeSpot(map, 'a')
     expect(map.anchors.lounge).toContainEqual(spot)
+  })
+})
+
+describe('cratePosition', () => {
+  const belt = {
+    id: 'a->b',
+    fromNodeId: 'a',
+    toNodeId: 'b',
+    path: [
+      { x: 1, y: 5 },
+      { x: 2, y: 5 },
+      { x: 3, y: 5 },
+      { x: 3, y: 4 },
+    ],
+  }
+
+  it('starts on the first tile and glides between tiles rather than jumping', () => {
+    expect(cratePosition(belt, 0)).toEqual({ x: 1 * 16 + 8, y: 5 * 16 + 8 })
+    const quarter = cratePosition(belt, 0.25)
+    expect(quarter.x).toBeGreaterThan(1 * 16 + 8)
+    expect(quarter.x).toBeLessThan(2 * 16 + 8)
+  })
+
+  it('parks one tile short of the seat the belt ends on', () => {
+    expect(cratePosition(belt, 1)).toEqual({ x: 3 * 16 + 8, y: 5 * 16 + 8 })
+  })
+
+  it('stays on the only tile of a one-tile belt', () => {
+    const short = { ...belt, path: [{ x: 4, y: 4 }] }
+    expect(cratePosition(short, 0.5)).toEqual({ x: 4 * 16 + 8, y: 4 * 16 + 8 })
   })
 })

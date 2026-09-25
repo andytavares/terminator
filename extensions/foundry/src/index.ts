@@ -55,6 +55,7 @@ import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import { readTranscript } from './runtime/transcript-tailer.js'
+import { recordTools } from './factory/timeline-store.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
 /** One hunk as a surface renders it: the change, and what was decided. */
@@ -586,6 +587,11 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     const lastSeenChange = new Map<string, number>()
     stallWatcher = createStallWatcher({
       runs: () => runner.watchable(),
+      // Each tool call, recorded once, beside the order's run graph — what the
+      // Factory view plays back after the fact.
+      onActivity: (run, activity) => {
+        void recordTools(run.featureDir, run.sessionId, activity).catch(() => {})
+      },
       netChangeSince: (sessionId) => {
         const diff = supervision?.runs.get(sessionId)?.diff
         if (diff === undefined) return 1
@@ -1973,6 +1979,7 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:session.attach', (payload) => runs.attach(payload))
   // What each running node's agent has been doing, for the Factory view.
   reg(api, 'foundry:run.activity', (payload) => runs.activity(payload))
+  reg(api, 'foundry:run.timeline', (payload) => runs.timeline(payload))
 
   // ── The inbox ──────────────────────────────────────────────────────────
   //

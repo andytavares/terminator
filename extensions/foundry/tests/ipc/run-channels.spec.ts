@@ -11,6 +11,7 @@ import { probeToolchain } from '../../src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
+import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -1099,5 +1100,51 @@ describe('a run whose agents are gone', () => {
     expect(await channels.attach({ orderId: 'WO-1', nodeId })).toEqual({
       error: `${nodeId} has no live agent — its session ended when the application last closed. Resume the run to start it again.`,
     })
+  })
+})
+
+describe('the run timeline', () => {
+  beforeEach(() => forgetTimelines())
+
+  it('records a frame of every node’s standing when a run starts', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const timeline = await readTimeline(path.join(dataRoot, 'orders', 'WO-1'))
+    expect(timeline.frames).toHaveLength(1)
+    expect(timeline.frames[0].nodes.length).toBeGreaterThan(0)
+  })
+
+  it('hands back the graph, the recording and every gate the order raised', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const gate = { id: 'g-1', orderId: 'WO-1' }
+    const withGates = createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      gatesFor: async () => [gate as never],
+    })
+    const r = (await withGates.timeline({ id: 'WO-1' })) as {
+      graph: RunGraph
+      timeline: { frames: unknown[]; tools: unknown[] }
+      gates: unknown[]
+    }
+    expect(r.graph.orderId).toBe('WO-1')
+    expect(r.timeline.frames).toHaveLength(1)
+    expect(r.timeline.tools).toEqual([])
+    expect(r.gates).toEqual([gate])
+  })
+
+  it('says so for an order with no run, and for a request it cannot read', async () => {
+    expect(await channels().timeline({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
+    expect(await channels().timeline({})).toEqual({ error: 'Malformed request.' })
+  })
+
+  it('hands back no gates when the host has no gate store to ask', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().timeline({ id: 'WO-1' })) as { gates: unknown[] }
+    expect(r.gates).toEqual([])
   })
 })

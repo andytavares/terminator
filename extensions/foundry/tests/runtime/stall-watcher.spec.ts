@@ -251,3 +251,29 @@ describe('the facts the loop signal is made of', () => {
     expect(factsFrom(run({ transcriptPath: path }), readTranscript(path)).recentNetChange).toBe(1)
   })
 })
+
+describe('handing on what it read', () => {
+  it('passes each run’s transcript activity to onActivity on every tick, fired or not', () => {
+    const path = transcript([
+      { tool: 'Read', callId: 'c1', file: 'a.ts', at: 1000 },
+      { result: 'c1', at: 2000 },
+    ])
+    const seen: Array<{ sessionId: string; calls: string[] }> = []
+    const watcher = createStallWatcher({
+      runs: () => [run({ transcriptPath: path })],
+      onFiring: () => {},
+      onActivity: (watched, activity) =>
+        seen.push({
+          sessionId: watched.sessionId,
+          calls: activity.map((a) => `${a.callId}:${a.kind}`),
+        }),
+      now: () => 3000,
+    })
+    watcher.tick()
+    watcher.tick()
+    expect(seen).toEqual([
+      { sessionId: 'session-1', calls: ['c1:tool_started', 'c1:tool_finished'] },
+      { sessionId: 'session-1', calls: ['c1:tool_started', 'c1:tool_finished'] },
+    ])
+  })
+})
