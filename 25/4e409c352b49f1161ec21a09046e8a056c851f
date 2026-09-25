@@ -1,0 +1,81 @@
+extensions/foundry/tests/factory/art/props.spec.ts
+  s_10b76946c6f0cb::t_4b80f37b03c91c 200-204,216-244
+  s_10b76946c6f0cb::t_08b43914c819e5 205-215
+  s_10b76946c6f0cb::t_086ce0136f2a76 1-65,70-91,98-114,136-199,245-248,258-279
+  s_10b76946c6f0cb::t_7cdfbb8d378616 115-116,123-135
+  s_10b76946c6f0cb::t_45db9df81c76e4 66-69,92-97,117-122,249-257
+extensions/foundry/tests/factory/art/kit.spec.ts
+  s_10b76946c6f0cb::t_b5941d812b233a 1,11-89
+  s_10b76946c6f0cb::t_45db9df81c76e4 2-10
+extensions/foundry/tests/factory/layout.spec.ts
+  s_10b76946c6f0cb::t_e216d18add976e 321-352
+  s_10b76946c6f0cb::t_df9e9e5fa83815 149-168
+extensions/foundry/src/factory/layout.ts
+  s_10b76946c6f0cb::t_08b43914c819e5 103-108
+  s_10b76946c6f0cb::t_06ba17e2e2cc04 84-102,109-119
+  s_10b76946c6f0cb::t_d6b89cc1aae681 355-357
+  s_10b76946c6f0cb::t_8ce68b012f9e8f 248-250,291-354,358-364
+  s_10b76946c6f0cb::t_9d79a8dcc88ca2 196-206
+  s_10b76946c6f0cb::t_2714d7a6e9953c 365
+extensions/foundry/tests/components/factory/HallScene.spec.tsx
+  s_10b76946c6f0cb::t_9ddccf9b262c12 1-107,111-116
+  s_10b76946c6f0cb::t_45db9df81c76e4 108-110
+extensions/foundry/src/factory/art/crew.ts
+  s_10b76946c6f0cb::t_3c554726590153 1-22,31-96,106-150,159-181
+  s_10b76946c6f0cb::t_45db9df81c76e4 23-30,97-105,151-158
+extensions/foundry/tests/factory/art/palette.spec.ts
+  s_10b76946c6f0cb::t_89858b6f8babd6 1-35,46-55
+  s_10b76946c6f0cb::t_45db9df81c76e4 36-45
+extensions/foundry/src/factory/art/kit.ts
+  s_10b76946c6f0cb::t_458596d33da9d1 1-12,14-38,47-67,76-103,110-118,127-129,131-132
+  s_10b76946c6f0cb::t_4ad63f8c159d00 130
+  s_10b76946c6f0cb::t_45db9df81c76e4 39-46,68-75,104-109,119-126
+  s_10b76946c6f0cb::t_f09781b35ddba1 13
+extensions/foundry/tests/factory/art/crew.spec.ts
+  s_10b76946c6f0cb::t_45db9df81c76e4 6-15
+  s_10b76946c6f0cb::t_20a383ea6f9f68 74-89
+  s_10b76946c6f0cb::t_9e2bb15e3aa0c8 1-5,16-73,90
+extensions/foundry/src/components/factory/HallScene.tsx
+  s_10b76946c6f0cb::t_08b43914c819e5 107
+  s_10b76946c6f0cb::t_182abb28d7c4f6 2
+  s_10b76946c6f0cb::t_14a86eadb4af59 56-81,85
+  s_10b76946c6f0cb::t_45db9df81c76e4 44-45,153-158
+  s_10b76946c6f0cb::t_8ddaf7302d3ea6 27
+  s_10b76946c6f0cb::t_e9c646e342ec8d 161,179-188,193,206
+  s_10b76946c6f0cb::t_5b6743de4d1298 104-106,108
+  s_10b76946c6f0cb::t_ca6cdf69d6d3ff 125,129-148
+  s_10b76946c6f0cb::t_c06b7c58511ab6 1,3-26,28-43,46-55,82-84,86-103,109-124,126-128,149-152,159-160,162-178,189-192,194-205,207-240
+extensions/foundry/src/factory/art/props.ts
+  s_10b76946c6f0cb::t_30031220422906 133-159,168-176,181-187
+  s_10b76946c6f0cb::t_08b43914c819e5 99-100,160-167
+  s_10b76946c6f0cb::t_825e83fab6031e 392-396,400,403-405,407-409
+  s_10b76946c6f0cb::t_5dc3e3d99655ea 206,208-210,214-225
+  s_10b76946c6f0cb::t_d2366dcc441566 1-47,115-132,177-180,188-205,207,211-213,226-257,266-277,280-285,287,296-321,328-353,357-360,362-363,373-374,377,379-381,383-391,397-399,401-402,406,410-412,422-438,447-599
+  s_10b76946c6f0cb::t_806bab12c00385 354-356,361,364-372,375-376,378,382
+  s_10b76946c6f0cb::t_45db9df81c76e4 258-265,413-421,439-446
+  s_10b76946c6f0cb::t_bedca180e7b17f 322-327
+  s_10b76946c6f0cb::t_89f22e309f4bfa 278-279,286,288-295
+  s_10b76946c6f0cb::t_e2eac5bf2d2a2e 48-98,101-114
+extensions/foundry/src/factory/art/palette.ts
+  s_10b76946c6f0cb::t_30d4dcbe96454b 1-37,45-168
+  s_10b76946c6f0cb::t_45db9df81c76e4 38-44
+extensions/foundry/tests/factory/art/paint-fake.ts
+  s_10b76946c6f0cb::t_24e5ecec72f238 1-9,18-48
+  s_10b76946c6f0cb::t_45db9df81c76e4 10-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "254e409c352b49f1161ec21a09046e8a056c851f",
+  "prompts": {},
+  "sessions": {
+    "s_10b76946c6f0cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e9e2f02b-997e-4bcc-a008-5d8ab6b5f241",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
