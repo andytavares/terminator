@@ -1,0 +1,30 @@
+extensions/foundry/tests/factory/director.spec.ts
+  s_10b76946c6f0cb::t_0d9b52bf3d769b 236-242,244,248,250-253,256,258-259,265-269,272-283,294-301,304,317,324-325,328,334-335,352-362,364,366-382
+  s_10b76946c6f0cb::t_ec3dab2556c503 260-264,284-293
+  s_10b76946c6f0cb::t_a735797682a8e9 3
+extensions/foundry/src/factory/sim.ts
+  s_10b76946c6f0cb::t_b2b062c0e9a9dd 161
+  s_10b76946c6f0cb::t_fdc3828dea8e16 38-52,58
+extensions/foundry/src/factory/director.ts
+  s_10b76946c6f0cb::t_e04b0a27c05969 188
+  s_10b76946c6f0cb::t_14abc23527f115 203-205
+  s_10b76946c6f0cb::t_f02e2a8e2391aa 112-113,115-125,127-141
+  s_10b76946c6f0cb::t_e7fe249cd0f137 3
+  s_10b76946c6f0cb::t_1284354a337f68 30-31,33-39,41-43,46-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4404f4264a23f16d848cf21361041f65a599f338",
+  "prompts": {},
+  "sessions": {
+    "s_10b76946c6f0cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e9e2f02b-997e-4bcc-a008-5d8ab6b5f241",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
