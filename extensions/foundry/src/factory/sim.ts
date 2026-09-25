@@ -1,0 +1,213 @@
+import type { HallMap, HallProp, Tile } from './layout.js'
+import { TILE_PX } from './layout.js'
+import { findPath } from './path.js'
+import { gateNodeId } from './events.js'
+import type { Observation } from './events.js'
+import type { RunNode } from '../line/run-graph.js'
+import type { StepKind } from '../recipe/parse.js'
+
+// The world a scene renders: crew walking a hall, crates riding belts.
+//
+// Pure and deterministic on purpose. The renderer owns the only mutable ref
+// (`worldRef` in `HallScene`), advances it every frame with `tick`, and never
+// touches `Math.random` or `Date` in here — a replay of the same events and
+// the same tick sizes always lands crew on the same pixel.
+
+export type CrewAnim = 'walk' | 'idle' | 'type' | 'reach' | 'scan' | 'wave' | 'slump' | 'couch'
+export type Facing = 'N' | 'S' | 'E' | 'W'
+
+export interface Crew {
+  readonly nodeId: string
+  readonly role: string | null
+  readonly x: number
+  readonly y: number
+  readonly facing: Facing
+  readonly anim: CrewAnim
+  readonly path: readonly Tile[]
+  readonly goal: Tile | null
+  readonly then: CrewAnim
+  readonly present: boolean
+}
+
+export interface Crate {
+  readonly id: string
+  readonly beltId: string
+  readonly progress: number
+}
+
+export interface World {
+  readonly map: HallMap
+  readonly crew: readonly Crew[]
+  readonly crates: readonly Crate[]
+  readonly gatesWaiting: readonly string[]
+  readonly clockMs: number
+}
+
+const WALK_PX_PER_S = 46
+const CRATE_PX_PER_S = 34
+
+/** A node counts as crewed when someone works it: a role, or a working kind. */
+const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run', 'judge']
+
+export function workAnim(kind: StepKind): CrewAnim {
+  return kind === 'run' || kind === 'judge' ? 'scan' : 'type'
+}
+
+export function tileCenter(tile: Tile): { readonly x: number; readonly y: number } {
+  return { x: tile.x * TILE_PX + 8, y: tile.y * TILE_PX + 12 }
+}
+
+function tileOf(x: number, y: number): Tile {
+  return { x: Math.round((x - 8) / TILE_PX), y: Math.round((y - 12) / TILE_PX) }
+}
+
+export function stationOf(map: HallMap, nodeId: string): HallProp | null {
+  return map.props.find((p) => p.nodeId === nodeId) ?? null
+}
+
+export function seatOf(map: HallMap, nodeId: string): Tile | null {
+  return stationOf(map, nodeId)?.seat ?? null
+}
+
+/**
+ * A deterministic lounge slot for a node — no randomness, same node every time.
+ *
+ * `HallMap.anchors.lounge` is documented as at least 6 tiles for every map
+ * `layoutHall` produces, so there is always one to pick.
+ */
+export function loungeSpot(map: HallMap, nodeId: string): Tile {
+  const lounge = map.anchors.lounge
+  let hash = 0
+  for (let i = 0; i < nodeId.length; i++) hash = (hash * 31 + nodeId.charCodeAt(i)) >>> 0
+  return lounge[hash % lounge.length]
+}
+
+function placementFor(
+  map: HallMap,
+  node: RunNode
+): { readonly tile: Tile; readonly anim: CrewAnim } | null {
+  const seat = seatOf(map, node.id)
+  switch (node.state) {
+    case 'running':
+    case 'verifying':
+      return seat === null ? null : { tile: seat, anim: workAnim(node.kind) }
+    case 'ready':
+      return seat === null ? null : { tile: seat, anim: 'idle' }
+    case 'failed':
+      return seat === null ? null : { tile: seat, anim: 'slump' }
+    case 'passed':
+      return { tile: loungeSpot(map, node.id), anim: 'couch' }
+    case 'waiting':
+    case 'skipped':
+    case 'blocked':
+      return { tile: loungeSpot(map, node.id), anim: 'idle' }
+    /* v8 ignore next 3 -- exhaustive union, unreachable */
+    default: {
+      const never: never = node.state
+      throw new Error(`unhandled node state: ${String(never)}`)
+    }
+  }
+}
+
+function isCrewed(node: RunNode): boolean {
+  return node.role !== null || CREWED_KINDS.includes(node.kind)
+}
+
+/** Placement settled on first load: nobody walks in, everyone is where the run left them. */
+export function createWorld(map: HallMap, observation: Observation): World {
+  const orphaned = new Set(observation.orphaned)
+  const crew: Crew[] = []
+  for (const node of observation.graph.nodes) {
+    if (!isCrewed(node)) continue
+    const placement = placementFor(map, node)
+    if (placement === null) continue
+    const center = tileCenter(placement.tile)
+    crew.push({
+      nodeId: node.id,
+      role: node.role,
+      x: center.x,
+      y: center.y,
+      facing: 'S',
+      anim: placement.anim,
+      path: [],
+      goal: null,
+      then: placement.anim,
+      present: !orphaned.has(node.id),
+    })
+  }
+
+  const gatesWaiting = new Set<string>()
+  for (const gate of observation.waiting) {
+    const nodeId = gateNodeId(gate, observation.graph)
+    if (nodeId !== null) gatesWaiting.add(nodeId)
+  }
+
+  return { map, crew, crates: [], gatesWaiting: [...gatesWaiting], clockMs: 0 }
+}
+
+function beltDistance(belt: { readonly path: readonly Tile[] }): number {
+  return Math.max(belt.path.length, 1) * TILE_PX
+}
+
+function tickCrate(world: World, crate: Crate, dtSec: number): Crate | null {
+  const belt = world.map.belts.find((b) => b.id === crate.beltId)
+  const distance = belt === undefined ? TILE_PX : beltDistance(belt)
+  const progress = crate.progress + (CRATE_PX_PER_S * dtSec) / distance
+  if (progress >= 1) return null
+  return { ...crate, progress }
+}
+
+function facingFor(dx: number, dy: number, prior: Facing): Facing {
+  if (dx === 0 && dy === 0) return prior
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'E' : 'W'
+  return dy > 0 ? 'S' : 'N'
+}
+
+function tickCrew(map: HallMap, crew: Crew, dtSec: number): Crew {
+  if (crew.goal === null && crew.path.length === 0) return crew
+
+  let path = crew.path
+  if (path.length === 0 && crew.goal !== null) {
+    path = findPath(map.solid, tileOf(crew.x, crew.y), crew.goal)
+    if (path.length === 0) {
+      // Already there, or nothing found: arrival either way.
+      return { ...crew, goal: null, anim: crew.then }
+    }
+  }
+
+  const target = tileCenter(path[0])
+  const dx = target.x - crew.x
+  const dy = target.y - crew.y
+  const remaining = Math.hypot(dx, dy)
+  const step = WALK_PX_PER_S * dtSec
+  const facing = facingFor(dx, dy, crew.facing)
+
+  if (remaining <= step) {
+    const rest = path.slice(1)
+    if (rest.length === 0) {
+      return {
+        ...crew,
+        x: target.x,
+        y: target.y,
+        facing,
+        path: [],
+        goal: null,
+        anim: crew.then,
+      }
+    }
+    return { ...crew, x: target.x, y: target.y, facing, path: rest, anim: 'walk' }
+  }
+
+  const x = crew.x + (dx / remaining) * step
+  const y = crew.y + (dy / remaining) * step
+  return { ...crew, x, y, facing, path, anim: 'walk' }
+}
+
+export function tick(world: World, dtMs: number): World {
+  const dtSec = dtMs / 1000
+  const crew = world.crew.map((c) => tickCrew(world.map, c, dtSec))
+  const crates = world.crates
+    .map((crate) => tickCrate(world, crate, dtSec))
+    .filter((crate): crate is Crate => crate !== null)
+  return { ...world, crew, crates, clockMs: world.clockMs + dtMs }
+}
