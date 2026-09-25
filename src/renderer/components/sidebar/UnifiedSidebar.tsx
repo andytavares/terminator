@@ -8,7 +8,11 @@ import { revealSession } from '../../terminal/navigate-to-session'
 import { useSettingsStore } from '../../stores/settings.store'
 import { useToastStore } from '../../stores/toast.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
-import { buildBranchRows, type BranchRow as BranchRowData } from '../../sidebar/branch-rows'
+import {
+  buildBranchRows,
+  sessionIssueKeys,
+  type BranchRow as BranchRowData,
+} from '../../sidebar/branch-rows'
 import { BellAndBusySource } from '../../sidebar/agent-state'
 import { abbreviatePath, branchLabel, qualifiedBranchLabel } from '../../sidebar/branch-display'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
@@ -352,6 +356,24 @@ export function UnifiedSidebar({
   )
   const [linkSessionId, setLinkSessionId] = useState<string | null>(null)
 
+  /** A scratch row is its terminal: its own key, then any its split panes carry. */
+  function scratchIssueKeys(sessionId: string): string[] {
+    const ids = [
+      sessionId,
+      ...[...sessions.values()].filter((s) => s.parentSessionId === sessionId).map((s) => s.id),
+    ]
+    return sessionIssueKeys(
+      ids.map((id) => ({
+        sessionId: id,
+        title: '',
+        state: 'idle',
+        bellCount: 0,
+        panes: [],
+        workItem: workItemsBySession.get(id) ?? null,
+      }))
+    )
+  }
+
   function removeSessionLink(sessionId: string): void {
     const facts = factsBySessionId.get(sessionId)
     if (facts) void useSessionRecordsStore.getState().setLink(facts.snapshot, null)
@@ -630,6 +652,7 @@ export function UnifiedSidebar({
           now={clock}
           issueKey={issueLinkFor(row.projectId)?.key ?? null}
           onIssueClick={() => openDrawer(row.projectId)}
+          sessionIssueKeys={sessionIssueKeys(row.terminals)}
           changeStats={statsFor(row.projectId)?.stats}
           onSelect={() => selectBranch(row.projectId)}
           onAddTerminal={() => addSessionToProject(row.projectId)}
@@ -802,7 +825,7 @@ export function UnifiedSidebar({
                         state: pane.agentState,
                         bellCount: pane.bellCount ?? 0,
                         panes: [],
-                        workItem: null,
+                        workItem: workItemsBySession.get(pane.id) ?? null,
                       })),
                     lastActivityAt: session.lastActivityAt,
                     workspaceId: '',
@@ -811,6 +834,7 @@ export function UnifiedSidebar({
                   now={clock}
                   onSelect={() => onSelectScratchSession(session.id)}
                   onRename={(title) => sessionStore.renameSession(session.id, title)}
+                  sessionIssueKeys={scratchIssueKeys(session.id)}
                 />
               ))}
             </div>

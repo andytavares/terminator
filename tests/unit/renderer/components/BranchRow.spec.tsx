@@ -406,4 +406,33 @@ describe('BranchRow — open in editor', () => {
     fireEvent.click(screen.getByText('Open in editor'))
     expect(onSelect).not.toHaveBeenCalled()
   })
+
+  describe('session issue keys', () => {
+    it('shows a session key when the branch has no link of its own', () => {
+      const { container } = renderRow({}, { sessionIssueKeys: ['ENG-7'] })
+      const key = container.querySelector('.branch-row__issue')!
+      expect(key.textContent).toBe('ENG-7')
+      expect(key.tagName).toBe('SPAN')
+    })
+
+    it('keeps the branch key first and counts the other keys its terminals carry', () => {
+      const { container } = renderRow(
+        {},
+        {
+          issueKey: 'TAV-14',
+          onIssueClick: vi.fn(),
+          sessionIssueKeys: ['ENG-7', 'TAV-14', 'ENG-8'],
+        }
+      )
+      const key = container.querySelector('.branch-row__issue')!
+      expect(key.textContent).toBe('TAV-14 +2')
+      expect(key.getAttribute('title')).toBe('TAV-14, ENG-7, ENG-8')
+      expect(container.querySelectorAll('.branch-row__issue')).toHaveLength(1)
+    })
+
+    it('draws no key when neither the branch nor a terminal is linked', () => {
+      const { container } = renderRow({}, { sessionIssueKeys: [] })
+      expect(container.querySelector('.branch-row__issue')).toBeNull()
+    })
+  })
 })

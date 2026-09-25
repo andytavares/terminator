@@ -297,6 +297,22 @@ export function buildBranchRows(
 }
 
 /** Roots first, each carrying the panes pinned to it. */
+/**
+ * The keys a branch's terminals are linked to in their own right, each once,
+ * roots before their panes. A key a terminal only inherits from its branch is
+ * left out — the branch row already says it.
+ */
+export function sessionIssueKeys(terminals: readonly BranchTerminal[]): string[] {
+  const keys: string[] = []
+  const visit = (t: BranchTerminal): void => {
+    const key = t.workItem?.source === 'session' ? t.workItem.ref.key : null
+    if (key !== null && !keys.includes(key)) keys.push(key)
+    t.panes.forEach(visit)
+  }
+  terminals.forEach(visit)
+  return keys
+}
+
 function buildTerminals(
   sessions: TerminalSession[],
   workItems: WorkItemsBySession

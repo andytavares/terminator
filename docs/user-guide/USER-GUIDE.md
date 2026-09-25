@@ -436,7 +436,7 @@ A session shows its branch's linked ticket by default. **Link** on any row, tile
 
 Opening a session from anywhere — a Ledger row, a tile, the sidebar, a tab, Quick Actions, or a notification — takes you to its terminal with the cursor in it, ready to type.
 
-A ticket linked to one terminal shows as its key on that terminal's sidebar row and its tab. Right-click either to link, change or remove it; **Quick actions → Link issue** links the focused terminal, and **Link issue to branch** links the branch. An agent started in that terminal is given the terminal's own ticket as context, over the branch's.
+A ticket linked to one terminal shows as its key on that terminal's sidebar row, on its branch's row while the branch is collapsed (with **+N** when its terminals carry more than one), and on its tab. Right-click either to link, change or remove it; **Quick actions → Link issue** links the focused terminal, and **Link issue to branch** links the branch. An agent started in that terminal is given the terminal's own ticket as context, over the branch's.
 
 When an agent is waiting on a numbered choice — a Claude Code permission prompt, for example — its options appear as buttons on the tile and in the Ledger's preview. Pressing one answers it as if you had typed the number. Terminator reads the screen again first, and sends nothing if the question has changed or been answered in the terminal.
 

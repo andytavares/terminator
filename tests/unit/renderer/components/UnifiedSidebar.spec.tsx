@@ -590,6 +590,30 @@ describe('UnifiedSidebar — scratch is the one place a terminal is still a row'
     expect(container.querySelector('.unified-sidebar__scratch-count')!.textContent).toBe('1')
   })
 
+  it("shows a scratch terminal's own ticket, and one its split pane carries, on its row", () => {
+    sessions.set(
+      'sc1-pane',
+      session('sc1-pane', '00000000-0000-0000-0000-000000000000', {
+        tabTitle: 'pane',
+        parentSessionId: 'sc1',
+      })
+    )
+    mockUseSessionFacts.mockReturnValue([
+      {
+        sessionId: 'sc1',
+        workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-3' } },
+      },
+      {
+        sessionId: 'sc1-pane',
+        workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-4' } },
+      },
+    ])
+    const { container } = renderSidebar()
+    const key = container.querySelector('.unified-sidebar__scratch .branch-row__issue')!
+    expect(key.textContent).toBe('ENG-3 +1')
+    mockUseSessionFacts.mockReturnValue([])
+  })
+
   it('selects a scratch terminal when its row is clicked', () => {
     const onSelectScratchSession = vi.fn()
     const { container } = renderSidebar({ onSelectScratchSession })

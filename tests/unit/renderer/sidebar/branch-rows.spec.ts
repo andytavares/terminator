@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildBranchRows } from '../../../../src/renderer/sidebar/branch-rows'
+import { buildBranchRows, sessionIssueKeys } from '../../../../src/renderer/sidebar/branch-rows'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import type { SessionView } from '../../../../src/renderer/sidebar/view-model'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
@@ -487,6 +487,33 @@ describe('buildBranchRows', () => {
     const orphan: Project = { ...feature, id: 'p9', workspaceId: 'ws-gone' }
     const result = buildBranchRows([], [...PROJECTS, orphan], REPOS, view(), NOW, STALE_AFTER)
     expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).not.toContain('p9')
+  })
+
+  describe('sessionIssueKeys', () => {
+    const own = (key: string): WorkItem => ({ source: 'session', ref: { tracker: 'linear', key } })
+    const inherited: WorkItem = { source: 'project', ref: { tracker: 'linear', key: 'ENG-9' } }
+    const terminal = (sessionId: string, workItem: WorkItem | null, panes = []) => ({
+      sessionId,
+      title: sessionId,
+      state: 'idle' as const,
+      bellCount: 0,
+      panes,
+      workItem,
+    })
+
+    it('lists each own session key once, roots then panes, and skips inherited ones', () => {
+      const keys = sessionIssueKeys([
+        terminal('a', own('ENG-1'), [terminal('a1', own('ENG-2')) as never]),
+        terminal('b', inherited),
+        terminal('c', own('ENG-1')),
+        terminal('d', null),
+      ])
+      expect(keys).toEqual(['ENG-1', 'ENG-2'])
+    })
+
+    it('is empty for a branch with no terminals', () => {
+      expect(sessionIssueKeys([])).toEqual([])
+    })
   })
 
   describe('workItem', () => {
