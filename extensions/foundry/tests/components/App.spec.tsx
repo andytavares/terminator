@@ -422,4 +422,51 @@ describe('the Factory view toggle', () => {
       )
     )
   })
+
+  it('opens a hall band with no gate behind it in the List view', async () => {
+    orderRows = [
+      {
+        id: 'WO-1',
+        title: 'Working order',
+        status: 'running',
+        risk: 'low',
+        failures: 0,
+        source: { kind: 'typed', tracker: null, key: null },
+        standing: {
+          kind: 'working',
+          turn: 'foundry',
+          label: 'building',
+          headline: 'Building',
+          detail: '',
+          done: 0,
+          total: 1,
+          gateId: null,
+        },
+      },
+    ]
+    observeStanding = {
+      kind: 'adrift',
+      turn: 'you',
+      label: 'adrift',
+      headline: 'Nothing is running this',
+      detail: '',
+      done: 0,
+      total: 1,
+      gateId: null,
+    }
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Factory view' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
+    await waitFor(() => screen.getByText('Working order'))
+    fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
+    await waitFor(() => screen.getByText('Nothing is running this'))
+    fireEvent.click(screen.getByRole('button', { name: 'Open in List view' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
+        'true'
+      )
+    )
+    expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
+  })
 })

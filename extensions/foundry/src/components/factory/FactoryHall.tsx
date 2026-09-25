@@ -23,6 +23,8 @@ import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 export interface FactoryHallProps {
   readonly orderId: string
   readonly onOpenInbox: () => void
+  /** Where an order's own controls live — resume, stop, a held call. */
+  readonly onOpenInList: () => void
   readonly onBack: () => void
 }
 
@@ -34,7 +36,12 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
-export function FactoryHall({ orderId, onOpenInbox, onBack }: FactoryHallProps): JSX.Element {
+export function FactoryHall({
+  orderId,
+  onOpenInbox,
+  onOpenInList,
+  onBack,
+}: FactoryHallProps): JSX.Element {
   const { view, problem, pending } = useRunObservation(orderId)
   const [activity, setActivity] = useState<Readonly<Record<string, readonly ToolActivity[]>>>({})
   const [map, setMap] = useState<HallMap | null>(null)
@@ -160,9 +167,18 @@ export function FactoryHall({ orderId, onOpenInbox, onBack }: FactoryHallProps):
       {standing !== undefined && standing.turn === 'you' ? (
         <div className="fdry-hall-band">
           <span>{standing.headline}</span>
-          <button type="button" className="is-primary" onClick={onOpenInbox}>
-            Open Inbox
-          </button>
+          {/* Only a gate is decided in the Inbox. Every other move — resuming a
+              run nothing is running, answering a held call — is on the order
+              itself, so the band names that place instead of an empty Inbox. */}
+          {standing.gateId !== null ? (
+            <button type="button" className="is-primary" onClick={onOpenInbox}>
+              Open Inbox
+            </button>
+          ) : (
+            <button type="button" className="is-primary" onClick={onOpenInList}>
+              Open in List view
+            </button>
+          )}
         </div>
       ) : null}
 

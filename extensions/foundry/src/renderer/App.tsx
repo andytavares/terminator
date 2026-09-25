@@ -250,6 +250,11 @@ export function App(): JSX.Element {
             <FactoryHall
               orderId={factoryOrder.id}
               onOpenInbox={() => setSurface('inbox')}
+              onOpenInList={() => {
+                setListOpenOrderId(factoryOrder.id)
+                setFactoryOrder(null)
+                setFactoryView('list')
+              }}
               onBack={() => setFactoryOrder(null)}
             />
           )
