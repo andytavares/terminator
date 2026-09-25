@@ -241,9 +241,49 @@ describe('layoutHall', () => {
       const map = layoutHall(g)
       expect(map.belts).toEqual([])
       expect(map.lanes).toEqual([])
-      for (const node of g.nodes) {
-        const station = map.props.find((p) => p.nodeId === node.id)!
-        expect(station.x).toBe(3) // every node is a root: depth 0
+      const stations = g.nodes.map((node) => map.props.find((p) => p.nodeId === node.id)!)
+      expect(stations).toHaveLength(3)
+      // every node is a root, so they share depth 0 and stand side by side
+      expect(new Set(stations.map((p) => p.y)).size).toBe(1)
+      const byX = [...stations].sort((p, q) => p.x - q.x)
+      expect(byX[0].x).toBe(3)
+      for (let i = 1; i < byX.length; i++) {
+        expect(byX[i].x).toBeGreaterThanOrEqual(byX[i - 1].x + byX[i - 1].w)
+      }
+    })
+
+    it('never overlaps two stations that share a lane and a depth', () => {
+      const g = graph([
+        rn({ id: 'root', kind: 'agent' }),
+        rn({ id: 'x', kind: 'agent', lane: 1, dependsOn: ['root'] }),
+        rn({ id: 'y', kind: 'run', lane: 1, dependsOn: ['root'] }),
+        rn({ id: 'z', kind: 'agent', lane: 2, dependsOn: ['root'] }),
+      ])
+      const map = layoutHall(g)
+      const stations = stationsOf(map.props)
+      expect(stations.length).toBe(4)
+      for (const a of stations) {
+        for (const b of stations) {
+          if (a === b) continue
+          const overlap = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+          expect(overlap).toBe(false)
+        }
+      }
+      for (const p of stations) expect(map.solid[p.seat!.y][p.seat!.x]).toBe(false)
+    })
+
+    it('gives the yard a clear row under the wall and a press two rows of footprint', () => {
+      const g = graph([
+        rn({ id: 'a', kind: 'agent' }),
+        rn({ id: 'j', kind: 'join', dependsOn: ['a'] }),
+      ])
+      const map = layoutHall(g)
+      const press = map.props.find((p) => p.nodeId === 'j')!
+      expect(press.kind).toBe('press')
+      expect(press.h).toBe(2)
+      expect(press.seat!.y).toBe(press.y + 2)
+      for (const p of stationsOf(map.props)) {
+        expect(map.solid[p.y - 1][p.x]).toBe(false)
       }
     })
 

@@ -78,11 +78,12 @@ export interface HallMap {
 export const TILE_PX = 16
 
 const TOP_WALL_ROWS = 3
-const YARD_ROWS = 3
+const YARD_ROWS = 4
 const LANE_BAND_ROWS = 4
 const LOUNGE_ROWS = 4
 /** How far the room extends past the last station's column — the hall hugs its content. */
 const CONTENT_MARGIN = 3
+const COLUMN_PITCH = 5
 const MIN_WIDTH = 16
 
 type FixtureKind = 'shelves' | 'racks' | 'statuswall' | 'lockers'
@@ -195,21 +196,42 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
   const nodeDepths = depths(graph.nodes)
   // The rightmost edge any station actually occupies — the room hugs this,
   // rather than a fixed reserved bay past the deepest column.
+  // Nodes sharing a band and a depth stand side by side rather than on top of
+  // one another, so a depth column is as wide as its most crowded band.
+  const bandKey = (node: RunNode): string => (node.lane === null ? 'yard' : `lane-${node.lane}`)
+  const slotOf = new Map<string, number>()
+  const slotsAtDepth = new Map<number, number>()
+  const taken = new Map<string, number>()
+  for (const node of graph.nodes) {
+    const depth = nodeDepths.get(node.id) as number
+    const key = `${bandKey(node)}@${depth}`
+    const slot = taken.get(key) ?? 0
+    taken.set(key, slot + 1)
+    slotOf.set(node.id, slot)
+    slotsAtDepth.set(depth, Math.max(slotsAtDepth.get(depth) ?? 0, slot + 1))
+  }
+  const maxDepth = Math.max(-1, ...slotsAtDepth.keys())
+  const columnStart: number[] = []
+  for (let d = 0, x = 3; d <= maxDepth; d++) {
+    columnStart.push(x)
+    x += COLUMN_PITCH * (slotsAtDepth.get(d) ?? 1)
+  }
+  const stationX = (node: RunNode): number =>
+    columnStart[nodeDepths.get(node.id) as number] + (slotOf.get(node.id) as number) * COLUMN_PITCH
+
   const rightmostStationEdge =
     graph.nodes.length === 0
       ? 3 + stationWidth('desk')
-      : Math.max(
-          ...graph.nodes.map(
-            (n) => 3 + (nodeDepths.get(n.id) as number) * 5 + stationWidth(stationKind(n.kind))
-          )
-        )
+      : Math.max(...graph.nodes.map((n) => stationX(n) + stationWidth(stationKind(n.kind))))
   const width = Math.max(MIN_WIDTH, rightmostStationEdge + CONTENT_MARGIN)
 
   const laneValues = [
     ...new Set(graph.nodes.map((n) => n.lane).filter((l): l is number => l !== null)),
   ].sort((a, b) => a - b)
 
-  const yardStationRow = TOP_WALL_ROWS
+  // One clear row under the wall, so a tall machine in the yard has headroom
+  // instead of being drawn up into the wall face.
+  const yardStationRow = TOP_WALL_ROWS + 1
   const yardSeatRow = yardStationRow + 1
   const yardBeltRow = yardStationRow + 2
 
@@ -251,11 +273,9 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
   for (const node of graph.nodes) {
     const kind = stationKind(node.kind)
     const w = stationWidth(kind)
-    // `depths` visits every node in the graph, so this is always populated.
-    const depth = nodeDepths.get(node.id) as number
-    const x = 3 + depth * 5
+    const x = stationX(node)
     const stationRow = node.lane === null ? yardStationRow : (laneRowOf.get(node.lane) as number)
-    const h = 1
+    const h = kind === 'press' ? 2 : 1
     const y = stationRow
     const seat: Tile = { x: x + Math.floor(w / 2), y: y + h }
 
@@ -312,12 +332,12 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     return prop.x
   }
   const archive: Tile = {
-    x: nearestClearColumn(solid, yardStationRow, fixtureCol('shelves'), width),
-    y: yardStationRow,
+    x: nearestClearColumn(solid, TOP_WALL_ROWS, fixtureCol('shelves'), width),
+    y: TOP_WALL_ROWS,
   }
   const rack: Tile = {
-    x: nearestClearColumn(solid, yardStationRow, fixtureCol('racks'), width),
-    y: yardStationRow,
+    x: nearestClearColumn(solid, TOP_WALL_ROWS, fixtureCol('racks'), width),
+    y: TOP_WALL_ROWS,
   }
   const wait: Tile = {
     x: nearestClearColumn(solid, yardSeatRow, fixtureCol('statuswall'), width),

@@ -352,13 +352,15 @@ function drawBench(paint: Paint, prop: HallProp, context: SceneContext, tMs: num
 }
 
 /** The press is the biggest machine on the floor — the lanes converge here. */
-const PRESS_VISUAL_H = 92
 
 function drawPress(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
   const x = prop.x * TILE_PX
   const y = prop.y * TILE_PX
   const w = prop.w * TILE_PX
-  const top = y - PRESS_VISUAL_H
+  // One tile of headroom above the footprint, so the machine stands tall
+  // without reaching into the wall face behind it.
+  const top = y - TILE_PX
+  const PRESS_VISUAL_H = (prop.h + 1) * TILE_PX - 14
   const active = prop.nodeId !== null && typingAt(context, prop.nodeId)
 
   rect(paint, x, top, w, PRESS_VISUAL_H + 10, HALL.steel)
