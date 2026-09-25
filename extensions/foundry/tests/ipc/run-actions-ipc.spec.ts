@@ -82,6 +82,7 @@ vi.mock('../../src/runtime/transcript-excerpt.js', () => ({
 }))
 
 let getHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
+let getCommand: (id: string) => (() => void) | undefined
 let api: ExtensionAPI
 // The layer the channels read. Held here so a test can put a run on the
 // register, which is the state every one of them keys on.
@@ -112,6 +113,7 @@ function startRun(sessionId = 'session-1'): void {
 
 beforeAll(async () => {
   const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
+  const commands = new Map<string, () => void>()
   api = {
     ipc: {
       registerHandler: vi.fn((channel: string, handler: (payload: unknown) => Promise<unknown>) => {
@@ -124,7 +126,13 @@ beforeAll(async () => {
       isRemoteAccessible: vi.fn().mockReturnValue(false),
     },
     window: { broadcast: vi.fn(), openAuxiliary: vi.fn(), focusSelf: vi.fn(), showSelf: vi.fn() },
-    commands: { register: vi.fn().mockReturnValue({ dispose: vi.fn() }), setEnabled: vi.fn() },
+    commands: {
+      register: vi.fn((command: { id: string }, handler: () => void) => {
+        commands.set(command.id, handler)
+        return { dispose: vi.fn(() => commands.delete(command.id)) }
+      }),
+      setEnabled: vi.fn(),
+    },
     shell: { exec },
     notifications: { showToast, createNotification },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -162,6 +170,7 @@ beforeAll(async () => {
   const { activate, startSupervisionRuntime } = await import('../../src/index.ts')
   activate(api)
   getHandler = (channel) => handlers.get(channel)
+  getCommand = (id) => commands.get(id)
   // Awaited rather than slept on: activation starts the runtime in the
   // background, and without a handle every channel below would be testing the
   // "no runtime" branch and passing for the wrong reason.
@@ -286,5 +295,62 @@ describe('ending a run', () => {
   it('reports a stop that did not land', async () => {
     runner.stop.mockReturnValue(false)
     expect(await call('foundry:run-stop', { sessionId: 'gone' })).toEqual({ ok: false })
+  })
+})
+
+describe('the Forge view preference', () => {
+  it('defaults to list when nothing is set', async () => {
+    ;(api.settings.get as ReturnType<typeof vi.fn>).mockReturnValue(undefined)
+    expect(await call('foundry:ui.view', {})).toEqual({ view: 'list' })
+  })
+
+  it('reads back a persisted factory preference', async () => {
+    ;(api.settings.get as ReturnType<typeof vi.fn>).mockReturnValue('factory')
+    expect(await call('foundry:ui.view', {})).toEqual({ view: 'factory' })
+  })
+
+  it('treats anything other than factory as list', async () => {
+    ;(api.settings.get as ReturnType<typeof vi.fn>).mockReturnValue('nonsense')
+    expect(await call('foundry:ui.view', {})).toEqual({ view: 'list' })
+  })
+
+  it('writes the setting and broadcasts the change', async () => {
+    expect(await call('foundry:ui.set-view', { view: 'factory' })).toEqual({ view: 'factory' })
+    expect(api.settings.set).toHaveBeenCalledWith('terminator.foundry.view', 'factory')
+    expect(api.window.broadcast).toHaveBeenCalledWith('foundry:ui.view-changed', {
+      view: 'factory',
+    })
+  })
+
+  it('rejects a value that is not a known view', async () => {
+    expect(await call('foundry:ui.set-view', { view: 'grid' })).toEqual({
+      error: 'Malformed request.',
+    })
+    expect(api.settings.set).not.toHaveBeenCalled()
+  })
+})
+
+describe('toggling the Forge view', () => {
+  function toggleHandler(): () => void {
+    const handler = getCommand('toggle-view')
+    if (handler === undefined) throw new Error('toggle-view is not registered')
+    return handler
+  }
+
+  it('flips list to factory, brings Foundry forward and broadcasts', () => {
+    ;(api.settings.get as ReturnType<typeof vi.fn>).mockReturnValue('list')
+    toggleHandler()()
+    expect(api.settings.set).toHaveBeenCalledWith('terminator.foundry.view', 'factory')
+    expect(api.window.showSelf).toHaveBeenCalledWith('main')
+    expect(api.window.broadcast).toHaveBeenCalledWith('foundry:ui.view-changed', {
+      view: 'factory',
+    })
+  })
+
+  it('flips factory back to list', () => {
+    ;(api.settings.get as ReturnType<typeof vi.fn>).mockReturnValue('factory')
+    toggleHandler()()
+    expect(api.settings.set).toHaveBeenCalledWith('terminator.foundry.view', 'list')
+    expect(api.window.broadcast).toHaveBeenCalledWith('foundry:ui.view-changed', { view: 'list' })
   })
 })

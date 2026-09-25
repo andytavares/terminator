@@ -2734,3 +2734,175 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* Factory view — the toggle, the hall, the site.
+   The world inside the canvas has its own palette (`factory/art/palette.ts`);
+   everything here is chrome around it, on the same tokens as the rest of
+   Foundry. */
+
+.fdry-view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 12px;
+  padding: 2px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+}
+
+.fdry-view-toggle button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--tm-radius-xs);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-view-toggle button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.fdry-view-toggle button.is-on {
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.fdry-hall-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.fdry-hall-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fdry-hall-card:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-hall-card-beacon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tm-warning);
+}
+
+.fdry-hall-card-state {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-hall-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  overflow: auto;
+  height: 100%;
+}
+
+.fdry-hall-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--tm-radius-md);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+}
+
+.fdry-hall-band button.is-primary {
+  appearance: none;
+  font: inherit;
+  padding: 6px 13px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-accent);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  cursor: pointer;
+}
+
+.fdry-hall-stage {
+  position: relative;
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--tm-border-strong);
+}
+
+.fdry-hall-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.fdry-hall-station {
+  position: absolute;
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 1px;
+}
+
+.fdry-hall-flag {
+  width: 12px;
+  height: 12px;
+  color: var(--tm-warning);
+}
+
+.fdry-hall-ticker {
+  min-height: 1em;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-hall-drawer {
+  padding: 12px 14px;
+  border-radius: var(--tm-radius-md);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+}
+
+.fdry-hall-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fdry-hall-drawer-head button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}

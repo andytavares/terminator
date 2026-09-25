@@ -10,6 +10,7 @@ import { draftOrder } from '../../src/order/schema.js'
 import { probeToolchain } from '../../src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
+import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -485,6 +486,64 @@ describe('attaching to a running agent', () => {
 
   it('rejects a malformed request', async () => {
     expect(await channels().attach({ nope: true })).toEqual({ error: 'Malformed request.' })
+  })
+})
+
+describe('foundry:run.activity', () => {
+  function channelsWithActivity(activityFor: (sessionId: string) => ToolActivity[]) {
+    return createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      activityFor,
+    })
+  }
+
+  async function startedGraph(): Promise<{ id: string; sessionId: string | null }[]> {
+    await store.save(order())
+    const r = (await channels().start({ id: 'WO-1' })) as { graph: RunGraph }
+    return r.graph.nodes
+  }
+
+  function activityEvent(at: number, callId = `c-${at}`): ToolActivity {
+    return { kind: 'tool_started', toolName: 'Read', callId, isShell: false, path: null, at }
+  }
+
+  it('returns the last 20 activity entries for a node with a session', async () => {
+    const nodes = await startedGraph()
+    const graphPath = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+    const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8')) as {
+      nodes: { id: string; sessionId: string | null }[]
+    }
+    graph.nodes[0].sessionId = 'sess-1'
+    fs.writeFileSync(graphPath, JSON.stringify(graph))
+
+    const events = Array.from({ length: 25 }, (_, i) => activityEvent(i))
+    const withActivity = channelsWithActivity((sessionId) => (sessionId === 'sess-1' ? events : []))
+    const r = (await withActivity.activity({ id: 'WO-1' })) as {
+      activity: Record<string, ToolActivity[]>
+    }
+    expect(r.activity[nodes[0].id]).toHaveLength(20)
+    expect(r.activity[nodes[0].id]).toEqual(events.slice(-20))
+  })
+
+  it('omits nodes with no session', async () => {
+    const nodes = await startedGraph()
+    const withActivity = channelsWithActivity(() => [activityEvent(1)])
+    const r = (await withActivity.activity({ id: 'WO-1' })) as {
+      activity: Record<string, ToolActivity[]>
+    }
+    expect(Object.keys(r.activity)).not.toContain(nodes[0].id)
+  })
+
+  it('reports an order with no run', async () => {
+    const r = (await channels().activity({ id: 'WO-nope' })) as { error: string }
+    expect(r.error).toBe('No run for WO-nope.')
+  })
+
+  it('rejects a malformed request', async () => {
+    expect(await channels().activity({ nope: true })).toEqual({ error: 'Malformed request.' })
   })
 })
 

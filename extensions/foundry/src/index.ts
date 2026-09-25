@@ -54,6 +54,7 @@ import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/di
 import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
+import { readTranscript } from './runtime/transcript-tailer.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
 /** One hunk as a surface renders it: the change, and what was decided. */
@@ -1904,6 +1905,13 @@ export function activate(api: ExtensionAPI): void {
       [...strandedAgents.values()]
         .filter((a) => a.orderId === orderId && isLiveSession(a.sessionId))
         .map((a) => a.sessionId),
+    // What each agent has been doing, for the Factory view's activity
+    // markers. Read from the same transcript file the stall detector tails —
+    // no session means nothing to report, not an error.
+    activityFor: (sessionId) => {
+      const run = supervision?.runs.get(sessionId)
+      return run ? readTranscript(run.transcriptPath) : []
+    },
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))
@@ -1963,6 +1971,8 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:run.observe', (payload) => runs.observe(payload))
   reg(api, 'foundry:run.recipes', (payload) => runs.recipes(payload))
   reg(api, 'foundry:session.attach', (payload) => runs.attach(payload))
+  // What each running node's agent has been doing, for the Factory view.
+  reg(api, 'foundry:run.activity', (payload) => runs.activity(payload))
 
   // ── The inbox ──────────────────────────────────────────────────────────
   //
@@ -2500,9 +2510,34 @@ export function activate(api: ExtensionAPI): void {
             'On by default. A stall detector that cries wolf gets turned off, and then the real stalls go unreported too — judge a week of recorded firings before turning this off.',
           default: true,
         },
+        // Per-operator, not per-order: which view draws the order list and the
+        // Line (FR — Factory view). Only the Forge surface changes; Inbox,
+        // Ledger and Settings are unaffected either way.
+        'terminator.foundry.view': {
+          type: 'enum',
+          label: 'Foundry view',
+          description: 'How the Forge surface draws orders and runs.',
+          options: ['list', 'factory'],
+          default: 'list',
+        },
       },
     })
   )
+
+  // Anything but 'factory' reads as 'list' — an unset or corrupted setting is
+  // the same as never having chosen the newer view.
+  const viewSetting = (): 'list' | 'factory' =>
+    api.settings.get<string>('terminator.foundry.view') === 'factory' ? 'factory' : 'list'
+
+  reg(api, 'foundry:ui.view', () => ({ view: viewSetting() }))
+
+  reg(api, 'foundry:ui.set-view', (payload: unknown) => {
+    const { view } = (payload ?? {}) as { view?: unknown }
+    if (view !== 'list' && view !== 'factory') return { error: 'Malformed request.' }
+    api.settings.set('terminator.foundry.view', view)
+    api.window.broadcast('foundry:ui.view-changed', { view })
+    return { view }
+  })
 
   // Renderer calls this on mount to pick up an intake request triggered
   // before the main view existed.
@@ -2537,6 +2572,23 @@ export function activate(api: ExtensionAPI): void {
           pendingNewOrder = false
           pendingNewOrderTimer = null
         }, 5000)
+      }
+    )
+  )
+
+  disposables.push(
+    api.commands.register(
+      {
+        id: 'toggle-view',
+        label: 'Toggle factory view',
+        category: 'Foundry',
+        mnemonic: 'v',
+      },
+      () => {
+        const next = viewSetting() === 'factory' ? 'list' : 'factory'
+        api.settings.set('terminator.foundry.view', next)
+        api.window.showSelf('main')
+        api.window.broadcast('foundry:ui.view-changed', { view: next })
       }
     )
   )

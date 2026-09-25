@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Settings, ArrowLeft } from 'lucide-react'
+import { Settings, ArrowLeft, List, Factory } from 'lucide-react'
 import { Inbox } from '../components/Inbox.js'
 import { Orders } from '../components/Orders.js'
 import { Ledger } from '../components/Ledger.js'
 import { SettingsView } from '../components/SettingsView.js'
+import { FactorySite } from '../components/factory/FactorySite.js'
+import { FactoryHall } from '../components/factory/FactoryHall.js'
+import type { FactoryOrderRow } from '../components/factory/FactorySite.js'
 
 // Three surfaces, and a way into settings.
 //
@@ -42,6 +45,56 @@ export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [waiting, setWaiting] = useState<Attention>({ inbox: 0, forge: 0 })
   const [focusIdeaSignal, setFocusIdeaSignal] = useState(0)
+
+  // The Forge's own view: a list of orders, or a hall drawn from the run
+  // graph. Per-operator (`terminator.foundry.view`), never per-order — the
+  // Inbox, Ledger and Settings are unaffected either way.
+  const [factoryView, setFactoryView] = useState<'list' | 'factory'>('list')
+  // The hall currently open, or null for the site (the grid of every hall).
+  const [factoryOrder, setFactoryOrder] = useState<FactoryOrderRow | null>(null)
+  // An order the site handed back to the list because it is still being
+  // shaped — that half of an order has no hall of its own to draw.
+  const [listOpenOrderId, setListOpenOrderId] = useState<string | null>(null)
+
+  useEffect(() => {
+    window.electronAPI.extensionBridge
+      .invoke('foundry:ui.view')
+      .then((result: unknown) => {
+        const next = (result as { view?: string }).view
+        if (next === 'factory') setFactoryView('factory')
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('foundry:ui.view-changed', (data: unknown) => {
+      const next = (data as { view?: string }).view
+      setFactoryView(next === 'factory' ? 'factory' : 'list')
+    })
+  }, [])
+
+  const setForgeView = (next: 'list' | 'factory'): void => {
+    setFactoryOrder(null)
+    setListOpenOrderId(null)
+    setFactoryView(next)
+    void window.electronAPI.extensionBridge.invoke('foundry:ui.set-view', { view: next })
+  }
+
+  // Where an order opened from the site goes: the hall if a line is actually
+  // running it, back to the list — open — if it is still being agreed. A
+  // gate order the recipe never started has no run graph for a hall to draw.
+  const openFromSite = (order: FactoryOrderRow): void => {
+    const shaping =
+      order.standing?.kind === 'shaping' ||
+      (order.standing === undefined && order.status === 'draft')
+    if (shaping) {
+      setFactoryOrder(null)
+      setFactoryView('list')
+      setListOpenOrderId(order.id)
+    } else {
+      setFactoryOrder(order)
+    }
+  }
 
   // The "New work order…" quick action's target: bring the Forge into view
   // with the cursor already in the idea box, whether the extension's own view
@@ -100,6 +153,8 @@ export function App(): JSX.Element {
       const d = data as { repoRoot?: string | null }
       setRepoRoot(d.repoRoot ?? null)
       setSettingsOpen(false)
+      setFactoryOrder(null)
+      setListOpenOrderId(null)
     })
   }, [])
 
@@ -143,6 +198,28 @@ export function App(): JSX.Element {
             )
           })}
         </nav>
+        {!settingsOpen && surface === 'forge' ? (
+          <div className="fdry-view-toggle" role="group" aria-label="Forge view">
+            <button
+              type="button"
+              aria-label="List view"
+              aria-pressed={factoryView === 'list'}
+              className={factoryView === 'list' ? 'is-on' : ''}
+              onClick={() => setForgeView('list')}
+            >
+              <List aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="Factory view"
+              aria-pressed={factoryView === 'factory'}
+              className={factoryView === 'factory' ? 'is-on' : ''}
+              onClick={() => setForgeView('factory')}
+            >
+              <Factory aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
         <button
           aria-label="Settings"
           className="sk-btn"
@@ -166,8 +243,27 @@ export function App(): JSX.Element {
           <Inbox />
         ) : surface === 'ledger' ? (
           <Ledger />
+        ) : factoryView === 'factory' ? (
+          factoryOrder === null ? (
+            <FactorySite repoRoot={repoRoot} onOpen={openFromSite} />
+          ) : (
+            <FactoryHall
+              orderId={factoryOrder.id}
+              onOpenInbox={() => setSurface('inbox')}
+              onOpenInList={() => {
+                setListOpenOrderId(factoryOrder.id)
+                setFactoryOrder(null)
+                setFactoryView('list')
+              }}
+              onBack={() => setFactoryOrder(null)}
+            />
+          )
         ) : (
-          <Orders repoRoot={repoRoot} focusIdeaSignal={focusIdeaSignal} />
+          <Orders
+            repoRoot={repoRoot}
+            focusIdeaSignal={focusIdeaSignal}
+            openOrderId={listOpenOrderId}
+          />
         )}
       </div>
     </div>
