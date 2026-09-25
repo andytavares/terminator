@@ -1,0 +1,32 @@
+docs/research/prompt-audit-2026-09-24.md
+  s_9126708f68ed92::t_bf217dc0359ec4 1-2,4-12,23-27,29,42-44,53-67
+  s_9126708f68ed92::t_25ff6a33cf2a8e 3,13-22,30-41,45-52
+  s_9126708f68ed92::t_de7b7607d4483d 28
+docs/user-guide/USER-GUIDE.md
+  s_9126708f68ed92::t_d577267d2b9292 728-733
+extensions/foundry/CLAUDE.md
+  s_9126708f68ed92::t_dc1cd60cfb559f 52
+  s_9126708f68ed92::t_d577267d2b9292 28,86
+docs/adr/059-foundry-prompts-fit-opus-5-5.md
+  s_9126708f68ed92::t_25ff6a33cf2a8e 32
+  s_9126708f68ed92::t_5d59d45f2fbd87 1-31
+docs/ARCHITECTURE.md
+  s_9126708f68ed92::t_d577267d2b9292 1056-1057
+  s_9126708f68ed92::t_dc1cd60cfb559f 1247-1250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a2d64053dc21d0242b8776fe4ecf3bc1daebf39f",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
