@@ -1,0 +1,34 @@
+tests/unit/main/profile-lock.spec.ts
+  s_da4d456cde4d75::t_e441592b8faae8 1-49
+src/main/profile-lock.ts
+  s_da4d456cde4d75::t_2c405315d95857 3-6
+  s_da4d456cde4d75::t_56c5e4dce48846 1-2,7-19
+src/main/claim-profile.ts
+  s_da4d456cde4d75::t_01603168993ca4 1-8
+src/main/index.ts
+  s_da4d456cde4d75::t_8c90fc64cc7fe5 290-295
+  s_da4d456cde4d75::t_01603168993ca4 1
+  s_da4d456cde4d75::t_615c0e3704ef46 296
+docs/ARCHITECTURE.md
+  s_da4d456cde4d75::t_850056b587aae9 122-123
+tests/unit/main/claim-profile.spec.ts
+  s_da4d456cde4d75::t_f09d53c5c72d91 1-30
+docs/CONTRIBUTING.md
+  s_da4d456cde4d75::t_850056b587aae9 33-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ec86a7b432063c189601f3ca9d08f72640569aa0",
+  "prompts": {},
+  "sessions": {
+    "s_da4d456cde4d75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6bfb5021-03c9-4cf3-9e07-0ca7d3a5062d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
