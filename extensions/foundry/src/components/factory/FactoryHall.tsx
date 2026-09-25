@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ShieldQuestion, Terminal, X } from 'lucide-react'
+import { ArrowLeft, History, Pause, Play, Radio, ShieldQuestion, Terminal, X } from 'lucide-react'
 import { useRunObservation } from '../../renderer/use-run-observation.js'
 import type { FloorView, PendingAsk } from '../../renderer/use-run-observation.js'
 import { layoutHall } from '../../factory/layout.js'
@@ -7,12 +7,15 @@ import type { HallMap, HallProp } from '../../factory/layout.js'
 import { createWorld } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import { diffObservation, describeEvent } from '../../factory/events.js'
-import type { Observation } from '../../factory/events.js'
+import type { FactoryEvent, Observation } from '../../factory/events.js'
 import { direct } from '../../factory/director.js'
 import { calloutFor, interruptionsFor, stateWord } from '../../factory/callouts.js'
 import type { Callout, Interruption } from '../../factory/callouts.js'
+import { momentsOf, observationAt, replayClock } from '../../factory/replay.js'
+import type { ReplayClock, Timeline } from '../../factory/replay.js'
+import type { Gate } from '../../gates/rules.js'
 import { HallScene } from './HallScene.js'
-import type { NodeState } from '../../line/run-graph.js'
+import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 
@@ -41,6 +44,32 @@ const ACTIVITY_POLL_MS = 2000
 const CALLOUT_MS = 5000
 /** Rows from the top of the hall under which a pinned card opens downward instead. */
 const CARD_FLIP_ROW = 7
+/** How often a playing replay advances, in ms of replay time at 1x. */
+const REPLAY_STEP_MS = 100
+/** The longest quiet stretch a replay plays at full length before it is shortened. */
+const REPLAY_MAX_GAP_MS = 6000
+const REPLAY_SPEEDS = [1, 4, 16] as const
+type ReplaySpeed = (typeof REPLAY_SPEEDS)[number]
+
+interface Replay {
+  readonly graph: RunGraph
+  readonly timeline: Timeline
+  readonly gates: readonly Gate[]
+  readonly map: HallMap
+  readonly clock: ReplayClock
+  readonly pos: number
+  readonly playing: boolean
+  readonly speed: ReplaySpeed
+  readonly observation: Observation
+}
+
+function clockText(ms: number): string {
+  const s = Math.round(ms / 1000)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+/** Percent of the hall's width within which two callouts count as neighbours. */
+const CALLOUT_NEAR = 16
 /** Tiles a nameplate may span: a column pitch, less a gap. */
 const PLATE_COLUMNS = 4.6
 
@@ -97,6 +126,13 @@ export function FactoryHall({
   const [attachProblem, setAttachProblem] = useState<string | null>(null)
   const [answerProblem, setAnswerProblem] = useState<Readonly<Record<string, string>>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const [replay, setReplay] = useState<Replay | null>(null)
+  const [replayNote, setReplayNote] = useState<string | null>(null)
+  // The replay's own world, beside the live one: live polling carries on
+  // underneath a replay, so leaving it lands back on the run as it is now.
+  const replayRef = useRef<Replay | null>(null)
+  const replayWorldRef = useRef<World | null>(null)
+  const replayPrevRef = useRef<Observation | null>(null)
 
   // Refs, not state: these are read and written inside the observation
   // effect on every poll, and putting them in state would make the effect
@@ -130,6 +166,24 @@ export function FactoryHall({
     return () => clearInterval(timer)
   }, [callouts.length])
 
+  // What a batch of events says: callouts at their stations, and one sentence
+  // for a screen reader. Live polls and a playing replay both come through here.
+  const announce = useCallback(
+    (events: readonly FactoryEvent[], labels: Readonly<Record<string, string>>) => {
+      if (events.length === 0) return
+      const now = Date.now()
+      const raised = events
+        .map((event) => calloutFor(event, labels, now))
+        .filter((c): c is Callout => c !== null)
+      if (raised.length > 0) {
+        const owners = new Set(raised.map((c) => c.nodeId))
+        setCallouts((live) => [...live.filter((c) => !owners.has(c.nodeId)), ...raised])
+      }
+      setSpoken(events.map((event) => describeEvent(event, labels)).join(' '))
+    },
+    []
+  )
+
   // The one place `direct` is called — on every poll of either the graph or
   // the activity feed, event or no event, with a real clock. A call held
   // open across polls only crosses its walking threshold on a poll that
@@ -161,18 +215,96 @@ export function FactoryHall({
     const events = diffObservation(prevObservationRef.current, observation)
     worldRef.current = direct(world, events, now)
     prevObservationRef.current = observation
-    if (events.length === 0) return
+    // A replay has the stage; live events still move the live world, silently.
+    if (replayRef.current === null) announce(events, view.labels ?? {})
+  }, [view, activity, announce])
 
-    const labels = view.labels ?? {}
-    const raised = events
-      .map((event) => calloutFor(event, labels, now))
-      .filter((c): c is Callout => c !== null)
-    if (raised.length > 0) {
-      const owners = new Set(raised.map((c) => c.nodeId))
-      setCallouts((live) => [...live.filter((c) => !owners.has(c.nodeId)), ...raised])
+  const labelsNow = view?.labels
+
+  const startReplay = useCallback(async () => {
+    setReplayNote(null)
+    const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
+      graph?: RunGraph
+      timeline?: Timeline
+      gates?: Gate[]
+      error?: string
     }
-    setSpoken(events.map((event) => describeEvent(event, labels)).join(' '))
-  }, [view, activity])
+    if (r.graph === undefined || r.timeline === undefined || r.timeline.frames.length === 0) {
+      setReplayNote('Nothing recorded for this run yet.')
+      return
+    }
+    const gates = r.gates ?? []
+    const clock = replayClock(momentsOf(r.timeline, gates), REPLAY_MAX_GAP_MS)
+    const observation = observationAt(r.timeline, gates, r.graph, clock.toReal(0))
+    const replayMap = layoutHall(r.graph, labelsNow ?? {})
+    replayWorldRef.current = createWorld(replayMap, observation)
+    replayPrevRef.current = observation
+    setCallouts([])
+    const next: Replay = {
+      graph: r.graph,
+      timeline: r.timeline,
+      gates,
+      map: replayMap,
+      clock,
+      pos: 0,
+      playing: true,
+      speed: 1,
+      observation,
+    }
+    replayRef.current = next
+    setReplay(next)
+  }, [orderId, labelsNow])
+
+  // Move the replay to `pos`. Playing forward goes through the same diff and
+  // director as a live poll, so it animates; a seek rebuilds the hall settled
+  // at that moment, as a hall opened then would have been.
+  const moveReplay = useCallback(
+    (pos: number, seek: boolean) => {
+      const r = replayRef.current
+      if (r === null) return
+      const at = Math.min(Math.max(pos, 0), r.clock.duration)
+      const real = r.clock.toReal(at)
+      const observation = observationAt(r.timeline, r.gates, r.graph, real)
+      if (seek) {
+        replayWorldRef.current = createWorld(r.map, observation)
+        setCallouts([])
+      } else {
+        const events = diffObservation(replayPrevRef.current, observation)
+        replayWorldRef.current = direct(replayWorldRef.current as World, events, real)
+        announce(events, labelsNow ?? {})
+      }
+      replayPrevRef.current = observation
+      const next = { ...r, pos: at, observation, playing: r.playing && at < r.clock.duration }
+      replayRef.current = next
+      setReplay(next)
+    },
+    [announce, labelsNow]
+  )
+
+  const setReplayWith = (change: Partial<Replay>): void => {
+    const r = replayRef.current
+    if (r === null) return
+    const next = { ...r, ...change }
+    replayRef.current = next
+    setReplay(next)
+  }
+
+  const leaveReplay = (): void => {
+    replayRef.current = null
+    replayWorldRef.current = null
+    setCallouts([])
+    setReplay(null)
+  }
+
+  const replayPlaying = replay?.playing ?? false
+  useEffect(() => {
+    if (!replayPlaying) return
+    const timer = setInterval(() => {
+      const r = replayRef.current
+      if (r !== null) moveReplay(r.pos + REPLAY_STEP_MS * r.speed, false)
+    }, REPLAY_STEP_MS)
+    return () => clearInterval(timer)
+  }, [replayPlaying, moveReplay])
 
   const openStation = useCallback(
     async (nodeId: string) => {
@@ -255,16 +387,22 @@ export function FactoryHall({
   }
 
   const labels = view.labels ?? {}
-  const orphaned = new Set(view.orphaned ?? [])
+  // In a replay the hall shows the recording; everything else is the run now.
+  const shownMap = replay?.map ?? map
+  const shownGraph = replay?.observation.graph ?? view.graph
+  const shownWorldRef = (
+    replay === null ? worldRef : replayWorldRef
+  ) as React.MutableRefObject<World>
+  const orphaned = new Set(replay === null ? (view.orphaned ?? []) : [])
   const interruptions = interruptionsFor({
-    graph: view.graph,
-    waiting: view.waiting ?? [],
-    stranded: view.stranded ?? [],
-    pending,
+    graph: shownGraph,
+    waiting: replay?.observation.waiting ?? view.waiting ?? [],
+    stranded: replay === null ? (view.stranded ?? []) : [],
+    pending: replay === null ? pending : [],
   })
   const flaggedNodes = new Set(interruptions.map((i) => i.nodeId))
   const states: Record<string, NodeState> = {}
-  for (const n of view.graph.nodes) states[n.id] = n.state
+  for (const n of shownGraph.nodes) states[n.id] = n.state
   const selectedNode =
     selected === null ? null : (view.graph.nodes.find((n) => n.id === selected) ?? null)
 
@@ -274,18 +412,23 @@ export function FactoryHall({
         className="fdry-hall-frame"
         style={
           {
-            aspectRatio: `${map.width} / ${map.height}`,
-            '--fdry-hall-aspect': map.width / map.height,
+            aspectRatio: `${shownMap.width} / ${shownMap.height}`,
+            '--fdry-hall-aspect': shownMap.width / shownMap.height,
           } as React.CSSProperties
         }
       >
-        <HallScene map={map} worldRef={worldRef as React.MutableRefObject<World>} states={states} />
+        <HallScene
+          map={shownMap}
+          worldRef={shownWorldRef}
+          states={states}
+          speed={replay?.speed ?? 1}
+        />
 
         <div className="fdry-hall-overlay">
-          {map.props
+          {shownMap.props
             .filter((prop) => prop.nodeId !== null)
             .map((prop) => {
-              const node = view.graph.nodes.find((n) => n.id === prop.nodeId)
+              const node = shownGraph.nodes.find((n) => n.id === prop.nodeId)
               if (node === undefined) return null
               const label = labels[node.id] ?? node.id
               const gone = orphaned.has(node.id)
@@ -295,7 +438,7 @@ export function FactoryHall({
                     type="button"
                     className="fdry-hall-station"
                     title={label}
-                    style={stationStyle(map, prop)}
+                    style={stationStyle(shownMap, prop)}
                     aria-label={`${label}, ${node.role ?? 'unassigned'}, ${node.state}, attempt ${node.attempts}`}
                     onClick={() => void openStation(node.id)}
                   >
@@ -310,11 +453,11 @@ export function FactoryHall({
                     data-state={gone ? 'gone' : node.state}
                     aria-hidden="true"
                     style={{
-                      left: `${anchorOf(map, node.id).left}%`,
-                      top: `${anchorOf(map, node.id).top}%`,
+                      left: `${anchorOf(shownMap, node.id).left}%`,
+                      top: `${anchorOf(shownMap, node.id).top}%`,
                       // Neighbouring stations are one column pitch apart; a
                       // plate wider than that runs into the next one's.
-                      maxWidth: `${(PLATE_COLUMNS / map.width) * 100}%`,
+                      maxWidth: `${(PLATE_COLUMNS / shownMap.width) * 100}%`,
                     }}
                   >
                     <span className="fdry-plate__name">{label}</span>
@@ -327,15 +470,29 @@ export function FactoryHall({
               )
             })}
 
-          {callouts.map((c) => {
-            const at = anchorOf(map, c.nodeId)
+          {callouts.map((c, index) => {
+            const at = anchorOf(shownMap, c.nodeId)
+            // Neighbouring stations raise callouts into the same air; each one
+            // stacks above the earlier ones near it instead of covering them.
+            const stack = callouts.slice(0, index).filter((other) => {
+              const there = anchorOf(shownMap, other.nodeId)
+              return (
+                Math.abs(there.left - at.left) < CALLOUT_NEAR && Math.abs(there.top - at.top) < 1
+              )
+            }).length
             return (
               <div
                 key={c.id}
                 className="fdry-callout"
                 data-tone={c.tone}
                 aria-hidden="true"
-                style={{ left: `${at.left}%`, top: `${at.top}%` }}
+                style={
+                  {
+                    left: `${at.left}%`,
+                    top: `${at.top}%`,
+                    '--fdry-stack': stack,
+                  } as React.CSSProperties
+                }
               >
                 {c.text}
               </div>
@@ -346,8 +503,9 @@ export function FactoryHall({
             <InterruptionCard
               key={`${item.kind}:${item.id}`}
               item={item}
-              anchor={anchorOf(map, item.nodeId)}
-              flip={anchorOf(map, item.nodeId).top < (CARD_FLIP_ROW / map.height) * 100}
+              anchor={anchorOf(shownMap, item.nodeId)}
+              flip={anchorOf(shownMap, item.nodeId).top < (CARD_FLIP_ROW / shownMap.height) * 100}
+              readOnly={replay !== null}
               busy={busy === item.id}
               problem={answerProblem[item.id] ?? null}
               onAllow={() => resolveAsk(item.id, 'allow')}
@@ -367,11 +525,66 @@ export function FactoryHall({
 
         <HallHud
           view={view}
+          shownGraph={shownGraph}
+          replaying={replay !== null}
           waitingCount={interruptions.length}
+          note={replayNote}
           onBack={onBack}
+          onReplay={() => void startReplay()}
           onOpenInbox={onOpenInbox}
           onOpenInList={onOpenInList}
         />
+
+        {replay === null ? null : (
+          <div className="fdry-replay" role="group" aria-label="Replay">
+            <button
+              type="button"
+              className="fdry-hall-btn is-primary"
+              aria-label={replay.playing ? 'Pause' : 'Play'}
+              onClick={() =>
+                replay.playing
+                  ? setReplayWith({ playing: false })
+                  : replay.pos >= replay.clock.duration
+                    ? (moveReplay(0, true), setReplayWith({ playing: true }))
+                    : setReplayWith({ playing: true })
+              }
+            >
+              {replay.playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+            </button>
+            <input
+              type="range"
+              className="fdry-replay__track"
+              aria-label="Replay position"
+              min={0}
+              max={Math.max(replay.clock.duration, 1)}
+              step={REPLAY_STEP_MS}
+              value={replay.pos}
+              onChange={(e) => moveReplay(Number(e.currentTarget.value), true)}
+            />
+            <span className="fdry-replay__time">
+              {clockText(replay.pos)} / {clockText(replay.clock.duration)}
+            </span>
+            <span className="fdry-replay__speeds">
+              {REPLAY_SPEEDS.map((speed) => (
+                <button
+                  key={speed}
+                  type="button"
+                  className="fdry-hall-btn"
+                  aria-pressed={replay.speed === speed}
+                  onClick={() => setReplayWith({ speed })}
+                >
+                  {speed}x
+                </button>
+              ))}
+            </span>
+            <span className="fdry-replay__at">
+              {new Date(replay.clock.toReal(replay.pos)).toLocaleTimeString()}
+            </span>
+            <button type="button" className="fdry-hall-btn" onClick={leaveReplay}>
+              <Radio aria-hidden="true" /> Back to live
+            </button>
+          </div>
+        )}
 
         {selectedNode === null ? null : (
           <section className="fdry-hall-inspector" aria-labelledby="fdry-hall-inspector-h">
@@ -409,8 +622,13 @@ export function FactoryHall({
 
 interface HallHudProps {
   readonly view: FloorView
+  /** The graph on show: the run now, or the moment a replay stands at. */
+  readonly shownGraph: RunGraph
+  readonly replaying: boolean
   readonly waitingCount: number
+  readonly note: string | null
   readonly onBack: () => void
+  readonly onReplay: () => void
   readonly onOpenInbox: () => void
   readonly onOpenInList: () => void
 }
@@ -418,14 +636,19 @@ interface HallHudProps {
 /** The order's own status, on the hall's top edge rather than above or below it. */
 function HallHud({
   view,
+  shownGraph,
+  replaying,
   waitingCount,
+  note,
   onBack,
+  onReplay,
   onOpenInbox,
   onOpenInList,
 }: HallHudProps): JSX.Element {
-  const standing = view.standing
-  const done = standing?.done ?? 0
-  const total = standing?.total ?? view.graph.nodes.length
+  const standing = replaying ? undefined : view.standing
+  const finished = (s: NodeState): boolean => s === 'passed' || s === 'skipped'
+  const done = standing?.done ?? shownGraph.nodes.filter((n) => finished(n.state)).length
+  const total = standing?.total ?? shownGraph.nodes.length
   return (
     <div className="fdry-hall-hud">
       <button type="button" className="fdry-hall-btn" onClick={onBack}>
@@ -440,7 +663,15 @@ function HallHud({
           {done}/{total}
         </span>
       </div>
-      {waitingCount > 0 ? (
+      {replaying ? (
+        <span className="fdry-hall-hud__tag">Replay</span>
+      ) : (
+        <button type="button" className="fdry-hall-btn" onClick={onReplay}>
+          <History aria-hidden="true" /> Replay
+        </button>
+      )}
+      {note !== null ? <span className="fdry-hall-hud__note">{note}</span> : null}
+      {!replaying && waitingCount > 0 ? (
         <span className="fdry-hall-hud__needs">{waitingCount} need you</span>
       ) : null}
       {/* A move no card owns — a run nothing is running, say — still names
@@ -465,6 +696,8 @@ function HallHud({
 
 interface InterruptionCardProps {
   readonly item: Interruption
+  /** A replayed wait: shown where it happened, with nothing left to answer. */
+  readonly readOnly: boolean
   readonly anchor: Anchor
   readonly flip: boolean
   readonly busy: boolean
@@ -479,6 +712,7 @@ interface InterruptionCardProps {
 /** Pinned over the station that is waiting, and answerable where it stands. */
 function InterruptionCard({
   item,
+  readOnly,
   anchor,
   flip,
   busy,
@@ -506,54 +740,58 @@ function InterruptionCard({
       </div>
       <p className="fdry-card__detail">{item.detail}</p>
       {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
-      <div className="fdry-card__actions">
-        {item.kind === 'ask' ? (
-          <>
+      {readOnly ? (
+        <p className="fdry-card__history">Waited on you here.</p>
+      ) : (
+        <div className="fdry-card__actions">
+          {item.kind === 'ask' ? (
+            <>
+              <button
+                type="button"
+                className="fdry-hall-btn is-primary"
+                disabled={busy}
+                onClick={onAllow}
+              >
+                Allow
+              </button>
+              <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onDeny}>
+                Deny
+              </button>
+              <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onTerminal}>
+                <Terminal aria-hidden="true" /> Terminal
+              </button>
+            </>
+          ) : item.kind === 'gate' ? (
+            item.needsInbox ? (
+              <button type="button" className="fdry-hall-btn is-primary" onClick={onOpenInbox}>
+                Open Inbox
+              </button>
+            ) : (
+              item.options.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  title={option.consequence}
+                  className="fdry-hall-btn is-primary"
+                  disabled={busy}
+                  onClick={() => onDecide(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))
+            )
+          ) : (
             <button
               type="button"
               className="fdry-hall-btn is-primary"
               disabled={busy}
-              onClick={onAllow}
+              onClick={onTerminal}
             >
-              Allow
+              <Terminal aria-hidden="true" /> Go to terminal
             </button>
-            <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onDeny}>
-              Deny
-            </button>
-            <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onTerminal}>
-              <Terminal aria-hidden="true" /> Terminal
-            </button>
-          </>
-        ) : item.kind === 'gate' ? (
-          item.needsInbox ? (
-            <button type="button" className="fdry-hall-btn is-primary" onClick={onOpenInbox}>
-              Open Inbox
-            </button>
-          ) : (
-            item.options.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                title={option.consequence}
-                className="fdry-hall-btn is-primary"
-                disabled={busy}
-                onClick={() => onDecide(option.id)}
-              >
-                {option.label}
-              </button>
-            ))
-          )
-        ) : (
-          <button
-            type="button"
-            className="fdry-hall-btn is-primary"
-            disabled={busy}
-            onClick={onTerminal}
-          >
-            <Terminal aria-hidden="true" /> Go to terminal
-          </button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

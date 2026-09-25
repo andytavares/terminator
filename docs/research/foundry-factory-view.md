@@ -195,6 +195,8 @@ Then do one live run: a real two-lane order with the factory open. Capture the W
 
 ## As built
 
+After review, status moved into the hall (nameplates, rising callouts, pinned answerable cards) and runs became replayable from a recorded timeline; see the addendum to ADR 060.
+
 Four points where the shipped factory differs from this design:
 
 - **`World` remembers open tool calls.** `direct` only ever sees the events since the last poll, and a long-running Read emits `tool_started` exactly once — so the 1.5 s "walk to the prop" rule could never re-fire on a later poll. The world now keeps each open call and re-checks its age against `nowMs` on every `direct`, not only at the moment it opened.

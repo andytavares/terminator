@@ -41,6 +41,14 @@ export interface StallWatcherOptions {
   runs: () => readonly WatchedRun[]
   /** Fired when one is judged stuck. Shadow mode is the caller's decision. */
   onFiring: (firing: StallFiring, featureDir: string) => void
+  /**
+   * Everything a tick read from a run's transcript, fired or not.
+   *
+   * The watcher is the one thing already reading every live run's transcript
+   * on a clock, so the Factory view's recording rides on it rather than
+   * reading each transcript a second time.
+   */
+  onActivity?: (run: WatchedRun, activity: readonly ToolActivity[]) => void
   thresholds?: StallThresholds
   now?: () => number
   /** How often to look. Every thirty seconds, matching the spec. */
@@ -137,14 +145,12 @@ export function createStallWatcher(options: StallWatcherOptions): StallWatcher {
       }
 
       for (const run of live) {
+        const activity = readTranscript(run.transcriptPath)
+        options.onActivity?.(run, activity)
         if (fired.has(run.sessionId)) continue
         // Growth since the last look. Without it the loop signal cannot tell
         // "going round in circles" from "working steadily on one file".
-        const facts = factsFrom(
-          run,
-          readTranscript(run.transcriptPath),
-          options.netChangeSince?.(run.sessionId) ?? 1
-        )
+        const facts = factsFrom(run, activity, options.netChangeSince?.(run.sessionId) ?? 1)
         const firing = evaluateStall(facts, thresholds, now())
         if (firing === null) continue
         fired.add(run.sessionId)

@@ -18,6 +18,7 @@ import { readStanding } from '../order/standing.js'
 import { runFailure } from '../line/run-outcome.js'
 import type { Gate } from '../gates/rules.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
+import { recordGraph, readTimeline } from '../factory/timeline-store.js'
 
 // Starting a run.
 //
@@ -138,6 +139,8 @@ export interface RunChannels {
   attach(payload: unknown): Promise<unknown>
   /** What each running node's agent has been doing, for the Factory view. */
   activity(payload: unknown): Promise<unknown>
+  /** Everything recorded about a run, for the Factory view to play back. */
+  timeline(payload: unknown): Promise<unknown>
 }
 
 function graphPath(dataRoot: string, orderId: string): string {
@@ -158,6 +161,13 @@ export async function writeRunGraph(dataRoot: string, graph: RunGraph): Promise<
     `${JSON.stringify(graph, null, 2)}\n`,
     'utf8'
   )
+  // The replay's record of the run. Best effort: the graph just written is
+  // the truth, and a timeline that cannot be appended to must not undo it.
+  try {
+    await recordGraph(orderDir(dataRoot, graph.orderId), graph, Date.now())
+  } catch {
+    // Nothing to do; the run goes on without this frame.
+  }
 }
 
 /**
@@ -679,5 +689,24 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return { activity }
   }
 
-  return { start, resume, observe, recipes, attach, activity }
+  /**
+   * What the run did, as recorded while it did it: the graph for its shape,
+   * each frame of node states and each tool call, and every gate the order
+   * raised — decided ones included, since a replay shows the waits too.
+   */
+  async function timeline(raw: unknown): Promise<unknown> {
+    const parsed = ActivityPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const graph = await loadGraph(parsed.data.id)
+    if (graph === null) return { error: `No run for ${parsed.data.id}.` }
+
+    return {
+      graph,
+      timeline: await readTimeline(orderDir(deps.dataRoot(), parsed.data.id)),
+      gates: (await deps.gatesFor?.(parsed.data.id)) ?? [],
+    }
+  }
+
+  return { start, resume, observe, recipes, attach, activity, timeline }
 }

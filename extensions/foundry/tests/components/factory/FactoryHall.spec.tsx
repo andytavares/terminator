@@ -334,6 +334,71 @@ describe('FactoryHall', () => {
     )
   })
 
+  function replayable(frames: unknown[]) {
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:run.observe') return view()
+      if (channel === 'foundry:permissions-list') return { pending: [] }
+      if (channel === 'foundry:run.activity') return { activity: {} }
+      if (channel === 'foundry:run.timeline')
+        return {
+          graph: view().graph,
+          timeline: { frames, tools: [] },
+          gates: [],
+        }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(
+      <FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onOpenInList={vi.fn()} onBack={vi.fn()} />
+    )
+  }
+
+  const plateText = () =>
+    (document.querySelector('.fdry-hall-overlay .fdry-plate') as HTMLElement).textContent
+
+  it('replays the run from what was recorded, and scrubs to any moment of it', async () => {
+    replayable([
+      { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
+      { at: 9000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
+    ])
+    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    const position = (await screen.findByRole('slider', {
+      name: 'Replay position',
+    })) as HTMLInputElement
+    expect(invoke).toHaveBeenCalledWith('foundry:run.timeline', { id: 'WO-1' })
+    expect(plateText()).toContain('Working')
+    fireEvent.change(position, { target: { value: position.max } })
+    await waitFor(() => expect(plateText()).toContain('Done'))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to live' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('slider', { name: 'Replay position' })).toBeNull()
+    )
+    expect(plateText()).toContain('Working')
+  })
+
+  it('plays, pauses and changes speed', async () => {
+    replayable([
+      { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
+      { at: 3000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
+    ])
+    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    await screen.findByRole('button', { name: 'Pause' })
+    fireEvent.click(screen.getByRole('button', { name: '4x' }))
+    expect(screen.getByRole('button', { name: '4x' }).getAttribute('aria-pressed')).toBe('true')
+    // 2 s of recording at 4x is half a second of replay
+    await waitFor(() => expect(plateText()).toContain('Done'), { timeout: 2500 })
+    await screen.findByRole('button', { name: 'Play' })
+  })
+
+  it('says so when nothing was recorded for this run', async () => {
+    replayable([])
+    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    await screen.findByText('Nothing recorded for this run yet.')
+    expect(screen.queryByRole('slider', { name: 'Replay position' })).toBeNull()
+  })
+
   it('goes back to the site', async () => {
     const { onBack } = mount()
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
