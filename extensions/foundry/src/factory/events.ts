@@ -38,7 +38,13 @@ export type FactoryEvent =
       readonly open: boolean
       readonly at: number
     }
-  | { readonly kind: 'handoff'; readonly fromNodeId: string; readonly toNodeId: string }
+  | {
+      readonly kind: 'handoff'
+      readonly fromNodeId: string
+      readonly toNodeId: string
+      /** Whether the next step is already under way, or the work queues at it. */
+      readonly targetStarted: boolean
+    }
   | { readonly kind: 'gate'; readonly nodeId: string; readonly waiting: boolean }
 
 const ARCHIVE_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'NotebookRead'])
@@ -47,6 +53,11 @@ export function toolProp(toolName: string, isShell: boolean): ToolProp {
   if (isShell) return 'rack'
   if (ARCHIVE_TOOLS.has(toolName)) return 'archive'
   return 'desk'
+}
+
+/** A step that has taken in its input — work bound for it no longer queues. */
+export function hasStarted(state: NodeState): boolean {
+  return state !== 'waiting' && state !== 'ready' && state !== 'blocked'
 }
 
 function activityKey(activity: ToolActivity): string {
@@ -127,8 +138,12 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
       if (sourceNow === undefined || sourceNow.state !== 'passed') continue
       const sourceBefore = prevNodes.get(fromNodeId)
       if (sourceBefore?.state === 'passed') continue
-      if (node.state !== 'ready' && node.state !== 'running') continue
-      events.push({ kind: 'handoff', fromNodeId, toNodeId: node.id })
+      events.push({
+        kind: 'handoff',
+        fromNodeId,
+        toNodeId: node.id,
+        targetStarted: hasStarted(node.state),
+      })
     }
   }
 

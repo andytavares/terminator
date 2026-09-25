@@ -1,3 +1,4 @@
+import { hasStarted } from './events.js'
 import type { FactoryEvent } from './events.js'
 import { seatOf, loungeSpot } from './sim.js'
 import type { World, Crew, Crate, OpenCall } from './sim.js'
@@ -67,8 +68,19 @@ function applyOpenCallWalks(world: World, nowMs: number): World {
   return next
 }
 
+/** A step that starts takes in the work queued at it: those crates stop parking. */
+function consumeQueued(world: World, nodeId: string): World {
+  const into = new Set(world.map.belts.filter((b) => b.toNodeId === nodeId).map((b) => b.id))
+  if (!world.crates.some((c) => c.parks && into.has(c.beltId))) return world
+  return {
+    ...world,
+    crates: world.crates.map((c) => (c.parks && into.has(c.beltId) ? { ...c, parks: false } : c)),
+  }
+}
+
 function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node-state' }>): World {
-  return withCrew(world, event.nodeId, (crew) => {
+  const fed = hasStarted(event.to) ? consumeQueued(world, event.nodeId) : world
+  return withCrew(fed, event.nodeId, (crew) => {
     switch (event.to) {
       case 'ready':
       case 'running':
@@ -146,7 +158,12 @@ function applyHandoff(world: World, event: Extract<FactoryEvent, { kind: 'handof
     (b) => b.fromNodeId === event.fromNodeId && b.toNodeId === event.toNodeId
   )
   if (belt === undefined) return world
-  const crate: Crate = { id: `${belt.id}@${world.clockMs}`, beltId: belt.id, progress: 0 }
+  const crate: Crate = {
+    id: `${belt.id}@${world.clockMs}`,
+    beltId: belt.id,
+    progress: 0,
+    parks: !event.targetStarted,
+  }
   return { ...world, crates: [...world.crates, crate] }
 }
 

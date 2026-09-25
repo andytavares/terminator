@@ -398,16 +398,48 @@ describe('direct: handoff', () => {
     const g = graph()
     const world = worldFor(g)
     expect(world.crates).toEqual([])
-    const next = direct(world, [{ kind: 'handoff', fromNodeId: 'a', toNodeId: 'b' }], 0)
+    const next = direct(
+      world,
+      [{ kind: 'handoff', fromNodeId: 'a', toNodeId: 'b', targetStarted: false }],
+      0
+    )
     expect(next.crates).toHaveLength(1)
     expect(next.crates[0].progress).toBe(0)
     expect(next.crates[0].beltId).toBe('a->b')
+    expect(next.crates[0].parks).toBe(true)
+  })
+
+  it('a crate for a step already running is consumed on arrival, not parked', () => {
+    const world = worldFor(graph())
+    const next = direct(
+      world,
+      [{ kind: 'handoff', fromNodeId: 'a', toNodeId: 'b', targetStarted: true }],
+      0
+    )
+    expect(next.crates[0].parks).toBe(false)
+  })
+
+  it('a step starting takes in the work parked at it', () => {
+    const world = {
+      ...worldFor(graph()),
+      crates: [{ id: 'q', beltId: 'a->b', progress: 1, parks: true }],
+    }
+    const next = direct(
+      world,
+      [{ kind: 'node-state', nodeId: 'b', from: 'ready', to: 'running' }],
+      0
+    )
+    expect(next.crates).toEqual([{ id: 'q', beltId: 'a->b', progress: 1, parks: false }])
   })
 
   it('does nothing for a handoff with no matching belt', () => {
     const g = graph()
     const world = worldFor(g)
-    const next = direct(world, [{ kind: 'handoff', fromNodeId: 'ghost', toNodeId: 'nowhere' }], 0)
+    const next = direct(
+      world,
+      [{ kind: 'handoff', fromNodeId: 'ghost', toNodeId: 'nowhere', targetStarted: false }],
+      0
+    )
     expect(next.crates).toEqual([])
   })
 })
@@ -485,7 +517,7 @@ describe('direct: applies a batch of events in order and is pure', () => {
     const world = worldFor(g)
     const events: FactoryEvent[] = [
       { kind: 'node-state', nodeId: 'a', from: 'waiting', to: 'running' },
-      { kind: 'handoff', fromNodeId: 'a', toNodeId: 'b' },
+      { kind: 'handoff', fromNodeId: 'a', toNodeId: 'b', targetStarted: false },
     ]
     const next = direct(world, events, 0)
     expect(next.crew.find((c) => c.nodeId === 'a')!.then).toBe('type')
