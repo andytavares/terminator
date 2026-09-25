@@ -19,6 +19,8 @@ export interface HallSceneProps {
   readonly worldRef: React.MutableRefObject<World>
   readonly states: Readonly<Record<string, NodeState>>
   readonly reducedMotion?: boolean
+  /** How fast the world moves: 1 live, more when a replay is fast-forwarded. */
+  readonly speed?: number
 }
 
 const DARKNESS = 'rgba(5,8,18,0.42)'
@@ -152,8 +154,12 @@ export function HallScene({
   worldRef,
   states,
   reducedMotion,
+  speed = 1,
 }: HallSceneProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  // Read by the running loop each frame, so a speed change does not restart it.
+  const speedRef = useRef(speed)
+  speedRef.current = speed
   const bakeRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
   const lightRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
 
@@ -197,7 +203,7 @@ export function HallScene({
 
     function frame(now: number): void {
       if (!running) return
-      const dt = Math.min(MAX_FRAME_MS, now - last)
+      const dt = Math.min(MAX_FRAME_MS, now - last) * speedRef.current
       last = now
       worldRef.current = tick(worldRef.current, dt)
       draw(paint, bake, lightLayer, map, worldRef.current, states, worldRef.current.clockMs)

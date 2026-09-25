@@ -2946,7 +2946,7 @@
 .fdry-callout {
   position: absolute;
   z-index: var(--tm-layer-panel);
-  transform: translate(-50%, calc(-100% - 30px));
+  transform: translate(-50%, calc(-100% - 30px - var(--fdry-stack, 0) * 24px));
   padding: 3px 8px;
   border-radius: 2px;
   box-shadow:
@@ -2999,19 +2999,19 @@
 @keyframes fdry-callout-rise {
   0% {
     opacity: 0;
-    transform: translate(-50%, calc(-100% - 18px));
+    transform: translate(-50%, calc(-100% - 18px - var(--fdry-stack, 0) * 24px));
   }
   8% {
     opacity: 1;
-    transform: translate(-50%, calc(-100% - 30px));
+    transform: translate(-50%, calc(-100% - 30px - var(--fdry-stack, 0) * 24px));
   }
   75% {
     opacity: 1;
-    transform: translate(-50%, calc(-100% - 40px));
+    transform: translate(-50%, calc(-100% - 40px - var(--fdry-stack, 0) * 24px));
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, calc(-100% - 50px));
+    transform: translate(-50%, calc(-100% - 50px - var(--fdry-stack, 0) * 24px));
   }
 }
 
@@ -3198,6 +3198,98 @@
   background: #15110a;
   color: #f5e6c8;
   font-size: 11px;
+}
+
+.fdry-hall-hud__tag {
+  padding: 4px 10px;
+  border-radius: 2px;
+  background: #72d8f2;
+  color: #06202a;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fdry-hall-hud__note {
+  padding: 4px 10px;
+  border: 1px solid #2c3340;
+  border-radius: 2px;
+  background: rgba(10, 12, 18, 0.86);
+  color: #98a2b1;
+  font-size: 11px;
+}
+
+.fdry-card__history {
+  margin: 6px 0 0;
+  color: #98a2b1;
+  font-style: italic;
+}
+
+/* Playback of a recorded run, on the hall's bottom edge. */
+.fdry-replay {
+  position: absolute;
+  z-index: var(--tm-layer-modal);
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid #2c3340;
+  border-radius: 3px;
+  background: rgba(10, 12, 18, 0.92);
+  font-size: 11px;
+}
+
+.fdry-replay .fdry-replay__track {
+  flex: 1;
+  min-width: 80px;
+  height: 14px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fdry-replay .fdry-replay__track::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid #2c3340;
+  border-radius: 1px;
+  background: #1d2530;
+}
+
+.fdry-replay .fdry-replay__track::-webkit-slider-thumb {
+  width: 10px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid #07090d;
+  border-radius: 1px;
+  background: #72d8f2;
+  appearance: none;
+}
+
+.fdry-replay .fdry-replay__track:focus-visible {
+  outline: 2px solid #72d8f2;
+  outline-offset: 2px;
+}
+
+.fdry-replay__time,
+.fdry-replay__at {
+  font-variant-numeric: tabular-nums;
+  color: #98a2b1;
+  white-space: nowrap;
+}
+
+.fdry-replay__speeds {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.fdry-replay__speeds .fdry-hall-btn[aria-pressed='true'] {
+  border-color: #72d8f2;
+  color: #72d8f2;
 }
 
 /* A station's detail, over the hall's right edge. */
