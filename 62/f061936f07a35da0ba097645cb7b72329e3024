@@ -1,0 +1,23 @@
+extensions/foundry/roles/architect.yaml
+  s_9126708f68ed92::t_d577267d2b9292 23,28-29,39
+CLAUDE.md
+  s_9126708f68ed92::t_d577267d2b9292 1,3
+extensions/foundry/src/forge/converge.ts
+  s_9126708f68ed92::t_d577267d2b9292 137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "62f061936f07a35da0ba097645cb7b72329e3024",
+  "prompts": {},
+  "sessions": {
+    "s_9126708f68ed92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ceef50e-cc85-4492-b436-bb8300c52b35",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
