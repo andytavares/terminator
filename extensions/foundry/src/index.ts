@@ -54,7 +54,6 @@ import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/di
 import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
-import { settledRungExitCode } from './runtime/transcript-tailer.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
 /** One hunk as a surface renders it: the change, and what was decided. */
@@ -824,25 +823,6 @@ function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): Int
   }
 }
 
-/** A node for one rung of the ladder. Not from the graph — the ladder is not in it. */
-function ladderNode(rung: string, name: string, lane: number): RunNode {
-  return {
-    id: `ladder-${rung}-${name.replace(/\W+/g, '-').toLowerCase()}`,
-    stepId: `ladder-${rung}`,
-    kind: 'run',
-    state: 'running',
-    unitIds: [],
-    lane,
-    role: null,
-    dependsOn: [],
-    attempts: 0,
-    sessionId: null,
-    worktreePath: null,
-    startedAt: null,
-    endedAt: null,
-  }
-}
-
 /**
  * Stop a run, and mean it.
  *
@@ -1313,63 +1293,25 @@ async function executeRun(
         evidence: [...gate.evidence],
       })
     },
-    // A rung runs as a step inside the supervised session, in the lane's own
-    // checkout — not as a hidden child process, which is what makes its output
-    // visible and its tool calls hook-gated.
+    // A rung is a command, not a conversation: its inputs fully determine what
+    // it does and its verdict is its exit status. So it runs in a terminal tab
+    // of its own in the lane's checkout — visible, like everything else here —
+    // with no agent in between to spend a turn on it or a transcript to read
+    // the answer back out of.
     runStep: async (step) => {
       if (step.command === null) return null
       const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
-      const started = await runNode({
-        node: ladderNode(step.rung, step.name, lane),
-        role: null,
-        // A rung is a command, not a conversation. It runs on whatever the
-        // operator chose, like any node with no role of its own, and answers
-        // to no role's tool list. No effort either: a shell command has no
-        // reasoning to size.
-        modelTier: 'deep',
-        effort: null,
-        mayUseTool: () => true,
-        prompt: `Run this exactly, and report its exit status. Do not fix what it reports.\n\n\`\`\`\n${step.command}\n\`\`\``,
-        // In the ladder's own conversation, not the lane's. Eight rungs would
-        // otherwise be eight fresh agents and eight terminals, each re-reading
-        // the repository to run one command — but resuming the *role's*
-        // conversation hands a bare command to whoever spoke last, and a rung
-        // told "do not fix what it reports" should not arrive carrying the
-        // builder's identity.
-        resumeSessionId: conversations.get(conversation(lane, null)),
-        readOnly: false,
+      const checkout = checkouts.get(lane)
+      const runner = supervisedRunner
+      // Nothing ran, so nothing was measured — never a pass.
+      if (checkout === undefined || runner === null) return null
+      return runner.runCommand({
+        worktreePath: checkout.path,
+        workspaceId,
+        branch: checkout.branch,
+        title: step.name,
+        command: step.command,
       })
-
-      // The rung's verdict is the command's exit status, never the agent's
-      // turn ending (FR-037) and never its account of how it went (FR-033).
-      // The turn end is only what tells us to go and look.
-      const run = supervision?.runs.get(started.sessionId) ?? null
-      if (run === null) return started.exitCode
-      // From this rung's own turn only. A lane is one conversation: read the
-      // whole transcript and the answer is whatever an earlier node ran. On a
-      // live run that was the architect's `npm test`, from before the change
-      // existed — the producing session's own result, standing in for the
-      // check (FR-033).
-      //
-      // Read with a short wait, because the turn ending and the transcript
-      // being written are not the same instant. The turn end arrives on the
-      // `Stop` hook; the records it is about are flushed by the runtime a
-      // moment later. Reading immediately raced them and lost: a live run
-      // whose rungs both ran and both exited 0 shipped saying "Not measured
-      // here: Lint, The unit's own tests" — and asked against the finished
-      // file, the same function answers 0 for both.
-      //
-      // Bounded, and it still reports `null` at the end of it. "We could not
-      // see it" is a real answer; waiting forever for one is not.
-      const measured = await settledRungExitCode(
-        run.transcriptPath,
-        step.command,
-        started.transcriptFrom ?? 0
-      )
-      // `null` is "the agent never ran it", which the ladder reads as not
-      // measured. Reading it as a pass is the failure the whole ladder exists
-      // to prevent.
-      return measured
     },
     observe: async () => ({
       // Fractional on purpose. Rounded, a run at 19:31 reported "20" and a

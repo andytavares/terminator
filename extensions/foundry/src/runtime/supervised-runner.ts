@@ -114,6 +114,16 @@ export interface PhaseCallbacks {
   onEnd?: (exitCode: number) => void
 }
 
+export interface RunCommandOptions {
+  worktreePath: string
+  workspaceId: string
+  /** The branch the worktree is on — names the project. */
+  branch: string
+  /** What the tab is called: the check being run. */
+  title: string
+  command: string
+}
+
 export interface SupervisedRunner {
   start(options: StartSupervisedRunOptions): Promise<SupervisedRun | null>
   /**
@@ -131,6 +141,15 @@ export interface SupervisedRunner {
     sessionId: string,
     options: { prompt: string; phase: StepLabel } & PhaseCallbacks
   ): SupervisedRun | null
+  /**
+   * Runs one shell command in its own terminal tab, and resolves with its exit
+   * status. No agent: a command's inputs fully decide what it does, and its
+   * verdict is the exit status, so a model in between adds cost and a
+   * transcript to read back, and nothing else.
+   *
+   * Null when no project or tab could be opened — "not measured", never a pass.
+   */
+  runCommand(options: RunCommandOptions): Promise<number | null>
   /** The card's open conversation, if it still has one. */ /**
    * Answers a tool call the operator was asked about.
    *
@@ -277,6 +296,33 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         parts.command,
         'TERMINATOR_LAUNCH',
         `exec ${parts.command}`,
+        '',
+      ].join('\n'),
+      { mode: 0o700 }
+    )
+    return file
+  }
+
+  /**
+   * A script that shows the command, then runs it and exits with its status.
+   *
+   * A file for the same reason the agent launch is one: a typed line past
+   * `MAX_CANON` is mangled. Run by the shell rather than `exec`ed, so a
+   * command with `&&` in it still works.
+   */
+  function writeCommandScript(id: string, command: string): string {
+    const dir = path.join(stateDir, 'launch')
+    fs.mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, `${id}.sh`)
+    fs.writeFileSync(
+      file,
+      [
+        '#!/bin/sh',
+        '# Written by Terminator. One per command; overwritten on every run.',
+        "cat <<'TERMINATOR_LAUNCH'",
+        command,
+        'TERMINATOR_LAUNCH',
+        command,
         '',
       ].join('\n'),
       { mode: 0o700 }
@@ -467,6 +513,35 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         transcriptPath: spec.transcriptPath,
         transcriptFrom,
       }
+    },
+
+    runCommand(options: RunCommandOptions): Promise<number | null> {
+      const project = api.workspace.createProject({
+        workspaceId: options.workspaceId,
+        name: options.branch,
+        worktreePath: options.worktreePath,
+        gitBranch: options.branch,
+      })
+      if (project === null) return Promise.resolve(null)
+
+      const terminalSessionId = api.pty.openTerminalTab({
+        projectId: project.id,
+        cwd: options.worktreePath,
+        tabTitle: options.title,
+        type: 'human',
+      })
+      if (terminalSessionId === null) return Promise.resolve(null)
+
+      return new Promise((resolve) => {
+        // The shell exits with the command's status, so the tab's own exit is
+        // the verdict. It stays open, exited, as the record of what ran.
+        api.pty.onExit?.(terminalSessionId, (exitCode: number) => resolve(exitCode))
+        const script = writeCommandScript(randomUUID(), options.command)
+        api.pty.write(
+          terminalSessionId,
+          `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(script)}; exit $?\r`
+        )
+      })
     },
 
     continueRun(sessionId, next): SupervisedRun | null {
