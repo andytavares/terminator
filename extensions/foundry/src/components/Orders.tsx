@@ -49,9 +49,15 @@ export interface OrdersProps {
    * a counter rather than a boolean: two requests in a row must focus twice.
    */
   readonly focusIdeaSignal?: number
+  /**
+   * Open this order on mount — how the Factory view hands an order still
+   * being shaped back to this surface, since that half of an order has no
+   * hall of its own to draw.
+   */
+  readonly openOrderId?: string | null
 }
 
-export function Orders({ repoRoot, focusIdeaSignal }: OrdersProps): JSX.Element {
+export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps): JSX.Element {
   const [rows, setRows] = useState<OrderRow[]>([])
   const [open, setOpen] = useState<string | null>(null)
   const [idea, setIdea] = useState('')
@@ -72,6 +78,10 @@ export function Orders({ repoRoot, focusIdeaSignal }: OrdersProps): JSX.Element 
     const r = (await invoke('foundry:order.list')) as { orders?: OrderRow[] }
     setRows(r.orders ?? [])
   }, [])
+
+  useEffect(() => {
+    if (openOrderId) setOpen(openOrderId)
+  }, [openOrderId])
 
   useEffect(() => {
     void refresh()

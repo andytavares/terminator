@@ -35,7 +35,7 @@ function fakeMap(): HallMap {
 }
 
 function fakeWorld(map: HallMap): World {
-  return { map, crew: [], crates: [], gatesWaiting: [], clockMs: 0 }
+  return { map, crew: [], crates: [], gatesWaiting: [], openCalls: [], clockMs: 0 }
 }
 
 function fakeContext2D(fillRectSpy: ReturnType<typeof vi.fn>) {
