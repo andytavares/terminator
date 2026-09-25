@@ -1,0 +1,39 @@
+extensions/foundry/src/factory/path.ts
+  s_10b76946c6f0cb::t_04460c093fcdd8 1-61
+extensions/foundry/tests/factory/path.spec.ts
+  s_10b76946c6f0cb::t_78042de2b21e02 1-58
+extensions/foundry/src/factory/layout.ts
+  s_10b76946c6f0cb::t_520375df86786b 160,165-167,207,309-311
+  s_10b76946c6f0cb::t_b088f726a157ed 241-243
+  s_10b76946c6f0cb::t_62dbadfdf840dd 87,103
+  s_10b76946c6f0cb::t_30d11b822efb69 260-261,275
+  s_10b76946c6f0cb::t_ed6ffce8123b8d 272-273
+  s_10b76946c6f0cb::t_07a7526ad83d5c 141-144,155
+  s_10b76946c6f0cb::t_4c16e843fd54b8 1-2,4-17,21,23-86,88-102,104-140,145-154,156-159,161-164,168-206,208-240,244-259,262-271,274,276-277,279-288,290-308,312-314,319-320,322-326,328-342
+  s_10b76946c6f0cb::t_4ad4d9452a83f8 18-20,22
+  s_10b76946c6f0cb::t_d3121a38a5133b 315-318,321,327
+  s_10b76946c6f0cb::t_6fce003ba7f9dd 3
+  s_10b76946c6f0cb::t_79ab6fbac34777 278,289
+extensions/foundry/tests/factory/layout.spec.ts
+  s_10b76946c6f0cb::t_f82b85c449620b 1-7,9-78,100-204,309-320
+  s_10b76946c6f0cb::t_b2f983e2fadd4f 8
+  s_10b76946c6f0cb::t_d05562260319e9 205-277,283-308
+  s_10b76946c6f0cb::t_0048a586282935 79-99
+  s_10b76946c6f0cb::t_28858fb9b03340 278-282
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "80d62639a793e6760f64bbf86d36e466990f2501",
+  "prompts": {},
+  "sessions": {
+    "s_10b76946c6f0cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e9e2f02b-997e-4bcc-a008-5d8ab6b5f241",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
