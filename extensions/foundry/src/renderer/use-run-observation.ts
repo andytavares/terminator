@@ -60,6 +60,17 @@ export interface FloorView {
   ci?: CiState | null
   /** Skills each node gets, keyed by node id. Absent nodes have none. */
   skills?: Record<string, string[]>
+  /**
+   * Where this order stands in the refinery's file-overlap queue.
+   *
+   * Null when it is not in a queue at all — nothing else agreed against the
+   * same repository and base touches the same files. Present and `behind:
+   * []` means it is first in line.
+   */
+  queue?: {
+    position: number
+    behind: { orderId: string; title: string; files: string[] }[]
+  } | null
 }
 
 /** A tool call an agent is holding at, waiting for an answer. */

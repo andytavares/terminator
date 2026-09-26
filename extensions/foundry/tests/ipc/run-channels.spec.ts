@@ -249,6 +249,49 @@ describe('foundry:run.observe', () => {
     const r = (await channels().observe({ id: 'WO-1' })) as { skills: Record<string, string[]> }
     expect(r.skills).toEqual({})
   })
+
+  it('carries no queue when nothing has wired the refinery', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as { queue: unknown }
+    expect(r.queue).toBeNull()
+  })
+
+  it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const withQueue = createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      queueEntries: async () => [
+        {
+          orderId: 'WO-1',
+          title: 'x',
+          repo: 'repo',
+          base: 'main',
+          agreedAt: '2026-09-02T00:00:00.000Z',
+          files: ['src/a'],
+          merged: false,
+        },
+        {
+          orderId: 'WO-earlier',
+          title: 'Earlier work',
+          repo: 'repo',
+          base: 'main',
+          agreedAt: '2026-09-01T00:00:00.000Z',
+          files: ['src/a'],
+          merged: false,
+        },
+      ],
+    })
+    const r = (await withQueue.observe({ id: 'WO-1' })) as {
+      queue: { position: number; behind: { orderId: string }[] } | null
+    }
+    expect(r.queue?.position).toBe(2)
+    expect(r.queue?.behind[0]?.orderId).toBe('WO-earlier')
+  })
 })
 
 describe('foundry:run.recipes', () => {

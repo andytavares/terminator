@@ -252,11 +252,82 @@ describe('foundry:order.compile', () => {
       error: 'No order WO-nope.',
     })
   })
+
+  it('carries no advisory when nothing has wired the refinery', async () => {
+    const order = await completeOrder()
+    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView & {
+      advisory: string | null
+    }
+    expect(r.advisory).toBeNull()
+  })
+
+  it('advises when the newly agreed order overlaps an in-flight one', async () => {
+    const order = await completeOrder()
+    const c = createForgeChannels({
+      store,
+      now: () => '2026-09-06T10:00:00.000Z',
+      queueEntries: async () => [
+        {
+          orderId: 'WO-earlier',
+          title: 'Earlier work',
+          repo: order.context.repos[0]?.name ?? '',
+          base: order.context.repos[0]?.baseBranch ?? 'main',
+          agreedAt: '2026-09-01T00:00:00.000Z',
+          files: ['src/a.ts'],
+          merged: false,
+        },
+      ],
+    })
+    const r = (await c.compile({ id: order.id, commit: true })) as OrderView & {
+      advisory: string | null
+    }
+    expect(r.advisory).toContain('WO-earlier')
+  })
 })
 
 describe('foundry:order.list', () => {
   it('lists nothing before any order is seeded', async () => {
     expect(await channels().list()).toEqual({ orders: [] })
+  })
+
+  it('carries no queue field when nothing has wired the refinery', async () => {
+    await channels().create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
+    const r = (await channels().list()) as { orders: { queue: unknown }[] }
+    expect(r.orders[0]?.queue).toBeNull()
+  })
+
+  it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
+    const seeded = (await channels().create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const c = createForgeChannels({
+      store,
+      now: () => '2026-09-06T10:00:00.000Z',
+      queueEntries: async () => [
+        {
+          orderId: seeded.order.id,
+          title: seeded.order.title,
+          repo: 'repo',
+          base: 'main',
+          agreedAt: '2026-09-02T00:00:00.000Z',
+          files: ['src/a.ts'],
+          merged: false,
+        },
+        {
+          orderId: 'WO-earlier',
+          title: 'Earlier work',
+          repo: 'repo',
+          base: 'main',
+          agreedAt: '2026-09-01T00:00:00.000Z',
+          files: ['src/a.ts'],
+          merged: false,
+        },
+      ],
+    })
+    const r = (await c.list()) as { orders: { id: string; queue: { position: number } | null }[] }
+    const row = r.orders.find((o) => o.id === seeded.order.id)
+    expect(row?.queue?.position).toBe(2)
   })
 
   it('lists each order with where its checks stand', async () => {

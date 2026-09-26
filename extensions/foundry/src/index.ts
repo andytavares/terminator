@@ -21,6 +21,7 @@ import { availableNames, availableSensors, resolveRule } from './recipe/resolve.
 import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore, createGateStore } from './gates/store.js'
+import { raiseGate } from './gates/rules.js'
 import { orphanedNodes } from './line/reclaim.js'
 import type { StandingSources } from './order/standing.js'
 import { countAttention } from './gates/attention.js'
@@ -35,8 +36,14 @@ import { writeCiState } from './line/ci-state.js'
 import type { CiState } from './line/ci-state.js'
 import { rework } from './line/scheduler.js'
 import { resolveRecipe } from './recipe/resolve.js'
-import { ensureCheckout, ensureCheckouts } from './line/worktree.js'
+import { ensureCheckout, ensureCheckouts, branchFor, checkoutPath } from './line/worktree.js'
 import type { Checkout } from './line/worktree.js'
+import { queueEntries } from './line/refinery-entries.js'
+import { readRefineryState, writeRefineryState } from './line/refinery-state.js'
+import { refineryTick } from './line/refinery-tick.js'
+import type { RefineryTickDeps } from './line/refinery-tick.js'
+import type { QueueEntry } from './line/refinery.js'
+import { restack } from './line/restack.js'
 import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
 import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
@@ -438,6 +445,12 @@ let paletteTimer: NodeJS.Timeout | null = null
  * `dueSensors` filters on that before anything is collected.
  */
 let sensorTimer: NodeJS.Timeout | null = null
+/**
+ * The refinery tick: once a minute, watch merged predecessors and restack
+ * whatever queued behind them (R4). Nothing runs when nothing has shipped a
+ * pull yet — `computeQueueEntries`'s candidates are empty.
+ */
+let refineryTimer: NodeJS.Timeout | null = null
 // Auto-expires so a late manual visit to the Forge doesn't surprise the
 // operator with an intake that opened itself for no reason they can see.
 let pendingNewOrder = false
@@ -937,6 +950,46 @@ function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): Int
 }
 
 /**
+ * Every in-flight order's queue entries, for the refinery's file-overlap
+ * queue: the observe/list channels' `queue` field, and the advisory shown on
+ * agreement.
+ *
+ * `merged` is read up front into a plain set, because `queueEntries` asks for
+ * it synchronously — every candidate order's `refinery.json` is small and
+ * this runs at most once per channel call, never per tick.
+ */
+async function computeQueueEntries(api: ExtensionAPI, root: string): Promise<QueueEntry[]> {
+  const orders = await createOrderStore(root).list()
+  const inFlight = orders.filter((o) => o.status === 'running' || o.status === 'shipped')
+  const merged = new Set<string>()
+  for (const order of inFlight) {
+    const state = await readRefineryState(root, order.id)
+    if (state.mergedAt !== null) merged.add(order.id)
+  }
+
+  const diffCommand: RunCommand = async (command, args, cwd) => {
+    if (command !== 'git' && command !== 'gh') return { ok: false, stdout: '' }
+    const result = await api.shell.exec({ command, args, cwd })
+    return { ok: result.exitCode === 0, stdout: result.stdout }
+  }
+
+  return queueEntries(orders, {
+    readPulls: (orderId) => readPulls(root, orderId),
+    changedFiles: async (order) => {
+      const files: string[] = []
+      for (const repo of order.context.repos) {
+        const path = checkoutPath(root, order, repo.name)
+        if (!fs.existsSync(path)) continue
+        files.push(...(await readChangedFiles(path, repo.baseBranch, diffCommand)))
+      }
+      return files
+    },
+    merged: (orderId) => merged.has(orderId),
+    agreedAt: (order) => order.agreedAt ?? '',
+  })
+}
+
+/**
  * The parts of a CI round that never change between the run that opened the
  * draft and a later "another round" answered from the inbox: how a pull's
  * checks are watched, how a failure's log is read, and where the round's own
@@ -1017,6 +1070,142 @@ function ciSendBackFor(
     await pushLanes(order, integrateDeps)
     return true
   }
+}
+
+/**
+ * One CI watch for an order whose lanes the refinery just rebased.
+ *
+ * The same shape as the `ci.red` gate's "another round" — `ciRounds` against
+ * the drafts that already exist, then `finishShipping` so the order gets its
+ * ready gate again, or `ci.red` if the rebase broke something. The recipe's
+ * own round count, not the fixed `1` the inbox path uses: this is a full
+ * re-check of a change nothing has looked at since it moved, not one more
+ * attempt at a failure the operator already saw.
+ */
+async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string): Promise<void> {
+  const order = await createOrderStore(root).load(orderId)
+  if (order === null || order.recipe === null) return
+  const resolved = resolveRecipe(order.recipe, resolveSources(api, root))
+  if (!resolved.ok) return
+  const recipe = resolved.resolved.value
+  const graph = await readRunGraph(root, orderId)
+  if (graph === null) return
+  const pulls = await readPulls(root, orderId)
+  if (pulls.length === 0) return
+
+  const { deps: executorDeps, exec } = await buildExecutorDeps(api, root, order, recipe, graph)
+  const integrateDeps = integrateDepsFor(api, root, orderId)
+  const graphRef = { current: graph }
+  const outcome = await ciRounds({
+    pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+    rounds: recipe.ci?.rounds ?? null,
+    ...ciRoundDepsFor(root, orderId, exec),
+    sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
+  })
+  const gates = createLiveGateStore(() => root)
+  await finishShipping(
+    order,
+    { verdicts: [], findings: [] },
+    pulls,
+    pulls.map((p) => p.bodyPath),
+    outcome,
+    {
+      ...integrateDeps,
+      raiseGate: async (g) => {
+        await gates.save(g)
+      },
+    }
+  )
+}
+
+/**
+ * The refinery's own gate: an overlapping order's lanes no longer rebase
+ * cleanly onto their base after a predecessor merged. Never resolved
+ * automatically — `restack` already refused to guess, and this just says so
+ * where the operator will see it.
+ */
+async function raiseRefineryConflict(
+  root: string,
+  orderId: string,
+  why: string,
+  files: readonly string[]
+): Promise<void> {
+  const gate = raiseGate({
+    id: `${orderId}-refinery-conflict`,
+    rule: 'refinery.conflict',
+    orderId,
+    summary: `${orderId} no longer rebases cleanly`,
+    why,
+    evidence: files.map((file) => ({ kind: 'diff' as const, path: file })),
+    at: new Date().toISOString(),
+  })
+  await createLiveGateStore(() => root).save(gate)
+}
+
+/**
+ * One pass of the refinery: watch for merges, restack what queued behind,
+ * recheck it. Built fresh on every tick so it always reads the workspace's
+ * current data root, the same reason every other tick function does.
+ */
+async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
+  const store = createOrderStore(root)
+
+  const deps: RefineryTickDeps = {
+    candidates: async () => {
+      const orders = await store.list()
+      const inFlight = orders.filter((o) => o.status === 'running' || o.status === 'shipped')
+      return Promise.all(
+        inFlight.map(async (order) => ({
+          order: { id: order.id, title: order.title },
+          pulls: (await readPulls(root, order.id)).map((pull) => ({ url: pull.url })),
+        }))
+      )
+    },
+    readState: (orderId) => readRefineryState(root, orderId),
+    writeState: (orderId, state) => writeRefineryState(root, orderId, state),
+    viewPr: async (url) => {
+      const result = await api.shell.exec({
+        command: 'gh',
+        args: ['pr', 'view', url, '--json', 'state,mergedAt,baseRefName'],
+        cwd: root,
+        timeoutMs: 30_000,
+      })
+      if (result.exitCode !== 0) return { merged: false }
+      try {
+        const parsed = JSON.parse(result.stdout) as { state?: unknown }
+        return { merged: parsed.state === 'MERGED' }
+      } catch {
+        return { merged: false }
+      }
+    },
+    entries: () => computeQueueEntries(api, root),
+    lanesFor: async (orderId) => {
+      const order = await store.load(orderId)
+      if (order === null) return []
+      return order.context.repos.map((repo) => ({
+        cwd: checkoutPath(root, order, repo.name),
+        branch: branchFor(order, repo.lane),
+        base: repo.baseBranch,
+      }))
+    },
+    restack: (lane) => restack(lane, (options) => api.shell.exec(options)),
+    watchCi: (orderId) => watchRestackedCi(api, root, orderId),
+    raiseConflict: (orderId, why, files) => raiseRefineryConflict(root, orderId, why, files),
+    record: (orderId, action, subject, reason) =>
+      store.record({
+        at: new Date().toISOString(),
+        orderId,
+        actor: 'rule:refinery',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      }),
+    titleOf: async (orderId) => (await store.load(orderId))?.title ?? orderId,
+    now: () => new Date().toISOString(),
+  }
+
+  await refineryTick(deps)
 }
 
 /**
@@ -1989,6 +2178,10 @@ export function activate(api: ExtensionAPI): void {
   sensorTimer = setInterval(() => {
     void tickSensors(api, dataRoot(), signalStore)
   }, 60_000)
+  // R4: watch for merges, restack what queued behind, recheck it.
+  refineryTimer = setInterval(() => {
+    void runRefineryTick(api, dataRoot())
+  }, 60_000)
   // Where every surface's answer to "what is this order doing" comes from.
   //
   // Assembled once and handed to both the order list and the Floor, because
@@ -2134,6 +2327,7 @@ export function activate(api: ExtensionAPI): void {
         branchName: (issue as { branchName?: string | null }).branchName ?? null,
       }
     },
+    queueEntries: () => computeQueueEntries(api, dataRoot()),
   })
   // Your tickets, so a ticket can be picked rather than typed from memory.
   //
@@ -2275,6 +2469,7 @@ export function activate(api: ExtensionAPI): void {
       const run = supervision?.runs.get(sessionId)
       return run ? readTranscript(run.transcriptPath) : []
     },
+    queueEntries: () => computeQueueEntries(api, dataRoot()),
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))
@@ -3122,6 +3317,8 @@ export function deactivate(): void {
   paletteTimer = null
   if (sensorTimer !== null) clearInterval(sensorTimer)
   sensorTimer = null
+  if (refineryTimer !== null) clearInterval(refineryTimer)
+  refineryTimer = null
   for (const registration of paletteRegistrations) registration.dispose()
   paletteRegistrations = []
   paletteSignature = ''

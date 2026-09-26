@@ -151,9 +151,11 @@ Run the six checks and, when they all pass, move the order to `agreed`. Idempote
 
 **Payload**: `{ id: string; commit: boolean }`
 
-**Response**: `{ compile: CompileResult; order: WorkOrder }`
+**Response**: `{ compile: CompileResult; order: WorkOrder; advisory?: string | null }`
 
 When `commit` is true and `compile.ok` is false the order is unchanged and `failures` names the specific offending criterion or unit (FR-011).
+
+**The refinery's advisory (R4).** When `commit` agrees the order, `advisory` says what it is about to queue behind, if anything — computed against every other `running`/`shipped` order's queue entries, using the plan's own `touches` as this order's files (there is no checkout yet). `null` when nothing overlaps, or when the host has not wired the refinery. See "The refinery" below.
 
 ---
 
@@ -212,6 +214,21 @@ An agent's terminal is a child of the application process, so quitting kills eve
 **CI on the drafts (ADR-064).** `run.observe` carries `ci: CiState | null` — `{ round, max, status: 'watching' | 'green' | 'red' | 'not_measured' | 'reworking', pulls: { url, checks: { name, bucket, link, workflow }[] }[], reason, at }`, read from the order's `ci.json`; `null` until a draft opens on a recipe that declares `ci`. Each `order.list` row carries `ci: { status, round, max } | null` from the same file. A run graph node carries `reworks: number` and `feedback: Feedback[]` (ADR-063), defaulted when an older graph is read.
 
 **Skills each node gets.** `run.observe` also carries `skills: Record<nodeId, string[]>`, computed with `skillsFor` from the order's own recipe and role registry — the same resolution `run.start` refuses on if a name is unknown. A node with no skills is absent from the map. An order whose recipe no longer resolves (removed from disk after the run began) reports `{}` rather than throwing.
+
+## The refinery (R4)
+
+Parallel orders agreed against the same repository and base can each be correct on their own and still collide on disk if they touch the same files. The refinery watches for a predecessor's pull merging and restacks whatever queued behind it, so that collision surfaces as a rebase during the run rather than a merge conflict the operator finds later.
+
+**`run.observe` carries `queue: { position: number; behind: { orderId; title; files }[] } | null`** — this order's place in the file-overlap queue, from `queue(entries)` over every `running`/`shipped` order's queue entries. `null` when it is not in a queue at all (nothing overlapping is in flight) or the host has not wired the refinery. `behind` lists only the earlier orders it actually shares files with, and which files.
+
+**Each `order.list` row carries the same `queue` field**, computed once per call over the whole list.
+
+**The ledger.** A 60-second tick (cleared on deactivate, like the sensor and palette ticks) watches every shipped/running order's open pulls via `gh pr view --json state,mergedAt,baseRefName`. Actions recorded, actor `rule:refinery`:
+
+- `refinery.merged` — a predecessor's pulls all merged; `refinery.json`'s `mergedAt` is written once.
+- `refinery.rebased` — an overlapping later order's lanes were rebased onto their base after the merge; `restackedFor` gains the predecessor's id, and one CI watch runs against its existing drafts.
+- `refinery.conflict` — the rebase failed with conflicts; the `refinery.conflict` gate is raised (`take_over`/`hold`) and the order is left exactly as `restack` found it — no auto-resolution, no retry.
+- `refinery.failed` — a transient failure (fetch/push); nothing is marked restacked, so the next tick retries.
 
 ---
 

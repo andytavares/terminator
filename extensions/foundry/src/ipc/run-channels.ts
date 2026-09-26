@@ -19,6 +19,8 @@ import { runFailure } from '../line/run-outcome.js'
 import { skillsFor } from '../line/executor.js'
 import { createRoleRegistry } from '../line/roles.js'
 import { readCiState } from '../line/ci-state.js'
+import { queue } from '../line/refinery.js'
+import type { QueueEntry, QueuePosition } from '../line/refinery.js'
 import type { Gate } from '../gates/rules.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import { recordGraph, readTimeline } from '../factory/timeline-store.js'
@@ -129,6 +131,12 @@ export interface RunDeps {
    * picture of a run that just started.
    */
   readonly activityFor?: (sessionId: string) => readonly ToolActivity[]
+  /**
+   * Every in-flight order's queue entries, for the refinery's file-overlap
+   * queue. Absent means no queue to ask, which reads as "not queued" — a host
+   * that has never wired the refinery has nothing to say either way.
+   */
+  readonly queueEntries?: () => Promise<readonly QueueEntry[]>
 }
 
 export interface RunChannels {
@@ -144,6 +152,21 @@ export interface RunChannels {
   activity(payload: unknown): Promise<unknown>
   /** Everything recorded about a run, for the Factory view to play back. */
   timeline(payload: unknown): Promise<unknown>
+}
+
+/**
+ * Where one order stands in the refinery's file-overlap queue.
+ *
+ * Null when there is no queue to ask, or the order is not in one — both read
+ * the same to a surface that only wants to know whether to draw a queue band.
+ */
+async function queuePositionFor(
+  deps: Pick<RunDeps, 'queueEntries'>,
+  orderId: string
+): Promise<QueuePosition | null> {
+  if (deps.queueEntries === undefined) return null
+  const entries = await deps.queueEntries()
+  return queue(entries).find((position) => position.orderId === orderId) ?? null
 }
 
 function graphPath(dataRoot: string, orderId: string): string {
@@ -569,6 +592,10 @@ export function createRunChannels(deps: RunDeps): RunChannels {
               // so the reason the operator reads is the reason the rule gave.
               hold: mayMergeLane(order, view.lane.ord, []).reason,
             })),
+      // Where this order stands in the refinery's file-overlap queue. Null
+      // when it is not in one — nothing else agreed against the same repo and
+      // base touches the same files.
+      queue: await queuePositionFor(deps, parsed.data.id),
     }
   }
 
