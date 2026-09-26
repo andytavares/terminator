@@ -1,0 +1,23 @@
+README.md
+  s_4f15472be339a2::t_772667263adca1 22
+docs/ARCHITECTURE.md
+  s_4f15472be339a2::t_7693ce1fa5b94c 1264-1282,1360
+docs/adr/066-sensors-propose-never-start.md
+  s_4f15472be339a2::t_65befa70eb0066 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aa76b7c468d8f3204d2a77ecd3c69729fa146f2d",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
