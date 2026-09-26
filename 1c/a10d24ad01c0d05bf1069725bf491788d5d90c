@@ -1,0 +1,25 @@
+docs/adr/063-a-failed-check-sends-the-work-back.md
+  s_4f15472be339a2::t_20c8d2ccc4752c 1-73
+README.md
+  s_4f15472be339a2::t_ace90592240a9a 22
+docs/ARCHITECTURE.md
+  s_4f15472be339a2::t_898c3b138d47db 1040-1053,1305
+specs/037-foundry-software-factory/contracts/recipe-role-rule.md
+  s_4f15472be339a2::t_fbee9d4f691347 83-88,91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1ca10d24ad01c0d05bf1069725bf491788d5d90c",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
