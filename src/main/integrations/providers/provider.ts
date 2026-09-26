@@ -37,12 +37,13 @@ export interface VerifiedAccount extends TrackerAccount {
  *    'rate-limited' carrying the tracker's own period. The facade waits it
  *    out; a provider never sleeps on its own.
  * 5. **No caching, no state.** Providers are functions over a credential.
- * 6. **No mutation beyond `comment` and `transition`.** A comment, and the
- *    issue's position in its own workflow. There is deliberately no way here
- *    to change an issue's assignee, title, labels, estimate or any other
- *    field, to create one or to delete one, and no implementation may add one
- *    — see provider.spec.ts, which tests the shape of this surface rather
- *    than trusting it.
+ * 6. **No mutation beyond `comment`, `transition` and `create`.** A comment,
+ *    the issue's position in its own workflow, and a new issue the operator
+ *    asked for (ADR-061). There is deliberately no way here to change an
+ *    existing issue's assignee, title, labels, estimate or any other field,
+ *    or to delete one, and no implementation may add one — see
+ *    provider.spec.ts, which tests the shape of this surface rather than
+ *    trusting it.
  * 7. **Absent means null.** A field the tracker does not have is null or
  *    empty, never synthesised.
  */
@@ -95,6 +96,15 @@ export interface TrackerProvider {
     intent: TransitionIntent,
     optionId?: string
   ): Promise<void>
+
+  /** The teams the credential's own user belongs to — where an issue can be filed. */
+  teams?(cred: StoredCredential): Promise<TrackerTeam[]>
+
+  /**
+   * File a new issue and return it as `get` would. Optional, like the
+   * workflow pair: callers ask `IssueService.supportsCreate` first.
+   */
+  create?(cred: StoredCredential, input: NewIssueInput): Promise<Issue>
 }
 
 /**
@@ -114,16 +124,18 @@ export const PROVIDER_OPERATIONS = [
   'comment',
   'states',
   'transition',
+  'teams',
+  'create',
 ] as const
 
 /**
  * The operations permitted to write to a tracker.
  *
- * Two, and the second is narrow by construction: `transition` moves an issue
- * along its own workflow and can do nothing else. It cannot set a field, and
- * an intent it cannot satisfy is refused rather than approximated.
+ * Three. `transition` is narrow by construction: it moves an issue along its
+ * own workflow and can do nothing else. `create` files a new issue the
+ * operator asked for (ADR-061); neither can set a field of an existing one.
  */
-export const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition'] as const
+export const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition', 'create'] as const
 
 /**
  * The optional half of the surface.
@@ -131,7 +143,7 @@ export const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition'] as const
  * A provider is complete without these; `PROVIDER_OPERATIONS` is what a
  * provider *may* expose, not what it must.
  */
-export const PROVIDER_OPTIONAL_OPERATIONS = ['states', 'transition'] as const
+export const PROVIDER_OPTIONAL_OPERATIONS = ['states', 'transition', 'teams', 'create'] as const
 
 /**
  * The workflow positions an issue can be asked to move to.
@@ -155,4 +167,19 @@ export interface TrackerStateOption {
   readonly intent: TransitionIntent | null
   /** False when the tracker will not accept it from the issue's current status. */
   readonly available: boolean
+}
+
+/** A team an issue can be filed in. */
+export interface TrackerTeam {
+  readonly id: string
+  /** The prefix of the team's issue keys, e.g. `TAV`. */
+  readonly key: string
+  readonly name: string
+}
+
+/** What `create` files. The description is markdown. */
+export interface NewIssueInput {
+  readonly teamId: string
+  readonly title: string
+  readonly description: string
 }

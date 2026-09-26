@@ -11,6 +11,9 @@ const service = vi.hoisted(() => ({
   states: vi.fn(),
   transition: vi.fn(),
   supportsTransitions: vi.fn(),
+  teams: vi.fn(),
+  create: vi.fn(),
+  supportsCreate: vi.fn(),
 }))
 const store = vi.hoisted(() => ({
   listConnections: vi.fn(),
@@ -136,6 +139,39 @@ describe('api.issues — workflow moves (v2.3.0)', () => {
   })
 })
 
+describe('api.issues — creating an issue (v2.4.0)', () => {
+  it('lists the teams an issue could be filed in', async () => {
+    service.teams.mockResolvedValue([{ id: 't1', key: 'TAV', name: 'Team' }])
+    const api = await makeApi()
+    await expect(api.issues.teams('linear')).resolves.toEqual([
+      { id: 't1', key: 'TAV', name: 'Team' },
+    ])
+  })
+
+  it('carries the title, description and team through unchanged', async () => {
+    service.create.mockResolvedValue({ key: 'TAV-7' })
+    const api = await makeApi()
+    const input = { teamId: 't1', title: 'Only open tickets', description: 'body' }
+    await expect(api.issues.create('linear', input)).resolves.toEqual({ key: 'TAV-7' })
+    expect(service.create).toHaveBeenCalledWith('linear', input)
+  })
+
+  it('rejects a refused create rather than swallowing it', async () => {
+    service.create.mockRejectedValue(new Error('Linear refused'))
+    const api = await makeApi()
+    await expect(
+      api.issues.create('linear', { teamId: 't1', title: 'x', description: '' })
+    ).rejects.toThrow('Linear refused')
+  })
+
+  it('answers whether a tracker can create at all, without calling one', async () => {
+    service.supportsCreate.mockReturnValue(false)
+    const api = await makeApi()
+    expect(api.issues.supportsCreate('jira')).toBe(false)
+    expect(service.create).not.toHaveBeenCalled()
+  })
+})
+
 describe('api.issues — the surface itself (FR-034)', () => {
   it('exposes exactly the sanctioned operations', async () => {
     const api = await makeApi()
@@ -143,23 +179,26 @@ describe('api.issues — the surface itself (FR-034)', () => {
       [
         'comment',
         'connections',
+        'create',
         'get',
         'linkFor',
         'listMine',
         'onLinkChange',
         'search',
         'states',
+        'supportsCreate',
         'supportsTransitions',
+        'teams',
         'transition',
       ].sort()
     )
   })
 
-  it('offers no way to create or delete an issue, or to set any field of one', async () => {
+  it('offers no way to delete an issue, or to set any field of one', async () => {
     const api = await makeApi()
-    // `transition` is the one sanctioned exception, and it is not a field
-    // write: it takes an intent, and refuses one the tracker cannot satisfy.
-    const forbidden = /^(create|update|set(?!ting)|assign|close|move|delete|archive|label)/i
+    // `transition` and `create` are the sanctioned exceptions, and neither is
+    // a field write: one takes an intent, the other makes a new issue.
+    const forbidden = /^(update|set(?!ting)|assign|close|move|delete|archive|label)/i
     for (const method of Object.keys(api.issues)) {
       expect(forbidden.test(method), `api.issues.${method} looks like a field write`).toBe(false)
     }

@@ -10,8 +10,10 @@ import type {
 } from '../../../shared/types/index.js'
 import { TrackerError, toErrorMessage } from '../tracker-error.js'
 import type {
+  NewIssueInput,
   StoredCredential,
   TrackerProvider,
+  TrackerTeam,
   TrackerStateOption,
   TransitionIntent,
   VerifiedAccount,
@@ -28,12 +30,18 @@ import type {
 const MAX_COMMENTS = 5
 
 interface LinearLike {
-  viewer: Promise<{ name: string; email: string; assignedIssues?: (vars?: unknown) => unknown }>
+  viewer: Promise<{
+    name: string
+    email: string
+    assignedIssues?: (vars?: unknown) => unknown
+    teams?: (vars?: unknown) => unknown
+  }>
   issues(vars?: unknown): unknown
   searchIssues(vars?: unknown): unknown
   issue(id: string): unknown
   createComment(input: { issueId: string; body: string }): unknown
   updateIssue(id: string, input: { stateId: string }): unknown
+  createIssue(input: NewIssueInput): unknown
 }
 
 export type LinearClientFactory = (apiKey: string) => LinearLike
@@ -388,6 +396,44 @@ export function createLinearProvider(
         if (result?.success !== true) {
           throw new TrackerError('failed', `Linear refused the move of ${key} to ${chosen.name}`)
         }
+      })
+    },
+
+    async teams(cred): Promise<TrackerTeam[]> {
+      const client = clientFor(cred)
+      return run(async () => {
+        const viewer = await client.viewer
+        const connection = (await viewer.teams?.()) as { nodes?: unknown[] } | null | undefined
+        return (connection?.nodes ?? []).flatMap((node) => {
+          const raw = node as { id?: unknown; key?: unknown; name?: unknown }
+          if (typeof raw.id !== 'string') return []
+          return [
+            {
+              id: raw.id,
+              key: typeof raw.key === 'string' ? raw.key : '',
+              name: typeof raw.name === 'string' ? raw.name : raw.id,
+            },
+          ]
+        })
+      })
+    },
+
+    async create(cred, input): Promise<Issue> {
+      const client = clientFor(cred)
+      return run(async () => {
+        const payload = (await client.createIssue({
+          teamId: input.teamId,
+          title: input.title,
+          description: input.description,
+        })) as { success?: boolean; issue?: unknown } | null
+        if (payload?.success !== true) {
+          throw new TrackerError('failed', `Linear refused to create "${input.title}"`)
+        }
+        const raw = (await Promise.resolve(payload.issue)) as RawIssue | null | undefined
+        if (raw === null || raw === undefined) {
+          throw new TrackerError('failed', `Linear created "${input.title}" but returned no issue`)
+        }
+        return toIssue(raw)
       })
     },
   }
