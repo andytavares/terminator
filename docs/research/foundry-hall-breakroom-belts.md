@@ -165,7 +165,7 @@ export interface HallMap {
 }
 ```
 
-`PropKind` loses `couch`, `coffee` and `booth`, and gains `partition`, `bench`, `sofa`, `table`, `lowtable`, `fridge`, `coffeebar` and `vending`. `plant` stays and becomes solid. The union change reaches the exhaustive `drawProp` switch, which is ADR 060's own rule.
+`PropKind` loses `couch`, `coffee` and `booth`, and gains `partition`, `restbench` (named apart from the judge station's `bench`), `sofa`, `table`, `lowtable`, `fridge`, `coffeebar` and `vending`. `plant` stays and becomes solid. The union change reaches the exhaustive `drawProp` switch, which is ADR 060's own rule.
 
 ### Breakroom layout (`layout.ts`)
 
@@ -227,7 +227,7 @@ export interface HallMap {
 Each test is written failing first. Specs live in `extensions/foundry/tests/factory/`.
 
 - `layout.spec.ts`. The fixtures are every recipe in `extensions/foundry/recipes/` crossed with lanes `[1]`, `[1,2]`, `[1,2,3]` and `[1..5]`.
-  - Every rest seat lies on a `bench` or `sofa` prop, and no seat is on a `plant` or on solid decor.
+  - Every rest seat lies on a `restbench` or `sofa` prop, and no seat is on a `plant` or on solid decor.
   - `restSeats.length ≥ crewed + 2`.
   - The breakroom is closed except for its door tiles.
   - No tile that is walkable in `walk` is a belt tile, unless it is in `crossovers`.
