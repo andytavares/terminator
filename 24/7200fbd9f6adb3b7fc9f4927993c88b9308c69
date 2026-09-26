@@ -1,0 +1,29 @@
+extensions/foundry/src/factory/layout.ts
+  s_0f24e553b5329a::t_e69530ceb6e05d 437
+  s_0f24e553b5329a::t_0e6fb37375268c 619
+  s_0f24e553b5329a::t_b85320cdc90bfb 540-545,548-554,557
+  s_0f24e553b5329a::t_58ed994664ffed 578,615-618,620-642
+  s_0f24e553b5329a::t_66f8ca346befd7 643
+docs/adr/060-a-factory-is-a-projection.md
+  s_0f24e553b5329a::t_ebfa9500a5cad6 49-52
+extensions/foundry/tests/factory/layout.spec.ts
+  s_0f24e553b5329a::t_d1191f73eac66d 301-319
+extensions/foundry/tests/factory/fixtures/hall-golden.json
+  s_0f24e553b5329a::t_538f946232c8e2 219,1291-1294,1558,1574,1576-1577,1581,1585,2495-2502,2718-2721,2928,3810-3813,4045,4061,4063-4064,4068
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "247200fbd9f6adb3b7fc9f4927993c88b9308c69",
+  "prompts": {},
+  "sessions": {
+    "s_0f24e553b5329a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af7e2c3-2eb0-4869-9f43-9efc8b9b4bad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
