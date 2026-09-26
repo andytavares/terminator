@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ScrollText, Sparkles, Check, X, Trash2 } from 'lucide-react'
 import type { LedgerEntry } from '../ledger/append.js'
 import type { Proposal } from '../ledger/curator.js'
+import { MarkdownInline } from './Markdown.js'
 
 // The record: every decision, by whom or by what rule, and why.
 //
@@ -193,7 +194,8 @@ export function Ledger(): JSX.Element {
                 <ul className="fdry-citations">
                   {proposal.citations.map((citation) => (
                     <li key={citation.ref}>
-                      <code>{citation.subject}</code> {citation.at.slice(0, 10)} — {citation.reason}
+                      <code>{citation.subject}</code> {citation.at.slice(0, 10)} —{' '}
+                      <MarkdownInline text={citation.reason} />
                     </li>
                   ))}
                 </ul>
@@ -239,7 +241,7 @@ export function Ledger(): JSX.Element {
             <ul className="fdry-citations">
               {rules?.declined?.map((entry) => (
                 <li key={entry.id}>
-                  <code>{entry.id}</code> — {entry.reason}
+                  <code>{entry.id}</code> — <MarkdownInline text={entry.reason} />
                 </li>
               ))}
             </ul>
@@ -275,7 +277,9 @@ export function Ledger(): JSX.Element {
                     <code>{entry.action}</code>
                   </td>
                   <td>{entry.subject}</td>
-                  <td>{entry.reason}</td>
+                  <td>
+                    <MarkdownInline text={entry.reason} />
+                  </td>
                 </tr>
               ))}
             </tbody>

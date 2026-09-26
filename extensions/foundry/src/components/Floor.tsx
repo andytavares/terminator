@@ -17,6 +17,7 @@ import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
 import { HunkLines } from './HunkLines.js'
+import { Markdown, MarkdownInline } from './Markdown.js'
 import {
   useRunObservation,
   type FloorView,
@@ -792,7 +793,13 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                   <small>
                     <code>{ask.toolName}</code>
                   </small>
-                  {ask.detail !== null ? <pre className="fdry-ask-detail">{ask.detail}</pre> : null}
+                  {/* An agent's question is prose; any other tool's input is
+                      literal, and rendering it would eat a command's `*`s. */}
+                  {ask.detail === null ? null : ask.toolName === 'AskUserQuestion' ? (
+                    <Markdown text={ask.detail} />
+                  ) : (
+                    <pre className="fdry-ask-detail">{ask.detail}</pre>
+                  )}
                 </div>
                 <div className="fdry-ask-actions">
                   <button
@@ -1082,7 +1089,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           {feed.map((entry) => (
             <div key={entry.id} className="fdry-feed-row">
               <span className="fdry-feed-author">{entry.author}</span>
-              <span className="fdry-feed-summary">{entry.summary}</span>
+              <span className="fdry-feed-summary">
+                <MarkdownInline text={entry.summary} />
+              </span>
               <button
                 type="button"
                 aria-label={`Dismiss ${entry.id}`}

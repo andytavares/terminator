@@ -10,7 +10,8 @@ import { registerGitHandlers } from './ipc/git.ipc.js'
 import { registerIntegrationsHandlers } from './ipc/integrations.ipc.js'
 import { migrateLegacyCredentials } from './integrations/tracker-store.js'
 import { loadLinks, registerLinkGarbageCollection } from './integrations/issue-link-store.js'
-import { loadRecords, sweepOpenRecords } from './sessions/session-record-store.js'
+import { loadRecords, markClosed, sweepOpenRecords } from './sessions/session-record-store.js'
+import { closeSessionsOfDeletedProjects } from './terminal/project-sessions.js'
 import { installCaptureScript, installUserHook } from './agents/agent-session-hook.js'
 import { startAgentSessionWatcher } from './agents/agent-session-watcher.js'
 import { makeSnapshotFor } from './sessions/session-snapshot.js'
@@ -405,6 +406,7 @@ app.whenReady().then(async () => {
   // path (the sidebar draws a badge per project) and none can await a file.
   void loadLinks()
   registerLinkGarbageCollection()
+  closeSessionsOfDeletedProjects({ pty: ptyManager, markClosed })
   // Nothing can be open at startup: sessions die with the app, so whatever the
   // last run left open is closed at its last update before anyone reads it.
   void loadRecords()

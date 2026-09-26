@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Workspace, Project } from '../../shared/types/index'
+import { useSessionStore } from './session.store'
 
 interface WorkspaceState {
   workspaces: Workspace[]
@@ -299,6 +300,7 @@ if (typeof window !== 'undefined' && window.electronAPI?.project?.onAdded) {
 
 if (typeof window !== 'undefined' && window.electronAPI?.project?.onRemoved) {
   window.electronAPI.project.onRemoved((id) => {
+    useSessionStore.getState().dropProjectSessions(id)
     useWorkspaceStore.setState((s) => {
       const map = new Map(s.projectsByWorkspaceId)
       for (const [wsId, projects] of map) {

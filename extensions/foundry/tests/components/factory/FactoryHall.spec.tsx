@@ -276,6 +276,33 @@ describe('FactoryHall', () => {
     )
   })
 
+  it("renders an agent's question on its card as markdown, and a command literally", async () => {
+    mount({
+      pending: [
+        {
+          requestId: 'r-1',
+          sessionId: 's-1',
+          toolName: 'AskUserQuestion',
+          summary: 'Hide **done** tickets?',
+          detail: null,
+          at: 0,
+        },
+        {
+          requestId: 'r-2',
+          sessionId: 's-1',
+          toolName: 'Bash',
+          summary: 'rm **/*.tmp',
+          detail: null,
+          at: 0,
+        },
+      ],
+    })
+    const asked = await screen.findByRole('group', { name: 'Wants to run AskUserQuestion' })
+    expect(within(asked).getByText('done').tagName).toBe('STRONG')
+    const command = await screen.findByRole('group', { name: 'Wants to run Bash' })
+    expect(command.textContent).toContain('rm **/*.tmp')
+  })
+
   it('pins a waiting gate over the gate and decides it with the gate’s own options', async () => {
     mount({
       view: view({

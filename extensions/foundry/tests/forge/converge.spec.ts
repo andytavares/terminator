@@ -49,6 +49,35 @@ afterEach(() => {
 })
 
 describe('what the architect is told', () => {
+  it('tells the architect to decide what it is 90% sure of rather than ask', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('90%')
+    expect(plan.prompt).toContain('"confidence"')
+    expect(plan.prompt).toContain('"dismissFindings"')
+  })
+
+  it('names each open finding, so the architect can close it rather than the operator', () => {
+    const plan = convergeBrief({
+      order: order({
+        redTeam: [
+          {
+            id: 'RT-no-non-goals',
+            severity: 'low',
+            text: 'The order excludes nothing.',
+            status: 'open',
+            reason: '',
+          },
+          { id: 'RT-done', severity: 'low', text: 'Settled.', status: 'resolved', reason: '' },
+        ],
+      }),
+      root,
+      sources: sources(),
+      rules: [],
+    })
+    expect(plan.prompt).toContain('RT-no-non-goals (low) — The order excludes nothing.')
+    expect(plan.prompt).not.toContain('Settled.')
+  })
+
   it("leads with the architect's own prompt and the order", () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('Turn intent and context into criteria and a plan')
@@ -244,6 +273,42 @@ describe('reading back what it wrote', () => {
     expect(result.ok).toBe(true)
     expect(result.ok && result.order.acceptance).toHaveLength(1)
     expect(result.ok && result.note).toBe('first draft')
+  })
+
+  // Spec 062: the Forge stops the operator only for what the architect
+  // cannot settle.
+  it('decides a question the architect is at least 90% sure of, instead of asking', () => {
+    const file = write({
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'Hide or grey out?',
+          options: ['Hide', 'Grey'],
+          recommended: 0,
+          confidence: 0.94,
+        },
+      ],
+    })
+    const result = readProposal(order(), file, 'now')
+    expect(result.ok && result.order.openQuestions[0].answer).toBe('Hide')
+    expect(result.ok && result.order.assumptions.map((a) => a.id)).toContain('A-Q-1')
+  })
+
+  it('applies the findings the architect dismissed with confidence, and only low or medium ones', () => {
+    const file = write({
+      dismissFindings: [
+        { id: 'RT-no-non-goals', reason: 'nothing to exclude', confidence: 0.95 },
+        { id: 'RT-no-runnable-check', reason: 'r', confidence: 0.99 },
+      ],
+    })
+    const before = order({
+      redTeam: [
+        { id: 'RT-no-non-goals', severity: 'low', text: 't', status: 'open', reason: '' },
+        { id: 'RT-no-runnable-check', severity: 'high', text: 't', status: 'open', reason: '' },
+      ],
+    })
+    const result = readProposal(before, file, 'now')
+    expect(result.ok && result.order.redTeam.map((f) => f.status)).toEqual(['accepted', 'open'])
   })
 
   it('says so when the architect wrote nothing', () => {

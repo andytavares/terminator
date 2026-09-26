@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
+import { MarkdownInline } from './Markdown.js'
 
 // The one surface the operator is required to visit.
 //
@@ -150,9 +151,12 @@ export function Inbox(): JSX.Element {
             <small>
               {digest.entryCount} things happened across {digest.sessionCount}{' '}
               {digest.sessionCount === 1 ? 'run' : 'runs'} since you last looked
-              {digest.bySession[0]?.entries[0] !== undefined
-                ? ` — most recently: ${digest.bySession[0].entries[0].summary}`
-                : ''}
+              {digest.bySession[0]?.entries[0] !== undefined ? (
+                <>
+                  {' — most recently: '}
+                  <MarkdownInline text={digest.bySession[0].entries[0].summary} />
+                </>
+              ) : null}
             </small>
           ) : null}
         </div>

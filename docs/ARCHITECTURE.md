@@ -565,8 +565,10 @@ so both trackers behave identically and a third would too. A failing or unconnec
 reported in `failures` rather than silently dropped — an incomplete list must never read as an
 empty one.
 
-**Comments are the only write.** The provider interface exposes no way to change an issue's state,
-assignee or any other field, and a test asserts the shape of that surface so it stays true.
+**Three writes: comment, transition, create.** The provider interface exposes no way to change an
+existing issue's assignee or any other field, or to delete one, and a test asserts the shape of that
+surface so it stays true. `transition` moves an issue by intent (ADR-041); `create` files one the
+operator asked for, Linear only (ADR-061).
 
 ---
 
@@ -1112,6 +1114,28 @@ reviewer's finding is judgement and stays with the operator.
   does that and then takes the order's whole directory, ledger included.
   `order.cancel` is still there for a record worth keeping: it marks an order
   `cancelled` and changes nothing on disk.
+- **One sidebar project per order, per repository** (`line/order-project.ts`,
+  ADR-061). The lane checkout is cut before the architect's first turn, and
+  the architect, every lane agent and every check command run in it — so the
+  order is one project, named with lane 1's branch: the ticket's recommended
+  `branchName`, else `foundry/wo-…`. The order's ticket is linked to it, it
+  sits under the workspace whose folder is the repository (not the first
+  workspace in the sidebar), and reset and delete remove it with the
+  checkout. A typed idea is offered a Linear ticket first when Linear is
+  connected (`forge/ticket-offer.ts`), so its project can carry the ticket's
+  name too. An intake conversation filed under another directory is started
+  fresh, not resumed (`resumableIn`).
+- **A deleted project closes its sessions** (`src/main/terminal/project-sessions.ts`).
+  Whoever deletes a project — the sidebar, or an extension through
+  `workspace.deleteProject` — every PTY in it is killed, its record marked
+  closed, and its tabs dropped. Deleting an order also stops its architect.
+- **The Forge decides what it is sure of** (`forge/autonomy.ts`, ADR-062).
+  Questions at ≥ 0.9 confidence are answered with the recommended option and
+  recorded as assumptions; low/medium findings may be dismissed with a reason;
+  closable failing checks go back to the architect up to twice.
+- **Agent text is markdown** — rendered by `components/Markdown.tsx`
+  (`Markdown`, and `MarkdownInline` for buttons and labels), built as React
+  elements so nothing an agent writes becomes HTML. Tool input stays literal.
 - **Both order-level controls are always on the Floor.** They used to render
   only inside the "nothing is running this" band, so a live run — or one halted
   at a gate — had no way out on that screen at all, while `order.cancel`
@@ -1264,6 +1288,8 @@ App
 - [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
 - [ADR-040: the work order is the contract](adr/040-the-work-order-is-the-contract.md) — supersedes the card model (ADR-010) and the run modes (ADR-012).
 - [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
+- [ADR-062: the Forge decides what it is sure of](adr/062-the-forge-decides-what-it-is-sure-of.md) — questions at ≥ 90% confidence are decided, low/medium findings dismissable, failing checks sent back up to twice.
+- [ADR-061: one project per order, and an extension may file an issue](adr/061-one-project-per-order.md) — an order is one sidebar project named after its ticket's branch; `ExtensionAPI.issues.create` v2.5.0.
 - [ADR-042: Foundry installs nothing](adr/042-foundry-installs-nothing.md) — the data root, the three rungs, and the toolchain probe.
 - [ADR-043: an agent proposes the order](adr/043-an-agent-proposes-the-order-and-never-writes-it.md) — intake is an agent turn, and what it may and may not write.
 - [ADR-049: an accidental question costs five minutes](adr/049-an-accidental-question-costs-five-minutes.md) — why a policy that asks by accident is a latency defect, and the eight changes measured against one live run.

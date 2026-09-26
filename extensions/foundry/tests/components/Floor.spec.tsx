@@ -1377,3 +1377,39 @@ describe('the standing band', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
 })
+
+// An agent's own words are markdown and shown as markdown; a command it wants
+// to run is shown literally, because rendering it would eat its `*`s.
+describe('agent text on the Floor', () => {
+  it("renders an agent's question as markdown", async () => {
+    mount(reply(), {
+      pending: [
+        {
+          ...ASK,
+          toolName: 'AskUserQuestion',
+          summary: 'Asks: which?',
+          detail: 'Hide **done** tickets?\n\n- Hide\n- Grey',
+        },
+      ],
+    })
+    await waitFor(() => screen.getByText('done'))
+    expect(screen.getByText('done').tagName).toBe('STRONG')
+    expect(screen.getByText('Grey').tagName).toBe('LI')
+  })
+
+  it('keeps a command literal', async () => {
+    mount(reply(), {
+      pending: [{ ...ASK, toolName: 'Bash', detail: 'rm **/*.tmp' }],
+    })
+    await waitFor(() => screen.getByText('rm **/*.tmp'))
+    expect(screen.getByText('rm **/*.tmp').tagName).toBe('PRE')
+  })
+
+  it('renders an activity line as markdown', async () => {
+    mount(reply(), {
+      feed: [{ id: 'f-9', at: 1, sessionId: 's-1', author: 'agent', summary: 'edited `a.ts`' }],
+    })
+    await waitFor(() => screen.getByText('a.ts'))
+    expect(screen.getByText('a.ts').tagName).toBe('CODE')
+  })
+})

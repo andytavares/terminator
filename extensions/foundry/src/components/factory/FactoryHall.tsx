@@ -18,6 +18,7 @@ import { HallScene } from './HallScene.js'
 import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
+import { MarkdownInline } from '../Markdown.js'
 
 // One order, drawn as a hall instead of a list of chips.
 //
@@ -738,7 +739,9 @@ function InterruptionCard({
         <ShieldQuestion aria-hidden="true" />
         <span id={titleId}>{item.title}</span>
       </div>
-      <p className="fdry-card__detail">{item.detail}</p>
+      <p className="fdry-card__detail">
+        {item.kind === 'ask' && item.prose ? <MarkdownInline text={item.detail} /> : item.detail}
+      </p>
       {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
       {readOnly ? (
         <p className="fdry-card__history">Waited on you here.</p>

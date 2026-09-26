@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import React from 'react'
-import { Markdown } from '../../src/components/Markdown.js'
+import { Markdown, MarkdownInline } from '../../src/components/Markdown.js'
 
 // An issue's body is markdown and it was rendered into a `<p>`, which collapses
 // every newline — so a real ticket arrived as
@@ -94,5 +94,27 @@ describe('a ticket written by somebody else', () => {
   it('shows an img tag as text rather than fetching it', () => {
     const { container } = render(<Markdown text={'<img src=x onerror=alert(1)>'} />)
     expect(container.querySelector('img')).toBeNull()
+  })
+})
+
+// One-line agent text — a question, an option, an assumption — sits inside a
+// button or a label, where a block element is invalid markup.
+describe('an inline span', () => {
+  it('renders code, bold and italic without any block element', () => {
+    const { container } = render(
+      <button type="button">
+        <MarkdownInline text="Hide **done** tickets in `Orders.tsx`, *not* grey" />
+      </button>
+    )
+    expect(container.querySelector('strong')?.textContent).toBe('done')
+    expect(container.querySelector('code')?.textContent).toBe('Orders.tsx')
+    expect(container.querySelector('em')?.textContent).toBe('not')
+    expect(container.querySelector('p, ul, ol, pre, div')).toBeNull()
+  })
+
+  it('shows script tags as the text they are', () => {
+    const { container } = render(<MarkdownInline text="<script>x</script>" />)
+    expect(container.querySelector('script')).toBeNull()
+    expect(screen.getByText('<script>x</script>')).toBeTruthy()
   })
 })

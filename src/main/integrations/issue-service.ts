@@ -8,9 +8,11 @@ import type {
 } from '../../shared/types/index.js'
 import { TrackerError, toErrorKind, toErrorMessage } from './tracker-error.js'
 import type {
+  NewIssueInput,
   StoredCredential,
   TrackerProvider,
   TrackerStateOption,
+  TrackerTeam,
   TransitionIntent,
 } from './providers/provider.js'
 
@@ -77,6 +79,15 @@ export interface IssueService {
    * to know rather than calling and catching.
    */
   supportsTransitions(tracker: TrackerId): boolean
+
+  /** Teams an issue can be filed in (ADR-061). */
+  teams(tracker: TrackerId): Promise<TrackerTeam[]>
+
+  /** File a new issue the operator asked for, and return it (ADR-061). */
+  create(tracker: TrackerId, input: NewIssueInput): Promise<Issue>
+
+  /** Whether this tracker can create an issue at all. Synchronous, like `supportsTransitions`. */
+  supportsCreate(tracker: TrackerId): boolean
 
   /** Drops every cached copy. Used when a credential changes underneath us. */
   invalidate(tracker?: TrackerId): void
@@ -147,8 +158,8 @@ export function createIssueService(deps: IssueServiceDeps): IssueService {
    * differently: a failure is retried, an unsupported capability is recorded
    * once and never asked about again.
    */
-  function unsupported(tracker: TrackerId): TrackerError {
-    return new TrackerError('unsupported', `${tracker} cannot be asked to move an issue`)
+  function unsupported(tracker: TrackerId, what = 'move an issue'): TrackerError {
+    return new TrackerError('unsupported', `${tracker} cannot be asked to ${what}`)
   }
 
   async function fetchIssue(tracker: TrackerId, key: string): Promise<Issue | null> {
@@ -281,6 +292,27 @@ export function createIssueService(deps: IssueServiceDeps): IssueService {
       await withRetry(tracker, () => move(cred, key, intent, optionId))
       // Its state is exactly what just changed.
       cache.delete(cacheKey(tracker, key))
+    },
+
+    supportsCreate(tracker): boolean {
+      const provider = deps.providers[tracker]
+      return typeof provider?.teams === 'function' && typeof provider.create === 'function'
+    },
+
+    async teams(tracker): Promise<TrackerTeam[]> {
+      const list = deps.providers[tracker]?.teams
+      if (list === undefined) throw unsupported(tracker, 'create an issue')
+      const cred = await credentialFor(tracker)
+      return withRetry(tracker, () => list(cred))
+    },
+
+    async create(tracker, input): Promise<Issue> {
+      const file = deps.providers[tracker]?.create
+      if (file === undefined) throw unsupported(tracker, 'create an issue')
+      const cred = await credentialFor(tracker)
+      const issue = await withRetry(tracker, () => file(cred, input))
+      cache.set(cacheKey(tracker, issue.key), { issue, at: now() })
+      return issue
     },
 
     invalidate(tracker): void {

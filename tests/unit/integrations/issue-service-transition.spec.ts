@@ -55,6 +55,8 @@ function build(over: { linear?: TrackerProvider; jira?: TrackerProvider } = {}) 
     fakeProvider('linear', {
       states: vi.fn().mockResolvedValue(OPTIONS),
       transition: vi.fn().mockResolvedValue(undefined),
+      teams: vi.fn().mockResolvedValue([{ id: 't1', key: 'TAV', name: 'Team' }]),
+      create: vi.fn().mockResolvedValue(issue('linear', 'TAV-7')),
     })
   // Jira omits both, exactly as the shipped provider does.
   const jira = over.jira ?? fakeProvider('jira')
@@ -174,5 +176,40 @@ describe('the Jira provider is untouched by this feature', () => {
     for (const method of ['verify', 'listMine', 'search', 'get', 'comment']) {
       expect(typeof jira[method]).toBe('function')
     }
+  })
+})
+
+describe('create (ADR-061)', () => {
+  it('is supported where the provider implements it, and not for Jira', () => {
+    const { service } = build()
+    expect(service.supportsCreate('linear')).toBe(true)
+    expect(service.supportsCreate('jira')).toBe(false)
+  })
+
+  it('delegates the input with the resolved credential and returns the issue', async () => {
+    const { service, linear } = build()
+    const input = { teamId: 't1', title: 'Only open tickets', description: 'body' }
+    await expect(service.create('linear', input)).resolves.toMatchObject({ key: 'TAV-7' })
+    expect(linear.create).toHaveBeenCalledWith({ tracker: 'linear', apiKey: 'k' }, input)
+  })
+
+  it('serves the created issue from cache rather than fetching it again', async () => {
+    const { service, linear } = build()
+    await service.create('linear', { teamId: 't1', title: 'x', description: '' })
+    await service.get('linear', 'TAV-7')
+    expect(linear.get).not.toHaveBeenCalled()
+  })
+
+  it('lists teams through the provider', async () => {
+    const { service } = build()
+    await expect(service.teams('linear')).resolves.toEqual([{ id: 't1', key: 'TAV', name: 'Team' }])
+  })
+
+  it('rejects with unsupported where the provider omits it', async () => {
+    const { service } = build()
+    await expect(
+      service.create('jira', { teamId: 't', title: 'x', description: '' })
+    ).rejects.toMatchObject({ kind: 'unsupported' })
+    await expect(service.teams('jira')).rejects.toMatchObject({ kind: 'unsupported' })
   })
 })

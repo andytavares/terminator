@@ -1238,3 +1238,67 @@ describe('walking the Forge', () => {
     expect(document.activeElement?.textContent).toBe('Red team findings')
   })
 })
+
+// What the architect and the red team write is markdown, and is shown as
+// markdown — not as asterisks and backticks.
+describe('agent text is rendered as markdown', () => {
+  const md = {
+    openQuestions: [
+      {
+        id: 'Q-1',
+        text: 'Hide **done** tickets?',
+        why: 'The picker lists `completed` ones.\n\n- one\n- two',
+        options: ['Hide *them*', 'Grey them'],
+        recommended: 0,
+        answer: null,
+        rank: 1,
+        confidence: 0.5,
+      },
+    ],
+    acceptance: [
+      {
+        id: 'AC-1',
+        statement: 'Only **open** tickets are listed',
+        priority: 'P1' as const,
+        verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
+        unverifiable: null,
+      },
+    ],
+    assumptions: [
+      { id: 'A-1', text: 'The filter lives in `Orders.tsx`', struck: false, affects: [] },
+    ],
+    redTeam: [
+      {
+        id: 'RT-x',
+        severity: 'medium' as const,
+        text: 'The plan never touches **the picker**',
+        status: 'open' as const,
+        reason: '',
+      },
+    ],
+  }
+
+  it('renders a question, its reason and its options', async () => {
+    mount({}, md)
+    await waitFor(() => screen.getByText('done'))
+    expect(screen.getByText('done').tagName).toBe('STRONG')
+    expect(screen.getByText('completed').tagName).toBe('CODE')
+    expect(screen.getByText('one').tagName).toBe('LI')
+    expect(screen.getByText('them').tagName).toBe('EM')
+  })
+
+  it('renders criteria and assumptions on the Plan step', async () => {
+    mount({}, md)
+    await openStep('Plan')
+    await waitFor(() => screen.getByText('open'))
+    expect(screen.getByText('open').tagName).toBe('STRONG')
+    expect(screen.getByText('Orders.tsx').tagName).toBe('CODE')
+  })
+
+  it('renders a red-team finding on the Red team step', async () => {
+    mount({}, md)
+    await openStep('Red team')
+    await waitFor(() => screen.getByText('the picker'))
+    expect(screen.getByText('the picker').tagName).toBe('STRONG')
+  })
+})

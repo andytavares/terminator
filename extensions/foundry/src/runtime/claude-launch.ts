@@ -1,7 +1,7 @@
 import { writeFileSync, mkdirSync } from 'fs'
 import { isAbsolute, join } from 'path'
 import { homedir } from 'os'
-import { realpathSync } from 'fs'
+import { existsSync, realpathSync } from 'fs'
 
 // What to type into the terminal to start an agent, and the settings that make
 // it answerable from the console.
@@ -106,6 +106,16 @@ export function shellQuote(value: string): string {
 export function transcriptPathFor(cwd: string, sessionId: string, home = homedir()): string {
   const encoded = realPath(cwd).replace(/[/.]/g, '-')
   return join(home, '.claude', 'projects', encoded, `${sessionId}.jsonl`)
+}
+
+/** The session to `--resume` from this directory, or undefined to start a fresh one. */
+export function resumableIn(
+  cwd: string,
+  sessionId: string | undefined,
+  home = homedir()
+): string | undefined {
+  if (sessionId === undefined) return undefined
+  return existsSync(transcriptPathFor(cwd, sessionId, home)) ? sessionId : undefined
 }
 
 /** The path with every symlink resolved, or the path itself when it has none. */

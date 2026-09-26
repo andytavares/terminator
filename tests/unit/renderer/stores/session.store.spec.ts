@@ -44,6 +44,25 @@ describe('useSessionStore', () => {
     resetStore()
   })
 
+  // The main process already ended these; the tabs must not outlive them.
+  describe('dropProjectSessions', () => {
+    it("removes the deleted project's tabs and disposes their terminals, leaving others", () => {
+      const dispose = vi.fn()
+      useSessionStore.setState({
+        sessions: new Map([
+          ['a', makeSession({ id: 'a', projectId: 'gone' })],
+          ['b', makeSession({ id: 'b', projectId: 'kept' })],
+        ]),
+        terminalInstances: new Map([['a', { dispose } as never]]),
+      })
+      useSessionStore.getState().dropProjectSessions('gone')
+      expect([...useSessionStore.getState().sessions.keys()]).toEqual(['b'])
+      expect(useSessionStore.getState().terminalInstances.has('a')).toBe(false)
+      expect(dispose).toHaveBeenCalled()
+      expect(mockElectronAPI.terminal.close).not.toHaveBeenCalled()
+    })
+  })
+
   describe('createSession', () => {
     it('keeps the shell the main process spawned', async () => {
       mockElectronAPI.terminal.create.mockResolvedValue({

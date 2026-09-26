@@ -389,7 +389,7 @@ test('every registered channel answers rather than rejecting', async () => {
  * and that something is an agent. Until this ran, nothing did — and the only
  * route to a runnable order was hand-writing its JSON.
  */
-test('intake launches the architect against the draft, read-only, in the repository', async () => {
+test('intake launches the architect read-only in the order’s own project, and delete removes it', async () => {
   test.setTimeout(180_000)
   const { page } = handle
 
@@ -409,9 +409,13 @@ test('intake launches the architect against the draft, read-only, in the reposit
   // It either ran or said why. Silence would be the bug.
   expect(converged).not.toBeNull()
 
-  const project = page.locator('.branch-row__name').filter({ hasText: 'intake' })
-  await expect(project.first()).toBeVisible({ timeout: 60_000 })
-  await project.first().click()
+  // One project for the order (ADR-061): named with the branch its lanes will
+  // use, and no separate intake project beside it.
+  const branch = `foundry/${created.order.id.toLowerCase()}`
+  const project = page.locator('.branch-row__name').filter({ hasText: branch })
+  await expect(project).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.locator('.branch-row__name').filter({ hasText: 'intake' })).toHaveCount(0)
+  await project.click()
 
   const screen = page.locator('.xterm-screen')
   // The script's own path is what is typed, and it is short enough to survive.
@@ -426,10 +430,18 @@ test('intake launches the architect against the draft, read-only, in the reposit
   // And it does not carry the parent Claude Code session in with it.
   expect(launched).toMatch(/^unset .*CLAUDE_CODE_BRIDGE_SESSION_ID/m)
 
-  // Intake runs in the repository itself — no worktree is cut for a plan that
-  // may never be agreed.
+  // The architect reads the order's lane checkout — the tree the builder
+  // will change — cut under the data root, not inside the repository.
   const worktrees = execFileSync('git', ['worktree', 'list'], { cwd: repo }).toString()
-  expect(worktrees).not.toContain('intake')
+  expect(worktrees).toContain(join('.foundry', 'orders', created.order.id, 'worktrees'))
+  expect(worktrees).toContain(`[${branch}]`)
+
+  // Deleting the order takes its project with the checkout.
+  const deleted = (await foundry('foundry:order.delete', { id: created.order.id })) as {
+    removed?: string[]
+  }
+  expect(deleted.removed).toContain(`the project ${branch}`)
+  await expect(project).toHaveCount(0, { timeout: 30_000 })
 })
 
 test('a run cuts a worktree and launches a supervised agent in a visible terminal', async () => {
@@ -698,6 +710,81 @@ async function budgetsOf(id: string): Promise<Record<string, number | null>> {
 // The operator could not see or change an order's budgets, and "Raise the
 // budget" resumed the run against the budget it had just gone past. Both are
 // read back from the order the running application saved, not from the call.
+test('what the architect writes is shown as markdown in the Forge', async () => {
+  const created = (await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'markdown in the forge' },
+    repoPaths: [repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id as string
+  expect(id, 'no order was created to open').toBeTruthy()
+
+  // As the architect writes it: markdown in a question, its reason and an
+  // assumption.
+  const file = join(repo, '.foundry', 'orders', id, 'order.json')
+  const order = JSON.parse(readFileSync(file, 'utf8'))
+  order.openQuestions = [
+    {
+      id: 'Q-1',
+      text: 'Hide **done** tickets from the picker?',
+      why: 'The picker lists `completed` issues today.\n\n- Hide them\n- Grey them out',
+      options: ['Hide *them*', 'Grey them out'],
+      recommended: 0,
+      answer: null,
+      rank: 1,
+      confidence: 0.6,
+    },
+  ]
+  order.assumptions = [
+    { id: 'A-1', text: 'The filter lives in `Orders.tsx`', struck: false, affects: [] },
+  ]
+  writeFileSync(file, JSON.stringify(order))
+
+  await openFoundry()
+  expect(await clickByName('button', 'Forge')).toBe(true)
+  await handle.page.waitForTimeout(800)
+  // An earlier test may have left another order open.
+  await clickByName('button', 'All orders')
+  await handle.page.waitForTimeout(800)
+  const opened = await inFoundry<boolean>(`(function () {
+    var all = document.querySelectorAll('button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
+        all[i].click()
+        return true
+      }
+    }
+    return false
+  })()`)
+  expect(opened, `no row for ${id} in the Forge`).toBe(true)
+  await handle.page.waitForTimeout(1200)
+
+  const rendered = await inFoundry<Record<string, boolean>>(`(function () {
+    function has(sel, text) {
+      return Array.prototype.some.call(document.querySelectorAll(sel), function (el) {
+        return el.textContent === text
+      })
+    }
+    return {
+      bold: has('strong', 'done'),
+      code: has('code', 'completed'),
+      list: has('li', 'Grey them out'),
+      option: has('button em', 'them'),
+      noAsterisks: document.body.innerText.indexOf('**') === -1,
+    }
+  })()`)
+  expect(rendered).toEqual({ bold: true, code: true, list: true, option: true, noAsterisks: true })
+
+  const png = await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    return (await view.capturePage()).toPNG().toString('base64')
+  })
+  mkdirSync('test-results', { recursive: true })
+  writeFileSync(join('test-results', 'forge-markdown.png'), Buffer.from(png, 'base64'))
+})
+
 test('an order’s budgets are set on the Plan step, and raised at the gate that stopped it', async () => {
   const created = (await foundry('foundry:order.create', {
     source: { kind: 'typed', text: 'budgets are the operator’s to set' },

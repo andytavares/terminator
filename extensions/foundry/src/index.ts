@@ -20,7 +20,14 @@ import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { tearDownRun, deleteOrder } from './line/teardown.js'
 import { markReady, readPulls, shipOrder } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
-import { ensureCheckouts } from './line/worktree.js'
+import { ensureCheckout, ensureCheckouts } from './line/worktree.js'
+import type { Checkout } from './line/worktree.js'
+import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
+import { resumableIn } from './runtime/claude-launch.js'
+import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
+import { followUpFor } from './forge/autonomy.js'
+import { endAndWait } from './runtime/end-session.js'
+import { compileOrder } from './order/compile.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
 import type { RunCommand } from './runtime/diff-metrics.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
@@ -967,7 +974,8 @@ async function executeRun(
     return { changedFiles, linesChanged }
   }
 
-  const workspaceId = api.workspace?.list()[0]?.id ?? ''
+  const workspaceOf = (checkout: { origin: string }): string =>
+    workspaceFor(api.workspace?.list() ?? [], checkout.origin)
   const store = createOrderStore(root)
   const featureDir = orderDir(root, order.id)
 
@@ -1060,8 +1068,9 @@ async function executeRun(
         .start({
           featureDir,
           worktreePath: checkout.path,
-          workspaceId,
+          workspaceId: workspaceOf(checkout),
           branch: checkout.branch,
+          issue: issueOf(order),
           prompt: input.prompt,
           phase: (input.role ?? input.node.id) as never,
           resumeSessionId: input.resumeSessionId,
@@ -1314,8 +1323,9 @@ async function executeRun(
       if (checkout === undefined || runner === null) return null
       return runner.runCommand({
         worktreePath: checkout.path,
-        workspaceId,
+        workspaceId: workspaceOf(checkout),
         branch: checkout.branch,
+        issue: issueOf(order),
         title: step.name,
         command: step.command,
       })
@@ -1432,9 +1442,9 @@ async function executeRun(
 /**
  * One turn of intake, in a session the operator can see and type into.
  *
- * The architect runs read-only in the repository itself: intake changes no
- * code, and cutting a worktree for a plan that may never be agreed would be
- * creating a branch for nothing. It writes one file, and that file is
+ * The architect runs read-only in the order's lane checkout — the one its
+ * lanes will build in — so the whole order is one sidebar project (ADR-061).
+ * It writes one file, and that file is
  * validated before any of it reaches the order — an agent that could write the
  * order directly could set its status and agree its own work.
  *
@@ -1471,9 +1481,17 @@ async function convergeOnce(
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
   }
 
-  const workspaceId = api.workspace?.list()[0]?.id ?? ''
   const featureDir = orderDir(root, order.id)
   await fs.promises.mkdir(featureDir, { recursive: true })
+
+  // The lane's own checkout, so the order is one project from its first turn
+  // (ADR-061) and the architect reads the base the builder will change.
+  let checkout: Checkout
+  try {
+    checkout = await ensureCheckout(order, 1, { exec: (o) => api.shell.exec(o), root })
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
 
   // One conversation per order, so a follow-up does not make the architect
   // read the repository again to answer "why not the other approach".
@@ -1546,12 +1564,13 @@ async function convergeOnce(
     void runner
       .start({
         featureDir,
-        worktreePath: plan.cwd,
-        workspaceId,
-        branch: `foundry/intake-${order.id.toLowerCase()}`,
+        worktreePath: checkout.path,
+        workspaceId: workspaceFor(api.workspace?.list() ?? [], checkout.origin),
+        branch: checkout.branch,
+        issue: issueOf(order),
         prompt: plan.prompt,
         phase: 'architect' as never,
-        resumeSessionId: plan.role.allowResume ? resuming : undefined,
+        resumeSessionId: plan.role.allowResume ? resumableIn(checkout.path, resuming) : undefined,
         model: modelForTier(api, plan.role.modelTier),
         // Read-only, enforced by the hook rather than by the prompt. The
         // architect proposes; it does not edit the repository it is reading.
@@ -1725,6 +1744,81 @@ export function activate(api: ExtensionAPI): void {
       executingOrders.has(orderId) ? [] : orphanedNodes(graph, isLiveSession).map((n) => n.id),
   }
 
+  /**
+   * One architect turn, and the ones the Forge starts on its own after it.
+   *
+   * A plan that still fails a check the architect can close goes straight
+   * back to it, up to MAX_AUTO_TURNS times, instead of waiting for someone to
+   * click "Ask for the gap to be closed" (spec 062). Only unanswered questions,
+   * or a plan still failing when the turns run out, reach the operator.
+   */
+  const convergeWithFollowUps = (
+    order: WorkOrder,
+    message: string,
+    autoTurns: number
+  ): Promise<ConvergeStarted> =>
+    convergeOnce(api, dataRoot(), order, message, async (outcome) => {
+      const store = createOrderStore(dataRoot())
+      if (!outcome.ok) {
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'role:architect',
+          action: 'converge.refused',
+          subject: order.id,
+          reason: outcome.reason,
+          evidence: [],
+        })
+        // Out loud, once, because a refusal changes nothing and therefore
+        // shows up nowhere the operator happens to be looking. The Forge
+        // renders it whenever they open the order; this is for the minutes
+        // between the turn ending and them going back to look — which on
+        // the run that found this was the rest of the afternoon.
+        api.notifications.showToast(
+          'warning',
+          `${order.title}: the architect's plan was refused and nothing changed.`,
+          `foundry.converge.refused.${order.id}`
+        )
+        return
+      }
+      await store.save(outcome.order)
+      await store.record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'role:architect',
+        action: 'order.redrafted',
+        subject: order.id,
+        reason: outcome.note === '' ? 'redrafted the plan' : outcome.note,
+        evidence: [],
+      })
+
+      const next = followUpFor(compileOrder(outcome.order).failures, autoTurns)
+      if (next === null) return
+      // The finished turn's process is still at its prompt; the follow-up
+      // resumes the same conversation, so end it first.
+      const previous = intakeSessions.get(order.id)
+      if (previous !== undefined) {
+        await endAndWait(
+          {
+            stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
+            isLive: isLiveSession,
+          },
+          previous,
+          'continuing in a follow-up turn'
+        )
+      }
+      const started = await convergeWithFollowUps(outcome.order, next, autoTurns + 1)
+      await store.record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'role:architect',
+        action: started.ok ? 'converge.started' : 'converge.refused',
+        subject: started.ok ? started.sessionId : order.id,
+        reason: started.ok ? 'closing the failing checks on its own' : started.reason,
+        evidence: [],
+      })
+    })
+
   const forge = createForgeChannels({
     store: createLiveOrderStore(dataRoot),
     now: () => new Date().toISOString(),
@@ -1735,42 +1829,7 @@ export function activate(api: ExtensionAPI): void {
     priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
     // The redraft lands here, when the architect's turn ends — minutes after
     // the channel that started it answered.
-    converge: (order, message) =>
-      convergeOnce(api, dataRoot(), order, message, async (outcome) => {
-        const store = createOrderStore(dataRoot())
-        if (!outcome.ok) {
-          await store.record({
-            at: new Date().toISOString(),
-            orderId: order.id,
-            actor: 'role:architect',
-            action: 'converge.refused',
-            subject: order.id,
-            reason: outcome.reason,
-            evidence: [],
-          })
-          // Out loud, once, because a refusal changes nothing and therefore
-          // shows up nowhere the operator happens to be looking. The Forge
-          // renders it whenever they open the order; this is for the minutes
-          // between the turn ending and them going back to look — which on
-          // the run that found this was the rest of the afternoon.
-          api.notifications.showToast(
-            'warning',
-            `${order.title}: the architect's plan was refused and nothing changed.`,
-            `foundry.converge.refused.${order.id}`
-          )
-          return
-        }
-        await store.save(outcome.order)
-        await store.record({
-          at: new Date().toISOString(),
-          orderId: order.id,
-          actor: 'role:architect',
-          action: 'order.redrafted',
-          subject: order.id,
-          reason: outcome.note === '' ? 'redrafted the plan' : outcome.note,
-          evidence: [],
-        })
-      }),
+    converge: (order, message) => convergeWithFollowUps(order, message, 0),
     // FR-059a: asked when the order is agreed, so an issue that will never
     // move is known before the run rather than after it.
     capability:
@@ -1840,6 +1899,15 @@ export function activate(api: ExtensionAPI): void {
       return { error: error instanceof Error ? error.message : 'Could not read your tickets.' }
     }
   })
+  // A ticket for a typed idea, offered before it becomes an order (spec 061).
+  reg(api, 'foundry:ticket.offer', async () => ({ offer: await ticketOffer(api.issues) }))
+  reg(api, 'foundry:ticket.create', async (payload) => {
+    const { idea, teamId } = (payload ?? {}) as { idea?: unknown; teamId?: unknown }
+    if (typeof idea !== 'string' || typeof teamId !== 'string' || api.issues === undefined) {
+      return { error: 'Malformed request.' }
+    }
+    return fileTicket(api.issues, { idea, teamId })
+  })
   reg(api, 'foundry:order.create', (payload) => forge.create(payload))
   reg(api, 'foundry:order.turn', (payload) => forge.turn(payload))
   reg(api, 'foundry:order.compile', (payload) => forge.compile(payload))
@@ -1868,7 +1936,18 @@ export function activate(api: ExtensionAPI): void {
     // Its agents first. Deleting the records out from under a live session
     // leaves an agent writing into a worktree whose order no longer exists.
     await stopOrder(root, id, 'the order was deleted')
-    const result = await deleteOrder(order, { exec: (o) => api.shell.exec(o), root })
+    // The architect too: it runs in the checkout about to be removed, and the
+    // run graph that `stopOrder` reads does not know about it.
+    const intake = intakeSessions.get(id)
+    if (intake !== undefined) {
+      supervisedRunner?.stop(intake, 'the order was deleted')
+      intakeSessions.delete(id)
+    }
+    const result = await deleteOrder(order, {
+      exec: (o) => api.shell.exec(o),
+      root,
+      removeProjectAt: projectRemover(api.workspace),
+    })
     return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
   })
 
@@ -1950,7 +2029,11 @@ export function activate(api: ExtensionAPI): void {
     if (order === null) return { error: `No order ${id}.` }
 
     await stopOrder(root, id, 'starting over')
-    const result = await tearDownRun(order, { exec: (o) => api.shell.exec(o), root })
+    const result = await tearDownRun(order, {
+      exec: (o) => api.shell.exec(o),
+      root,
+      removeProjectAt: projectRemover(api.workspace),
+    })
 
     // Read back rather than reused: `stopOrder` saves, and writing the order
     // we loaded before it would put `running` back.

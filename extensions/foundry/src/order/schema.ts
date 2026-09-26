@@ -208,6 +208,9 @@ const OpenQuestionSchema = z.object({
   recommended: z.number().int().nullable().default(null),
   answer: z.string().nullable().default(null),
   rank: z.number().default(0),
+  // How sure the architect is of `recommended`, 0–1. At the bar it is decided
+  // rather than asked (spec 062); absent means "ask".
+  confidence: z.number().min(0).max(1).nullable().default(null),
 })
 
 const RedTeamFindingSchema = z

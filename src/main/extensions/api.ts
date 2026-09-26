@@ -131,6 +131,8 @@ export interface ProjectSnapshot {
   readonly id: string
   readonly workspaceId: string
   readonly name: string
+  /** The directory it points at, when it is not the workspace folder (v2.5.0). */
+  readonly worktreePath?: string
 }
 
 // Canonical session-authority types live with the authority (pty-manager.ts);
@@ -149,9 +151,14 @@ import type {
   TrackerConnection,
   TrackerId,
 } from '../../shared/types/index.js'
-import type { TrackerStateOption, TransitionIntent } from '../integrations/providers/provider.js'
+import type {
+  NewIssueInput,
+  TrackerStateOption,
+  TrackerTeam,
+  TransitionIntent,
+} from '../integrations/providers/provider.js'
 export type { Issue, IssueLink, IssueListResult, IssueSummary, TrackerConnection, TrackerId }
-export type { TrackerStateOption, TransitionIntent }
+export type { NewIssueInput, TrackerStateOption, TrackerTeam, TransitionIntent }
 
 export interface PtyManagerAPI {
   /** @deprecated since v1.4.0 — use spawnSession() plus onData()/onExit(). */
@@ -340,10 +347,11 @@ export interface ExtensionAPI {
    * An extension never holds a tracker credential and never contacts a tracker
    * itself — it asks here, the same way it asks for a shell or a PTY.
    *
-   * Two writes, and only two: a comment, and the issue's own position in its
-   * own workflow (v2.3.0, ADR-041). There is deliberately no way to create an
-   * issue, to delete one, or to change any other field of one — not the
-   * title, not the assignee, not a label. `transition` is narrow by
+   * Three writes, and only three: a comment, the issue's own position in its
+   * own workflow (v2.3.0, ADR-041), and a new issue the operator asked for
+   * (v2.5.0, ADR-061). There is deliberately no way to delete an issue or to
+   * change any field of an existing one — not the title, not the assignee,
+   * not a label. `transition` is narrow by
    * construction: it takes an intent, not a field, and an intent the tracker
    * cannot satisfy is refused rather than approximated.
    */
@@ -383,6 +391,16 @@ export interface ExtensionAPI {
      * work.
      */
     supportsTransitions(tracker: TrackerId): boolean
+    /** Teams the operator can file an issue in (v2.5.0). */
+    teams(tracker: TrackerId): Promise<TrackerTeam[]>
+    /**
+     * File a new issue (v2.5.0, ADR-061). Only on the operator's explicit
+     * word — an extension never files one on its own judgement. Rejects on
+     * failure.
+     */
+    create(tracker: TrackerId, input: NewIssueInput): Promise<Issue>
+    /** Whether this tracker can create an issue at all (v2.5.0). Synchronous. */
+    supportsCreate(tracker: TrackerId): boolean
     /** The issue attached to a project, or null. Synchronous: it is local state. */
     linkFor(projectId: string): IssueLink | null
     /** Fires when any project's link is set, replaced, cleared or garbage-collected. */
@@ -490,7 +508,7 @@ import {
   createProject as createProjectInStore,
   deleteProject as deleteProjectFromStore,
 } from '../storage/workspace-store.js'
-import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
+import { onWorkspaceDelete, onProjectDelete, emitProjectDelete } from './workspace-events.js'
 import { getIssueService } from '../integrations/index.js'
 import { listConnections as listTrackerConnections } from '../integrations/tracker-store.js'
 import {
@@ -857,11 +875,14 @@ export function createExtensionAPI(
         return listWorkspaces().map(({ id, name, folderPath }) => ({ id, name, folderPath }))
       },
       listProjects(workspaceId: string): ProjectSnapshot[] {
-        return listProjectsFromStore(workspaceId).map(({ id, workspaceId: wsId, name }) => ({
-          id,
-          workspaceId: wsId,
-          name,
-        }))
+        return listProjectsFromStore(workspaceId).map(
+          ({ id, workspaceId: wsId, name, worktreePath }) => ({
+            id,
+            workspaceId: wsId,
+            name,
+            worktreePath,
+          })
+        )
       },
       createProject(input): ProjectSnapshot | null {
         // Reused rather than duplicated: provisioning the same worktree twice
@@ -903,6 +924,8 @@ export function createExtensionAPI(
       },
       deleteProject(projectId: string): void {
         deleteProjectFromStore(projectId)
+        emitProjectDelete(projectId)
+        deps?.broadcastToWindows?.('workspace:project-removed', { id: projectId })
       },
       onDelete(handler: (workspaceId: string) => void): Disposable {
         const unsub = onWorkspaceDelete(handler)
@@ -984,6 +1007,15 @@ export function createExtensionAPI(
       },
       supportsTransitions(tracker: TrackerId): boolean {
         return getIssueService().supportsTransitions(tracker)
+      },
+      async teams(tracker: TrackerId): Promise<TrackerTeam[]> {
+        return getIssueService().teams(tracker)
+      },
+      async create(tracker: TrackerId, input: NewIssueInput): Promise<Issue> {
+        return getIssueService().create(tracker, input)
+      },
+      supportsCreate(tracker: TrackerId): boolean {
+        return getIssueService().supportsCreate(tracker)
       },
       linkFor(projectId: string): IssueLink | null {
         return getIssueLink(projectId)

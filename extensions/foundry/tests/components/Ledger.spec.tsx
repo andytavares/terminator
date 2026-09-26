@@ -295,3 +295,21 @@ describe('removing an accepted check (FR-081)', () => {
     expect(screen.queryByText('Checks you accepted')).toBeNull()
   })
 })
+
+describe('the reasons in the record', () => {
+  it('renders a reason as markdown — an architect note is written that way', async () => {
+    mount({
+      entries: [
+        {
+          ...ENTRIES[0],
+          actor: 'role:architect',
+          action: 'order.redrafted',
+          reason: 'split **U-2** out of `U-1`',
+        },
+      ],
+      total: 1,
+    })
+    await waitFor(() => screen.getByText('U-2'))
+    expect(screen.getByText('U-2').tagName).toBe('STRONG')
+  })
+})

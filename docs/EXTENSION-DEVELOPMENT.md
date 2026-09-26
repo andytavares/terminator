@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 2.4.0 (`api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
+**Current API version**: 2.5.0 (`api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
 
 ---
 
@@ -649,7 +649,7 @@ for (const failure of failures) {
 // tracker it came from — Jira's ADF is converted before it reaches you.
 const issue = await api.issues.get('linear', 'TAV-42')
 
-// The only write. It rejects on failure; do not swallow it.
+// A write. It rejects on failure; do not swallow it.
 await api.issues.comment('linear', 'TAV-42', `PR opened: ${prUrl}`)
 
 // The issue attached to a project. Synchronous — it is local state.
@@ -662,9 +662,9 @@ const off = api.issues.onLinkChange((id, next) => {
 **Identity is the pair `(tracker, key)`, never the key alone.** Two trackers can both have a
 `TAV-42` and they are different issues.
 
-**Two writes, and only two**: a comment, and the issue's own position in its own workflow.
-There is deliberately no way to create an issue, to delete one, or to change any other field of
-one — not the title, not the assignee, not a label. A test asserts the shape of that surface, so
+**Three writes, and only three**: a comment, the issue's own position in its own workflow, and a
+new issue the operator asked for (v2.5.0). There is deliberately no way to delete an issue or to
+change any field of an existing one — not the title, not the assignee, not a label. A test asserts the shape of that surface, so
 widening it takes a deliberate edit to a file whose purpose is to make widening conspicuous.
 
 #### Moving an issue along its workflow _(v2.3.0)_
@@ -701,6 +701,27 @@ comment saying it moved.
 
 See [ADR 041](adr/041-an-extension-may-move-an-issue.md) for the whole decision, including what
 was deliberately not added.
+
+#### Creating an issue _(v2.5.0)_
+
+```typescript
+if (api.issues.supportsCreate('linear')) {
+  // The teams the operator belongs to. Offer a choice only when there is one.
+  const teams = await api.issues.teams('linear')
+  // The whole issue comes back, as `get` would return it — including
+  // `branchName`, the tracker's recommended branch.
+  const issue = await api.issues.create('linear', {
+    teamId: teams[0].id,
+    title: 'Only list open tickets',
+    description: 'Markdown body',
+  })
+}
+```
+
+**Only on the operator's word.** An extension never files an issue on its own judgement; Foundry
+asks first and calls this only on "Create ticket". **Only Linear implements it**:
+`supportsCreate('jira')` is `false`, and `teams` / `create` reject with `unsupported`. See
+[ADR 061](adr/061-one-project-per-order.md).
 
 **Types** — `Issue`, `IssueSummary`, `IssueLink`, `IssueListResult`, `TrackerConnection`,
 `TrackerId` — are exported from the API module. Do not re-declare them locally.
@@ -749,9 +770,16 @@ merge two different worktrees whose branches happen to share one; a name
 collision is disambiguated instead, as `name (directory)`. The sidebar is notified, so it appears
 without a reload.
 
+#### Finding and removing it again _(v2.5.0)_
+
+`workspace.listProjects(workspaceId)` reports each project's `worktreePath` (absent when it is the
+workspace folder), so an extension can find the project it registered for a checkout.
+`workspace.deleteProject(projectId)` removes it and tells the sidebar. Remove the project when you
+remove its worktree — a project pointing at a deleted directory is clutter nobody can use.
+
 ---
 
-> **A note on version numbers.** The markers in this document (v1.1.0 … v2.3.0) are the API's own
+> **A note on version numbers.** The markers in this document (v1.1.0 … v2.5.0) are the API's own
 > release series. The annotations in `src/main/extensions/api.ts` still use an older v1.x series
 > for some of the same members. The two disagree; this document is the one to follow. Reconciling
 > them is a separate cleanup and was deliberately not folded into the v2.2.0 work.

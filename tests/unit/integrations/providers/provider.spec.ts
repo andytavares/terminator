@@ -64,14 +64,14 @@ describe('TrackerProvider surface', () => {
     }
   })
 
-  it('linear implements the optional workflow-move pair', () => {
+  it('linear implements every optional operation', () => {
     const [, linear] = providers[0]
     for (const operation of PROVIDER_OPTIONAL_OPERATIONS) {
       expect(methodsOf(linear)).toContain(operation)
     }
   })
 
-  it('jira omits the optional pair, and reports that rather than throwing when asked', () => {
+  it('jira omits every optional operation, and reports that rather than throwing when asked', () => {
     const [, jira] = providers[1]
     for (const operation of PROVIDER_OPTIONAL_OPERATIONS) {
       expect(methodsOf(jira)).not.toContain(operation)
@@ -90,13 +90,15 @@ describe('TrackerProvider surface', () => {
     }
   })
 
-  it('sanctions exactly two write operations, and no field-level write among them', () => {
-    expect(PROVIDER_WRITE_OPERATIONS).toEqual(['comment', 'transition'])
+  // 061 widened it by one more: creating an issue, at the operator's word
+  // (ADR-061). Still no field-level write, and still no way to delete one.
+  it('sanctions exactly three write operations, and no field-level write among them', () => {
+    expect(PROVIDER_WRITE_OPERATIONS).toEqual(['comment', 'transition', 'create'])
   })
 
-  it('sanctions no way to create or delete an issue', () => {
+  it('sanctions no way to delete or archive an issue', () => {
     for (const operation of PROVIDER_OPERATIONS) {
-      expect(/^(create|delete|archive)/i.test(operation)).toBe(false)
+      expect(/^(delete|archive)/i.test(operation)).toBe(false)
     }
   })
 

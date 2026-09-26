@@ -24,6 +24,11 @@ import type { WorkOrder } from '../order/schema.js'
 // `running` with no way out — which is strictly worse than one that finishes
 // and names the parts it could not remove.
 
+export interface TeardownDeps extends CheckoutDeps {
+  /** Deletes the sidebar project pointing at a checkout; true when there was one. */
+  readonly removeProjectAt?: (worktreePath: string) => boolean
+}
+
 export interface TeardownResult {
   /** What is actually gone. Goes into the ledger, so it cannot be a guess. */
   readonly removed: readonly string[]
@@ -59,7 +64,7 @@ function rmIfPresent(target: string, label: string, removed: string[], failed: s
 async function tearDownLane(
   order: WorkOrder,
   lane: number,
-  deps: CheckoutDeps,
+  deps: TeardownDeps,
   removed: string[],
   failed: string[]
 ): Promise<void> {
@@ -77,6 +82,8 @@ async function tearDownLane(
   })
   if (gone.exitCode === 0) removed.push(`the checkout at ${target}`)
   else failed.push(`the checkout at ${target}: ${gone.stderr.trim()}`)
+
+  if (deps.removeProjectAt?.(target) === true) removed.push(`the project ${branch}`)
 
   // Unconditional: the point of pruning is the registration left by a
   // directory that is already gone, which is exactly the case where the
@@ -109,7 +116,7 @@ async function tearDownLane(
  * the ledger — the record of what was asked for and everything that has
  * happened to it, which a restart has no reason to lose.
  */
-export async function tearDownRun(order: WorkOrder, deps: CheckoutDeps): Promise<TeardownResult> {
+export async function tearDownRun(order: WorkOrder, deps: TeardownDeps): Promise<TeardownResult> {
   const removed: string[] = []
   const failed: string[] = []
 
@@ -144,7 +151,7 @@ export async function tearDownRun(order: WorkOrder, deps: CheckoutDeps): Promise
  * fourth branch by hand. `Discard` still exists for the case where the record
  * is worth keeping.
  */
-export async function deleteOrder(order: WorkOrder, deps: CheckoutDeps): Promise<TeardownResult> {
+export async function deleteOrder(order: WorkOrder, deps: TeardownDeps): Promise<TeardownResult> {
   const run = await tearDownRun(order, deps)
   const removed = [...run.removed]
   const failed = [...run.failed]

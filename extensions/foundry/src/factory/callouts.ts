@@ -116,6 +116,8 @@ export type Interruption =
       readonly nodeId: string | null
       readonly title: string
       readonly detail: string
+      /** An agent's question is prose and shown as markdown; any other tool's input is literal. */
+      readonly prose: boolean
     }
   | {
       readonly kind: 'gate'
@@ -153,6 +155,7 @@ export function interruptionsFor(input: InterruptionInput): Interruption[] {
     nodeId: nodeOfSession(call.sessionId),
     title: `Wants to run ${call.toolName}`,
     detail: call.summary,
+    prose: call.toolName === 'AskUserQuestion',
   }))
 
   const gates: Interruption[] = input.waiting.map((gate) => ({

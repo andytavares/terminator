@@ -44,6 +44,16 @@ export const ProposalSchema = z
     plan: orderShape.plan.optional(),
     assumptions: orderShape.assumptions.optional(),
     openQuestions: orderShape.openQuestions.optional(),
+    // Findings the architect is sure do not apply. Only low and medium ones are
+    // honoured, and only at the confidence bar (spec 062); `redTeam` itself
+    // stays out of reach.
+    dismissFindings: z
+      .array(
+        z
+          .object({ id: z.string(), reason: z.string(), confidence: z.number().min(0).max(1) })
+          .strict()
+      )
+      .optional(),
     /** What the agent changed and why, for the ledger. */
     note: z.string().default(''),
   })
