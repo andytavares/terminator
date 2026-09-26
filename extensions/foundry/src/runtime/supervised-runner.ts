@@ -62,6 +62,8 @@ export interface StartSupervisedRunOptions {
   workspaceId: string
   /** The branch the worktree is on — names the project and the tab. */
   branch: string
+  /** The order's ticket, linked to the project (ADR-061). */
+  issue?: { tracker: 'linear' | 'jira'; key: string }
   /** What to tell the agent: a `/speckit-*` command, or a reply to it. */
   prompt: string
   phase: StepLabel
@@ -119,6 +121,8 @@ export interface RunCommandOptions {
   workspaceId: string
   /** The branch the worktree is on — names the project. */
   branch: string
+  /** The order's ticket, linked to the project (ADR-061). */
+  issue?: { tracker: 'linear' | 'jira'; key: string }
   /** What the tab is called: the check being run. */
   title: string
   command: string
@@ -417,6 +421,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         name: start.branch,
         worktreePath: start.worktreePath,
         gitBranch: start.branch,
+        issue: start.issue,
       })
       if (project === null) {
         release()
@@ -521,6 +526,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         name: options.branch,
         worktreePath: options.worktreePath,
         gitBranch: options.branch,
+        issue: options.issue,
       })
       if (project === null) return Promise.resolve(null)
 

@@ -110,6 +110,11 @@ describe('starting a supervised run', () => {
     })
   })
 
+  it("links the order's ticket to the project, so the sidebar shows it (ADR-061)", async () => {
+    await runner().start({ ...start, issue: { tracker: 'linear', key: 'TAV-15' } })
+    expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
+  })
+
   it('opens a terminal in that project rather than a hidden child process', async () => {
     await runner().start(start)
     expect(opened[0]).toMatchObject({
@@ -734,6 +739,12 @@ describe('running one command in a terminal, with no agent', () => {
     title: 'Lint',
     command: 'npm run lint',
   }
+
+  it("links the order's ticket to the project a command opens, too", async () => {
+    void runner().runCommand({ ...command, issue: { tracker: 'linear', key: 'TAV-15' } })
+    await Promise.resolve()
+    expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
+  })
 
   it('opens a plain terminal tab in the worktree project', async () => {
     void runner().runCommand(command)

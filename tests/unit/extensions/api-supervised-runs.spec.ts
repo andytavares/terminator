@@ -165,6 +165,27 @@ describe('workspace.createProject', () => {
   })
 })
 
+// v2.4.0 — an extension that registered a worktree can find and remove it
+// again when the worktree goes (ADR-061).
+describe('workspace.listProjects and deleteProject', () => {
+  it('says which directory each project points at', () => {
+    const api = build()
+    api.workspace.createProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
+    expect(api.workspace.listProjects('ws-1')).toEqual([
+      expect.objectContaining({ name: 'a', worktreePath: '/wt/a' }),
+    ])
+  })
+
+  it('tells the sidebar a deleted project is gone', () => {
+    const api = build()
+    api.workspace.deleteProject('proj-1')
+    expect(broadcasts).toContainEqual({
+      channel: 'workspace:project-removed',
+      payload: { id: 'proj-1' },
+    })
+  })
+})
+
 describe('pty.openTerminalTab', () => {
   const input = { projectId: 'proj-1', cwd: '/wt/a', tabTitle: 'feat/x' }
 

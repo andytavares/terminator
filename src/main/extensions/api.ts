@@ -131,6 +131,8 @@ export interface ProjectSnapshot {
   readonly id: string
   readonly workspaceId: string
   readonly name: string
+  /** The directory it points at, when it is not the workspace folder (v2.4.0). */
+  readonly worktreePath?: string
 }
 
 // Canonical session-authority types live with the authority (pty-manager.ts);
@@ -873,11 +875,14 @@ export function createExtensionAPI(
         return listWorkspaces().map(({ id, name, folderPath }) => ({ id, name, folderPath }))
       },
       listProjects(workspaceId: string): ProjectSnapshot[] {
-        return listProjectsFromStore(workspaceId).map(({ id, workspaceId: wsId, name }) => ({
-          id,
-          workspaceId: wsId,
-          name,
-        }))
+        return listProjectsFromStore(workspaceId).map(
+          ({ id, workspaceId: wsId, name, worktreePath }) => ({
+            id,
+            workspaceId: wsId,
+            name,
+            worktreePath,
+          })
+        )
       },
       createProject(input): ProjectSnapshot | null {
         // Reused rather than duplicated: provisioning the same worktree twice
@@ -919,6 +924,7 @@ export function createExtensionAPI(
       },
       deleteProject(projectId: string): void {
         deleteProjectFromStore(projectId)
+        deps?.broadcastToWindows?.('workspace:project-removed', { id: projectId })
       },
       onDelete(handler: (workspaceId: string) => void): Disposable {
         const unsub = onWorkspaceDelete(handler)

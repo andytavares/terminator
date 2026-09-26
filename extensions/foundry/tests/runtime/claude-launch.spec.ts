@@ -10,6 +10,7 @@ import {
   buildSettings,
   shellQuote,
   transcriptPathFor,
+  resumableIn,
 } from '../../src/runtime/claude-launch.js'
 
 let directory: string
@@ -47,6 +48,33 @@ describe('shellQuote', () => {
 
   it('leaves a path with spaces in one argument', () => {
     expect(shellQuote('/Application Support/a b')).toBe(`'/Application Support/a b'`)
+  })
+})
+
+// A conversation is filed under the directory it ran in. One begun elsewhere —
+// an architect that ran on the repository root before ADR-061 — cannot be
+// resumed from the order's checkout, and `--resume` on it would end the turn.
+describe('resumableIn', () => {
+  it('resumes a conversation filed under this directory', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'resumable-'))
+    const file = transcriptPathFor('/wt/order', 'sid', home)
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, '{}\n')
+    expect(resumableIn('/wt/order', 'sid', home)).toBe('sid')
+    fs.rmSync(home, { recursive: true, force: true })
+  })
+
+  it('starts fresh when the conversation was filed under another directory', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'resumable-'))
+    const file = transcriptPathFor('/repos/a', 'sid', home)
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, '{}\n')
+    expect(resumableIn('/wt/order', 'sid', home)).toBeUndefined()
+    fs.rmSync(home, { recursive: true, force: true })
+  })
+
+  it('starts fresh when there is no conversation to resume', () => {
+    expect(resumableIn('/wt/order', undefined)).toBeUndefined()
   })
 })
 

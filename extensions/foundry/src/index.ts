@@ -20,7 +20,10 @@ import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { tearDownRun, deleteOrder } from './line/teardown.js'
 import { markReady, readPulls, shipOrder } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
-import { ensureCheckouts } from './line/worktree.js'
+import { ensureCheckout, ensureCheckouts } from './line/worktree.js'
+import type { Checkout } from './line/worktree.js'
+import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
+import { resumableIn } from './runtime/claude-launch.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
 import type { RunCommand } from './runtime/diff-metrics.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
@@ -967,7 +970,8 @@ async function executeRun(
     return { changedFiles, linesChanged }
   }
 
-  const workspaceId = api.workspace?.list()[0]?.id ?? ''
+  const workspaceOf = (checkout: { origin: string }): string =>
+    workspaceFor(api.workspace?.list() ?? [], checkout.origin)
   const store = createOrderStore(root)
   const featureDir = orderDir(root, order.id)
 
@@ -1060,8 +1064,9 @@ async function executeRun(
         .start({
           featureDir,
           worktreePath: checkout.path,
-          workspaceId,
+          workspaceId: workspaceOf(checkout),
           branch: checkout.branch,
+          issue: issueOf(order),
           prompt: input.prompt,
           phase: (input.role ?? input.node.id) as never,
           resumeSessionId: input.resumeSessionId,
@@ -1314,8 +1319,9 @@ async function executeRun(
       if (checkout === undefined || runner === null) return null
       return runner.runCommand({
         worktreePath: checkout.path,
-        workspaceId,
+        workspaceId: workspaceOf(checkout),
         branch: checkout.branch,
+        issue: issueOf(order),
         title: step.name,
         command: step.command,
       })
@@ -1432,9 +1438,9 @@ async function executeRun(
 /**
  * One turn of intake, in a session the operator can see and type into.
  *
- * The architect runs read-only in the repository itself: intake changes no
- * code, and cutting a worktree for a plan that may never be agreed would be
- * creating a branch for nothing. It writes one file, and that file is
+ * The architect runs read-only in the order's lane checkout — the one its
+ * lanes will build in — so the whole order is one sidebar project (ADR-061).
+ * It writes one file, and that file is
  * validated before any of it reaches the order — an agent that could write the
  * order directly could set its status and agree its own work.
  *
@@ -1471,9 +1477,17 @@ async function convergeOnce(
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
   }
 
-  const workspaceId = api.workspace?.list()[0]?.id ?? ''
   const featureDir = orderDir(root, order.id)
   await fs.promises.mkdir(featureDir, { recursive: true })
+
+  // The lane's own checkout, so the order is one project from its first turn
+  // (ADR-061) and the architect reads the base the builder will change.
+  let checkout: Checkout
+  try {
+    checkout = await ensureCheckout(order, 1, { exec: (o) => api.shell.exec(o), root })
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
 
   // One conversation per order, so a follow-up does not make the architect
   // read the repository again to answer "why not the other approach".
@@ -1546,12 +1560,13 @@ async function convergeOnce(
     void runner
       .start({
         featureDir,
-        worktreePath: plan.cwd,
-        workspaceId,
-        branch: `foundry/intake-${order.id.toLowerCase()}`,
+        worktreePath: checkout.path,
+        workspaceId: workspaceFor(api.workspace?.list() ?? [], checkout.origin),
+        branch: checkout.branch,
+        issue: issueOf(order),
         prompt: plan.prompt,
         phase: 'architect' as never,
-        resumeSessionId: plan.role.allowResume ? resuming : undefined,
+        resumeSessionId: plan.role.allowResume ? resumableIn(checkout.path, resuming) : undefined,
         model: modelForTier(api, plan.role.modelTier),
         // Read-only, enforced by the hook rather than by the prompt. The
         // architect proposes; it does not edit the repository it is reading.
@@ -1868,7 +1883,11 @@ export function activate(api: ExtensionAPI): void {
     // Its agents first. Deleting the records out from under a live session
     // leaves an agent writing into a worktree whose order no longer exists.
     await stopOrder(root, id, 'the order was deleted')
-    const result = await deleteOrder(order, { exec: (o) => api.shell.exec(o), root })
+    const result = await deleteOrder(order, {
+      exec: (o) => api.shell.exec(o),
+      root,
+      removeProjectAt: projectRemover(api.workspace),
+    })
     return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
   })
 
@@ -1950,7 +1969,11 @@ export function activate(api: ExtensionAPI): void {
     if (order === null) return { error: `No order ${id}.` }
 
     await stopOrder(root, id, 'starting over')
-    const result = await tearDownRun(order, { exec: (o) => api.shell.exec(o), root })
+    const result = await tearDownRun(order, {
+      exec: (o) => api.shell.exec(o),
+      root,
+      removeProjectAt: projectRemover(api.workspace),
+    })
 
     // Read back rather than reused: `stopOrder` saves, and writing the order
     // we loaded before it would put `running` back.

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -102,6 +102,22 @@ describe('tearDownRun', () => {
     await tearDownRun(order(), { exec, root })
     const order_ = calls.map((c) => c.args.slice(0, 2).join(' '))
     expect(order_.indexOf('worktree prune')).toBeGreaterThan(order_.indexOf('worktree remove'))
+  })
+
+  it("removes the sidebar project that pointed at the lane's checkout", async () => {
+    const { exec } = recorder()
+    const removeProjectAt = vi.fn(() => true)
+    const result = await tearDownRun(order(), { exec, root, removeProjectAt })
+    expect(removeProjectAt).toHaveBeenCalledWith(
+      path.join(orderDir(root, 'WO-1'), 'worktrees', path.basename(repo))
+    )
+    expect(result.removed).toContain('the project wip')
+  })
+
+  it('names no project when there was none to remove', async () => {
+    const { exec } = recorder()
+    const result = await tearDownRun(order(), { exec, root, removeProjectAt: () => false })
+    expect(result.removed.some((r) => r.startsWith('the project'))).toBe(false)
   })
 
   it('deletes the branch the lane was working on', async () => {
