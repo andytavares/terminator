@@ -1,0 +1,100 @@
+extensions/foundry/src/factory/callouts.ts
+  s_4f15472be339a2::t_ad7b931c375345 5
+  s_4f15472be339a2::t_2f36dfc1c3f4a0 104-121
+extensions/foundry/tests/factory/callouts.spec.ts
+  s_4f15472be339a2::t_ff7fe470d512d2 147-178
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_4f15472be339a2::t_da84bd97a83d11 176-250
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_4f15472be339a2::t_1f6137d864a68d 203-207
+  s_4f15472be339a2::t_17f35b155be354 200,209
+extensions/foundry/src/components/Floor.tsx
+  s_4f15472be339a2::t_34f15f11b4928a 175-183
+  s_4f15472be339a2::t_90aad439fbe9bb 864-889
+  s_4f15472be339a2::t_72fe8840ca733b 16
+  s_4f15472be339a2::t_9a4241b75c0efa 890-892
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_4f15472be339a2::t_1502d83743e2e4 73-75
+  s_4f15472be339a2::t_23d6050210112c 20-26
+extensions/foundry/src/factory/art/props.ts
+  s_4f15472be339a2::t_e94be7c6f0afd8 27-28
+  s_4f15472be339a2::t_0eb7c0d7587ba4 5
+  s_4f15472be339a2::t_ba9f3a3323d626 907-908
+  s_4f15472be339a2::t_4fc58d574f8a01 671-704
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_4f15472be339a2::t_b486e09b00c851 66-79
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_4f15472be339a2::t_9b33b7af552432 8
+  s_4f15472be339a2::t_fd1998dad7759e 352-390
+extensions/foundry/tests/factory/layout.spec.ts
+  s_4f15472be339a2::t_1210e6e83670c9 546-566
+extensions/foundry/src/renderer/use-run-observation.ts
+  s_4f15472be339a2::t_6639412b657f97 59-60
+  s_4f15472be339a2::t_2cc09654710afd 5
+extensions/foundry/tests/factory/events.spec.ts
+  s_4f15472be339a2::t_df3d64824ff595 12
+  s_4f15472be339a2::t_d84fa3178ac7c1 355-417
+  s_4f15472be339a2::t_03c5c5a7173de9 55-67
+  s_4f15472be339a2::t_d561dc80384245 418-420
+extensions/foundry/src/factory/layout.ts
+  s_4f15472be339a2::t_1a139af3a97f86 238-242
+  s_4f15472be339a2::t_f5f06c939a5769 613
+  s_4f15472be339a2::t_078dcdd1247c0e 313-330
+  s_4f15472be339a2::t_9117263e744841 41-44
+  s_4f15472be339a2::t_b8e5eac5f2f0c8 331
+extensions/foundry/tests/factory/director.spec.ts
+  s_4f15472be339a2::t_cbbeaa2cef0949 570-594
+  s_4f15472be339a2::t_3f9779dd7425b1 61
+  s_4f15472be339a2::t_c95528090411d5 595
+extensions/foundry/src/factory/events.ts
+  s_4f15472be339a2::t_576ac921f3bef3 238-241
+  s_4f15472be339a2::t_3281e7d363d390 4-5
+  s_4f15472be339a2::t_88a0dd7dc7cc8b 188-205
+  s_4f15472be339a2::t_88ca8f598a6d76 22
+  s_4f15472be339a2::t_8fdff80ea89380 61-62
+extensions/foundry/tests/factory/art/props.spec.ts
+  s_4f15472be339a2::t_90f195b3206e40 241-260
+  s_4f15472be339a2::t_c98142f64cd64c 44
+extensions/foundry/src/factory/director.ts
+  s_4f15472be339a2::t_83bb832fb2fa8d 274-279
+  s_4f15472be339a2::t_acc7dbe1c70b79 238-248
+extensions/foundry/src/components/factory/HallScene.tsx
+  s_4f15472be339a2::t_7af3335816a082 99
+extensions/foundry/src/ipc/forge-channels.ts
+  s_4f15472be339a2::t_a99864028a8edf 166-174
+  s_4f15472be339a2::t_051c2cc5b4601c 12
+  s_4f15472be339a2::t_d1023c6f6216fe 615-623
+  s_4f15472be339a2::t_c86f3e1c74ae8a 624-625
+extensions/foundry/src/factory/sim.ts
+  s_4f15472be339a2::t_7244854f2d199d 60-66,74-75
+  s_4f15472be339a2::t_62b38be0b6c705 240-251
+  s_4f15472be339a2::t_91f0dbb26b6119 8
+extensions/foundry/tests/factory/sim.spec.ts
+  s_4f15472be339a2::t_96440aa62d8a95 72
+  s_4f15472be339a2::t_b0d809f592d1f1 128-152
+  s_4f15472be339a2::t_9bd19d56418f47 153-155
+extensions/foundry/src/factory/replay.ts
+  s_4f15472be339a2::t_3530f5ffcc3eec 95-97
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_4f15472be339a2::t_bc555f982b91b7 15-16
+  s_4f15472be339a2::t_acfbbbb3af1087 182-204
+extensions/foundry/src/ipc/run-channels.ts
+  s_4f15472be339a2::t_676e7b61608a14 19
+  s_4f15472be339a2::t_aef2fd27a879f4 478-481
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "69392aa6f659005ba5b6af25bc6693115e05242e",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

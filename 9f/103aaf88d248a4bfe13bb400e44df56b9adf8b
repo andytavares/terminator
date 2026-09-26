@@ -1,0 +1,40 @@
+extensions/foundry/src/recipe/parse.ts
+  s_4f15472be339a2::t_8644523b15ea9d 135-138
+  s_4f15472be339a2::t_8849d958e9c9e9 205-215
+  s_4f15472be339a2::t_9816952187ede1 216
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_4f15472be339a2::t_643ca721970f09 487-496
+  s_4f15472be339a2::t_54d7e1f0b5e432 484-486,497-516
+extensions/foundry/tests/recipe/parse.spec.ts
+  s_4f15472be339a2::t_7b2fadbe2884e9 442-483
+extensions/foundry/recipes/bugfix.yaml
+  s_4f15472be339a2::t_7fc726a3b65415 9-11
+extensions/foundry/recipes/direct.yaml
+  s_4f15472be339a2::t_7ebeebd8563d7c 7-9
+extensions/foundry/recipes/poc.yaml
+  s_4f15472be339a2::t_eeac86209b8254 9-11
+extensions/foundry/recipes/quick.yaml
+  s_4f15472be339a2::t_4ce18ad99966e6 16-18
+extensions/foundry/recipes/refactor.yaml
+  s_4f15472be339a2::t_a9ea2b1c569ab4 9-11
+extensions/foundry/recipes/speckit.yaml
+  s_4f15472be339a2::t_04a93729e4b1c4 13-15
+extensions/foundry/recipes/standard.yaml
+  s_4f15472be339a2::t_3c54f5deb8da32 7-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9f103aaf88d248a4bfe13bb400e44df56b9adf8b",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
