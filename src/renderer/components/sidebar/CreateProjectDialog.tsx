@@ -129,8 +129,14 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         // eslint-disable-next-line no-control-regex
         .replace(/[~^:?*[\\\x00-\x1f\x7f]/g, '')
         .replace(/\.\.+/g, '.')
-        .replace(/^[./]+|[./]+$/g, '')
+        // Only the leading end: stripping a trailing `/` on every keystroke
+        // made `feature/login` impossible to type. The tail is trimmed on submit.
+        .replace(/^[./]+/, '')
     )
+  }
+
+  function typedBranchName(): string {
+    return newBranchName.trim().replace(/[./]+$/, '')
   }
 
   /** The project exists; give it the issue it was created for (FR-011). */
@@ -173,7 +179,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     if (!gitRoot || branchMode === 'existing') {
       let branch = selectedBranch
       if (gitRoot && isNewBranch) {
-        const branchTrimmed = newBranchName.trim()
+        const branchTrimmed = typedBranchName()
         if (!branchTrimmed) {
           setError('Enter a branch name')
           return false
@@ -211,7 +217,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       await attachIssue(result)
     } else {
       // worktree
-      const branch = worktreeIsNewBranch ? newBranchName.trim() : selectedBranch
+      const branch = worktreeIsNewBranch ? typedBranchName() : selectedBranch
       if (!branch) {
         setError('Select or enter a branch name')
         return false

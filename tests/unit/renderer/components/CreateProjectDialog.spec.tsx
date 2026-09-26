@@ -708,6 +708,35 @@ describe('CreateProjectDialog branch names and fetching', () => {
     await vi.waitFor(() => screen.getByText('Worktree path'))
   }
 
+  it('keeps a slash while the new branch name is being typed', async () => {
+    setupGitWorkspace()
+    await openWorktreeMode()
+    const input = screen.getByPlaceholderText('feature/my-feature') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'feature/' } })
+    expect(input.value).toBe('feature/')
+    fireEvent.change(input, { target: { value: 'feature/login' } })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() =>
+      expect(git().createWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'feature/login', isNewBranch: true })
+      )
+    )
+  })
+
+  it('drops a trailing slash left on submit', async () => {
+    setupGitWorkspace()
+    await openWorktreeMode()
+    fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
+      target: { value: 'feature/' },
+    })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() =>
+      expect(git().createWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'feature' })
+      )
+    )
+  })
+
   it('offers a branch that exists only on the remote, by its bare name', async () => {
     setupGitWorkspace()
     git().listBranches.mockResolvedValue({
