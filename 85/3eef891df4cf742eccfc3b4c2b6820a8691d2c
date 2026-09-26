@@ -1,0 +1,40 @@
+extensions/foundry/tests/components/SettingsView.spec.tsx
+  s_0f24e553b5329a::t_013e7f39a71c7b 34-35
+  s_0f24e553b5329a::t_317444c94d0eaf 33,144-169
+  s_0f24e553b5329a::t_65a32ed8c0b86f 170
+extensions/foundry/SUPERVISION.md
+  s_0f24e553b5329a::t_2b0b7379b643a3 809-813
+extensions/foundry/tests/ipc/run-actions-ipc.spec.ts
+  s_0f24e553b5329a::t_317444c94d0eaf 357-384
+extensions/foundry/tests/forge/converge.spec.ts
+  s_0f24e553b5329a::t_317444c94d0eaf 6-11,523-540
+  s_0f24e553b5329a::t_d772f973ce91bb 541
+extensions/foundry/src/forge/converge.ts
+  s_0f24e553b5329a::t_d29b8d1d65cffd 227-242
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_0f24e553b5329a::t_2b0b7379b643a3 536-542
+extensions/foundry/src/index.ts
+  s_0f24e553b5329a::t_d29b8d1d65cffd 235,401-405,2040-2043,2783-2791
+  s_0f24e553b5329a::t_3906811073b723 55-62
+  s_0f24e553b5329a::t_8a53a2e1cfd2fa 2792-2793
+extensions/foundry/src/components/SettingsView.tsx
+  s_0f24e553b5329a::t_bbb69a131b77cb 36
+  s_0f24e553b5329a::t_013e7f39a71c7b 34-35,37-38,48,134-155,198-217
+  s_0f24e553b5329a::t_0398895d6099ee 218-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "853eef891df4cf742eccfc3b4c2b6820a8691d2c",
+  "prompts": {},
+  "sessions": {
+    "s_0f24e553b5329a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af7e2c3-2eb0-4869-9f43-9efc8b9b4bad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
