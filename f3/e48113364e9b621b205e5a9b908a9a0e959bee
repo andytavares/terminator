@@ -1,0 +1,21 @@
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_654aa27bb8605b::t_ed417ae9b35608 132-134,138-141,182,220
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_654aa27bb8605b::t_e13c6fbad70877 711-739
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f3e48113364e9b621b205e5a9b908a9a0e959bee",
+  "prompts": {},
+  "sessions": {
+    "s_654aa27bb8605b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c92f186c-8546-4489-b43c-5303c88c1306",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
