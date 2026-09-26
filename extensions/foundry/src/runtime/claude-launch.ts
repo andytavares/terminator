@@ -59,6 +59,11 @@ export interface LaunchSpecOptions {
   model?: string
   /** What `--effort` gets. Absent leaves the flag off, so the operator's configuration wins. */
   effort?: string
+  /**
+   * Extra directories Claude Code loads skills from, one `--add-dir` per
+   * entry. Absent or empty adds none — most runs mount nothing.
+   */
+  addDirs?: string[]
 }
 
 /**
@@ -237,6 +242,9 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
     ...(options.effort === undefined || options.effort === ''
       ? []
       : ['--effort', shellQuote(options.effort)]),
+    // One per mounted skill directory, so Claude Code loads
+    // `<dir>/.claude/skills/<name>/SKILL.md` from each of them.
+    ...(options.addDirs ?? []).flatMap((dir) => ['--add-dir', shellQuote(dir)]),
     // The ladder still decides first: a PreToolUse hook runs under every
     // permission mode, and its allow/deny is honoured before the mode is
     // consulted at all. What the mode picks up is only what the ladder

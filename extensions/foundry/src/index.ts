@@ -1124,6 +1124,8 @@ async function buildExecutorDeps(
     mayUseTool: (tool: string) => boolean
     /** The one file this rung may write, or null when it has no artefact. */
     outputPath?: string | null
+    /** Where this node's skills were mounted, or null when it declared none. */
+    skillsMount: string | null
     /** Called as soon as the session exists, not when its turn ends. */
     onStarted?: (sessionId: string) => void
   }): Promise<StartedRun> {
@@ -1172,6 +1174,7 @@ async function buildExecutorDeps(
           resumeSessionId: input.resumeSessionId,
           model: modelForTier(api, input.modelTier),
           effort: input.effort ?? undefined,
+          addDirs: input.skillsMount === null ? undefined : [input.skillsMount],
           // The read-only decision is taken by the same policy the hook
           // applies, so a verifier that decides to fix what it found is
           // refused rather than reminded.
@@ -1196,7 +1199,7 @@ async function buildExecutorDeps(
               autonomy: autonomyFor(api),
               worktreePath: checkout.path,
               outputPath: input.outputPath ?? null,
-              skillsMount: null,
+              skillsMount: input.skillsMount,
             }),
           onPending: (pending) => {
             // Asks reach the console as well as the inbox. A refusal is posted

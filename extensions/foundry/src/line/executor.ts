@@ -20,8 +20,10 @@ import type { RoleRegistry } from './roles.js'
 import { brief } from './brief.js'
 import { collectableWrites, rungOutputPath } from './rung-output.js'
 import { orderDir } from '../data-root.js'
+import { mountSkills } from './skills-mount.js'
+import { resolveSkills } from '../recipe/resolve.js'
 import type { ResolveSources } from '../recipe/resolve.js'
-import type { EffortLevel, Recipe, Rule } from '../recipe/parse.js'
+import type { EffortLevel, Recipe, Rule, Step } from '../recipe/parse.js'
 import type { Budgets, RiskAssessment, WorkOrder } from '../order/schema.js'
 import { verdictFromExit, summarise } from '../verify/verdict.js'
 import type { Verdict } from '../verify/verdict.js'
@@ -116,6 +118,14 @@ export interface ExecutorDeps {
      * the diff, and for a bare command.
      */
     outputPath: string | null
+    /**
+     * Where this node's skills were mounted, or null when it declared none.
+     *
+     * Handed to the caller so it can pass `--add-dir` and put the same value
+     * on the tool decision — a node's skills are readable and nothing else
+     * about the mount is.
+     */
+    skillsMount: string | null
     /**
      * Called the moment the session exists, which is not when the turn ends.
      *
@@ -327,6 +337,33 @@ function isGateRule(value: unknown): value is GateRuleId {
 /** A node id, made safe to use as a filename. */
 function safeFilename(id: string): string {
   return id.replace(/[^A-Za-z0-9._-]/g, '_')
+}
+
+/** A step's own `skills:`, plus its inner step's for a fan-out. */
+function stepSkillsOf(step: Step): readonly string[] {
+  const own = step.skills ?? []
+  if (step.kind !== 'fanout') return own
+  const inner = (step.step ?? {}) as { skills?: unknown }
+  const innerSkills = Array.isArray(inner.skills)
+    ? inner.skills.filter((id): id is string => typeof id === 'string')
+    : []
+  return [...own, ...innerSkills]
+}
+
+/**
+ * Which skills a node's agent gets: the union of its role's and its step's,
+ * de-duplicated.
+ *
+ * A fan-out's inner `step:` may carry its own `skills:` alongside the outer
+ * step's, the way `wantsFreshContext` reads `context` off the same object —
+ * so both are read here rather than only the one a plain step has.
+ */
+export function skillsFor(recipe: Recipe, node: RunNode, roles: RoleRegistry): string[] {
+  const step = stepFor(recipe, node)
+  const role = node.role === null ? null : roles.get(node.role)
+  const roleSkills = role?.skills ?? []
+  const stepSkills = step === undefined ? [] : stepSkillsOf(step)
+  return [...new Set([...roleSkills, ...stepSkills])]
 }
 
 /** The tail of a log, for a feedback excerpt — never the whole thing. */
@@ -719,6 +756,29 @@ export async function execute(
           const outputPath = outputFor(node, roleId)
           const tier = (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep'
 
+          // This node's skills, mounted for its agent — outside the checkout,
+          // read-only, and refreshed on every run rather than only the first.
+          // A run step that ran as a command already returned above and never
+          // reaches here, so only an agent ever gets a mount.
+          const skillIds = skillsFor(recipe, node, roles)
+          const skillsMount =
+            skillIds.length === 0
+              ? null
+              : path.join(
+                  orderDir(deps.sources.dataRoot, order.id),
+                  'skills-mount',
+                  safeFilename(node.id)
+                )
+          if (skillsMount !== null) {
+            const { skills } = resolveSkills(skillIds, deps.sources)
+            mountSkills(skillsMount, skills)
+            await deps.record?.(
+              'skills.mounted',
+              node.id,
+              skills.map((skill) => `${skill.id} (${skill.rung})`).join(', ')
+            )
+          }
+
           // The previous process of this conversation may still be sitting at
           // its prompt. Two processes must not share one conversation — the
           // same reason `endAndWait` exists for a resumed terminal session.
@@ -731,6 +791,7 @@ export async function execute(
             resumeSessionId,
             readOnly,
             modelTier: tier,
+            skillsMount,
             effort:
               tier === 'fast' ? null : (stepFor(recipe, node)?.effort ?? recipe.effort ?? null),
             mayUseTool: (tool) => roleId === null || roles.mayUseTool(roleId, tool),

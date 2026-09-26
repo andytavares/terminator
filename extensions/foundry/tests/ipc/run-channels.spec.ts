@@ -108,6 +108,34 @@ describe('foundry:run.start', () => {
     expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(false)
   })
 
+  it('refuses to start when a role names a skill nothing defines, and nothing runs', async () => {
+    // The data root overrides the built-in builder with one that names a
+    // skill nobody has, at any of the three rungs.
+    fs.mkdirSync(path.join(dataRoot, 'roles'), { recursive: true })
+    fs.writeFileSync(
+      path.join(dataRoot, 'roles', 'builder.yaml'),
+      [
+        'schemaVersion: 1',
+        'id: builder',
+        'modelTier: deep',
+        'allowResume: true',
+        'reads: []',
+        'writes: [worktree]',
+        'tools: []',
+        'skills: [nonexistent]',
+        'prompt: build it',
+        '',
+      ].join('\n')
+    )
+    await store.save(order())
+    const r = (await channels().start({ id: 'WO-1' })) as { error: string }
+    expect(r.error).toMatch(/Unknown skill "nonexistent"/)
+    expect(r.error).toContain('builder')
+    expect(r.error).toContain(`${dataRoot}/skills/nonexistent/SKILL.md`)
+    expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(false)
+    expect((await store.load('WO-1'))?.status).toBe('agreed')
+  })
+
   it('refuses a shape this repository cannot support, and says why', async () => {
     await store.save(order())
     const r = (await channels().start({ id: 'WO-1', recipe: 'speckit' })) as { error: string }

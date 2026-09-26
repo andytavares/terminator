@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execute, opensPullRequest } from '../../src/line/executor.js'
+import { execute, opensPullRequest, skillsFor } from '../../src/line/executor.js'
 import type { ExecutorEvent, StartedRun } from '../../src/line/executor.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
 import { retry } from '../../src/line/scheduler.js'
@@ -2128,5 +2128,111 @@ describe('a resumed session is ended before it is resumed', () => {
     expect(ended).toContain('sess-builder')
     // It was ended before the node that resumed it actually ran with it.
     expect(seenAtRunTime.has('sess-builder')).toBe(true)
+  })
+})
+
+describe('skillsFor', () => {
+  const roles = createRoleRegistry({ dataRoot: '', repoPaths: [], builtInDir })
+
+  it("is the union of the role's and the step's skills, de-duplicated", () => {
+    const withStep = parseRecipe(
+      `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: agent
+    role: builder
+    skills: [ci-fix, extra]
+`,
+      'direct.yaml'
+    )
+    if (!withStep.ok) throw new Error(withStep.reason)
+    const graph = buildRunGraph(order([unit('U-1')]), withStep.value)
+    const node = graph.nodes.find((n) => n.id === 'build')!
+    // The builder role already declares `ci-fix`; the step adds `extra`.
+    expect(skillsFor(withStep.value, node, roles).sort()).toEqual(['ci-fix', 'extra'])
+  })
+
+  it('reads a skill declared on a fan-out’s inner step', () => {
+    const fanned = parseRecipe(
+      `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder, skills: [extra] }
+`,
+      'direct.yaml'
+    )
+    if (!fanned.ok) throw new Error(fanned.reason)
+    const graph = buildRunGraph(order([unit('U-1')]), fanned.value)
+    const node = graph.nodes.find((n) => n.id === 'build:U-1')!
+    expect(skillsFor(fanned.value, node, roles).sort()).toEqual(['ci-fix', 'extra'])
+  })
+
+  it('is empty for a role and a step that declare none', () => {
+    const verifying = RECIPE.replace('role: builder', 'role: verifier')
+    const r = recipe(verifying)
+    const graph = buildRunGraph(order([unit('U-1')]), r)
+    const node = graph.nodes.find((n) => n.id === 'build:U-1')!
+    expect(skillsFor(r, node, roles)).toEqual([])
+  })
+})
+
+describe('a node with skills gets them mounted', () => {
+  it('hands the run its mounted skills, and null when it has none', async () => {
+    const run = vi.fn(ok)
+    const o = order([unit('U-1')])
+    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), deps(run))
+
+    // The builder role declares `ci-fix`.
+    const build = run.mock.calls.find((c) => c[0].node.id === 'build:U-1')?.[0]
+    expect(build?.skillsMount).toBe(
+      path.join(dataRoot, 'orders', o.id, 'skills-mount', 'build_U-1')
+    )
+    expect(
+      fs.existsSync(path.join(build?.skillsMount, '.claude', 'skills', 'ci-fix', 'SKILL.md'))
+    ).toBe(true)
+
+    // The verifier declares no skills at all.
+    const verify = run.mock.calls.find((c) => c[0].node.id === 'verify:U-1')?.[0]
+    expect(verify?.skillsMount).toBeNull()
+  })
+
+  it('records skills.mounted, naming each skill and the rung it came from', async () => {
+    const recorded: string[][] = []
+    const o = order([unit('U-1')])
+    await execute(o, recipe(CHECKED), buildRunGraph(o, recipe(CHECKED)), {
+      ...deps(vi.fn(ok)),
+      record: async (action, subject, reason) => {
+        recorded.push([action, subject, reason])
+      },
+    })
+    expect(recorded).toContainEqual(['skills.mounted', 'build:U-1', 'ci-fix (built-in)'])
+    expect(recorded.some(([, subject]) => subject === 'verify:U-1')).toBe(false)
+  })
+
+  it('never mounts anything for a `run` step that runs as a command', async () => {
+    const o = order([unit('U-1')])
+    const RUN_AS_COMMAND = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: check
+    kind: run
+    command: make
+`
+    const recorded: string[][] = []
+    await execute(o, recipe(RUN_AS_COMMAND), buildRunGraph(o, recipe(RUN_AS_COMMAND)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+      record: async (action, subject, reason) => {
+        recorded.push([action, subject, reason])
+      },
+    })
+    expect(recorded.some(([action]) => action === 'skills.mounted')).toBe(false)
   })
 })

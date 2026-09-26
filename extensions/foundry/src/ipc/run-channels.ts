@@ -9,13 +9,15 @@ import type { Recipe } from '../recipe/parse.js'
 import { readyNodes, blockedReason, retry as retryNode } from '../line/scheduler.js'
 import { reclaim, orphanedNodes } from '../line/reclaim.js'
 import type { SessionLiveness } from '../line/reclaim.js'
-import { resolveRecipe, availableNames } from '../recipe/resolve.js'
+import { resolveRecipe, availableNames, resolveSkills } from '../recipe/resolve.js'
 import type { Resolved, ResolveSources } from '../recipe/resolve.js'
 import { checkRequirements } from '../recipe/requirements.js'
 import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
 import { runFailure } from '../line/run-outcome.js'
+import { skillsFor } from '../line/executor.js'
+import { createRoleRegistry } from '../line/roles.js'
 import { readCiState } from '../line/ci-state.js'
 import type { Gate } from '../gates/rules.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
@@ -394,6 +396,25 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const name = proposal.name
 
     const graph = buildRunGraph(order, recipe.value)
+
+    // Every node's skills, resolved before anything is cut. An unknown one
+    // discovered mid-run has already spent agent time on a node that was
+    // going to fail the moment its agent tried to read a directory nobody
+    // mounted; refusing here costs nothing.
+    const roleRegistry = createRoleRegistry(deps.sources())
+    for (const node of graph.nodes) {
+      const ids = skillsFor(recipe.value, node, roleRegistry)
+      if (ids.length === 0) continue
+      const { unknown } = resolveSkills(ids, deps.sources())
+      if (unknown.length === 0) continue
+      const missing = unknown[0]
+      const role = node.role === null ? null : roleRegistry.get(node.role)
+      const declaredBy = role !== null && role.skills.includes(missing) ? node.role : node.stepId
+      return {
+        error: `Unknown skill "${missing}" (declared by ${declaredBy}). Add it under ${deps.dataRoot()}/skills/${missing}/SKILL.md or remove it.`,
+      }
+    }
+
     await saveGraph(graph)
 
     const running: WorkOrder = {

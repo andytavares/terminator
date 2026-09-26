@@ -248,6 +248,22 @@ describe('buildLaunchSpec', () => {
   })
 })
 
+describe('mounted skills on the command line', () => {
+  it('adds no --add-dir when there is nothing to mount', () => {
+    expect(buildLaunchSpec(options()).command).not.toContain('--add-dir')
+  })
+
+  it('adds one --add-dir per directory, shell-quoted', () => {
+    const spec = buildLaunchSpec({
+      ...options(),
+      addDirs: ['/order/skills-mount/build_U-1', "/order/skills-mount/o'clock"],
+    })
+    expect(spec.command).toContain("--add-dir '/order/skills-mount/build_U-1'")
+    expect(spec.command).toContain(`--add-dir '/order/skills-mount/o'\\''clock'`)
+    expect(spec.command.match(/--add-dir/g)).toHaveLength(2)
+  })
+})
+
 describe('buildLaunchSpec — what it falls back to', () => {
   it('runs the hook with this application, when no other node is named', () => {
     const { nodePath: _unused, ...rest } = options()
