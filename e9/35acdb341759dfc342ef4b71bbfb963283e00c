@@ -1,0 +1,19 @@
+docs/research/foundry-hall-breakroom-belts.md
+  s_ada067fd581084::t_6cfe73b3aae573 168,230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e935acdb341759dfc342ef4b71bbfb963283e00c",
+  "prompts": {},
+  "sessions": {
+    "s_ada067fd581084": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37ef5476-deb7-4867-9476-00f095ba1d89",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
