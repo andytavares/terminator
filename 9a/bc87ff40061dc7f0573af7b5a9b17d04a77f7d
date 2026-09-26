@@ -1,0 +1,57 @@
+extensions/foundry/src/components/foundry.css
+  s_654aa27bb8605b::t_d9da242d15f304 892-893,895,911-922,1686-1737
+  s_654aa27bb8605b::t_fa93e949820326 489-490,503-504,509-510,908-910
+  s_654aa27bb8605b::t_2c8b8aa83e4c2e 1738
+extensions/foundry/roles/red-team.yaml
+  s_654aa27bb8605b::t_14d152ea5046ca 18-22
+extensions/foundry/src/order/proposal.ts
+  s_654aa27bb8605b::t_4815e759c760e9 57-62
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_654aa27bb8605b::t_a27e1b5407ba4c 967-969,974-976,1015-1018
+extensions/foundry/src/line/rung-output.ts
+  s_654aa27bb8605b::t_14d152ea5046ca 140-143
+docs/adr/068-the-architect-closes-the-findings-it-fixes.md
+  s_654aa27bb8605b::t_4b0f2cdcabc521 1-46
+extensions/foundry/src/forge/converge.ts
+  s_654aa27bb8605b::t_4815e759c760e9 7,83,141-145,318-325
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_654aa27bb8605b::t_0804437110940f 595,599-601,604-607,609-611,613-621,623-631,696-733,737-738,745-769
+  s_654aa27bb8605b::t_8f134378ef3d14 739-744
+  s_654aa27bb8605b::t_5011c7a274d52a 608,734-736
+  s_654aa27bb8605b::t_39b68b9aa03ce3 770-771
+extensions/foundry/tests/forge/red-team.spec.ts
+  s_654aa27bb8605b::t_a27e1b5407ba4c 5,221,224,226-230,248
+extensions/foundry/tests/forge/converge.spec.ts
+  s_654aa27bb8605b::t_8738e4d8255d87 367-410
+docs/ARCHITECTURE.md
+  s_654aa27bb8605b::t_7d73a830c2ec89 1026-1027,1034-1037
+extensions/foundry/src/forge/red-team.ts
+  s_654aa27bb8605b::t_4815e759c760e9 194-204,207-212
+extensions/foundry/tests/line/rung-output.spec.ts
+  s_654aa27bb8605b::t_29596d2c57e941 111-118
+extensions/foundry/src/components/Forge.tsx
+  s_654aa27bb8605b::t_e305e343286eca 179-185,187-228,293-295,991,997-1026,1030-1034,1036,1038-1041,1043-1049,1051-1078,1080-1091,1094-1095,1098-1111
+  s_654aa27bb8605b::t_5011c7a274d52a 524,1096-1097
+  s_654aa27bb8605b::t_fa93e949820326 1042
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_654aa27bb8605b::t_4b0f2cdcabc521 139,143-146
+  s_654aa27bb8605b::t_03d7ae4a8f19fb 147
+extensions/foundry/src/ipc/forge-channels.ts
+  s_654aa27bb8605b::t_e3d4b77499b5c4 6,58,60-62,67,323,328,337
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9abc87ff40061dc7f0573af7b5a9b17d04a77f7d",
+  "prompts": {},
+  "sessions": {
+    "s_654aa27bb8605b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c92f186c-8546-4489-b43c-5303c88c1306",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
