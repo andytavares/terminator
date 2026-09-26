@@ -1120,6 +1120,17 @@ reviewer's finding is judgement and stays with the operator.
   connected (`forge/ticket-offer.ts`), so its project can carry the ticket's
   name too. An intake conversation filed under another directory is started
   fresh, not resumed (`resumableIn`).
+- **A deleted project closes its sessions** (`src/main/terminal/project-sessions.ts`).
+  Whoever deletes a project — the sidebar, or an extension through
+  `workspace.deleteProject` — every PTY in it is killed, its record marked
+  closed, and its tabs dropped. Deleting an order also stops its architect.
+- **The Forge decides what it is sure of** (`forge/autonomy.ts`, ADR-062).
+  Questions at ≥ 0.9 confidence are answered with the recommended option and
+  recorded as assumptions; low/medium findings may be dismissed with a reason;
+  closable failing checks go back to the architect up to twice.
+- **Agent text is markdown** — rendered by `components/Markdown.tsx`
+  (`Markdown`, and `MarkdownInline` for buttons and labels), built as React
+  elements so nothing an agent writes becomes HTML. Tool input stays literal.
 - **Both order-level controls are always on the Floor.** They used to render
   only inside the "nothing is running this" band, so a live run — or one halted
   at a gate — had no way out on that screen at all, while `order.cancel`

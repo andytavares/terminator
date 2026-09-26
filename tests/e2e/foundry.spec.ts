@@ -742,6 +742,9 @@ test('what the architect writes is shown as markdown in the Forge', async () => 
   await openFoundry()
   expect(await clickByName('button', 'Forge')).toBe(true)
   await handle.page.waitForTimeout(800)
+  // An earlier test may have left another order open.
+  await clickByName('button', 'All orders')
+  await handle.page.waitForTimeout(800)
   const opened = await inFoundry<boolean>(`(function () {
     var all = document.querySelectorAll('button')
     for (var i = 0; i < all.length; i++) {
