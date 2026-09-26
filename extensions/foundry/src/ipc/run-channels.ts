@@ -493,9 +493,25 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const gates = await (deps.gatesFor?.(parsed.data.id) ?? Promise.resolve([]))
     const waiting = gates.filter((gate) => gate.decision === null)
 
+    // Every node's skills, resolved the way `start` resolves them. An order
+    // whose recipe no longer resolves — removed from disk after the run
+    // began — has nothing to report rather than a thrown surface.
+    const skills: Record<string, string[]> = {}
+    if (order?.recipe !== null && order?.recipe !== undefined) {
+      const resolved = resolveRecipe(order.recipe, deps.sources())
+      if (resolved.ok) {
+        const roleRegistry = createRoleRegistry(deps.sources())
+        for (const node of graph.nodes) {
+          const ids = skillsFor(resolved.resolved.value, node, roleRegistry)
+          if (ids.length > 0) skills[node.id] = ids
+        }
+      }
+    }
+
     return {
       graph,
       labels,
+      skills,
       // The draft's CI, read from the ship tail's own file rather than
       // re-derived here — a surface that only wants "where does CI stand"
       // reads one small file instead of walking nodes and feedback.

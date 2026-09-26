@@ -323,6 +323,21 @@ describe('removing an accepted check (FR-081)', () => {
   })
 })
 
+describe('the skills in force', () => {
+  it('lists a skill available across the rungs, with the rung it came from', async () => {
+    mount({ inForce: { rules: [], declined: [], skills: [{ id: 'ci-fix', rung: 'built-in' }] } })
+    await waitFor(() => expect(screen.getByText('Skills in force')).toBeTruthy())
+    expect(screen.getByText(/ci-fix/)).toBeTruthy()
+    expect(screen.getByText(/built-in/)).toBeTruthy()
+  })
+
+  it('shows the panel not at all when nothing is available', async () => {
+    mount()
+    await waitFor(() => screen.getByText('G-1'))
+    expect(screen.queryByText('Skills in force')).toBeNull()
+  })
+})
+
 describe('the Factory view (FR: the factory’s numbers)', () => {
   it('stays on Record until asked', async () => {
     mount()

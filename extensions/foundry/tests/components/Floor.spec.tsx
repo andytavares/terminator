@@ -333,6 +333,21 @@ describe('a rework', () => {
   })
 })
 
+describe('a node with skills', () => {
+  it('shows which skills that node gets', async () => {
+    mount(reply({ skills: { 'N-1': ['ci-fix'] } }))
+    await waitFor(() => screen.getByText('N-1'))
+    expect(screen.getByText(/Skills: ci-fix/)).toBeTruthy()
+  })
+
+  it('omits the line for a node with no skills', async () => {
+    mount(reply({ skills: { 'N-1': ['ci-fix'] } }))
+    await waitFor(() => screen.getByText('N-2'))
+    const n2 = screen.getByText('N-2').closest('span')
+    expect(n2?.textContent).not.toContain('Skills:')
+  })
+})
+
 describe('when there is no run', () => {
   it('says so rather than spinning', async () => {
     mount({ error: 'No run for WO-1.' })

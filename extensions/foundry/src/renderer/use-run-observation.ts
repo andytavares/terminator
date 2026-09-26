@@ -58,6 +58,8 @@ export interface FloorView {
   orphaned?: string[]
   /** The draft's CI, from the ship tail's own file. Absent means no run has shipped yet. */
   ci?: CiState | null
+  /** Skills each node gets, keyed by node id. Absent nodes have none. */
+  skills?: Record<string, string[]>
 }
 
 /** A tool call an agent is holding at, waiting for an answer. */

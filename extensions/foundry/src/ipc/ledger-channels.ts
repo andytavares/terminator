@@ -15,6 +15,8 @@ import { createGateStore } from '../gates/store.js'
 import { readRunGraph } from './run-channels.js'
 import { factoryMetrics as computeFactoryMetrics } from '../factory/metrics.js'
 import type { OrderRecords } from '../factory/metrics.js'
+import { availableSkills } from '../recipe/resolve.js'
+import type { ResolveSources } from '../recipe/resolve.js'
 
 // The record, and what the operator can ask it for.
 //
@@ -63,6 +65,12 @@ export interface LedgerDeps {
    * that repository.
    */
   readonly acceptedRules: () => readonly AcceptedRule[]
+  /**
+   * Which repositories are open, for `availableSkills` — the same reason
+   * `RunDeps` carries this: resolved on every call, since which `.foundry/`
+   * directories are honoured changes when the operator switches workspace.
+   */
+  readonly sources: () => ResolveSources
   readonly now: () => string
 }
 
@@ -165,6 +173,7 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     return {
       rules: deps.acceptedRules(),
       declined: await declinedWithReasons(deps.dataRoot()),
+      skills: availableSkills(deps.sources()),
     }
   }
 

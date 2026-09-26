@@ -211,6 +211,8 @@ An agent's terminal is a child of the application process, so quitting kills eve
 
 **CI on the drafts (ADR-064).** `run.observe` carries `ci: CiState | null` — `{ round, max, status: 'watching' | 'green' | 'red' | 'not_measured' | 'reworking', pulls: { url, checks: { name, bucket, link, workflow }[] }[], reason, at }`, read from the order's `ci.json`; `null` until a draft opens on a recipe that declares `ci`. Each `order.list` row carries `ci: { status, round, max } | null` from the same file. A run graph node carries `reworks: number` and `feedback: Feedback[]` (ADR-063), defaulted when an older graph is read.
 
+**Skills each node gets.** `run.observe` also carries `skills: Record<nodeId, string[]>`, computed with `skillsFor` from the order's own recipe and role registry — the same resolution `run.start` refuses on if a name is unknown. A node with no skills is absent from the map. An order whose recipe no longer resolves (removed from disk after the run began) reports `{}` rather than throwing.
+
 ---
 
 ## `foundry:run.observe`
@@ -360,7 +362,9 @@ Only rules that resolved from the **records location** rung are listed. A built-
 
 **Payload**: `{}`
 
-**Response**: `{ rules: Array<{ id: string; asserts: string; rung: string; origin: string }>; declined: Array<{ id: string; reason: string }> }`
+**Response**: `{ rules: Array<{ id: string; asserts: string; rung: string; origin: string }>; declined: Array<{ id: string; reason: string }>; skills: Array<{ id: string; rung: string; dir: string }> }`
+
+`skills` is every skill available across all three rungs (data root, repository, built-in), from `availableSkills`, most specific winning per id, sorted by id — unlike `rules`, this lists everything in force, not only what the operator added.
 
 ---
 

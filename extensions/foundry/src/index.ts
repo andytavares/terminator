@@ -2412,6 +2412,7 @@ export function activate(api: ExtensionAPI): void {
         ]
       })
     },
+    sources: () => resolveSources(api, dataRoot()),
     now: () => new Date().toISOString(),
   })
   reg(api, 'foundry:ledger.query', (payload) => ledger.query(payload))

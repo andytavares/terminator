@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createLedgerChannels } from '../../src/ipc/ledger-channels.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/schema.js'
@@ -13,6 +14,11 @@ import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
+import type { ResolveSources } from '../../src/recipe/resolve.js'
+
+// The real built-in directory, so a test asking for "the skills that ship
+// with the tool" is asking about the ones that actually do.
+const realBuiltIn = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 // Reading the record, and asking it what it thinks.
 //
@@ -42,12 +48,13 @@ function acceptedRules() {
   })
 }
 
-function channels(existingRuleIds: string[] = []) {
+function channels(existingRuleIds: string[] = [], sources?: () => ResolveSources) {
   return createLedgerChannels({
     store: createOrderStore(root),
     dataRoot: () => root,
     existingRuleIds: () => existingRuleIds,
     acceptedRules,
+    sources: sources ?? (() => ({ dataRoot: root, repoPaths: [], builtInDir: realBuiltIn })),
     now: () => '2026-09-06T12:00:00.000Z',
   })
 }
@@ -354,6 +361,16 @@ describe('removing an accepted check (FR-081)', () => {
 
   it('rejects a malformed request', async () => {
     expect(await channels().removeAcceptedRule({})).toEqual({ error: 'Malformed request.' })
+  })
+})
+
+describe('the skills in force', () => {
+  it('lists every skill available, each with the rung it comes from', async () => {
+    const view = (await channels().rulesInForce({})) as {
+      skills: { id: string; rung: string }[]
+    }
+    const ciFix = view.skills.find((s) => s.id === 'ci-fix')
+    expect(ciFix?.rung).toBe('built-in')
   })
 })
 

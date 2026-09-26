@@ -171,6 +171,32 @@ export function resolveSkill(id: string, sources: ResolveSources): ResolvedSkill
   return null
 }
 
+/** Every skill available across all three rungs, most specific winning, sorted by id. */
+export function availableSkills(sources: ResolveSources): ResolvedSkill[] {
+  const seen = new Map<string, ResolvedSkill>()
+  const bases = [
+    ['data-root' as Rung, path.join(sources.dataRoot, 'skills')] as [Rung, string],
+    ...sources.repoPaths.map(
+      (repo) => ['repository' as Rung, path.join(repo, '.foundry', 'skills')] as [Rung, string]
+    ),
+    ['built-in' as Rung, path.join(sources.builtInDir, 'skills')] as [Rung, string],
+  ]
+  for (const [rung, dir] of bases) {
+    let entries: string[]
+    try {
+      entries = fs.readdirSync(dir)
+    } catch {
+      continue
+    }
+    for (const id of entries) {
+      if (seen.has(id)) continue
+      if (fs.existsSync(path.join(dir, id, 'SKILL.md')))
+        seen.set(id, { id, rung, dir: path.join(dir, id) })
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.id.localeCompare(b.id))
+}
+
 export function resolveSkills(
   ids: readonly string[],
   sources: ResolveSources

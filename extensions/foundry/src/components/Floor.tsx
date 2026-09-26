@@ -942,6 +942,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                         </>
                       ) : null}
                     </span>
+                    {(view.skills?.[node.id]?.length ?? 0) > 0 ? (
+                      <p className="fdry-unit-skills">{`Skills: ${view.skills?.[node.id]?.join(', ')}`}</p>
+                    ) : null}
                     {feedback.length > 0 ? (
                       <details className="fdry-unit-feedback">
                         <summary>Why it was sent back</summary>

@@ -29,9 +29,15 @@ interface AcceptedRule {
   origin: string
 }
 
+interface AvailableSkill {
+  id: string
+  rung: string
+}
+
 interface RulesView {
   rules: AcceptedRule[]
   declined: { id: string; reason: string }[]
+  skills: AvailableSkill[]
 }
 
 const PAGE = 200
@@ -68,7 +74,7 @@ export function Ledger(): JSX.Element {
     if (next.error !== undefined) return
     // Normalised on arrival rather than guarded at every read: a reply missing
     // an array is the same thing to this panel as an empty one.
-    setRules({ rules: next.rules ?? [], declined: next.declined ?? [] })
+    setRules({ rules: next.rules ?? [], declined: next.declined ?? [], skills: next.skills ?? [] })
   }, [])
 
   const refresh = useCallback(async () => {
@@ -282,6 +288,19 @@ export function Ledger(): JSX.Element {
                   ))}
                 </ul>
               ) : null}
+            </section>
+          ) : null}
+
+          {(rules?.skills?.length ?? 0) > 0 ? (
+            <section className="fdry-panel">
+              <h3 className="fdry-panel-h">Skills in force</h3>
+              <ul className="fdry-citations">
+                {rules?.skills?.map((skill) => (
+                  <li key={skill.id}>
+                    <code>{skill.id}</code> ({skill.rung})
+                  </li>
+                ))}
+              </ul>
             </section>
           ) : null}
 

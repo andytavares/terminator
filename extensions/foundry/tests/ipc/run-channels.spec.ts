@@ -230,6 +230,25 @@ describe('foundry:run.observe', () => {
     const r = (await channels().observe({ id: 'WO-1' })) as { ci: CiState | null }
     expect(r.ci).toBeNull()
   })
+
+  it("reports each node's skills, resolved from the order's recipe", async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const graph = await readRunGraph(dataRoot, 'WO-1')
+    const builderNode = graph?.nodes.find((n) => n.role === 'builder')
+    const r = (await channels().observe({ id: 'WO-1' })) as { skills: Record<string, string[]> }
+    expect(builderNode).toBeDefined()
+    expect(r.skills[builderNode?.id ?? '']).toEqual(['ci-fix'])
+  })
+
+  it('reports no skills for an order whose recipe no longer resolves', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const running = await store.load('WO-1')
+    await store.save({ ...(running as WorkOrder), recipe: 'ghost-recipe' })
+    const r = (await channels().observe({ id: 'WO-1' })) as { skills: Record<string, string[]> }
+    expect(r.skills).toEqual({})
+  })
 })
 
 describe('foundry:run.recipes', () => {

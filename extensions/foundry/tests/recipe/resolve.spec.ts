@@ -9,6 +9,7 @@ import {
   loadAllRules,
   resolveSkill,
   resolveSkills,
+  availableSkills,
 } from '../../src/recipe/resolve.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
 import { checkRequirements } from '../../src/recipe/requirements.js'
@@ -197,6 +198,25 @@ describe('resolveSkills', () => {
 
   it('returns an empty resolution for no ids', () => {
     expect(resolveSkills([], sources())).toEqual({ skills: [], unknown: [] })
+  })
+})
+
+describe('availableSkills', () => {
+  it('lists every skill across the three rungs, sorted by id', () => {
+    putSkill(builtIn, 'ci-fix', SKILL_BODY)
+    putSkill(builtIn, 'docs', SKILL_BODY)
+    expect(availableSkills(sources()).map((s) => s.id)).toEqual(['ci-fix', 'docs'])
+  })
+
+  it('lets the data root win over the built-in for the same id', () => {
+    putSkill(builtIn, 'ci-fix', SKILL_BODY)
+    putSkill(dataRoot, 'ci-fix', SKILL_BODY)
+    const found = availableSkills(sources()).find((s) => s.id === 'ci-fix')
+    expect(found?.rung).toBe('data-root')
+  })
+
+  it('is empty when nothing defines a skill anywhere', () => {
+    expect(availableSkills(sources())).toEqual([])
   })
 })
 
