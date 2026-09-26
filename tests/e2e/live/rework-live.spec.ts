@@ -1,7 +1,14 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  readdirSync,
+} from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle } from '../helpers'
 
@@ -206,6 +213,7 @@ interface Observed {
       attempts: number
       reworks: number
       feedback: { from: string; exitCode: number | null; excerpt: string; logPath: string | null }[]
+      sessionId: string | null
     }[]
   }
 }
@@ -271,6 +279,21 @@ test('a lint failure goes back to the builder and the run still ships', async ()
   expect(existsSync(build?.feedback[0]?.logPath ?? ''), 'the lint output was not kept').toBe(true)
 
   expect(ledger).toContain('rework.started')
+
+  // The builder was given its skills (ADR-065): mounted, recorded, and seen by
+  // the agent, with nothing written into the repository to do it.
+  expect(ledger).toMatch(/"skills.mounted"[^\n]*ci-fix \(built-in\)/)
+  const buildSession = (last.graph?.nodes ?? []).find((n) => n.stepId === 'build')?.sessionId
+  expect(buildSession, 'the build node never named its session').toBeTruthy()
+  const projects = join(homedir(), '.claude', 'projects')
+  const transcript = readdirSync(projects)
+    .map((dir) => join(projects, dir, `${buildSession}.jsonl`))
+    .find((file) => existsSync(file))
+  expect(transcript, 'no transcript for the build session').toBeTruthy()
+  expect(readFileSync(transcript as string, 'utf8'), 'the agent never saw ci-fix').toContain(
+    'ci-fix'
+  )
+  expect(existsSync(join(repo, '.claude')), 'a skill was written into the repository').toBe(false)
   // The ready-for-review gate is raised once the draft exists; it is the one
   // decision that is always the operator's. Nothing else may have asked.
   const asked = existsSync(gatesFile)
