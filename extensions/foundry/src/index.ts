@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { app } from 'electron'
 import * as fs from 'node:fs'
@@ -2464,21 +2465,35 @@ export function activate(api: ExtensionAPI): void {
 
   // Anything shown as a list should be prunable, and a feed you cannot clear a
   // line from is one you stop reading.
+  // Validated, because each writes a line that every later read replays: a
+  // dismiss with no id appended `{}`, which then read back as a feed entry with
+  // no summary and took the Floor down.
+  const FeedDismiss = z.object({ id: z.string().min(1) })
+  const FeedMute = z
+    .object({
+      sessionId: z.string().min(1).optional(),
+      author: z.enum(['agent', 'console']).optional(),
+    })
+    .refine((rule) => rule.sessionId !== undefined || rule.author !== undefined)
+
   reg(api, 'foundry:feed-dismiss', (payload: unknown) => {
-    const { id } = payload as { id: string }
-    supervision?.feed.removeEntry(id)
+    const parsed = FeedDismiss.safeParse(payload)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    supervision?.feed.removeEntry(parsed.data.id)
     return { ok: true }
   })
 
   reg(api, 'foundry:feed-mute', (payload: unknown) => {
-    const { sessionId, author } = payload as { sessionId?: string; author?: 'agent' | 'console' }
-    mutes?.add({ sessionId, author })
+    const parsed = FeedMute.safeParse(payload)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    mutes?.add(parsed.data)
     return { mutes: mutes?.list() ?? [] }
   })
 
   reg(api, 'foundry:feed-unmute', (payload: unknown) => {
-    const { sessionId, author } = payload as { sessionId?: string; author?: 'agent' | 'console' }
-    mutes?.remove({ sessionId, author })
+    const parsed = FeedMute.safeParse(payload)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    mutes?.remove(parsed.data)
     return { mutes: mutes?.list() ?? [] }
   })
 
