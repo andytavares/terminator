@@ -170,6 +170,37 @@ describe('parseRecipe', () => {
     )
     expect(r.ok && r.value.schemaVersion).toBe(RECIPE_SCHEMA_VERSION)
   })
+
+  it('leaves a step with no declared skills undefined, not defaulted to a list', () => {
+    const r = parseRecipe(RECIPE, 'bugfix.yaml')
+    expect(r.ok && r.value.steps[0].skills).toBeUndefined()
+  })
+
+  it('carries the skills a step declares', () => {
+    const r = parseRecipe(
+      RECIPE.replace(
+        '    role: builder\n    expect',
+        '    role: builder\n    skills: [ci-fix]\n    expect'
+      ),
+      'bugfix.yaml'
+    )
+    expect(r.ok && r.value.steps[0].skills).toEqual(['ci-fix'])
+  })
+
+  it('refuses a step skill id that could not be a directory name, and names the step', () => {
+    const r = parseRecipe(
+      RECIPE.replace(
+        '    role: builder\n    expect',
+        '    role: builder\n    skills: [Not Valid!]\n    expect'
+      ),
+      'bugfix.yaml'
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.reason).toMatch(/reproduce/)
+      expect(r.reason).toMatch(/Not Valid!/)
+    }
+  })
 })
 
 const ROLE = `
@@ -243,6 +274,25 @@ describe('parseRole', () => {
   it('rejects a model tier it does not have', () => {
     const r = parseRole(ROLE.replace('modelTier: deep', 'modelTier: enormous'), 'verifier.yaml')
     expect(r.ok).toBe(false)
+  })
+
+  it('defaults skills to an empty list', () => {
+    const r = parseRole(ROLE, 'verifier.yaml')
+    expect(r.ok && r.value.skills).toEqual([])
+  })
+
+  it('carries the skills a role declares', () => {
+    const r = parseRole(`${ROLE}skills: [ci-fix]\n`, 'verifier.yaml')
+    expect(r.ok && r.value.skills).toEqual(['ci-fix'])
+  })
+
+  it('refuses a skill id that could not be a directory name, and names the role', () => {
+    const r = parseRole(`${ROLE}skills: [Not Valid!]\n`, 'verifier.yaml')
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.reason).toMatch(/verifier/)
+      expect(r.reason).toMatch(/Not Valid!/)
+    }
   })
 })
 

@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseRecipe, parseRole, STEP_KINDS } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
+import { resolveSkill } from '../../src/recipe/resolve.js'
 import { createRoleRegistry } from '../../src/line/roles.js'
 import { brief } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/schema.js'
@@ -512,5 +513,32 @@ describe('ci rounds on every shape that ships code', () => {
 
   it('leaves exactly spike and the document shapes unwatched', () => {
     expect([...unwatched].sort()).toEqual(['design-doc.yaml', 'research.yaml', 'spike.yaml'])
+  })
+})
+
+// A role's skills are mounted for it the way Claude Code loads them: a
+// directory per skill, resolved on the same three rungs as a recipe. The
+// built-in ci-fix skill is what lets the builder recover from a check
+// handed back in its brief, so the builder declares it and the directory
+// has to actually be there for that to mean anything.
+describe('the built-in ci-fix skill', () => {
+  it('is declared by the builder role', () => {
+    const parsed = parseRole(read(rolesDir, 'builder.yaml'), 'builder.yaml')
+    expect(parsed.ok && parsed.value.skills).toEqual(['ci-fix'])
+  })
+
+  it('resolves on the built-in rung', () => {
+    const resolved = resolveSkill('ci-fix', {
+      dataRoot: '/nowhere',
+      repoPaths: [],
+      builtInDir: root,
+    })
+    expect(resolved?.rung).toBe('built-in')
+    expect(resolved && fs.existsSync(path.join(resolved.dir, 'SKILL.md'))).toBe(true)
+  })
+
+  it('names itself ci-fix in its own frontmatter', () => {
+    const text = fs.readFileSync(path.join(root, 'skills', 'ci-fix', 'SKILL.md'), 'utf8')
+    expect(text).toMatch(/^name:\s*ci-fix\s*$/m)
   })
 })

@@ -139,3 +139,48 @@ export function loadAllRules(sources: ResolveSources): { rules: Rule[]; problems
   }
   return { rules, problems }
 }
+
+// ── skills ───────────────────────────────────────────────────────────────
+//
+// A skill resolves on the same three rungs as a recipe, role or rule, but it
+// is a directory rather than a file: Claude Code loads a skill from
+// `<dir>/.claude/skills/<name>/SKILL.md` for every directory mounted with
+// `--add-dir`, so what Foundry resolves here is the directory to mount, not
+// its contents.
+
+export interface ResolvedSkill {
+  readonly id: string
+  readonly rung: Rung
+  readonly dir: string
+}
+
+function skillCandidates(id: string, sources: ResolveSources): [Rung, string][] {
+  return [
+    ['data-root' as Rung, path.join(sources.dataRoot, 'skills', id)],
+    ...sources.repoPaths.map(
+      (repo) => ['repository' as Rung, path.join(repo, '.foundry', 'skills', id)] as [Rung, string]
+    ),
+    ['built-in' as Rung, path.join(sources.builtInDir, 'skills', id)],
+  ]
+}
+
+export function resolveSkill(id: string, sources: ResolveSources): ResolvedSkill | null {
+  for (const [rung, dir] of skillCandidates(id, sources)) {
+    if (fs.existsSync(path.join(dir, 'SKILL.md'))) return { id, rung, dir }
+  }
+  return null
+}
+
+export function resolveSkills(
+  ids: readonly string[],
+  sources: ResolveSources
+): { skills: ResolvedSkill[]; unknown: string[] } {
+  const skills: ResolvedSkill[] = []
+  const unknown: string[] = []
+  for (const id of ids) {
+    const resolved = resolveSkill(id, sources)
+    if (resolved !== null) skills.push(resolved)
+    else unknown.push(id)
+  }
+  return { skills, unknown }
+}

@@ -7,6 +7,8 @@ import {
   resolveRecipe,
   availableNames,
   loadAllRules,
+  resolveSkill,
+  resolveSkills,
 } from '../../src/recipe/resolve.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
 import { checkRequirements } from '../../src/recipe/requirements.js'
@@ -147,6 +149,54 @@ describe('loadAllRules', () => {
     const loaded = loadAllRules(sources())
     expect(loaded.rules.map((r) => r.id)).toEqual(['good'])
     expect(loaded.problems).toHaveLength(1)
+  })
+})
+
+function putSkill(dir: string, id: string, body: string): void {
+  fs.mkdirSync(path.join(dir, 'skills', id), { recursive: true })
+  fs.writeFileSync(path.join(dir, 'skills', id, 'SKILL.md'), body)
+}
+
+const SKILL_BODY = '---\nname: ci-fix\ndescription: fix a check\n---\n\nReproduce, then fix.\n'
+
+describe('resolveSkill', () => {
+  it('finds a built-in skill when nothing else defines it', () => {
+    putSkill(builtIn, 'ci-fix', SKILL_BODY)
+    const r = resolveSkill('ci-fix', sources())
+    expect(r?.rung).toBe('built-in')
+    expect(r?.dir).toBe(path.join(builtIn, 'skills', 'ci-fix'))
+  })
+
+  it('lets the operator override a repository skill, which overrides the built-in', () => {
+    putSkill(builtIn, 'ci-fix', SKILL_BODY)
+    putSkill(path.join(repo, '.foundry'), 'ci-fix', SKILL_BODY)
+    expect(resolveSkill('ci-fix', sources())?.rung).toBe('repository')
+
+    putSkill(dataRoot, 'ci-fix', SKILL_BODY)
+    expect(resolveSkill('ci-fix', sources())?.rung).toBe('data-root')
+  })
+
+  it('reads a repository rung without ever creating it', () => {
+    putSkill(builtIn, 'ci-fix', SKILL_BODY)
+    resolveSkill('ci-fix', sources())
+    expect(fs.existsSync(path.join(repo, '.foundry'))).toBe(false)
+  })
+
+  it('returns null for a skill nobody defines', () => {
+    expect(resolveSkill('nowhere', sources())).toBeNull()
+  })
+})
+
+describe('resolveSkills', () => {
+  it('resolves every known id and lists the rest as unknown', () => {
+    putSkill(builtIn, 'ci-fix', SKILL_BODY)
+    const r = resolveSkills(['ci-fix', 'nowhere'], sources())
+    expect(r.skills.map((s) => s.id)).toEqual(['ci-fix'])
+    expect(r.unknown).toEqual(['nowhere'])
+  })
+
+  it('returns an empty resolution for no ids', () => {
+    expect(resolveSkills([], sources())).toEqual({ skills: [], unknown: [] })
   })
 })
 
