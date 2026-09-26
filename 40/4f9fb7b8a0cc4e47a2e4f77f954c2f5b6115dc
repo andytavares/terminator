@@ -1,0 +1,52 @@
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_ff9afaf52b6925::t_ad503ff318e922 298-300,314-315
+  s_ff9afaf52b6925::t_289201898f5bbd 301-313
+extensions/foundry/src/components/Markdown.tsx
+  s_ff9afaf52b6925::t_def47c2f5b54c1 175-182
+tests/e2e/foundry.spec.ts
+  s_ff9afaf52b6925::t_bd333f530a6247 713-784
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_ff9afaf52b6925::t_516a2c43c939cf 162-173
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_ff9afaf52b6925::t_f0befd159eb226 1241-1302
+  s_ff9afaf52b6925::t_7db2efeeef8346 1303-1304
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_ff9afaf52b6925::t_1884afeb59b7c2 21,742-744
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_ff9afaf52b6925::t_ad503ff318e922 1380-1415
+extensions/foundry/tests/components/Markdown.spec.tsx
+  s_ff9afaf52b6925::t_def47c2f5b54c1 4,99-119
+  s_ff9afaf52b6925::t_5d150d25cea4a1 120
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_ff9afaf52b6925::t_516a2c43c939cf 279-305
+extensions/foundry/src/components/Forge.tsx
+  s_ff9afaf52b6925::t_87eb7e829abe7d 1,605-608,620,769,881,930
+extensions/foundry/src/components/Inbox.tsx
+  s_ff9afaf52b6925::t_1884afeb59b7c2 14,154-159
+extensions/foundry/src/components/Ledger.tsx
+  s_ff9afaf52b6925::t_289201898f5bbd 5,197-198,244,280-282
+extensions/foundry/src/components/foundry.css
+  s_ff9afaf52b6925::t_fc4e58bd8672a4 1948-1949,1970-1971
+extensions/foundry/src/factory/callouts.ts
+  s_ff9afaf52b6925::t_1884afeb59b7c2 119-120,158
+extensions/foundry/src/components/Floor.tsx
+  s_ff9afaf52b6925::t_289201898f5bbd 20,796-802,1092-1094
+extensions/foundry/tests/factory/callouts.spec.ts
+  s_ff9afaf52b6925::t_449e5be6443faa 154,158-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "404f9fb7b8a0cc4e47a2e4f77f954c2f5b6115dc",
+  "prompts": {},
+  "sessions": {
+    "s_ff9afaf52b6925": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5562dac0-030b-4795-b6e4-21da34ab4d17",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
