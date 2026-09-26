@@ -1,0 +1,40 @@
+extensions/foundry/src/recipe/resolve.ts
+  s_4f15472be339a2::t_4af5226cc5eb78 142-186
+extensions/foundry/src/recipe/parse.ts
+  s_4f15472be339a2::t_48b3ce0f2235e1 106-109
+  s_4f15472be339a2::t_04048211dbc475 296,313-319
+  s_4f15472be339a2::t_799621347e6e9c 212-217
+  s_4f15472be339a2::t_cf922bc0627c57 53-61
+  s_4f15472be339a2::t_30a9156be6a1c9 294-295
+extensions/foundry/roles/builder.yaml
+  s_4f15472be339a2::t_a68bf8995020f3 8
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_4f15472be339a2::t_aec932309b5ff8 7
+  s_4f15472be339a2::t_ac43aa7cd9f969 518-540
+  s_4f15472be339a2::t_eb778886433744 541-544
+extensions/foundry/skills/ci-fix/SKILL.md
+  s_4f15472be339a2::t_8eb9012e5dbb53 1-14
+extensions/foundry/tests/recipe/parse.spec.ts
+  s_4f15472be339a2::t_c2e36c29cf21e5 173-200,288
+  s_4f15472be339a2::t_039d73b3143180 279,284,289-293
+  s_4f15472be339a2::t_41641062c7b4b1 201-203,278,280-283,285-287,294-296
+extensions/foundry/tests/recipe/resolve.spec.ts
+  s_4f15472be339a2::t_7130bb94089b51 155-202
+  s_4f15472be339a2::t_947d8b0d87fed9 10-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0b34b12155f59aaf0839e72fb1e0fd7a1730ada3",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
