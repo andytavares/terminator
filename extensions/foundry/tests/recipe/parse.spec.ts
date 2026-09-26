@@ -170,6 +170,37 @@ describe('parseRecipe', () => {
     )
     expect(r.ok && r.value.schemaVersion).toBe(RECIPE_SCHEMA_VERSION)
   })
+
+  it('leaves a step with no declared skills undefined, not defaulted to a list', () => {
+    const r = parseRecipe(RECIPE, 'bugfix.yaml')
+    expect(r.ok && r.value.steps[0].skills).toBeUndefined()
+  })
+
+  it('carries the skills a step declares', () => {
+    const r = parseRecipe(
+      RECIPE.replace(
+        '    role: builder\n    expect',
+        '    role: builder\n    skills: [ci-fix]\n    expect'
+      ),
+      'bugfix.yaml'
+    )
+    expect(r.ok && r.value.steps[0].skills).toEqual(['ci-fix'])
+  })
+
+  it('refuses a step skill id that could not be a directory name, and names the step', () => {
+    const r = parseRecipe(
+      RECIPE.replace(
+        '    role: builder\n    expect',
+        '    role: builder\n    skills: [Not Valid!]\n    expect'
+      ),
+      'bugfix.yaml'
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.reason).toMatch(/reproduce/)
+      expect(r.reason).toMatch(/Not Valid!/)
+    }
+  })
 })
 
 const ROLE = `
@@ -243,6 +274,25 @@ describe('parseRole', () => {
   it('rejects a model tier it does not have', () => {
     const r = parseRole(ROLE.replace('modelTier: deep', 'modelTier: enormous'), 'verifier.yaml')
     expect(r.ok).toBe(false)
+  })
+
+  it('defaults skills to an empty list', () => {
+    const r = parseRole(ROLE, 'verifier.yaml')
+    expect(r.ok && r.value.skills).toEqual([])
+  })
+
+  it('carries the skills a role declares', () => {
+    const r = parseRole(`${ROLE}skills: [ci-fix]\n`, 'verifier.yaml')
+    expect(r.ok && r.value.skills).toEqual(['ci-fix'])
+  })
+
+  it('refuses a skill id that could not be a directory name, and names the role', () => {
+    const r = parseRole(`${ROLE}skills: [Not Valid!]\n`, 'verifier.yaml')
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.reason).toMatch(/verifier/)
+      expect(r.reason).toMatch(/Not Valid!/)
+    }
   })
 })
 
@@ -437,5 +487,47 @@ steps:
     const r = parseRecipe(EFFORT.replace('effort: xhigh', 'effort: extreme'), 'direct.yaml')
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toMatch(/^direct\.yaml: /)
+  })
+})
+
+// CI is watched on the draft a `ready-for-review` gate opens. A recipe that
+// never opens one has no draft for CI to watch, so `ci` without that gate is
+// refused rather than silently doing nothing.
+describe('ci rounds', () => {
+  it('accepts a recipe that declares ci alongside a ready-for-review gate', () => {
+    const r = parseRecipe(`ci:\n  rounds: 2\n${RECIPE}`, 'bugfix.yaml')
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    if (r.ok) expect(r.value.ci).toEqual({ rounds: 2 })
+  })
+
+  it('leaves ci undefined where nothing declared it', () => {
+    const r = parseRecipe(RECIPE, 'bugfix.yaml')
+    if (r.ok) expect(r.value.ci).toBeUndefined()
+  })
+
+  it('rejects a rounds of 0', () => {
+    const r = parseRecipe(`ci:\n  rounds: 0\n${RECIPE}`, 'bugfix.yaml')
+    expect(r.ok).toBe(false)
+  })
+
+  it('rejects a rounds of 4', () => {
+    const r = parseRecipe(`ci:\n  rounds: 4\n${RECIPE}`, 'bugfix.yaml')
+    expect(r.ok).toBe(false)
+  })
+
+  it('refuses ci on a recipe with no ready-for-review gate', () => {
+    const noGate = `
+schemaVersion: ${RECIPE_SCHEMA_VERSION}
+id: bugfix
+ci:
+  rounds: 2
+steps:
+  - id: reproduce
+    kind: agent
+    role: builder
+`
+    const r = parseRecipe(noGate, 'bugfix.yaml')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/ready-for-review/)
   })
 })

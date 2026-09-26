@@ -12,6 +12,8 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
 import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
+import { writeCiState } from '../../src/line/ci-state.js'
+import type { CiState } from '../../src/line/ci-state.js'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -106,6 +108,34 @@ describe('foundry:run.start', () => {
     expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(false)
   })
 
+  it('refuses to start when a role names a skill nothing defines, and nothing runs', async () => {
+    // The data root overrides the built-in builder with one that names a
+    // skill nobody has, at any of the three rungs.
+    fs.mkdirSync(path.join(dataRoot, 'roles'), { recursive: true })
+    fs.writeFileSync(
+      path.join(dataRoot, 'roles', 'builder.yaml'),
+      [
+        'schemaVersion: 1',
+        'id: builder',
+        'modelTier: deep',
+        'allowResume: true',
+        'reads: []',
+        'writes: [worktree]',
+        'tools: []',
+        'skills: [nonexistent]',
+        'prompt: build it',
+        '',
+      ].join('\n')
+    )
+    await store.save(order())
+    const r = (await channels().start({ id: 'WO-1' })) as { error: string }
+    expect(r.error).toMatch(/Unknown skill "nonexistent"/)
+    expect(r.error).toContain('builder')
+    expect(r.error).toContain(`${dataRoot}/skills/nonexistent/SKILL.md`)
+    expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(false)
+    expect((await store.load('WO-1'))?.status).toBe('agreed')
+  })
+
   it('refuses a shape this repository cannot support, and says why', async () => {
     await store.save(order())
     const r = (await channels().start({ id: 'WO-1', recipe: 'speckit' })) as { error: string }
@@ -176,6 +206,91 @@ describe('foundry:run.observe', () => {
   it('reports no run before one has started', async () => {
     await store.save(order())
     expect(await channels().observe({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
+  })
+
+  it('reports the CI state a written ci.json carries', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const state: CiState = {
+      round: 1,
+      max: 3,
+      status: 'watching',
+      pulls: [{ url: 'https://github.com/x/y/pull/1', checks: [] }],
+      reason: '',
+      at: '2026-09-06T10:00:00.000Z',
+    }
+    await writeCiState(dataRoot, 'WO-1', state)
+    const r = (await channels().observe({ id: 'WO-1' })) as { ci: CiState | null }
+    expect(r.ci).toEqual(state)
+  })
+
+  it('reports no CI when nothing has written one', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as { ci: CiState | null }
+    expect(r.ci).toBeNull()
+  })
+
+  it("reports each node's skills, resolved from the order's recipe", async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const graph = await readRunGraph(dataRoot, 'WO-1')
+    const builderNode = graph?.nodes.find((n) => n.role === 'builder')
+    const r = (await channels().observe({ id: 'WO-1' })) as { skills: Record<string, string[]> }
+    expect(builderNode).toBeDefined()
+    expect(r.skills[builderNode?.id ?? '']).toEqual(['ci-fix'])
+  })
+
+  it('reports no skills for an order whose recipe no longer resolves', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const running = await store.load('WO-1')
+    await store.save({ ...(running as WorkOrder), recipe: 'ghost-recipe' })
+    const r = (await channels().observe({ id: 'WO-1' })) as { skills: Record<string, string[]> }
+    expect(r.skills).toEqual({})
+  })
+
+  it('carries no queue when nothing has wired the refinery', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as { queue: unknown }
+    expect(r.queue).toBeNull()
+  })
+
+  it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const withQueue = createRunChannels({
+      store,
+      dataRoot: () => dataRoot,
+      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
+      now: () => '2026-09-06T10:00:00.000Z',
+      queueEntries: async () => [
+        {
+          orderId: 'WO-1',
+          title: 'x',
+          repo: 'repo',
+          base: 'main',
+          agreedAt: '2026-09-02T00:00:00.000Z',
+          files: ['src/a'],
+          merged: false,
+        },
+        {
+          orderId: 'WO-earlier',
+          title: 'Earlier work',
+          repo: 'repo',
+          base: 'main',
+          agreedAt: '2026-09-01T00:00:00.000Z',
+          files: ['src/a'],
+          merged: false,
+        },
+      ],
+    })
+    const r = (await withQueue.observe({ id: 'WO-1' })) as {
+      queue: { position: number; behind: { orderId: string }[] } | null
+    }
+    expect(r.queue?.position).toBe(2)
+    expect(r.queue?.behind[0]?.orderId).toBe('WO-earlier')
   })
 })
 

@@ -38,6 +38,10 @@ export type PropKind =
   | 'fridge'
   | 'coffeebar'
   | 'vending'
+  | 'dispatch'
+
+/** The synthetic node id the dispatch prop carries — no `RunNode` owns it. */
+export const DISPATCH_NODE_ID = 'ci'
 
 export interface HallProp {
   readonly id: string
@@ -231,7 +235,11 @@ const NEIGHBOUR_STEPS: readonly Tile[] = [
   { x: 0, y: -1 },
 ]
 
-export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, string>>): HallMap {
+export function layoutHall(
+  graph: RunGraph,
+  _labels?: Readonly<Record<string, string>>,
+  hasCi?: boolean
+): HallMap {
   const nodeDepths = depths(graph.nodes)
   // The rightmost edge any station actually occupies — the room hugs this,
   // rather than a fixed reserved bay past the deepest column.
@@ -301,6 +309,25 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
   }
   const intake: Tile = { x: 0, y: doorRow }
   const exit: Tile = { x: width - 1, y: doorRow }
+
+  // A run's CI, drawn as a small tower beside the exit — only when the
+  // observation actually carries one (ADR-060: nothing is drawn that the
+  // observation does not report).
+  const dispatchProps: HallProp[] = hasCi
+    ? [
+        {
+          id: 'dispatch',
+          kind: 'dispatch',
+          x: Math.max(exit.x - 1, 1),
+          y: exit.y,
+          w: 1,
+          h: 1,
+          solid: false,
+          nodeId: DISPATCH_NODE_ID,
+          seat: null,
+        },
+      ]
+    : []
 
   // Every lane a node can carry came from `laneValues`, which `laneRowOf` was
   // just built from — a node's lane is always a key of this map.
@@ -597,7 +624,7 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     height,
     solid,
     walk,
-    props,
+    props: [...props, ...dispatchProps],
     belts,
     beltTiles,
     crossovers,

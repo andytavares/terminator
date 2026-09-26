@@ -32,6 +32,14 @@ export interface OrderView {
   converging?: string
   /** How the last intake turn ended. Absent only on a channel that predates it. */
   intake?: IntakeOutcome
+  /**
+   * What agreeing this order is about to queue behind, if anything (R4).
+   *
+   * Set only by the compile call that agrees the order; null when nothing
+   * overlaps, or the host has not wired the refinery. Absent on every other
+   * response, including a redraft that never reached hand-off.
+   */
+  advisory?: string | null
 }
 
 /** How often the document is refetched while the architect is working. */
@@ -635,7 +643,16 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
         <header className="fdry-wizard-head">
           <div className="fdry-order-head">
             <h1>{order.title}</h1>
-            {order.source.key !== null ? (
+            {order.source.kind === 'signal' ? (
+              <span className="fdry-src">
+                From a sensor signal
+                {order.source.url !== null ? (
+                  <a href={order.source.url} target="_blank" rel="noreferrer">
+                    evidence
+                  </a>
+                ) : null}
+              </span>
+            ) : order.source.key !== null ? (
               <span className="fdry-src">
                 {order.source.tracker} {order.source.key}
               </span>
@@ -1200,6 +1217,12 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
               ) : null}
             </span>
           </div>
+          {/* What agreeing this order queued it behind (R4) — a note, not a
+              check or a failure: the run still starts, it just waits its
+              turn on a file another order already has. */}
+          {step.id === 'handOff' && view.advisory != null ? (
+            <p className="fdry-note fdry-advisory">{view.advisory}</p>
+          ) : null}
         </footer>
       </div>
     </div>

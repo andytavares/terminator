@@ -58,7 +58,16 @@ function graph(): RunGraph {
 }
 
 function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
-  return { graph: g, orphaned: [], stranded: [], waiting: [], activity: {}, ...over }
+  return {
+    graph: g,
+    orphaned: [],
+    stranded: [],
+    waiting: [],
+    activity: {},
+    ci: null,
+    queue: null,
+    ...over,
+  }
 }
 
 function worldFor(g: RunGraph): World {
@@ -565,5 +574,48 @@ describe('direct: applies a batch of events in order and is pure', () => {
     const next = direct(world, events, 0)
     expect(next.crew.find((c) => c.nodeId === 'a')!.then).toBe('type')
     expect(next.crates).toHaveLength(1)
+  })
+})
+
+describe('direct: CI', () => {
+  it('records the round on a ci-round event', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const next = direct(world, [{ kind: 'ci-round', round: 2, max: 3 }], 0)
+    expect(next.ci).toEqual({ round: 2, max: 3, checks: {} })
+  })
+
+  it('records a check bucket on a ci-check event, keeping earlier checks', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const round = direct(world, [{ kind: 'ci-round', round: 1, max: 3 }], 0)
+    const one = direct(round, [{ kind: 'ci-check', name: 'test', bucket: 'fail' }], 0)
+    const two = direct(one, [{ kind: 'ci-check', name: 'lint', bucket: 'pass' }], 0)
+    expect(two.ci).toEqual({ round: 1, max: 3, checks: { test: 'fail', lint: 'pass' } })
+  })
+
+  it('overwrites a check bucket when it changes', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const one = direct(world, [{ kind: 'ci-check', name: 'test', bucket: 'pending' }], 0)
+    const two = direct(one, [{ kind: 'ci-check', name: 'test', bucket: 'pass' }], 0)
+    expect(two.ci?.checks.test).toBe('pass')
+  })
+})
+
+describe('direct: queue', () => {
+  it('records the position and who it is behind on a queued event', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const next = direct(world, [{ kind: 'queued', position: 2, behind: ['Other order'] }], 0)
+    expect(next.queue).toEqual({ position: 2, behind: ['Other order'] })
+  })
+
+  it('overwrites the position when it moves', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const first = direct(world, [{ kind: 'queued', position: 2, behind: ['Other order'] }], 0)
+    const second = direct(first, [{ kind: 'queued', position: 1, behind: ['Other order'] }], 0)
+    expect(second.queue).toEqual({ position: 1, behind: ['Other order'] })
   })
 })

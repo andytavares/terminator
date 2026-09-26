@@ -38,6 +38,24 @@ describe('lastIntake', () => {
     })
   })
 
+  // A turn the Forge started on its own, closing a gap the architect left
+  // behind, still counts as an operator-started turn to every reader here.
+  it('is running while a follow-up the Forge started itself is the last thing that happened', () => {
+    const out = lastIntake([
+      entry({
+        action: 'converge.followed_up',
+        subject: 'sess-2',
+        reason: 'closing the failing checks on its own',
+      }),
+    ])
+    expect(out).toEqual({
+      kind: 'running',
+      at: '2026-09-09T19:30:00Z',
+      sessionId: 'sess-2',
+      asked: 'closing the failing checks on its own',
+    })
+  })
+
   it('is redrafted once the architect has saved one', () => {
     const out = lastIntake([
       entry({ action: 'converge.started', subject: 'sess-1' }),

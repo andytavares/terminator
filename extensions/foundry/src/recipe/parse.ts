@@ -50,6 +50,15 @@ function idMatchesFile(id: string, file: string): boolean {
   return id === path.basename(file).replace(/\.ya?ml$/, '')
 }
 
+// A skill id becomes a directory name — `<dir>/skills/<id>/SKILL.md` — so it
+// is held to the shape a directory name can take, not the looser rule for a
+// recipe or role id.
+const SKILL_ID = /^[a-z0-9][a-z0-9-]*$/
+
+function badSkillIds(ids: readonly string[]): string[] {
+  return ids.filter((id) => !SKILL_ID.test(id))
+}
+
 // ── recipes ──────────────────────────────────────────────────────────────
 
 /**
@@ -94,6 +103,10 @@ const StepSchema = z
     context: z.enum(['fresh', 'resume']).optional(),
     evidence: z.array(z.string()).optional(),
     effort: z.enum(EFFORT_LEVELS).optional(),
+    // Mounted for this step's agent the way Claude Code loads a skill: a
+    // directory per id, passed with `--add-dir`. Optional, because most steps
+    // need none — a step declaring one is opting into something extra.
+    skills: z.array(z.string().min(1)).optional(),
     onFail: z
       .strictObject({
         rework: z.string().min(1),
@@ -132,6 +145,10 @@ const RecipeSchema = z.object({
   description: z.string().default(''),
   requires: z.array(RequirementSchema).default([]),
   effort: z.enum(EFFORT_LEVELS).optional(),
+  // CI is watched on the draft a `ready-for-review` gate opens. A shape that
+  // never opens one has no draft to watch, so a recipe declaring `ci` with no
+  // such gate is refused by parseRecipe rather than silently doing nothing.
+  ci: z.strictObject({ rounds: z.number().int().min(1).max(3) }).optional(),
   steps: z.array(StepSchema).min(1),
 })
 
@@ -192,11 +209,29 @@ export function parseRecipe(text: string, file: string): ParseResult<Recipe> {
       }
     }
   }
+  for (const step of recipe.steps) {
+    const bad = badSkillIds(step.skills ?? [])
+    if (bad.length > 0) {
+      return fail(file, `step "${step.id}" names skill "${bad[0]}", which is not a valid skill id`)
+    }
+  }
   const cycle = findCycle(recipe.steps)
   if (cycle !== null) return fail(file, `has a cycle in its step graph, through "${cycle}"`)
 
   const onFailProblem = checkOnFail(recipe.steps, file)
   if (onFailProblem !== null) return onFailProblem
+
+  if (recipe.ci !== undefined) {
+    const hasReadyForReviewGate = recipe.steps.some(
+      (step) => step.kind === 'gate' && step.rule === 'ready-for-review'
+    )
+    if (!hasReadyForReviewGate) {
+      return fail(
+        file,
+        'declares ci, but opens no ready-for-review gate — there is no draft for CI to watch'
+      )
+    }
+  }
 
   return { ok: true, value: recipe }
 }
@@ -256,6 +291,9 @@ const RoleSchema = z.object({
   reads: z.array(z.string()).default([]),
   writes: z.array(z.string()).default([]),
   tools: z.array(z.string()).default([]),
+  // Mounted for every agent launched with this role, the way Claude Code
+  // loads a skill: a directory per id, passed with `--add-dir`.
+  skills: z.array(z.string().min(1)).default([]),
   prompt: z.string().min(1),
 })
 
@@ -271,6 +309,13 @@ export function parseRole(text: string, file: string): ParseResult<Role> {
   if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
   if (!idMatchesFile(parsed.data.id, file)) {
     return fail(file, `declares id "${parsed.data.id}", which does not match the filename`)
+  }
+  const bad = badSkillIds(parsed.data.skills)
+  if (bad.length > 0) {
+    return fail(
+      file,
+      `role "${parsed.data.id}" names skill "${bad[0]}", which is not a valid skill id`
+    )
   }
   return { ok: true, value: parsed.data }
 }

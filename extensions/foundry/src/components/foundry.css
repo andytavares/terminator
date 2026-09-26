@@ -371,6 +371,12 @@
   margin: 0 0 10px;
 }
 
+/* What agreeing this order is about to queue behind (R4) — a note beside the
+   hand-off button, not styled as a check or a failure. */
+.fdry-advisory {
+  margin: 10px 0 0;
+}
+
 .fdry-wizard-nav {
   display: flex;
   align-items: center;
@@ -747,6 +753,19 @@
   font-size: 12px;
   line-height: 1.5;
   color: var(--tm-text-secondary);
+}
+
+/* The refinery's file-overlap queue: this order sits behind another's files,
+   which is a fact about the queue rather than an interruption — informational,
+   so it borrows `.fdry-needs-you`'s left-border shape without its stronger
+   warning weight. */
+.fdry-queue {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-left: 3px solid var(--tm-accent);
+  border-radius: var(--tm-radius-md);
+  padding: 10px 14px;
+  margin-bottom: 12px;
 }
 
 /* A held tool call. The one thing on this surface that is not read-only. */
@@ -1468,6 +1487,12 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-xs);
   padding: 1px 6px;
+}
+
+.fdry-src a {
+  color: inherit;
+  margin-left: 6px;
+  text-decoration: underline;
 }
 
 .fdry-attach {
@@ -2267,6 +2292,126 @@
   color: var(--tm-text-secondary);
 }
 
+/* ─── Foundry: sensor signals ────────────────────────────────────────
+   A signal never starts anything by itself, so its row reads lighter than
+   a gate: no stripe, no risk grade — just what a heuristic saw and the two
+   moves the operator has over it. */
+
+.fdry-signals {
+  margin-top: 18px;
+}
+
+.fdry-signal-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fdry-signal {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: 10px 12px;
+}
+
+.fdry-signal-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.fdry-signal-main b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fdry-signal-meta {
+  margin-top: 4px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-signal-meta a {
+  color: var(--tm-accent);
+}
+
+.fdry-signal-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.fdry-signal-actions button {
+  appearance: none;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fdry-signal-actions button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-signal-promote {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.fdry-signal-promote label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-signal-promote input {
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  padding: 3px 8px;
+  color: var(--tm-text-primary);
+  min-width: 220px;
+}
+
+.fdry-signal-promote button {
+  appearance: none;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-signal-promote button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
 /* ─── Foundry: the floor ─────────────────────────────────────────── */
 
 .fdry-lane {
@@ -2366,6 +2511,13 @@
   color: var(--tm-danger);
 }
 
+.fdry-unit-skills {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
 .fdry-unit-feedback {
   flex-basis: 100%;
   font-size: 12px;
@@ -2441,6 +2593,102 @@
   font-family: var(--tm-font-mono, ui-monospace, monospace);
   font-size: 11px;
   color: var(--tm-text-muted);
+}
+
+.fdry-sensors {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.fdry-sensor {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  padding: 10px 12px;
+}
+
+.fdry-sensor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fdry-sensor-head b {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.fdry-sensor-rung {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  padding: 1px 7px;
+}
+
+.fdry-sensor-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-sensor-repo {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-sensor-repo input {
+  flex: 1;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  padding: 3px 8px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-sensor-meta {
+  margin-top: 6px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-sensor-actions {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fdry-sensor-actions button {
+  appearance: none;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-sensor-actions span {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
 }
 
 /* Controls that end or destroy a run.
@@ -2854,6 +3102,86 @@
   padding: 14px;
 }
 
+/* The Dock: what a sensor flagged, waiting to be promoted or left alone.
+   Sits above the hall grid, and takes no space at all when it is empty. */
+
+.fdry-dock {
+  padding: 14px 14px 0;
+}
+
+.fdry-dock-crates {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.fdry-crate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 200px;
+  padding: 10px 12px;
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-elevated);
+}
+
+.fdry-crate b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fdry-crate-meta {
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-crate button {
+  appearance: none;
+  margin-top: 4px;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-card);
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-crate button.is-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-crate-promote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.fdry-crate-promote label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-crate-promote input {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  padding: 3px 8px;
+  color: var(--tm-text-primary);
+  min-width: 160px;
+}
+
 .fdry-hall-card {
   position: relative;
   display: flex;
@@ -2886,6 +3214,79 @@
 .fdry-hall-card-state {
   font-size: 12px;
   color: var(--tm-text-secondary);
+}
+
+.fdry-hall-card-ci {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tm-text-secondary);
+}
+
+/* The refinery: which orders sit behind which on disk, below the hall grid. */
+.fdry-refinery {
+  margin-top: 16px;
+}
+
+.fdry-refinery-track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fdry-refinery-token {
+  padding: 4px 10px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-card);
+  font-size: 12px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-refinery-join {
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+}
+
+.fdry-ci-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.fdry-ci-checks li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fdry-ci-checks a {
+  color: var(--tm-text-primary);
+}
+
+.fdry-ci-bucket {
+  padding: 1px 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-text-secondary);
+}
+
+.fdry-ci-bucket[data-bucket='pass'] {
+  border-color: var(--tm-success);
+  color: var(--tm-success);
+}
+
+.fdry-ci-bucket[data-bucket='fail'],
+.fdry-ci-bucket[data-bucket='cancel'] {
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
 }
 
 .fdry-hall-shell {
@@ -3454,5 +3855,124 @@
   .fdry-card,
   .fdry-hall-hud__needs {
     animation: none;
+  }
+}
+
+/* Segmented controls: Record · Factory, and the metrics' time window. */
+.fdry-seg,
+.fdry-window-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 12px;
+  width: fit-content;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-surface);
+}
+
+.fdry-seg button,
+.fdry-window-toggle button {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--tm-radius-xs);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.fdry-seg button:hover,
+.fdry-window-toggle button:hover {
+  color: var(--tm-text-primary);
+}
+
+.fdry-seg button[aria-pressed='true'],
+.fdry-window-toggle button[aria-pressed='true'] {
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+  font-weight: 600;
+}
+
+.fdry-metrics-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.fdry-metrics-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-card);
+}
+
+.fdry-metrics-tile__value {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--tm-text-primary);
+}
+
+.fdry-metrics-tile__label {
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+}
+
+/* The factory site: the hall cards, with the status wall beside them. */
+.fdry-site {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 16px;
+  align-items: start;
+}
+
+.fdry-site > .fdry-status-wall {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.fdry-status-wall {
+  margin: 28px 28px 0 0;
+  padding: 12px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-surface);
+}
+
+.fdry-status-wall .fdry-metrics-tiles {
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.fdry-status-wall .fdry-metrics-tile {
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px solid var(--tm-border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+.fdry-status-wall .fdry-metrics-tile__value {
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .fdry-site {
+    grid-template-columns: 1fr;
+  }
+
+  .fdry-site > .fdry-status-wall {
+    grid-column: 1;
+    grid-row: auto;
   }
 }

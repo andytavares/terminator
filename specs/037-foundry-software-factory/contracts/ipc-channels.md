@@ -151,9 +151,11 @@ Run the six checks and, when they all pass, move the order to `agreed`. Idempote
 
 **Payload**: `{ id: string; commit: boolean }`
 
-**Response**: `{ compile: CompileResult; order: WorkOrder }`
+**Response**: `{ compile: CompileResult; order: WorkOrder; advisory?: string | null }`
 
 When `commit` is true and `compile.ok` is false the order is unchanged and `failures` names the specific offending criterion or unit (FR-011).
+
+**The refinery's advisory (R4).** When `commit` agrees the order, `advisory` says what it is about to queue behind, if anything — computed against every other `running`/`shipped` order's queue entries, using the plan's own `touches` as this order's files (there is no checkout yet). `null` when nothing overlaps, or when the host has not wired the refinery. See "The refinery" below.
 
 ---
 
@@ -208,6 +210,25 @@ An agent's terminal is a child of the application process, so quitting kills eve
 - **The `run.interrupted` gate is raised on first read of a records location**, by `foundry:attention` and `foundry:inbox.list`, and is live at every autonomy setting. The chrome polls `attention` from the moment the application opens, so a run the last session left behind is counted on the Inbox tab within one poll.
 
 `session.attach` refuses a session this process no longer has, rather than navigating to a terminal that does not exist.
+
+**CI on the drafts (ADR-064).** `run.observe` carries `ci: CiState | null` — `{ round, max, status: 'watching' | 'green' | 'red' | 'not_measured' | 'reworking', pulls: { url, checks: { name, bucket, link, workflow }[] }[], reason, at }`, read from the order's `ci.json`; `null` until a draft opens on a recipe that declares `ci`. Each `order.list` row carries `ci: { status, round, max } | null` from the same file. A run graph node carries `reworks: number` and `feedback: Feedback[]` (ADR-063), defaulted when an older graph is read.
+
+**Skills each node gets.** `run.observe` also carries `skills: Record<nodeId, string[]>`, computed with `skillsFor` from the order's own recipe and role registry — the same resolution `run.start` refuses on if a name is unknown. A node with no skills is absent from the map. An order whose recipe no longer resolves (removed from disk after the run began) reports `{}` rather than throwing.
+
+## The refinery (R4)
+
+Parallel orders agreed against the same repository and base can each be correct on their own and still collide on disk if they touch the same files. The refinery watches for a predecessor's pull merging and restacks whatever queued behind it, so that collision surfaces as a rebase during the run rather than a merge conflict the operator finds later.
+
+**`run.observe` carries `queue: { position: number; behind: { orderId; title; files }[] } | null`** — this order's place in the file-overlap queue, from `queue(entries)` over every `running`/`shipped` order's queue entries. `null` when it is not in a queue at all (nothing overlapping is in flight) or the host has not wired the refinery. `behind` lists only the earlier orders it actually shares files with, and which files.
+
+**Each `order.list` row carries the same `queue` field**, computed once per call over the whole list.
+
+**The ledger.** A 60-second tick (cleared on deactivate, like the sensor and palette ticks) watches every shipped/running order's open pulls via `gh pr view --json state,mergedAt,baseRefName`. Actions recorded, actor `rule:refinery`:
+
+- `refinery.merged` — a predecessor's pulls all merged; `refinery.json`'s `mergedAt` is written once.
+- `refinery.rebased` — an overlapping later order's lanes were rebased onto their base after the merge; `restackedFor` gains the predecessor's id, and one CI watch runs against its existing drafts.
+- `refinery.conflict` — the rebase failed with conflicts; the `refinery.conflict` gate is raised (`take_over`/`hold`) and the order is left exactly as `restack` found it — no auto-resolution, no retry.
+- `refinery.failed` — a transient failure (fetch/push); nothing is marked restacked, so the next tick retries.
 
 ---
 
@@ -295,6 +316,18 @@ Read by the tab strip on every surface. Foundry holds work for a person in three
 
 ---
 
+## `foundry:factory.metrics`
+
+The factory's own dashboard: every order's records, reduced to lead time, first-pass yield and the rest of `FactoryMetrics`. Nothing here is stored — it is recomputed on every call from the same ledger, gates and run graph the order screens already read.
+
+**Payload**: `{ window?: '30d' | 'all' }` (default `'30d'`)
+
+**Response**: `FactoryMetrics` (see `src/factory/metrics.ts`)
+
+A follow-up turn the Forge starts on its own — closing a gap the architect left behind rather than waiting for the operator to ask again (spec 062) — is recorded as `converge.followed_up`, not `converge.started`. Every reader of the ledger's intake outcome treats the two the same way: a turn is running. Only `converge.followed_up` is counted separately, as `forgeFollowUps`, in the factory's metrics.
+
+---
+
 ## `foundry:rules.propose`
 
 Run the curator over the ledger and return proposals. On request only — never scheduled, never unprompted (FR-080).
@@ -346,7 +379,9 @@ Only rules that resolved from the **records location** rung are listed. A built-
 
 **Payload**: `{}`
 
-**Response**: `{ rules: Array<{ id: string; asserts: string; rung: string; origin: string }>; declined: Array<{ id: string; reason: string }> }`
+**Response**: `{ rules: Array<{ id: string; asserts: string; rung: string; origin: string }>; declined: Array<{ id: string; reason: string }>; skills: Array<{ id: string; rung: string; dir: string }> }`
+
+`skills` is every skill available across all three rungs (data root, repository, built-in), from `availableSkills`, most specific winning per id, sorted by id — unlike `rules`, this lists everything in force, not only what the operator added.
 
 ---
 
@@ -359,6 +394,52 @@ Refused for any id not in `foundry:rules.inForce`.
 **Payload**: `{ ruleId: string; reason?: string }`
 
 **Response**: `{ ok: true; removed: boolean; reason: string; at: string }`, or `{ error }`.
+
+---
+
+## Sensors (ADR-066)
+
+Signals read the product's own state — failing CI runs, open issues — back into the factory while the app is open. A signal proposes work; it never starts any. A sensor runs only while enabled and pointed at a repository; nothing runs by default.
+
+### `foundry:signals.list`
+
+**Payload**: `{}`
+
+**Response**: `{ signals: Signal[]; counts: { open: number } }` — open signals only, ranked by impact (occurrences × severity weight), most recent first among ties.
+
+### `foundry:signals.dismiss`
+
+**Payload**: `{ id: string }`
+
+**Response**: `{ signal: Signal }`, or `{ error }` for an unknown id. A dismissed signal reopens once its evidence grows by half again.
+
+### `foundry:signals.promote`
+
+Seed a draft order from a signal — the same intake path as a typed idea or a tracker issue, so nothing starts: the Forge still has to converge it. Marks the signal `promoted` with the new order's id and writes `signal.promoted` to that order's ledger.
+
+**Payload**: `{ id: string; repoPaths: string[] }`
+
+**Response**: `{ order: WorkOrder }`, or `{ error }` for an unknown id.
+
+### `foundry:sensors.list`
+
+**Response**: `{ sensors: { def: SensorDef; rung: 'data-root' | 'repository' | 'built-in'; state: SensorState; nextDueAt: string | null }[] }` — every sensor resolved the same way a recipe, role or rule is, with a defaulted state (`enabled: false, repoPath: null, lastRunAt: null, lastProblem: null`) for one that has never been configured.
+
+### `foundry:sensors.set`
+
+Turn a sensor on or off, or point it at a repository. Refused when it would leave a sensor enabled with no repository to watch.
+
+**Payload**: `{ id: string; enabled?: boolean; repoPath?: string | null }`
+
+**Response**: `{ state: SensorState }`, or `{ error }`.
+
+### `foundry:sensors.run-now`
+
+Run one sensor once, immediately, outside its own schedule.
+
+**Payload**: `{ id: string }`
+
+**Response**: `{ recorded: number; problem: string | null }`, or `{ error }` for an unknown sensor or one with no repository set.
 
 ---
 

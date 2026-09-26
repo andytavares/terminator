@@ -555,6 +555,27 @@ describe('layoutHall', () => {
       expect(map.width).toBeGreaterThan(0)
       expect(map.height).toBeGreaterThan(0)
     })
+
+    it('draws no dispatch tower when the observation carries no CI', () => {
+      const map = layoutHall(graph([rn({ id: 'a', kind: 'agent' })]))
+      expect(map.props.some((p) => p.kind === 'dispatch')).toBe(false)
+    })
+
+    it('draws a dispatch tower at the exit only when CI is present', () => {
+      const withCi = layoutHall(graph([rn({ id: 'a', kind: 'agent' })]), undefined, true)
+      const dispatch = withCi.props.find((p) => p.kind === 'dispatch')
+      expect(dispatch).toBeDefined()
+      expect(dispatch?.y).toBe(withCi.anchors.exit.y)
+    })
+
+    it('leaves the rest of the map unchanged by adding the dispatch tower', () => {
+      const without = layoutHall(graph([rn({ id: 'a', kind: 'agent' })]))
+      const withCi = layoutHall(graph([rn({ id: 'a', kind: 'agent' })]), undefined, true)
+      const stationsOnly = (m: HallMap) => m.props.filter((p) => p.kind !== 'dispatch')
+      expect(stationsOnly(withCi)).toEqual(stationsOnly(without))
+      expect(withCi.width).toBe(without.width)
+      expect(withCi.height).toBe(without.height)
+    })
   })
 })
 

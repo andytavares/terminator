@@ -9,6 +9,9 @@ import type { OrderStore } from '../order/store.js'
 import { readStanding } from '../order/standing.js'
 import { intakeRefusal, lastIntake } from '../forge/intake-outcome.js'
 import { runFailure } from '../line/run-outcome.js'
+import { readCiState } from '../line/ci-state.js'
+import { queue, advisory as advisoryFor } from '../line/refinery.js'
+import type { QueueEntry } from '../line/refinery.js'
 import type { StandingSources } from '../order/standing.js'
 import { TransitionIntentSchema, WorkOrderSchema, WriteBackSchema } from '../order/schema.js'
 import type { Budgets, TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
@@ -162,6 +165,22 @@ export interface ForgeDeps {
   readonly capability?: (order: WorkOrder) => Promise<CapabilityReport>
   /** The agreement write-back. Its failure never fails the agreement. */
   readonly onAgreed?: (order: WorkOrder) => Promise<void>
+  /**
+   * Where the records live, so the list can read each order's `ci.json`.
+   *
+   * Resolved on every call, like the other read-only deps here: the records
+   * location follows the open workspace. Absent means the row carries no `ci`
+   * field at all, which is what a host that has never wired CI is actually
+   * true of.
+   */
+  readonly dataRoot?: () => string
+  /**
+   * Every in-flight order's queue entries, for the refinery's file-overlap
+   * queue: the list's `queue` field, and the advisory shown on agreement.
+   * Absent means no queue to ask, which reads as "not queued" — a host that
+   * has never wired the refinery has nothing to say either way.
+   */
+  readonly queueEntries?: () => Promise<readonly QueueEntry[]>
 }
 
 export interface ForgeChannels {
@@ -186,6 +205,26 @@ export interface ForgeChannels {
 /** The order plus its checks — what every Forge channel hands back. */
 function view(order: WorkOrder, changed: string[] = []) {
   return { order, compile: compileOrder(order), changed }
+}
+
+/**
+ * What agreeing this order is about to queue behind, if anything.
+ *
+ * One repository at a time, because `advisory` compares a single repo+base
+ * against the current queue — an order spanning several repositories can
+ * queue behind different predecessors in each, and the operator reads one
+ * sentence per repository rather than a single one that elides which.
+ */
+function advisoryForOrder(order: WorkOrder, entries: readonly QueueEntry[]): string | null {
+  const messages = order.context.repos
+    .map((repo) => {
+      const files = order.plan.units
+        .filter((unit) => unit.lane === repo.lane)
+        .flatMap((unit) => unit.touches)
+      return advisoryFor({ repo: repo.name, base: repo.baseBranch, files }, entries)
+    })
+    .filter((message): message is string => message !== null)
+  return messages.length === 0 ? null : messages.join(' ')
 }
 
 export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
@@ -477,7 +516,21 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       // Recorded by the write-back itself; the order is agreed regardless.
     }
 
-    return { compile: compileOrder(agreed.order), order: agreed.order, intake, capability }
+    // What this order is about to queue behind, if anything — said once, at
+    // the moment it becomes real work, rather than left for the operator to
+    // discover as a merge conflict later.
+    const advisory =
+      deps.queueEntries === undefined
+        ? null
+        : advisoryForOrder(agreed.order, await deps.queueEntries())
+
+    return {
+      compile: compileOrder(agreed.order),
+      order: agreed.order,
+      intake,
+      capability,
+      advisory,
+    }
   }
 
   /**
@@ -572,6 +625,9 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     // A discarded order stays in the records and leaves the list; the list is
     // what needs doing, not what was ever asked for.
     const live = orders.filter((order) => order.status !== 'cancelled')
+    // Computed once for the whole list rather than per row: every row's
+    // queue position comes from the same set of in-flight orders.
+    const queuePositions = deps.queueEntries === undefined ? null : queue(await deps.queueEntries())
     return {
       orders: await Promise.all(
         live.map(async (order) => ({
@@ -602,6 +658,21 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
             intakeRefusedFor: async (orderId) => intakeRefusal(await deps.store.entries(orderId)),
             runFailureFor: async (orderId) => runFailure(await deps.store.entries(orderId)),
           }),
+          // Absent when this host has never wired a records location for CI;
+          // null once it has one and this order has not shipped a pull yet.
+          ...(deps.dataRoot === undefined
+            ? {}
+            : {
+                ci: await readCiState(deps.dataRoot(), order.id).then((state) =>
+                  state === null
+                    ? null
+                    : { status: state.status, round: state.round, max: state.max }
+                ),
+              }),
+          // Where this order stands in the refinery's file-overlap queue.
+          // Null when it is not in a queue at all, or the host has never
+          // wired the refinery.
+          queue: queuePositions?.find((position) => position.orderId === order.id) ?? null,
         }))
       ),
     }

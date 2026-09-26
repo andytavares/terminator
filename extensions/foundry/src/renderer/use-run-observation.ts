@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
+import type { CiState } from '../line/ci-state.js'
 
 /** One repository this order spans, and what it is waiting for. */
 interface LaneRow {
@@ -55,6 +56,21 @@ export interface FloorView {
    * dead run and a working one are the same chips.
    */
   orphaned?: string[]
+  /** The draft's CI, from the ship tail's own file. Absent means no run has shipped yet. */
+  ci?: CiState | null
+  /** Skills each node gets, keyed by node id. Absent nodes have none. */
+  skills?: Record<string, string[]>
+  /**
+   * Where this order stands in the refinery's file-overlap queue.
+   *
+   * Null when it is not in a queue at all — nothing else agreed against the
+   * same repository and base touches the same files. Present and `behind:
+   * []` means it is first in line.
+   */
+  queue?: {
+    position: number
+    behind: { orderId: string; title: string; files: string[] }[]
+  } | null
 }
 
 /** A tool call an agent is holding at, waiting for an answer. */

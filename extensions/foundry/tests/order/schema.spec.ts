@@ -295,6 +295,14 @@ describe('parseWorkOrder', () => {
   })
 })
 
+describe('a signal-sourced order', () => {
+  it('parses a source of kind signal, promoted from a sensor (ADR-066)', () => {
+    const order = valid() as Record<string, unknown>
+    order.source = { kind: 'signal', tracker: null, key: 'sig-1', url: 'https://example.com/1' }
+    expect(() => parseWorkOrder(order)).not.toThrow()
+  })
+})
+
 describe('draftOrder', () => {
   it('builds a draft that parses, so the Forge always starts from a valid document', () => {
     const o = draftOrder({

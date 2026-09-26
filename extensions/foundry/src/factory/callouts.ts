@@ -1,7 +1,9 @@
 import { gateNodeId } from './events.js'
 import type { FactoryEvent } from './events.js'
+import { ordinal } from './format.js'
 import type { Gate, GateOption } from '../gates/rules.js'
 import type { NodeState, RunGraph } from '../line/run-graph.js'
+import { DISPATCH_NODE_ID } from './layout.js'
 
 // What the hall says, and where it says it.
 //
@@ -98,6 +100,33 @@ export function calloutFor(
         event.toNodeId,
         'fail',
         `Sent back: ${name(labels, event.fromNodeId)} failed`,
+        at
+      )
+    case 'ci-round':
+      return callout(DISPATCH_NODE_ID, 'start', `Round ${event.round} of ${event.max}`, at)
+    case 'ci-check':
+      switch (event.bucket) {
+        case 'fail':
+        case 'cancel':
+          return callout(DISPATCH_NODE_ID, 'fail', `${event.name} failed`, at)
+        case 'pass':
+          return callout(DISPATCH_NODE_ID, 'done', `${event.name} passed`, at)
+        case 'pending':
+        case 'skipping':
+          return null
+        /* v8 ignore next 3 -- exhaustive union, unreachable */
+        default: {
+          const never: never = event.bucket
+          throw new Error(`unhandled check bucket: ${String(never)}`)
+        }
+      }
+    case 'queued':
+      return callout(
+        DISPATCH_NODE_ID,
+        'start',
+        event.behind.length === 0
+          ? `Queued ${ordinal(event.position)}`
+          : `Queued ${ordinal(event.position)} behind ${event.behind[event.behind.length - 1]}`,
         at
       )
     /* v8 ignore next 3 -- exhaustive union, unreachable */

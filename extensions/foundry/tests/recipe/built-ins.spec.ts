@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseRecipe, parseRole, STEP_KINDS } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
+import { resolveSkill } from '../../src/recipe/resolve.js'
 import { createRoleRegistry } from '../../src/line/roles.js'
 import { brief } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/schema.js'
@@ -479,5 +480,65 @@ describe('the lint pass every code-producing shape adds after its build', () => 
   it('leaves refactor baseline without a rework target', () => {
     const baseline = recipe('refactor.yaml').steps.find((s) => s.id === 'baseline')
     expect(baseline?.onFail).toBeUndefined()
+  })
+})
+
+// CI is watched on the draft a `ready-for-review` gate opens: every shape
+// that opens one gets two rounds back to the lane's builder before it holds
+// for the operator. Only spike opens none — it is a question, not a change,
+// and ships no pull request at all.
+describe('ci rounds on every shape that ships code', () => {
+  // A document shape's draft carries prose; a red CI on the code around it is
+  // not something its scribe can fix.
+  const DOCUMENT_SHAPES = ['research.yaml', 'design-doc.yaml']
+  const withReadyForReviewGate = recipeFiles.filter((file) =>
+    recipe(file).steps.some((s) => s.kind === 'gate' && s.rule === 'ready-for-review')
+  )
+  const watched = withReadyForReviewGate.filter((file) => !DOCUMENT_SHAPES.includes(file))
+  const unwatched = recipeFiles.filter((file) => !watched.includes(file))
+
+  it('finds a ready-for-review gate in every shape but spike', () => {
+    expect(recipeFiles.filter((file) => !withReadyForReviewGate.includes(file))).toEqual([
+      'spike.yaml',
+    ])
+  })
+
+  it.each(watched)('%s gives its draft two rounds of CI', (file) => {
+    expect(recipe(file).ci).toEqual({ rounds: 2 })
+  })
+
+  it.each(unwatched)('%s declares no ci', (file) => {
+    expect(recipe(file).ci).toBeUndefined()
+  })
+
+  it('leaves exactly spike and the document shapes unwatched', () => {
+    expect([...unwatched].sort()).toEqual(['design-doc.yaml', 'research.yaml', 'spike.yaml'])
+  })
+})
+
+// A role's skills are mounted for it the way Claude Code loads them: a
+// directory per skill, resolved on the same three rungs as a recipe. The
+// built-in ci-fix skill is what lets the builder recover from a check
+// handed back in its brief, so the builder declares it and the directory
+// has to actually be there for that to mean anything.
+describe('the built-in ci-fix skill', () => {
+  it('is declared by the builder role', () => {
+    const parsed = parseRole(read(rolesDir, 'builder.yaml'), 'builder.yaml')
+    expect(parsed.ok && parsed.value.skills).toEqual(['ci-fix'])
+  })
+
+  it('resolves on the built-in rung', () => {
+    const resolved = resolveSkill('ci-fix', {
+      dataRoot: '/nowhere',
+      repoPaths: [],
+      builtInDir: root,
+    })
+    expect(resolved?.rung).toBe('built-in')
+    expect(resolved && fs.existsSync(path.join(resolved.dir, 'SKILL.md'))).toBe(true)
+  })
+
+  it('names itself ci-fix in its own frontmatter', () => {
+    const text = fs.readFileSync(path.join(root, 'skills', 'ci-fix', 'SKILL.md'), 'utf8')
+    expect(text).toMatch(/^name:\s*ci-fix\s*$/m)
   })
 })

@@ -1,27 +1,49 @@
+import { z } from 'zod'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { app } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { modelCatalog } from './state/model-catalog.js'
 
 import { createForgeChannels } from './ipc/forge-channels.js'
 import { createRunChannels, writeRunGraph, readRunGraph } from './ipc/run-channels.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
 import { createLedgerChannels } from './ipc/ledger-channels.js'
+import { createSensorChannels } from './ipc/sensor-channels.js'
+import { newOrderId } from './forge/intake-source.js'
+import { createSignalStore } from './sensors/store.js'
+import type { SignalStore } from './sensors/store.js'
+import { dueSensors, runSensor } from './sensors/schedule.js'
+import type { CollectDeps } from './sensors/collect.js'
 import { rulesFor, rulesAtRung } from './verify/rules.js'
-import { availableNames, resolveRule } from './recipe/resolve.js'
+import { availableNames, availableSensors, resolveRule } from './recipe/resolve.js'
 import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore, createGateStore } from './gates/store.js'
+import { raiseGate } from './gates/rules.js'
 import { orphanedNodes } from './line/reclaim.js'
 import type { StandingSources } from './order/standing.js'
 import { countAttention } from './gates/attention.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { tearDownRun, deleteOrder } from './line/teardown.js'
-import { markReady, readPulls, shipOrder } from './line/integrate.js'
+import { markReady, readPulls, shipOrder, finishShipping, pushLanes } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
-import { ensureCheckout, ensureCheckouts } from './line/worktree.js'
+import { watchChecks, failedLogs } from './line/ci.js'
+import type { Check, CiVerdict } from './line/ci.js'
+import { ciRounds, ciReworkTarget, shipNodeId } from './line/ship-tail.js'
+import { writeCiState } from './line/ci-state.js'
+import type { CiState } from './line/ci-state.js'
+import { rework } from './line/scheduler.js'
+import { resolveRecipe } from './recipe/resolve.js'
+import { ensureCheckout, ensureCheckouts, branchFor, checkoutPath } from './line/worktree.js'
 import type { Checkout } from './line/worktree.js'
+import { queueEntries } from './line/refinery-entries.js'
+import { readRefineryState, writeRefineryState } from './line/refinery-state.js'
+import { refineryTick } from './line/refinery-tick.js'
+import type { RefineryTickDeps } from './line/refinery-tick.js'
+import type { QueueEntry } from './line/refinery.js'
+import { restack } from './line/restack.js'
 import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
 import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
@@ -35,8 +57,8 @@ import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
 import { interruptedRuns, interruptedGate } from './line/adopt.js'
 import { createRoleRegistry } from './line/roles.js'
-import type { RunOutcome, StartedRun } from './line/executor.js'
-import type { RunGraph, RunNode } from './line/run-graph.js'
+import type { RunOutcome, StartedRun, ExecutorDeps } from './line/executor.js'
+import type { RunGraph, RunNode, Feedback } from './line/run-graph.js'
 import type { EffortLevel, Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
 import { collectableWrites, readRungOutput } from './line/rung-output.js'
@@ -417,6 +439,18 @@ let stallWatcher: StallWatcher | null = null
 let paletteRegistrations: Disposable[] = []
 let paletteSignature = ''
 let paletteTimer: NodeJS.Timeout | null = null
+/**
+ * The sensor tick (ADR-066): every due, enabled sensor runs sequentially once
+ * a minute while the app is open. Nothing runs when no sensor is enabled —
+ * `dueSensors` filters on that before anything is collected.
+ */
+let sensorTimer: NodeJS.Timeout | null = null
+/**
+ * The refinery tick: once a minute, watch merged predecessors and restack
+ * whatever queued behind them (R4). Nothing runs when nothing has shipped a
+ * pull yet — `computeQueueEntries`'s candidates are empty.
+ */
+let refineryTimer: NodeJS.Timeout | null = null
 // Auto-expires so a late manual visit to the Forge doesn't surprise the
 // operator with an intake that opened itself for no reason they can see.
 let pendingNewOrder = false
@@ -713,6 +747,84 @@ function issuesPortFor(api: ExtensionAPI): IssuesPort | null {
 }
 
 /**
+ * The application's tracker connection, narrowed to what a sensor's `tracker`
+ * source needs (`collect.ts`). Null when nothing is connected — a sensor of
+ * this kind then reports "no tracker is connected" rather than throwing.
+ */
+function sensorIssuesFor(api: ExtensionAPI): CollectDeps['issues'] {
+  const issues = api.issues
+  if (issues === undefined) return null
+  return {
+    search: async (query, opts) =>
+      (await issues.search(query, opts)).issues.map((issue) => ({
+        key: issue.key,
+        title: issue.title,
+        url: issue.url,
+      })),
+    listMine: async (opts) =>
+      (await issues.listMine(opts)).issues.map((issue) => ({
+        key: issue.key,
+        title: issue.title,
+        url: issue.url,
+      })),
+  }
+}
+
+/**
+ * One `CollectDeps` for a sensor watching `repoPath`, over the extension's own
+ * `gh`/`git` exec and tracker connection.
+ */
+function sensorCollectDepsFor(api: ExtensionAPI, repoPath: string): CollectDeps {
+  return {
+    exec: (options) => api.shell.exec(options),
+    cwd: repoPath,
+    issues: sensorIssuesFor(api),
+    now: () => new Date().toISOString(),
+  }
+}
+
+/**
+ * A signal store whose root is resolved on every call — the records location
+ * follows the open workspace, the same reason `createLiveOrderStore` exists.
+ */
+function liveSignalStore(root: () => string): SignalStore {
+  return {
+    list: () => createSignalStore(root()).list(),
+    save: (signals) => createSignalStore(root()).save(signals),
+    get: (id) => createSignalStore(root()).get(id),
+    sensorState: () => createSignalStore(root()).sensorState(),
+    setSensorState: (id, patch) => createSignalStore(root()).setSensorState(id, patch),
+  }
+}
+
+/**
+ * Every due, enabled sensor, run once, sequentially — one interval tick,
+ * whether it is the live 60-second one or a manual "run now".
+ */
+async function tickSensors(api: ExtensionAPI, root: string, store: SignalStore): Promise<void> {
+  const sources = resolveSources(api, root)
+  const defs = availableSensors(sources).map(({ def }) => def)
+  const states = await store.sensorState()
+  const now = new Date().toISOString()
+  for (const def of dueSensors(defs, states, now)) {
+    // `dueSensors` already refused anything without a repository; the null
+    // check here is only so the type checker agrees.
+    const repoPath = states[def.id].repoPath
+    if (repoPath === null) continue
+    try {
+      await runSensor(def, {
+        store,
+        collectDeps: sensorCollectDepsFor(api, repoPath),
+        now: () => new Date().toISOString(),
+        newId: () => randomUUID(),
+      })
+    } catch (error) {
+      api.log.error(`sensor ${def.id} failed to run`, error)
+    }
+  }
+}
+
+/**
  * What the record already says about these files (FR-077).
  *
  * One line per past decision, newest first and bounded — the point is to tell
@@ -838,6 +950,265 @@ function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): Int
 }
 
 /**
+ * Every in-flight order's queue entries, for the refinery's file-overlap
+ * queue: the observe/list channels' `queue` field, and the advisory shown on
+ * agreement.
+ *
+ * `merged` is read up front into a plain set, because `queueEntries` asks for
+ * it synchronously — every candidate order's `refinery.json` is small and
+ * this runs at most once per channel call, never per tick.
+ */
+async function computeQueueEntries(api: ExtensionAPI, root: string): Promise<QueueEntry[]> {
+  const orders = await createOrderStore(root).list()
+  const inFlight = orders.filter((o) => o.status === 'running' || o.status === 'shipped')
+  const merged = new Set<string>()
+  for (const order of inFlight) {
+    const state = await readRefineryState(root, order.id)
+    if (state.mergedAt !== null) merged.add(order.id)
+  }
+
+  const diffCommand: RunCommand = async (command, args, cwd) => {
+    if (command !== 'git' && command !== 'gh') return { ok: false, stdout: '' }
+    const result = await api.shell.exec({ command, args, cwd })
+    return { ok: result.exitCode === 0, stdout: result.stdout }
+  }
+
+  return queueEntries(orders, {
+    readPulls: (orderId) => readPulls(root, orderId),
+    changedFiles: async (order) => {
+      const files: string[] = []
+      for (const repo of order.context.repos) {
+        const path = checkoutPath(root, order, repo.name)
+        if (!fs.existsSync(path)) continue
+        files.push(...(await readChangedFiles(path, repo.baseBranch, diffCommand)))
+      }
+      return files
+    },
+    merged: (orderId) => merged.has(orderId),
+    agreedAt: (order) => order.agreedAt ?? '',
+  })
+}
+
+/**
+ * The parts of a CI round that never change between the run that opened the
+ * draft and a later "another round" answered from the inbox: how a pull's
+ * checks are watched, how a failure's log is read, and where the round's own
+ * ledger entry and live state go.
+ *
+ * `sendBack` is deliberately not here — the run and the inbox each build a
+ * different one, because the run already has a graph and executor deps in
+ * hand and the inbox has to rebuild them.
+ */
+function ciRoundDepsFor(
+  root: string,
+  orderId: string,
+  exec: ShellExec
+): {
+  watch: (
+    pull: { url: string; cwd: string },
+    onPoll: (checks: readonly Check[]) => void,
+    judged: ReadonlySet<string>
+  ) => Promise<CiVerdict>
+  failedLogs: (checks: readonly Check[], cwd: string) => Promise<string>
+  record: (action: string, subject: string, reason: string) => Promise<void>
+  state: (state: Omit<CiState, 'at'>) => Promise<void>
+} {
+  return {
+    watch: (pull, onPoll, judged) =>
+      watchChecks(pull, exec, {
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        onPoll,
+        ignoreRuns: judged,
+      }),
+    failedLogs: (checks, cwd) => failedLogs(checks, cwd, exec),
+    record: async (action, subject, reason) => {
+      await createOrderStore(root).record({
+        at: new Date().toISOString(),
+        orderId,
+        actor: 'rule:ci',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      })
+    },
+    state: (state) => writeCiState(root, orderId, { ...state, at: new Date().toISOString() }),
+  }
+}
+
+/**
+ * The fix round a red CI check gets: rework the graph back to the builder,
+ * re-run the executor from there, and — if that leaves the order shippable —
+ * push the fixed branches onto the drafts that are already open.
+ *
+ * Shared between a run in flight and a `ci.red` gate answered later from the
+ * inbox, which is the whole reason `graphRef` is a box rather than a plain
+ * graph: each round has to see the graph the previous round left, and the
+ * inbox path has no closure over a running executor to hold it for it.
+ */
+function ciSendBackFor(
+  root: string,
+  order: WorkOrder,
+  recipe: Recipe,
+  executorDeps: ExecutorDeps,
+  integrateDeps: IntegrateDeps,
+  graphRef: { current: RunGraph }
+): (feedback: Feedback) => Promise<boolean> {
+  return async (feedback) => {
+    const target = ciReworkTarget(recipe)
+    const shipId = shipNodeId(recipe)
+    if (target === null || shipId === null) return false
+
+    graphRef.current = rework(graphRef.current, shipId, target, feedback)
+    await writeRunGraph(root, graphRef.current)
+
+    const outcome = await execute(order, recipe, graphRef.current, executorDeps)
+    graphRef.current = outcome.graph
+    await writeRunGraph(root, graphRef.current)
+
+    if (!outcome.shippable) return false
+    await pushLanes(order, integrateDeps)
+    return true
+  }
+}
+
+/**
+ * One CI watch for an order whose lanes the refinery just rebased.
+ *
+ * The same shape as the `ci.red` gate's "another round" — `ciRounds` against
+ * the drafts that already exist, then `finishShipping` so the order gets its
+ * ready gate again, or `ci.red` if the rebase broke something. The recipe's
+ * own round count, not the fixed `1` the inbox path uses: this is a full
+ * re-check of a change nothing has looked at since it moved, not one more
+ * attempt at a failure the operator already saw.
+ */
+async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string): Promise<void> {
+  const order = await createOrderStore(root).load(orderId)
+  if (order === null || order.recipe === null) return
+  const resolved = resolveRecipe(order.recipe, resolveSources(api, root))
+  if (!resolved.ok) return
+  const recipe = resolved.resolved.value
+  const graph = await readRunGraph(root, orderId)
+  if (graph === null) return
+  const pulls = await readPulls(root, orderId)
+  if (pulls.length === 0) return
+
+  const { deps: executorDeps, exec } = await buildExecutorDeps(api, root, order, recipe, graph)
+  const integrateDeps = integrateDepsFor(api, root, orderId)
+  const graphRef = { current: graph }
+  const outcome = await ciRounds({
+    pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+    rounds: recipe.ci?.rounds ?? null,
+    ...ciRoundDepsFor(root, orderId, exec),
+    sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
+  })
+  const gates = createLiveGateStore(() => root)
+  await finishShipping(
+    order,
+    { verdicts: [], findings: [] },
+    pulls,
+    pulls.map((p) => p.bodyPath),
+    outcome,
+    {
+      ...integrateDeps,
+      raiseGate: async (g) => {
+        await gates.save(g)
+      },
+    }
+  )
+}
+
+/**
+ * The refinery's own gate: an overlapping order's lanes no longer rebase
+ * cleanly onto their base after a predecessor merged. Never resolved
+ * automatically — `restack` already refused to guess, and this just says so
+ * where the operator will see it.
+ */
+async function raiseRefineryConflict(
+  root: string,
+  orderId: string,
+  why: string,
+  files: readonly string[]
+): Promise<void> {
+  const gate = raiseGate({
+    id: `${orderId}-refinery-conflict`,
+    rule: 'refinery.conflict',
+    orderId,
+    summary: `${orderId} no longer rebases cleanly`,
+    why,
+    evidence: files.map((file) => ({ kind: 'diff' as const, path: file })),
+    at: new Date().toISOString(),
+  })
+  await createLiveGateStore(() => root).save(gate)
+}
+
+/**
+ * One pass of the refinery: watch for merges, restack what queued behind,
+ * recheck it. Built fresh on every tick so it always reads the workspace's
+ * current data root, the same reason every other tick function does.
+ */
+async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
+  const store = createOrderStore(root)
+
+  const deps: RefineryTickDeps = {
+    candidates: async () => {
+      const orders = await store.list()
+      const inFlight = orders.filter((o) => o.status === 'running' || o.status === 'shipped')
+      return Promise.all(
+        inFlight.map(async (order) => ({
+          order: { id: order.id, title: order.title },
+          pulls: (await readPulls(root, order.id)).map((pull) => ({ url: pull.url })),
+        }))
+      )
+    },
+    readState: (orderId) => readRefineryState(root, orderId),
+    writeState: (orderId, state) => writeRefineryState(root, orderId, state),
+    viewPr: async (url) => {
+      const result = await api.shell.exec({
+        command: 'gh',
+        args: ['pr', 'view', url, '--json', 'state,mergedAt,baseRefName'],
+        cwd: root,
+        timeoutMs: 30_000,
+      })
+      if (result.exitCode !== 0) return { merged: false }
+      try {
+        const parsed = JSON.parse(result.stdout) as { state?: unknown }
+        return { merged: parsed.state === 'MERGED' }
+      } catch {
+        return { merged: false }
+      }
+    },
+    entries: () => computeQueueEntries(api, root),
+    lanesFor: async (orderId) => {
+      const order = await store.load(orderId)
+      if (order === null) return []
+      return order.context.repos.map((repo) => ({
+        cwd: checkoutPath(root, order, repo.name),
+        branch: branchFor(order, repo.lane),
+        base: repo.baseBranch,
+      }))
+    },
+    restack: (lane) => restack(lane, (options) => api.shell.exec(options)),
+    watchCi: (orderId) => watchRestackedCi(api, root, orderId),
+    raiseConflict: (orderId, why, files) => raiseRefineryConflict(root, orderId, why, files),
+    record: (orderId, action, subject, reason) =>
+      store.record({
+        at: new Date().toISOString(),
+        orderId,
+        actor: 'rule:refinery',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      }),
+    titleOf: async (orderId) => (await store.load(orderId))?.title ?? orderId,
+    now: () => new Date().toISOString(),
+  }
+
+  await refineryTick(deps)
+}
+
+/**
  * Stop a run, and mean it.
  *
  * Every gate that offers "Stop here" said the order would be cancelled, and
@@ -936,13 +1307,18 @@ async function adoptInterruptedRuns(root: string): Promise<void> {
  * a role with no write list is run read-only, refused by the `PreToolUse` hook
  * rather than by a reminder in its own instructions.
  */
-async function executeRun(
+async function buildExecutorDeps(
   api: ExtensionAPI,
   root: string,
   order: WorkOrder,
   recipe: Recipe,
   graph: RunGraph
-): Promise<void> {
+): Promise<{
+  deps: ExecutorDeps
+  exec: ShellExec
+  store: ReturnType<typeof createOrderStore>
+  houseRules: ReturnType<typeof rulesFor>['rules']
+}> {
   const exec: ShellExec = (options) => api.shell.exec(options)
   // `diff-metrics` speaks in bare command and args; the core allowlist admits
   // `git` and `gh` and nothing else, so anything past those is refused here
@@ -1028,6 +1404,8 @@ async function executeRun(
     mayUseTool: (tool: string) => boolean
     /** The one file this rung may write, or null when it has no artefact. */
     outputPath?: string | null
+    /** Where this node's skills were mounted, or null when it declared none. */
+    skillsMount: string | null
     /** Called as soon as the session exists, not when its turn ends. */
     onStarted?: (sessionId: string) => void
   }): Promise<StartedRun> {
@@ -1076,6 +1454,7 @@ async function executeRun(
           resumeSessionId: input.resumeSessionId,
           model: modelForTier(api, input.modelTier),
           effort: input.effort ?? undefined,
+          addDirs: input.skillsMount === null ? undefined : [input.skillsMount],
           // The read-only decision is taken by the same policy the hook
           // applies, so a verifier that decides to fix what it found is
           // refused rather than reminded.
@@ -1100,6 +1479,7 @@ async function executeRun(
               autonomy: autonomyFor(api),
               worktreePath: checkout.path,
               outputPath: input.outputPath ?? null,
+              skillsMount: input.skillsMount,
             }),
           onPending: (pending) => {
             // Asks reach the console as well as the inbox. A refusal is posted
@@ -1229,6 +1609,186 @@ async function executeRun(
     houseDocs: [...order.context.houseDocs],
   }).rules
   const gates = createLiveGateStore(() => root)
+  return {
+    deps: {
+      now: () => new Date().toISOString(),
+      sources,
+      run: runNode,
+      sessionFor: (lane, role) => conversations.get(conversation(lane, role)),
+      record: async (action, subject, reason) => {
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'rule:line',
+          action,
+          subject,
+          reason,
+          evidence: [],
+        })
+      },
+      autonomy: autonomyFor(api),
+      // Loaded once, so what an agent is told the house rules are and what the
+      // change is judged against are the same list.
+      rules: houseRules,
+      /**
+       * Take what a read-only rung wrote, put it on the order, and save it.
+       *
+       * The Forge has always had this and the Line never did: four of the
+       * standard shape's nine steps are roles whose whole product is a document,
+       * and every one of them ended its turn with the document in a terminal
+       * nobody reads. Watched on a live run — a scout's complete report of where
+       * the application picks its colours, gone; an architect's three defects in
+       * the order it was about to be built from, gone, refused on the way out by
+       * the very policy that makes the rung trustworthy.
+       */
+      collect: async ({ nodeId, role, outputPath }) => {
+        const current = (await store.load(order.id)) ?? order
+        const result = readRungOutput({
+          order: current,
+          role,
+          writes: collectableWrites(roleRegistry.get(role)),
+          outputPath,
+          at: new Date().toISOString(),
+        })
+        if (result === null) return null
+
+        // A refusal is a result too, and it is the agent's to act on rather than
+        // the operator's to decipher — so it is recorded and the rung is not
+        // credited with having filed anything.
+        if (!result.ok) {
+          await store.record({
+            at: new Date().toISOString(),
+            orderId: order.id,
+            actor: `role:${role}`,
+            action: 'rung.refused',
+            subject: nodeId,
+            reason: result.reason,
+            evidence: [],
+          })
+          return null
+        }
+
+        await store.save(result.order)
+        return { order: result.order, note: result.note, defect: result.defect }
+      },
+      raise: async (gate) => {
+        await gates.save(gate)
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: `rule:${gate.rule}`,
+          action: 'gate.raised',
+          subject: gate.id,
+          reason: gate.why,
+          evidence: [...gate.evidence],
+        })
+      },
+      // A rung is a command, not a conversation: its inputs fully determine what
+      // it does and its verdict is its exit status. So it runs in a terminal tab
+      // of its own in the lane's checkout — visible, like everything else here —
+      // with no agent in between to spend a turn on it or a transcript to read
+      // the answer back out of.
+      runStep: async (step) => {
+        if (step.command === null) return null
+        const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
+        const checkout = checkouts.get(lane)
+        const runner = supervisedRunner
+        // Nothing ran, so nothing was measured — never a pass.
+        if (checkout === undefined || runner === null) return null
+        return runner.runCommand({
+          worktreePath: checkout.path,
+          workspaceId: workspaceOf(checkout),
+          branch: checkout.branch,
+          issue: issueOf(order),
+          title: step.name,
+          command: step.command,
+        })
+      },
+      // A recipe `run` step whose command is not a slash instruction runs as a
+      // command in the lane's checkout, the same way `runStep` runs a gate's
+      // check — visible, and never handed to an agent that would report a
+      // pass regardless of what the command did.
+      runCommand: async (input) => {
+        const lane = input.node.lane ?? [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
+        const checkout = checkouts.get(lane)
+        const runner = supervisedRunner
+        // Nothing ran, so nothing was measured — never a pass.
+        if (checkout === undefined || runner === null) return null
+        return runner.runCommand({
+          worktreePath: checkout.path,
+          workspaceId: workspaceOf(checkout),
+          branch: checkout.branch,
+          issue: issueOf(order),
+          title: input.title,
+          command: input.command,
+          logPath: input.logPath,
+        })
+      },
+      // The previous process of this conversation may still be sitting at its
+      // prompt when a node resumes it. Two processes must not share one
+      // conversation — the same reason `endAndWait` exists for a follow-up turn.
+      endSession: (sessionId) =>
+        endAndWait(
+          {
+            stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
+            isLive: isLiveSession,
+          },
+          sessionId,
+          'continuing the lane in its next step'
+        ).then(() => undefined),
+      observe: async () => ({
+        // Fractional on purpose. Rounded, a run at 19:31 reported "20" and a
+        // twenty-minute budget could only be exceeded at 20:30 — so a run whose
+        // deadline was the budget never saw the gate at all. The gate rounds it
+        // for the sentence it prints; the comparison is exact.
+        elapsedMinutes: (Date.now() - startedAt) / 60_000,
+      }),
+      onEvent: (event) => {
+        if (event.type !== 'verdict') return
+        void store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: `role:${event.verdict.producedBy.role}`,
+          action: 'verify.verdict',
+          subject: event.verdict.criterionId,
+          reason: `${event.verdict.result}${event.verdict.reason === '' ? '' : `: ${event.verdict.reason}`}`,
+          evidence: [...event.verdict.evidence],
+        })
+      },
+      // Written on every change rather than only at the end. `run.observe` reads
+      // this file, so without it the Floor shows the graph the run started with
+      // for the whole of the run.
+      persist: (graph) => writeRunGraph(root, graph),
+      // What the work actually changed, so the regrade answers for the change
+      // rather than for the plan that predicted it. Without this the executor
+      // was handed the units' own `touches` list and a hardcoded zero lines, so
+      // a builder that went outside what it declared was invisible to the check
+      // that exists to notice, and nothing could ever grade worse than planned.
+      observedChange: readObservedChange,
+      // Lets the budget be re-read while agents are in flight. Without it the
+      // wall-clock budget can only fire between waves, which is every case
+      // except the one it exists for: an agent that never comes back.
+      wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    },
+    exec,
+    store,
+    houseRules,
+  }
+}
+
+async function executeRun(
+  api: ExtensionAPI,
+  root: string,
+  order: WorkOrder,
+  recipe: Recipe,
+  graph: RunGraph
+): Promise<void> {
+  const {
+    deps: executorDeps,
+    exec,
+    store,
+    houseRules,
+  } = await buildExecutorDeps(api, root, order, recipe, graph)
   const issuesPort = issuesPortFor(api)
 
   // The issue moves the moment work starts, not when somebody remembers.
@@ -1236,166 +1796,7 @@ async function executeRun(
     await writeBack(order, 'started', writeBackDepsFor(api, root, order, issuesPort))
   }
 
-  const outcome = await execute(order, recipe, graph, {
-    now: () => new Date().toISOString(),
-    sources,
-    run: runNode,
-    sessionFor: (lane, role) => conversations.get(conversation(lane, role)),
-    record: async (action, subject, reason) => {
-      await store.record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: 'rule:line',
-        action,
-        subject,
-        reason,
-        evidence: [],
-      })
-    },
-    autonomy: autonomyFor(api),
-    // Loaded once, so what an agent is told the house rules are and what the
-    // change is judged against are the same list.
-    rules: houseRules,
-    /**
-     * Take what a read-only rung wrote, put it on the order, and save it.
-     *
-     * The Forge has always had this and the Line never did: four of the
-     * standard shape's nine steps are roles whose whole product is a document,
-     * and every one of them ended its turn with the document in a terminal
-     * nobody reads. Watched on a live run — a scout's complete report of where
-     * the application picks its colours, gone; an architect's three defects in
-     * the order it was about to be built from, gone, refused on the way out by
-     * the very policy that makes the rung trustworthy.
-     */
-    collect: async ({ nodeId, role, outputPath }) => {
-      const current = (await store.load(order.id)) ?? order
-      const result = readRungOutput({
-        order: current,
-        role,
-        writes: collectableWrites(roleRegistry.get(role)),
-        outputPath,
-        at: new Date().toISOString(),
-      })
-      if (result === null) return null
-
-      // A refusal is a result too, and it is the agent's to act on rather than
-      // the operator's to decipher — so it is recorded and the rung is not
-      // credited with having filed anything.
-      if (!result.ok) {
-        await store.record({
-          at: new Date().toISOString(),
-          orderId: order.id,
-          actor: `role:${role}`,
-          action: 'rung.refused',
-          subject: nodeId,
-          reason: result.reason,
-          evidence: [],
-        })
-        return null
-      }
-
-      await store.save(result.order)
-      return { order: result.order, note: result.note, defect: result.defect }
-    },
-    raise: async (gate) => {
-      await gates.save(gate)
-      await store.record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: `rule:${gate.rule}`,
-        action: 'gate.raised',
-        subject: gate.id,
-        reason: gate.why,
-        evidence: [...gate.evidence],
-      })
-    },
-    // A rung is a command, not a conversation: its inputs fully determine what
-    // it does and its verdict is its exit status. So it runs in a terminal tab
-    // of its own in the lane's checkout — visible, like everything else here —
-    // with no agent in between to spend a turn on it or a transcript to read
-    // the answer back out of.
-    runStep: async (step) => {
-      if (step.command === null) return null
-      const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
-      const checkout = checkouts.get(lane)
-      const runner = supervisedRunner
-      // Nothing ran, so nothing was measured — never a pass.
-      if (checkout === undefined || runner === null) return null
-      return runner.runCommand({
-        worktreePath: checkout.path,
-        workspaceId: workspaceOf(checkout),
-        branch: checkout.branch,
-        issue: issueOf(order),
-        title: step.name,
-        command: step.command,
-      })
-    },
-    // A recipe `run` step whose command is not a slash instruction runs as a
-    // command in the lane's checkout, the same way `runStep` runs a gate's
-    // check — visible, and never handed to an agent that would report a
-    // pass regardless of what the command did.
-    runCommand: async (input) => {
-      const lane = input.node.lane ?? [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
-      const checkout = checkouts.get(lane)
-      const runner = supervisedRunner
-      // Nothing ran, so nothing was measured — never a pass.
-      if (checkout === undefined || runner === null) return null
-      return runner.runCommand({
-        worktreePath: checkout.path,
-        workspaceId: workspaceOf(checkout),
-        branch: checkout.branch,
-        issue: issueOf(order),
-        title: input.title,
-        command: input.command,
-        logPath: input.logPath,
-      })
-    },
-    // The previous process of this conversation may still be sitting at its
-    // prompt when a node resumes it. Two processes must not share one
-    // conversation — the same reason `endAndWait` exists for a follow-up turn.
-    endSession: (sessionId) =>
-      endAndWait(
-        {
-          stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
-          isLive: isLiveSession,
-        },
-        sessionId,
-        'continuing the lane in its next step'
-      ).then(() => undefined),
-    observe: async () => ({
-      // Fractional on purpose. Rounded, a run at 19:31 reported "20" and a
-      // twenty-minute budget could only be exceeded at 20:30 — so a run whose
-      // deadline was the budget never saw the gate at all. The gate rounds it
-      // for the sentence it prints; the comparison is exact.
-      elapsedMinutes: (Date.now() - startedAt) / 60_000,
-    }),
-    onEvent: (event) => {
-      if (event.type !== 'verdict') return
-      void store.record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: `role:${event.verdict.producedBy.role}`,
-        action: 'verify.verdict',
-        subject: event.verdict.criterionId,
-        reason: `${event.verdict.result}${event.verdict.reason === '' ? '' : `: ${event.verdict.reason}`}`,
-        evidence: [...event.verdict.evidence],
-      })
-    },
-    // Written on every change rather than only at the end. `run.observe` reads
-    // this file, so without it the Floor shows the graph the run started with
-    // for the whole of the run.
-    persist: (graph) => writeRunGraph(root, graph),
-    // What the work actually changed, so the regrade answers for the change
-    // rather than for the plan that predicted it. Without this the executor
-    // was handed the units' own `touches` list and a hardcoded zero lines, so
-    // a builder that went outside what it declared was invisible to the check
-    // that exists to notice, and nothing could ever grade worse than planned.
-    observedChange: readObservedChange,
-    // Lets the budget be re-read while agents are in flight. Without it the
-    // wall-clock budget can only fire between waves, which is every case
-    // except the one it exists for: an agent that never comes back.
-    wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  })
+  const outcome = await execute(order, recipe, graph, executorDeps)
 
   await writeRunGraph(root, outcome.graph)
   await store.record({
@@ -1433,10 +1834,14 @@ async function executeRun(
     return
   }
 
+  const gates = createLiveGateStore(() => root)
+  const shippedOrder = { ...order, risk: outcome.risk }
+  const graphRef = { current: outcome.graph }
+
   // Shipped against the grade the change turned out to deserve, not the one
   // the plan predicted — which is the whole reason the executor regrades.
   const shipped = await shipOrder(
-    { ...order, risk: outcome.risk },
+    shippedOrder,
     {
       verdicts: outcome.verdicts,
       findings: outcome.inspection.required ? [outcome.inspection.reason] : [],
@@ -1458,6 +1863,22 @@ async function executeRun(
       raiseGate: async (gate) => {
         await gates.save(gate)
       },
+      // A recipe with no `ci` never asks to watch anything (`rounds: null`
+      // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
+      watchCi: (pulls) =>
+        ciRounds({
+          pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+          rounds: recipe.ci?.rounds ?? null,
+          ...ciRoundDepsFor(root, order.id, exec),
+          sendBack: ciSendBackFor(
+            root,
+            shippedOrder,
+            recipe,
+            executorDeps,
+            integrateDepsFor(api, root, order.id),
+            graphRef
+          ),
+        }),
     }
   )
 
@@ -1744,6 +2165,23 @@ export function activate(api: ExtensionAPI): void {
   // to change — so the operator is told what it costs and what avoids it.
   noteUntrackedDataRoot(api, dataRoot())
   const issuesPort = issuesPortFor(api)
+
+  // ── Sensors (ADR-066) ────────────────────────────────────────────────────
+  //
+  // Signals read the product back into the factory while the app is open. One
+  // tick a minute, over whichever sensors are enabled and have a repository —
+  // nothing runs while none are, which is the default. Resolved on every tick
+  // rather than once, the same reason `dataRoot` is a function: the records
+  // location, and which repository each sensor watches, both follow the
+  // operator's own configuration.
+  const signalStore = liveSignalStore(dataRoot)
+  sensorTimer = setInterval(() => {
+    void tickSensors(api, dataRoot(), signalStore)
+  }, 60_000)
+  // R4: watch for merges, restack what queued behind, recheck it.
+  refineryTimer = setInterval(() => {
+    void runRefineryTick(api, dataRoot())
+  }, 60_000)
   // Where every surface's answer to "what is this order doing" comes from.
   //
   // Assembled once and handed to both the order list and the Floor, because
@@ -1844,7 +2282,7 @@ export function activate(api: ExtensionAPI): void {
         at: new Date().toISOString(),
         orderId: order.id,
         actor: 'role:architect',
-        action: started.ok ? 'converge.started' : 'converge.refused',
+        action: started.ok ? 'converge.followed_up' : 'converge.refused',
         subject: started.ok ? started.sessionId : order.id,
         reason: started.ok ? 'closing the failing checks on its own' : started.reason,
         evidence: [],
@@ -1853,6 +2291,7 @@ export function activate(api: ExtensionAPI): void {
 
   const forge = createForgeChannels({
     store: createLiveOrderStore(dataRoot),
+    dataRoot,
     now: () => new Date().toISOString(),
     standingSources,
     writeBackDefault: () => defaultWriteBack(api),
@@ -1888,6 +2327,7 @@ export function activate(api: ExtensionAPI): void {
         branchName: (issue as { branchName?: string | null }).branchName ?? null,
       }
     },
+    queueEntries: () => computeQueueEntries(api, dataRoot()),
   })
   // Your tickets, so a ticket can be picked rather than typed from memory.
   //
@@ -2029,6 +2469,7 @@ export function activate(api: ExtensionAPI): void {
       const run = supervision?.runs.get(sessionId)
       return run ? readTranscript(run.transcriptPath) : []
     },
+    queueEntries: () => computeQueueEntries(api, dataRoot()),
   })
   reg(api, 'foundry:run.start', (payload) => runs.start(payload))
   reg(api, 'foundry:run.resume', (payload) => runs.resume(payload))
@@ -2140,6 +2581,53 @@ export function activate(api: ExtensionAPI): void {
         return
       }
 
+      // A `ci.red` gate is not the run stopping — the run already finished
+      // and shipped a draft. "Another round" is one more watch-fail-rework
+      // cycle against the drafts that already exist, not a resume of a graph
+      // that has nothing left waiting on it.
+      if (gate.rule === 'ci.red') {
+        if (option !== 'send_back') return
+        const root = dataRoot()
+        const order = await createOrderStore(root).load(gate.orderId)
+        if (order === null || order.recipe === null) return
+        const resolved = resolveRecipe(order.recipe, resolveSources(api, root))
+        if (!resolved.ok) return
+        const recipe = resolved.resolved.value
+        const graph = await readRunGraph(root, gate.orderId)
+        if (graph === null) return
+        const pulls = await readPulls(root, gate.orderId)
+        const { deps: executorDeps, exec } = await buildExecutorDeps(
+          api,
+          root,
+          order,
+          recipe,
+          graph
+        )
+        const integrateDeps = integrateDepsFor(api, root, order.id)
+        const graphRef = { current: graph }
+        const outcome = await ciRounds({
+          pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+          rounds: 1,
+          ...ciRoundDepsFor(root, order.id, exec),
+          sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
+        })
+        const gates = createLiveGateStore(dataRoot)
+        await finishShipping(
+          order,
+          { verdicts: [], findings: [] },
+          pulls,
+          pulls.map((pull) => pull.bodyPath),
+          outcome,
+          {
+            ...integrateDeps,
+            raiseGate: async (g) => {
+              await gates.save(g)
+            },
+          }
+        )
+        return
+      }
+
       // `stop` now stops. Every gate offering it promised the order would be
       // cancelled and nothing did it — the run stayed `running` for ever, and
       // `order.cancel` refuses a running order and points back at this gate.
@@ -2223,13 +2711,31 @@ export function activate(api: ExtensionAPI): void {
         ]
       })
     },
+    sources: () => resolveSources(api, dataRoot()),
     now: () => new Date().toISOString(),
   })
   reg(api, 'foundry:ledger.query', (payload) => ledger.query(payload))
+  reg(api, 'foundry:factory.metrics', (payload) => ledger.factoryMetrics(payload))
   reg(api, 'foundry:rules.propose', (payload) => ledger.proposeRules(payload))
   reg(api, 'foundry:rules.decide', (payload) => ledger.decideProposal(payload))
   reg(api, 'foundry:rules.inForce', (payload) => ledger.rulesInForce(payload))
   reg(api, 'foundry:rules.remove', (payload) => ledger.removeAcceptedRule(payload))
+
+  // ── Signals (ADR-066) ────────────────────────────────────────────────────
+  const sensors = createSensorChannels({
+    store: signalStore,
+    orderStore: createLiveOrderStore(dataRoot),
+    availableSensors: () => availableSensors(resolveSources(api, dataRoot())),
+    collectDepsFor: (repoPath) => sensorCollectDepsFor(api, repoPath),
+    now: () => new Date().toISOString(),
+    newId: () => newOrderId(new Date()),
+  })
+  reg(api, 'foundry:signals.list', (payload) => sensors.list(payload))
+  reg(api, 'foundry:signals.dismiss', (payload) => sensors.dismiss(payload))
+  reg(api, 'foundry:signals.promote', (payload) => sensors.promote(payload))
+  reg(api, 'foundry:sensors.list', (payload) => sensors.sensorsList(payload))
+  reg(api, 'foundry:sensors.set', (payload) => sensors.sensorsSet(payload))
+  reg(api, 'foundry:sensors.run-now', (payload) => sensors.sensorsRunNow(payload))
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands
@@ -2280,21 +2786,35 @@ export function activate(api: ExtensionAPI): void {
 
   // Anything shown as a list should be prunable, and a feed you cannot clear a
   // line from is one you stop reading.
+  // Validated, because each writes a line that every later read replays: a
+  // dismiss with no id appended `{}`, which then read back as a feed entry with
+  // no summary and took the Floor down.
+  const FeedDismiss = z.object({ id: z.string().min(1) })
+  const FeedMute = z
+    .object({
+      sessionId: z.string().min(1).optional(),
+      author: z.enum(['agent', 'console']).optional(),
+    })
+    .refine((rule) => rule.sessionId !== undefined || rule.author !== undefined)
+
   reg(api, 'foundry:feed-dismiss', (payload: unknown) => {
-    const { id } = payload as { id: string }
-    supervision?.feed.removeEntry(id)
+    const parsed = FeedDismiss.safeParse(payload)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    supervision?.feed.removeEntry(parsed.data.id)
     return { ok: true }
   })
 
   reg(api, 'foundry:feed-mute', (payload: unknown) => {
-    const { sessionId, author } = payload as { sessionId?: string; author?: 'agent' | 'console' }
-    mutes?.add({ sessionId, author })
+    const parsed = FeedMute.safeParse(payload)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    mutes?.add(parsed.data)
     return { mutes: mutes?.list() ?? [] }
   })
 
   reg(api, 'foundry:feed-unmute', (payload: unknown) => {
-    const { sessionId, author } = payload as { sessionId?: string; author?: 'agent' | 'console' }
-    mutes?.remove({ sessionId, author })
+    const parsed = FeedMute.safeParse(payload)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    mutes?.remove(parsed.data)
     return { mutes: mutes?.list() ?? [] }
   })
 
@@ -2795,6 +3315,10 @@ export function deactivate(): void {
   stallWatcher = null
   if (paletteTimer !== null) clearInterval(paletteTimer)
   paletteTimer = null
+  if (sensorTimer !== null) clearInterval(sensorTimer)
+  sensorTimer = null
+  if (refineryTimer !== null) clearInterval(refineryTimer)
+  refineryTimer = null
   for (const registration of paletteRegistrations) registration.dispose()
   paletteRegistrations = []
   paletteSignature = ''

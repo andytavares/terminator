@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { drawProp, bakeHall, drawBelts, drawCrate } from '../../../src/factory/art/props.js'
+import {
+  drawProp,
+  bakeHall,
+  drawBelts,
+  drawCrate,
+  drawQueuePlate,
+} from '../../../src/factory/art/props.js'
 import type { SceneContext } from '../../../src/factory/art/props.js'
 import { HALL } from '../../../src/factory/art/palette.js'
 import { TILE_PX } from '../../../src/factory/layout.js'
@@ -9,6 +15,7 @@ import type {
   HallBelt,
   BeltTile,
   PropKind,
+  Tile,
 } from '../../../src/factory/layout.js'
 import type { Crew } from '../../../src/factory/sim.js'
 import { createRecordingPaint } from './paint-fake.js'
@@ -41,6 +48,7 @@ const ALL_PROP_KINDS: readonly PropKind[] = [
   'fridge',
   'coffeebar',
   'vending',
+  'dispatch',
 ]
 
 const PROP_DEFAULTS: Readonly<Partial<Record<PropKind, Partial<HallProp>>>> = {
@@ -236,6 +244,69 @@ describe('factory/art/props drawProp', () => {
     const empty = createRecordingPaint()
     drawProp(empty, prop('chair'), context(), 0)
     expect(containsColor(empty.calls, '#3a4150')).toBe(true)
+  })
+
+  it('lights the dispatch tower with one lamp per check, coloured by bucket', () => {
+    const paint = createRecordingPaint()
+    drawProp(
+      paint,
+      prop('dispatch'),
+      context({ ci: { checks: { test: 'fail', lint: 'pass', typecheck: 'pending' } } }),
+      0
+    )
+    expect(containsColor(paint.calls, HALL.red)).toBe(true)
+    expect(containsColor(paint.calls, HALL.green)).toBe(true)
+    expect(containsColor(paint.calls, HALL.amber)).toBe(true)
+  })
+
+  it('draws no lamps for a dispatch tower nothing has reported checks for', () => {
+    const paint = createRecordingPaint()
+    drawProp(paint, prop('dispatch'), context({ ci: { checks: {} } }), 0)
+    expect(containsColor(paint.calls, HALL.red)).toBe(false)
+    expect(containsColor(paint.calls, HALL.green)).toBe(false)
+  })
+
+  it('draws the status wall the order metrics own numbers', () => {
+    const paint = createRecordingPaint()
+    drawProp(
+      paint,
+      prop('statuswall', { w: 6 }),
+      context({ metrics: { leadTimeMs: 80 * 60_000, reworks: 2, ciRounds: 3 } }),
+      0
+    )
+    expect(containsColor(paint.calls, HALL.cyan)).toBe(true)
+    expect(containsColor(paint.calls, HALL.red)).toBe(true)
+    expect(containsColor(paint.calls, HALL.amber)).toBe(true)
+  })
+
+  it('skips the lead-time readout while the order has not shipped', () => {
+    const paint = createRecordingPaint()
+    drawProp(
+      paint,
+      prop('statuswall', { w: 6 }),
+      context({ metrics: { leadTimeMs: null, reworks: 0, ciRounds: 0 } }),
+      0
+    )
+    expect(containsColor(paint.calls, HALL.cyan)).toBe(false)
+    // Zero reworks and zero CI rounds are still numbers worth drawing.
+    expect(containsColor(paint.calls, HALL.red)).toBe(true)
+    expect(containsColor(paint.calls, HALL.amber)).toBe(true)
+  })
+
+  it('draws no readouts at all when there is no metrics row for this order', () => {
+    const withMetrics = createRecordingPaint()
+    drawProp(
+      withMetrics,
+      prop('statuswall', { w: 6 }),
+      context({ metrics: { leadTimeMs: 0, reworks: 0, ciRounds: 0 } }),
+      0
+    )
+    const without = createRecordingPaint()
+    drawProp(without, prop('statuswall', { w: 6 }), context(), 0)
+    expect(containsColor(without.calls, HALL.cyan)).toBe(false)
+    expect(containsColor(without.calls, HALL.red)).toBe(false)
+    expect(containsColor(without.calls, HALL.amber)).toBe(false)
+    expect(without.calls.length).toBeLessThan(withMetrics.calls.length)
   })
 })
 
@@ -458,6 +529,36 @@ describe('factory/art/props drawCrate', () => {
   it('draws a crate without throwing', () => {
     const paint = createRecordingPaint()
     expect(() => drawCrate(paint, 10, 10)).not.toThrow()
+    expect(paint.calls.length).toBeGreaterThan(0)
+  })
+})
+
+describe('factory/art/props drawQueuePlate', () => {
+  const exit: Tile = { x: 10, y: 8 }
+
+  it('draws nothing when the order is not queued behind anything', () => {
+    const paint = createRecordingPaint()
+    drawQueuePlate(paint, exit, context(), 0)
+    expect(paint.calls).toHaveLength(0)
+  })
+
+  it('draws the plate once a queue position is on the scene context', () => {
+    const paint = createRecordingPaint()
+    drawQueuePlate(paint, exit, context({ queue: { position: 2 } }), 0)
+    expect(paint.calls.length).toBeGreaterThan(0)
+  })
+
+  it('flashes the beacon on the same clock as a waiting gate', () => {
+    const t0 = createRecordingPaint()
+    drawQueuePlate(t0, exit, context({ queue: { position: 1 } }), 0)
+    const t1 = createRecordingPaint()
+    drawQueuePlate(t1, exit, context({ queue: { position: 1 } }), 250)
+    expect(t0.calls).not.toEqual(t1.calls)
+  })
+
+  it('draws the same plate regardless of position value beyond the digits shown', () => {
+    const paint = createRecordingPaint()
+    expect(() => drawQueuePlate(paint, exit, context({ queue: { position: 12 } }), 0)).not.toThrow()
     expect(paint.calls.length).toBeGreaterThan(0)
   })
 })

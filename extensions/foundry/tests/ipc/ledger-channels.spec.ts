@@ -2,13 +2,23 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createLedgerChannels } from '../../src/ipc/ledger-channels.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/schema.js'
 import { resolveRule } from '../../src/recipe/resolve.js'
 import { declinedProposals } from '../../src/verify/rules.js'
 import { availableNames } from '../../src/recipe/resolve.js'
+import { createGateStore } from '../../src/gates/store.js'
+import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
+import type { Gate } from '../../src/gates/rules.js'
+import type { RunGraph } from '../../src/line/run-graph.js'
+import type { ResolveSources } from '../../src/recipe/resolve.js'
+
+// The real built-in directory, so a test asking for "the skills that ship
+// with the tool" is asking about the ones that actually do.
+const realBuiltIn = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 // Reading the record, and asking it what it thinks.
 //
@@ -38,12 +48,13 @@ function acceptedRules() {
   })
 }
 
-function channels(existingRuleIds: string[] = []) {
+function channels(existingRuleIds: string[] = [], sources?: () => ResolveSources) {
   return createLedgerChannels({
     store: createOrderStore(root),
     dataRoot: () => root,
     existingRuleIds: () => existingRuleIds,
     acceptedRules,
+    sources: sources ?? (() => ({ dataRoot: root, repoPaths: [], builtInDir: realBuiltIn })),
     now: () => '2026-09-06T12:00:00.000Z',
   })
 }
@@ -350,5 +361,110 @@ describe('removing an accepted check (FR-081)', () => {
 
   it('rejects a malformed request', async () => {
     expect(await channels().removeAcceptedRule({})).toEqual({ error: 'Malformed request.' })
+  })
+})
+
+describe('the skills in force', () => {
+  it('lists every skill available, each with the rung it comes from', async () => {
+    const view = (await channels().rulesInForce({})) as {
+      skills: { id: string; rung: string }[]
+    }
+    const ciFix = view.skills.find((s) => s.id === 'ci-fix')
+    expect(ciFix?.rung).toBe('built-in')
+  })
+})
+
+function gate(over: Partial<Gate> & Pick<Gate, 'id' | 'orderId' | 'raisedAt'>): Gate {
+  return {
+    rule: 'risk.p0',
+    nodeId: null,
+    summary: '',
+    why: 'test',
+    evidence: [],
+    options: [],
+    defaultIfIgnored: 'hold',
+    deadline: null,
+    blockedUnits: 0,
+    riskGrade: 'P3',
+    decision: null,
+    breach: null,
+    ...over,
+  }
+}
+
+function graph(orderId: string): RunGraph {
+  return {
+    orderId,
+    recipe: 'default',
+    nodes: [
+      {
+        id: 'agent-1',
+        stepId: 'agent-1',
+        kind: 'agent',
+        state: 'passed',
+        unitIds: [],
+        lane: null,
+        role: null,
+        dependsOn: [],
+        attempts: 1,
+        reworks: 0,
+        feedback: [],
+        sessionId: null,
+        worktreePath: null,
+        startedAt: null,
+        endedAt: null,
+      },
+    ],
+  }
+}
+
+describe('foundry:factory.metrics', () => {
+  it('gathers every order on disk, with its ledger, gates and run graph', async () => {
+    await seedOrder('WO-1')
+    await record('WO-1', {
+      action: 'order.seeded',
+      at: '2026-09-05T10:00:00.000Z',
+      subject: 'WO-1',
+    })
+    await record('WO-1', {
+      action: 'ship.draft_opened',
+      at: '2026-09-05T12:00:00.000Z',
+      subject: 'WO-1',
+    })
+    await createGateStore(root).save(
+      gate({ id: 'G-1', orderId: 'WO-1', raisedAt: '2026-09-05T11:00:00.000Z' })
+    )
+    await writeRunGraph(root, graph('WO-1'))
+
+    await seedOrder('WO-2')
+
+    const r = (await channels().factoryMetrics({})) as {
+      window: string
+      shipped: number
+      firstPassYield: number | null
+      orders: { orderId: string }[]
+    }
+    expect(r.window).toBe('30d')
+    expect(r.shipped).toBe(1)
+    expect(r.firstPassYield).toBe(1)
+    expect(r.orders.map((o) => o.orderId).sort()).toEqual(['WO-1', 'WO-2'])
+  })
+
+  it('defaults to the 30 day window', async () => {
+    await seedOrder('WO-1')
+    const r = (await channels().factoryMetrics({})) as { window: string }
+    expect(r.window).toBe('30d')
+  })
+
+  it('honours an explicit window', async () => {
+    await seedOrder('WO-1')
+    const r = (await channels().factoryMetrics({ window: 'all' })) as { window: string }
+    expect(r.window).toBe('all')
+  })
+
+  it('rejects a malformed request', async () => {
+    expect(await channels().factoryMetrics({ window: 'bogus' })).toEqual({
+      error: 'Malformed request.',
+    })
   })
 })

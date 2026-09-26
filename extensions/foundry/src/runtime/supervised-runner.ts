@@ -73,6 +73,11 @@ export interface StartSupervisedRunOptions {
   model?: string
   /** What `--effort` gets. Absent leaves the flag off entirely. */
   effort?: string
+  /**
+   * Where this node's skills were mounted, one `--add-dir` per entry. Absent
+   * or empty mounts none.
+   */
+  addDirs?: string[]
   /** Decides without asking when the autonomy ladder allows it. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   /** The ladder refused something without asking. Only refusals are reported. */
@@ -403,6 +408,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         prompt: start.prompt,
         model: start.model,
         effort: start.effort,
+        addDirs: start.addDirs,
         settingsDirectory: path.join(stateDir, 'settings'),
         hookScriptPath,
         controlUrl: control.url,

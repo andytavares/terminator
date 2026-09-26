@@ -5,6 +5,7 @@ import * as path from 'node:path'
 import { createForgeChannels } from '../../src/ipc/forge-channels.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { raiseGate } from '../../src/gates/rules.js'
+import { writeCiState } from '../../src/line/ci-state.js'
 import type { Standing } from '../../src/order/standing.js'
 import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -251,11 +252,82 @@ describe('foundry:order.compile', () => {
       error: 'No order WO-nope.',
     })
   })
+
+  it('carries no advisory when nothing has wired the refinery', async () => {
+    const order = await completeOrder()
+    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView & {
+      advisory: string | null
+    }
+    expect(r.advisory).toBeNull()
+  })
+
+  it('advises when the newly agreed order overlaps an in-flight one', async () => {
+    const order = await completeOrder()
+    const c = createForgeChannels({
+      store,
+      now: () => '2026-09-06T10:00:00.000Z',
+      queueEntries: async () => [
+        {
+          orderId: 'WO-earlier',
+          title: 'Earlier work',
+          repo: order.context.repos[0]?.name ?? '',
+          base: order.context.repos[0]?.baseBranch ?? 'main',
+          agreedAt: '2026-09-01T00:00:00.000Z',
+          files: ['src/a.ts'],
+          merged: false,
+        },
+      ],
+    })
+    const r = (await c.compile({ id: order.id, commit: true })) as OrderView & {
+      advisory: string | null
+    }
+    expect(r.advisory).toContain('WO-earlier')
+  })
 })
 
 describe('foundry:order.list', () => {
   it('lists nothing before any order is seeded', async () => {
     expect(await channels().list()).toEqual({ orders: [] })
+  })
+
+  it('carries no queue field when nothing has wired the refinery', async () => {
+    await channels().create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
+    const r = (await channels().list()) as { orders: { queue: unknown }[] }
+    expect(r.orders[0]?.queue).toBeNull()
+  })
+
+  it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
+    const seeded = (await channels().create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const c = createForgeChannels({
+      store,
+      now: () => '2026-09-06T10:00:00.000Z',
+      queueEntries: async () => [
+        {
+          orderId: seeded.order.id,
+          title: seeded.order.title,
+          repo: 'repo',
+          base: 'main',
+          agreedAt: '2026-09-02T00:00:00.000Z',
+          files: ['src/a.ts'],
+          merged: false,
+        },
+        {
+          orderId: 'WO-earlier',
+          title: 'Earlier work',
+          repo: 'repo',
+          base: 'main',
+          agreedAt: '2026-09-01T00:00:00.000Z',
+          files: ['src/a.ts'],
+          merged: false,
+        },
+      ],
+    })
+    const r = (await c.list()) as { orders: { id: string; queue: { position: number } | null }[] }
+    const row = r.orders.find((o) => o.id === seeded.order.id)
+    expect(row?.queue?.position).toBe(2)
   })
 
   it('lists each order with where its checks stand', async () => {
@@ -347,6 +419,45 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].standing.kind).toBe('shaping')
     expect(r.orders[0].standing.turn).toBe('you')
     expect(r.orders[0].openQuestions).toBe(1)
+  })
+
+  it('carries no ci field when this host has no records location wired', async () => {
+    const c = channels()
+    await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
+    const r = (await c.list()) as { orders: Record<string, unknown>[] }
+    expect(r.orders[0].ci).toBeUndefined()
+    expect('ci' in r.orders[0]).toBe(false)
+  })
+
+  it('says an order has no CI yet when nothing has shipped', async () => {
+    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const r = (await c.list()) as { orders: { id: string; ci: unknown }[] }
+    expect(r.orders.find((o) => o.id === seeded.order.id)?.ci).toBeNull()
+  })
+
+  it("reports a shipped order's CI round and status", async () => {
+    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    await writeCiState(root, seeded.order.id, {
+      round: 2,
+      max: 3,
+      status: 'red',
+      pulls: [],
+      reason: '',
+      at: NOW,
+    })
+    const r = (await c.list()) as {
+      orders: { id: string; ci: { status: string; round: number; max: number } }[]
+    }
+    const row = r.orders.find((o) => o.id === seeded.order.id)
+    expect(row?.ci).toEqual({ status: 'red', round: 2, max: 3 })
   })
 })
 

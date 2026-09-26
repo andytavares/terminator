@@ -173,6 +173,35 @@ describe('the tracker write-back panel', () => {
   })
 })
 
+describe('an order seeded from a sensor signal', () => {
+  it('says where it came from, with a link to the evidence', async () => {
+    mount(
+      {},
+      {
+        source: {
+          kind: 'signal',
+          tracker: null,
+          key: 'SIG-1',
+          url: 'https://ci.example/42',
+        },
+      }
+    )
+    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    expect(screen.getByText('From a sensor signal')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'evidence' })).toHaveProperty(
+      'href',
+      'https://ci.example/42'
+    )
+  })
+
+  it('says so even with no evidence url, and shows no tracker key', async () => {
+    mount({}, { source: { kind: 'signal', tracker: null, key: 'SIG-1', url: null } })
+    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    expect(screen.getByText('From a sensor signal')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'evidence' })).toBeNull()
+  })
+})
+
 /** A Forge over an order that will compile, so hand-off actually runs. */
 function mountForStart(over: Record<string, unknown> = {}) {
   const current = {
@@ -209,7 +238,11 @@ function mountForStart(over: Record<string, unknown> = {}) {
     if (channel === 'foundry:order.compile') {
       const commit = (payload as { commit?: boolean }).commit === true
       const shown = commit ? { ...current, status: 'agreed' as const } : current
-      return { order: shown, compile: compileOrder(shown) }
+      return {
+        order: shown,
+        compile: compileOrder(shown),
+        ...(commit ? { advisory: (over.advisory as string | null | undefined) ?? null } : {}),
+      }
     }
     if (channel === 'foundry:order.states') return {}
     if (channel === 'foundry:run.recipes') {
@@ -275,6 +308,23 @@ describe('handing off', () => {
     await openStep('Hand off')
     await waitFor(() => screen.getByRole('button', { name: /Blocked by/ }))
     expect(screen.getByRole('button', { name: /Blocked by/ }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('shows the refinery advisory as a note, once agreeing returns one (R4/R5)', async () => {
+    mountForStart({ advisory: 'This queues behind WO-2 on src/a.ts.' })
+    await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    const note = await screen.findByText('This queues behind WO-2 on src/a.ts.')
+    expect(note.className).toContain('fdry-note')
+    expect(note.className).not.toContain('fdry-problem')
+  })
+
+  it('says nothing about the refinery when nothing was queued', async () => {
+    mountForStart()
+    await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    await waitFor(() => expect(screen.getByText(/Handed off/)).toBeTruthy())
+    expect(screen.queryByText(/queues behind/)).toBeNull()
   })
 })
 

@@ -5,6 +5,7 @@ allowResume: true
 reads: [unit, context, rules, feedback]
 writes: [worktree]
 tools: [read, search, edit, run_tests]
+skills: [ci-fix]
 prompt: |
   Build one unit, in its own worktree, and nothing else.
 

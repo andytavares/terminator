@@ -9,13 +9,18 @@ import type { Recipe } from '../recipe/parse.js'
 import { readyNodes, blockedReason, retry as retryNode } from '../line/scheduler.js'
 import { reclaim, orphanedNodes } from '../line/reclaim.js'
 import type { SessionLiveness } from '../line/reclaim.js'
-import { resolveRecipe, availableNames } from '../recipe/resolve.js'
+import { resolveRecipe, availableNames, resolveSkills } from '../recipe/resolve.js'
 import type { Resolved, ResolveSources } from '../recipe/resolve.js'
 import { checkRequirements } from '../recipe/requirements.js'
 import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
 import { runFailure } from '../line/run-outcome.js'
+import { skillsFor } from '../line/executor.js'
+import { createRoleRegistry } from '../line/roles.js'
+import { readCiState } from '../line/ci-state.js'
+import { queue } from '../line/refinery.js'
+import type { QueueEntry, QueuePosition } from '../line/refinery.js'
 import type { Gate } from '../gates/rules.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import { recordGraph, readTimeline } from '../factory/timeline-store.js'
@@ -126,6 +131,12 @@ export interface RunDeps {
    * picture of a run that just started.
    */
   readonly activityFor?: (sessionId: string) => readonly ToolActivity[]
+  /**
+   * Every in-flight order's queue entries, for the refinery's file-overlap
+   * queue. Absent means no queue to ask, which reads as "not queued" — a host
+   * that has never wired the refinery has nothing to say either way.
+   */
+  readonly queueEntries?: () => Promise<readonly QueueEntry[]>
 }
 
 export interface RunChannels {
@@ -141,6 +152,21 @@ export interface RunChannels {
   activity(payload: unknown): Promise<unknown>
   /** Everything recorded about a run, for the Factory view to play back. */
   timeline(payload: unknown): Promise<unknown>
+}
+
+/**
+ * Where one order stands in the refinery's file-overlap queue.
+ *
+ * Null when there is no queue to ask, or the order is not in one — both read
+ * the same to a surface that only wants to know whether to draw a queue band.
+ */
+async function queuePositionFor(
+  deps: Pick<RunDeps, 'queueEntries'>,
+  orderId: string
+): Promise<QueuePosition | null> {
+  if (deps.queueEntries === undefined) return null
+  const entries = await deps.queueEntries()
+  return queue(entries).find((position) => position.orderId === orderId) ?? null
 }
 
 function graphPath(dataRoot: string, orderId: string): string {
@@ -393,6 +419,25 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const name = proposal.name
 
     const graph = buildRunGraph(order, recipe.value)
+
+    // Every node's skills, resolved before anything is cut. An unknown one
+    // discovered mid-run has already spent agent time on a node that was
+    // going to fail the moment its agent tried to read a directory nobody
+    // mounted; refusing here costs nothing.
+    const roleRegistry = createRoleRegistry(deps.sources())
+    for (const node of graph.nodes) {
+      const ids = skillsFor(recipe.value, node, roleRegistry)
+      if (ids.length === 0) continue
+      const { unknown } = resolveSkills(ids, deps.sources())
+      if (unknown.length === 0) continue
+      const missing = unknown[0]
+      const role = node.role === null ? null : roleRegistry.get(node.role)
+      const declaredBy = role !== null && role.skills.includes(missing) ? node.role : node.stepId
+      return {
+        error: `Unknown skill "${missing}" (declared by ${declaredBy}). Add it under ${deps.dataRoot()}/skills/${missing}/SKILL.md or remove it.`,
+      }
+    }
+
     await saveGraph(graph)
 
     const running: WorkOrder = {
@@ -471,9 +516,29 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     const gates = await (deps.gatesFor?.(parsed.data.id) ?? Promise.resolve([]))
     const waiting = gates.filter((gate) => gate.decision === null)
 
+    // Every node's skills, resolved the way `start` resolves them. An order
+    // whose recipe no longer resolves — removed from disk after the run
+    // began — has nothing to report rather than a thrown surface.
+    const skills: Record<string, string[]> = {}
+    if (order?.recipe !== null && order?.recipe !== undefined) {
+      const resolved = resolveRecipe(order.recipe, deps.sources())
+      if (resolved.ok) {
+        const roleRegistry = createRoleRegistry(deps.sources())
+        for (const node of graph.nodes) {
+          const ids = skillsFor(resolved.resolved.value, node, roleRegistry)
+          if (ids.length > 0) skills[node.id] = ids
+        }
+      }
+    }
+
     return {
       graph,
       labels,
+      skills,
+      // The draft's CI, read from the ship tail's own file rather than
+      // re-derived here — a surface that only wants "where does CI stand"
+      // reads one small file instead of walking nodes and feedback.
+      ci: await readCiState(deps.dataRoot(), parsed.data.id),
       // What the operator called it. The surface's heading was the order id
       // and the recipe name — two identifiers nobody chose — so the screen
       // showing a run never said which piece of work it was.
@@ -527,6 +592,10 @@ export function createRunChannels(deps: RunDeps): RunChannels {
               // so the reason the operator reads is the reason the rule gave.
               hold: mayMergeLane(order, view.lane.ord, []).reason,
             })),
+      // Where this order stands in the refinery's file-overlap queue. Null
+      // when it is not in one — nothing else agreed against the same repo and
+      // base touches the same files.
+      queue: await queuePositionFor(deps, parsed.data.id),
     }
   }
 

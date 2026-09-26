@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import {
+  appendFileSync,
   mkdtempSync,
   mkdirSync,
   rmSync,
@@ -783,6 +784,181 @@ test('what the architect writes is shown as markdown in the Forge', async () => 
   })
   mkdirSync('test-results', { recursive: true })
   writeFileSync(join('test-results', 'forge-markdown.png'), Buffer.from(png, 'base64'))
+})
+
+test('a draft’s CI is on the Floor while it is watched', async () => {
+  const created = (await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'a draft whose CI is being watched' },
+    repoPaths: [repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id as string
+  expect(id, 'no order was created').toBeTruthy()
+
+  const dir = join(repo, '.foundry', 'orders', id)
+  const file = join(dir, 'order.json')
+  writeFileSync(
+    file,
+    JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), status: 'running' })
+  )
+  const node = (nodeId: string, kind: string, role: string | null, lane: number | null) => ({
+    id: nodeId,
+    stepId: nodeId.split(':')[0],
+    kind,
+    state: 'passed',
+    unitIds: [],
+    lane,
+    role,
+    dependsOn: [],
+    attempts: 1,
+    reworks: 0,
+    feedback: [],
+    sessionId: null,
+    worktreePath: null,
+    startedAt: null,
+    endedAt: null,
+  })
+  writeFileSync(
+    join(dir, 'run-graph.json'),
+    JSON.stringify({
+      orderId: id,
+      recipe: 'direct',
+      nodes: [node('build:lane-1', 'fanout', 'builder', 1), node('ship', 'gate', null, null)],
+    })
+  )
+  const link = (run: number) => `https://github.com/o/r/actions/runs/${run}/job/1`
+  writeFileSync(
+    join(dir, 'ci.json'),
+    JSON.stringify({
+      round: 1,
+      max: 2,
+      status: 'watching',
+      pulls: [
+        {
+          url: 'https://github.com/o/r/pull/7',
+          checks: [
+            { name: 'Test', bucket: 'fail', link: link(1), workflow: 'CI' },
+            { name: 'Lint', bucket: 'pass', link: link(1), workflow: 'CI' },
+            { name: 'E2E', bucket: 'pending', link: link(1), workflow: 'CI' },
+          ],
+        },
+      ],
+      reason: '',
+      at: new Date().toISOString(),
+    })
+  )
+
+  await openFoundry()
+  expect(await clickByName('button', 'Forge')).toBe(true)
+  await handle.page.waitForTimeout(800)
+  await clickByName('button', 'All orders')
+  await handle.page.waitForTimeout(800)
+  const opened = await inFoundry<boolean>(`(function () {
+    var all = document.querySelectorAll('button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
+        all[i].click()
+        return true
+      }
+    }
+    return false
+  })()`)
+  expect(opened, `no row for ${id} in the Forge`).toBe(true)
+  await handle.page.waitForTimeout(2000)
+
+  const band = await inFoundry<string>(`(function () {
+    var h = document.getElementById('fdry-ci-h')
+    return h && h.closest('section') ? h.closest('section').innerText : ''
+  })()`)
+  expect(band).toContain('Round 1 of 2')
+  expect(band).toContain('Test')
+
+  const png = await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    return (await view.capturePage()).toPNG().toString('base64')
+  })
+  mkdirSync('test-results', { recursive: true })
+  writeFileSync(join('test-results', 'floor-ci.png'), Buffer.from(png, 'base64'))
+})
+
+test('the Ledger’s Factory tab reads the numbers off what was recorded', async () => {
+  const created = (await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'a shipped order to measure' },
+    repoPaths: [repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id as string
+  expect(id, 'no order was created to measure').toBeTruthy()
+
+  // What a run that shipped first time leaves behind: started, then a draft
+  // thirty minutes after the order was seeded, with nothing sent back.
+  const seededAt = Date.now()
+  const entry = (minutes: number, action: string): string =>
+    JSON.stringify({
+      at: new Date(seededAt + minutes * 60_000).toISOString(),
+      orderId: id,
+      actor: 'rule:line',
+      action,
+      subject: id,
+      reason: 'seeded by the test',
+      evidence: [],
+    })
+  appendFileSync(
+    join(repo, '.foundry', 'orders', id, 'ledger.jsonl'),
+    [entry(10, 'run.started'), entry(30, 'ship.draft_opened')].map((line) => `${line}\n`).join('')
+  )
+
+  await openFoundry()
+  expect(await clickByName('button', 'Ledger')).toBe(true)
+  await handle.page.waitForTimeout(800)
+  expect(await clickByName('button', 'Factory')).toBe(true)
+  await handle.page.waitForTimeout(1500)
+
+  const tiles = await inFoundry<Record<string, string>>(`(function () {
+    var out = {}
+    document.querySelectorAll('.fdry-metrics-tile').forEach(function (tile) {
+      var label = tile.querySelector('.fdry-metrics-tile__label')
+      out[(label && label.textContent) || ''] = tile.textContent.replace(label ? label.textContent : '', '').trim()
+    })
+    return out
+  })()`)
+  expect(tiles['Shipped']).toBe('1')
+  expect(tiles['First-pass yield']).toBe('100%')
+  expect(tiles['Median lead time']).toBe('30 min')
+  expect(await bodyText()).toContain('a shipped order to measure')
+
+  const png = await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    return (await view.capturePage()).toPNG().toString('base64')
+  })
+  mkdirSync('test-results', { recursive: true })
+  writeFileSync(join('test-results', 'ledger-factory.png'), Buffer.from(png, 'base64'))
+
+  // And on the factory site's status wall.
+  expect(await clickByName('button', 'Forge')).toBe(true)
+  await handle.page.waitForTimeout(600)
+  expect(await clickByName('button', 'Factory view')).toBe(true)
+  await handle.page.waitForTimeout(1500)
+  const wall = await inFoundry<string>(`(function () {
+    var wall = document.querySelector('[aria-label="Status wall"]')
+    return wall ? wall.innerText : ''
+  })()`)
+  expect(wall).toContain('First-pass yield')
+  const site = await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    return (await view.capturePage()).toPNG().toString('base64')
+  })
+  writeFileSync(join('test-results', 'site-status-wall.png'), Buffer.from(site, 'base64'))
+  // Back to the list, which the tests after this one expect.
+  expect(await clickByName('button', 'List view')).toBe(true)
+  await handle.page.waitForTimeout(800)
 })
 
 test('an order’s budgets are set on the Plan step, and raised at the gate that stopped it', async () => {

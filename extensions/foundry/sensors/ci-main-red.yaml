@@ -1,0 +1,11 @@
+schemaVersion: 1
+id: ci-main-red
+description: Workflow runs failing on the base branch
+# Ships built in, but does nothing until an operator enables it in Settings
+# (ADR-066) — a signal proposes work, it never starts any on its own.
+every: 30m
+severity: high
+source:
+  kind: github-runs
+  branch: null # null means the repository's own base branch
+  limit: 20

@@ -6,6 +6,9 @@ description: >
   it as a draft so the result is visible.
 effort: medium
 requires: []
+ci:
+  # A red CI goes back to the lane's builder with the failed logs twice, then to you.
+  rounds: 2
 steps:
   - id: build
     kind: fanout

@@ -1,6 +1,9 @@
 import type { RunGraph, NodeState } from '../line/run-graph.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import type { Gate } from '../gates/rules.js'
+import type { CiState } from '../line/ci-state.js'
+import type { Check } from '../line/ci.js'
+import { ordinal } from './format.js'
 
 // What changed between two observations of a run, as events a director can
 // act on.
@@ -17,6 +20,12 @@ export interface Observation {
   readonly stranded: readonly string[]
   readonly waiting: readonly Gate[]
   readonly activity: Readonly<Record<string, readonly ToolActivity[]>>
+  readonly ci: CiState | null
+  /** This order's place in the refinery's file-overlap queue. Null out of a queue, or in a replay. */
+  readonly queue: {
+    readonly position: number
+    readonly behind: readonly { readonly orderId: string; readonly title: string }[]
+  } | null
 }
 
 export type ToolProp = 'archive' | 'rack' | 'desk'
@@ -55,6 +64,9 @@ export type FactoryEvent =
       /** `toNodeId`'s new feedback length — how many times it has been sent back, in all. */
       readonly round: number
     }
+  | { readonly kind: 'ci-round'; readonly round: number; readonly max: number }
+  | { readonly kind: 'ci-check'; readonly name: string; readonly bucket: Check['bucket'] }
+  | { readonly kind: 'queued'; readonly position: number; readonly behind: readonly string[] }
 
 const ARCHIVE_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'NotebookRead'])
 
@@ -180,6 +192,39 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
     if (!nextGateNodes.has(nodeId)) events.push({ kind: 'gate', nodeId, waiting: false })
   }
 
+  if (next.ci !== null && (prev.ci === null || next.ci.round > prev.ci.round)) {
+    events.push({ kind: 'ci-round', round: next.ci.round, max: next.ci.max })
+  }
+
+  if (next.ci !== null) {
+    const prevBuckets = new Map<string, Check['bucket']>()
+    for (const pull of prev.ci?.pulls ?? []) {
+      for (const check of pull.checks) prevBuckets.set(check.name, check.bucket)
+    }
+    for (const pull of next.ci.pulls) {
+      for (const check of pull.checks) {
+        if (prevBuckets.get(check.name) !== check.bucket) {
+          events.push({ kind: 'ci-check', name: check.name, bucket: check.bucket })
+        }
+      }
+    }
+  }
+
+  if (next.queue !== null) {
+    const changed =
+      prev.queue === null ||
+      prev.queue.position !== next.queue.position ||
+      prev.queue.behind.length !== next.queue.behind.length ||
+      prev.queue.behind.some((entry, index) => entry.orderId !== next.queue?.behind[index]?.orderId)
+    if (changed) {
+      events.push({
+        kind: 'queued',
+        position: next.queue.position,
+        behind: next.queue.behind.map((entry) => entry.title),
+      })
+    }
+  }
+
   return events
 }
 
@@ -212,6 +257,14 @@ export function describeEvent(
         : `${name(labels, event.nodeId)}'s gate cleared.`
     case 'rework':
       return `${name(labels, event.fromNodeId)} sent ${name(labels, event.toNodeId)} back (round ${event.round}).`
+    case 'ci-round':
+      return `CI round ${event.round} of ${event.max}.`
+    case 'ci-check':
+      return `${event.name} is now ${event.bucket}.`
+    case 'queued':
+      return event.behind.length === 0
+        ? `Queued ${ordinal(event.position)}.`
+        : `Queued ${ordinal(event.position)}, behind ${event.behind.join(', ')}.`
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = event

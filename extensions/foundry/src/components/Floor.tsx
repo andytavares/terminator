@@ -13,10 +13,12 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import type { RunNode } from '../line/run-graph.js'
+import type { CiState } from '../line/ci-state.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
 import { HunkLines } from './HunkLines.js'
+import { ordinal } from '../factory/format.js'
 import { Markdown, MarkdownInline } from './Markdown.js'
 import {
   useRunObservation,
@@ -169,6 +171,15 @@ function laneName(view: FloorView, lane: number): string {
   if (lane === 0) return 'the whole order'
   const named = view.lanes?.find((row) => row.ord === lane)
   return named === undefined ? `lane ${lane}` : named.repo
+}
+
+/** What the CI band says about a status, in words rather than the raw enum. */
+const CI_STATUS_LABEL: Record<CiState['status'], string> = {
+  watching: 'Watching',
+  green: 'Green',
+  red: 'Red',
+  not_measured: 'Not measured',
+  reworking: 'Sending the failures back',
 }
 
 export interface FloorProps {
@@ -520,6 +531,20 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           : `${view.graph.orderId} · ${view.graph.recipe}`}
       </p>
 
+      {/* The refinery's file-overlap queue: what this order sits behind, and
+          why — the collision the merge-order section cannot see, because it
+          is between orders, not between lanes of the same one. Nothing here
+          when it is not queued behind anything (R5). */}
+      {view.queue !== null && view.queue !== undefined && view.queue.behind.length > 0 ? (
+        <section className="fdry-queue" aria-label="Refinery queue">
+          {view.queue.behind.map((entry) => (
+            <p key={entry.orderId} className="fdry-note">
+              {`Queued ${ordinal(view.queue?.position ?? 0)}, behind ${entry.title} (${entry.files.length} shared ${entry.files.length === 1 ? 'file' : 'files'})`}
+            </p>
+          ))}
+        </section>
+      ) : null}
+
       {/* Where the run stands, and the move that takes it forward.
 
           First on the screen and across its width, because everything below is
@@ -851,6 +876,37 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
         </section>
       ) : null}
 
+      {/* Present only when the ship tail has actually written a CI state — a
+          draft that has never shipped a pull says nothing here (ADR-060). */}
+      {view.ci ? (
+        <section className="fdry-panel" style={{ marginBottom: 12 }} aria-labelledby="fdry-ci-h">
+          <h3 className="fdry-panel-h" id="fdry-ci-h">
+            CI
+          </h3>
+          <p>
+            {CI_STATUS_LABEL[view.ci.status]}
+            {view.ci.status === 'not_measured' ? `: ${view.ci.reason}` : ''}
+          </p>
+          <p>
+            Round {view.ci.round} of {view.ci.max}
+          </p>
+          <ul className="fdry-ci-checks">
+            {view.ci.pulls.flatMap((pull, pullIndex) =>
+              pull.checks.map((check, checkIndex) => (
+                <li key={`${pullIndex}-${checkIndex}`}>
+                  <a href={check.link} target="_blank" rel="noreferrer noopener">
+                    {check.name}
+                  </a>
+                  <span className="fdry-ci-bucket" data-bucket={check.bucket}>
+                    {check.bucket}
+                  </span>
+                </li>
+              ))
+            )}
+          </ul>
+        </section>
+      ) : null}
+
       {lanes.map((lane) => (
         <div key={lane} className="fdry-lane">
           <div className="fdry-lane-name">
@@ -901,6 +957,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                         </>
                       ) : null}
                     </span>
+                    {(view.skills?.[node.id]?.length ?? 0) > 0 ? (
+                      <p className="fdry-unit-skills">{`Skills: ${view.skills?.[node.id]?.join(', ')}`}</p>
+                    ) : null}
                     {feedback.length > 0 ? (
                       <details className="fdry-unit-feedback">
                         <summary>Why it was sent back</summary>

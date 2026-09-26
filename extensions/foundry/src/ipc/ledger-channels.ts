@@ -11,6 +11,12 @@ import {
   removeRule,
 } from '../verify/rules.js'
 import type { OrderStore } from '../order/store.js'
+import { createGateStore } from '../gates/store.js'
+import { readRunGraph } from './run-channels.js'
+import { factoryMetrics as computeFactoryMetrics } from '../factory/metrics.js'
+import type { OrderRecords } from '../factory/metrics.js'
+import { availableSkills } from '../recipe/resolve.js'
+import type { ResolveSources } from '../recipe/resolve.js'
 
 // The record, and what the operator can ask it for.
 //
@@ -27,6 +33,8 @@ const QueryPayload = z.object({
 })
 
 const ProposePayload = z.object({ orderId: z.string().optional() })
+
+const FactoryMetricsPayload = z.object({ window: z.enum(['30d', 'all']).optional() })
 
 const DecidePayload = z.object({
   proposalId: z.string(),
@@ -57,6 +65,12 @@ export interface LedgerDeps {
    * that repository.
    */
   readonly acceptedRules: () => readonly AcceptedRule[]
+  /**
+   * Which repositories are open, for `availableSkills` — the same reason
+   * `RunDeps` carries this: resolved on every call, since which `.foundry/`
+   * directories are honoured changes when the operator switches workspace.
+   */
+  readonly sources: () => ResolveSources
   readonly now: () => string
 }
 
@@ -66,6 +80,7 @@ export interface LedgerChannels {
   decideProposal(payload: unknown): Promise<unknown>
   rulesInForce(payload: unknown): Promise<unknown>
   removeAcceptedRule(payload: unknown): Promise<unknown>
+  factoryMetrics(payload: unknown): Promise<unknown>
 }
 
 export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
@@ -158,6 +173,7 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     return {
       rules: deps.acceptedRules(),
       declined: await declinedWithReasons(deps.dataRoot()),
+      skills: availableSkills(deps.sources()),
     }
   }
 
@@ -185,5 +201,42 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     return { ok: true, removed, reason, at: deps.now() }
   }
 
-  return { query, proposeRules, decideProposal, rulesInForce, removeAcceptedRule }
+  /**
+   * The factory's own dashboard: every order's ledger, gates and run graph,
+   * reduced by `factoryMetrics`. Nothing here is stored — it is recomputed on
+   * every call from the same records the order screens already read.
+   */
+  async function factoryMetrics(raw: unknown): Promise<unknown> {
+    const parsed = FactoryMetricsPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+    const window = parsed.data.window ?? '30d'
+
+    const orders = await deps.store.list()
+    const allGates = await createGateStore(deps.dataRoot()).list()
+    const records: OrderRecords[] = await Promise.all(
+      orders.map(async (order) => {
+        const [ledger, graph] = await Promise.all([
+          queryEntries(ledgerPath(deps.dataRoot(), order.id)),
+          readRunGraph(deps.dataRoot(), order.id),
+        ])
+        return {
+          order,
+          ledger,
+          gates: allGates.filter((g) => g.orderId === order.id),
+          graph,
+        }
+      })
+    )
+
+    return computeFactoryMetrics(records, window, deps.now())
+  }
+
+  return {
+    query,
+    proposeRules,
+    decideProposal,
+    rulesInForce,
+    removeAcceptedRule,
+    factoryMetrics,
+  }
 }

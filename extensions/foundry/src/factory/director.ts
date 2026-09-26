@@ -235,6 +235,22 @@ function applyGate(world: World, event: Extract<FactoryEvent, { kind: 'gate' }>)
   return world2
 }
 
+/** A run's round advancing: the dispatch tower's own count moves on. */
+function applyCiRound(world: World, event: Extract<FactoryEvent, { kind: 'ci-round' }>): World {
+  return { ...world, ci: { round: event.round, max: event.max, checks: world.ci?.checks ?? {} } }
+}
+
+/** One check's lamp changing colour on the dispatch tower. */
+function applyCiCheck(world: World, event: Extract<FactoryEvent, { kind: 'ci-check' }>): World {
+  const base = world.ci ?? { round: 0, max: 0, checks: {} }
+  return { ...world, ci: { ...base, checks: { ...base.checks, [event.name]: event.bucket } } }
+}
+
+/** The refinery's queue moving this order — flashes the exit, beside the dispatch tower. */
+function applyQueued(world: World, event: Extract<FactoryEvent, { kind: 'queued' }>): World {
+  return { ...world, queue: { position: event.position, behind: event.behind } }
+}
+
 export function direct(world: World, events: readonly FactoryEvent[], nowMs: number): World {
   let next = world
   for (const event of events) {
@@ -259,6 +275,15 @@ export function direct(world: World, events: readonly FactoryEvent[], nowMs: num
         break
       case 'rework':
         next = applyRework(next, event)
+        break
+      case 'ci-round':
+        next = applyCiRound(next, event)
+        break
+      case 'ci-check':
+        next = applyCiCheck(next, event)
+        break
+      case 'queued':
+        next = applyQueued(next, event)
         break
       /* v8 ignore next 3 -- exhaustive union, unreachable */
       default: {

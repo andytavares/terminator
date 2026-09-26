@@ -1,7 +1,8 @@
-import type { HallMap, HallProp, PropKind, Side, BeltTile } from '../layout.js'
+import type { HallMap, HallProp, PropKind, Side, BeltTile, Tile } from '../layout.js'
 import { TILE_PX } from '../layout.js'
 import type { Crew } from '../sim.js'
 import type { NodeState } from '../../line/run-graph.js'
+import type { Check } from '../../line/ci.js'
 import type { Paint } from './kit.js'
 import { rect, bevel, rivets, wear, mulberry32 } from './kit.js'
 import { HALL, CODE_LINE_COLORS } from './palette.js'
@@ -23,10 +24,26 @@ export interface SceneContext {
   readonly crew: readonly Crew[]
   readonly states: Readonly<Record<string, NodeState>>
   readonly gatesWaiting: readonly string[]
+  /** The dispatch tower's own state: null until CI has something to show. */
+  readonly ci?: { readonly checks: Readonly<Record<string, Check['bucket']>> } | null
+  /**
+   * This order's own numbers, for the status wall — null until there is a
+   * metrics row to draw. `leadTimeMs` is null on its own until the order has
+   * shipped, which the status wall reads as "nothing to show yet" rather than
+   * zero.
+   */
+  readonly metrics?: {
+    readonly leadTimeMs: number | null
+    readonly reworks: number
+    readonly ciRounds: number
+  } | null
+  /** This order's place in the refinery's file-overlap queue — null out of a queue. */
+  readonly queue?: { readonly position: number } | null
 }
 
 /** Rows 0–2 are the top wall on every `HallMap` — see `layout.ts`'s contract. */
 const TOP_WALL_ROWS = 3
+const MINUTE_MS = 60_000
 
 function typingAt(context: SceneContext, nodeId: string): boolean {
   return context.crew.some((c) => c.present && c.nodeId === nodeId && c.anim === 'type')
@@ -663,6 +680,90 @@ function drawStatuswall(paint: Paint, prop: HallProp, context: SceneContext): vo
   const filled = Math.round((passedCount / total) * (w - 4))
   rect(paint, x + 2, y - 4, filled, 2, HALL.green)
   rect(paint, x + 2 + filled, y - 4, w - 4 - filled, 2, '#1d3440')
+
+  const metrics = context.metrics
+  if (metrics == null) return
+
+  // Minutes to ship, reworks, CI rounds — three digit readouts along the
+  // wall, in the order's own numbers. Minutes is skipped, not zeroed, while
+  // the order has not shipped: a run that has not shipped has no lead time,
+  // and zero would claim it shipped instantly.
+  const minutes = metrics.leadTimeMs === null ? null : Math.round(metrics.leadTimeMs / MINUTE_MS)
+  const readouts: readonly [number | null, string][] = [
+    [minutes, HALL.cyan],
+    [metrics.reworks, HALL.red],
+    [metrics.ciRounds, HALL.amber],
+  ]
+  let dx = x + 3
+  for (const [value, color] of readouts) {
+    if (value === null) continue
+    for (const digit of String(Math.min(Math.max(value, 0), 99))) {
+      drawDigit(paint, dx, y - 14, digit, color)
+      dx += 7
+    }
+    dx += 4
+  }
+}
+
+function lampColor(bucket: Check['bucket']): string {
+  switch (bucket) {
+    case 'pass':
+      return HALL.green
+    case 'fail':
+    case 'cancel':
+      return HALL.red
+    case 'pending':
+    case 'skipping':
+      return HALL.amber
+    /* v8 ignore next 3 -- exhaustive union, unreachable */
+    default: {
+      const never: never = bucket
+      throw new Error(`unhandled check bucket: ${String(never)}`)
+    }
+  }
+}
+
+/** A small tower beside the exit, one lamp per check the ship tail is watching. */
+function drawDispatch(paint: Paint, prop: HallProp, context: SceneContext): void {
+  const x = prop.x * TILE_PX
+  const y = prop.y * TILE_PX
+
+  rect(paint, x + 3, y - 24, 10, 24, '#20242c')
+  bevel(paint, x + 3, y - 24, 10, 24, '#3a414d', '#12151b')
+
+  const buckets = Object.values(context.ci?.checks ?? {})
+  buckets.forEach((bucket, index) => {
+    const ly = y - 21 + index * 5
+    if (ly < y - 24) return
+    rect(paint, x + 5, ly, 6, 3, lampColor(bucket))
+  })
+}
+
+/**
+ * A small amber plaque beside the exit, showing the position this order
+ * holds in the refinery's file-overlap queue — flashing, the way a gate's
+ * beacon flashes while it waits, for as long as `context.queue` says there is
+ * one. Nothing here spells out the ordinal's letters: the hall's pixel font
+ * only has digits, so the plaque shows the number and leans on its flash and
+ * its place at the exit to say what it means.
+ */
+export function drawQueuePlate(paint: Paint, exit: Tile, context: SceneContext, tMs: number): void {
+  const queue = context.queue ?? null
+  if (queue === null) return
+  const x = exit.x * TILE_PX
+  const y = exit.y * TILE_PX
+  const flashOn = Math.floor(tMs / 250) % 2 === 0
+
+  rect(paint, x - 18, y - 40, 16, 12, '#20242c')
+  bevel(paint, x - 18, y - 40, 16, 12, HALL.steelLight, HALL.steelDark)
+  rect(paint, x - 16, y - 38, 12, 8, flashOn ? HALL.amber : HALL.amberDim)
+
+  const digits = String(Math.max(queue.position, 0))
+  let dx = x - 15 + Math.max(0, (12 - digits.length * 7) / 2)
+  for (const digit of digits) {
+    drawDigit(paint, dx, y - 36, digit, '#1a1508')
+    dx += 7
+  }
 }
 
 function drawLockers(paint: Paint, prop: HallProp): void {
@@ -867,6 +968,8 @@ export function drawProp(paint: Paint, prop: HallProp, context: SceneContext, tM
       return counter(paint, x, y)
     case 'vending':
       return drawVendingProp(paint, prop)
+    case 'dispatch':
+      return drawDispatch(paint, prop, context)
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = kind

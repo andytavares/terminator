@@ -172,6 +172,60 @@ describe('seedOrder from a tracker issue', () => {
   })
 })
 
+describe('seedOrder from a signal (ADR-066)', () => {
+  const signal = {
+    id: 'sig-1',
+    sensorId: 'ci-flake',
+    key: 'workflow:ci',
+    title: 'CI is flaky on main',
+    evidence: [
+      { kind: 'ci-run' as const, title: 'run 1', url: 'https://x/1', at: '2026-01-01T00:00:00Z' },
+      { kind: 'ci-run' as const, title: 'run 2', url: 'https://x/2', at: '2026-01-02T00:00:00Z' },
+    ],
+    occurrences: 2,
+    severity: 'medium' as const,
+    firstSeen: '2026-01-01T00:00:00Z',
+    lastSeen: '2026-01-02T00:00:00Z',
+    status: 'open' as const,
+    dismissedAt: null,
+    orderId: null,
+  }
+
+  it('seeds title and one problem line per piece of evidence', async () => {
+    const r = await seedOrder(
+      { kind: 'signal', signalId: 'sig-1', repoPaths: [repo] },
+      deps({ readSignal: vi.fn(async () => signal) })
+    )
+    if (!('order' in r)) throw new Error('expected an order')
+    expect(r.order.title).toBe('CI is flaky on main')
+    expect(r.order.intent.problem).toContain('- run 1 (https://x/1)')
+    expect(r.order.intent.problem).toContain('- run 2 (https://x/2)')
+  })
+
+  it('sources the order from the signal, with the first evidence url', async () => {
+    const r = await seedOrder(
+      { kind: 'signal', signalId: 'sig-1', repoPaths: [repo] },
+      deps({ readSignal: vi.fn(async () => signal) })
+    )
+    if (!('order' in r)) throw new Error('expected an order')
+    expect(r.order.source).toEqual({
+      kind: 'signal',
+      tracker: null,
+      key: 'sig-1',
+      url: 'https://x/1',
+    })
+  })
+
+  it('reports a signal it cannot read rather than seeding an empty order', async () => {
+    const r = await seedOrder(
+      { kind: 'signal', signalId: 'sig-missing', repoPaths: [repo] },
+      deps({ readSignal: vi.fn(async () => null) })
+    )
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('sig-missing')
+  })
+})
+
 describe('seedOrder validation', () => {
   it('refuses to seed with no repository', async () => {
     const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [] }, deps())

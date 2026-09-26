@@ -1051,6 +1051,13 @@ reviewer's finding is judgement and stays with the operator.
   `standard`, `bugfix` and `poc` lint in the lane right after the build when the
   probe found a lint command. Before a node resumes a lane's conversation, its
   previous process is ended (`endSession` → `endAndWait`).
+- **Skills are mounted, never installed** (ADR-065). Roles and steps declare
+  `skills: [id]`, resolved like recipes on three rungs
+  (`<dataRoot>/skills/<id>/SKILL.md`, a repository's `.foundry/skills/`, the
+  extension's `skills/`). Before a node's agent launches, its skills are copied
+  to `<order>/skills-mount/<node>/.claude/skills/` and passed with `--add-dir`;
+  the tool policy allows reads there and refuses writes. An unknown skill
+  refuses the run before it starts. The builder carries `ci-fix`.
 - **A fan-out parallelises lanes, never units in one lane** (ADR-044). A lane is
   a worktree and a branch, so units inside one cannot run at the same time
   however many nodes point at them. `over: plan.units[role=builder] by lane`
@@ -1229,6 +1236,24 @@ it ready — never whether to create it. For the two highest risk grades the
 operator decides before anything reaches the remote; for everything lower the
 draft opens first, so review happens on a real change.
 
+**CI is a check with rounds** (ADR-064, `src/line/ci.ts`, `src/line/ship-tail.ts`).
+Before the ready gate, a recipe with `ci: { rounds }` has every draft's checks
+polled through `gh pr checks --json` until nothing is pending. Green adds "CI
+passed" to the ready gate; no checks is "not measured", never green. Red with
+rounds left sends `gh run view --log-failed` back to the build step as `ci`
+feedback, runs the Line again and pushes the lanes (`pushLanes`). With the
+rounds spent, `ci.red` replaces the ready gate, and its "Another round" runs
+one more. The state is in the order's `ci.json`.
+
+**The refinery restacks, it never merges** (ADR-067, `src/line/refinery.ts`,
+`src/line/restack.ts`). Running and shipped orders in one repository and base
+queue in agreed order; an order overlaps an earlier one when their changed
+files intersect, and the Forge says so at agreement. A 60-second tick asks
+GitHub whether each draft merged; when one has, each later overlapping order
+is rebased lane by lane and pushed with lease, and its CI is watched again. A
+conflicting rebase is aborted and raises `refinery.conflict`. `refinery.json`
+records each merge acted on.
+
 **Every command runs in the lane's worktree**, derived per lane by
 `checkoutPath` exactly as the branch is derived by `branchFor`. Both were once
 read raw off `context.repos[]`, which holds the _repository_ and a `headBranch`
@@ -1245,6 +1270,25 @@ pull request links. A tracker write never affects the work: a failure is
 retried, an unsupported capability is recorded once at agreement and never
 asked about again.
 
+### Sensors and signals (`src/sensors/`, ADR-066)
+
+Sensors read the product's signals back into the factory and **propose** work;
+nothing they see starts a run. A sensor is YAML resolved on the three rungs
+(`sensors/<id>.yaml`): a source (`github-runs` on a branch, `github-issues`
+with a label, or a `tracker` query), an interval and a severity. The two
+built-ins, `ci-main-red` and `tracker-query`, are off until enabled in
+Settings, which also names the repository each watches. One 60-second tick in
+`activate()` runs whatever is due, and only while the application is open.
+
+Collectors use `gh` and the core's issues API only. Items cluster by key
+(workflow name; label and a normalised title) into signals in
+`<dataRoot>/signals/signals.jsonl` (append-only; the latest line per signal
+wins) with each sensor's state in `state.json`. Impact is occurrences × severity
+(1, 3, 9). The Inbox lists open signals below the gates, and the tab badge
+counts gates only. Dismissing hides a signal until it grows by half again.
+Promoting seeds a draft order whose `source.kind` is `signal`; it still has to
+converge in the Forge and be agreed by a person.
+
 ### The ledger (`src/ledger/`)
 
 Append-only JSONL, one file per order, one object per line. A reversal is a new
@@ -1258,6 +1302,26 @@ a rule for anything the operator has rejected three times for the same reason,
 citing the entries. It imports no filesystem module and schedules nothing, and
 the append path cannot reach it — an assistant that volunteers rules is one
 whose rules get accepted without being read.
+
+**Factory metrics** (`factory/metrics.ts`, `foundry:factory.metrics`) are a pure
+function of what is already recorded — ledgers, gates and run graphs — so they
+store nothing and can always be recomputed. Per order and over 30 days or all
+time:
+
+| Metric                 | Definition                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| Lead time              | first `order.seeded` → first `ship.draft_opened`                                                        |
+| Build time             | first `run.started` → first `ship.draft_opened`                                                         |
+| Your time              | Σ (decided − raised) over gates the operator decided                                                    |
+| First-pass yield       | shipped orders with no `rework.started`, `ci.round` or Send back, over shipped orders                   |
+| Reworks, CI rounds     | counts of `rework.started`, `ci.round`                                                                  |
+| Sessions               | Σ attempts over agent and fan-out nodes                                                                 |
+| Forge follow-ups       | count of `converge.followed_up`, the turns the Forge started itself                                     |
+| Forge decisions struck | struck `A-Q-*` assumptions over all of them — how well the architect's ≥ 90% confidence holds (ADR-062) |
+
+The Ledger shows them under **Factory**, the factory site on its status wall,
+and each hall's status wall draws its own order's time to ship, reworks and CI
+rounds.
 
 ### Surfaces
 
@@ -1302,6 +1366,10 @@ App
 - [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
 - [ADR-040: the work order is the contract](adr/040-the-work-order-is-the-contract.md) — supersedes the card model (ADR-010) and the run modes (ADR-012).
 - [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
+- [ADR-067: the refinery restacks, it never merges](adr/067-the-refinery-restacks-it-never-merges.md) — overlapping orders queue; a merge restacks the later ones with lease and rechecks CI, or raises `refinery.conflict`.
+- [ADR-066: sensors propose work, they never start it](adr/066-sensors-propose-never-start.md) — YAML sensors on a tick while the app is open, clustered signals in the Inbox, promote seeds a draft.
+- [ADR-065: skills are mounted, never installed](adr/065-skills-are-mounted-never-installed.md) — `skills:` on roles and steps, three rungs, copied per node and passed with `--add-dir`.
+- [ADR-064: CI is a check with rounds](adr/064-ci-is-a-check-with-rounds.md) — drafts' CI is watched, a red one goes back to the builder twice, then `ci.red`.
 - [ADR-063: a failed check sends the work back](adr/063-a-failed-check-sends-the-work-back.md) — run steps run as commands, `onFail` reworks the builder with the failing output, the stalled gate names its node.
 - [ADR-062: the Forge decides what it is sure of](adr/062-the-forge-decides-what-it-is-sure-of.md) — questions at ≥ 90% confidence are decided, low/medium findings dismissable, failing checks sent back up to twice.
 - [ADR-061: one project per order, and an extension may file an issue](adr/061-one-project-per-order.md) — an order is one sidebar project named after its ticket's branch; `ExtensionAPI.issues.create` v2.5.0.

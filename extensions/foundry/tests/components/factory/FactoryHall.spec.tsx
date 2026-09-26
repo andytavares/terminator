@@ -63,6 +63,7 @@ function mount(
     pending?: unknown[]
     activity?: Record<string, unknown>
     lines?: unknown[]
+    metrics?: Record<string, unknown>[]
     onOpenInbox?: () => void
     onBack?: () => void
     onOpenInList?: () => void
@@ -78,6 +79,7 @@ function mount(
     if (channel === 'foundry:run-transcript') return { lines: props.lines ?? [] }
     if (channel === 'foundry:session.attach') return { terminalSessionId: 't-1' }
     if (channel === 'foundry:run-terminal') return { ok: true }
+    if (channel === 'foundry:factory.metrics') return { orders: props.metrics ?? [] }
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -103,6 +105,27 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+describe('FactoryHall status wall plumbing', () => {
+  it('fetches this order’s own metrics row for the status wall', async () => {
+    mount({
+      metrics: [
+        { orderId: 'WO-1', title: 'This one', leadTimeMs: 90_000, reworks: 1, ciRounds: 2 },
+        { orderId: 'WO-2', title: 'Some other order', leadTimeMs: 1, reworks: 9, ciRounds: 9 },
+      ],
+    })
+    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
+    )
+  })
+
+  it('does not fail to render when there is no metrics row for this order', async () => {
+    mount({ metrics: [] })
+    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    expect(screen.getByRole('button', { name: /Build the thing/ })).toBeTruthy()
+  })
 })
 
 describe('FactoryHall', () => {

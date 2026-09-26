@@ -2,6 +2,8 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { parseRecipe, parseRole, parseRule } from './parse.js'
 import type { ParseResult, Recipe, Role, Rule } from './parse.js'
+import { parseSensor } from '../sensors/schema.js'
+import type { SensorDef } from '../sensors/types.js'
 
 // Resolving a recipe, role or rule by name.
 //
@@ -11,7 +13,7 @@ import type { ParseResult, Recipe, Role, Rule } from './parse.js'
 // directory, because writing into a target repository is the one thing it does
 // not do.
 
-export type Kind = 'recipes' | 'roles' | 'rules'
+export type Kind = 'recipes' | 'roles' | 'rules' | 'sensors'
 
 export type Rung = 'data-root' | 'repository' | 'built-in'
 
@@ -122,6 +124,10 @@ export function resolveRule(name: string, sources: ResolveSources) {
   return resolveParsed<Rule>('rules', name, sources, parseRule)
 }
 
+export function resolveSensor(name: string, sources: ResolveSources) {
+  return resolveParsed<SensorDef>('sensors', name, sources, parseSensor)
+}
+
 /**
  * Every rule that loads, with the malformed ones reported rather than thrown.
  *
@@ -138,4 +144,90 @@ export function loadAllRules(sources: ResolveSources): { rules: Rule[]; problems
     else problems.push(result.reason)
   }
   return { rules, problems }
+}
+
+/**
+ * Every sensor that loads, most specific rung winning per id, with the
+ * malformed ones dropped rather than thrown — a sensor stays off until an
+ * operator enables it, so a bad file in the data root must not hide the
+ * built-ins.
+ */
+export function availableSensors(sources: ResolveSources): { def: SensorDef; rung: Rung }[] {
+  const found: { def: SensorDef; rung: Rung }[] = []
+  for (const name of availableNames('sensors', sources)) {
+    const result = resolveSensor(name, sources)
+    if (result.ok) found.push({ def: result.resolved.value, rung: result.resolved.rung })
+  }
+  return found
+}
+
+// ── skills ───────────────────────────────────────────────────────────────
+//
+// A skill resolves on the same three rungs as a recipe, role or rule, but it
+// is a directory rather than a file: Claude Code loads a skill from
+// `<dir>/.claude/skills/<name>/SKILL.md` for every directory mounted with
+// `--add-dir`, so what Foundry resolves here is the directory to mount, not
+// its contents.
+
+export interface ResolvedSkill {
+  readonly id: string
+  readonly rung: Rung
+  readonly dir: string
+}
+
+function skillCandidates(id: string, sources: ResolveSources): [Rung, string][] {
+  return [
+    ['data-root' as Rung, path.join(sources.dataRoot, 'skills', id)],
+    ...sources.repoPaths.map(
+      (repo) => ['repository' as Rung, path.join(repo, '.foundry', 'skills', id)] as [Rung, string]
+    ),
+    ['built-in' as Rung, path.join(sources.builtInDir, 'skills', id)],
+  ]
+}
+
+export function resolveSkill(id: string, sources: ResolveSources): ResolvedSkill | null {
+  for (const [rung, dir] of skillCandidates(id, sources)) {
+    if (fs.existsSync(path.join(dir, 'SKILL.md'))) return { id, rung, dir }
+  }
+  return null
+}
+
+/** Every skill available across all three rungs, most specific winning, sorted by id. */
+export function availableSkills(sources: ResolveSources): ResolvedSkill[] {
+  const seen = new Map<string, ResolvedSkill>()
+  const bases = [
+    ['data-root' as Rung, path.join(sources.dataRoot, 'skills')] as [Rung, string],
+    ...sources.repoPaths.map(
+      (repo) => ['repository' as Rung, path.join(repo, '.foundry', 'skills')] as [Rung, string]
+    ),
+    ['built-in' as Rung, path.join(sources.builtInDir, 'skills')] as [Rung, string],
+  ]
+  for (const [rung, dir] of bases) {
+    let entries: string[]
+    try {
+      entries = fs.readdirSync(dir)
+    } catch {
+      continue
+    }
+    for (const id of entries) {
+      if (seen.has(id)) continue
+      if (fs.existsSync(path.join(dir, id, 'SKILL.md')))
+        seen.set(id, { id, rung, dir: path.join(dir, id) })
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.id.localeCompare(b.id))
+}
+
+export function resolveSkills(
+  ids: readonly string[],
+  sources: ResolveSources
+): { skills: ResolvedSkill[]; unknown: string[] } {
+  const skills: ResolvedSkill[] = []
+  const unknown: string[] = []
+  for (const id of ids) {
+    const resolved = resolveSkill(id, sources)
+    if (resolved !== null) skills.push(resolved)
+    else unknown.push(id)
+  }
+  return { skills, unknown }
 }
