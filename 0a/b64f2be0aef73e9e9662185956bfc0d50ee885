@@ -1,0 +1,23 @@
+extensions/foundry/tests/sensors/store.spec.ts
+  s_4f15472be339a2::t_858c6cd7b59262 1-128
+  s_4f15472be339a2::t_7f1d0604035426 129-135
+extensions/foundry/src/sensors/store.ts
+  s_4f15472be339a2::t_5edca32e4912a3 1-147
+  s_4f15472be339a2::t_deacc0538ec1d1 148-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0ab64f2be0aef73e9e9662185956bfc0d50ee885",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
