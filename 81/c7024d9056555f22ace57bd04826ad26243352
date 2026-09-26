@@ -1,0 +1,45 @@
+extensions/foundry/src/index.ts
+  s_ff9afaf52b6925::t_13c6a1d52a9d2c 29,1797-1809
+  s_ff9afaf52b6925::t_485690cb0868d4 28,1747-1766,1768,1770-1796,1810-1813,1816,1819-1821,1832
+  s_ff9afaf52b6925::t_4a6836b40e37ff 30,1767,1769,1814-1815,1817-1818
+extensions/foundry/tests/runtime/end-session.spec.ts
+  s_ff9afaf52b6925::t_13c6a1d52a9d2c 1-59
+extensions/foundry/src/order/proposal.ts
+  s_ff9afaf52b6925::t_76a109fac2316b 47-56
+extensions/foundry/src/order/schema.ts
+  s_ff9afaf52b6925::t_5a8302a9265a9d 211-213
+extensions/foundry/src/runtime/end-session.ts
+  s_ff9afaf52b6925::t_13c6a1d52a9d2c 1-28
+extensions/foundry/src/forge/converge.ts
+  s_ff9afaf52b6925::t_76a109fac2316b 8,80,82,130-142,157-168,298-305
+extensions/foundry/tests/forge/converge.spec.ts
+  s_ff9afaf52b6925::t_65fa467f3a0e68 52-80,278-312
+  s_ff9afaf52b6925::t_8294593276e25a 313
+extensions/foundry/tests/forge/autonomy.spec.ts
+  s_ff9afaf52b6925::t_8af5f496eeae4d 1-110,112-183
+  s_ff9afaf52b6925::t_3b16d3dd5c08ad 111
+extensions/foundry/src/forge/autonomy.ts
+  s_ff9afaf52b6925::t_5a8302a9265a9d 1-93
+docs/ARCHITECTURE.md
+  s_ff9afaf52b6925::t_dcd864383174a6 1275
+docs/adr/062-the-forge-decides-what-it-is-sure-of.md
+  s_ff9afaf52b6925::t_b3c0ae61647b5c 1-46
+specs/062-forge-stops-only-for-show-stoppers/spec.md
+  s_ff9afaf52b6925::t_a5bb9895cea417 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "81c7024d9056555f22ace57bd04826ad26243352",
+  "prompts": {},
+  "sessions": {
+    "s_ff9afaf52b6925": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5562dac0-030b-4795-b6e4-21da34ab4d17",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
