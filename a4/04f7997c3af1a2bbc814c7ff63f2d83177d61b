@@ -1,0 +1,23 @@
+docs/ARCHITECTURE.md
+  s_ff9afaf52b6925::t_1e12b81cd7d236 1123-1133
+README.md
+  s_ff9afaf52b6925::t_1e12b81cd7d236 22
+tests/e2e/foundry.spec.ts
+  s_ff9afaf52b6925::t_b6bcf0ddb0f719 745-747
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a404f7997c3af1a2bbc814c7ff63f2d83177d61b",
+  "prompts": {},
+  "sessions": {
+    "s_ff9afaf52b6925": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5562dac0-030b-4795-b6e4-21da34ab4d17",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
