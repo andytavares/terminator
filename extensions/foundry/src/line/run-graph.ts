@@ -23,7 +23,7 @@ export type NodeState =
 export interface Feedback {
   readonly from: string
   readonly attempt: number
-  readonly source: 'check'
+  readonly source: 'check' | 'ci'
   readonly command: string | null
   readonly exitCode: number | null
   readonly excerpt: string
