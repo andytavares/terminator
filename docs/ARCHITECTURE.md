@@ -1261,6 +1261,25 @@ pull request links. A tracker write never affects the work: a failure is
 retried, an unsupported capability is recorded once at agreement and never
 asked about again.
 
+### Sensors and signals (`src/sensors/`, ADR-066)
+
+Sensors read the product's signals back into the factory and **propose** work;
+nothing they see starts a run. A sensor is YAML resolved on the three rungs
+(`sensors/<id>.yaml`): a source (`github-runs` on a branch, `github-issues`
+with a label, or a `tracker` query), an interval and a severity. The two
+built-ins, `ci-main-red` and `tracker-query`, are off until enabled in
+Settings, which also names the repository each watches. One 60-second tick in
+`activate()` runs whatever is due, and only while the application is open.
+
+Collectors use `gh` and the core's issues API only. Items cluster by key
+(workflow name; label and a normalised title) into signals in
+`<dataRoot>/signals/signals.jsonl` (append-only; the latest line per signal
+wins) with each sensor's state in `state.json`. Impact is occurrences × severity
+(1, 3, 9). The Inbox lists open signals below the gates, and the tab badge
+counts gates only. Dismissing hides a signal until it grows by half again.
+Promoting seeds a draft order whose `source.kind` is `signal`; it still has to
+converge in the Forge and be agreed by a person.
+
 ### The ledger (`src/ledger/`)
 
 Append-only JSONL, one file per order, one object per line. A reversal is a new
@@ -1338,6 +1357,7 @@ App
 - [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
 - [ADR-040: the work order is the contract](adr/040-the-work-order-is-the-contract.md) — supersedes the card model (ADR-010) and the run modes (ADR-012).
 - [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
+- [ADR-066: sensors propose work, they never start it](adr/066-sensors-propose-never-start.md) — YAML sensors on a tick while the app is open, clustered signals in the Inbox, promote seeds a draft.
 - [ADR-065: skills are mounted, never installed](adr/065-skills-are-mounted-never-installed.md) — `skills:` on roles and steps, three rungs, copied per node and passed with `--add-dir`.
 - [ADR-064: CI is a check with rounds](adr/064-ci-is-a-check-with-rounds.md) — drafts' CI is watched, a red one goes back to the builder twice, then `ci.red`.
 - [ADR-063: a failed check sends the work back](adr/063-a-failed-check-sends-the-work-back.md) — run steps run as commands, `onFail` reworks the builder with the failing output, the stalled gate names its node.
