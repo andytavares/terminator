@@ -6,6 +6,8 @@ A lit, detailed pixel-art factory hall drawn from the run Foundry is already doi
 
 _The published artifact carries an animated pixel mock of one hall: plan → two lanes → tool calls → verification → merge → gate._
 
+See `docs/research/foundry-hall-breakroom-belts.md` for the current breakroom, seating and belt layout.
+
 ## Context
 
 Foundry's running work is watched as text: the Forge list, and the Floor's chips and bands. The request is a second view at the fidelity of [StarNet](https://github.com/androoAGI/starnet) ([starnetos.com](https://starnetos.com/)): a detailed, lit station where agents visibly walk, sit and work, and where the operator can switch to it and back on demand. Revision 1 of this document proposed a coarse tile grid with static workers, and it was rejected as too blocky and cartoony. This revision sets StarNet as the target for detail and motion. It keeps StarNet's own rule, _“the interface must never assert state the harness cannot prove”_, which is also why Foundry's `src/order/standing.ts` exists.
@@ -13,8 +15,8 @@ Foundry's running work is watched as text: the Forge list, and the Floor's chips
 ## Goals
 
 - **Detail at StarNet's level.** A 3/4 top-down hall with wall faces, props that have depth, a lightmap with glow from live screens and lamps, and characters with walk cycles in four directions.
-- **A crew that moves.** Agents walk to their station when their step starts, go to the archive or the terminal rack when they call a tool, carry work between stations, go to the gate or to the operator when they need an answer, and go back to the lounge when their work is done.
-- **Every movement has a cause.** A walk, a lit screen or a moving belt is caused by a node transition, a tool call, a held ask or a gate. Idle crew stay in the lounge and never wander past a workstation.
+- **A crew that moves.** Agents walk to their station when their step starts, go to the archive or the terminal rack when they call a tool, carry work between stations, go to the gate or to the operator when they need an answer, and go back to the breakroom when their work is done.
+- **Every movement has a cause.** A walk, a lit screen or a moving belt is caused by a node transition, a tool call, a held ask or a gate. Idle crew stay in the breakroom and never wander past a workstation.
 - **A List ⇄ Factory toggle** in the app bar and as a quick action, remembered across restarts.
 - Anything waiting on you stays a full-width band at the top, as it is on the Floor.
 
@@ -95,14 +97,14 @@ All paths are under `extensions/foundry/`.
 | Gate + beacon         | `gate`. The beacon flashes while the gate is undecided.                                    | `FloorView.waiting`        |
 | Status wall           | Per-lane progress, taken from node counts                                                  | `standing.done / total`    |
 | Exit dock (right)     | The draft PR ships                                                                         | `standing.kind === 'done'` |
-| Lounge                | Crew whose nodes are waiting, passed or skipped. The only place idle wandering is allowed. | `RunNode.state`            |
+| Breakroom             | Crew whose nodes are waiting, passed or skipped. The only place idle wandering is allowed. | `RunNode.state`            |
 | Foreman's booth       | Where the foreman waits when no gate is up                                                 | none                       |
 
 ### What makes an agent move
 
 | Event (derived by diffing polls)      | On screen                                                                                                                                  |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| node → `ready`                        | The agent enters at the airlock, or leaves the lounge, and walks to its station (A\* over the walkable grid).                              |
+| node → `ready`                        | The agent enters at the airlock, or leaves the breakroom, and walks to its station (A\* over the walkable grid).                           |
 | node → `running`                      | The agent sits and types, and the screens light and scroll.                                                                                |
 | `tool_started` Read/Grep/Glob         | The agent walks to the archive and reaches for a binder, then returns when the call finishes.                                              |
 | `tool_started` with `isShell`         | The agent walks to the terminal rack, then returns when the call finishes.                                                                 |
@@ -113,7 +115,7 @@ All paths are under `extensions/foundry/`.
 | gate waiting                          | The foreman walks to the gate and waves, the beacon flashes, and the band appears.                                                         |
 | node → `failed`                       | The agent slumps at the station, the lamp goes out, and attempt pips show.                                                                 |
 | node in `orphaned`                    | The station goes dark and the chair is empty. The agent is not drawn.                                                                      |
-| node → `passed`                       | The lamp lights green and the agent walks to the lounge.                                                                                   |
+| node → `passed`                       | The lamp lights green and the agent walks to the breakroom.                                                                                |
 
 Tool calls shorter than a walk would make the crew thrash between the desk and the shelves. The director coalesces them: an agent starts a walk only for a call still open after 1.5 s, or for a run of three or more calls of the same kind, and stays at the prop while calls of that kind keep coming. The ticker under the scene (an `aria-live` region) states each event in words, so the motion never carries meaning on its own.
 
@@ -123,7 +125,7 @@ Tool calls shorter than a walk would make the crew thrash between the desk and t
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/factory/layout.ts`                        | **Pure.** `layoutHall(graph, lanes)` returns a `HallMap`: rooms, props, belts, the walkable grid, seats, wait anchors and lights. The column is the longest-path depth over `dependsOn`, and the row is the lane. The same input always gives the same map.                                                                   |
 | `src/factory/events.ts`                        | **Pure.** `diffObservation(prev, next, activity)` returns `FactoryEvent[]` for the transitions in the table above.                                                                                                                                                                                                            |
-| `src/factory/director.ts`                      | **Pure.** Turns events into per-agent intents (go, sit, reach, scan, wave, lounge), with coalescing, one queue per agent, and exhaustive switches with `assertNever`.                                                                                                                                                         |
+| `src/factory/director.ts`                      | **Pure.** Turns events into per-agent intents (go, sit, reach, scan, wave, breakroom), with coalescing, one queue per agent, and exhaustive switches with `assertNever`.                                                                                                                                                      |
 | `src/factory/sim.ts`                           | **Pure, deterministic.** `tick(world, dtMs)` advances walks along A\* paths, crates along belts, press cycles and gate state. The clock is injected and there is no RNG, so it can be replayed in tests.                                                                                                                      |
 | `src/factory/path.ts`                          | A\* on the walkable grid. Belts are walkable, as in StarNet.                                                                                                                                                                                                                                                                  |
 | `src/factory/art/props.ts`, `art/kit.ts`       | Procedural prop draw functions and the detail kit.                                                                                                                                                                                                                                                                            |
@@ -150,7 +152,7 @@ Tool calls shorter than a walk would make the crew thrash between the desk and t
 
 - `tests/factory/layout.spec.ts`: lanes become rows and depth becomes columns. Every seat and anchor is reachable by A\*. Output is identical for identical input. Fixtures are real graphs from `standard.yaml` and `bugfix.yaml`.
 - `tests/factory/events.spec.ts`: every NodeState transition yields its event, a Bash `tool_started` yields a rack event, and an orphaned node yields no work event.
-- `tests/factory/director.spec.ts`: coalescing (a 200 ms Read causes no walk; a 2 s Read does), lounge-only idling, and exhaustiveness.
+- `tests/factory/director.spec.ts`: coalescing (a 200 ms Read causes no walk; a 2 s Read does), breakroom-only idling, and exhaustiveness.
 - `tests/factory/sim.spec.ts`: replay a recorded run's polls and check that the agent reaches its seat, a crate reaches the press only after upstream passed, and the gate beacon is lit only while the gate is waiting.
 - `tests/components/factory/*.spec.tsx` (jsdom): stations are addressable by role, Attach navigates, reduced motion draws one frame, and the toggle persists.
 - `tests/e2e/foundry-factory-view.spec.ts`: toggle to Factory, find a station by role, reload, confirm Factory is still selected, then toggle back.
@@ -171,7 +173,7 @@ Then do one live run: a real two-lane order with the factory open. Capture the W
 | Risk                                                                                                      | Mitigation                                                                                                                                                                                                  |
 | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The crew sprites are the long pole. StarNet's are 1254 px source frames across 8 directions and 5 tracks. | Use four directions and fewer tracks at first. Props are procedural, so only the crew needs drawn art. The art source is an open question.                                                                  |
-| Motion implies work that isn't happening.                                                                 | Only the director moves crew, and only on events. Idle crew stay in the lounge. Sim tests assert the negative cases.                                                                                        |
+| Motion implies work that isn't happening.                                                                 | Only the director moves crew, and only on events. Idle crew stay in the breakroom. Sim tests assert the negative cases.                                                                                     |
 | Thrash from short tool calls.                                                                             | Coalescing thresholds, unit-tested.                                                                                                                                                                         |
 | Frame cost in a hidden or large view.                                                                     | The bake is cached, the loop pauses when hidden, and glow gradients are cached per source as in StarNet. Frame time is **not measured** yet; the live run measures it and the PixiJS trigger depends on it. |
 | Motion sensitivity.                                                                                       | `prefers-reduced-motion` draws a settled frame. The ticker and the DOM carry all meaning.                                                                                                                   |
@@ -190,7 +192,7 @@ Then do one live run: a real two-lane order with the factory open. Capture the W
 - Revision 1's coarse tile grid with static workers: it was rejected as too blocky and not alive.
 - Port StarNet's renderer: 22k+ lines built for a different model, and the art's provenance is unknown.
 - PixiJS now: a dependency before a measured need. It stays the escape hatch.
-- Idle wandering across the floor: it would show work that isn't happening, so wandering stays in the lounge.
+- Idle wandering across the floor: it would show work that isn't happening, so wandering stays in the breakroom.
 - An editable layout: the graph is derived from the recipe, so edits to the picture would drift from the run.
 
 ## As built

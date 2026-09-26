@@ -1,6 +1,6 @@
-import type { HallMap, HallProp, Tile } from './layout.js'
+import type { HallMap, HallProp, RestSeat, Tile } from './layout.js'
 import { TILE_PX } from './layout.js'
-import { findPath } from './path.js'
+import { findPath, distancesFrom } from './path.js'
 import { gateNodeId, hasStarted } from './events.js'
 import type { Observation } from './events.js'
 import type { NodeState, RunNode } from '../line/run-graph.js'
@@ -27,6 +27,10 @@ export interface Crew {
   readonly goal: Tile | null
   readonly then: CrewAnim
   readonly present: boolean
+  /** The breakroom seat this crew member currently occupies, or is headed to sit in; null otherwise. */
+  readonly restSeat: number | null
+  /** The facing to adopt on arrival at `goal` — set alongside a rest seat, cleared for every other errand. */
+  readonly settle: Facing | null
 }
 
 export interface Crate {
@@ -67,6 +71,17 @@ const CRATE_PX_PER_S = 34
 /** A node counts as crewed when someone works it: a role, or a working kind. */
 const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run', 'judge']
 
+const NEIGHBOUR_STEPS: readonly Tile[] = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+]
+
+function key(tile: Tile): string {
+  return `${tile.x},${tile.y}`
+}
+
 export function workAnim(kind: StepKind): CrewAnim {
   return kind === 'run' || kind === 'judge' ? 'scan' : 'type'
 }
@@ -75,7 +90,7 @@ export function tileCenter(tile: Tile): { readonly x: number; readonly y: number
   return { x: tile.x * TILE_PX + 8, y: tile.y * TILE_PX + 12 }
 }
 
-function tileOf(x: number, y: number): Tile {
+export function tileOf(x: number, y: number): Tile {
   return { x: Math.round((x - 8) / TILE_PX), y: Math.round((y - 12) / TILE_PX) }
 }
 
@@ -88,37 +103,75 @@ export function seatOf(map: HallMap, nodeId: string): Tile | null {
 }
 
 /**
- * A deterministic lounge slot for a node — no randomness, same node every time.
+ * The free breakroom seat nearest `from`, walked over `map.walk`.
  *
- * `HallMap.anchors.lounge` is documented as at least 6 tiles for every map
- * `layoutHall` produces, so there is always one to pick.
+ * A seat tile is only enterable once it is free, so its distance is one more
+ * than the shortest flood distance among its four neighbours. Ties go to the
+ * lower seat id: `map.restSeats` is already ordered that way, and the
+ * comparison below is a strict `<`, so the first seat reached at the best
+ * distance is the one that wins.
  */
-export function loungeSpot(map: HallMap, nodeId: string): Tile {
-  const lounge = map.anchors.lounge
-  let hash = 0
-  for (let i = 0; i < nodeId.length; i++) hash = (hash * 31 + nodeId.charCodeAt(i)) >>> 0
-  return lounge[hash % lounge.length]
+export function nearestRestSeat(
+  map: HallMap,
+  from: Tile,
+  taken: ReadonlySet<number>
+): RestSeat | null {
+  const distances = distancesFrom(map.walk, from)
+  let best: RestSeat | null = null
+  let bestDistance = Infinity
+  for (const seat of map.restSeats) {
+    if (taken.has(seat.id)) continue
+    const neighbourDistance = Math.min(
+      ...NEIGHBOUR_STEPS.map(
+        (s) => distances.get(key({ x: seat.tile.x + s.x, y: seat.tile.y + s.y })) ?? Infinity
+      )
+    )
+    const distance = neighbourDistance + 1
+    if (distance < bestDistance) {
+      bestDistance = distance
+      best = seat
+    }
+  }
+  return best
 }
 
-function placementFor(
-  map: HallMap,
-  node: RunNode
-): { readonly tile: Tile; readonly anim: CrewAnim } | null {
+interface Placement {
+  readonly tile: Tile
+  readonly anim: CrewAnim
+  readonly facing: Facing
+  readonly restSeat: number | null
+  readonly settle: Facing | null
+}
+
+const WORKING: Omit<Placement, 'tile' | 'anim'> = { facing: 'S', restSeat: null, settle: null }
+
+function placementFor(map: HallMap, node: RunNode, taken: Set<number>): Placement | null {
   const seat = seatOf(map, node.id)
+  if (seat === null) return null
   switch (node.state) {
     case 'running':
     case 'verifying':
-      return seat === null ? null : { tile: seat, anim: workAnim(node.kind) }
+      return { tile: seat, anim: workAnim(node.kind), ...WORKING }
     case 'ready':
-      return seat === null ? null : { tile: seat, anim: 'idle' }
+      return { tile: seat, anim: 'idle', ...WORKING }
     case 'failed':
-      return seat === null ? null : { tile: seat, anim: 'slump' }
+      return { tile: seat, anim: 'slump', ...WORKING }
     case 'passed':
-      return { tile: loungeSpot(map, node.id), anim: 'couch' }
     case 'waiting':
     case 'skipped':
-    case 'blocked':
-      return { tile: loungeSpot(map, node.id), anim: 'idle' }
+    case 'blocked': {
+      const rest = nearestRestSeat(map, seat, taken)
+      /* v8 ignore next -- a hall always has at least (crewed + 2) rest seats */
+      if (rest === null) return { tile: seat, anim: 'idle', ...WORKING }
+      taken.add(rest.id)
+      return {
+        tile: rest.tile,
+        anim: 'couch',
+        facing: rest.facing,
+        restSeat: rest.id,
+        settle: rest.facing,
+      }
+    }
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = node.state
@@ -135,9 +188,10 @@ function isCrewed(node: RunNode): boolean {
 export function createWorld(map: HallMap, observation: Observation): World {
   const orphaned = new Set(observation.orphaned)
   const crew: Crew[] = []
+  const taken = new Set<number>()
   for (const node of observation.graph.nodes) {
     if (!isCrewed(node)) continue
-    const placement = placementFor(map, node)
+    const placement = placementFor(map, node, taken)
     if (placement === null) continue
     const center = tileCenter(placement.tile)
     crew.push({
@@ -145,12 +199,14 @@ export function createWorld(map: HallMap, observation: Observation): World {
       role: node.role,
       x: center.x,
       y: center.y,
-      facing: 'S',
+      facing: placement.facing,
       anim: placement.anim,
       path: [],
       goal: null,
       then: placement.anim,
       present: !orphaned.has(node.id),
+      restSeat: placement.restSeat,
+      settle: placement.settle,
     })
   }
 
@@ -177,22 +233,22 @@ export function createWorld(map: HallMap, observation: Observation): World {
 /**
  * Where a crate is drawn, in world px.
  *
- * A belt's path ends on the seat of the step it feeds, so the ride stops one
- * tile short of it: a parked crate waits beside the station, not under the
- * chair. Linear between tile centres, so it glides instead of jumping.
+ * A belt's path now ends beside the station it feeds, not under its chair,
+ * so the whole path is ridden — nothing is dropped from the end. Linear
+ * between tile centres, so it glides instead of jumping.
  */
 export function cratePosition(
   belt: HallMap['belts'][number],
   progress: number
 ): { readonly x: number; readonly y: number } {
-  const stops = belt.path.length > 1 ? belt.path.slice(0, -1) : belt.path
+  const stops = belt.path
   const at = Math.min(Math.max(progress, 0), 1) * (stops.length - 1)
   const from = stops[Math.floor(at)]
   const to = stops[Math.min(Math.floor(at) + 1, stops.length - 1)]
   const t = at - Math.floor(at)
   return {
     x: (from.x + (to.x - from.x) * t) * TILE_PX + 8,
-    y: (from.y + (to.y - from.y) * t) * TILE_PX + 8,
+    y: (from.y + (to.y - from.y) * t) * TILE_PX + 10,
   }
 }
 
@@ -219,10 +275,10 @@ function tickCrew(map: HallMap, crew: Crew, dtSec: number): Crew {
 
   let path = crew.path
   if (path.length === 0 && crew.goal !== null) {
-    path = findPath(map.solid, tileOf(crew.x, crew.y), crew.goal)
+    path = findPath(map.walk, tileOf(crew.x, crew.y), crew.goal)
     if (path.length === 0) {
       // Already there, or nothing found: arrival either way.
-      return { ...crew, goal: null, anim: crew.then }
+      return { ...crew, goal: null, anim: crew.then, facing: crew.settle ?? crew.facing }
     }
   }
 
@@ -240,7 +296,7 @@ function tickCrew(map: HallMap, crew: Crew, dtSec: number): Crew {
         ...crew,
         x: target.x,
         y: target.y,
-        facing,
+        facing: crew.settle ?? facing,
         path: [],
         goal: null,
         anim: crew.then,

@@ -6,7 +6,7 @@ import type { World } from '../../factory/sim.js'
 import type { NodeState } from '../../line/run-graph.js'
 import type { Paint, PaintGradient } from '../../factory/art/kit.js'
 import { glow } from '../../factory/art/kit.js'
-import { bakeHall, drawProp, drawBelt, drawCrate } from '../../factory/art/props.js'
+import { bakeHall, drawProp, drawBelts, drawCrate } from '../../factory/art/props.js'
 import { drawCrew } from '../../factory/art/crew.js'
 
 // The one place the hall gets painted. Everything here is a projection: it
@@ -26,7 +26,10 @@ export interface HallSceneProps {
 const DARKNESS = 'rgba(5,8,18,0.42)'
 const LIGHT_RADIUS = 70
 const MAX_FRAME_MS = 50
-const LOUNGE_FURNITURE: ReadonlySet<PropKind> = new Set(['couch', 'coffee', 'plant', 'booth'])
+// Seating furniture shares its own tile with the crew member who sits or
+// stands there — sorted behind them, since its low silhouette (not its tall
+// backrest) is what should tie-break against a seat one row down.
+const SEAT_FURNITURE: ReadonlySet<PropKind> = new Set(['restbench', 'sofa', 'plant'])
 
 function toPaint(ctx: CanvasRenderingContext2D): Paint {
   return {
@@ -95,18 +98,13 @@ function draw(
 
   const context = { crew: world.crew, states, gatesWaiting: world.gatesWaiting }
 
-  for (const belt of map.belts) {
-    const moving = world.crates.some((c) => c.beltId === belt.id)
-    drawBelt(paint, belt, moving, tMs)
-  }
+  const moving = new Set(world.crates.map((c) => c.beltId))
+  drawBelts(paint, map, moving, tMs)
 
   type Drawable = { readonly y: number; readonly draw: () => void }
   const drawables: Drawable[] = []
   for (const prop of map.props) {
-    // Lounge furniture shares its own tile with the crew member who sits or
-    // stands there — sort it behind them (its low silhouette, not its tall
-    // backrest, is what should tie-break against a seat one row down).
-    const sortY = LOUNGE_FURNITURE.has(prop.kind) ? prop.y * TILE_PX : (prop.y + prop.h) * TILE_PX
+    const sortY = SEAT_FURNITURE.has(prop.kind) ? prop.y * TILE_PX : (prop.y + prop.h) * TILE_PX
     drawables.push({ y: sortY, draw: () => drawProp(paint, prop, context, tMs) })
   }
   for (const crew of world.crew) {

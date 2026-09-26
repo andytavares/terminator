@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { layoutHall, stationKind, TILE_PX } from '../../src/factory/layout.js'
-import type { HallMap, HallProp } from '../../src/factory/layout.js'
-import { findPath } from '../../src/factory/path.js'
+import type { HallMap, HallProp, Tile } from '../../src/factory/layout.js'
+import { findPath, distancesFrom } from '../../src/factory/path.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
@@ -11,9 +11,11 @@ import type { Recipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
-// Two real recipes drive these tests, the same way tests/line/run-graph.spec.ts
-// exercises buildRunGraph — this is a layout of an actual run graph, not of a
-// hand-built fixture that only happens to look like one.
+// Two real recipes drive most of these tests, the same way
+// tests/line/run-graph.spec.ts exercises buildRunGraph — this is a layout of
+// an actual run graph, not of a hand-built fixture that only happens to look
+// like one. The golden fixtures pin the prototype's exact output; the
+// property tests sweep every recipe the repo ships, at every lane count.
 
 function recipeFrom(file: string): Recipe {
   const text = fs.readFileSync(path.join(__dirname, '..', '..', 'recipes', file), 'utf-8')
@@ -64,14 +66,6 @@ function graphFor(recipeFile: string, lanes: number[]): RunGraph {
   return buildRunGraph(order, recipe)
 }
 
-function allSeats(map: HallMap): { tile: { x: number; y: number }; label: string }[] {
-  const seats: { tile: { x: number; y: number }; label: string }[] = []
-  for (const prop of map.props) {
-    if (prop.seat !== null) seats.push({ tile: prop.seat, label: prop.id })
-  }
-  return seats
-}
-
 function stationsOf(props: readonly HallProp[]): HallProp[] {
   return props.filter((p) => p.nodeId !== null)
 }
@@ -96,6 +90,213 @@ function rn(over: Partial<RunNode> & Pick<RunNode, 'id' | 'kind'>): RunNode {
 function graph(nodes: RunNode[]): RunGraph {
   return { orderId: 'WO-hand', recipe: 'hand', nodes }
 }
+
+const CREWED_KINDS = ['agent', 'fanout', 'run', 'judge']
+function isCrewed(node: RunNode): boolean {
+  return node.role !== null || CREWED_KINDS.includes(node.kind)
+}
+
+/**
+ * The tiles the routed search itself refuses to enter: every station seat
+ * and every anchor. Only the last-resort BFS-over-`solid` fallback can put a
+ * belt on one of these, since the routed search's own `passBelt` predicate
+ * excludes them structurally — so a belt path touching one is the honest
+ * sign that a route fell back rather than being found.
+ */
+function blockedForBeltKeys(map: HallMap): Set<string> {
+  const blocked = new Set<string>()
+  for (const p of map.props) if (p.seat !== null) blocked.add(`${p.seat.x},${p.seat.y}`)
+  for (const anchor of [map.anchors.archive, map.anchors.rack, map.anchors.wait]) {
+    blocked.add(`${anchor.x},${anchor.y}`)
+  }
+  return blocked
+}
+
+describe('layoutHall — golden output', () => {
+  const GOLDEN: Record<string, { file: string; lanes: number[] }> = {
+    'standard-3': { file: 'standard.yaml', lanes: [1, 2, 3] },
+    'bugfix-1': { file: 'bugfix.yaml', lanes: [1] },
+    'standard-2': { file: 'standard.yaml', lanes: [1, 2] },
+  }
+
+  const goldenPath = path.join(__dirname, 'fixtures', 'hall-golden.json')
+  const golden: Record<string, unknown> = JSON.parse(fs.readFileSync(goldenPath, 'utf-8'))
+
+  for (const [key, { file, lanes }] of Object.entries(GOLDEN)) {
+    it(`matches the prototype's output for ${key}`, () => {
+      const map = layoutHall(graphFor(file, lanes))
+      const expected = golden[key] as {
+        width: number
+        height: number
+        props: unknown
+        belts: unknown
+        beltTiles: unknown
+        crossovers: unknown
+        restSeats: unknown
+        breakroom: unknown
+        lights: unknown
+        anchors: unknown
+        walk: string[]
+      }
+      expect(map.width).toBe(expected.width)
+      expect(map.height).toBe(expected.height)
+      expect(
+        map.props.map((p) => ({
+          id: p.id,
+          kind: p.kind,
+          x: p.x,
+          y: p.y,
+          w: p.w,
+          h: p.h,
+          nodeId: p.nodeId,
+          seat: p.seat,
+        }))
+      ).toEqual(expected.props)
+      expect(
+        map.belts.map((b) => ({
+          id: b.id,
+          fromNodeId: b.fromNodeId,
+          toNodeId: b.toNodeId,
+          path: b.path,
+        }))
+      ).toEqual(expected.belts)
+      expect(map.beltTiles).toEqual(expected.beltTiles)
+      expect(map.crossovers).toEqual(expected.crossovers)
+      expect(map.restSeats.map((s) => ({ id: s.id, tile: s.tile, facing: s.facing }))).toEqual(
+        expected.restSeats
+      )
+      expect(map.breakroom).toEqual(expected.breakroom)
+      expect(map.lights).toEqual(expected.lights)
+      expect(map.anchors).toEqual(expected.anchors)
+      const walkRows = map.walk.map((row) => row.map((v) => (v ? '#' : '.')).join(''))
+      expect(walkRows).toEqual(expected.walk)
+    })
+  }
+})
+
+describe('layoutHall — properties, across every recipe and lane count', () => {
+  const recipeFiles = fs
+    .readdirSync(path.join(__dirname, '..', '..', 'recipes'))
+    .filter((f) => f.endsWith('.yaml'))
+  const laneSets: number[][] = [[1], [1, 2], [1, 2, 3], [1, 2, 3, 4, 5]]
+
+  for (const file of recipeFiles) {
+    for (const lanes of laneSets) {
+      describe(`${file} lanes=[${lanes.join(',')}]`, () => {
+        const g = graphFor(file, lanes)
+        const map = layoutHall(g)
+
+        it('has a non-empty graph to test against', () => {
+          expect(g.nodes.length).toBeGreaterThan(0)
+        })
+
+        it('seats every rest seat on a bench or sofa prop, at the seat tile itself', () => {
+          expect(map.restSeats.length).toBeGreaterThan(0)
+          for (const seat of map.restSeats) {
+            const prop = map.props.find((p) => p.id === seat.propId) as HallProp | undefined
+            expect(prop).toBeDefined()
+            expect(['restbench', 'sofa']).toContain((prop as HallProp).kind)
+            const p = prop as HallProp
+            expect(seat.tile.x).toBeGreaterThanOrEqual(p.x)
+            expect(seat.tile.x).toBeLessThan(p.x + p.w)
+            expect(seat.tile.y).toBe(p.y)
+          }
+        })
+
+        it('gives at least two more rest seats than crewed nodes', () => {
+          const crewedCount = g.nodes.filter(isCrewed).length
+          expect(map.restSeats.length).toBeGreaterThanOrEqual(crewedCount + 2)
+        })
+
+        it('never lets a belt tile stand in for a walkable tile, except a crossover', () => {
+          expect(map.beltTiles.length).toBeGreaterThan(0)
+          const crossoverKeys = new Set(map.crossovers.map((t) => `${t.x},${t.y}`))
+          for (const tile of map.beltTiles) {
+            const k = `${tile.x},${tile.y}`
+            if (crossoverKeys.has(k)) {
+              expect(map.walk[tile.y][tile.x]).toBe(false)
+            } else {
+              expect(map.walk[tile.y][tile.x]).toBe(true)
+            }
+          }
+        })
+
+        it('reaches every station seat, rest seat, anchor and the exit from the intake', () => {
+          const stationSeats = map.props.filter((p) => p.seat !== null).map((p) => p.seat as Tile)
+          const targets: Tile[] = [
+            ...stationSeats,
+            map.anchors.exit,
+            map.anchors.archive,
+            map.anchors.rack,
+            map.anchors.wait,
+          ]
+          expect(targets.length).toBeGreaterThan(0)
+          for (const target of targets) {
+            const p = findPath(map.walk, map.anchors.intake, target)
+            expect(p.length).toBeGreaterThan(0)
+            expect(p[p.length - 1]).toEqual(target)
+          }
+          // rest seats are reached via a neighbouring tile, since the seat
+          // itself is only enterable as a goal once it is taken.
+          const distances = distancesFrom(map.walk, map.anchors.intake)
+          for (const seat of map.restSeats) {
+            const neighbours = [
+              { x: seat.tile.x + 1, y: seat.tile.y },
+              { x: seat.tile.x - 1, y: seat.tile.y },
+              { x: seat.tile.x, y: seat.tile.y + 1 },
+              { x: seat.tile.x, y: seat.tile.y - 1 },
+            ]
+            const reached = neighbours.some((n) => distances.has(`${n.x},${n.y}`))
+            expect(reached).toBe(true)
+          }
+        })
+
+        it('routes every belt as a 4-contiguous path from port to port', () => {
+          expect(map.belts.length).toBeGreaterThan(0)
+          const byNode = new Map(
+            map.props.filter((p) => p.nodeId).map((p) => [p.nodeId as string, p])
+          )
+          for (const belt of map.belts) {
+            expect(belt.path.length).toBeGreaterThan(0)
+            let prev = belt.path[0]
+            for (const t of belt.path.slice(1)) {
+              expect(Math.abs(t.x - prev.x) + Math.abs(t.y - prev.y)).toBe(1)
+              prev = t
+            }
+            const from = byNode.get(belt.fromNodeId) as HallProp
+            const to = byNode.get(belt.toNodeId) as HallProp
+            expect(belt.path[0]).toEqual({ x: from.x + from.w, y: from.y })
+            expect(belt.path[belt.path.length - 1]).toEqual({ x: to.x - 1, y: to.y })
+          }
+        })
+
+        it('never gives a belt tile more than one input and more than one output at once', () => {
+          expect(map.beltTiles.length).toBeGreaterThan(0)
+          for (const tile of map.beltTiles) {
+            expect(tile.ins.length > 1 && tile.outs.length > 1).toBe(false)
+          }
+        })
+
+        it('never falls back to the BFS path', () => {
+          expect(map.belts.length).toBeGreaterThan(0)
+          const blocked = blockedForBeltKeys(map)
+          for (const belt of map.belts) {
+            for (const t of belt.path) {
+              expect(blocked.has(`${t.x},${t.y}`)).toBe(false)
+            }
+          }
+        })
+      })
+    }
+  }
+
+  it('gives the 3-lane standard graph at least one split and one merge', () => {
+    const map = layoutHall(graphFor('standard.yaml', [1, 2, 3]))
+    const kinds = map.beltTiles.map((t) => t.kind)
+    expect(kinds).toContain('split')
+    expect(kinds).toContain('merge')
+  })
+})
 
 describe('layoutHall', () => {
   const FIXTURES: { file: string; lanes: number[] }[] = [
@@ -164,43 +365,6 @@ describe('layoutHall', () => {
         expect(new Set(xs).size).toBe(xs.length)
         const spread = Math.max(...xs) - Math.min(...xs)
         expect(spread).toBeGreaterThan(map.width / 3)
-      })
-
-      it('reaches every seat and every anchor from the intake', () => {
-        const map = layoutHall(graph)
-        const targets = [
-          ...allSeats(map).map((s) => s.tile),
-          map.anchors.exit,
-          map.anchors.archive,
-          map.anchors.rack,
-          map.anchors.wait,
-          ...map.anchors.lounge,
-        ]
-        expect(targets.length).toBeGreaterThan(0)
-        for (const target of targets) {
-          const p = findPath(map.solid, map.anchors.intake, target)
-          expect(p.length).toBeGreaterThan(0)
-          expect(p[p.length - 1]).toEqual(target)
-        }
-      })
-
-      it('makes one belt per dependsOn edge, each an orthogonally contiguous, non-solid path', () => {
-        const map = layoutHall(graph)
-        const edgeCount = graph.nodes.reduce((sum, n) => sum + n.dependsOn.length, 0)
-        expect(edgeCount).toBeGreaterThan(0)
-        expect(map.belts).toHaveLength(edgeCount)
-        for (const belt of map.belts) {
-          expect(belt.path.length).toBeGreaterThan(0)
-          for (const tile of belt.path) {
-            expect(map.solid[tile.y][tile.x]).toBe(false)
-          }
-          let prev = belt.path[0]
-          for (const tile of belt.path.slice(1)) {
-            const dist = Math.abs(tile.x - prev.x) + Math.abs(tile.y - prev.y)
-            expect(dist).toBe(1)
-            prev = tile
-          }
-        }
       })
 
       it('is deterministic: the same graph lays out identically twice', () => {
@@ -370,24 +534,6 @@ describe('layoutHall', () => {
       const lastStation = map.props.find((p) => p.nodeId === 'e') as HallProp
       const rightEdge = lastStation.x + lastStation.w
       expect(map.width - rightEdge).toBeLessThanOrEqual(3)
-    })
-
-    it('places more than one kind of lounge furniture, spread across the bottom band', () => {
-      const g = graph([
-        rn({ id: 'a', kind: 'agent' }),
-        rn({ id: 'b', kind: 'agent', dependsOn: ['a'] }),
-        rn({ id: 'c', kind: 'agent', dependsOn: ['b'] }),
-        rn({ id: 'd', kind: 'agent', dependsOn: ['c'] }),
-        rn({ id: 'e', kind: 'agent', dependsOn: ['d'] }),
-      ])
-      const map = layoutHall(g)
-      const loungeKinds: HallProp['kind'][] = ['couch', 'coffee', 'plant', 'booth']
-      const lounge = map.props.filter((p) => loungeKinds.includes(p.kind))
-      const kindsSeen = new Set(lounge.map((p) => p.kind))
-      expect(kindsSeen.size).toBeGreaterThan(1)
-      const xs = lounge.map((p) => p.x)
-      expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(map.width / 3)
-      expect(map.anchors.lounge.length).toBeGreaterThanOrEqual(6)
     })
 
     it('lays out an empty graph without throwing', () => {

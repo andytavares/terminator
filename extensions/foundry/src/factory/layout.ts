@@ -1,6 +1,8 @@
 import type { RunGraph, RunNode } from '../line/run-graph.js'
 import type { StepKind } from '../recipe/parse.js'
-import { findPath } from './path.js'
+import { findPath, distancesFrom } from './path.js'
+import { routeBelts } from './belts.js'
+import type { BeltTile } from './belts.js'
 
 // A run graph turned into a floor plan.
 //
@@ -15,6 +17,8 @@ export interface Tile {
   readonly y: number
 }
 
+export type { Side, BeltTileKind, BeltTile } from './belts.js'
+
 /** The five prop kinds that carry a `RunNode`; every other kind is decor. */
 export type StationKind = 'desk' | 'rig' | 'bench' | 'press' | 'gate'
 
@@ -24,11 +28,16 @@ export type PropKind =
   | 'racks'
   | 'statuswall'
   | 'lockers'
-  | 'couch'
-  | 'coffee'
   | 'plant'
-  | 'booth'
   | 'chair'
+  | 'partition'
+  | 'restbench'
+  | 'sofa'
+  | 'table'
+  | 'lowtable'
+  | 'fridge'
+  | 'coffeebar'
+  | 'vending'
 
 export interface HallProp {
   readonly id: string
@@ -61,15 +70,42 @@ export interface HallAnchors {
   readonly archive: Tile
   readonly rack: Tile
   readonly wait: Tile
-  readonly lounge: readonly Tile[]
+}
+
+/** A seat in the breakroom — a stable order, left to right, top row then bottom row. */
+export interface RestSeat {
+  readonly id: number
+  readonly tile: Tile
+  /** Which way a seated crew member faces. */
+  readonly facing: 'N' | 'S'
+  /** The bench or sofa prop this seat is on. */
+  readonly propId: string
+}
+
+export interface Breakroom {
+  readonly x: number
+  readonly y: number
+  readonly w: number
+  readonly h: number
+  readonly door: readonly Tile[]
 }
 
 export interface HallMap {
   readonly width: number
   readonly height: number
+  /** The physical footprint: walls, stations, furniture. */
   readonly solid: readonly (readonly boolean[])[]
+  /** `solid` plus belts plus every seat, minus the crossovers — what a crew member actually walks over. */
+  readonly walk: readonly (readonly boolean[])[]
   readonly props: readonly HallProp[]
+  /** One per `dependsOn` edge, its path routed port to port. */
   readonly belts: readonly HallBelt[]
+  /** The union of every belt path, one entry per tile. */
+  readonly beltTiles: readonly BeltTile[]
+  /** Straight belt tiles opened as a step-over plate, so crew can cross. */
+  readonly crossovers: readonly Tile[]
+  readonly breakroom: Breakroom
+  readonly restSeats: readonly RestSeat[]
   readonly lanes: readonly HallLane[]
   readonly anchors: HallAnchors
   readonly lights: readonly Tile[]
@@ -80,7 +116,7 @@ export const TILE_PX = 16
 const TOP_WALL_ROWS = 3
 const YARD_ROWS = 4
 const LANE_BAND_ROWS = 4
-const LOUNGE_ROWS = 4
+const BREAKROOM_ROWS = 5
 /** How far the room extends past the last station's column — the hall hugs its content. */
 const CONTENT_MARGIN = 3
 const COLUMN_PITCH = 5
@@ -89,16 +125,8 @@ const MIN_WIDTH = 16
 type FixtureKind = 'shelves' | 'racks' | 'statuswall' | 'lockers'
 const FIXTURE_KINDS: readonly FixtureKind[] = ['shelves', 'racks', 'statuswall', 'lockers']
 
-type LoungeKind = 'couch' | 'coffee' | 'plant' | 'booth'
-/** Repeats across the lounge band until the room runs out of width. */
-const LOUNGE_PATTERN: readonly { readonly kind: LoungeKind; readonly w: number }[] = [
-  { kind: 'plant', w: 1 },
-  { kind: 'couch', w: 3 },
-  { kind: 'plant', w: 1 },
-  { kind: 'coffee', w: 1 },
-  { kind: 'booth', w: 3 },
-  { kind: 'plant', w: 1 },
-]
+/** A node crewed by someone, and so one that needs a place to sit when idle. */
+const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run', 'judge']
 
 /** The nearest column in `row` that isn't solid, scanning outward from `preferred`. */
 function nearestClearColumn(
@@ -192,6 +220,17 @@ function fillRect(
   }
 }
 
+function key(tile: Tile): string {
+  return `${tile.x},${tile.y}`
+}
+
+const NEIGHBOUR_STEPS: readonly Tile[] = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+]
+
 export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, string>>): HallMap {
   const nodeDepths = depths(graph.nodes)
   // The rightmost edge any station actually occupies — the room hugs this,
@@ -204,9 +243,9 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
   const taken = new Map<string, number>()
   for (const node of graph.nodes) {
     const depth = nodeDepths.get(node.id) as number
-    const key = `${bandKey(node)}@${depth}`
-    const slot = taken.get(key) ?? 0
-    taken.set(key, slot + 1)
+    const bandDepthKey = `${bandKey(node)}@${depth}`
+    const slot = taken.get(bandDepthKey) ?? 0
+    taken.set(bandDepthKey, slot + 1)
     slotOf.set(node.id, slot)
     slotsAtDepth.set(depth, Math.max(slotsAtDepth.get(depth) ?? 0, slot + 1))
   }
@@ -219,11 +258,16 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
   const stationX = (node: RunNode): number =>
     columnStart[nodeDepths.get(node.id) as number] + (slotOf.get(node.id) as number) * COLUMN_PITCH
 
-  const rightmostStationEdge =
-    graph.nodes.length === 0
-      ? 3 + stationWidth('desk')
-      : Math.max(...graph.nodes.map((n) => stationX(n) + stationWidth(stationKind(n.kind))))
-  const width = Math.max(MIN_WIDTH, rightmostStationEdge + CONTENT_MARGIN)
+  const rightmostStationEdge = Math.max(
+    -Infinity,
+    ...graph.nodes.map((n) => stationX(n) + stationWidth(stationKind(n.kind)))
+  )
+
+  const crewed = graph.nodes.filter((n) => n.role !== null || CREWED_KINDS.includes(n.kind))
+  const modules = Math.max(3, Math.ceil((crewed.length + 2) / 4))
+  const roomWidth = 3 * modules + 6
+
+  const width = Math.max(MIN_WIDTH, rightmostStationEdge + CONTENT_MARGIN, roomWidth + 2)
 
   const laneValues = [
     ...new Set(graph.nodes.map((n) => n.lane).filter((l): l is number => l !== null)),
@@ -239,17 +283,17 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     return TOP_WALL_ROWS + YARD_ROWS + index * LANE_BAND_ROWS
   }
 
-  const loungeStart = laneBandStart(laneValues.length)
-  const bottomWallRow = loungeStart + LOUNGE_ROWS
-  const height = bottomWallRow + 1
+  const roomRow = laneBandStart(laneValues.length)
+  const bottomRoomRow = roomRow + BREAKROOM_ROWS
+  const height = bottomRoomRow + 1
 
   const solid: boolean[][] = Array.from({ length: height }, () => Array(width).fill(false))
 
   // Perimeter: top wall, bottom wall, left/right walls with a door each.
   fillRect(solid, 0, 0, width, TOP_WALL_ROWS, true)
-  fillRect(solid, 0, bottomWallRow, width, 1, true)
+  fillRect(solid, 0, bottomRoomRow, width, 1, true)
   const doorRow = yardBeltRow
-  for (let y = TOP_WALL_ROWS; y < bottomWallRow; y++) {
+  for (let y = TOP_WALL_ROWS; y < bottomRoomRow; y++) {
     if (y !== doorRow) {
       solid[y][0] = true
       solid[y][width - 1] = true
@@ -267,9 +311,22 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     return { lane, row, label: `Lane ${lane}` }
   })
 
-  // Stations go down first: fixtures and the lounge are dressing placed
+  // Row roles, for where a belt may run horizontally (and where crossing a
+  // seat or an aisle costs a walk more).
+  const role: string[] = Array(height).fill('wall')
+  role[TOP_WALL_ROWS] = 'head'
+  const bandStarts = [yardStationRow, ...laneValues.map((_, i) => laneBandStart(i))]
+  for (const r of bandStarts) {
+    role[r] = 'station'
+    role[r + 1] = 'seat'
+    role[r + 2] = 'belt'
+    if (r + 3 < roomRow) role[r + 3] = 'aisle'
+  }
+
+  // Stations go down first: fixtures and the breakroom are dressing placed
   // *around* them, and need to know which floor tiles are already taken.
   const props: HallProp[] = []
+  const blockedForBelt = new Set<string>()
   for (const node of graph.nodes) {
     const kind = stationKind(node.kind)
     const w = stationWidth(kind)
@@ -292,6 +349,7 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     })
     fillRect(solid, x, y, w, h, true)
     solid[seat.y][seat.x] = false
+    blockedForBelt.add(key(seat))
 
     if (kind === 'desk') {
       props.push({
@@ -343,66 +401,180 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     x: nearestClearColumn(solid, yardSeatRow, fixtureCol('statuswall'), width),
     y: yardSeatRow,
   }
+  for (const anchor of [archive, rack, wait]) blockedForBelt.add(key(anchor))
 
-  // Lounge/utility band: a repeating strip of furniture across the whole
-  // bottom band, never under a station (the lounge band sits below every
-  // lane), so there is nothing to dodge.
-  const lounge: Tile[] = []
-  let loungeX = 1
-  let loungeIndex = 0
-  while (loungeX < width - 2) {
-    const piece = LOUNGE_PATTERN[loungeIndex % LOUNGE_PATTERN.length]
-    if (loungeX + piece.w > width - 1) break
-    props.push({
-      id: `lounge-${piece.kind}-${loungeIndex}`,
-      kind: piece.kind,
-      x: loungeX,
-      y: loungeStart,
-      w: piece.w,
-      h: 1,
-      solid: false,
-      nodeId: null,
-      seat: null,
+  // Breakroom: a room in the bottom band, centred on the median crewed
+  // station column and clamped inside the hall, with a two-tile door in the
+  // middle of its partition.
+  const crewedX = crewed
+    .map((n) => {
+      const stationProp = props.find((p) => p.nodeId === n.id) as HallProp
+      return stationProp.x + Math.floor(stationProp.w / 2)
     })
-    if (piece.w >= 3) {
-      lounge.push({ x: loungeX, y: loungeStart }, { x: loungeX + piece.w - 1, y: loungeStart })
-    } else {
-      lounge.push({ x: loungeX, y: loungeStart })
-    }
-    loungeX += piece.w + 1
-    loungeIndex += 1
-  }
-  // `width` is never below `MIN_WIDTH` (16), and one partial cycle of
-  // `LOUNGE_PATTERN` through a 16-column room already seats 7 — the
-  // contract's minimum of 6 needs no separate top-up.
+    .sort((a, b) => a - b)
+  const median =
+    crewedX.length > 0 ? crewedX[Math.floor(crewedX.length / 2)] : Math.floor(width / 2)
+  const roomX = Math.min(Math.max(median - Math.floor(roomWidth / 2), 1), width - 1 - roomWidth)
+  const doorX = roomX + Math.floor(roomWidth / 2) - 1
+  const door: Tile[] = [
+    { x: doorX, y: roomRow },
+    { x: doorX + 1, y: roomRow },
+  ]
+  fillRect(solid, roomX, roomRow, roomWidth, 1, true)
+  fillRect(solid, roomX, roomRow, 1, BREAKROOM_ROWS, true)
+  fillRect(solid, roomX + roomWidth - 1, roomRow, 1, BREAKROOM_ROWS, true)
+  for (const d of door) solid[d.y][d.x] = false
+  props.push({
+    id: 'room-partition',
+    kind: 'partition',
+    x: roomX,
+    y: roomRow,
+    w: roomWidth,
+    h: BREAKROOM_ROWS,
+    solid: true,
+    nodeId: null,
+    seat: null,
+  })
 
-  // Lights: one per ~6 columns, per band (the lounge included).
+  const put = (id: string, kind: PropKind, x: number, y: number, w = 1, h = 1): void => {
+    props.push({ id, kind, x, y, w, h, solid: true, nodeId: null, seat: null })
+    fillRect(solid, x, y, w, h, true)
+  }
+  put('room-fridge', 'fridge', roomX + 1, roomRow + 2)
+  put('room-coffee', 'coffeebar', roomX + 1, roomRow + 3)
+  put('room-plant-l', 'plant', roomX + 1, roomRow + 4)
+  put('room-vending', 'vending', roomX + roomWidth - 2, roomRow + 2)
+  put('room-plant-r', 'plant', roomX + roomWidth - 2, roomRow + 4)
+
+  const restSeats: RestSeat[] = []
+  for (let m = 0; m < modules; m++) {
+    const c = roomX + 4 + 3 * m
+    const sofa = m % 2 === 1
+    const topId = `room-top-${m}`
+    const botId = `room-bot-${m}`
+    put(topId, sofa ? 'sofa' : 'restbench', c, roomRow + 2, 2, 1)
+    put(`room-table-${m}`, sofa ? 'lowtable' : 'table', c, roomRow + 3, 2, 1)
+    put(botId, 'restbench', c, roomRow + 4, 2, 1)
+    for (const dx of [0, 1]) {
+      restSeats.push({
+        id: restSeats.length,
+        tile: { x: c + dx, y: roomRow + 2 },
+        facing: 'S',
+        propId: topId,
+      })
+    }
+    for (const dx of [0, 1]) {
+      restSeats.push({
+        id: restSeats.length,
+        tile: { x: c + dx, y: roomRow + 4 },
+        facing: 'N',
+        propId: botId,
+      })
+    }
+  }
+
+  // Lights: one per ~6 columns, per belt row, plus one over the breakroom's
+  // near seat row.
   const lights: Tile[] = []
-  const bandRows = [yardBeltRow, ...laneValues.map((_, i) => laneBandStart(i) + 2), loungeStart]
-  for (const row of bandRows) {
+  const litRows = [yardBeltRow, ...laneValues.map((_, i) => laneBandStart(i) + 2)]
+  for (const row of litRows) {
     for (let col = 3; col < width - 1; col += 6) lights.push({ x: col, y: row })
   }
+  lights.push({ x: roomX + Math.floor(roomWidth / 2), y: roomRow + 2 })
 
-  const stationById = new Map(
-    props.filter((p) => p.nodeId !== null).map((p) => [p.nodeId as string, p])
+  // Belts: one routed path per `dependsOn` edge, sharing tiles only within a
+  // split (same source) or merge (same target) group.
+  const byNode = new Map(props.filter((p) => p.nodeId !== null).map((p) => [p.nodeId as string, p]))
+  const { belts, beltTiles } = routeBelts(
+    graph.nodes,
+    byNode,
+    solid,
+    role,
+    blockedForBelt,
+    width,
+    height,
+    TOP_WALL_ROWS,
+    roomRow
   )
 
-  const belts: HallBelt[] = []
-  for (const node of graph.nodes) {
-    // `node` came from `graph.nodes`, which the loop above gave a station to
-    // unconditionally, so the target side is always found; the source side
-    // is not — `dependsOn` can name an id no node in this graph carries.
-    const toProp = stationById.get(node.id) as HallProp
-    for (const fromNodeId of node.dependsOn) {
-      const fromProp = stationById.get(fromNodeId)
-      if (fromProp === undefined) continue
-      const beltRow = fromProp.y + 2
-      const start: Tile = {
-        x: Math.min(Math.max(fromProp.x + Math.floor(fromProp.w / 2), 1), width - 2),
-        y: Math.min(beltRow, height - 2),
-      }
-      const path = findPath(solid, start, toProp.seat as Tile)
-      belts.push({ id: `${fromNodeId}->${node.id}`, fromNodeId, toNodeId: node.id, path })
+  // Walk grid: solid ∪ belt tiles ∪ every seat. Crossovers open only where
+  // the floor would otherwise split, or a station's walk to the breakroom
+  // door detours badly around belts.
+  const seatKeys = new Set<string>([
+    ...props.filter((p) => p.seat !== null).map((p) => key(p.seat as Tile)),
+    ...restSeats.map((s) => key(s.tile)),
+  ])
+  const beltTileAt = new Map(beltTiles.map((t) => [key(t), t]))
+  const walk: boolean[][] = solid.map((row, y) =>
+    row.map((v, x) => v || beltTileAt.has(key({ x, y })) || seatKeys.has(key({ x, y })))
+  )
+  const free: boolean[][] = solid.map((row, y) =>
+    row.map((v, x) => v || seatKeys.has(key({ x, y })))
+  )
+
+  const crossovers: Tile[] = []
+  const isPortOfSomeBelt = (t: Tile): boolean =>
+    belts.some((b) => {
+      const first = b.path[0]
+      const last = b.path[b.path.length - 1]
+      return (
+        (first !== undefined && key(first) === key(t)) ||
+        (last !== undefined && key(last) === key(t))
+      )
+    })
+  const isOpenableStraight = (t: Tile): boolean => {
+    const tile = beltTileAt.get(key(t))
+    return tile !== undefined && tile.kind === 'straight' && !isPortOfSomeBelt(t)
+  }
+  const open = (t: Tile): void => {
+    walk[t.y][t.x] = false
+    crossovers.push(t)
+  }
+  const requiredKeys = [...seatKeys, key(archive), key(rack), key(wait), key(exit)]
+  const required: Tile[] = requiredKeys.map((k) => {
+    const [x, y] = k.split(',').map(Number)
+    return { x, y }
+  })
+  const reachable = (seen: ReadonlySet<string>, t: Tile): boolean =>
+    seen.has(key(t)) || NEIGHBOUR_STEPS.some((s) => seen.has(key({ x: t.x + s.x, y: t.y + s.y })))
+
+  for (let guard = 0; guard < 50; guard++) {
+    const seen = new Set(distancesFrom(walk, intake).keys())
+    if (required.every((t) => reachable(seen, t))) break
+    const candidates = [...beltTileAt.keys()]
+      .map((k) => {
+        const [x, y] = k.split(',').map(Number)
+        return { x, y }
+      })
+      .filter((t) => {
+        if (!isOpenableStraight(t)) return false
+        const tile = beltTileAt.get(key(t)) as BeltTile
+        const horizontal = tile.outs.includes('E') || tile.outs.includes('W')
+        const [p, q] = horizontal
+          ? [
+              { x: t.x, y: t.y - 1 },
+              { x: t.x, y: t.y + 1 },
+            ]
+          : [
+              { x: t.x - 1, y: t.y },
+              { x: t.x + 1, y: t.y },
+            ]
+        const isOpen = (u: Tile): boolean => walk[u.y]?.[u.x] !== true
+        return isOpen(p) && isOpen(q) && seen.has(key(p)) !== seen.has(key(q))
+      })
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+    if (candidates.length === 0) break
+    open(candidates[0])
+  }
+
+  for (const p of props.filter((q) => q.seat !== null)) {
+    for (let i = 0; i < 3; i++) {
+      const blockedLength = findPath(walk, p.seat as Tile, door[0]).length
+      const freePath = findPath(free, p.seat as Tile, door[0])
+      if (blockedLength > 0 && blockedLength <= freePath.length + 8) break
+      const t = freePath.find((u) => walk[u.y][u.x] && isOpenableStraight(u))
+      if (t === undefined) break
+      open(t)
     }
   }
 
@@ -410,10 +582,15 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     width,
     height,
     solid,
+    walk,
     props,
     belts,
+    beltTiles,
+    crossovers,
+    breakroom: { x: roomX, y: roomRow, w: roomWidth, h: BREAKROOM_ROWS, door },
+    restSeats,
     lanes,
-    anchors: { intake, exit, archive, rack, wait, lounge },
+    anchors: { intake, exit, archive, rack, wait },
     lights,
   }
 }
