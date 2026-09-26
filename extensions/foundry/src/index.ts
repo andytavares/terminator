@@ -24,6 +24,7 @@ import { ensureCheckout, ensureCheckouts } from './line/worktree.js'
 import type { Checkout } from './line/worktree.js'
 import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
+import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
 import type { RunCommand } from './runtime/diff-metrics.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
@@ -1854,6 +1855,15 @@ export function activate(api: ExtensionAPI): void {
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Could not read your tickets.' }
     }
+  })
+  // A ticket for a typed idea, offered before it becomes an order (spec 061).
+  reg(api, 'foundry:ticket.offer', async () => ({ offer: await ticketOffer(api.issues) }))
+  reg(api, 'foundry:ticket.create', async (payload) => {
+    const { idea, teamId } = (payload ?? {}) as { idea?: unknown; teamId?: unknown }
+    if (typeof idea !== 'string' || typeof teamId !== 'string' || api.issues === undefined) {
+      return { error: 'Malformed request.' }
+    }
+    return fileTicket(api.issues, { idea, teamId })
   })
   reg(api, 'foundry:order.create', (payload) => forge.create(payload))
   reg(api, 'foundry:order.turn', (payload) => forge.turn(payload))

@@ -122,3 +122,100 @@ describe('the New work order quick action', () => {
     )
   })
 })
+
+// Spec 061, FR-4: a typed idea is offered a Linear ticket before it becomes an
+// order, so the order — and its one project — are named after the ticket.
+describe('offering a ticket for a typed idea', () => {
+  function mountWith(offer: unknown, created: unknown = { key: 'TAV-16' }) {
+    const invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.list') return { orders: [] }
+      if (channel === 'foundry:ticket.offer') return { offer }
+      if (channel === 'foundry:ticket.create') return created
+      if (channel === 'foundry:order.create') return {}
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Orders repoRoot="/repos/app" />)
+    return invoke
+  }
+
+  async function submitIdea(text = 'Only list open tickets') {
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(screen.getByLabelText('Describe what you want built or fixed'), {
+      target: { value: text },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /New order/ }))
+    return fireEvent
+  }
+
+  const orderCreates = (invoke: ReturnType<typeof vi.fn>) =>
+    invoke.mock.calls.filter(([c]) => c === 'foundry:order.create').map(([, p]) => p)
+
+  it('asks nothing and seeds a typed order when no ticket can be made', async () => {
+    const invoke = mountWith(null)
+    await submitIdea()
+    await waitFor(() => expect(orderCreates(invoke)).toHaveLength(1))
+    expect(orderCreates(invoke)[0]).toMatchObject({ source: { kind: 'typed' } })
+    expect(screen.queryByText(/Create a Linear ticket/)).toBeNull()
+  })
+
+  it('creates the ticket and seeds the order from it', async () => {
+    const invoke = mountWith({ teams: [{ id: 't1', key: 'TAV', name: 'Team' }] })
+    const fire = await submitIdea()
+    await waitFor(() => screen.getByText(/Create a Linear ticket for this/))
+    expect(orderCreates(invoke)).toHaveLength(0)
+    expect(screen.queryByRole('combobox', { name: 'Linear team' })).toBeNull()
+    fire.click(screen.getByRole('button', { name: 'Create ticket' }))
+    await waitFor(() => expect(orderCreates(invoke)).toHaveLength(1))
+    expect(invoke).toHaveBeenCalledWith('foundry:ticket.create', {
+      idea: 'Only list open tickets',
+      teamId: 't1',
+    })
+    expect(orderCreates(invoke)[0]).toMatchObject({
+      source: { kind: 'tracker', tracker: 'linear', key: 'TAV-16' },
+    })
+  })
+
+  it('seeds a typed order when the operator declines', async () => {
+    const invoke = mountWith({ teams: [{ id: 't1', key: 'TAV', name: 'Team' }] })
+    const fire = await submitIdea()
+    await waitFor(() => screen.getByText(/Create a Linear ticket for this/))
+    fire.click(screen.getByRole('button', { name: 'No ticket' }))
+    await waitFor(() => expect(orderCreates(invoke)).toHaveLength(1))
+    expect(orderCreates(invoke)[0]).toMatchObject({ source: { kind: 'typed' } })
+    expect(invoke).not.toHaveBeenCalledWith('foundry:ticket.create', expect.anything())
+  })
+
+  it('lets the operator pick the team only when there is more than one', async () => {
+    const invoke = mountWith({
+      teams: [
+        { id: 't1', key: 'TAV', name: 'Team' },
+        { id: 't2', key: 'OPS', name: 'Ops' },
+      ],
+    })
+    const fire = await submitIdea()
+    const picker = await waitFor(() => screen.getByRole('combobox', { name: 'Linear team' }))
+    fire.change(picker, { target: { value: 't2' } })
+    fire.click(screen.getByRole('button', { name: 'Create ticket' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:ticket.create', {
+        idea: 'Only list open tickets',
+        teamId: 't2',
+      })
+    )
+  })
+
+  it('says why and makes no order when the ticket cannot be created', async () => {
+    const invoke = mountWith(
+      { teams: [{ id: 't1', key: 'TAV', name: 'Team' }] },
+      { error: 'Linear refused' }
+    )
+    const fire = await submitIdea()
+    await waitFor(() => screen.getByText(/Create a Linear ticket for this/))
+    fire.click(screen.getByRole('button', { name: 'Create ticket' }))
+    await waitFor(() => screen.getByText('Linear refused'))
+    expect(orderCreates(invoke)).toHaveLength(0)
+  })
+})

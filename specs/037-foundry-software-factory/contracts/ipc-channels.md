@@ -67,6 +67,33 @@ rather than showing an empty list, which reads as "you have no tickets".
 
 ---
 
+## `foundry:ticket.offer`
+
+Whether a typed idea should be offered a Linear ticket before it becomes an
+order (spec 061). An order's project and branch take its ticket's branch name,
+so the ticket has to exist first.
+
+**Payload**: none.
+
+**Returns**: `{ offer: { teams: { id: string; key: string; name: string }[] } | null }` —
+`null` when Linear is not connected, the host cannot create issues, the
+operator is in no team, or the tracker cannot be reached. Null means no
+question is asked.
+
+---
+
+## `foundry:ticket.create`
+
+File the ticket the operator said yes to. Title is the idea's first sentence;
+the description is the whole idea.
+
+**Payload**: `{ idea: string; teamId: string }`
+
+**Returns**: `{ key: string }` — then seed with `order.create` from that key —
+or `{ error: string }` in the tracker's own words.
+
+---
+
 ## `foundry:order.create`
 
 Seed a new work order and return the first complete draft. Scout runs before this resolves — the operator never sees an empty shell (FR-002, FR-003).

@@ -93,7 +93,7 @@ export function newOrderId(at: Date = new Date(), random: () => number = Math.ra
 }
 
 /** A title from a typed idea: the first sentence, trimmed to something readable. */
-function titleFrom(text: string): string {
+export function titleFrom(text: string): string {
   const firstSentence = text.trim().split(/(?<=[.!?])\s/)[0] ?? text.trim()
   return firstSentence.length > 90 ? `${firstSentence.slice(0, 87)}…` : firstSentence
 }

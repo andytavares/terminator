@@ -18,6 +18,12 @@ interface Ticket {
   readonly status: string
 }
 
+interface Team {
+  readonly id: string
+  readonly key: string
+  readonly name: string
+}
+
 interface OrderRow {
   readonly id: string
   readonly title: string
@@ -73,6 +79,9 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [started, setStarted] = useState<string | null>(null)
+  // A ticket offered for the idea before it becomes an order (spec 061).
+  const [offer, setOffer] = useState<{ teams: Team[] } | null>(null)
+  const [teamId, setTeamId] = useState('')
 
   const refresh = useCallback(async () => {
     const r = (await invoke('foundry:order.list')) as { orders?: OrderRow[] }
@@ -154,13 +163,11 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
 
   const ready = idea.trim() !== ''
 
-  const seed = useCallback(async () => {
-    if (!ready || repoRoot === null) return
-    setBusy(true)
-    setProblem(null)
-    try {
+  const createOrder = useCallback(
+    async (source: Record<string, unknown>) => {
+      if (repoRoot === null) return
       const r = (await invoke('foundry:order.create', {
-        source: { kind: 'typed', text: idea },
+        source,
         repoPaths: [repoRoot],
       })) as { order?: OrderRow; existing?: { id: string }; error?: string }
       if (r.error !== undefined) {
@@ -170,10 +177,55 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
       setIdea('')
       await refresh()
       setOpen(r.order?.id ?? r.existing?.id ?? null)
+    },
+    [repoRoot, refresh]
+  )
+
+  const seed = useCallback(async () => {
+    if (!ready || repoRoot === null) return
+    setBusy(true)
+    setProblem(null)
+    try {
+      // Asked before the order exists, because its project and branch are
+      // named after the ticket. No offer means no question.
+      const r = (await invoke('foundry:ticket.offer')) as { offer?: { teams: Team[] } | null }
+      if (r.offer) {
+        setOffer(r.offer)
+        setTeamId(r.offer.teams[0]?.id ?? '')
+        return
+      }
+      await createOrder({ kind: 'typed', text: idea })
     } finally {
       setBusy(false)
     }
-  }, [idea, ready, repoRoot, refresh])
+  }, [idea, ready, repoRoot, createOrder])
+
+  const answerOffer = useCallback(
+    async (withTicket: boolean) => {
+      setBusy(true)
+      setProblem(null)
+      try {
+        if (!withTicket) {
+          setOffer(null)
+          await createOrder({ kind: 'typed', text: idea })
+          return
+        }
+        const r = (await invoke('foundry:ticket.create', { idea, teamId })) as {
+          key?: string
+          error?: string
+        }
+        if (r.key === undefined) {
+          setProblem(r.error ?? 'Linear did not create the ticket.')
+          return
+        }
+        setOffer(null)
+        await createOrder({ kind: 'tracker', tracker: 'linear', key: r.key })
+      } finally {
+        setBusy(false)
+      }
+    },
+    [idea, teamId, createOrder]
+  )
 
   if (open !== null) {
     const status = rows.find((row) => row.id === open)?.status
@@ -352,6 +404,34 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
           </button>
         )}
       </form>
+      {offer !== null ? (
+        <div className="fdry-ticket-offer" role="group" aria-label="Create a Linear ticket">
+          <p>
+            Create a Linear ticket for this? The order&rsquo;s branch and project will be named
+            after it.
+          </p>
+          {offer.teams.length > 1 ? (
+            <select
+              aria-label="Linear team"
+              value={teamId}
+              disabled={busy}
+              onChange={(event) => setTeamId(event.target.value)}
+            >
+              {offer.teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <button type="button" disabled={busy} onClick={() => void answerOffer(true)}>
+            Create ticket
+          </button>
+          <button type="button" disabled={busy} onClick={() => void answerOffer(false)}>
+            No ticket
+          </button>
+        </div>
+      ) : null}
       {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
 
       {from === 'tracker' ? (
