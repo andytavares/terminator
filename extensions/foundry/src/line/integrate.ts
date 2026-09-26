@@ -8,6 +8,7 @@ import type { Gate } from '../gates/rules.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
 import type { LadderOutcome } from '../verify/ladder.js'
+import type { CiOutcome } from './ship-tail.js'
 
 // The end of the line: a draft pull request, opened without being asked for.
 //
@@ -54,6 +55,13 @@ export interface IntegrateDeps {
   readonly record: (action: string, subject: string, reason: string) => Promise<void>
   /** Put the "mark it ready?" decision where the operator will see it. */
   readonly raiseGate?: (gate: Gate) => Promise<void>
+  /**
+   * Watch the drafts' CI before the ready-for-review gate is raised (D2).
+   *
+   * Absent means shipping behaves exactly as it did before CI was watched at
+   * all — no watching, no note on the gate, nothing withheld.
+   */
+  readonly watchCi?: (pulls: readonly LanePullRequest[]) => Promise<CiOutcome>
 }
 
 export interface Shipment {
@@ -319,6 +327,44 @@ async function writeBody(file: string, contents: string): Promise<void> {
 }
 
 /**
+ * The branch and checkout path each lane is actually on, in lane order.
+ *
+ * `context.repos[].headBranch` is initialised empty and written by nothing,
+ * so reading it raw pushed `HEAD:` and asked for a pull request with
+ * `--head ''` — which every mocked-exec test accepted as a fine argument
+ * list, and which the first real `git` refused outright.
+ *
+ * And the *path* the same way, for the same reason one layer down.
+ * `context.repos[].path` is the repository, where `main` is checked out; the
+ * work is in the lane's worktree. Pushing `HEAD:<branch>` from the repository
+ * pushes `main` — so the branch reached the remote at exactly the commit it
+ * was cut from, and GitHub answered the pull request with "No commits between
+ * main and foundry/wo-live-run". Watched on a live run that had done
+ * everything else right: the builder's commit was sitting in the worktree the
+ * push never looked at.
+ */
+function resolvedRepos(order: WorkOrder, deps: IntegrateDeps) {
+  return [...order.context.repos]
+    .sort((a, b) => a.lane - b.lane)
+    .map((repo) => ({
+      ...repo,
+      headBranch: branchFor(order, repo.lane),
+      path: checkoutPath(deps.root, order, repo.name),
+    }))
+}
+
+/**
+ * Push every lane's branch, for a fix round updating drafts that already
+ * exist. No draft is opened here — the pull requests are already open, and
+ * this only moves the commits a fix round produced onto their branches.
+ */
+export async function pushLanes(order: WorkOrder, deps: IntegrateDeps): Promise<void> {
+  for (const repo of resolvedRepos(order, deps)) {
+    await pushLane(repo, deps)
+  }
+}
+
+/**
  * Push one lane's branch.
  *
  * `HEAD:<branch>` rather than the branch name alone so this works from a
@@ -409,27 +455,7 @@ export async function shipOrder(
   shipment: Shipment,
   deps: IntegrateDeps
 ): Promise<ShipOutcome> {
-  // The branch each lane is actually on, asked of the same function the
-  // checkout asked. `context.repos[].headBranch` is initialised empty and
-  // written by nothing, so reading it raw pushed `HEAD:` and asked for a pull
-  // request with `--head ''` — which every mocked-exec test accepted as a
-  // fine argument list, and which the first real `git` refused outright.
-  //
-  // And the *path* the same way, for the same reason one layer down.
-  // `context.repos[].path` is the repository, where `main` is checked out; the
-  // work is in the lane's worktree. Pushing `HEAD:<branch>` from the repository
-  // pushes `main` — so the branch reached the remote at exactly the commit it
-  // was cut from, and GitHub answered the pull request with "No commits between
-  // main and foundry/wo-live-run". Watched on a live run that had done
-  // everything else right: the builder's commit was sitting in the worktree the
-  // push never looked at.
-  const repos = [...order.context.repos]
-    .sort((a, b) => a.lane - b.lane)
-    .map((repo) => ({
-      ...repo,
-      headBranch: branchFor(order, repo.lane),
-      path: checkoutPath(deps.root, order, repo.name),
-    }))
+  const repos = resolvedRepos(order, deps)
   const bodyPaths: string[] = []
 
   for (const repo of repos) {
@@ -529,6 +555,67 @@ export async function shipOrder(
     'utf8'
   )
 
+  // Watched before the ready-for-review gate is raised (D2): a draft whose
+  // CI has not been watched, or is still red, is not "ready for review" —
+  // it is a fix round away, or the automatic rounds already ran and it needs
+  // the operator, not a gate that reads as if the work were done.
+  const ci: CiOutcome = deps.watchCi ? await deps.watchCi(pulls) : { kind: 'none' }
+  return finishShipping(order, shipment, pulls, bodyPaths, ci, deps)
+}
+
+/**
+ * The last step of shipping, once a CI outcome is known: raise the gate the
+ * outcome calls for, or none at all for a halted run.
+ *
+ * Pulled out of `shipOrder` so a fix round for a `ci.red` gate — reached
+ * directly from the inbox rather than through a fresh run of the recipe —
+ * can produce the same gate from the same rules, instead of a second copy of
+ * this logic drifting from the first.
+ */
+export async function finishShipping(
+  order: WorkOrder,
+  shipment: Shipment,
+  pulls: readonly LanePullRequest[],
+  bodyPaths: readonly string[],
+  ci: CiOutcome,
+  deps: IntegrateDeps
+): Promise<ShipOutcome> {
+  if (ci.kind === 'halted') {
+    // The run that halted raised its own gate; raising another here would
+    // be a second interruption for the one thing that already stopped.
+    await deps.record('ship.ci_halted', order.id, ci.reason)
+    return { pulls, bodyPaths, held: true, reason: ci.reason }
+  }
+
+  if (ci.kind === 'red') {
+    const names = ci.checks
+      .filter((check) => check.bucket === 'fail' || check.bucket === 'cancel')
+      .map((check) => check.name)
+      .join(', ')
+    const tail = ci.excerpt.split('\n').slice(-20).join('\n')
+    const gate = raiseGate({
+      id: `${order.id}-ci-red`,
+      rule: 'ci.red',
+      orderId: order.id,
+      summary: `CI is still red on ${names} for ${order.title}`,
+      why: `${ci.rounds} automatic rounds ran and CI is still red. ${tail}`,
+      evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
+      riskGrade: order.risk.grade,
+      blockedUnits: 0,
+      at: deps.now(),
+    })
+    await deps.raiseGate?.(gate)
+    await deps.record('ship.ci_red', order.id, gate.why)
+    return { pulls, bodyPaths, held: true, reason: gate.why, gate }
+  }
+
+  const ciNote =
+    ci.kind === 'green'
+      ? `CI passed: ${ci.checks.length} checks.`
+      : ci.kind === 'not_measured'
+        ? `CI not measured: ${ci.reason}.`
+        : ''
+
   // The decision the operator is finally offered (FR-057). Raised here rather
   // than by the executor because it is about the pull request, which does not
   // exist until now — and it is one of the four rules that stay live at every
@@ -549,6 +636,7 @@ export async function shipOrder(
         ? 'The inspection found nothing.'
         : `The inspection found ${shipment.findings.length}.`,
       rules.length === 0 ? '' : `Judged against: ${rules.join(', ')}.`,
+      ciNote,
     ]
       .filter((line) => line !== '')
       .join(' '),

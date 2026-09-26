@@ -7,8 +7,10 @@ import {
   GATED_GRADES,
   prBody,
   shipOrder,
+  pushLanes,
   markReady,
   PushRefusedError,
+  finishShipping,
 } from '../../src/line/integrate.js'
 import type { IntegrateDeps } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
@@ -16,6 +18,8 @@ import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeVerdict } from '../../src/verify/verdict.js'
 import type { Verdict } from '../../src/verify/verdict.js'
+import type { CiOutcome } from '../../src/line/ship-tail.js'
+import type { Check } from '../../src/line/ci.js'
 
 // Work ends in a draft pull request without anyone asking for one, and the
 // decision the operator is offered is whether to mark it ready — never whether
@@ -931,4 +935,214 @@ describe('the branch shipping actually pushes', () => {
     const [push] = callsTo(d.exec, 'git')
     expect(push.args).toContain('HEAD:andy/tav-42-session-ttl')
   })
+})
+
+describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
+  function check(over: Partial<Check> = {}): Check {
+    return { name: 'build', bucket: 'pass', link: '', workflow: 'ci', ...over }
+  }
+
+  it('is unchanged, byte for byte, when there is no watchCi', async () => {
+    const raiseGate = vi.fn(async () => undefined)
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ raiseGate })
+    )
+    expect(result.gate?.rule).toBe('ready-for-review')
+    expect(result.gate?.why).not.toContain('CI')
+    expect(result.held).toBe(false)
+  })
+
+  it('adds "CI passed: N checks." to the ready gate when CI is green', async () => {
+    const outcome: CiOutcome = { kind: 'green', checks: [check(), check({ name: 'lint' })] }
+    const watchCi = vi.fn(async () => outcome)
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ watchCi })
+    )
+    expect(watchCi).toHaveBeenCalledWith(result.pulls)
+    expect(result.gate?.rule).toBe('ready-for-review')
+    expect(result.gate?.why).toContain('CI passed: 2 checks.')
+    expect(result.held).toBe(false)
+  })
+
+  it('adds the reason, never as a pass, when CI was not measured', async () => {
+    const outcome: CiOutcome = { kind: 'not_measured', reason: 'gh is not authenticated' }
+    const watchCi = vi.fn(async () => outcome)
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ watchCi })
+    )
+    expect(result.gate?.rule).toBe('ready-for-review')
+    expect(result.gate?.why).toContain('CI not measured: gh is not authenticated.')
+    expect(result.gate?.why).not.toMatch(/CI passed/)
+    expect(result.held).toBe(false)
+  })
+
+  it('raises exactly one ci.red gate, and no ready-for-review gate, when CI stayed red', async () => {
+    const raiseGate = vi.fn(async () => undefined)
+    const outcome: CiOutcome = {
+      kind: 'red',
+      checks: [check({ bucket: 'fail', name: 'unit-tests' })],
+      excerpt: Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n'),
+      rounds: 3,
+    }
+    const watchCi = vi.fn(async () => outcome)
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ watchCi, raiseGate })
+    )
+    expect(raiseGate).toHaveBeenCalledTimes(1)
+    expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ci.red' }))
+    expect(result.gate?.rule).toBe('ci.red')
+    expect(result.gate?.id).toBe('WO-1-ci-red')
+    expect(result.gate?.summary).toContain('unit-tests')
+    expect(result.gate?.summary).toContain(order().title)
+    expect(result.gate?.why).toContain('3 automatic rounds ran and CI is still red.')
+    expect(result.gate?.why).toContain('line 29')
+    expect(result.gate?.why).not.toContain('line 9\n')
+    expect(result.held).toBe(true)
+  })
+
+  it('records ship.ci_red when CI stayed red', async () => {
+    const record = vi.fn(async () => undefined)
+    const outcome: CiOutcome = {
+      kind: 'red',
+      checks: [check({ bucket: 'fail', name: 'unit-tests' })],
+      excerpt: 'boom',
+      rounds: 1,
+    }
+    await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ watchCi: vi.fn(async () => outcome), record })
+    )
+    expect(record).toHaveBeenCalledWith('ship.ci_red', 'WO-1', expect.any(String))
+  })
+
+  it('raises nothing and records ship.ci_halted when watching CI halted', async () => {
+    const raiseGate = vi.fn(async () => undefined)
+    const record = vi.fn(async () => undefined)
+    const outcome: CiOutcome = { kind: 'halted', reason: 'the fix round could not finish' }
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ watchCi: vi.fn(async () => outcome), raiseGate, record })
+    )
+    expect(raiseGate).not.toHaveBeenCalled()
+    expect(result.gate).toBeUndefined()
+    expect(result.held).toBe(true)
+    expect(result.reason).toBe('the fix round could not finish')
+    expect(record).toHaveBeenCalledWith('ship.ci_halted', 'WO-1', 'the fix round could not finish')
+  })
+
+  it('behaves as today for a "none" CI outcome', async () => {
+    const outcome: CiOutcome = { kind: 'none' }
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ watchCi: vi.fn(async () => outcome) })
+    )
+    expect(result.gate?.rule).toBe('ready-for-review')
+    expect(result.gate?.why).not.toContain('CI')
+  })
+})
+
+describe('finishShipping', () => {
+  const pull = {
+    lane: 1,
+    repo: 'app',
+    cwd: '/repos/app',
+    branch: 'foundry/wo-1',
+    url: 'https://github.com/tav/app/pull/7',
+    bodyPath: '/x/pull-request-lane-1.md',
+  }
+
+  function check(over: Partial<Check> = {}): Check {
+    return { name: 'build', bucket: 'pass', link: '', workflow: 'ci', ...over }
+  }
+
+  it('raises a ci.red gate, not ready-for-review, when CI stayed red', async () => {
+    const raiseGate = vi.fn(async () => undefined)
+    const ci: CiOutcome = {
+      kind: 'red',
+      checks: [check({ bucket: 'fail', name: 'unit-tests' })],
+      excerpt: 'boom',
+      rounds: 2,
+    }
+    const result = await finishShipping(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      [pull],
+      [pull.bodyPath],
+      ci,
+      deps({ raiseGate })
+    )
+    expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ci.red' }))
+    expect(result.gate?.rule).toBe('ci.red')
+    expect(result.held).toBe(true)
+  })
+
+  it('raises a ready-for-review gate carrying the CI note when CI is green', async () => {
+    const raiseGate = vi.fn(async () => undefined)
+    const ci: CiOutcome = { kind: 'green', checks: [check()] }
+    const result = await finishShipping(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      [pull],
+      [pull.bodyPath],
+      ci,
+      deps({ raiseGate })
+    )
+    expect(raiseGate).toHaveBeenCalledWith(expect.objectContaining({ rule: 'ready-for-review' }))
+    expect(result.gate?.rule).toBe('ready-for-review')
+    expect(result.gate?.why).toContain('CI passed: 1 checks.')
+    expect(result.held).toBe(false)
+  })
+})
+
+describe('pushLanes (D2)', () => {
+  it('pushes every lane in lane order, from its checkout path', async () => {
+    const d = multiDepsForPush()
+    await pushLanes(twoLanesOrder(), d)
+    const pushes = callsTo(d.exec, 'git').filter((call) => call.args[0] === 'push')
+    expect(pushes).toHaveLength(2)
+    expect(pushes[0].args).toEqual(['push', '--set-upstream', 'origin', 'HEAD:f/wo-1'])
+    expect(pushes[0].cwd).toBe(checkoutPath(root, twoLanesOrder(), 'proto'))
+    expect(pushes[1].cwd).toBe(checkoutPath(root, twoLanesOrder(), 'cli'))
+  })
+
+  it('never calls gh', async () => {
+    const d = multiDepsForPush()
+    await pushLanes(twoLanesOrder(), d)
+    expect(callsTo(d.exec, 'gh')).toHaveLength(0)
+  })
+
+  function twoLanesOrder(): WorkOrder {
+    const base = order()
+    return {
+      ...base,
+      context: {
+        ...base.context,
+        repos: [
+          {
+            name: 'proto',
+            path: '/repos/proto',
+            lane: 1,
+            baseBranch: 'main',
+            headBranch: 'f/wo-1',
+          },
+          { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: 'f/wo-1' },
+        ],
+      },
+    }
+  }
+
+  function multiDepsForPush() {
+    return deps()
+  }
 })
