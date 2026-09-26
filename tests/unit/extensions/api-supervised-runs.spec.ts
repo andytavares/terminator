@@ -165,7 +165,7 @@ describe('workspace.createProject', () => {
   })
 })
 
-// v2.4.0 — an extension that registered a worktree can find and remove it
+// v2.5.0 — an extension that registered a worktree can find and remove it
 // again when the worktree goes (ADR-061).
 describe('workspace.listProjects and deleteProject', () => {
   it('says which directory each project points at', () => {

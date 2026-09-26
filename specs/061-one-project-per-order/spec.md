@@ -28,7 +28,7 @@ ticket, and none is removed when the order's checkout is torn down.
 - **FR-5** Tearing an order's checkout down also removes the project that
   pointed at it.
 - **FR-6** Core gains one tracker write: `issues.create` (Linear only),
-  exposed to extensions as ExtensionAPI v2.4.0. ADR-061 supersedes the
+  exposed to extensions as ExtensionAPI v2.5.0. ADR-061 supersedes the
   "no create" clause of ADR-041 and the provider contract.
 
 ## Acceptance

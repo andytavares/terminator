@@ -127,7 +127,7 @@ export interface ProjectSnapshot {
   readonly id: string
   readonly workspaceId: string
   readonly name: string
-  /** The directory it points at, when it is not the workspace folder (v2.4.0). */
+  /** The directory it points at, when it is not the workspace folder (v2.5.0). */
   readonly worktreePath?: string
 }
 

@@ -131,7 +131,7 @@ export interface ProjectSnapshot {
   readonly id: string
   readonly workspaceId: string
   readonly name: string
-  /** The directory it points at, when it is not the workspace folder (v2.4.0). */
+  /** The directory it points at, when it is not the workspace folder (v2.5.0). */
   readonly worktreePath?: string
 }
 
@@ -349,7 +349,7 @@ export interface ExtensionAPI {
    *
    * Three writes, and only three: a comment, the issue's own position in its
    * own workflow (v2.3.0, ADR-041), and a new issue the operator asked for
-   * (v2.4.0, ADR-061). There is deliberately no way to delete an issue or to
+   * (v2.5.0, ADR-061). There is deliberately no way to delete an issue or to
    * change any field of an existing one — not the title, not the assignee,
    * not a label. `transition` is narrow by
    * construction: it takes an intent, not a field, and an intent the tracker
@@ -391,15 +391,15 @@ export interface ExtensionAPI {
      * work.
      */
     supportsTransitions(tracker: TrackerId): boolean
-    /** Teams the operator can file an issue in (v2.4.0). */
+    /** Teams the operator can file an issue in (v2.5.0). */
     teams(tracker: TrackerId): Promise<TrackerTeam[]>
     /**
-     * File a new issue (v2.4.0, ADR-061). Only on the operator's explicit
+     * File a new issue (v2.5.0, ADR-061). Only on the operator's explicit
      * word — an extension never files one on its own judgement. Rejects on
      * failure.
      */
     create(tracker: TrackerId, input: NewIssueInput): Promise<Issue>
-    /** Whether this tracker can create an issue at all (v2.4.0). Synchronous. */
+    /** Whether this tracker can create an issue at all (v2.5.0). Synchronous. */
     supportsCreate(tracker: TrackerId): boolean
     /** The issue attached to a project, or null. Synchronous: it is local state. */
     linkFor(projectId: string): IssueLink | null

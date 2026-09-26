@@ -32,7 +32,7 @@ existing project↔issue link is set. Teardown deletes the project along with
 the checkout.
 
 **`issues.create`, Linear only, on the operator's word.** The provider gains
-`teams` and `create`; the service and `ExtensionAPI.issues` (v2.4.0) expose
+`teams` and `create`; the service and `ExtensionAPI.issues` (v2.5.0) expose
 `teams`, `create` and `supportsCreate`. `create` is a write operation in the
 contract test, which is the conspicuous edit ADR 041 asked a widening to be.
 Deletion and field edits remain forbidden. Foundry calls it only from the

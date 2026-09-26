@@ -139,7 +139,7 @@ describe('api.issues — workflow moves (v2.3.0)', () => {
   })
 })
 
-describe('api.issues — creating an issue (v2.4.0)', () => {
+describe('api.issues — creating an issue (v2.5.0)', () => {
   it('lists the teams an issue could be filed in', async () => {
     service.teams.mockResolvedValue([{ id: 't1', key: 'TAV', name: 'Team' }])
     const api = await makeApi()
