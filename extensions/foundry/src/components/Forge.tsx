@@ -1,4 +1,4 @@
-import { Markdown } from './Markdown.js'
+import { Markdown, MarkdownInline } from './Markdown.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle, LoaderCircle } from 'lucide-react'
 import type { WorkOrder } from '../order/schema.js'
@@ -602,8 +602,10 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
           <div className="fdry-needs-you-list">
             {questions.map((question) => (
               <div key={question.id} className="fdry-question">
-                <b>{question.text}</b>
-                {question.why !== '' ? <p>{question.why}</p> : null}
+                <b>
+                  <MarkdownInline text={question.text} />
+                </b>
+                {question.why !== '' ? <Markdown text={question.why} /> : null}
                 <div className="fdry-options">
                   {question.options.map((option, optionIndex) => (
                     <button
@@ -615,7 +617,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         void turn({ answer: { questionId: question.id, option: optionIndex } })
                       }
                     >
-                      {option}
+                      <MarkdownInline text={option} />
                       {optionIndex === question.recommended ? ' (recommended)' : ''}
                     </button>
                   ))}
@@ -764,7 +766,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         <div key={criterion.id} className={`fdry-ac ${uncovered ? 'is-gap' : ''}`}>
                           <span className="fdry-ac-id">{criterion.id}</span>
                           <div>
-                            <p>{criterion.statement}</p>
+                            <Markdown text={criterion.statement} />
                             <span className="fdry-verify">
                               proven by {criterion.verify.kind}
                               {uncovered ? ' · no unit satisfies this' : ''}
@@ -876,7 +878,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                           disabled={busy}
                           onClick={() => void turn({ strike: assumption.id })}
                         >
-                          {assumption.text} <X aria-hidden="true" />
+                          <MarkdownInline text={assumption.text} /> <X aria-hidden="true" />
                         </button>
                       ))}
                     </div>
@@ -925,7 +927,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                     <div key={finding.id} className="fdry-finding">
                       <CircleDot aria-hidden="true" />
                       <span>
-                        {finding.text}
+                        <MarkdownInline text={finding.text} />
                         {/* Under the finding rather than beside it: in the
                             button row it squeezed the finding to one word a
                             line. */}

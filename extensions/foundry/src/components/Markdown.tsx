@@ -172,3 +172,11 @@ export function Markdown({ text }: MarkdownProps): JSX.Element | null {
     </div>
   )
 }
+
+/**
+ * One line of agent text, inline: code, bold, italic, links — no blocks, so it
+ * can sit inside a button or a label.
+ */
+export function MarkdownInline({ text }: MarkdownProps): JSX.Element {
+  return <span className="fdry-md-inline">{inline(text, 'i')}</span>
+}

@@ -710,6 +710,78 @@ async function budgetsOf(id: string): Promise<Record<string, number | null>> {
 // The operator could not see or change an order's budgets, and "Raise the
 // budget" resumed the run against the budget it had just gone past. Both are
 // read back from the order the running application saved, not from the call.
+test('what the architect writes is shown as markdown in the Forge', async () => {
+  const created = (await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'markdown in the forge' },
+    repoPaths: [repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id as string
+  expect(id, 'no order was created to open').toBeTruthy()
+
+  // As the architect writes it: markdown in a question, its reason and an
+  // assumption.
+  const file = join(repo, '.foundry', 'orders', id, 'order.json')
+  const order = JSON.parse(readFileSync(file, 'utf8'))
+  order.openQuestions = [
+    {
+      id: 'Q-1',
+      text: 'Hide **done** tickets from the picker?',
+      why: 'The picker lists `completed` issues today.\n\n- Hide them\n- Grey them out',
+      options: ['Hide *them*', 'Grey them out'],
+      recommended: 0,
+      answer: null,
+      rank: 1,
+      confidence: 0.6,
+    },
+  ]
+  order.assumptions = [
+    { id: 'A-1', text: 'The filter lives in `Orders.tsx`', struck: false, affects: [] },
+  ]
+  writeFileSync(file, JSON.stringify(order))
+
+  await openFoundry()
+  expect(await clickByName('button', 'Forge')).toBe(true)
+  await handle.page.waitForTimeout(800)
+  const opened = await inFoundry<boolean>(`(function () {
+    var all = document.querySelectorAll('button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
+        all[i].click()
+        return true
+      }
+    }
+    return false
+  })()`)
+  expect(opened, `no row for ${id} in the Forge`).toBe(true)
+  await handle.page.waitForTimeout(1200)
+
+  const rendered = await inFoundry<Record<string, boolean>>(`(function () {
+    function has(sel, text) {
+      return Array.prototype.some.call(document.querySelectorAll(sel), function (el) {
+        return el.textContent === text
+      })
+    }
+    return {
+      bold: has('strong', 'done'),
+      code: has('code', 'completed'),
+      list: has('li', 'Grey them out'),
+      option: has('button em', 'them'),
+      noAsterisks: document.body.innerText.indexOf('**') === -1,
+    }
+  })()`)
+  expect(rendered).toEqual({ bold: true, code: true, list: true, option: true, noAsterisks: true })
+
+  const png = await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    return (await view.capturePage()).toPNG().toString('base64')
+  })
+  mkdirSync('test-results', { recursive: true })
+  writeFileSync(join('test-results', 'forge-markdown.png'), Buffer.from(png, 'base64'))
+})
+
 test('an order’s budgets are set on the Plan step, and raised at the gate that stopped it', async () => {
   const created = (await foundry('foundry:order.create', {
     source: { kind: 'typed', text: 'budgets are the operator’s to set' },

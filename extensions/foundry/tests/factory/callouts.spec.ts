@@ -151,7 +151,20 @@ describe('interruptionsFor', () => {
       nodeId: 'build',
       title: 'Wants to run Bash',
       detail: 'rm -rf dist',
+      prose: false,
     })
+  })
+
+  it("marks an agent's question as prose, to be shown as markdown", () => {
+    const [ask] = interruptionsFor({
+      graph,
+      waiting: [],
+      stranded: [],
+      pending: [
+        { requestId: 'r-1', sessionId: 's-build', toolName: 'AskUserQuestion', summary: 'Which?' },
+      ],
+    })
+    expect(ask).toMatchObject({ kind: 'ask', prose: true })
   })
 
   it('pins a gate to its node, with its options and whether it needs a number', () => {

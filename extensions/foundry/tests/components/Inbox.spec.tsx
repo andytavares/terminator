@@ -159,6 +159,18 @@ describe('nothing needs you', () => {
     expect(screen.getByText(/ran the tests/)).toBeTruthy()
   })
 
+  it('renders the most recent line as markdown', async () => {
+    mount({
+      digest: {
+        entryCount: 1,
+        sessionCount: 1,
+        bySession: [{ sessionId: 's-1', entries: [{ summary: 'edited `a.ts`' }] }],
+      },
+    })
+    await waitFor(() => screen.getByText('a.ts'))
+    expect(screen.getByText('a.ts').tagName).toBe('CODE')
+  })
+
   it('stays quiet when nothing happened', async () => {
     mount()
     await waitFor(() => screen.getByText('Nothing needs you.'))
