@@ -1,0 +1,32 @@
+extensions/foundry/tests/recipe/parse.spec.ts
+  s_4f15472be339a2::t_b6b8e28fbfd6bc 319-395
+extensions/foundry/src/recipe/parse.ts
+  s_4f15472be339a2::t_a91f1409130a80 198-200,204-241
+  s_4f15472be339a2::t_bb2cf44310f767 97-102
+  s_4f15472be339a2::t_c1b439db0da9c6 242-245
+extensions/foundry/src/recipe/step-kinds.ts
+  s_4f15472be339a2::t_d269e3f31a15f4 217-238
+  s_4f15472be339a2::t_61069f58892816 2
+  s_4f15472be339a2::t_974e1f76647c33 139-146
+  s_4f15472be339a2::t_40a806d031d660 239
+extensions/foundry/tests/recipe/step-kinds.spec.ts
+  s_4f15472be339a2::t_f44472fdbe3898 114-153
+  s_4f15472be339a2::t_cae9b8495da576 2
+  s_4f15472be339a2::t_fb42dc2457dd45 3-7,154-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "343c20b6b4571ef2aa94cffd73760c52666b64f9",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
