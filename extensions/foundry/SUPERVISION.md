@@ -806,6 +806,11 @@ settings, because the main process is the only thing that builds a `claude`
 command line. It previously lived only in the renderer's `localStorage`, which
 is why the setting existed, rendered, and did nothing at all.
 
+The architect's first draft runs on that choice. A turn that amends the draft
+(an ask, an answer, or a follow-up the Forge starts on its own) runs on the ask
+model instead: `sonnet` by default, `opus` when the operator overrides it in
+Settings. It is persisted through `foundry:ask-model-set`.
+
 ## Two things the runtime does to a supervised run
 
 **Session persistence is forced.** Claude Code sets `CLAUDE_CODE_CHILD_SESSION=1`

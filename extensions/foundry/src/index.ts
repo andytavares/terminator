@@ -52,7 +52,14 @@ import { endAndWait } from './runtime/end-session.js'
 import { compileOrder } from './order/compile.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
 import type { RunCommand } from './runtime/diff-metrics.js'
-import { convergeBrief, readProposal } from './forge/converge.js'
+import {
+  architectModel,
+  ASK_MODELS,
+  convergeBrief,
+  DEFAULT_ASK_MODEL,
+  readProposal,
+} from './forge/converge.js'
+import type { AskModel } from './forge/converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
 import { interruptedRuns, interruptedGate } from './line/adopt.js'
@@ -225,6 +232,7 @@ function resolveFoundryDataRoot(api: ExtensionAPI): string {
 }
 
 const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
+const ASK_MODEL_SETTING_KEY = 'terminator.foundry.askModel'
 
 /**
  * The model every phase launches with.
@@ -388,6 +396,11 @@ function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' 
     api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
     'standard'
   )
+}
+
+function askModel(api: ExtensionAPI): AskModel {
+  const value = api.settings.get<string>(ASK_MODEL_SETTING_KEY)
+  return ASK_MODELS.find((m) => m === value) ?? DEFAULT_ASK_MODEL
 }
 
 function defaultModel(api: ExtensionAPI): string {
@@ -2024,7 +2037,10 @@ async function convergeOnce(
         prompt: plan.prompt,
         phase: 'architect' as never,
         resumeSessionId: plan.role.allowResume ? resumableIn(checkout.path, resuming) : undefined,
-        model: modelForTier(api, plan.role.modelTier),
+        model: architectModel(message, {
+          draft: modelForTier(api, plan.role.modelTier),
+          ask: askModel(api),
+        }),
         // Read-only, enforced by the hook rather than by the prompt. The
         // architect proposes; it does not edit the repository it is reading.
         // Its one exception is the proposal itself, and only at that path.
@@ -2762,6 +2778,17 @@ export function activate(api: ExtensionAPI): void {
     if (typeof model !== 'string') return { error: 'model must be a string' }
     api.settings.set(MODEL_SETTING_KEY, model)
     return { ok: true, selected: model }
+  })
+
+  // What answers an ask: a narrow amendment, so Sonnet unless overridden.
+  reg(api, 'foundry:ask-model', () => ({ selected: askModel(api) }))
+
+  reg(api, 'foundry:ask-model-set', (payload: unknown) => {
+    const { model } = payload as { model?: unknown }
+    const chosen = ASK_MODELS.find((m) => m === model)
+    if (chosen === undefined) return { error: `model must be one of ${ASK_MODELS.join(', ')}` }
+    api.settings.set(ASK_MODEL_SETTING_KEY, chosen)
+    return { ok: true, selected: chosen }
   })
 
   // The firings, and whether they were recorded or surfaced. Precision is

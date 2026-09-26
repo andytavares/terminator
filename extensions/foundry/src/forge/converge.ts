@@ -224,6 +224,22 @@ export interface ConvergeBrief {
   readonly cwd: string
 }
 
+/** What an ask can be answered on. Sonnet unless the operator chose Opus. */
+export const ASK_MODELS = ['sonnet', 'opus'] as const
+export type AskModel = (typeof ASK_MODELS)[number]
+export const DEFAULT_ASK_MODEL: AskModel = 'sonnet'
+
+/**
+ * The model one architect turn runs on: the operator's for a draft, and the
+ * ask model for a turn that answers something typed or asked.
+ */
+export function architectModel(
+  message: string | undefined,
+  models: { readonly draft: string; readonly ask: string }
+): string {
+  return message === undefined || message.trim() === '' ? models.draft : models.ask
+}
+
 export class NoArchitectError extends Error {
   readonly code = 'NO_ARCHITECT'
   constructor(reason: string) {
