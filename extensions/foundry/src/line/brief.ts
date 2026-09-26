@@ -3,6 +3,7 @@ import { collectableWrites, rungOutputContract } from './rung-output.js'
 import type { PlanUnit, WorkOrder } from '../order/schema.js'
 import type { Role } from '../recipe/parse.js'
 import type { Rule } from '../recipe/parse.js'
+import type { Feedback } from './run-graph.js'
 
 // What an agent is actually told.
 //
@@ -16,7 +17,15 @@ import type { Rule } from '../recipe/parse.js'
 // get the plan. The list is a permission, not a preference.
 
 /** Everything a role can ask for. Anything else in `reads:` is ignored. */
-export const READABLE = ['unit', 'criteria', 'context', 'rules', 'order', 'conventions'] as const
+export const READABLE = [
+  'unit',
+  'criteria',
+  'context',
+  'rules',
+  'order',
+  'conventions',
+  'feedback',
+] as const
 
 export type Readable = (typeof READABLE)[number]
 
@@ -34,6 +43,8 @@ export interface BriefInput {
   readonly rules: readonly Rule[]
   /** For a `run` step: the command, which is the whole instruction. */
   readonly command?: string
+  /** What a check said the last time this node's work failed one, oldest first. */
+  readonly feedback?: readonly Feedback[]
   /**
    * Where this rung writes what it found, absolute.
    *
@@ -86,6 +97,31 @@ function unitSection(order: WorkOrder, units: readonly PlanUnit[]): string[] {
     'on an earlier one, and nothing else is coming to do the rest.',
     '',
     ...units.flatMap((unit) => [...oneUnit(order, unit, '### '), '']),
+  ]
+}
+
+/**
+ * Why a builder's work came back, in the check's own words.
+ *
+ * Naming the check and its exit status is what keeps a resend from reading
+ * as "try again" — it says which command found the problem, so the fix is
+ * aimed at what failed rather than at the check itself.
+ */
+function feedbackSection(feedback: readonly Feedback[]): string[] {
+  if (feedback.length === 0) return []
+  return [
+    '## Your previous attempt failed a check',
+    '',
+    'Fix its cause, not the check.',
+    '',
+    ...feedback.flatMap((entry) => [
+      `- ${entry.command === null ? 'a check' : `\`${entry.command}\``}, ${entry.exitCode === null ? 'no exit status' : `exit ${entry.exitCode}`}:`,
+      '',
+      '```',
+      entry.excerpt,
+      '```',
+      '',
+    ]),
   ]
 }
 
@@ -150,7 +186,7 @@ function rulesSection(rules: readonly Rule[]): string[] {
  * being enforced rather than requested.
  */
 export function brief(input: BriefInput): string {
-  const { order, role, units, rules, command, outputPath } = input
+  const { order, role, units, rules, command, outputPath, feedback = [] } = input
 
   // A `run` step is a command, not a conversation. Wrapping it in context
   // would invite an agent to reinterpret it.
@@ -203,6 +239,10 @@ export function brief(input: BriefInput): string {
       '',
       ...order.acceptance.map((c) => `- **${c.id}** ${c.statement} — proven by ${c.verify.kind}`)
     )
+  }
+
+  if (reads.has('feedback') && feedback.length > 0) {
+    sections.push('', ...feedbackSection(feedback))
   }
 
   if (reads.has('context') || reads.has('conventions')) {

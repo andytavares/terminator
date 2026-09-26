@@ -3,6 +3,7 @@ import { brief, READABLE } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { PlanUnit, WorkOrder } from '../../src/order/schema.js'
 import type { Role, Rule } from '../../src/recipe/parse.js'
+import type { Feedback } from '../../src/line/run-graph.js'
 
 // What an agent is actually told.
 //
@@ -17,7 +18,7 @@ function role(over: Partial<Role> = {}): Role {
     id: 'builder',
     modelTier: 'deep',
     allowResume: true,
-    reads: ['unit', 'context', 'rules'],
+    reads: ['unit', 'context', 'rules', 'feedback'],
     writes: ['worktree'],
     tools: ['read', 'edit'],
 
@@ -171,7 +172,106 @@ describe('what each role may read is declared, not assumed', () => {
   })
 
   it('offers a closed set of things a role can ask for', () => {
-    expect([...READABLE]).toEqual(['unit', 'criteria', 'context', 'rules', 'order', 'conventions'])
+    expect([...READABLE]).toEqual([
+      'unit',
+      'criteria',
+      'context',
+      'rules',
+      'order',
+      'conventions',
+      'feedback',
+    ])
+  })
+})
+
+function feedback(over: Partial<Feedback> = {}): Feedback {
+  return {
+    from: 'run:test',
+    attempt: 1,
+    source: 'check',
+    command: 'npm test',
+    exitCode: 1,
+    excerpt: 'AssertionError: expected 200 to be 401',
+    logPath: '/logs/run.log',
+    ...over,
+  }
+}
+
+describe('a builder sent back is told why', () => {
+  it('names the failed check, its exit status and the excerpt', () => {
+    const text = brief({
+      order: order(),
+      role: role(),
+      units: [unit()],
+      rules: [],
+      feedback: [feedback()],
+    })
+    expect(text).toContain('## Your previous attempt failed a check')
+    expect(text).toContain('Fix its cause, not the check.')
+    expect(text).toContain('`npm test`')
+    expect(text).toContain('exit 1')
+    expect(text).toContain('AssertionError: expected 200 to be 401')
+  })
+
+  it('renders every entry, most recent last, in order', () => {
+    const text = brief({
+      order: order(),
+      role: role(),
+      units: [unit()],
+      rules: [],
+      feedback: [
+        feedback({ attempt: 1, command: 'npm test', excerpt: 'first failure' }),
+        feedback({ attempt: 2, command: 'npm run lint', excerpt: 'second failure' }),
+      ],
+    })
+    expect(text.indexOf('first failure')).toBeLessThan(text.indexOf('second failure'))
+    expect(text).toContain('`npm run lint`')
+  })
+
+  it('says so when the command is unknown', () => {
+    const text = brief({
+      order: order(),
+      role: role(),
+      units: [unit()],
+      rules: [],
+      feedback: [feedback({ command: null, exitCode: null })],
+    })
+    expect(text).toContain('a check')
+    expect(text).toContain('no exit status')
+  })
+
+  it('renders nothing for an empty feedback list', () => {
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [], feedback: [] })
+    expect(text).not.toContain('failed a check')
+  })
+
+  it('renders nothing when feedback is absent', () => {
+    const text = brief({ order: order(), role: role(), units: [unit()], rules: [] })
+    expect(text).not.toContain('failed a check')
+  })
+
+  it('renders nothing for a role that does not read feedback', () => {
+    const verifier = role({ id: 'verifier', reads: ['criteria'], writes: [], allowResume: false })
+    const text = brief({
+      order: order(),
+      role: verifier,
+      units: [unit()],
+      rules: [],
+      feedback: [feedback()],
+    })
+    expect(text).not.toContain('failed a check')
+  })
+
+  it('sits right after the unit section and before the repository', () => {
+    const text = brief({
+      order: order(),
+      role: role(),
+      units: [unit()],
+      rules: [],
+      feedback: [feedback()],
+    })
+    expect(text.indexOf('## The unit:')).toBeLessThan(text.indexOf('failed a check'))
+    expect(text.indexOf('failed a check')).toBeLessThan(text.indexOf('## The repository'))
   })
 })
 
