@@ -1893,6 +1893,13 @@ export function activate(api: ExtensionAPI): void {
     // Its agents first. Deleting the records out from under a live session
     // leaves an agent writing into a worktree whose order no longer exists.
     await stopOrder(root, id, 'the order was deleted')
+    // The architect too: it runs in the checkout about to be removed, and the
+    // run graph that `stopOrder` reads does not know about it.
+    const intake = intakeSessions.get(id)
+    if (intake !== undefined) {
+      supervisedRunner?.stop(intake, 'the order was deleted')
+      intakeSessions.delete(id)
+    }
     const result = await deleteOrder(order, {
       exec: (o) => api.shell.exec(o),
       root,

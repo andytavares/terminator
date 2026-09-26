@@ -389,7 +389,7 @@ test('every registered channel answers rather than rejecting', async () => {
  * and that something is an agent. Until this ran, nothing did — and the only
  * route to a runnable order was hand-writing its JSON.
  */
-test('intake launches the architect against the draft, read-only, in the repository', async () => {
+test('intake launches the architect read-only in the order’s own project, and delete removes it', async () => {
   test.setTimeout(180_000)
   const { page } = handle
 
@@ -409,9 +409,13 @@ test('intake launches the architect against the draft, read-only, in the reposit
   // It either ran or said why. Silence would be the bug.
   expect(converged).not.toBeNull()
 
-  const project = page.locator('.branch-row__name').filter({ hasText: 'intake' })
-  await expect(project.first()).toBeVisible({ timeout: 60_000 })
-  await project.first().click()
+  // One project for the order (ADR-061): named with the branch its lanes will
+  // use, and no separate intake project beside it.
+  const branch = `foundry/${created.order.id.toLowerCase()}`
+  const project = page.locator('.branch-row__name').filter({ hasText: branch })
+  await expect(project).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.locator('.branch-row__name').filter({ hasText: 'intake' })).toHaveCount(0)
+  await project.click()
 
   const screen = page.locator('.xterm-screen')
   // The script's own path is what is typed, and it is short enough to survive.
@@ -426,10 +430,18 @@ test('intake launches the architect against the draft, read-only, in the reposit
   // And it does not carry the parent Claude Code session in with it.
   expect(launched).toMatch(/^unset .*CLAUDE_CODE_BRIDGE_SESSION_ID/m)
 
-  // Intake runs in the repository itself — no worktree is cut for a plan that
-  // may never be agreed.
+  // The architect reads the order's lane checkout — the tree the builder
+  // will change — cut under the data root, not inside the repository.
   const worktrees = execFileSync('git', ['worktree', 'list'], { cwd: repo }).toString()
-  expect(worktrees).not.toContain('intake')
+  expect(worktrees).toContain(join('.foundry', 'orders', created.order.id, 'worktrees'))
+  expect(worktrees).toContain(`[${branch}]`)
+
+  // Deleting the order takes its project with the checkout.
+  const deleted = (await foundry('foundry:order.delete', { id: created.order.id })) as {
+    removed?: string[]
+  }
+  expect(deleted.removed).toContain(`the project ${branch}`)
+  await expect(project).toHaveCount(0, { timeout: 30_000 })
 })
 
 test('a run cuts a worktree and launches a supervised agent in a visible terminal', async () => {
