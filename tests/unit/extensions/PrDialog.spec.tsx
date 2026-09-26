@@ -22,7 +22,7 @@ beforeEach(() => {
   mockListBranches.mockResolvedValue({
     branches: [
       { name: 'main', isCurrent: false, isRemote: false },
-      { name: 'origin/main', isCurrent: false, isRemote: true },
+      { name: 'teammate/fix', isCurrent: false, isRemote: true },
     ],
   })
   mockReadFile.mockResolvedValue({ error: 'not found' })

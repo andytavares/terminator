@@ -9,6 +9,7 @@ import { GIT_ENV } from './git-env.js'
 const execFile = promisify(execFileCb)
 
 const GIT_TIMEOUT = 10_000
+const FETCH_TIMEOUT = 60_000
 const DIFF_MAX_BYTES = 500 * 1024
 
 async function git(args: string[], cwd: string): Promise<string> {
@@ -130,26 +131,58 @@ export async function getCurrentBranch(dirPath: string): Promise<string> {
 }
 
 export async function listBranches(dirPath: string): Promise<Branch[]> {
-  const output = await git(
-    ['branch', '-a', '--sort=-committerdate', '--format=%(HEAD)|%(refname:short)'],
-    dirPath
-  )
-  const localNames = new Set<string>()
-  const all: Branch[] = []
+  // Full refnames: `refname:short` prints a remote-tracking branch as
+  // `origin/main`, indistinguishable from a local branch with a slash in it.
+  const [output, remotes] = await Promise.all([
+    git(['branch', '-a', '--sort=-committerdate', '--format=%(HEAD)|%(refname)'], dirPath),
+    git(['remote'], dirPath),
+  ])
+  // Only refs under a configured remote: a repo can carry stray
+  // refs/remotes/pull/<n>/head from a one-off fetch, which no remote owns.
+  const prefixes = remotes
+    .split('\n')
+    .filter(Boolean)
+    .map((r) => `refs/remotes/${r}/`)
+  const local: Branch[] = []
+  const remote: Branch[] = []
 
   for (const line of output.split('\n').filter(Boolean)) {
     const [head, ref] = line.split('|')
-    const isCurrent = head.trim() === '*'
-    const isRemote = ref.startsWith('remotes/')
-    const name = isRemote ? ref.replace(/^remotes\/[^/]+\//, '') : ref.trim()
-    if (name === 'HEAD') continue
-    if (name.startsWith('pull/')) continue
-    if (!isRemote) localNames.add(name)
-    all.push({ name, isCurrent, isRemote })
+    if (ref.startsWith('refs/heads/')) {
+      local.push({
+        name: ref.slice('refs/heads/'.length),
+        isCurrent: head === '*',
+        isRemote: false,
+      })
+      continue
+    }
+    const prefix = prefixes.find((p) => ref.startsWith(p))
+    if (prefix === undefined) continue
+    const name = ref.slice(prefix.length)
+    if (name === 'HEAD' || name.startsWith('pull/')) continue
+    remote.push({ name, isCurrent: false, isRemote: true })
   }
 
-  // deduplicate: drop remote branches that have a local equivalent
-  return all.filter((b) => !b.isRemote || !localNames.has(b.name))
+  // A remote branch is listed only when nothing local or on another remote
+  // already carries its name; git's checkout and worktree add resolve the bare
+  // name to it.
+  const seen = new Set(local.map((b) => b.name))
+  return [
+    ...local,
+    ...remote.filter((b) => {
+      if (seen.has(b.name)) return false
+      seen.add(b.name)
+      return true
+    }),
+  ]
+}
+
+export async function fetchRemotes(dirPath: string): Promise<void> {
+  await execFile('git', ['fetch', '--all', '--prune'], {
+    cwd: dirPath,
+    timeout: FETCH_TIMEOUT,
+    env: GIT_ENV,
+  })
 }
 
 export async function checkoutBranch(dirPath: string, branch: string): Promise<void> {

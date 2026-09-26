@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { RefreshCw } from 'lucide-react'
 import type { Branch } from '../../../shared/types/index'
 import './BranchSelect.css'
 
@@ -9,6 +10,8 @@ interface Props {
   newBranchLabel?: string
   onNewBranch?: () => void
   isNewSelected?: boolean
+  onRefresh?: () => void
+  refreshing?: boolean
 }
 
 export function BranchSelect({
@@ -18,6 +21,8 @@ export function BranchSelect({
   newBranchLabel,
   onNewBranch,
   isNewSelected,
+  onRefresh,
+  refreshing,
 }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState('')
@@ -47,10 +52,24 @@ export function BranchSelect({
 
   return (
     <div ref={containerRef} className="branch-select">
-      <button type="button" className="branch-select__trigger" onClick={() => setOpen((o) => !o)}>
-        <span className="branch-select__value">{displayValue}</span>
-        <span className="branch-select__caret">{open ? '▴' : '▾'}</span>
-      </button>
+      <div className="branch-select__row">
+        <button type="button" className="branch-select__trigger" onClick={() => setOpen((o) => !o)}>
+          <span className="branch-select__value">{displayValue}</span>
+          <span className="branch-select__caret">{open ? '▴' : '▾'}</span>
+        </button>
+        {onRefresh && (
+          <button
+            type="button"
+            className={`branch-select__refresh${refreshing ? ' branch-select__refresh--busy' : ''}`}
+            aria-label="Fetch branches"
+            title="Fetch — list branches pushed since the last fetch"
+            disabled={refreshing}
+            onClick={onRefresh}
+          >
+            <RefreshCw />
+          </button>
+        )}
+      </div>
 
       {open && (
         <div className="branch-select__dropdown">
