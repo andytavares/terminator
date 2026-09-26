@@ -80,6 +80,10 @@ Supported forms: `path_exists: <glob>`, `toolchain: <check>`, `repos: <compariso
 
 The `speckit` recipe declares `path_exists: .specify/`. That single line replaces `state/skill-availability.ts` and the whole plain-prose fallback table.
 
+### `skills`
+
+`skills: [id]` on a role, or on a step (a fan-out may put it on its inner `step:`). A node gets the union. An id resolves to `<dataRoot>/skills/<id>/SKILL.md`, then `<repo>/.foundry/skills/<id>/SKILL.md`, then the extension's `skills/<id>/SKILL.md`; an id no rung has refuses the run at start. The skills are copied to the order's `skills-mount/<node>/.claude/skills/` and passed to the agent with `--add-dir` (ADR-065). Ids match `^[a-z0-9][a-z0-9-]*$`.
+
 ### `onFail`
 
 `onFail: { rework: <step id>, max: 1..3 }`, on a `run` step only. When the command fails and the step has sent work back fewer than `max` times, the named step's node in the checked lane goes back to `waiting` with the failure in its `feedback` (command, exit status, the last 120 lines of output), as does everything between it and the check. The target must be upstream of the step (in its `after` closure) and be an `agent` or `fanout` step whose role may write. Past `max`, the step fails as any other does (ADR-063).

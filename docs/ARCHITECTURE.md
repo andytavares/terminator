@@ -1051,6 +1051,13 @@ reviewer's finding is judgement and stays with the operator.
   `standard`, `bugfix` and `poc` lint in the lane right after the build when the
   probe found a lint command. Before a node resumes a lane's conversation, its
   previous process is ended (`endSession` → `endAndWait`).
+- **Skills are mounted, never installed** (ADR-065). Roles and steps declare
+  `skills: [id]`, resolved like recipes on three rungs
+  (`<dataRoot>/skills/<id>/SKILL.md`, a repository's `.foundry/skills/`, the
+  extension's `skills/`). Before a node's agent launches, its skills are copied
+  to `<order>/skills-mount/<node>/.claude/skills/` and passed with `--add-dir`;
+  the tool policy allows reads there and refuses writes. An unknown skill
+  refuses the run before it starts. The builder carries `ci-fix`.
 - **A fan-out parallelises lanes, never units in one lane** (ADR-044). A lane is
   a worktree and a branch, so units inside one cannot run at the same time
   however many nodes point at them. `over: plan.units[role=builder] by lane`
@@ -1331,6 +1338,7 @@ App
 - [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
 - [ADR-040: the work order is the contract](adr/040-the-work-order-is-the-contract.md) — supersedes the card model (ADR-010) and the run modes (ADR-012).
 - [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
+- [ADR-065: skills are mounted, never installed](adr/065-skills-are-mounted-never-installed.md) — `skills:` on roles and steps, three rungs, copied per node and passed with `--add-dir`.
 - [ADR-064: CI is a check with rounds](adr/064-ci-is-a-check-with-rounds.md) — drafts' CI is watched, a red one goes back to the builder twice, then `ci.red`.
 - [ADR-063: a failed check sends the work back](adr/063-a-failed-check-sends-the-work-back.md) — run steps run as commands, `onFail` reworks the builder with the failing output, the stalled gate names its node.
 - [ADR-062: the Forge decides what it is sure of](adr/062-the-forge-decides-what-it-is-sure-of.md) — questions at ≥ 90% confidence are decided, low/medium findings dismissable, failing checks sent back up to twice.
