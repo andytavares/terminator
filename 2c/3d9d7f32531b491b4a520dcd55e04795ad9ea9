@@ -1,0 +1,72 @@
+extensions/foundry/src/factory/format.ts
+  s_4f15472be339a2::t_a3b0dd00b82c01 1-16
+extensions/foundry/src/factory/art/props.ts
+  s_4f15472be339a2::t_d17f6ab5caba0a 29-39
+  s_4f15472be339a2::t_47e7c294dbec00 681-703
+  s_4f15472be339a2::t_ecd4660ab19425 44
+extensions/foundry/src/components/Ledger.tsx
+  s_4f15472be339a2::t_d32686b276f4c5 301-305,311-313,332,340-347,349-352,354-355,361-368,372-381
+  s_4f15472be339a2::t_d95e480ee3d8bd 161-166,170-177,179-180,218
+  s_4f15472be339a2::t_3b4df5ff448af2 178
+  s_4f15472be339a2::t_5eedcb4100c50a 93-106
+  s_4f15472be339a2::t_4e9c52820245fb 348,353
+  s_4f15472be339a2::t_ad2f9a779fb2a5 5-6,8
+  s_4f15472be339a2::t_ade0edf05bed7b 50-51,53,61-62
+  s_4f15472be339a2::t_dbe6fec0179bb3 107,181-211,213-217,220-221,223-276,278-280,284-286,288-292,294-300,306-310,314-325,328-331,333-339
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_4f15472be339a2::t_107ed95e4f6493 78-80
+  s_4f15472be339a2::t_0ca2d44ea054e7 52
+  s_4f15472be339a2::t_d732af1721bc70 100,104-128
+  s_4f15472be339a2::t_5d9c06506303b9 10-24,28
+  s_4f15472be339a2::t_ce7b4ba786f42a 129
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_4f15472be339a2::t_62a9c16db33b77 162-178
+  s_4f15472be339a2::t_80f518c493f36d 123
+  s_4f15472be339a2::t_ecc1a9aa631258 450-458
+  s_4f15472be339a2::t_faf7b0db3ebfb9 17
+extensions/foundry/tests/factory/art/props.spec.ts
+  s_4f15472be339a2::t_d427d2252801c6 261-303
+extensions/foundry/src/components/factory/HallScene.tsx
+  s_4f15472be339a2::t_d3b31077e59bdd 231-240
+  s_4f15472be339a2::t_e3fae1c28b0a8e 166
+  s_4f15472be339a2::t_67e4cc96452321 172-175
+  s_4f15472be339a2::t_1dfb0c5582d809 209-218
+  s_4f15472be339a2::t_151e8aee364770 25-26
+  s_4f15472be339a2::t_88244bdb7e0b80 10
+  s_4f15472be339a2::t_2e11c01b82ee04 97-98,103-109
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_4f15472be339a2::t_e0c03115050820 110-128
+  s_4f15472be339a2::t_f9b37d6588b631 66,82
+  s_4f15472be339a2::t_fb75db57bb009b 129-130
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_4f15472be339a2::t_2444dbfb0113d7 46-47,62-74,77-111
+  s_4f15472be339a2::t_4f27e81a71d534 4
+  s_4f15472be339a2::t_3cdaf055a81bbc 3
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_4f15472be339a2::t_6ea2934f9d3551 2
+  s_4f15472be339a2::t_f786b7bfda6067 326-332,343-348,352-370,373-386
+  s_4f15472be339a2::t_cd94cf16e73b85 333-342,349-351,371-372
+  s_4f15472be339a2::t_b1c5cefd578b71 48-73,94
+  s_4f15472be339a2::t_5eafb3d917526d 387-388
+extensions/foundry/tests/factory/format.spec.ts
+  s_4f15472be339a2::t_36e1fc2f76313a 1-28
+extensions/foundry/src/components/MetricsTiles.tsx
+  s_4f15472be339a2::t_2eeac6ce52e174 1-60,62-63,65-69
+  s_4f15472be339a2::t_b49437e1db40b8 61,64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2c3d9d7f32531b491b4a520dcd55e04795ad9ea9",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
