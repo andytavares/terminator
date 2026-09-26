@@ -128,6 +128,23 @@ describe('countAttention', () => {
     expect(counts.forge).toBe(3)
   })
 
+  it('takes no notice of open signals — the badge counts gates only', () => {
+    // Sensor signals live in the Inbox as their own section, not in this
+    // count: `AttentionInput` carries gates, orders and held tool calls, and
+    // nothing that reads `signals.list`. An order seeded from a signal is
+    // just an order once it exists, so it is counted the same as any other —
+    // draft-status questions raise `forge`, and being signal-sourced adds
+    // nothing to `inbox`.
+    const fromASignal = order('WO-1', [], 'draft')
+    const counts = countAttention({
+      gates: [],
+      autonomy: 'standard',
+      orders: [fromASignal],
+      pendingAsks: 0,
+    })
+    expect(counts).toEqual({ inbox: 0, forge: 0, byOrder: {} })
+  })
+
   it('is zero across the board when nothing is waiting', () => {
     expect(countAttention({ gates: [], autonomy: 'standard', orders: [], pendingAsks: 0 })).toEqual(
       {

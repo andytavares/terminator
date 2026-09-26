@@ -3,6 +3,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { FactorySite } from '../../../src/components/factory/FactorySite.js'
 import type { FactoryOrderRow } from '../../../src/components/factory/FactorySite.js'
+import type { Signal } from '../../../src/sensors/types.js'
+
+function dockSignal(over: Partial<Signal> = {}): Signal {
+  return {
+    id: 'SIG-1',
+    sensorId: 'ci-flake',
+    key: 'flake:test-foo',
+    title: 'test-foo flakes on main',
+    evidence: [],
+    occurrences: 4,
+    severity: 'high',
+    firstSeen: '2026-09-18T00:00:00.000Z',
+    lastSeen: '2026-09-20T10:00:00.000Z',
+    status: 'open',
+    dismissedAt: null,
+    orderId: null,
+    ...over,
+  }
+}
 
 // The Factory's front door: one card per order, opened by whoever is waiting
 // on it.
@@ -21,11 +40,24 @@ const METRICS = {
   forgeDecisionsStruckShare: 0.25,
 }
 
-function mount(orders: FactoryOrderRow[], metrics: Record<string, unknown> = METRICS) {
+function mount(
+  orders: FactoryOrderRow[],
+  metrics: Record<string, unknown> = METRICS,
+  extra: { signals?: Signal[]; sensors?: unknown[]; promote?: unknown } = {}
+) {
   const onOpen = vi.fn()
-  const invoke = vi.fn(async (channel: string) => {
+  const invoke = vi.fn(async (channel: string, payload?: unknown) => {
     if (channel === 'foundry:order.list') return { orders }
     if (channel === 'foundry:factory.metrics') return metrics
+    if (channel === 'foundry:signals.list') {
+      const signals = extra.signals ?? []
+      return { signals, counts: { open: signals.length } }
+    }
+    if (channel === 'foundry:sensors.list') return { sensors: extra.sensors ?? [] }
+    if (channel === 'foundry:signals.promote') {
+      void payload
+      return extra.promote ?? { order: { id: 'WO-9' } }
+    }
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -125,5 +157,46 @@ describe('FactorySite status wall', () => {
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
+  })
+})
+
+describe('the Dock', () => {
+  it('shows nothing when there are no open signals', async () => {
+    mount([])
+    await waitFor(() => screen.getByText(/no orders yet/i))
+    expect(screen.queryByLabelText('Dock')).toBeNull()
+  })
+
+  it('shows a crate per open signal, with its title, count and severity', async () => {
+    mount([], METRICS, { signals: [dockSignal()] })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    expect(screen.getByText(/×4/)).toBeTruthy()
+    expect(screen.getByText(/high/)).toBeTruthy()
+  })
+
+  it('promotes a crate the same way the Inbox does', async () => {
+    const { invoke } = mount([], METRICS, {
+      signals: [dockSignal()],
+      sensors: [
+        {
+          def: { id: 'ci-flake', description: 'CI flake watch' },
+          rung: 'data-root',
+          state: { enabled: true, repoPath: '/repos/app', lastRunAt: null, lastProblem: null },
+          nextDueAt: null,
+        },
+      ],
+    })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    const repoInput = screen.getByRole('textbox', { name: /repository/i }) as HTMLInputElement
+    expect(repoInput.value).toBe('/repos/app')
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:signals.promote', {
+        id: 'SIG-1',
+        repoPaths: ['/repos/app'],
+      })
+    )
+    expect(await screen.findByText(/Draft WO-9 created — open it in the Forge/)).toBeTruthy()
   })
 })

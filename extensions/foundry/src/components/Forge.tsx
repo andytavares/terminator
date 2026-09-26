@@ -635,7 +635,16 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
         <header className="fdry-wizard-head">
           <div className="fdry-order-head">
             <h1>{order.title}</h1>
-            {order.source.key !== null ? (
+            {order.source.kind === 'signal' ? (
+              <span className="fdry-src">
+                From a sensor signal
+                {order.source.url !== null ? (
+                  <a href={order.source.url} target="_blank" rel="noreferrer">
+                    evidence
+                  </a>
+                ) : null}
+              </span>
+            ) : order.source.key !== null ? (
               <span className="fdry-src">
                 {order.source.tracker} {order.source.key}
               </span>

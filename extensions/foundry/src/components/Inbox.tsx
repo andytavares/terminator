@@ -13,6 +13,7 @@ import {
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
 import { MarkdownInline } from './Markdown.js'
+import type { Signal } from '../sensors/types.js'
 
 // The one surface the operator is required to visit.
 //
@@ -44,6 +45,18 @@ interface Digest {
 
 /** Where "since you last looked" is remembered. Per viewer, not per run. */
 const LAST_READ_KEY = 'foundry.inbox.lastRead'
+
+/** A sensor as `sensors.list` answers it — just enough to label a signal
+ *  and offer its own repository as the default a promotion asks for. */
+interface SensorRow {
+  readonly def: { readonly id: string; readonly description: string }
+  readonly state: { readonly repoPath: string | null }
+}
+
+/** The evidence a signal was last seen with, most recent first. */
+function latestEvidence(signal: Signal): Signal['evidence'][number] | undefined {
+  return [...signal.evidence].sort((a, b) => (a.at < b.at ? 1 : -1))[0]
+}
 
 const RULE_ICON: Record<GateRuleId, React.ComponentType> = {
   'risk.p0': ShieldAlert,
@@ -83,10 +96,26 @@ export function Inbox(): JSX.Element {
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [digest, setDigest] = useState<Digest | null>(null)
+  const [signals, setSignals] = useState<Signal[]>([])
+  const [sensors, setSensors] = useState<SensorRow[]>([])
+  const [promoting, setPromoting] = useState<string | null>(null)
+  const [repoDraft, setRepoDraft] = useState('')
+  const [signalProblem, setSignalProblem] = useState<string | null>(null)
+  const [promoted, setPromoted] = useState<string | null>(null)
+
+  const refreshSignals = useCallback(async () => {
+    const [sig, sen] = await Promise.all([
+      invoke('foundry:signals.list') as Promise<{ signals?: Signal[] }>,
+      invoke('foundry:sensors.list') as Promise<{ sensors?: SensorRow[] }>,
+    ])
+    setSignals(sig.signals ?? [])
+    setSensors(sen.sensors ?? [])
+  }, [])
 
   const refresh = useCallback(async () => {
     const next = (await invoke('foundry:inbox.list')) as InboxView
     setView(next)
+    await refreshSignals()
 
     // "Nothing needs you" is only reassuring if it also says what happened
     // while you were not looking. When it was is a property of the person
@@ -105,7 +134,7 @@ export function Inbox(): JSX.Element {
     } catch {
       // Nothing here is worth failing the surface for.
     }
-  }, [])
+  }, [refreshSignals])
 
   useEffect(() => {
     void refresh()
@@ -133,6 +162,43 @@ export function Inbox(): JSX.Element {
       }
     },
     [refresh]
+  )
+
+  const startPromote = useCallback(
+    (signal: Signal) => {
+      const sensor = sensors.find((s) => s.def.id === signal.sensorId)
+      setSignalProblem(null)
+      setPromoted(null)
+      setRepoDraft(sensor?.state.repoPath ?? '')
+      setPromoting(signal.id)
+    },
+    [sensors]
+  )
+
+  const confirmPromote = useCallback(
+    async (id: string) => {
+      setSignalProblem(null)
+      const result = (await invoke('foundry:signals.promote', {
+        id,
+        repoPaths: [repoDraft],
+      })) as { order?: { id: string }; error?: string }
+      if (result.error !== undefined) {
+        setSignalProblem(result.error)
+        return
+      }
+      setPromoting(null)
+      setPromoted(`Draft ${result.order?.id ?? ''} created — open it in the Forge`)
+      await refreshSignals()
+    },
+    [repoDraft, refreshSignals]
+  )
+
+  const dismissSignal = useCallback(
+    async (id: string) => {
+      await invoke('foundry:signals.dismiss', { id })
+      await refreshSignals()
+    },
+    [refreshSignals]
   )
 
   if (view === null) return <div className="fdry-empty">Loading…</div>
@@ -228,6 +294,75 @@ export function Inbox(): JSX.Element {
           })}
         </ul>
       )}
+
+      {signals.length > 0 ? (
+        <section className="fdry-signals" aria-label="From the factory's sensors">
+          <h2 className="fdry-panel-h">From the factory&rsquo;s sensors</h2>
+          {signalProblem !== null ? <p className="fdry-problem">{signalProblem}</p> : null}
+          {promoted !== null ? <p className="fdry-note">{promoted}</p> : null}
+          <ul className="fdry-signal-list">
+            {signals.map((signal) => {
+              const sensor = sensors.find((s) => s.def.id === signal.sensorId)
+              const evidence = latestEvidence(signal)
+              return (
+                <li key={signal.id} className="fdry-signal">
+                  <div className="fdry-signal-main">
+                    <b>{signal.title}</b>
+                    <div className="fdry-signal-meta">
+                      <span>×{signal.occurrences}</span>
+                      <span>{signal.severity}</span>
+                      <span>{sensor?.def.description ?? signal.sensorId}</span>
+                      {evidence !== undefined ? (
+                        <a href={evidence.url} target="_blank" rel="noreferrer">
+                          {evidence.title}
+                        </a>
+                      ) : null}
+                    </div>
+                    {promoting === signal.id ? (
+                      <div className="fdry-signal-promote">
+                        <label>
+                          Repository
+                          <input
+                            type="text"
+                            value={repoDraft}
+                            placeholder="/path/to/repo"
+                            onChange={(event) => setRepoDraft(event.target.value)}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="is-primary"
+                          disabled={repoDraft.trim() === ''}
+                          onClick={() => void confirmPromote(signal.id)}
+                        >
+                          Confirm promote
+                        </button>
+                        <button type="button" onClick={() => setPromoting(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                  {promoting === signal.id ? null : (
+                    <div className="fdry-signal-actions">
+                      <button
+                        type="button"
+                        className="is-primary"
+                        onClick={() => startPromote(signal)}
+                      >
+                        Promote
+                      </button>
+                      <button type="button" onClick={() => void dismissSignal(signal.id)}>
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ) : null}
 
       <footer className="fdry-queue-foot">
         <span>

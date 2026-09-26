@@ -173,6 +173,35 @@ describe('the tracker write-back panel', () => {
   })
 })
 
+describe('an order seeded from a sensor signal', () => {
+  it('says where it came from, with a link to the evidence', async () => {
+    mount(
+      {},
+      {
+        source: {
+          kind: 'signal',
+          tracker: null,
+          key: 'SIG-1',
+          url: 'https://ci.example/42',
+        },
+      }
+    )
+    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    expect(screen.getByText('From a sensor signal')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'evidence' })).toHaveProperty(
+      'href',
+      'https://ci.example/42'
+    )
+  })
+
+  it('says so even with no evidence url, and shows no tracker key', async () => {
+    mount({}, { source: { kind: 'signal', tracker: null, key: 'SIG-1', url: null } })
+    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    expect(screen.getByText('From a sensor signal')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'evidence' })).toBeNull()
+  })
+})
+
 /** A Forge over an order that will compile, so hand-off actually runs. */
 function mountForStart(over: Record<string, unknown> = {}) {
   const current = {

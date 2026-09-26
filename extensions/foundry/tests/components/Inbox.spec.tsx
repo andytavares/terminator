@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Inbox } from '../../src/components/Inbox.js'
 import { raiseGate, GATE_RULES } from '../../src/gates/rules.js'
+import type { Signal } from '../../src/sensors/types.js'
 
 // The one surface the operator is required to visit. Every row names the rule
 // that raised it, says what it looked at, and says what happens if it is
@@ -25,8 +26,36 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
   })
 }
 
+function signal(over: Partial<Signal> = {}): Signal {
+  return {
+    id: 'SIG-1',
+    sensorId: 'ci-flake',
+    key: 'flake:test-foo',
+    title: 'test-foo flakes on main',
+    evidence: [
+      {
+        kind: 'ci-run',
+        title: 'Run #42 failed',
+        url: 'https://ci.example/42',
+        at: '2026-09-20T10:00:00.000Z',
+      },
+    ],
+    occurrences: 4,
+    severity: 'high',
+    firstSeen: '2026-09-18T00:00:00.000Z',
+    lastSeen: '2026-09-20T10:00:00.000Z',
+    status: 'open',
+    dismissedAt: null,
+    orderId: null,
+    ...over,
+  }
+}
+
 function mount(over: Record<string, unknown> = {}) {
-  invoke = vi.fn(async (channel: string) => {
+  // Mutable so a dismiss during the test is reflected the next time the
+  // component re-polls the list, the way the real channel would behave.
+  let liveSignals = [...((over.signals as Signal[] | undefined) ?? [])]
+  invoke = vi.fn(async (channel: string, payload?: unknown) => {
     if (channel === 'foundry:inbox.list') {
       return {
         gates: over.gates ?? [],
@@ -46,6 +75,18 @@ function mount(over: Record<string, unknown> = {}) {
       return over.digest ?? { entryCount: 0, sessionCount: 0, bySession: [] }
     }
     if (channel === 'foundry:inbox.decide') return over.decide ?? { ok: true }
+    if (channel === 'foundry:signals.list') {
+      return { signals: liveSignals, counts: { open: liveSignals.length } }
+    }
+    if (channel === 'foundry:sensors.list') {
+      return { sensors: over.sensors ?? [] }
+    }
+    if (channel === 'foundry:signals.dismiss') {
+      const { id } = payload as { id: string }
+      liveSignals = liveSignals.filter((s) => s.id !== id)
+      return over.dismiss ?? { signal: null }
+    }
+    if (channel === 'foundry:signals.promote') return over.promote ?? { order: { id: 'WO-9' } }
     return { ok: true }
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -315,5 +356,120 @@ describe('ci.red', () => {
     expect(screen.getByText(/PR #200 has been red/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Another round' })).toBeTruthy()
     expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+  })
+})
+
+// From the factory's sensors: an open signal never starts anything by
+// itself. The two moves the operator has over one live here, below the
+// gates band, because gates are the surface's whole point and a heuristic's
+// hunch is not the same class of interruption as a gate that blocks work.
+describe("from the factory's sensors", () => {
+  const highSignal = () =>
+    signal({ id: 'SIG-1', title: 'test-foo flakes on main', occurrences: 4, severity: 'high' })
+  const lowSignal = () =>
+    signal({
+      id: 'SIG-2',
+      sensorId: 'issue-churn',
+      title: 'many issues opened against auth',
+      occurrences: 2,
+      severity: 'low',
+      evidence: [
+        { kind: 'issue', title: 'Issue #9', url: 'https://tracker/9', at: '2026-09-19T00:00:00Z' },
+      ],
+    })
+
+  it('lists open signals, each with its count, severity, sensor and evidence link', async () => {
+    mount({
+      signals: [highSignal()],
+      sensors: [
+        {
+          def: { id: 'ci-flake', description: 'CI flake watch' },
+          rung: 'data-root',
+          state: { enabled: true, repoPath: '/repos/app', lastRunAt: null, lastProblem: null },
+          nextDueAt: null,
+        },
+      ],
+    })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    expect(screen.getByText('×4')).toBeTruthy()
+    expect(screen.getByText('high')).toBeTruthy()
+    expect(screen.getByText('CI flake watch')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Run #42 failed' })).toHaveProperty(
+      'href',
+      'https://ci.example/42'
+    )
+  })
+
+  it('renders more than one signal, in the order the channel ranked them', async () => {
+    mount({ signals: [highSignal(), lowSignal()] })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    const titles = Array.from(document.querySelectorAll('.fdry-signal')).map(
+      (el) => el.querySelector('b')?.textContent
+    )
+    expect(titles).toEqual(['test-foo flakes on main', 'many issues opened against auth'])
+  })
+
+  it('does not show the section when there are no open signals', async () => {
+    mount({ signals: [] })
+    await waitFor(() => screen.getByText('Nothing needs you.'))
+    expect(screen.queryByText("From the factory's sensors")).toBeNull()
+  })
+
+  it('promotes with the repository, defaulting to the sensor’s own', async () => {
+    mount({
+      signals: [highSignal()],
+      sensors: [
+        {
+          def: { id: 'ci-flake', description: 'CI flake watch' },
+          rung: 'data-root',
+          state: { enabled: true, repoPath: '/repos/app', lastRunAt: null, lastProblem: null },
+          nextDueAt: null,
+        },
+      ],
+    })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    const repoInput = screen.getByRole('textbox', { name: /repository/i }) as HTMLInputElement
+    expect(repoInput.value).toBe('/repos/app')
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:signals.promote', {
+        id: 'SIG-1',
+        repoPaths: ['/repos/app'],
+      })
+    )
+    expect(await screen.findByText(/Draft WO-9 created — open it in the Forge/)).toBeTruthy()
+  })
+
+  it('lets the repository be changed before promoting', async () => {
+    mount({ signals: [highSignal()] })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    fireEvent.change(screen.getByRole('textbox', { name: /repository/i }), {
+      target: { value: '/repos/other' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:signals.promote', {
+        id: 'SIG-1',
+        repoPaths: ['/repos/other'],
+      })
+    )
+  })
+
+  it('dismisses a signal and removes it from the list', async () => {
+    mount({ signals: [highSignal()] })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:signals.dismiss', { id: 'SIG-1' })
+    )
+    await waitFor(() => expect(screen.queryByText('test-foo flakes on main')).toBeNull())
+  })
+
+  it('does not touch the attention badge — it never calls foundry:attention', async () => {
+    mount({ signals: [highSignal()] })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    expect(invoke).not.toHaveBeenCalledWith('foundry:attention', expect.anything())
   })
 })
