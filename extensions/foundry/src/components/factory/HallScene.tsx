@@ -7,6 +7,7 @@ import type { NodeState } from '../../line/run-graph.js'
 import type { Paint, PaintGradient } from '../../factory/art/kit.js'
 import { glow } from '../../factory/art/kit.js'
 import { bakeHall, drawProp, drawBelts, drawCrate } from '../../factory/art/props.js'
+import type { SceneContext } from '../../factory/art/props.js'
 import { drawCrew } from '../../factory/art/crew.js'
 
 // The one place the hall gets painted. Everything here is a projection: it
@@ -21,6 +22,8 @@ export interface HallSceneProps {
   readonly reducedMotion?: boolean
   /** How fast the world moves: 1 live, more when a replay is fast-forwarded. */
   readonly speed?: number
+  /** This order's own numbers, for the status wall — see `SceneContext`. */
+  readonly metrics?: SceneContext['metrics']
 }
 
 const DARKNESS = 'rgba(5,8,18,0.42)'
@@ -91,12 +94,19 @@ function draw(
   map: HallMap,
   world: World,
   states: Readonly<Record<string, NodeState>>,
-  tMs: number
+  tMs: number,
+  metrics: SceneContext['metrics']
 ): void {
   paint.globalCompositeOperation = 'source-over'
   paint.drawImage(bake, 0, 0)
 
-  const context = { crew: world.crew, states, gatesWaiting: world.gatesWaiting, ci: world.ci }
+  const context = {
+    crew: world.crew,
+    states,
+    gatesWaiting: world.gatesWaiting,
+    ci: world.ci,
+    metrics,
+  }
 
   const moving = new Set(world.crates.map((c) => c.beltId))
   drawBelts(paint, map, moving, tMs)
@@ -153,11 +163,16 @@ export function HallScene({
   states,
   reducedMotion,
   speed = 1,
+  metrics = null,
 }: HallSceneProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   // Read by the running loop each frame, so a speed change does not restart it.
   const speedRef = useRef(speed)
   speedRef.current = speed
+  // Same reasoning: a metrics poll landing mid-run should not restart the
+  // rAF loop, just be read on the next frame it already draws.
+  const metricsRef = useRef(metrics)
+  metricsRef.current = metrics
   const bakeRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
   const lightRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
 
@@ -191,7 +206,16 @@ export function HallScene({
     const reduced = reducedMotion ?? prefersReducedMotion()
 
     if (reduced) {
-      draw(paint, bake, lightLayer, map, worldRef.current, states, worldRef.current.clockMs)
+      draw(
+        paint,
+        bake,
+        lightLayer,
+        map,
+        worldRef.current,
+        states,
+        worldRef.current.clockMs,
+        metricsRef.current
+      )
       return
     }
 
@@ -204,7 +228,16 @@ export function HallScene({
       const dt = Math.min(MAX_FRAME_MS, now - last) * speedRef.current
       last = now
       worldRef.current = tick(worldRef.current, dt)
-      draw(paint, bake, lightLayer, map, worldRef.current, states, worldRef.current.clockMs)
+      draw(
+        paint,
+        bake,
+        lightLayer,
+        map,
+        worldRef.current,
+        states,
+        worldRef.current.clockMs,
+        metricsRef.current
+      )
       rafId = requestAnimationFrame(frame)
     }
 

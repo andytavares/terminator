@@ -14,6 +14,7 @@ import type { Callout, Interruption } from '../../factory/callouts.js'
 import { momentsOf, observationAt, replayClock } from '../../factory/replay.js'
 import type { ReplayClock, Timeline } from '../../factory/replay.js'
 import type { Gate } from '../../gates/rules.js'
+import type { OrderMetrics } from '../../factory/metrics.js'
 import { HallScene } from './HallScene.js'
 import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
@@ -119,6 +120,7 @@ export function FactoryHall({
 }: FactoryHallProps): JSX.Element {
   const { view, problem, pending, refresh } = useRunObservation(orderId)
   const [activity, setActivity] = useState<Readonly<Record<string, readonly ToolActivity[]>>>({})
+  const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
   const [map, setMap] = useState<HallMap | null>(null)
   const [callouts, setCallouts] = useState<readonly Callout[]>([])
   const [spoken, setSpoken] = useState('')
@@ -156,6 +158,23 @@ export function FactoryHall({
     const timer = setInterval(() => void pollActivity(), ACTIVITY_POLL_MS)
     return () => clearInterval(timer)
   }, [pollActivity])
+
+  // The order's own numbers for the status wall — same cadence as the
+  // activity poll, so a rework or a new CI round shows up within one beat.
+  const pollMetrics = useCallback(async () => {
+    const r = (await invoke('foundry:factory.metrics', { window: 'all' })) as {
+      orders?: OrderMetrics[]
+      error?: string
+    }
+    if (r.error !== undefined) return
+    setOrderMetrics(r.orders?.find((o) => o.orderId === orderId) ?? null)
+  }, [orderId])
+
+  useEffect(() => {
+    void pollMetrics()
+    const timer = setInterval(() => void pollMetrics(), ACTIVITY_POLL_MS)
+    return () => clearInterval(timer)
+  }, [pollMetrics])
 
   // Risen callouts leave on their own; nothing has to happen for them to go.
   useEffect(() => {
@@ -428,6 +447,15 @@ export function FactoryHall({
           worldRef={shownWorldRef}
           states={states}
           speed={replay?.speed ?? 1}
+          metrics={
+            orderMetrics === null
+              ? null
+              : {
+                  leadTimeMs: orderMetrics.leadTimeMs,
+                  reworks: orderMetrics.reworks,
+                  ciRounds: orderMetrics.ciRounds,
+                }
+          }
         />
 
         <div className="fdry-hall-overlay">

@@ -258,6 +258,49 @@ describe('factory/art/props drawProp', () => {
     expect(containsColor(paint.calls, HALL.red)).toBe(false)
     expect(containsColor(paint.calls, HALL.green)).toBe(false)
   })
+
+  it('draws the status wall the order metrics own numbers', () => {
+    const paint = createRecordingPaint()
+    drawProp(
+      paint,
+      prop('statuswall', { w: 6 }),
+      context({ metrics: { leadTimeMs: 80 * 60_000, reworks: 2, ciRounds: 3 } }),
+      0
+    )
+    expect(containsColor(paint.calls, HALL.cyan)).toBe(true)
+    expect(containsColor(paint.calls, HALL.red)).toBe(true)
+    expect(containsColor(paint.calls, HALL.amber)).toBe(true)
+  })
+
+  it('skips the lead-time readout while the order has not shipped', () => {
+    const paint = createRecordingPaint()
+    drawProp(
+      paint,
+      prop('statuswall', { w: 6 }),
+      context({ metrics: { leadTimeMs: null, reworks: 0, ciRounds: 0 } }),
+      0
+    )
+    expect(containsColor(paint.calls, HALL.cyan)).toBe(false)
+    // Zero reworks and zero CI rounds are still numbers worth drawing.
+    expect(containsColor(paint.calls, HALL.red)).toBe(true)
+    expect(containsColor(paint.calls, HALL.amber)).toBe(true)
+  })
+
+  it('draws no readouts at all when there is no metrics row for this order', () => {
+    const withMetrics = createRecordingPaint()
+    drawProp(
+      withMetrics,
+      prop('statuswall', { w: 6 }),
+      context({ metrics: { leadTimeMs: 0, reworks: 0, ciRounds: 0 } }),
+      0
+    )
+    const without = createRecordingPaint()
+    drawProp(without, prop('statuswall', { w: 6 }), context(), 0)
+    expect(containsColor(without.calls, HALL.cyan)).toBe(false)
+    expect(containsColor(without.calls, HALL.red)).toBe(false)
+    expect(containsColor(without.calls, HALL.amber)).toBe(false)
+    expect(without.calls.length).toBeLessThan(withMetrics.calls.length)
+  })
 })
 
 describe('factory/art/props bakeHall', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { Ledger } from '../../src/components/Ledger.js'
 
@@ -45,6 +45,32 @@ const PROPOSAL = {
   ],
 }
 
+const FACTORY_METRICS = {
+  window: '30d',
+  orders: [
+    {
+      orderId: 'WO-1',
+      title: 'Ship the thing',
+      shipped: true,
+      leadTimeMs: 80 * 60_000,
+      yourTimeMs: 45_000,
+      reworks: 1,
+      ciRounds: 2,
+      sessions: 3,
+      firstPass: false,
+    },
+  ],
+  shipped: 1,
+  medianLeadTimeMs: 80 * 60_000,
+  medianYourTimeMs: 45_000,
+  firstPassYield: 0.5,
+  reworksPerOrder: 1,
+  ciRoundsPerOrder: 2,
+  sessionsPerOrder: 3,
+  forgeFollowUps: 4,
+  forgeDecisionsStruckShare: 0.25,
+}
+
 let invoke: ReturnType<typeof vi.fn>
 
 function mount(over: Record<string, unknown> = {}) {
@@ -65,6 +91,7 @@ function mount(over: Record<string, unknown> = {}) {
       return over.inForce ?? { rules: [], declined: [] }
     }
     if (channel === 'foundry:rules.remove') return over.remove ?? { ok: true, removed: true }
+    if (channel === 'foundry:factory.metrics') return over.factoryMetrics ?? FACTORY_METRICS
     return {}
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -293,6 +320,69 @@ describe('removing an accepted check (FR-081)', () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
     expect(screen.queryByText('Checks you accepted')).toBeNull()
+  })
+})
+
+describe('the Factory view (FR: the factory’s numbers)', () => {
+  it('stays on Record until asked', async () => {
+    mount()
+    await waitFor(() => screen.getByText('G-1'))
+    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:factory.metrics')).toHaveLength(0)
+  })
+
+  function tileValue(label: string): string | null {
+    const tiles = document.querySelectorAll('.fdry-metrics-tile')
+    for (const tile of Array.from(tiles)) {
+      if (within(tile as HTMLElement).queryByText(label) !== null) {
+        return tile.querySelector('.fdry-metrics-tile__value')?.textContent ?? null
+      }
+    }
+    return null
+  }
+
+  it('shows the 30-day tiles and a per-order row when switched to Factory', async () => {
+    mount()
+    await waitFor(() => screen.getByText('G-1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    await waitFor(() => screen.getByText('Ship the thing'))
+
+    expect(tileValue('Shipped')).toBe('1')
+    expect(tileValue('Median lead time')).toBe('1 h 20 min')
+    expect(tileValue('First-pass yield')).toBe('50%')
+
+    const row = screen.getByText('Ship the thing').closest('tr')
+    expect(row?.textContent).toContain('✓')
+    expect(row?.textContent).toContain('1 h 20 min')
+  })
+
+  it('renders a null number as —, never 0', async () => {
+    mount({
+      factoryMetrics: {
+        ...FACTORY_METRICS,
+        medianLeadTimeMs: null,
+        firstPassYield: null,
+        orders: [{ ...FACTORY_METRICS.orders[0], leadTimeMs: null }],
+      },
+    })
+    await waitFor(() => screen.getByText('G-1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    await waitFor(() => screen.getByText('Ship the thing'))
+
+    expect(tileValue('Median lead time')).toBe('—')
+    expect(tileValue('First-pass yield')).toBe('—')
+    const row = screen.getByText('Ship the thing').closest('tr')
+    expect(row?.textContent).toContain('—')
+  })
+
+  it('refetches with the chosen window', async () => {
+    mount()
+    await waitFor(() => screen.getByText('G-1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    await waitFor(() => screen.getByText('Ship the thing'))
+    fireEvent.click(screen.getByRole('button', { name: 'All time' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
+    )
   })
 })
 

@@ -26,10 +26,22 @@ export interface SceneContext {
   readonly gatesWaiting: readonly string[]
   /** The dispatch tower's own state: null until CI has something to show. */
   readonly ci?: { readonly checks: Readonly<Record<string, Check['bucket']>> } | null
+  /**
+   * This order's own numbers, for the status wall — null until there is a
+   * metrics row to draw. `leadTimeMs` is null on its own until the order has
+   * shipped, which the status wall reads as "nothing to show yet" rather than
+   * zero.
+   */
+  readonly metrics?: {
+    readonly leadTimeMs: number | null
+    readonly reworks: number
+    readonly ciRounds: number
+  } | null
 }
 
 /** Rows 0–2 are the top wall on every `HallMap` — see `layout.ts`'s contract. */
 const TOP_WALL_ROWS = 3
+const MINUTE_MS = 60_000
 
 function typingAt(context: SceneContext, nodeId: string): boolean {
   return context.crew.some((c) => c.present && c.nodeId === nodeId && c.anim === 'type')
@@ -666,6 +678,29 @@ function drawStatuswall(paint: Paint, prop: HallProp, context: SceneContext): vo
   const filled = Math.round((passedCount / total) * (w - 4))
   rect(paint, x + 2, y - 4, filled, 2, HALL.green)
   rect(paint, x + 2 + filled, y - 4, w - 4 - filled, 2, '#1d3440')
+
+  const metrics = context.metrics
+  if (metrics == null) return
+
+  // Minutes to ship, reworks, CI rounds — three digit readouts along the
+  // wall, in the order's own numbers. Minutes is skipped, not zeroed, while
+  // the order has not shipped: a run that has not shipped has no lead time,
+  // and zero would claim it shipped instantly.
+  const minutes = metrics.leadTimeMs === null ? null : Math.round(metrics.leadTimeMs / MINUTE_MS)
+  const readouts: readonly [number | null, string][] = [
+    [minutes, HALL.cyan],
+    [metrics.reworks, HALL.red],
+    [metrics.ciRounds, HALL.amber],
+  ]
+  let dx = x + 3
+  for (const [value, color] of readouts) {
+    if (value === null) continue
+    for (const digit of String(Math.min(Math.max(value, 0), 99))) {
+      drawDigit(paint, dx, y - 14, digit, color)
+      dx += 7
+    }
+    dx += 4
+  }
 }
 
 function lampColor(bucket: Check['bucket']): string {
