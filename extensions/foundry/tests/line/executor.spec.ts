@@ -729,11 +729,11 @@ describe('a repeated failure becomes a decision', () => {
       buildRunGraph(o, recipe()),
       deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     )
-    // Nothing asks about *the unit*: a second attempt is owed first. The run
-    // still stops and says it cannot proceed, which is a different row — that
-    // one names no node.
-    expect(first.gates.filter((g) => g.nodeId !== null)).toEqual([])
-    expect(first.gates.some((g) => g.nodeId === null && g.why.includes('blocked'))).toBe(true)
+    // A second attempt is owed first, so nothing here is "attempt three is a
+    // decision" — but the graph still cannot move on its own, and that gate
+    // names the node the Inbox's "Send back" would have to retry.
+    const stalled = first.gates.find((g) => g.why.includes('blocked'))
+    expect(stalled?.nodeId).toBe('build:U-1')
   })
 })
 
@@ -1110,7 +1110,11 @@ describe('a graph that cannot move on its own', () => {
     const stalled = await execute(o, recipe(), graph, failing)
 
     expect(stalled.shippable).toBe(false)
-    expect(stalled.gates.some((g) => g.why.includes('blocked'))).toBe(true)
+    const gate = stalled.gates.find((g) => g.why.includes('blocked'))
+    expect(gate).toBeDefined()
+    // Names the failed node, so the Inbox's "Send back" retries something
+    // rather than nothing.
+    expect(gate?.nodeId).toBe('build:U-1')
   })
 
   it('does not call a finished run stalled', async () => {
@@ -1962,5 +1966,167 @@ steps:
     )
     expect(seen.length).toBeGreaterThan(0)
     expect(seen.every((s) => s.effort === null)).toBe(true)
+  })
+})
+
+// A failed check used to be a dead end: it either passed, off an exit code the
+// agent could not have failed, or it stopped the whole line for a decision.
+// `onFail` is a third way — a check that names where its failure belongs, and
+// sends the work back there instead of stopping.
+describe('a failed check pushes back on the builder', () => {
+  const REWORK = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: agent
+    role: builder
+  - id: lint
+    kind: run
+    command: \${toolchain.lint}
+    after: [build]
+    onFail: { rework: build, max: 1 }
+`
+
+  it('runs a command step as a command, not as an agent', async () => {
+    const o = order([])
+    const buildRuns = vi.fn(ok)
+    const runCommand = vi.fn(async () => 0)
+    await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
+      ...deps(buildRuns),
+      runCommand,
+    })
+    expect(runCommand).toHaveBeenCalledTimes(1)
+    expect(runCommand.mock.calls[0][0].command).toBe('npm run lint')
+    // Only the build step ever goes to an agent.
+    expect(buildRuns.mock.calls.every((c) => c[0].node.id === 'build')).toBe(true)
+  })
+
+  it('reworks the target instead of failing, and carries the excerpt forward', async () => {
+    const o = order([])
+    const buildRuns = vi.fn(ok)
+    const record = vi.fn(async () => undefined)
+    let call = 0
+    const runCommand = vi.fn(async (input: { logPath: string }) => {
+      call += 1
+      if (call === 1) {
+        fs.mkdirSync(path.dirname(input.logPath), { recursive: true })
+        fs.writeFileSync(input.logPath, 'lint: unexpected token at line 4\n')
+        return 1
+      }
+      return 0
+    })
+    const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
+      ...deps(buildRuns),
+      runCommand,
+      record,
+    })
+
+    expect(outcome.gates).toEqual([])
+    expect(record).toHaveBeenCalledWith(
+      'rework.started',
+      'lint',
+      expect.stringContaining('round 1 of 1')
+    )
+    const buildCalls = buildRuns.mock.calls.filter((c) => c[0].node.id === 'build')
+    expect(buildCalls).toHaveLength(2)
+    expect(buildCalls[1][0].prompt).toContain('unexpected token at line 4')
+  })
+
+  it('stops asking once reworks and attempts are both used up, naming the check', async () => {
+    const o = order([])
+    const runCommand = vi.fn(async () => 1)
+    const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
+      ...deps(vi.fn(ok)),
+      runCommand,
+    })
+    const repeatFails = outcome.gates.filter((g) => g.rule === 'verify.repeat-fail')
+    expect(repeatFails).toHaveLength(1)
+    expect(repeatFails[0].nodeId).toBe('lint')
+  })
+
+  it('skips a command the toolchain has no entry for, rather than passing or failing it', async () => {
+    const withoutLint = order([])
+    const o = {
+      ...withoutLint,
+      context: {
+        ...withoutLint.context,
+        toolchain: { ...withoutLint.context.toolchain, lint: null },
+      },
+    }
+    const record = vi.fn(async () => undefined)
+    const runCommand = vi.fn(async () => 0)
+    const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), {
+      ...deps(vi.fn(ok)),
+      runCommand,
+      record,
+    })
+    expect(runCommand).not.toHaveBeenCalled()
+    expect(outcome.graph.nodes.find((n) => n.id === 'lint')?.state).toBe('skipped')
+    expect(record).toHaveBeenCalledWith(
+      'step.not_measured',
+      'lint',
+      expect.stringContaining('toolchain.lint')
+    )
+  })
+
+  it('still hands a slash command to an agent, never to runCommand', async () => {
+    const slash = REWORK.replace('command: ${toolchain.lint}', 'command: /speckit-plan').replace(
+      '\n    onFail: { rework: build, max: 1 }',
+      ''
+    )
+    const o = order([])
+    const runCommand = vi.fn(async () => 0)
+    const run = vi.fn(ok)
+    await execute(o, recipe(slash), buildRunGraph(o, recipe(slash)), {
+      ...deps(run),
+      runCommand,
+    })
+    expect(runCommand).not.toHaveBeenCalled()
+    expect(run.mock.calls.some((c) => c[0].node.id === 'lint')).toBe(true)
+  })
+
+  it('behaves exactly as before when nothing offers a runCommand', async () => {
+    const o = order([])
+    const run = vi.fn(ok)
+    const outcome = await execute(o, recipe(REWORK), buildRunGraph(o, recipe(REWORK)), deps(run))
+    expect(run.mock.calls.some((c) => c[0].node.id === 'lint')).toBe(true)
+    expect(outcome.graph.nodes.find((n) => n.id === 'lint')?.state).toBe('passed')
+  })
+})
+
+describe('the stalled gate names what it would retry', () => {
+  it("names the failed node with a dependant, so the Inbox's Send back retries something", async () => {
+    const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
+    )
+    const stalled = outcome.gates.find((g) => g.why.includes('blocked'))
+    expect(stalled?.nodeId).toBe('build:U-1')
+  })
+})
+
+describe('a resumed session is ended before it is resumed', () => {
+  it('ends the live session before handing it back to the agent', async () => {
+    const order2 = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
+    const ended: string[] = []
+    const seenAtRunTime = new Set<string>()
+    const run = vi.fn(async (input: { node: { id: string }; resumeSessionId?: string }) => {
+      if (input.resumeSessionId !== undefined) seenAtRunTime.add(input.resumeSessionId)
+      return ok(input)
+    })
+    await execute(order2, recipe(), buildRunGraph(order2, recipe()), {
+      ...deps(run),
+      sessionFor: (_lane, role) => (role === 'builder' ? 'sess-builder' : undefined),
+      endSession: async (sessionId) => {
+        ended.push(sessionId)
+      },
+    })
+    expect(ended).toContain('sess-builder')
+    // It was ended before the node that resumed it actually ran with it.
+    expect(seenAtRunTime.has('sess-builder')).toBe(true)
   })
 })
