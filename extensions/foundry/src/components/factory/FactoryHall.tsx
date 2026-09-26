@@ -217,6 +217,7 @@ export function FactoryHall({
       waiting: view.waiting ?? [],
       activity,
       ci: view.ci ?? null,
+      queue: view.queue ?? null,
     }
 
     // CI presence joins the key: the dispatch tower has to appear the moment

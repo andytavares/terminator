@@ -52,7 +52,16 @@ function graph(): RunGraph {
 }
 
 function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
-  return { graph: g, orphaned: [], stranded: [], waiting: [], activity: {}, ci: null, ...over }
+  return {
+    graph: g,
+    orphaned: [],
+    stranded: [],
+    waiting: [],
+    activity: {},
+    ci: null,
+    queue: null,
+    ...over,
+  }
 }
 
 function ci(over: Partial<CiState> = {}): CiState {
@@ -356,6 +365,8 @@ describe('describeEvent', () => {
   it.each<[FactoryEvent, string]>([
     [{ kind: 'ci-round', round: 2, max: 3 }, 'CI round 2 of 3.'],
     [{ kind: 'ci-check', name: 'test', bucket: 'fail' }, 'test is now fail.'],
+    [{ kind: 'queued', position: 2, behind: ['Other order'] }, 'Queued 2nd, behind Other order.'],
+    [{ kind: 'queued', position: 1, behind: [] }, 'Queued 1st.'],
   ])('describes %o as %s', (event, sentence) => {
     expect(describeEvent(event, labels)).toBe(sentence)
   })
@@ -417,5 +428,57 @@ describe('CI events', () => {
     })
     const events = diffObservation(obs(g, { ci: state }), obs(g, { ci: state }))
     expect(events.some((e) => e.kind === 'ci-check')).toBe(false)
+  })
+})
+
+describe('queue events', () => {
+  const queue1 = { position: 2, behind: [{ orderId: 'WO-2', title: 'Other order' }] }
+
+  it('raises no event while nothing is queued', () => {
+    const g = graph()
+    expect(diffObservation(obs(g), obs(g))).toEqual([])
+  })
+
+  it('raises a queued event the moment a position first appears', () => {
+    const g = graph()
+    const events = diffObservation(obs(g), obs(g, { queue: queue1 }))
+    expect(events).toContainEqual({ kind: 'queued', position: 2, behind: ['Other order'] })
+  })
+
+  it('raises nothing when the position and who it is behind stay the same', () => {
+    const g = graph()
+    const prev = obs(g, { queue: queue1 })
+    const next = obs(g, { queue: { ...queue1 } })
+    expect(diffObservation(prev, next).some((e) => e.kind === 'queued')).toBe(false)
+  })
+
+  it('raises a fresh queued event when the position moves', () => {
+    const g = graph()
+    const prev = obs(g, { queue: queue1 })
+    const next = obs(g, { queue: { ...queue1, position: 1 } })
+    expect(diffObservation(prev, next)).toContainEqual({
+      kind: 'queued',
+      position: 1,
+      behind: ['Other order'],
+    })
+  })
+
+  it('raises a fresh queued event when who it is behind changes', () => {
+    const g = graph()
+    const prev = obs(g, { queue: queue1 })
+    const next = obs(g, {
+      queue: { position: 2, behind: [{ orderId: 'WO-3', title: 'A third order' }] },
+    })
+    expect(diffObservation(prev, next)).toContainEqual({
+      kind: 'queued',
+      position: 2,
+      behind: ['A third order'],
+    })
+  })
+
+  it('raises nothing when the queue clears — nothing here can spell "unqueued"', () => {
+    const g = graph()
+    const events = diffObservation(obs(g, { queue: queue1 }), obs(g, { queue: null }))
+    expect(events.some((e) => e.kind === 'queued')).toBe(false)
   })
 })

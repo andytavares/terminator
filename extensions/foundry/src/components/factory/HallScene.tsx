@@ -6,7 +6,13 @@ import type { World } from '../../factory/sim.js'
 import type { NodeState } from '../../line/run-graph.js'
 import type { Paint, PaintGradient } from '../../factory/art/kit.js'
 import { glow } from '../../factory/art/kit.js'
-import { bakeHall, drawProp, drawBelts, drawCrate } from '../../factory/art/props.js'
+import {
+  bakeHall,
+  drawProp,
+  drawBelts,
+  drawCrate,
+  drawQueuePlate,
+} from '../../factory/art/props.js'
 import type { SceneContext } from '../../factory/art/props.js'
 import { drawCrew } from '../../factory/art/crew.js'
 
@@ -106,10 +112,12 @@ function draw(
     gatesWaiting: world.gatesWaiting,
     ci: world.ci,
     metrics,
+    queue: world.queue,
   }
 
   const moving = new Set(world.crates.map((c) => c.beltId))
   drawBelts(paint, map, moving, tMs)
+  drawQueuePlate(paint, map.anchors.exit, context, tMs)
 
   type Drawable = { readonly y: number; readonly draw: () => void }
   const drawables: Drawable[] = []

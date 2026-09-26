@@ -176,6 +176,23 @@ describe('calloutFor', () => {
     expect(at({ kind: 'ci-check', name: 'test', bucket: 'pending' })).toBeNull()
     expect(at({ kind: 'ci-check', name: 'test', bucket: 'skipping' })).toBeNull()
   })
+
+  it('names the nearest predecessor, at the exit station, with the ordinal spelled out', () => {
+    expect(
+      at({ kind: 'queued', position: 2, behind: ['First order', 'Second order'] })
+    ).toMatchObject({
+      nodeId: 'ci',
+      tone: 'start',
+      text: 'Queued 2nd behind Second order',
+    })
+  })
+
+  it('says only the position when nothing overlaps it directly', () => {
+    expect(at({ kind: 'queued', position: 1, behind: [] })).toMatchObject({
+      nodeId: 'ci',
+      text: 'Queued 1st',
+    })
+  })
 })
 
 describe('interruptionsFor', () => {

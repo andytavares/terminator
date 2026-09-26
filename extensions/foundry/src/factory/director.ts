@@ -246,6 +246,11 @@ function applyCiCheck(world: World, event: Extract<FactoryEvent, { kind: 'ci-che
   return { ...world, ci: { ...base, checks: { ...base.checks, [event.name]: event.bucket } } }
 }
 
+/** The refinery's queue moving this order — flashes the exit, beside the dispatch tower. */
+function applyQueued(world: World, event: Extract<FactoryEvent, { kind: 'queued' }>): World {
+  return { ...world, queue: { position: event.position, behind: event.behind } }
+}
+
 export function direct(world: World, events: readonly FactoryEvent[], nowMs: number): World {
   let next = world
   for (const event of events) {
@@ -276,6 +281,9 @@ export function direct(world: World, events: readonly FactoryEvent[], nowMs: num
         break
       case 'ci-check':
         next = applyCiCheck(next, event)
+        break
+      case 'queued':
+        next = applyQueued(next, event)
         break
       /* v8 ignore next 3 -- exhaustive union, unreachable */
       default: {

@@ -3,6 +3,7 @@ import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import type { Gate } from '../gates/rules.js'
 import type { CiState } from '../line/ci-state.js'
 import type { Check } from '../line/ci.js'
+import { ordinal } from './format.js'
 
 // What changed between two observations of a run, as events a director can
 // act on.
@@ -20,6 +21,11 @@ export interface Observation {
   readonly waiting: readonly Gate[]
   readonly activity: Readonly<Record<string, readonly ToolActivity[]>>
   readonly ci: CiState | null
+  /** This order's place in the refinery's file-overlap queue. Null out of a queue, or in a replay. */
+  readonly queue: {
+    readonly position: number
+    readonly behind: readonly { readonly orderId: string; readonly title: string }[]
+  } | null
 }
 
 export type ToolProp = 'archive' | 'rack' | 'desk'
@@ -60,6 +66,7 @@ export type FactoryEvent =
     }
   | { readonly kind: 'ci-round'; readonly round: number; readonly max: number }
   | { readonly kind: 'ci-check'; readonly name: string; readonly bucket: Check['bucket'] }
+  | { readonly kind: 'queued'; readonly position: number; readonly behind: readonly string[] }
 
 const ARCHIVE_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'NotebookRead'])
 
@@ -203,6 +210,21 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
     }
   }
 
+  if (next.queue !== null) {
+    const changed =
+      prev.queue === null ||
+      prev.queue.position !== next.queue.position ||
+      prev.queue.behind.length !== next.queue.behind.length ||
+      prev.queue.behind.some((entry, index) => entry.orderId !== next.queue?.behind[index]?.orderId)
+    if (changed) {
+      events.push({
+        kind: 'queued',
+        position: next.queue.position,
+        behind: next.queue.behind.map((entry) => entry.title),
+      })
+    }
+  }
+
   return events
 }
 
@@ -239,6 +261,10 @@ export function describeEvent(
       return `CI round ${event.round} of ${event.max}.`
     case 'ci-check':
       return `${event.name} is now ${event.bucket}.`
+    case 'queued':
+      return event.behind.length === 0
+        ? `Queued ${ordinal(event.position)}.`
+        : `Queued ${ordinal(event.position)}, behind ${event.behind.join(', ')}.`
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = event

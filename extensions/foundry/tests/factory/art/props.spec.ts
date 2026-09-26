@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { drawProp, bakeHall, drawBelts, drawCrate } from '../../../src/factory/art/props.js'
+import {
+  drawProp,
+  bakeHall,
+  drawBelts,
+  drawCrate,
+  drawQueuePlate,
+} from '../../../src/factory/art/props.js'
 import type { SceneContext } from '../../../src/factory/art/props.js'
 import { HALL } from '../../../src/factory/art/palette.js'
 import { TILE_PX } from '../../../src/factory/layout.js'
@@ -9,6 +15,7 @@ import type {
   HallBelt,
   BeltTile,
   PropKind,
+  Tile,
 } from '../../../src/factory/layout.js'
 import type { Crew } from '../../../src/factory/sim.js'
 import { createRecordingPaint } from './paint-fake.js'
@@ -522,6 +529,36 @@ describe('factory/art/props drawCrate', () => {
   it('draws a crate without throwing', () => {
     const paint = createRecordingPaint()
     expect(() => drawCrate(paint, 10, 10)).not.toThrow()
+    expect(paint.calls.length).toBeGreaterThan(0)
+  })
+})
+
+describe('factory/art/props drawQueuePlate', () => {
+  const exit: Tile = { x: 10, y: 8 }
+
+  it('draws nothing when the order is not queued behind anything', () => {
+    const paint = createRecordingPaint()
+    drawQueuePlate(paint, exit, context(), 0)
+    expect(paint.calls).toHaveLength(0)
+  })
+
+  it('draws the plate once a queue position is on the scene context', () => {
+    const paint = createRecordingPaint()
+    drawQueuePlate(paint, exit, context({ queue: { position: 2 } }), 0)
+    expect(paint.calls.length).toBeGreaterThan(0)
+  })
+
+  it('flashes the beacon on the same clock as a waiting gate', () => {
+    const t0 = createRecordingPaint()
+    drawQueuePlate(t0, exit, context({ queue: { position: 1 } }), 0)
+    const t1 = createRecordingPaint()
+    drawQueuePlate(t1, exit, context({ queue: { position: 1 } }), 250)
+    expect(t0.calls).not.toEqual(t1.calls)
+  })
+
+  it('draws the same plate regardless of position value beyond the digits shown', () => {
+    const paint = createRecordingPaint()
+    expect(() => drawQueuePlate(paint, exit, context({ queue: { position: 12 } }), 0)).not.toThrow()
     expect(paint.calls.length).toBeGreaterThan(0)
   })
 })

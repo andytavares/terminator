@@ -58,7 +58,16 @@ function graph(): RunGraph {
 }
 
 function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
-  return { graph: g, orphaned: [], stranded: [], waiting: [], activity: {}, ci: null, ...over }
+  return {
+    graph: g,
+    orphaned: [],
+    stranded: [],
+    waiting: [],
+    activity: {},
+    ci: null,
+    queue: null,
+    ...over,
+  }
 }
 
 function worldFor(g: RunGraph): World {
@@ -591,5 +600,22 @@ describe('direct: CI', () => {
     const one = direct(world, [{ kind: 'ci-check', name: 'test', bucket: 'pending' }], 0)
     const two = direct(one, [{ kind: 'ci-check', name: 'test', bucket: 'pass' }], 0)
     expect(two.ci?.checks.test).toBe('pass')
+  })
+})
+
+describe('direct: queue', () => {
+  it('records the position and who it is behind on a queued event', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const next = direct(world, [{ kind: 'queued', position: 2, behind: ['Other order'] }], 0)
+    expect(next.queue).toEqual({ position: 2, behind: ['Other order'] })
+  })
+
+  it('overwrites the position when it moves', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const first = direct(world, [{ kind: 'queued', position: 2, behind: ['Other order'] }], 0)
+    const second = direct(first, [{ kind: 'queued', position: 1, behind: ['Other order'] }], 0)
+    expect(second.queue).toEqual({ position: 1, behind: ['Other order'] })
   })
 })

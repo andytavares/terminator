@@ -126,6 +126,46 @@ const TWO_LANES = [
 
 beforeEach(() => vi.clearAllMocks())
 
+describe('the refinery queue', () => {
+  it('says the position and what it is behind, with the shared-file count', async () => {
+    mount(
+      reply({
+        queue: {
+          position: 2,
+          behind: [{ orderId: 'WO-2', title: 'The other order', files: ['src/a.ts', 'src/b.ts'] }],
+        },
+      })
+    )
+    await waitFor(() => expect(screen.getByLabelText('Refinery queue')).toBeTruthy())
+    expect(screen.getByText('Queued 2nd, behind The other order (2 shared files)')).toBeTruthy()
+  })
+
+  it('singularises one shared file', async () => {
+    mount(
+      reply({
+        queue: {
+          position: 1,
+          behind: [{ orderId: 'WO-2', title: 'The other order', files: ['src/a.ts'] }],
+        },
+      })
+    )
+    await waitFor(() => expect(screen.getByLabelText('Refinery queue')).toBeTruthy())
+    expect(screen.getByText('Queued 1st, behind The other order (1 shared file)')).toBeTruthy()
+  })
+
+  it('says nothing when it is not queued behind anything', async () => {
+    mount(reply({ queue: null }))
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByLabelText('Refinery queue')).toBeNull()
+  })
+
+  it('says nothing when the run predates queue reporting', async () => {
+    mount(reply({}))
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByLabelText('Refinery queue')).toBeNull()
+  })
+})
+
 describe('the merge order section', () => {
   it('lists the repositories in the order they land', async () => {
     mount(reply({ lanes: TWO_LANES }))

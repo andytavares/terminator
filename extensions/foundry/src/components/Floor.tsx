@@ -18,6 +18,7 @@ import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
 import { HunkLines } from './HunkLines.js'
+import { ordinal } from '../factory/format.js'
 import { Markdown, MarkdownInline } from './Markdown.js'
 import {
   useRunObservation,
@@ -529,6 +530,20 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           ? view.graph.recipe
           : `${view.graph.orderId} · ${view.graph.recipe}`}
       </p>
+
+      {/* The refinery's file-overlap queue: what this order sits behind, and
+          why — the collision the merge-order section cannot see, because it
+          is between orders, not between lanes of the same one. Nothing here
+          when it is not queued behind anything (R5). */}
+      {view.queue !== null && view.queue !== undefined && view.queue.behind.length > 0 ? (
+        <section className="fdry-queue" aria-label="Refinery queue">
+          {view.queue.behind.map((entry) => (
+            <p key={entry.orderId} className="fdry-note">
+              {`Queued ${ordinal(view.queue?.position ?? 0)}, behind ${entry.title} (${entry.files.length} shared ${entry.files.length === 1 ? 'file' : 'files'})`}
+            </p>
+          ))}
+        </section>
+      ) : null}
 
       {/* Where the run stands, and the move that takes it forward.
 

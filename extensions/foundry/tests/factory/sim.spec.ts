@@ -69,7 +69,16 @@ function graph(): RunGraph {
 }
 
 function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
-  return { graph: g, orphaned: [], stranded: [], waiting: [], activity: {}, ci: null, ...over }
+  return {
+    graph: g,
+    orphaned: [],
+    stranded: [],
+    waiting: [],
+    activity: {},
+    ci: null,
+    queue: null,
+    ...over,
+  }
 }
 
 // Duplicated from tests/factory/layout.spec.ts: builds a real run graph from
@@ -155,6 +164,22 @@ describe('createWorld: CI', () => {
       })
     )
     expect(world.ci).toEqual({ round: 2, max: 3, checks: { test: 'fail' } })
+  })
+})
+
+describe('createWorld: queue', () => {
+  it('starts with no queue when the observation carries none', () => {
+    const g = graph()
+    expect(createWorld(layoutHall(g), obs(g)).queue).toBeNull()
+  })
+
+  it('carries the position and who it is behind, by title, from the observation', () => {
+    const g = graph()
+    const world = createWorld(
+      layoutHall(g),
+      obs(g, { queue: { position: 3, behind: [{ orderId: 'WO-2', title: 'Other order' }] } })
+    )
+    expect(world.queue).toEqual({ position: 3, behind: ['Other order'] })
   })
 })
 

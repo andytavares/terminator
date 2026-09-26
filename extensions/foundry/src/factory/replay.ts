@@ -92,9 +92,10 @@ export function observationAt(
     return Date.parse(gate.raisedAt) <= at && (decided === null || decided > at)
   })
 
-  // The timeline never records CI (ADR-060: only what was recorded plays
-  // back), so a replay shows no dispatch tower at any point in a run.
-  return { graph, orphaned: [], stranded: [], waiting, activity, ci: null }
+  // The timeline never records CI or the refinery's queue (ADR-060: only what
+  // was recorded plays back), so a replay shows no dispatch tower or queue
+  // nameplate at any point in a run.
+  return { graph, orphaned: [], stranded: [], waiting, activity, ci: null, queue: null }
 }
 
 /** Every recorded moment, in order: the beats a replay's clock is built on. */

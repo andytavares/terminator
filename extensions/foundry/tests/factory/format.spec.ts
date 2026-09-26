@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatDuration } from '../../src/factory/format.js'
+import { formatDuration, ordinal } from '../../src/factory/format.js'
 
 describe('factory/format formatDuration', () => {
   it('renders sub-minute durations in seconds', () => {
@@ -24,5 +24,24 @@ describe('factory/format formatDuration', () => {
 
   it('treats zero as zero seconds', () => {
     expect(formatDuration(0)).toBe('0 s')
+  })
+})
+
+describe('factory/format ordinal', () => {
+  it.each([
+    [1, '1st'],
+    [2, '2nd'],
+    [3, '3rd'],
+    [4, '4th'],
+    [11, '11th'],
+    [12, '12th'],
+    [13, '13th'],
+    [21, '21st'],
+    [22, '22nd'],
+    [23, '23rd'],
+    [101, '101st'],
+    [111, '111th'],
+  ])('renders %i as %s', (n, word) => {
+    expect(ordinal(n)).toBe(word)
   })
 })

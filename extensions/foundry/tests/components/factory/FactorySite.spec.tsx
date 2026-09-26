@@ -126,6 +126,30 @@ describe('FactorySite', () => {
     expect(screen.queryByText(/CI \d/)).toBeNull()
   })
 
+  it('shows no refinery track when nothing is queued behind anything', async () => {
+    mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
+    await waitFor(() => screen.getByText('Only one'))
+    expect(screen.queryByLabelText('Refinery')).toBeNull()
+  })
+
+  it('shows a token per queued order, in position order, joined by the shared-file count', async () => {
+    mount([
+      { id: 'WO-1', title: 'First', status: 'running' },
+      {
+        id: 'WO-2',
+        title: 'Second',
+        status: 'running',
+        queue: {
+          position: 2,
+          behind: [{ orderId: 'WO-1', title: 'First', files: ['a.ts', 'b.ts'] }],
+        },
+      },
+    ])
+    await waitFor(() => expect(screen.getByLabelText('Refinery')).toBeTruthy())
+    const track = screen.getByLabelText('Refinery').querySelector('.fdry-refinery-track')
+    expect(track?.textContent).toBe('First2 shared filesSecond')
+  })
+
   it('opens the order it is given', async () => {
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await waitFor(() => screen.getByText('Only one'))

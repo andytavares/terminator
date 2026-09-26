@@ -238,7 +238,11 @@ function mountForStart(over: Record<string, unknown> = {}) {
     if (channel === 'foundry:order.compile') {
       const commit = (payload as { commit?: boolean }).commit === true
       const shown = commit ? { ...current, status: 'agreed' as const } : current
-      return { order: shown, compile: compileOrder(shown) }
+      return {
+        order: shown,
+        compile: compileOrder(shown),
+        ...(commit ? { advisory: (over.advisory as string | null | undefined) ?? null } : {}),
+      }
     }
     if (channel === 'foundry:order.states') return {}
     if (channel === 'foundry:run.recipes') {
@@ -304,6 +308,23 @@ describe('handing off', () => {
     await openStep('Hand off')
     await waitFor(() => screen.getByRole('button', { name: /Blocked by/ }))
     expect(screen.getByRole('button', { name: /Blocked by/ }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('shows the refinery advisory as a note, once agreeing returns one (R4/R5)', async () => {
+    mountForStart({ advisory: 'This queues behind WO-2 on src/a.ts.' })
+    await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    const note = await screen.findByText('This queues behind WO-2 on src/a.ts.')
+    expect(note.className).toContain('fdry-note')
+    expect(note.className).not.toContain('fdry-problem')
+  })
+
+  it('says nothing about the refinery when nothing was queued', async () => {
+    mountForStart()
+    await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    await waitFor(() => expect(screen.getByText(/Handed off/)).toBeTruthy())
+    expect(screen.queryByText(/queues behind/)).toBeNull()
   })
 })
 

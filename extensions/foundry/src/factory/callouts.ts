@@ -1,5 +1,6 @@
 import { gateNodeId } from './events.js'
 import type { FactoryEvent } from './events.js'
+import { ordinal } from './format.js'
 import type { Gate, GateOption } from '../gates/rules.js'
 import type { NodeState, RunGraph } from '../line/run-graph.js'
 import { DISPATCH_NODE_ID } from './layout.js'
@@ -119,6 +120,15 @@ export function calloutFor(
           throw new Error(`unhandled check bucket: ${String(never)}`)
         }
       }
+    case 'queued':
+      return callout(
+        DISPATCH_NODE_ID,
+        'start',
+        event.behind.length === 0
+          ? `Queued ${ordinal(event.position)}`
+          : `Queued ${ordinal(event.position)} behind ${event.behind[event.behind.length - 1]}`,
+        at
+      )
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = event

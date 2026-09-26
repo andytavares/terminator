@@ -34,6 +34,92 @@ export interface FactoryOrderRow {
    * when the host answering the list has never heard of CI.
    */
   readonly ci?: { readonly status: string; readonly round: number; readonly max: number } | null
+  /**
+   * Where this order stands in the refinery's file-overlap queue.
+   *
+   * Null when it is not in a queue at all, and absent (like `standing`) when
+   * the host answering the list has never heard of the refinery.
+   */
+  readonly queue?: {
+    readonly position: number
+    readonly behind: {
+      readonly orderId: string
+      readonly title: string
+      readonly files: string[]
+    }[]
+  } | null
+}
+
+interface QueueChainToken {
+  readonly id: string
+  readonly title: string
+  readonly position: number
+}
+
+interface QueueChain {
+  readonly tokens: readonly QueueChainToken[]
+  /** Shared-file count between each token and the next one — one shorter than `tokens`. */
+  readonly joins: readonly number[]
+}
+
+/**
+ * The refinery's queues, as chains of orders that overlap on disk.
+ *
+ * Grouped by connected component rather than by repository: the list gives
+ * each order's own position and who it sits directly behind, not which
+ * repository named that queue, and two orders sharing files are one queue
+ * whichever repository it is.
+ */
+function refineryChains(rows: readonly FactoryOrderRow[]): QueueChain[] {
+  const title = new Map<string, string>()
+  const position = new Map<string, number>()
+  for (const row of rows) {
+    title.set(row.id, row.title)
+    if (row.queue != null) position.set(row.id, row.queue.position)
+  }
+
+  const parent = new Map<string, string>()
+  const find = (id: string): string => {
+    let root = id
+    while (parent.has(root)) root = parent.get(root) as string
+    return root
+  }
+  const union = (a: string, b: string): void => {
+    const ra = find(a)
+    const rb = find(b)
+    if (ra !== rb) parent.set(ra, rb)
+  }
+
+  const shared = new Map<string, number>()
+  for (const row of rows) {
+    if (row.queue == null) continue
+    for (const entry of row.queue.behind) {
+      title.set(entry.orderId, entry.title)
+      union(row.id, entry.orderId)
+      shared.set([row.id, entry.orderId].sort().join('|'), entry.files.length)
+    }
+  }
+
+  const groups = new Map<string, Set<string>>()
+  for (const id of title.keys()) {
+    const root = find(id)
+    const group = groups.get(root) ?? new Set<string>()
+    group.add(id)
+    groups.set(root, group)
+  }
+
+  const chains: QueueChain[] = []
+  for (const group of groups.values()) {
+    if (group.size < 2) continue
+    const tokens = [...group]
+      .map((id) => ({ id, title: title.get(id) ?? id, position: position.get(id) ?? 0 }))
+      .sort((a, b) => a.position - b.position)
+    const joins = tokens
+      .slice(1)
+      .map((token, index) => shared.get([tokens[index].id, token.id].sort().join('|')) ?? 0)
+    chains.push({ tokens, joins })
+  }
+  return chains
 }
 
 export interface FactorySiteProps {
@@ -131,6 +217,8 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
     [repoDraft, refreshSignals]
   )
 
+  const chains = refineryChains(rows)
+
   return (
     <div className="fdry-site">
       <aside className="fdry-status-wall" aria-label="Status wall">
@@ -212,6 +300,28 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
           ))}
         </div>
       )}
+      {/* The refinery: which orders sit behind which on disk. Nothing here
+          when no order is queued behind another (R5). */}
+      {chains.length > 0 ? (
+        <section className="fdry-refinery" aria-label="Refinery">
+          <h3 className="fdry-panel-h">Refinery</h3>
+          {chains.map((chain) => (
+            <div key={chain.tokens[0].id} className="fdry-refinery-track">
+              {chain.tokens.map((token, index) => (
+                <React.Fragment key={token.id}>
+                  {index > 0 ? (
+                    <span className="fdry-refinery-join">
+                      {chain.joins[index - 1]}{' '}
+                      {chain.joins[index - 1] === 1 ? 'shared file' : 'shared files'}
+                    </span>
+                  ) : null}
+                  <span className="fdry-refinery-token">{token.title}</span>
+                </React.Fragment>
+              ))}
+            </div>
+          ))}
+        </section>
+      ) : null}
     </div>
   )
 }

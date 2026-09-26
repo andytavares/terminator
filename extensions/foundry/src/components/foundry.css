@@ -371,6 +371,12 @@
   margin: 0 0 10px;
 }
 
+/* What agreeing this order is about to queue behind (R4) — a note beside the
+   hand-off button, not styled as a check or a failure. */
+.fdry-advisory {
+  margin: 10px 0 0;
+}
+
 .fdry-wizard-nav {
   display: flex;
   align-items: center;
@@ -747,6 +753,19 @@
   font-size: 12px;
   line-height: 1.5;
   color: var(--tm-text-secondary);
+}
+
+/* The refinery's file-overlap queue: this order sits behind another's files,
+   which is a fact about the queue rather than an interruption — informational,
+   so it borrows `.fdry-needs-you`'s left-border shape without its stronger
+   warning weight. */
+.fdry-queue {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-left: 3px solid var(--tm-accent);
+  border-radius: var(--tm-radius-md);
+  padding: 10px 14px;
+  margin-bottom: 12px;
 }
 
 /* A held tool call. The one thing on this surface that is not read-only. */
@@ -3201,6 +3220,34 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--tm-text-secondary);
+}
+
+/* The refinery: which orders sit behind which on disk, below the hall grid. */
+.fdry-refinery {
+  margin-top: 16px;
+}
+
+.fdry-refinery-track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fdry-refinery-token {
+  padding: 4px 10px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-card);
+  font-size: 12px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-refinery-join {
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
 }
 
 .fdry-ci-checks {

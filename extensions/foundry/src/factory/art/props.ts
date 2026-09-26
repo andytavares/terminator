@@ -1,4 +1,4 @@
-import type { HallMap, HallProp, PropKind, Side, BeltTile } from '../layout.js'
+import type { HallMap, HallProp, PropKind, Side, BeltTile, Tile } from '../layout.js'
 import { TILE_PX } from '../layout.js'
 import type { Crew } from '../sim.js'
 import type { NodeState } from '../../line/run-graph.js'
@@ -37,6 +37,8 @@ export interface SceneContext {
     readonly reworks: number
     readonly ciRounds: number
   } | null
+  /** This order's place in the refinery's file-overlap queue — null out of a queue. */
+  readonly queue?: { readonly position: number } | null
 }
 
 /** Rows 0–2 are the top wall on every `HallMap` — see `layout.ts`'s contract. */
@@ -735,6 +737,33 @@ function drawDispatch(paint: Paint, prop: HallProp, context: SceneContext): void
     if (ly < y - 24) return
     rect(paint, x + 5, ly, 6, 3, lampColor(bucket))
   })
+}
+
+/**
+ * A small amber plaque beside the exit, showing the position this order
+ * holds in the refinery's file-overlap queue — flashing, the way a gate's
+ * beacon flashes while it waits, for as long as `context.queue` says there is
+ * one. Nothing here spells out the ordinal's letters: the hall's pixel font
+ * only has digits, so the plaque shows the number and leans on its flash and
+ * its place at the exit to say what it means.
+ */
+export function drawQueuePlate(paint: Paint, exit: Tile, context: SceneContext, tMs: number): void {
+  const queue = context.queue ?? null
+  if (queue === null) return
+  const x = exit.x * TILE_PX
+  const y = exit.y * TILE_PX
+  const flashOn = Math.floor(tMs / 250) % 2 === 0
+
+  rect(paint, x - 18, y - 40, 16, 12, '#20242c')
+  bevel(paint, x - 18, y - 40, 16, 12, HALL.steelLight, HALL.steelDark)
+  rect(paint, x - 16, y - 38, 12, 8, flashOn ? HALL.amber : HALL.amberDim)
+
+  const digits = String(Math.max(queue.position, 0))
+  let dx = x - 15 + Math.max(0, (12 - digits.length * 7) / 2)
+  for (const digit of digits) {
+    drawDigit(paint, dx, y - 36, digit, '#1a1508')
+    dx += 7
+  }
 }
 
 function drawLockers(paint: Paint, prop: HallProp): void {

@@ -73,6 +73,8 @@ export interface World {
   readonly clockMs: number
   /** Null until the order has shipped a pull and CI has something to say. */
   readonly ci: WorldCi | null
+  /** This order's place in the refinery's file-overlap queue. Null out of a queue. */
+  readonly queue: { readonly position: number; readonly behind: readonly string[] } | null
 }
 
 const WALK_PX_PER_S = 46
@@ -248,7 +250,24 @@ export function createWorld(map: HallMap, observation: Observation): World {
           ),
         }
 
-  return { map, crew, crates, gatesWaiting: [...gatesWaiting], openCalls: [], clockMs: 0, ci }
+  const queue =
+    observation.queue === null
+      ? null
+      : {
+          position: observation.queue.position,
+          behind: observation.queue.behind.map((entry) => entry.title),
+        }
+
+  return {
+    map,
+    crew,
+    crates,
+    gatesWaiting: [...gatesWaiting],
+    openCalls: [],
+    clockMs: 0,
+    ci,
+    queue,
+  }
 }
 
 /**
