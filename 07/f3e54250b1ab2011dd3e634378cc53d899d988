@@ -1,0 +1,54 @@
+src/renderer/electron.d.ts
+  s_654aa27bb8605b::t_485bfea34751c2 79
+tests/unit/git/git-service.spec.ts
+  s_654aa27bb8605b::t_19c83274f52cbc 42,216,228,238,240-246,249-256,259,261-264,267,272-273,275,292-306
+  s_654aa27bb8605b::t_8bbb6fe7916c3c 279-282
+  s_654aa27bb8605b::t_c1ed37b44b5c64 217-224,226,232,239,247,260,265,271,276-278,283,287
+  s_654aa27bb8605b::t_8f2e310c1f62b1 307-308
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_654aa27bb8605b::t_c1e4e39f95df74 64
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_654aa27bb8605b::t_5cd1474985bc20 718-721,731-740
+  s_654aa27bb8605b::t_612edc55f17ea0 741-743
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_654aa27bb8605b::t_86030993354a3f 36,60,83-98,251-252,254
+  s_654aa27bb8605b::t_8bbb6fe7916c3c 255-258,260,334,343-344,375-376
+src/main/git/git-service.ts
+  s_654aa27bb8605b::t_3165f7a69a6970 12,134-135,146-147,151,157-158,163,166-185
+  s_654aa27bb8605b::t_c1ed37b44b5c64 136-145,159-162
+  s_654aa27bb8605b::t_8bbb6fe7916c3c 152-156
+tests/unit/ipc/git.ipc.spec.ts
+  s_654aa27bb8605b::t_c1e4e39f95df74 14,89-97
+  s_654aa27bb8605b::t_7071c6524ac815 98-101
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_654aa27bb8605b::t_8bbb6fe7916c3c 701,751
+  s_654aa27bb8605b::t_a1383e259908c9 698-700,702-750,752-753
+tests/unit/extensions/PrDialog.spec.tsx
+  s_654aa27bb8605b::t_10e2479f1beefd 25
+src/main/ipc/git.ipc.ts
+  s_654aa27bb8605b::t_485bfea34751c2 8,55-63
+  s_654aa27bb8605b::t_a4fd144844105e 64
+src/shared/electron-api/manifest.ts
+  s_654aa27bb8605b::t_485bfea34751c2 185-189
+  s_654aa27bb8605b::t_13bba16e660fbb 184
+src/renderer/components/sidebar/BranchSelect.css
+  s_654aa27bb8605b::t_86030993354a3f 5-49
+src/renderer/components/sidebar/BranchSelect.tsx
+  s_654aa27bb8605b::t_86030993354a3f 2,13-14,24-25,55-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "07f3e54250b1ab2011dd3e634378cc53d899d988",
+  "prompts": {},
+  "sessions": {
+    "s_654aa27bb8605b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c92f186c-8546-4489-b43c-5303c88c1306",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
