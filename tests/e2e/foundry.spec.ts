@@ -785,6 +785,103 @@ test('what the architect writes is shown as markdown in the Forge', async () => 
   writeFileSync(join('test-results', 'forge-markdown.png'), Buffer.from(png, 'base64'))
 })
 
+test('a draft’s CI is on the Floor while it is watched', async () => {
+  const created = (await foundry('foundry:order.create', {
+    source: { kind: 'typed', text: 'a draft whose CI is being watched' },
+    repoPaths: [repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id as string
+  expect(id, 'no order was created').toBeTruthy()
+
+  const dir = join(repo, '.foundry', 'orders', id)
+  const file = join(dir, 'order.json')
+  writeFileSync(
+    file,
+    JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), status: 'running' })
+  )
+  const node = (nodeId: string, kind: string, role: string | null, lane: number | null) => ({
+    id: nodeId,
+    stepId: nodeId.split(':')[0],
+    kind,
+    state: 'passed',
+    unitIds: [],
+    lane,
+    role,
+    dependsOn: [],
+    attempts: 1,
+    reworks: 0,
+    feedback: [],
+    sessionId: null,
+    worktreePath: null,
+    startedAt: null,
+    endedAt: null,
+  })
+  writeFileSync(
+    join(dir, 'run-graph.json'),
+    JSON.stringify({
+      orderId: id,
+      recipe: 'direct',
+      nodes: [node('build:lane-1', 'fanout', 'builder', 1), node('ship', 'gate', null, null)],
+    })
+  )
+  const link = (run: number) => `https://github.com/o/r/actions/runs/${run}/job/1`
+  writeFileSync(
+    join(dir, 'ci.json'),
+    JSON.stringify({
+      round: 1,
+      max: 2,
+      status: 'watching',
+      pulls: [
+        {
+          url: 'https://github.com/o/r/pull/7',
+          checks: [
+            { name: 'Test', bucket: 'fail', link: link(1), workflow: 'CI' },
+            { name: 'Lint', bucket: 'pass', link: link(1), workflow: 'CI' },
+            { name: 'E2E', bucket: 'pending', link: link(1), workflow: 'CI' },
+          ],
+        },
+      ],
+      reason: '',
+      at: new Date().toISOString(),
+    })
+  )
+
+  await openFoundry()
+  expect(await clickByName('button', 'Forge')).toBe(true)
+  await handle.page.waitForTimeout(800)
+  await clickByName('button', 'All orders')
+  await handle.page.waitForTimeout(800)
+  const opened = await inFoundry<boolean>(`(function () {
+    var all = document.querySelectorAll('button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
+        all[i].click()
+        return true
+      }
+    }
+    return false
+  })()`)
+  expect(opened, `no row for ${id} in the Forge`).toBe(true)
+  await handle.page.waitForTimeout(2000)
+
+  const band = await inFoundry<string>(`(function () {
+    var h = document.getElementById('fdry-ci-h')
+    return h && h.closest('section') ? h.closest('section').innerText : ''
+  })()`)
+  expect(band).toContain('Round 1 of 2')
+  expect(band).toContain('Test')
+
+  const png = await handle.app.evaluate(async ({ webContents }) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
+    if (!view) throw new Error('the Foundry view is not loaded')
+    return (await view.capturePage()).toPNG().toString('base64')
+  })
+  mkdirSync('test-results', { recursive: true })
+  writeFileSync(join('test-results', 'floor-ci.png'), Buffer.from(png, 'base64'))
+})
+
 test('an order’s budgets are set on the Plan step, and raised at the gate that stopped it', async () => {
   const created = (await foundry('foundry:order.create', {
     source: { kind: 'typed', text: 'budgets are the operator’s to set' },

@@ -2888,6 +2888,51 @@
   color: var(--tm-text-secondary);
 }
 
+.fdry-hall-card-ci {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-ci-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.fdry-ci-checks li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fdry-ci-checks a {
+  color: var(--tm-text-primary);
+}
+
+.fdry-ci-bucket {
+  padding: 1px 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-text-secondary);
+}
+
+.fdry-ci-bucket[data-bucket='pass'] {
+  border-color: var(--tm-success);
+  color: var(--tm-success);
+}
+
+.fdry-ci-bucket[data-bucket='fail'],
+.fdry-ci-bucket[data-bucket='cancel'] {
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
+}
+
 .fdry-hall-shell {
   display: flex;
   align-items: center;

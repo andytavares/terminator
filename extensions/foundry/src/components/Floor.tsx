@@ -882,7 +882,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                   <a href={check.link} target="_blank" rel="noreferrer noopener">
                     {check.name}
                   </a>
-                  <u>{check.bucket}</u>
+                  <span className="fdry-ci-bucket" data-bucket={check.bucket}>
+                    {check.bucket}
+                  </span>
                 </li>
               ))
             )}
