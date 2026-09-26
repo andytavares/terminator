@@ -1,0 +1,65 @@
+extensions/foundry/src/ipc/sensor-channels.ts
+  s_4f15472be339a2::t_c58304dddfc958 2
+  s_4f15472be339a2::t_68c1e915fd9bd8 96
+  s_4f15472be339a2::t_d2d0faa3705931 16
+  s_4f15472be339a2::t_4f724fda8b4e14 139-148,150,154
+  s_4f15472be339a2::t_404e33529e85db 1,3-15,17-95,97-138,149,151-153,155-185
+extensions/foundry/src/index.ts
+  s_4f15472be339a2::t_44c33c86f6c96d 435-440
+  s_4f15472be339a2::t_17771d2af94ef7 13,15-18
+  s_4f15472be339a2::t_0341c9096abf5b 14
+  s_4f15472be339a2::t_f69a86a706eb70 806
+  s_4f15472be339a2::t_bd0f78425aeb18 1979-1987,1989,1991
+  s_4f15472be339a2::t_a566e74eb0f752 20
+  s_4f15472be339a2::t_12011d31acef80 6
+  s_4f15472be339a2::t_276854e7021b24 736,774-787
+  s_4f15472be339a2::t_16606bfa261513 797-800,804
+  s_4f15472be339a2::t_93c368be31d75d 2529-2530,2532-2544
+  s_4f15472be339a2::t_ad58ac857dd997 3123-3124
+  s_4f15472be339a2::t_ce306c59c4bbe9 737-773,788-796,801-803,805,807-813
+  s_4f15472be339a2::t_c489d5a3c0c855 2531
+  s_4f15472be339a2::t_ceaba7f8d5cd96 1988,1990
+extensions/foundry/tests/sensors/store.spec.ts
+  s_4f15472be339a2::t_7b9d364ea30374 123-131
+extensions/foundry/tests/ipc/sensor-channels.spec.ts
+  s_4f15472be339a2::t_cf28af43ce3486 260-264
+  s_4f15472be339a2::t_890cf396fa44ca 112-116
+  s_4f15472be339a2::t_a3069c0af4f19a 1-111,117-141,147-164,187-209,238-259,265
+  s_4f15472be339a2::t_9b64bfa0dc1083 165-186
+  s_4f15472be339a2::t_4c5a842f1e1a06 142-146
+  s_4f15472be339a2::t_a82a2bb883f0dc 210-237
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_4f15472be339a2::t_87f395695e951f 383-428
+extensions/foundry/src/forge/intake-source.ts
+  s_4f15472be339a2::t_3347e07d56b8f2 122,136-151
+  s_4f15472be339a2::t_dd33960bb4d22c 8
+  s_4f15472be339a2::t_fc40f376642a22 55-56,62
+extensions/foundry/tests/sensors/schedule.spec.ts
+  s_4f15472be339a2::t_d7d5f2ff809ad5 1-136
+extensions/foundry/tests/order/schema.spec.ts
+  s_4f15472be339a2::t_8975e476f49f97 298-305
+extensions/foundry/tests/forge/intake-source.spec.ts
+  s_4f15472be339a2::t_ad1640c2de63a8 175-228
+extensions/foundry/src/sensors/store.ts
+  s_4f15472be339a2::t_36540692b1eab2 22-23
+extensions/foundry/src/sensors/schedule.ts
+  s_4f15472be339a2::t_e7201d71109fa8 1-59
+extensions/foundry/src/order/schema.ts
+  s_4f15472be339a2::t_71011a3b7eada8 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e615e8aa9f8c4fc27e657e9bef8dfe8f8a160d88",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
