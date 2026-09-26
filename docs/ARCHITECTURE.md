@@ -1037,6 +1037,20 @@ reviewer's finding is judgement and stays with the operator.
 - **Recipes** (`recipe/parse.ts`, `recipe/resolve.ts`) are YAML: a list of steps
   over six kinds — `agent`, `run`, `judge`, `gate`, `fanout`, `join`. There is
   no seventh. The ten SpecKit phases are one recipe, `recipes/speckit.yaml`.
+- **A failed check sends the work back** (ADR-063). A `run` step whose command
+  is not a slash command runs as a command in a terminal tab
+  (`SupervisedRunner.runCommand`), with `${toolchain.<check>}` resolved by
+  `resolveCommand`; a check the repository has no command for is `skipped` and
+  recorded as `step.not_measured`. Its output is tee'd to
+  `<order>/runs/<node>.<attempt>.log`. A step with
+  `onFail: { rework, max }` that fails while `reworks < max` calls
+  `scheduler.rework`: the target's node in the checked lane, everything between
+  it and the check, and the check go back to `waiting`, and the target's
+  `feedback` carries the command, exit status and the last 120 lines of output
+  into the builder's next brief. Ledger: `rework.started`. `quick`, `direct`,
+  `standard`, `bugfix` and `poc` lint in the lane right after the build when the
+  probe found a lint command. Before a node resumes a lane's conversation, its
+  previous process is ended (`endSession` → `endAndWait`).
 - **A fan-out parallelises lanes, never units in one lane** (ADR-044). A lane is
   a worktree and a branch, so units inside one cannot run at the same time
   however many nodes point at them. `over: plan.units[role=builder] by lane`
@@ -1288,6 +1302,7 @@ App
 - [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
 - [ADR-040: the work order is the contract](adr/040-the-work-order-is-the-contract.md) — supersedes the card model (ADR-010) and the run modes (ADR-012).
 - [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
+- [ADR-063: a failed check sends the work back](adr/063-a-failed-check-sends-the-work-back.md) — run steps run as commands, `onFail` reworks the builder with the failing output, the stalled gate names its node.
 - [ADR-062: the Forge decides what it is sure of](adr/062-the-forge-decides-what-it-is-sure-of.md) — questions at ≥ 90% confidence are decided, low/medium findings dismissable, failing checks sent back up to twice.
 - [ADR-061: one project per order, and an extension may file an issue](adr/061-one-project-per-order.md) — an order is one sidebar project named after its ticket's branch; `ExtensionAPI.issues.create` v2.5.0.
 - [ADR-042: Foundry installs nothing](adr/042-foundry-installs-nothing.md) — the data root, the three rungs, and the toolchain probe.
