@@ -1245,6 +1245,15 @@ feedback, runs the Line again and pushes the lanes (`pushLanes`). With the
 rounds spent, `ci.red` replaces the ready gate, and its "Another round" runs
 one more. The state is in the order's `ci.json`.
 
+**The refinery restacks, it never merges** (ADR-067, `src/line/refinery.ts`,
+`src/line/restack.ts`). Running and shipped orders in one repository and base
+queue in agreed order; an order overlaps an earlier one when their changed
+files intersect, and the Forge says so at agreement. A 60-second tick asks
+GitHub whether each draft merged; when one has, each later overlapping order
+is rebased lane by lane and pushed with lease, and its CI is watched again. A
+conflicting rebase is aborted and raises `refinery.conflict`. `refinery.json`
+records each merge acted on.
+
 **Every command runs in the lane's worktree**, derived per lane by
 `checkoutPath` exactly as the branch is derived by `branchFor`. Both were once
 read raw off `context.repos[]`, which holds the _repository_ and a `headBranch`
@@ -1357,6 +1366,7 @@ App
 - [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
 - [ADR-040: the work order is the contract](adr/040-the-work-order-is-the-contract.md) — supersedes the card model (ADR-010) and the run modes (ADR-012).
 - [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
+- [ADR-067: the refinery restacks, it never merges](adr/067-the-refinery-restacks-it-never-merges.md) — overlapping orders queue; a merge restacks the later ones with lease and rechecks CI, or raises `refinery.conflict`.
 - [ADR-066: sensors propose work, they never start it](adr/066-sensors-propose-never-start.md) — YAML sensors on a tick while the app is open, clustered signals in the Inbox, promote seeds a draft.
 - [ADR-065: skills are mounted, never installed](adr/065-skills-are-mounted-never-installed.md) — `skills:` on roles and steps, three rungs, copied per node and passed with `--add-dir`.
 - [ADR-064: CI is a check with rounds](adr/064-ci-is-a-check-with-rounds.md) — drafts' CI is watched, a red one goes back to the builder twice, then `ci.red`.
