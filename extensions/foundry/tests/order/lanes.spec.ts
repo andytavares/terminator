@@ -180,7 +180,7 @@ describe('compiling an order with a collision', () => {
   it('does not hide a real coverage gap behind the lane question', () => {
     const gap = order({ acceptance: [...order().acceptance], plan: { ...order().plan, units: [] } })
     const detail = compileOrder(gap).failures.find((f) => f.check === 'coverage')?.detail ?? ''
-    expect(detail).toContain('AC-1')
+    expect(detail).toContain('“a session id is a ULID”')
   })
 })
 
