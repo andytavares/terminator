@@ -93,6 +93,13 @@ export function calloutFor(
       )
     case 'gate':
       return event.waiting ? null : callout(event.nodeId, 'done', 'Gate cleared', at)
+    case 'rework':
+      return callout(
+        event.toNodeId,
+        'fail',
+        `Sent back: ${name(labels, event.fromNodeId)} failed`,
+        at
+      )
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = event

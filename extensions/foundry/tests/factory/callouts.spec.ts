@@ -109,6 +109,14 @@ describe('calloutFor', () => {
     ).toMatchObject({ text: 'Work in from x' })
   })
 
+  it('puts a rework on the station taking the failure back, naming the check', () => {
+    expect(at({ kind: 'rework', fromNodeId: 'ship', toNodeId: 'build', round: 1 })).toMatchObject({
+      nodeId: 'build',
+      tone: 'fail',
+      text: 'Sent back: Ship it failed',
+    })
+  })
+
   it('covers every other event kind', () => {
     expect(at({ kind: 'node-state', nodeId: 'build', from: 'ready', to: 'running' })?.text).toBe(
       'Started'
@@ -131,6 +139,9 @@ describe('calloutFor', () => {
     expect(at({ kind: 'gate', nodeId: 'ship', waiting: false })).toMatchObject({
       tone: 'done',
       text: 'Gate cleared',
+    })
+    expect(at({ kind: 'rework', fromNodeId: 'ship', toNodeId: 'build', round: 1 })).toMatchObject({
+      tone: 'fail',
     })
   })
 })

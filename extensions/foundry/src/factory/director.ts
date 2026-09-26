@@ -167,6 +167,26 @@ function applyHandoff(world: World, event: Extract<FactoryEvent, { kind: 'handof
   return { ...world, crates: [...world.crates, crate] }
 }
 
+/**
+ * A check sending work back: the crate rides the same belt a hand-off would
+ * use between the target and the check, but the other way — starting at the
+ * check's station and parking at the target's, since the target's own
+ * `node-state` event (back to `waiting`) is what actually seats its crew.
+ */
+function applyRework(world: World, event: Extract<FactoryEvent, { kind: 'rework' }>): World {
+  const belt = world.map.belts.find(
+    (b) => b.fromNodeId === event.toNodeId && b.toNodeId === event.fromNodeId
+  )
+  if (belt === undefined) return world
+  const crate: Crate = {
+    id: `${belt.id}@${world.clockMs}:rework${event.round}`,
+    beltId: belt.id,
+    progress: 0,
+    parks: true,
+  }
+  return { ...world, crates: [...world.crates, crate] }
+}
+
 function applyGate(world: World, event: Extract<FactoryEvent, { kind: 'gate' }>): World {
   const gatesWaiting = event.waiting
     ? world.gatesWaiting.includes(event.nodeId)
@@ -209,6 +229,9 @@ export function direct(world: World, events: readonly FactoryEvent[], nowMs: num
         break
       case 'gate':
         next = applyGate(next, event)
+        break
+      case 'rework':
+        next = applyRework(next, event)
         break
       /* v8 ignore next 3 -- exhaustive union, unreachable */
       default: {

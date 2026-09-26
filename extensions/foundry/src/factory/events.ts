@@ -46,6 +46,15 @@ export type FactoryEvent =
       readonly targetStarted: boolean
     }
   | { readonly kind: 'gate'; readonly nodeId: string; readonly waiting: boolean }
+  | {
+      readonly kind: 'rework'
+      /** The check that sent the work back. */
+      readonly fromNodeId: string
+      /** The node the failure landed on. */
+      readonly toNodeId: string
+      /** `toNodeId`'s new feedback length — how many times it has been sent back, in all. */
+      readonly round: number
+    }
 
 const ARCHIVE_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'NotebookRead'])
 
@@ -147,6 +156,21 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
     }
   }
 
+  for (const node of next.graph.nodes) {
+    const before = prevNodes.get(node.id)
+    const { feedback } = node
+    const prevLength = before?.feedback.length ?? 0
+    if (feedback.length > prevLength) {
+      const newest = feedback[feedback.length - 1]
+      events.push({
+        kind: 'rework',
+        fromNodeId: newest.from,
+        toNodeId: node.id,
+        round: feedback.length,
+      })
+    }
+  }
+
   const prevGateNodes = gateNodeIds(prev.waiting, prev.graph)
   const nextGateNodes = gateNodeIds(next.waiting, next.graph)
   for (const nodeId of nextGateNodes) {
@@ -186,6 +210,8 @@ export function describeEvent(
       return event.waiting
         ? `${name(labels, event.nodeId)} is waiting at the gate.`
         : `${name(labels, event.nodeId)}'s gate cleared.`
+    case 'rework':
+      return `${name(labels, event.fromNodeId)} sent ${name(labels, event.toNodeId)} back (round ${event.round}).`
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = event

@@ -444,6 +444,30 @@ describe('direct: handoff', () => {
   })
 })
 
+describe('direct: rework', () => {
+  it('adds a parked crate on the belt between the check and the node it sent back', () => {
+    const g = graph()
+    const world = worldFor(g)
+    expect(world.crates).toEqual([])
+    const next = direct(world, [{ kind: 'rework', fromNodeId: 'b', toNodeId: 'a', round: 1 }], 0)
+    expect(next.crates).toHaveLength(1)
+    expect(next.crates[0].beltId).toBe('a->b')
+    expect(next.crates[0].progress).toBe(0)
+    expect(next.crates[0].parks).toBe(true)
+  })
+
+  it('does nothing for a rework with no matching belt', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const next = direct(
+      world,
+      [{ kind: 'rework', fromNodeId: 'ghost', toNodeId: 'nowhere', round: 1 }],
+      0
+    )
+    expect(next.crates).toEqual([])
+  })
+})
+
 describe('direct: gate', () => {
   it('adds the node to gatesWaiting and sends the foreman to wave at its seat', () => {
     const g = graph()

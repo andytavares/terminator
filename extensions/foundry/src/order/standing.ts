@@ -1,5 +1,6 @@
 import type { Gate } from '../gates/rules.js'
 import type { RunGraph } from '../line/run-graph.js'
+import { nodeLabel } from '../line/run-graph.js'
 import type { WorkOrder } from './schema.js'
 
 // What an order is doing, and whose move it is.
@@ -282,6 +283,22 @@ export function standingOf(input: StandingInput): Standing {
     }
   }
 
+  // A step being worked can carry feedback from a check that sent it back —
+  // the run is not merely "building", it is redoing what a check rejected.
+  const reworking = nodes.find(
+    (n) => (n.state === 'running' || n.state === 'waiting') && (n.feedback?.length ?? 0) > 0
+  )
+  const reworkDetail =
+    reworking === undefined
+      ? null
+      : (() => {
+          const feedback = reworking.feedback
+          const latest = feedback[feedback.length - 1]
+          const fromNode = nodes.find((n) => n.id === latest.from)
+          const label = fromNode === undefined ? latest.from : nodeLabel(null, fromNode)
+          return `Reworking after ${label} failed.`
+        })()
+
   return {
     ...counts,
     kind: 'working',
@@ -289,9 +306,10 @@ export function standingOf(input: StandingInput): Standing {
     label: `building ${done}/${total}`,
     headline: running === 0 ? 'Between steps' : 'Building',
     detail:
-      running === 0
+      reworkDetail ??
+      (running === 0
         ? `${done} of ${total} steps done. Nothing is running right now.`
-        : `${running} ${plural(running, 'agent is', 'agents are')} working — ${done} of ${total} steps done.`,
+        : `${running} ${plural(running, 'agent is', 'agents are')} working — ${done} of ${total} steps done.`),
   }
 }
 

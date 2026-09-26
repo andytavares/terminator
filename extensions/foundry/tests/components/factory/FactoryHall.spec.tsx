@@ -32,6 +32,8 @@ function node(over: Record<string, unknown> = {}) {
     role: 'builder',
     dependsOn: [],
     attempts: 1,
+    reworks: 0,
+    feedback: [],
     sessionId: 's-1',
     worktreePath: null,
     startedAt: null,

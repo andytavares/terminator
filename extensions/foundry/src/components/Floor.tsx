@@ -865,38 +865,58 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                 // under a band saying nothing was running it, and a surface
                 // that contradicts itself is worse than one that says less.
                 const gone = orphaned.includes(node.id)
+                const { feedback, reworks } = node
                 return (
-                  <span
-                    key={node.id}
-                    className={`fdry-unit is-${node.state}${gone ? ' is-orphaned' : ''}`}
-                    // The id stays reachable because it is what the ledger and
-                    // the graph call this node, but it is not what a person
-                    // watching the run needs to read.
-                    title={node.id}
-                  >
-                    {view.labels?.[node.id] ?? node.id}
-                    <u>{gone ? 'stopped' : STATE_LABEL[node.state]}</u>
-                    {node.sessionId !== null && !gone ? (
-                      <>
-                        <button
-                          type="button"
-                          className="fdry-unit-attach"
-                          aria-label={`Watch ${view.labels?.[node.id] ?? node.id}`}
-                          onClick={() => setWatching(node.sessionId)}
-                        >
-                          <ShieldQuestion aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          className="fdry-unit-attach"
-                          aria-label={`Attach to ${view.labels?.[node.id] ?? node.id}`}
-                          onClick={() => void attach(node.id)}
-                        >
-                          <Terminal aria-hidden="true" />
-                        </button>
-                      </>
+                  <React.Fragment key={node.id}>
+                    <span
+                      className={`fdry-unit is-${node.state}${gone ? ' is-orphaned' : ''}`}
+                      // The id stays reachable because it is what the ledger and
+                      // the graph call this node, but it is not what a person
+                      // watching the run needs to read.
+                      title={node.id}
+                    >
+                      {view.labels?.[node.id] ?? node.id}
+                      <u>{gone ? 'stopped' : STATE_LABEL[node.state]}</u>
+                      {reworks > 0 ? (
+                        <span className="fdry-unit-rework">{`Sent back ${reworks}×`}</span>
+                      ) : null}
+                      {node.sessionId !== null && !gone ? (
+                        <>
+                          <button
+                            type="button"
+                            className="fdry-unit-attach"
+                            aria-label={`Watch ${view.labels?.[node.id] ?? node.id}`}
+                            onClick={() => setWatching(node.sessionId)}
+                          >
+                            <ShieldQuestion aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            className="fdry-unit-attach"
+                            aria-label={`Attach to ${view.labels?.[node.id] ?? node.id}`}
+                            onClick={() => void attach(node.id)}
+                          >
+                            <Terminal aria-hidden="true" />
+                          </button>
+                        </>
+                      ) : null}
+                    </span>
+                    {feedback.length > 0 ? (
+                      <details className="fdry-unit-feedback">
+                        <summary>Why it was sent back</summary>
+                        <ul>
+                          {feedback.map((entry, index) => (
+                            <li key={index}>
+                              <code>{entry.command ?? 'a check'}</code>
+                              {' — exit '}
+                              {entry.exitCode ?? 'unknown'}
+                              <pre className="fdry-ask-detail">{entry.excerpt}</pre>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     ) : null}
-                  </span>
+                  </React.Fragment>
                 )
               })}
           </div>
