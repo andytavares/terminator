@@ -16,6 +16,24 @@ describe('latestLineOf', () => {
     expect(latestLineOf(['me@host ~ $ ', '', ''], 0)).toBe('me@host ~ $')
   })
 
+  it("skips Claude Code's input box borders, which are box-drawing rules, not output", () => {
+    const rule = '─'.repeat(80)
+    const rows = [
+      '⏺ Updated the ledger to read the real screen.',
+      '',
+      rule,
+      '> ',
+      rule,
+      '  ? for shortcuts',
+    ]
+    expect(latestLineOf(rows, 3)).toBe('⏺ Updated the ledger to read the real screen.')
+  })
+
+  it('skips a rounded input box border too', () => {
+    const rows = ['⏺ Done.', '╭' + '─'.repeat(40) + '╮', '│ > │', '╰' + '─'.repeat(40) + '╯']
+    expect(latestLineOf(rows, 2)).toBe('⏺ Done.')
+  })
+
   it('is empty for a blank screen', () => {
     expect(latestLineOf(['', '  '])).toBe('')
     expect(latestLineOf([])).toBe('')

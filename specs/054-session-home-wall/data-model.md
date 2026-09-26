@@ -70,7 +70,7 @@ One view model that every surface draws, built by `buildSessionFacts(sessions, r
 
 - `state` is `'exited'` for a closed record.
 - `workspaceColor` is `null` for scratch terminals and closed records.
-- `latestLine` is the last non-empty visible buffer row, and is empty for closed records.
+- `latestLine` is the last non-empty visible buffer row above the cursor, skipping rows drawn only in box-drawing characters (Claude Code's input box borders), and is empty for closed records.
 
 ## HomePrefs (persisted, `localStorage` `terminator.home.prefs`)
 
