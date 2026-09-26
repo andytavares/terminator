@@ -18,8 +18,15 @@ import type { StandingSources } from './order/standing.js'
 import { countAttention } from './gates/attention.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { tearDownRun, deleteOrder } from './line/teardown.js'
-import { markReady, readPulls, shipOrder } from './line/integrate.js'
+import { markReady, readPulls, shipOrder, finishShipping, pushLanes } from './line/integrate.js'
 import type { ShellExec } from './line/integrate.js'
+import { watchChecks, failedLogs } from './line/ci.js'
+import type { Check, CiVerdict } from './line/ci.js'
+import { ciRounds, ciReworkTarget, shipNodeId } from './line/ship-tail.js'
+import { writeCiState } from './line/ci-state.js'
+import type { CiState } from './line/ci-state.js'
+import { rework } from './line/scheduler.js'
+import { resolveRecipe } from './recipe/resolve.js'
 import { ensureCheckout, ensureCheckouts } from './line/worktree.js'
 import type { Checkout } from './line/worktree.js'
 import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
@@ -35,8 +42,8 @@ import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
 import { interruptedRuns, interruptedGate } from './line/adopt.js'
 import { createRoleRegistry } from './line/roles.js'
-import type { RunOutcome, StartedRun } from './line/executor.js'
-import type { RunGraph, RunNode } from './line/run-graph.js'
+import type { RunOutcome, StartedRun, ExecutorDeps } from './line/executor.js'
+import type { RunGraph, RunNode, Feedback } from './line/run-graph.js'
 import type { EffortLevel, Recipe } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
 import { collectableWrites, readRungOutput } from './line/rung-output.js'
@@ -838,6 +845,84 @@ function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): Int
 }
 
 /**
+ * The parts of a CI round that never change between the run that opened the
+ * draft and a later "another round" answered from the inbox: how a pull's
+ * checks are watched, how a failure's log is read, and where the round's own
+ * ledger entry and live state go.
+ *
+ * `sendBack` is deliberately not here — the run and the inbox each build a
+ * different one, because the run already has a graph and executor deps in
+ * hand and the inbox has to rebuild them.
+ */
+function ciRoundDepsFor(
+  root: string,
+  orderId: string,
+  exec: ShellExec
+): {
+  watch: (
+    pull: { url: string; cwd: string },
+    onPoll: (checks: readonly Check[]) => void
+  ) => Promise<CiVerdict>
+  failedLogs: (checks: readonly Check[], cwd: string) => Promise<string>
+  record: (action: string, subject: string, reason: string) => Promise<void>
+  state: (state: Omit<CiState, 'at'>) => Promise<void>
+} {
+  return {
+    watch: (pull, onPoll) =>
+      watchChecks(pull, exec, { sleep: (ms) => new Promise((r) => setTimeout(r, ms)), onPoll }),
+    failedLogs: (checks, cwd) => failedLogs(checks, cwd, exec),
+    record: async (action, subject, reason) => {
+      await createOrderStore(root).record({
+        at: new Date().toISOString(),
+        orderId,
+        actor: 'rule:ci',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      })
+    },
+    state: (state) => writeCiState(root, orderId, { ...state, at: new Date().toISOString() }),
+  }
+}
+
+/**
+ * The fix round a red CI check gets: rework the graph back to the builder,
+ * re-run the executor from there, and — if that leaves the order shippable —
+ * push the fixed branches onto the drafts that are already open.
+ *
+ * Shared between a run in flight and a `ci.red` gate answered later from the
+ * inbox, which is the whole reason `graphRef` is a box rather than a plain
+ * graph: each round has to see the graph the previous round left, and the
+ * inbox path has no closure over a running executor to hold it for it.
+ */
+function ciSendBackFor(
+  root: string,
+  order: WorkOrder,
+  recipe: Recipe,
+  executorDeps: ExecutorDeps,
+  integrateDeps: IntegrateDeps,
+  graphRef: { current: RunGraph }
+): (feedback: Feedback) => Promise<boolean> {
+  return async (feedback) => {
+    const target = ciReworkTarget(recipe)
+    const shipId = shipNodeId(recipe)
+    if (target === null || shipId === null) return false
+
+    graphRef.current = rework(graphRef.current, shipId, target, feedback)
+    await writeRunGraph(root, graphRef.current)
+
+    const outcome = await execute(order, recipe, graphRef.current, executorDeps)
+    graphRef.current = outcome.graph
+    await writeRunGraph(root, graphRef.current)
+
+    if (!outcome.shippable) return false
+    await pushLanes(order, integrateDeps)
+    return true
+  }
+}
+
+/**
  * Stop a run, and mean it.
  *
  * Every gate that offers "Stop here" said the order would be cancelled, and
@@ -936,13 +1021,18 @@ async function adoptInterruptedRuns(root: string): Promise<void> {
  * a role with no write list is run read-only, refused by the `PreToolUse` hook
  * rather than by a reminder in its own instructions.
  */
-async function executeRun(
+async function buildExecutorDeps(
   api: ExtensionAPI,
   root: string,
   order: WorkOrder,
   recipe: Recipe,
   graph: RunGraph
-): Promise<void> {
+): Promise<{
+  deps: ExecutorDeps
+  exec: ShellExec
+  store: ReturnType<typeof createOrderStore>
+  houseRules: ReturnType<typeof rulesFor>['rules']
+}> {
   const exec: ShellExec = (options) => api.shell.exec(options)
   // `diff-metrics` speaks in bare command and args; the core allowlist admits
   // `git` and `gh` and nothing else, so anything past those is refused here
@@ -1229,6 +1319,186 @@ async function executeRun(
     houseDocs: [...order.context.houseDocs],
   }).rules
   const gates = createLiveGateStore(() => root)
+  return {
+    deps: {
+      now: () => new Date().toISOString(),
+      sources,
+      run: runNode,
+      sessionFor: (lane, role) => conversations.get(conversation(lane, role)),
+      record: async (action, subject, reason) => {
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'rule:line',
+          action,
+          subject,
+          reason,
+          evidence: [],
+        })
+      },
+      autonomy: autonomyFor(api),
+      // Loaded once, so what an agent is told the house rules are and what the
+      // change is judged against are the same list.
+      rules: houseRules,
+      /**
+       * Take what a read-only rung wrote, put it on the order, and save it.
+       *
+       * The Forge has always had this and the Line never did: four of the
+       * standard shape's nine steps are roles whose whole product is a document,
+       * and every one of them ended its turn with the document in a terminal
+       * nobody reads. Watched on a live run — a scout's complete report of where
+       * the application picks its colours, gone; an architect's three defects in
+       * the order it was about to be built from, gone, refused on the way out by
+       * the very policy that makes the rung trustworthy.
+       */
+      collect: async ({ nodeId, role, outputPath }) => {
+        const current = (await store.load(order.id)) ?? order
+        const result = readRungOutput({
+          order: current,
+          role,
+          writes: collectableWrites(roleRegistry.get(role)),
+          outputPath,
+          at: new Date().toISOString(),
+        })
+        if (result === null) return null
+
+        // A refusal is a result too, and it is the agent's to act on rather than
+        // the operator's to decipher — so it is recorded and the rung is not
+        // credited with having filed anything.
+        if (!result.ok) {
+          await store.record({
+            at: new Date().toISOString(),
+            orderId: order.id,
+            actor: `role:${role}`,
+            action: 'rung.refused',
+            subject: nodeId,
+            reason: result.reason,
+            evidence: [],
+          })
+          return null
+        }
+
+        await store.save(result.order)
+        return { order: result.order, note: result.note, defect: result.defect }
+      },
+      raise: async (gate) => {
+        await gates.save(gate)
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: `rule:${gate.rule}`,
+          action: 'gate.raised',
+          subject: gate.id,
+          reason: gate.why,
+          evidence: [...gate.evidence],
+        })
+      },
+      // A rung is a command, not a conversation: its inputs fully determine what
+      // it does and its verdict is its exit status. So it runs in a terminal tab
+      // of its own in the lane's checkout — visible, like everything else here —
+      // with no agent in between to spend a turn on it or a transcript to read
+      // the answer back out of.
+      runStep: async (step) => {
+        if (step.command === null) return null
+        const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
+        const checkout = checkouts.get(lane)
+        const runner = supervisedRunner
+        // Nothing ran, so nothing was measured — never a pass.
+        if (checkout === undefined || runner === null) return null
+        return runner.runCommand({
+          worktreePath: checkout.path,
+          workspaceId: workspaceOf(checkout),
+          branch: checkout.branch,
+          issue: issueOf(order),
+          title: step.name,
+          command: step.command,
+        })
+      },
+      // A recipe `run` step whose command is not a slash instruction runs as a
+      // command in the lane's checkout, the same way `runStep` runs a gate's
+      // check — visible, and never handed to an agent that would report a
+      // pass regardless of what the command did.
+      runCommand: async (input) => {
+        const lane = input.node.lane ?? [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
+        const checkout = checkouts.get(lane)
+        const runner = supervisedRunner
+        // Nothing ran, so nothing was measured — never a pass.
+        if (checkout === undefined || runner === null) return null
+        return runner.runCommand({
+          worktreePath: checkout.path,
+          workspaceId: workspaceOf(checkout),
+          branch: checkout.branch,
+          issue: issueOf(order),
+          title: input.title,
+          command: input.command,
+          logPath: input.logPath,
+        })
+      },
+      // The previous process of this conversation may still be sitting at its
+      // prompt when a node resumes it. Two processes must not share one
+      // conversation — the same reason `endAndWait` exists for a follow-up turn.
+      endSession: (sessionId) =>
+        endAndWait(
+          {
+            stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
+            isLive: isLiveSession,
+          },
+          sessionId,
+          'continuing the lane in its next step'
+        ).then(() => undefined),
+      observe: async () => ({
+        // Fractional on purpose. Rounded, a run at 19:31 reported "20" and a
+        // twenty-minute budget could only be exceeded at 20:30 — so a run whose
+        // deadline was the budget never saw the gate at all. The gate rounds it
+        // for the sentence it prints; the comparison is exact.
+        elapsedMinutes: (Date.now() - startedAt) / 60_000,
+      }),
+      onEvent: (event) => {
+        if (event.type !== 'verdict') return
+        void store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: `role:${event.verdict.producedBy.role}`,
+          action: 'verify.verdict',
+          subject: event.verdict.criterionId,
+          reason: `${event.verdict.result}${event.verdict.reason === '' ? '' : `: ${event.verdict.reason}`}`,
+          evidence: [...event.verdict.evidence],
+        })
+      },
+      // Written on every change rather than only at the end. `run.observe` reads
+      // this file, so without it the Floor shows the graph the run started with
+      // for the whole of the run.
+      persist: (graph) => writeRunGraph(root, graph),
+      // What the work actually changed, so the regrade answers for the change
+      // rather than for the plan that predicted it. Without this the executor
+      // was handed the units' own `touches` list and a hardcoded zero lines, so
+      // a builder that went outside what it declared was invisible to the check
+      // that exists to notice, and nothing could ever grade worse than planned.
+      observedChange: readObservedChange,
+      // Lets the budget be re-read while agents are in flight. Without it the
+      // wall-clock budget can only fire between waves, which is every case
+      // except the one it exists for: an agent that never comes back.
+      wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    },
+    exec,
+    store,
+    houseRules,
+  }
+}
+
+async function executeRun(
+  api: ExtensionAPI,
+  root: string,
+  order: WorkOrder,
+  recipe: Recipe,
+  graph: RunGraph
+): Promise<void> {
+  const {
+    deps: executorDeps,
+    exec,
+    store,
+    houseRules,
+  } = await buildExecutorDeps(api, root, order, recipe, graph)
   const issuesPort = issuesPortFor(api)
 
   // The issue moves the moment work starts, not when somebody remembers.
@@ -1236,166 +1506,7 @@ async function executeRun(
     await writeBack(order, 'started', writeBackDepsFor(api, root, order, issuesPort))
   }
 
-  const outcome = await execute(order, recipe, graph, {
-    now: () => new Date().toISOString(),
-    sources,
-    run: runNode,
-    sessionFor: (lane, role) => conversations.get(conversation(lane, role)),
-    record: async (action, subject, reason) => {
-      await store.record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: 'rule:line',
-        action,
-        subject,
-        reason,
-        evidence: [],
-      })
-    },
-    autonomy: autonomyFor(api),
-    // Loaded once, so what an agent is told the house rules are and what the
-    // change is judged against are the same list.
-    rules: houseRules,
-    /**
-     * Take what a read-only rung wrote, put it on the order, and save it.
-     *
-     * The Forge has always had this and the Line never did: four of the
-     * standard shape's nine steps are roles whose whole product is a document,
-     * and every one of them ended its turn with the document in a terminal
-     * nobody reads. Watched on a live run — a scout's complete report of where
-     * the application picks its colours, gone; an architect's three defects in
-     * the order it was about to be built from, gone, refused on the way out by
-     * the very policy that makes the rung trustworthy.
-     */
-    collect: async ({ nodeId, role, outputPath }) => {
-      const current = (await store.load(order.id)) ?? order
-      const result = readRungOutput({
-        order: current,
-        role,
-        writes: collectableWrites(roleRegistry.get(role)),
-        outputPath,
-        at: new Date().toISOString(),
-      })
-      if (result === null) return null
-
-      // A refusal is a result too, and it is the agent's to act on rather than
-      // the operator's to decipher — so it is recorded and the rung is not
-      // credited with having filed anything.
-      if (!result.ok) {
-        await store.record({
-          at: new Date().toISOString(),
-          orderId: order.id,
-          actor: `role:${role}`,
-          action: 'rung.refused',
-          subject: nodeId,
-          reason: result.reason,
-          evidence: [],
-        })
-        return null
-      }
-
-      await store.save(result.order)
-      return { order: result.order, note: result.note, defect: result.defect }
-    },
-    raise: async (gate) => {
-      await gates.save(gate)
-      await store.record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: `rule:${gate.rule}`,
-        action: 'gate.raised',
-        subject: gate.id,
-        reason: gate.why,
-        evidence: [...gate.evidence],
-      })
-    },
-    // A rung is a command, not a conversation: its inputs fully determine what
-    // it does and its verdict is its exit status. So it runs in a terminal tab
-    // of its own in the lane's checkout — visible, like everything else here —
-    // with no agent in between to spend a turn on it or a transcript to read
-    // the answer back out of.
-    runStep: async (step) => {
-      if (step.command === null) return null
-      const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
-      const checkout = checkouts.get(lane)
-      const runner = supervisedRunner
-      // Nothing ran, so nothing was measured — never a pass.
-      if (checkout === undefined || runner === null) return null
-      return runner.runCommand({
-        worktreePath: checkout.path,
-        workspaceId: workspaceOf(checkout),
-        branch: checkout.branch,
-        issue: issueOf(order),
-        title: step.name,
-        command: step.command,
-      })
-    },
-    // A recipe `run` step whose command is not a slash instruction runs as a
-    // command in the lane's checkout, the same way `runStep` runs a gate's
-    // check — visible, and never handed to an agent that would report a
-    // pass regardless of what the command did.
-    runCommand: async (input) => {
-      const lane = input.node.lane ?? [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
-      const checkout = checkouts.get(lane)
-      const runner = supervisedRunner
-      // Nothing ran, so nothing was measured — never a pass.
-      if (checkout === undefined || runner === null) return null
-      return runner.runCommand({
-        worktreePath: checkout.path,
-        workspaceId: workspaceOf(checkout),
-        branch: checkout.branch,
-        issue: issueOf(order),
-        title: input.title,
-        command: input.command,
-        logPath: input.logPath,
-      })
-    },
-    // The previous process of this conversation may still be sitting at its
-    // prompt when a node resumes it. Two processes must not share one
-    // conversation — the same reason `endAndWait` exists for a follow-up turn.
-    endSession: (sessionId) =>
-      endAndWait(
-        {
-          stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
-          isLive: isLiveSession,
-        },
-        sessionId,
-        'continuing the lane in its next step'
-      ).then(() => undefined),
-    observe: async () => ({
-      // Fractional on purpose. Rounded, a run at 19:31 reported "20" and a
-      // twenty-minute budget could only be exceeded at 20:30 — so a run whose
-      // deadline was the budget never saw the gate at all. The gate rounds it
-      // for the sentence it prints; the comparison is exact.
-      elapsedMinutes: (Date.now() - startedAt) / 60_000,
-    }),
-    onEvent: (event) => {
-      if (event.type !== 'verdict') return
-      void store.record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: `role:${event.verdict.producedBy.role}`,
-        action: 'verify.verdict',
-        subject: event.verdict.criterionId,
-        reason: `${event.verdict.result}${event.verdict.reason === '' ? '' : `: ${event.verdict.reason}`}`,
-        evidence: [...event.verdict.evidence],
-      })
-    },
-    // Written on every change rather than only at the end. `run.observe` reads
-    // this file, so without it the Floor shows the graph the run started with
-    // for the whole of the run.
-    persist: (graph) => writeRunGraph(root, graph),
-    // What the work actually changed, so the regrade answers for the change
-    // rather than for the plan that predicted it. Without this the executor
-    // was handed the units' own `touches` list and a hardcoded zero lines, so
-    // a builder that went outside what it declared was invisible to the check
-    // that exists to notice, and nothing could ever grade worse than planned.
-    observedChange: readObservedChange,
-    // Lets the budget be re-read while agents are in flight. Without it the
-    // wall-clock budget can only fire between waves, which is every case
-    // except the one it exists for: an agent that never comes back.
-    wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  })
+  const outcome = await execute(order, recipe, graph, executorDeps)
 
   await writeRunGraph(root, outcome.graph)
   await store.record({
@@ -1433,10 +1544,14 @@ async function executeRun(
     return
   }
 
+  const gates = createLiveGateStore(() => root)
+  const shippedOrder = { ...order, risk: outcome.risk }
+  const graphRef = { current: outcome.graph }
+
   // Shipped against the grade the change turned out to deserve, not the one
   // the plan predicted — which is the whole reason the executor regrades.
   const shipped = await shipOrder(
-    { ...order, risk: outcome.risk },
+    shippedOrder,
     {
       verdicts: outcome.verdicts,
       findings: outcome.inspection.required ? [outcome.inspection.reason] : [],
@@ -1458,6 +1573,22 @@ async function executeRun(
       raiseGate: async (gate) => {
         await gates.save(gate)
       },
+      // A recipe with no `ci` never asks to watch anything (`rounds: null`
+      // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
+      watchCi: (pulls) =>
+        ciRounds({
+          pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+          rounds: recipe.ci?.rounds ?? null,
+          ...ciRoundDepsFor(root, order.id, exec),
+          sendBack: ciSendBackFor(
+            root,
+            shippedOrder,
+            recipe,
+            executorDeps,
+            integrateDepsFor(api, root, order.id),
+            graphRef
+          ),
+        }),
     }
   )
 
@@ -1853,6 +1984,7 @@ export function activate(api: ExtensionAPI): void {
 
   const forge = createForgeChannels({
     store: createLiveOrderStore(dataRoot),
+    dataRoot,
     now: () => new Date().toISOString(),
     standingSources,
     writeBackDefault: () => defaultWriteBack(api),
@@ -2137,6 +2269,53 @@ export function activate(api: ExtensionAPI): void {
         if (order !== null && port !== null) {
           await writeBack(order, 'merged', writeBackDepsFor(api, dataRoot(), order, port))
         }
+        return
+      }
+
+      // A `ci.red` gate is not the run stopping — the run already finished
+      // and shipped a draft. "Another round" is one more watch-fail-rework
+      // cycle against the drafts that already exist, not a resume of a graph
+      // that has nothing left waiting on it.
+      if (gate.rule === 'ci.red') {
+        if (option !== 'send_back') return
+        const root = dataRoot()
+        const order = await createOrderStore(root).load(gate.orderId)
+        if (order === null || order.recipe === null) return
+        const resolved = resolveRecipe(order.recipe, resolveSources(api, root))
+        if (!resolved.ok) return
+        const recipe = resolved.resolved.value
+        const graph = await readRunGraph(root, gate.orderId)
+        if (graph === null) return
+        const pulls = await readPulls(root, gate.orderId)
+        const { deps: executorDeps, exec } = await buildExecutorDeps(
+          api,
+          root,
+          order,
+          recipe,
+          graph
+        )
+        const integrateDeps = integrateDepsFor(api, root, order.id)
+        const graphRef = { current: graph }
+        const outcome = await ciRounds({
+          pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+          rounds: 1,
+          ...ciRoundDepsFor(root, order.id, exec),
+          sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
+        })
+        const gates = createLiveGateStore(dataRoot)
+        await finishShipping(
+          order,
+          { verdicts: [], findings: [] },
+          pulls,
+          pulls.map((pull) => pull.bodyPath),
+          outcome,
+          {
+            ...integrateDeps,
+            raiseGate: async (g) => {
+              await gates.save(g)
+            },
+          }
+        )
         return
       }
 

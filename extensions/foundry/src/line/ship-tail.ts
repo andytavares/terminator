@@ -1,6 +1,7 @@
 import type { Check, CiVerdict } from './ci.js'
 import type { Feedback } from './run-graph.js'
 import type { CiState } from './ci-state.js'
+import type { Recipe, Step } from '../recipe/parse.js'
 
 // The tail end of shipping: watch a pull's CI, and if it goes red, send the
 // failure back to the builder for a bounded number of automatic rounds before
@@ -149,4 +150,35 @@ export async function ciRounds(input: CiRoundsInput): Promise<CiOutcome> {
     await input.state({ round, max: rounds, status: 'red', pulls: snapshot(), reason })
     return { kind: 'red', checks: redChecks, excerpt, rounds }
   }
+}
+
+/** A fan-out step's inner step, whose shape `StepSchema` leaves untyped. */
+function fanoutRole(step: Step): string | undefined {
+  const inner = step.step as { role?: unknown } | undefined
+  return typeof inner?.role === 'string' ? inner.role : undefined
+}
+
+/**
+ * The step a CI failure goes back to.
+ *
+ * Named by the recipe's own `onFail` where one exists — a step already told
+ * `rework` what to do on its own failure, and CI is just another way that
+ * step's output turned out wrong. Otherwise the first builder in the recipe,
+ * because that is the role whose work a red check is almost always about.
+ */
+export function ciReworkTarget(recipe: Recipe): string | null {
+  for (const step of recipe.steps) {
+    if (step.onFail !== undefined) return step.onFail.rework
+  }
+  for (const step of recipe.steps) {
+    if (step.kind === 'agent' && step.role === 'builder') return step.id
+    if (step.kind === 'fanout' && fanoutRole(step) === 'builder') return step.id
+  }
+  return null
+}
+
+/** The id of the recipe's `ready-for-review` gate — the node CI rounds count. */
+export function shipNodeId(recipe: Recipe): string | null {
+  const gate = recipe.steps.find((step) => step.kind === 'gate' && step.rule === 'ready-for-review')
+  return gate?.id ?? null
 }

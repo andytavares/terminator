@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ciRounds } from '../../src/line/ship-tail.js'
+import { ciRounds, ciReworkTarget, shipNodeId } from '../../src/line/ship-tail.js'
+import { parseRecipe } from '../../src/recipe/parse.js'
 import type { CiVerdict, Check } from '../../src/line/ci.js'
 import type { Feedback } from '../../src/line/run-graph.js'
 import type { CiState } from '../../src/line/ci-state.js'
+import type { Recipe } from '../../src/recipe/parse.js'
 
 function check(over: Partial<Check> = {}): Check {
   return { name: 'build', bucket: 'pass', link: 'https://x/1', workflow: 'ci', ...over }
@@ -163,5 +165,120 @@ describe('ciRounds', () => {
     })
     expect(outcome.kind).toBe('red')
     void n
+  })
+})
+
+function recipe(yaml: string): Recipe {
+  const parsed = parseRecipe(yaml, 't.yaml')
+  if (!parsed.ok) throw new Error(parsed.reason)
+  return parsed.value
+}
+
+describe('ciReworkTarget', () => {
+  it('names the onFail rework target when a step declares one', () => {
+    const r = recipe(`
+schemaVersion: 1
+id: t
+ci: { rounds: 1 }
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: check
+    kind: run
+    after: [build]
+    command: make check
+    onFail: { rework: build, max: 2 }
+  - id: ship
+    kind: gate
+    after: [check]
+    rule: ready-for-review
+    defaultIfIgnored: hold
+`)
+    expect(ciReworkTarget(r)).toBe('build')
+  })
+
+  it('falls back to the first fanout step whose inner step is a builder', () => {
+    const r = recipe(`
+schemaVersion: 1
+id: t
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+  - id: ship
+    kind: gate
+    after: [build]
+    rule: ready-for-review
+    defaultIfIgnored: hold
+`)
+    expect(ciReworkTarget(r)).toBe('build')
+  })
+
+  it('falls back to the first agent step whose role is builder', () => {
+    const r = recipe(`
+schemaVersion: 1
+id: t
+steps:
+  - id: build
+    kind: agent
+    role: builder
+  - id: ship
+    kind: gate
+    after: [build]
+    rule: ready-for-review
+    defaultIfIgnored: hold
+`)
+    expect(ciReworkTarget(r)).toBe('build')
+  })
+
+  it('is null when the recipe has no onFail and no builder', () => {
+    const r = recipe(`
+schemaVersion: 1
+id: t
+steps:
+  - id: review
+    kind: agent
+    role: reviewer
+  - id: ship
+    kind: gate
+    after: [review]
+    rule: ready-for-review
+    defaultIfIgnored: hold
+`)
+    expect(ciReworkTarget(r)).toBeNull()
+  })
+})
+
+describe('shipNodeId', () => {
+  it('names the ready-for-review gate step', () => {
+    const r = recipe(`
+schemaVersion: 1
+id: t
+steps:
+  - id: build
+    kind: agent
+    role: builder
+  - id: ship
+    kind: gate
+    after: [build]
+    rule: ready-for-review
+    defaultIfIgnored: hold
+`)
+    expect(shipNodeId(r)).toBe('ship')
+  })
+
+  it('is null when the recipe opens no ready-for-review gate', () => {
+    const r = recipe(`
+schemaVersion: 1
+id: t
+steps:
+  - id: build
+    kind: agent
+    role: builder
+`)
+    expect(shipNodeId(r)).toBeNull()
   })
 })
