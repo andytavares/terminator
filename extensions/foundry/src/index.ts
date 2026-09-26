@@ -1330,6 +1330,38 @@ async function executeRun(
         command: step.command,
       })
     },
+    // A recipe `run` step whose command is not a slash instruction runs as a
+    // command in the lane's checkout, the same way `runStep` runs a gate's
+    // check — visible, and never handed to an agent that would report a
+    // pass regardless of what the command did.
+    runCommand: async (input) => {
+      const lane = input.node.lane ?? [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
+      const checkout = checkouts.get(lane)
+      const runner = supervisedRunner
+      // Nothing ran, so nothing was measured — never a pass.
+      if (checkout === undefined || runner === null) return null
+      return runner.runCommand({
+        worktreePath: checkout.path,
+        workspaceId: workspaceOf(checkout),
+        branch: checkout.branch,
+        issue: issueOf(order),
+        title: input.title,
+        command: input.command,
+        logPath: input.logPath,
+      })
+    },
+    // The previous process of this conversation may still be sitting at its
+    // prompt when a node resumes it. Two processes must not share one
+    // conversation — the same reason `endAndWait` exists for a follow-up turn.
+    endSession: (sessionId) =>
+      endAndWait(
+        {
+          stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
+          isLive: isLiveSession,
+        },
+        sessionId,
+        'continuing the lane in its next step'
+      ).then(() => undefined),
     observe: async () => ({
       // Fractional on purpose. Rounded, a run at 19:31 reported "20" and a
       // twenty-minute budget could only be exceeded at 20:30 — so a run whose
