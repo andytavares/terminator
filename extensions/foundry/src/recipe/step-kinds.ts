@@ -1,4 +1,5 @@
 import type { PlanUnit, WorkOrder } from '../order/schema.js'
+import { CHECK_NAMES, type CheckName } from '../verify/toolchain-probe.js'
 
 // The small language a recipe is allowed to speak.
 //
@@ -135,6 +136,14 @@ function collectionAt(path: string, order: WorkOrder): unknown[] | null {
 export function evaluateWhen(expression: string | undefined, order: WorkOrder): boolean {
   if (expression === undefined || expression.trim() === '') return true
 
+  const toolchainSet = /^toolchain\.(\w+)\s+is\s+(not\s+)?set$/.exec(expression.trim())
+  if (toolchainSet !== null) {
+    const [, check, negated] = toolchainSet
+    if (!(CHECK_NAMES as readonly string[]).includes(check)) return false
+    const measured = order.context.toolchain[check as CheckName] !== null
+    return negated === undefined ? measured : !measured
+  }
+
   const emptiness = /^([\w.]+)\s+is\s+(not\s+)?empty$/.exec(expression.trim())
   if (emptiness !== null) {
     const items = collectionAt(emptiness[1], order)
@@ -204,4 +213,27 @@ export function checkExpect(
   }
 
   return failures
+}
+
+/**
+ * Fills in `${toolchain.<check>}` placeholders with the command the probe
+ * found. `null` — not a guess, not the literal string — is what a recipe gets
+ * back when a placeholder names a check the repository has no command for, or
+ * a check the toolchain does not have, or when the command carries any other
+ * `${...}` this language does not resolve: a step must not run on a command
+ * that is half a template.
+ */
+export function resolveCommand(command: string, order: WorkOrder): string | null {
+  const placeholders = command.match(/\$\{[^}]*\}/g) ?? []
+  if (placeholders.some((p) => !/^\$\{toolchain\.\w+\}$/.test(p))) return null
+
+  let resolved = command
+  for (const placeholder of placeholders) {
+    const check = /^\$\{toolchain\.(\w+)\}$/.exec(placeholder)![1]
+    if (!(CHECK_NAMES as readonly string[]).includes(check)) return null
+    const probed = order.context.toolchain[check as CheckName]
+    if (probed === null) return null
+    resolved = resolved.replace(placeholder, probed.command)
+  }
+  return resolved
 }

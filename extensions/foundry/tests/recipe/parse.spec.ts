@@ -316,6 +316,83 @@ describe('parseRule', () => {
   })
 })
 
+// `onFail` is a rework loop: a command step that fails sends the run back to
+// an earlier step rather than stopping the line. It only makes sense pointing
+// backward, at a step that can actually redo work.
+describe('onFail', () => {
+  const ONFAIL = `
+schemaVersion: 1
+id: onfail
+steps:
+  - id: build
+    kind: agent
+    role: builder
+  - id: sibling
+    kind: agent
+    role: builder
+  - id: gatecheck
+    kind: gate
+    rule: proceed
+    defaultIfIgnored: hold
+    after: [build]
+  - id: verify
+    kind: run
+    command: npm test
+    after: [gatecheck]
+    onFail: { rework: build, max: 2 }
+  - id: ship
+    kind: gate
+    rule: ready
+    defaultIfIgnored: hold
+    after: [verify]
+`
+
+  it('accepts onFail on a valid run step reworking an upstream agent step', () => {
+    const r = parseRecipe(ONFAIL, 'onfail.yaml')
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+  })
+
+  it('rejects onFail reworking a downstream step', () => {
+    const r = parseRecipe(ONFAIL.replace('rework: build', 'rework: ship'), 'onfail.yaml')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/verify/)
+  })
+
+  it('rejects onFail reworking a step that is not upstream at all', () => {
+    const r = parseRecipe(ONFAIL.replace('rework: build', 'rework: sibling'), 'onfail.yaml')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/verify/)
+  })
+
+  it('rejects onFail reworking a gate — only an agent or fanout can redo work', () => {
+    const r = parseRecipe(ONFAIL.replace('rework: build', 'rework: gatecheck'), 'onfail.yaml')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/verify/)
+  })
+
+  it('rejects a max below 1', () => {
+    const r = parseRecipe(ONFAIL.replace('max: 2', 'max: 0'), 'onfail.yaml')
+    expect(r.ok).toBe(false)
+  })
+
+  it('rejects a max above 3', () => {
+    const r = parseRecipe(ONFAIL.replace('max: 2', 'max: 4'), 'onfail.yaml')
+    expect(r.ok).toBe(false)
+  })
+
+  it('rejects onFail on a step whose kind is not run — only a command step can fail on its own today', () => {
+    const r = parseRecipe(
+      ONFAIL.replace(
+        '  - id: build\n    kind: agent\n    role: builder\n',
+        '  - id: build\n    kind: agent\n    role: builder\n    onFail: { rework: sibling, max: 1 }\n'
+      ),
+      'onfail.yaml'
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/build/)
+  })
+})
+
 // Effort is how hard the agent works, and it is a property of the shape of
 // the work: a one-lane P3 change and a cross-cutting refactor should not think
 // equally hard. A recipe sets it for every agent step; a step may say

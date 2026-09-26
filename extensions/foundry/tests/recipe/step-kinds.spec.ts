@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { selectOver, evaluateWhen, checkExpect } from '../../src/recipe/step-kinds.js'
+import {
+  selectOver,
+  evaluateWhen,
+  checkExpect,
+  resolveCommand,
+} from '../../src/recipe/step-kinds.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
@@ -105,6 +110,50 @@ describe('evaluateWhen', () => {
   it('is false for an expression it cannot read — a step that runs because nobody could read its condition is the worse failure', () => {
     expect(evaluateWhen('risk.grade == P0 && something', order())).toBe(false)
     expect(evaluateWhen('if risk then run', order())).toBe(false)
+  })
+
+  it('is set when the toolchain probed a command for that check', () => {
+    const o = order()
+    o.context.toolchain.test = { command: 'npm test', source: 'package.json' }
+    expect(evaluateWhen('toolchain.test is set', o)).toBe(true)
+    expect(evaluateWhen('toolchain.test is not set', o)).toBe(false)
+  })
+
+  it('is not set when the toolchain found no command for that check', () => {
+    const o = order()
+    expect(evaluateWhen('toolchain.lint is set', o)).toBe(false)
+    expect(evaluateWhen('toolchain.lint is not set', o)).toBe(true)
+  })
+
+  it('is false for a check name the toolchain does not have', () => {
+    expect(evaluateWhen('toolchain.nonesuch is set', order())).toBe(false)
+    expect(evaluateWhen('toolchain.nonesuch is not set', order())).toBe(false)
+  })
+})
+
+describe('resolveCommand', () => {
+  it('resolves a single placeholder to the probed command', () => {
+    const o = order()
+    o.context.toolchain.test = { command: 'npm test', source: 'package.json' }
+    expect(resolveCommand('${toolchain.test}', o)).toBe('npm test')
+  })
+
+  it('leaves a command with no placeholder unchanged', () => {
+    expect(resolveCommand('echo hi', order())).toBe('echo hi')
+  })
+
+  it('is null when the named check was not measured', () => {
+    expect(resolveCommand('${toolchain.lint}', order())).toBeNull()
+  })
+
+  it('is null for an unknown check name', () => {
+    expect(resolveCommand('${toolchain.nonesuch}', order())).toBeNull()
+  })
+
+  it('is null for any other placeholder', () => {
+    const o = order()
+    o.context.toolchain.test = { command: 'npm test', source: 'package.json' }
+    expect(resolveCommand('${toolchain.test} && ${x}', o)).toBeNull()
   })
 })
 
