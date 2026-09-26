@@ -55,6 +55,8 @@ const mockBridgeInvoke = vi.fn(async (channel: string, payload?: unknown) => {
             role: 'builder',
             dependsOn: [],
             attempts: 1,
+            reworks: 0,
+            feedback: [],
             sessionId: null,
             worktreePath: null,
             startedAt: null,

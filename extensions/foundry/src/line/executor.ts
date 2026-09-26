@@ -1,3 +1,5 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import {
   readyNodes,
   startReady,
@@ -7,11 +9,12 @@ import {
   budgetBreach,
   hasStalled,
   blockedNodes,
+  rework,
 } from './scheduler.js'
 import type { BudgetBreach } from './scheduler.js'
 import { withNode, stepFor, unitsOf, wantsFreshContext } from './run-graph.js'
-import { checkExpect } from '../recipe/step-kinds.js'
-import type { RunGraph, RunNode } from './run-graph.js'
+import { checkExpect, resolveCommand } from '../recipe/step-kinds.js'
+import type { RunGraph, RunNode, Feedback } from './run-graph.js'
 import { createRoleRegistry } from './roles.js'
 import type { RoleRegistry } from './roles.js'
 import { brief } from './brief.js'
@@ -124,6 +127,32 @@ export interface ExecutorDeps {
      */
     onStarted?: (sessionId: string) => void
   }) => Promise<StartedRun>
+
+  /**
+   * Run a `run` step's command directly, rather than handing it to an agent as
+   * an instruction.
+   *
+   * Without this every `run` step went to `deps.run`, which starts an agent
+   * session; the agent was told "run this exactly" and the turn's end reported
+   * exit 0 regardless, so a `run` step could never actually fail. Absent, a
+   * `run` step keeps going to `deps.run` exactly as before.
+   */
+  readonly runCommand?: (input: {
+    node: RunNode
+    command: string
+    title: string
+    logPath: string
+  }) => Promise<number | null>
+
+  /**
+   * End a lane's live session before it is resumed.
+   *
+   * The previous process of that conversation may still be sitting at its
+   * prompt; two processes must not share one conversation — the same reason
+   * `endAndWait` exists in `src/runtime/end-session.ts`.
+   */
+  readonly endSession?: (sessionId: string) => Promise<void>
+
   readonly now: () => string
   readonly sources: ResolveSources
   readonly onEvent?: (event: ExecutorEvent) => void
@@ -295,6 +324,16 @@ function isGateRule(value: unknown): value is GateRuleId {
   return typeof value === 'string' && (GATE_RULES as readonly string[]).includes(value)
 }
 
+/** A node id, made safe to use as a filename. */
+function safeFilename(id: string): string {
+  return id.replace(/[^A-Za-z0-9._-]/g, '_')
+}
+
+/** The tail of a log, for a feedback excerpt — never the whole thing. */
+function lastLines(text: string, count: number): string {
+  return text.split('\n').slice(-count).join('\n')
+}
+
 function promptFor(
   order: WorkOrder,
   recipe: Recipe,
@@ -312,6 +351,7 @@ function promptFor(
     rules,
     command: step.kind === 'run' ? (step.command ?? '') : undefined,
     outputPath: outputPath ?? undefined,
+    feedback: node.feedback,
   })
 }
 
@@ -524,6 +564,10 @@ export async function execute(
         halted = await raise('verify.repeat-fail', {
           summary: `${order.title} cannot go any further on its own`,
           why: `${blockedNodes(current).length} units are blocked and nothing is runnable. Something they depend on failed, or the plan has a cycle.`,
+          // The node the Inbox's "Send back" should retry — not just that
+          // *something* failed. Null only when nothing here is actually
+          // failed, which a cycle can still produce.
+          nodeId: current.nodes.find((n) => n.state === 'failed')?.id ?? null,
         })
         stalled = true
       }
@@ -583,6 +627,53 @@ export async function execute(
         .filter((n): n is RunNode => n !== undefined && n.kind !== 'gate')
         .map(async (node) => {
           const roleId = node.role
+          const step = stepFor(recipe, node)
+
+          // A `run` step whose command is not a slash instruction runs as a
+          // command, not as an agent. Handed to an agent, a `run` step was
+          // told "run this exactly" and the turn's end reported exit 0
+          // regardless — a `run` step could never actually fail. A slash
+          // command such as `/speckit-plan` is an agent instruction, not a
+          // shell command, and keeps going to `deps.run`.
+          if (
+            step?.kind === 'run' &&
+            step.command !== undefined &&
+            !step.command.trimStart().startsWith('/') &&
+            deps.runCommand !== undefined
+          ) {
+            const resolved = resolveCommand(step.command, order)
+            if (resolved === null) {
+              // Half a template, or a check this repository has no command
+              // for. Not measured here — never a silent pass.
+              await deps.record?.(
+                'step.not_measured',
+                node.id,
+                `${node.stepId} names "${step.command}", which nothing in this repository's toolchain resolves.`
+              )
+              return { node, skipped: true as const }
+            }
+            const logPath = path.join(
+              orderDir(deps.sources.dataRoot, order.id),
+              'runs',
+              `${safeFilename(node.id)}.${node.attempts}.log`
+            )
+            const exitCode = await deps.runCommand({
+              node,
+              command: resolved,
+              title: node.stepId,
+              logPath,
+            })
+            return {
+              node,
+              result: { sessionId: `${node.id}-command`, exitCode },
+              roleId,
+              readOnly: roleId !== null && !roles.mayWrite(roleId),
+              outputPath: outputFor(node, roleId),
+              command: resolved,
+              logPath,
+            }
+          }
+
           // One conversation per lane, where the role allows it. A fresh agent
           // per node is a terminal per node and an agent that has read nothing
           // — which is what `continueRun` exists to avoid.
@@ -628,6 +719,11 @@ export async function execute(
           const outputPath = outputFor(node, roleId)
           const tier = (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep'
 
+          // The previous process of this conversation may still be sitting at
+          // its prompt. Two processes must not share one conversation — the
+          // same reason `endAndWait` exists for a resumed terminal session.
+          if (resumeSessionId !== undefined) await deps.endSession?.(resumeSessionId)
+
           const result = await deps.run({
             node,
             role: roleId,
@@ -643,7 +739,15 @@ export async function execute(
             // a session on a node while there is still an agent in it.
             onStarted: (sessionId) => void noteStarted(node.id, sessionId),
           })
-          return { node, result, roleId, readOnly, outputPath }
+          return {
+            node,
+            result,
+            roleId,
+            readOnly,
+            outputPath,
+            command: step?.kind === 'run' ? (step.command ?? null) : null,
+            logPath: null,
+          }
         })
     )
 
@@ -663,7 +767,15 @@ export async function execute(
     }
     const { results } = waved
 
-    for (const { node, result, roleId, readOnly, outputPath } of results) {
+    for (const run of results) {
+      // A command this repository's toolchain could not resolve. It never ran
+      // — not a pass, and not a failure, which is why it does not go through
+      // the pass/fail machinery below.
+      if ('skipped' in run) {
+        await advance(withNode(current, run.node.id, { state: 'skipped', endedAt: deps.now() }))
+        continue
+      }
+      const { node, result, roleId, readOnly, outputPath, command, logPath } = run
       // A no-op when the run already reported its session. Kept for the caller
       // that reports none — every ladder rung, and every test stub.
       await noteStarted(node.id, result.sessionId)
@@ -805,20 +917,62 @@ export async function execute(
             `${node.stepId} did not meet what it promised: ${unmet.join('; ')}`
           )
         }
-        const failure = markFailed(current, node.id, deps.now())
-        await advance(failure.graph)
-        deps.onEvent?.({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
+        // A check that names a place to send its failure back to, rather than
+        // stopping the line over it. The role it sends work back to has to be
+        // one that may actually write, or "rework" is a decision nobody
+        // scoped it to make.
+        const onFail = step?.onFail
+        const target =
+          onFail === undefined ? undefined : recipe.steps.find((s) => s.id === onFail.rework)
+        const targetRole =
+          target === undefined
+            ? undefined
+            : target.kind === 'fanout'
+              ? ((target.step ?? {}) as { role?: string }).role
+              : target.role
 
-        if (failure.needsDecision) {
-          awaitingDecision.push(node.id)
-          // Two failures is a pattern, not bad luck. The third attempt is a
-          // decision rather than a retry, and this is where it is asked for.
-          halted =
-            (await raise('verify.repeat-fail', {
-              summary: `${node.unitIds.join(', ') || node.id} failed twice`,
-              why: `Attempt ${node.attempts + 1} of ${node.id} exited ${result.exitCode ?? 'without a status'}. A third try is a decision, not a retry.`,
-              nodeId: node.id,
-            })) || halted
+        if (
+          onFail !== undefined &&
+          target !== undefined &&
+          node.reworks < onFail.max &&
+          targetRole !== undefined &&
+          roles.mayWrite(targetRole)
+        ) {
+          const excerpt =
+            logPath !== null && fs.existsSync(logPath)
+              ? lastLines(fs.readFileSync(logPath, 'utf8'), 120)
+              : ''
+          const feedback: Feedback = {
+            from: node.id,
+            attempt: node.attempts,
+            source: 'check',
+            command,
+            exitCode: result.exitCode,
+            excerpt,
+            logPath,
+          }
+          await advance(rework(current, node.id, onFail.rework, feedback))
+          await deps.record?.(
+            'rework.started',
+            node.id,
+            `${node.stepId} exited ${result.exitCode ?? 'without a status'}; sending ${onFail.rework} back (round ${node.reworks + 1} of ${onFail.max})`
+          )
+        } else {
+          const failure = markFailed(current, node.id, deps.now())
+          await advance(failure.graph)
+          deps.onEvent?.({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
+
+          if (failure.needsDecision) {
+            awaitingDecision.push(node.id)
+            // Two failures is a pattern, not bad luck. The third attempt is a
+            // decision rather than a retry, and this is where it is asked for.
+            halted =
+              (await raise('verify.repeat-fail', {
+                summary: `${node.unitIds.join(', ') || node.id} failed twice`,
+                why: `Attempt ${node.attempts + 1} of ${node.id} exited ${result.exitCode ?? 'without a status'}. A third try is a decision, not a retry.`,
+                nodeId: node.id,
+              })) || halted
+          }
         }
       }
     }

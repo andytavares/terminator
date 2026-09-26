@@ -2,7 +2,7 @@ schemaVersion: 1
 id: builder
 modelTier: deep
 allowResume: true
-reads: [unit, context, rules]
+reads: [unit, context, rules, feedback]
 writes: [worktree]
 tools: [read, search, edit, run_tests]
 prompt: |

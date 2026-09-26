@@ -79,7 +79,9 @@ describe('built-in recipes', () => {
   it('and to passing afterwards — the pair is the proof', () => {
     const flip = recipe('bugfix.yaml').steps.find((s) => s.id === 'flip')
     expect(flip?.expect).toEqual({ exit_code: '== 0' })
-    expect(flip?.after).toContain('fix')
+    // The lint pass sits between fix and flip; flip waits on it, not on fix
+    // directly, but a skipped lint still settles for its dependants.
+    expect(flip?.after).toContain('lint')
   })
 
   it('makes a refactor characterise the behaviour before changing it', () => {
@@ -171,9 +173,9 @@ describe('built-in recipes', () => {
     }
   })
 
-  it('gives the quick shape one builder, one check and nothing else', () => {
+  it('gives the quick shape one builder, a lint pass, one check and nothing else', () => {
     const steps = recipe('quick.yaml').steps
-    expect(steps.map((s) => s.id)).toEqual(['build', 'check', 'ship'])
+    expect(steps.map((s) => s.id)).toEqual(['build', 'lint', 'check', 'ship'])
     expect(steps.filter((s) => s.kind === 'agent' || s.kind === 'fanout')).toHaveLength(1)
   })
 
@@ -406,5 +408,76 @@ describe('the effort each built-in shape asks for', () => {
     ['poc.yaml', 'medium'],
   ])('%s runs at %s', (file, effort) => {
     expect(recipe(file).effort).toBe(effort)
+  })
+})
+
+// Lint runs in the lane, as a command step right after the build it checks,
+// so a repository with a lint command catches it before the work ever
+// reaches a reviewer. It costs a terminal tab, not a session.
+describe('the lint pass every code-producing shape adds after its build', () => {
+  it.each([
+    ['quick.yaml', 'build'],
+    ['direct.yaml', 'build'],
+    ['standard.yaml', 'build'],
+    ['poc.yaml', 'build'],
+    ['bugfix.yaml', 'fix'],
+  ])('%s runs lint after %s, only when the repository has a lint command', (file, buildStep) => {
+    const lint = recipe(file).steps.find((s) => s.id === 'lint')
+    expect(lint?.kind).toBe('run')
+    expect(lint?.command).toBe('${toolchain.lint}')
+    expect(lint?.when).toBe('toolchain.lint is set')
+    expect(lint?.after).toEqual([buildStep])
+  })
+
+  it.each([
+    ['quick.yaml', 'build'],
+    ['direct.yaml', 'build'],
+    ['standard.yaml', 'build'],
+    ['poc.yaml', 'build'],
+    ['bugfix.yaml', 'fix'],
+  ])('%s sends a failing lint back to %s', (file, buildStep) => {
+    const lint = recipe(file).steps.find((s) => s.id === 'lint')
+    expect(lint?.onFail).toEqual({ rework: buildStep, max: 1 })
+  })
+
+  it.each(['quick.yaml', 'direct.yaml', 'standard.yaml', 'poc.yaml', 'bugfix.yaml'])(
+    '%s waits its next step on lint rather than the build it followed',
+    (file) => {
+      const nextId: Record<string, string> = {
+        'quick.yaml': 'check',
+        'direct.yaml': 'verify',
+        'standard.yaml': 'verify',
+        'poc.yaml': 'verify',
+        'bugfix.yaml': 'flip',
+      }
+      const step = recipe(file).steps.find((s) => s.id === nextId[file])
+      expect(step?.after).toContain('lint')
+    }
+  )
+
+  // refactor is not one of the five: its shape already runs the suite twice
+  // around the change, and there is no separate build step for lint to sit
+  // beside — `unchanged` still gets onFail below.
+  it('does not add a lint step to refactor', () => {
+    expect(recipe('refactor.yaml').steps.find((s) => s.id === 'lint')).toBeUndefined()
+  })
+
+  // The test run steps that follow a build gain a rework target of their
+  // own, so a failing suite sends the same builder back rather than holding
+  // the whole order for an operator.
+  it.each([
+    ['quick.yaml', 'check', 'build'],
+    ['bugfix.yaml', 'flip', 'fix'],
+    ['refactor.yaml', 'unchanged', 'change'],
+  ])('%s reworks %s back to %s on failure', (file, stepId, buildStep) => {
+    const step = recipe(file).steps.find((s) => s.id === stepId)
+    expect(step?.onFail).toEqual({ rework: buildStep, max: 1 })
+  })
+
+  // baseline runs before any change exists, so there is nothing upstream of
+  // it to send work back to.
+  it('leaves refactor baseline without a rework target', () => {
+    const baseline = recipe('refactor.yaml').steps.find((s) => s.id === 'baseline')
+    expect(baseline?.onFail).toBeUndefined()
   })
 })

@@ -94,6 +94,12 @@ const StepSchema = z
     context: z.enum(['fresh', 'resume']).optional(),
     evidence: z.array(z.string()).optional(),
     effort: z.enum(EFFORT_LEVELS).optional(),
+    onFail: z
+      .strictObject({
+        rework: z.string().min(1),
+        max: z.number().int().min(1).max(3),
+      })
+      .optional(),
   })
   .superRefine((step, ctx) => {
     const need = (field: string): void => {
@@ -189,7 +195,52 @@ export function parseRecipe(text: string, file: string): ParseResult<Recipe> {
   const cycle = findCycle(recipe.steps)
   if (cycle !== null) return fail(file, `has a cycle in its step graph, through "${cycle}"`)
 
+  const onFailProblem = checkOnFail(recipe.steps, file)
+  if (onFailProblem !== null) return onFailProblem
+
   return { ok: true, value: recipe }
+}
+
+/** Every id reachable by walking `after`, transitively — a step's upstream. */
+function upstreamOf(id: string, byId: Map<string, Step>): Set<string> {
+  const seen = new Set<string>()
+  const walk = (current: string): void => {
+    for (const next of byId.get(current)?.after ?? []) {
+      if (seen.has(next)) continue
+      seen.add(next)
+      walk(next)
+    }
+  }
+  walk(id)
+  return seen
+}
+
+function checkOnFail(steps: readonly Step[], file: string): { ok: false; reason: string } | null {
+  const byId = new Map(steps.map((s) => [s.id, s]))
+  for (const step of steps) {
+    if (step.onFail === undefined) continue
+    if (step.kind !== 'run') {
+      return fail(
+        file,
+        `step "${step.id}" has onFail, but only a command step can fail on its own today`
+      )
+    }
+    const target = byId.get(step.onFail.rework)
+    const upstream = upstreamOf(step.id, byId)
+    if (target === undefined || !upstream.has(target.id)) {
+      return fail(
+        file,
+        `step "${step.id}" has onFail.rework "${step.onFail.rework}", which is not upstream of it`
+      )
+    }
+    if (target.kind !== 'agent' && target.kind !== 'fanout') {
+      return fail(
+        file,
+        `step "${step.id}" has onFail.rework "${target.id}", but only an agent or fanout step can rework`
+      )
+    }
+  }
+  return null
 }
 
 // ── roles ────────────────────────────────────────────────────────────────

@@ -19,6 +19,15 @@ steps:
     over: plan.units[role=builder] by lane
     after: [challenge]
     step: { kind: agent, role: builder }
+  # Lint runs in the lane, not as a rung of its own: it costs a terminal
+  # tab rather than a session, and catching it here is cheaper than a
+  # review sending it back.
+  - id: lint
+    kind: run
+    command: '${toolchain.lint}'
+    when: toolchain.lint is set
+    after: [build]
+    onFail: { rework: build, max: 1 }
   # One verifier, not one per unit. A fresh context is what makes verification
   # independent of the work; a fresh context *per unit* adds nothing on top of
   # that and doubled the session count of every order that ever ran.
@@ -26,7 +35,7 @@ steps:
     kind: agent
     role: verifier
     context: fresh
-    after: [build]
+    after: [lint]
   - id: inspect
     kind: agent
     role: inspector

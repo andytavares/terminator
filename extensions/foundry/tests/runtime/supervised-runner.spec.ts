@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
 import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
@@ -779,5 +780,76 @@ describe('running one command in a terminal, with no agent', () => {
     projectId = 'project-1'
     terminalId = null
     await expect(runner().runCommand(command)).resolves.toBeNull()
+  })
+})
+
+// A command step's output used to vanish the moment the tab scrolled past it.
+// logPath tees stdout+stderr to a file while keeping the tab's own exit code
+// as the verdict — the command's status, never tee's.
+describe('running a command with a log file', () => {
+  const shells = ['/bin/sh', ...(existsSync('/bin/zsh') ? ['/bin/zsh'] : [])]
+
+  let logDir: string
+
+  beforeEach(() => {
+    logDir = mkdtempSync(join(tmpdir(), 'supervised-runner-log-'))
+  })
+
+  afterEach(() => {
+    rmSync(logDir, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  function scriptPath(): string {
+    const typed = written.map((w) => w.data).join('')
+    const match = /([^'\s]*\/launch\/[\w-]+\.sh)/.exec(typed)
+    if (match === null) throw new Error(`no command script was typed: ${typed}`)
+    return match[1]
+  }
+
+  for (const shell of shells) {
+    it(`(${shell}) exits with the command's status, not tee's, and writes the log`, async () => {
+      const logPath = join(logDir, 'false.log')
+      void runner().runCommand({
+        worktreePath: '/wt/feat-thing',
+        workspaceId: 'ws-1',
+        branch: 'feat/thing',
+        title: 'Check',
+        command: 'false',
+        logPath,
+      })
+      await Promise.resolve()
+      const result = spawnSync(shell, [scriptPath()])
+      expect(result.status).toBe(1)
+      expect(existsSync(logPath)).toBe(true)
+    })
+
+    it(`(${shell}) captures the command's exit code and its combined output in the log`, async () => {
+      written = []
+      const logPath = join(logDir, 'echo.log')
+      void runner().runCommand({
+        worktreePath: '/wt/feat-thing',
+        workspaceId: 'ws-1',
+        branch: 'feat/thing',
+        title: 'Check',
+        command: 'echo hello; exit 3',
+        logPath,
+      })
+      await Promise.resolve()
+      const result = spawnSync(shell, [scriptPath()])
+      expect(result.status).toBe(3)
+      expect(readFileSync(logPath, 'utf8')).toContain('hello')
+    })
+  }
+
+  it('has no tee when logPath is absent', async () => {
+    void runner().runCommand({
+      worktreePath: '/wt/feat-thing',
+      workspaceId: 'ws-1',
+      branch: 'feat/thing',
+      title: 'Check',
+      command: 'npm run lint',
+    })
+    await Promise.resolve()
+    expect(readFileSync(scriptPath(), 'utf8')).not.toContain('tee')
   })
 })

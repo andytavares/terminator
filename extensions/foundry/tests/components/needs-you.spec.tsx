@@ -129,6 +129,8 @@ const NODE = {
   state: 'running',
   sessionId: 's-1',
   attempts: 1,
+  reworks: 0,
+  feedback: [],
   startedAt: null,
   endedAt: null,
   dependsOn: [],

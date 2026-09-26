@@ -24,6 +24,8 @@ const NODES = [
     endedAt: null,
     dependsOn: [],
     stepId: 'build',
+    reworks: 0,
+    feedback: [],
   },
   {
     id: 'N-2',
@@ -37,6 +39,8 @@ const NODES = [
     startedAt: null,
     endedAt: null,
     dependsOn: ['N-1'],
+    reworks: 0,
+    feedback: [],
     stepId: 'build',
   },
 ]
@@ -203,6 +207,54 @@ describe('the units', () => {
     mount(reply({ blocked: [{ id: 'N-2', reason: 'N-1 has not passed' }] }))
     await waitFor(() => screen.getByText('Blocked'))
     expect(screen.getByText(/N-1 has not passed/)).toBeTruthy()
+  })
+})
+
+describe('a rework', () => {
+  const REWORKED_NODES = NODES.map((n) =>
+    n.id === 'N-2'
+      ? {
+          ...n,
+          reworks: 2,
+          feedback: [
+            {
+              from: 'N-1',
+              attempt: 1,
+              source: 'check',
+              command: 'npm test',
+              exitCode: 1,
+              excerpt: 'FAIL: expected 2 got 3',
+              logPath: null,
+            },
+          ],
+        }
+      : n
+  )
+
+  it('shows a chip counting how many times a node has been sent back', async () => {
+    mount(reply({ graph: { orderId: 'WO-1', recipe: 'standard', nodes: REWORKED_NODES } }))
+    await waitFor(() => screen.getByText(/Sent back 2×/))
+  })
+
+  it('does not show the chip for a node with no reworks', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText('N-1'))
+    expect(screen.queryByText(/Sent back/)).toBeNull()
+  })
+
+  it('discloses each feedback entry’s command, exit status and excerpt', async () => {
+    mount(reply({ graph: { orderId: 'WO-1', recipe: 'standard', nodes: REWORKED_NODES } }))
+    await waitFor(() => screen.getByText('Why it was sent back'))
+    fireEvent.click(screen.getByText('Why it was sent back'))
+    expect(screen.getByText('npm test')).toBeTruthy()
+    expect(screen.getByText(/exit/)).toBeTruthy()
+    expect(screen.getByText('FAIL: expected 2 got 3')).toBeTruthy()
+  })
+
+  it('has no disclosure for a node with no feedback', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText('N-1'))
+    expect(screen.queryByText('Why it was sent back')).toBeNull()
   })
 })
 
@@ -875,6 +927,8 @@ describe('the group that is not a lane', () => {
               endedAt: null,
               dependsOn: [],
               stepId: 'ship',
+              reworks: 0,
+              feedback: [],
             },
           ],
         },

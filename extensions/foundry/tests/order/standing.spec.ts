@@ -25,6 +25,8 @@ function node(over: Partial<RunNode> & Pick<RunNode, 'id'>): RunNode {
     role: null,
     dependsOn: [],
     attempts: 0,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,
@@ -83,6 +85,41 @@ describe('standingOf', () => {
     expect(standing.done).toBe(2)
     expect(standing.total).toBe(4)
     expect(standing.detail).toContain('2 of 4')
+  })
+
+  it('says which check sent the work back, while the run is still working it', () => {
+    const standing = standingOf(
+      input({
+        graph: graph([
+          node({ id: 'check', state: 'passed', role: 'lint', reworks: 1 }),
+          node({
+            id: 'build',
+            state: 'waiting',
+            role: 'builder',
+            feedback: [
+              {
+                from: 'check',
+                attempt: 1,
+                source: 'check',
+                command: 'npm test',
+                exitCode: 1,
+                excerpt: 'FAIL',
+                logPath: null,
+              },
+            ],
+          }),
+        ]),
+      })
+    )
+    expect(standing.kind).toBe('working')
+    expect(standing.detail).toBe('Reworking after lint failed.')
+  })
+
+  it('leaves the ordinary working detail alone when nothing has been sent back', () => {
+    const standing = standingOf(
+      input({ graph: graph([node({ id: 'a', state: 'running' }), node({ id: 'b' })]) })
+    )
+    expect(standing.detail).not.toContain('Reworking')
   })
 
   // The defect this whole module exists for. A running order's row read

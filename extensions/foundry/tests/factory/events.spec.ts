@@ -248,6 +248,61 @@ steps:
   })
 })
 
+describe('diffObservation: rework', () => {
+  it('emits a rework when a node’s feedback grows from 0 to 1', () => {
+    const g = graph()
+    const after = withNode(g, 'a', {
+      feedback: [
+        {
+          from: 'b',
+          attempt: 1,
+          source: 'check',
+          command: 'npm test',
+          exitCode: 1,
+          excerpt: 'FAIL',
+          logPath: null,
+        },
+      ],
+    })
+    const events = diffObservation(obs(g), obs(after))
+    expect(events).toContainEqual({ kind: 'rework', fromNodeId: 'b', toNodeId: 'a', round: 1 })
+  })
+
+  it('emits nothing when feedback is unchanged', () => {
+    const feedback = [
+      {
+        from: 'b',
+        attempt: 1,
+        source: 'check' as const,
+        command: 'npm test',
+        exitCode: 1,
+        excerpt: 'FAIL',
+        logPath: null,
+      },
+    ]
+    const g = withNode(graph(), 'a', { feedback })
+    const events = diffObservation(obs(g), obs(g))
+    expect(events.some((e) => e.kind === 'rework')).toBe(false)
+  })
+
+  it('emits nothing when the previous observation is null, even with feedback present', () => {
+    const g = withNode(graph(), 'a', {
+      feedback: [
+        {
+          from: 'b',
+          attempt: 1,
+          source: 'check',
+          command: null,
+          exitCode: null,
+          excerpt: 'FAIL',
+          logPath: null,
+        },
+      ],
+    })
+    expect(diffObservation(null, obs(g))).toEqual([])
+  })
+})
+
 describe('describeEvent', () => {
   const labels = { a: 'Builder', b: 'Reviewer' }
 
@@ -273,6 +328,10 @@ describe('describeEvent', () => {
     ],
     [{ kind: 'gate', nodeId: 'a', waiting: true }, 'Builder is waiting at the gate.'],
     [{ kind: 'gate', nodeId: 'a', waiting: false }, "Builder's gate cleared."],
+    [
+      { kind: 'rework', fromNodeId: 'b', toNodeId: 'a', round: 2 },
+      'Reviewer sent Builder back (round 2).',
+    ],
   ])('describes %o as %s', (event, sentence) => {
     expect(describeEvent(event, labels)).toBe(sentence)
   })

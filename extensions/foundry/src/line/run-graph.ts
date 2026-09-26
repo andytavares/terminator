@@ -19,6 +19,17 @@ export type NodeState =
   | 'blocked'
   | 'skipped'
 
+/** A failed check's own words, handed to the node sent back to answer it. */
+export interface Feedback {
+  readonly from: string
+  readonly attempt: number
+  readonly source: 'check'
+  readonly command: string | null
+  readonly exitCode: number | null
+  readonly excerpt: string
+  readonly logPath: string | null
+}
+
 export interface RunNode {
   /** `step`, or `step:unit` for a child of a fan-out. */
   readonly id: string
@@ -38,6 +49,10 @@ export interface RunNode {
   readonly dependsOn: readonly string[]
   /** Two failures and the third attempt becomes a decision, not a retry. */
   readonly attempts: number
+  /** How many times a check node has sent this work back. */
+  readonly reworks: number
+  /** Failures a check has handed to this node, oldest first. */
+  readonly feedback: readonly Feedback[]
   readonly sessionId: string | null
   readonly worktreePath: string | null
   readonly startedAt: string | null
@@ -58,6 +73,8 @@ function node(over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId' | 'kind'>):
     role: null,
     dependsOn: [],
     attempts: 0,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,

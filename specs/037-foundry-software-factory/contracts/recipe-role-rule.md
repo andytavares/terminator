@@ -80,9 +80,15 @@ Supported forms: `path_exists: <glob>`, `toolchain: <check>`, `repos: <compariso
 
 The `speckit` recipe declares `path_exists: .specify/`. That single line replaces `state/skill-availability.ts` and the whole plain-prose fallback table.
 
+### `onFail`
+
+`onFail: { rework: <step id>, max: 1..3 }`, on a `run` step only. When the command fails and the step has sent work back fewer than `max` times, the named step's node in the checked lane goes back to `waiting` with the failure in its `feedback` (command, exit status, the last 120 lines of output), as does everything between it and the check. The target must be upstream of the step (in its `after` closure) and be an `agent` or `fanout` step whose role may write. Past `max`, the step fails as any other does (ADR-063).
+
+A `run` step whose command does not start with `/` runs as a command, not an agent turn. `${toolchain.<check>}` resolves to the probed command; when the repository has none, the step is skipped and recorded as not measured.
+
 ### Expression surface
 
-`over`, `when` and `expect` accept a deliberately small language: a path into the order (`plan.units`, `risk.triggers`), an optional filter (`[role=builder]`), and comparisons (`is empty`, `is not empty`, `>= n`, `!= n`). It is not a scripting language and must not become one — a recipe that needs arbitrary logic wants a role, which is a prompt and an output schema, not code in a data file.
+`over`, `when` and `expect` accept a deliberately small language: a path into the order (`plan.units`, `risk.triggers`), an optional filter (`[role=builder]`), and comparisons (`is empty`, `is not empty`, `>= n`, `!= n`). `when` also takes `toolchain.<check> is set` / `is not set`. It is not a scripting language and must not become one — a recipe that needs arbitrary logic wants a role, which is a prompt and an output schema, not code in a data file.
 
 ## Roles
 

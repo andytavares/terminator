@@ -2361,6 +2361,27 @@
   background: var(--tm-warning);
 }
 
+.fdry-unit-rework {
+  font-size: 10.5px;
+  color: var(--tm-danger);
+}
+
+.fdry-unit-feedback {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-unit-feedback summary {
+  cursor: pointer;
+  color: var(--tm-text-muted);
+}
+
+.fdry-unit-feedback ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+
 .fdry-unit-attach {
   appearance: none;
   background: transparent;

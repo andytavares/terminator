@@ -126,6 +126,8 @@ export interface RunCommandOptions {
   /** What the tab is called: the check being run. */
   title: string
   command: string
+  /** Absolute path to tee the command's combined stdout+stderr into. */
+  logPath?: string
 }
 
 export interface SupervisedRunner {
@@ -314,10 +316,24 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
    * `MAX_CANON` is mangled. Run by the shell rather than `exec`ed, so a
    * command with `&&` in it still works.
    */
-  function writeCommandScript(id: string, command: string): string {
+  function writeCommandScript(id: string, command: string, logPath?: string): string {
     const dir = path.join(stateDir, 'launch')
     fs.mkdirSync(dir, { recursive: true })
     const file = path.join(dir, `${id}.sh`)
+    // Not `set -o pipefail`: the script is run by the user's own $SHELL, which
+    // may not support it. A status file survives the pipe into tee instead.
+    const runLine =
+      logPath === undefined
+        ? command
+        : (() => {
+            fs.mkdirSync(path.dirname(logPath), { recursive: true })
+            const statusFile = `${file}.status`
+            // A subshell, not a brace group: the command may itself call
+            // `exit` (as a test runner does on failure), which would end the
+            // whole script before the status file is written if it shared
+            // the script's own shell.
+            return `{ ( ${command} ); echo $? > ${shellQuote(statusFile)}; } 2>&1 | tee ${shellQuote(logPath)}; exit "$(cat ${shellQuote(statusFile)})"`
+          })()
     fs.writeFileSync(
       file,
       [
@@ -326,7 +342,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         "cat <<'TERMINATOR_LAUNCH'",
         command,
         'TERMINATOR_LAUNCH',
-        command,
+        runLine,
         '',
       ].join('\n'),
       { mode: 0o700 }
@@ -542,7 +558,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         // The shell exits with the command's status, so the tab's own exit is
         // the verdict. It stays open, exited, as the record of what ran.
         api.pty.onExit?.(terminalSessionId, (exitCode: number) => resolve(exitCode))
-        const script = writeCommandScript(randomUUID(), options.command)
+        const script = writeCommandScript(randomUUID(), options.command, options.logPath)
         api.pty.write(
           terminalSessionId,
           `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(script)}; exit $?\r`
