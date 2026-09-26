@@ -209,6 +209,8 @@ An agent's terminal is a child of the application process, so quitting kills eve
 
 `session.attach` refuses a session this process no longer has, rather than navigating to a terminal that does not exist.
 
+**CI on the drafts (ADR-064).** `run.observe` carries `ci: CiState | null` — `{ round, max, status: 'watching' | 'green' | 'red' | 'not_measured' | 'reworking', pulls: { url, checks: { name, bucket, link, workflow }[] }[], reason, at }`, read from the order's `ci.json`; `null` until a draft opens on a recipe that declares `ci`. Each `order.list` row carries `ci: { status, round, max } | null` from the same file. A run graph node carries `reworks: number` and `feedback: Feedback[]` (ADR-063), defaulted when an older graph is read.
+
 ---
 
 ## `foundry:run.observe`

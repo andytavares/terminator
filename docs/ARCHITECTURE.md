@@ -1229,6 +1229,15 @@ it ready — never whether to create it. For the two highest risk grades the
 operator decides before anything reaches the remote; for everything lower the
 draft opens first, so review happens on a real change.
 
+**CI is a check with rounds** (ADR-064, `src/line/ci.ts`, `src/line/ship-tail.ts`).
+Before the ready gate, a recipe with `ci: { rounds }` has every draft's checks
+polled through `gh pr checks --json` until nothing is pending. Green adds "CI
+passed" to the ready gate; no checks is "not measured", never green. Red with
+rounds left sends `gh run view --log-failed` back to the build step as `ci`
+feedback, runs the Line again and pushes the lanes (`pushLanes`). With the
+rounds spent, `ci.red` replaces the ready gate, and its "Another round" runs
+one more. The state is in the order's `ci.json`.
+
 **Every command runs in the lane's worktree**, derived per lane by
 `checkoutPath` exactly as the branch is derived by `branchFor`. Both were once
 read raw off `context.repos[]`, which holds the _repository_ and a `headBranch`
@@ -1302,6 +1311,7 @@ App
 - [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — work runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
 - [ADR-040: the work order is the contract](adr/040-the-work-order-is-the-contract.md) — supersedes the card model (ADR-010) and the run modes (ADR-012).
 - [ADR-041: an extension may move an issue](adr/041-an-extension-may-move-an-issue.md) — `ExtensionAPI.issues` v2.3.0, and the two writes it now permits.
+- [ADR-064: CI is a check with rounds](adr/064-ci-is-a-check-with-rounds.md) — drafts' CI is watched, a red one goes back to the builder twice, then `ci.red`.
 - [ADR-063: a failed check sends the work back](adr/063-a-failed-check-sends-the-work-back.md) — run steps run as commands, `onFail` reworks the builder with the failing output, the stalled gate names its node.
 - [ADR-062: the Forge decides what it is sure of](adr/062-the-forge-decides-what-it-is-sure-of.md) — questions at ≥ 90% confidence are decided, low/medium findings dismissable, failing checks sent back up to twice.
 - [ADR-061: one project per order, and an extension may file an issue](adr/061-one-project-per-order.md) — an order is one sidebar project named after its ticket's branch; `ExtensionAPI.issues.create` v2.5.0.
