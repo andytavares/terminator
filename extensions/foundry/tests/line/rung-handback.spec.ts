@@ -168,6 +168,7 @@ describe('a rung handing back what it found, end to end', () => {
           autonomy: 'lights-out',
           worktreePath: repo,
           outputPath: input.outputPath,
+          skillsMount: null,
         })
         expect(decision, `${input.node.id} was refused its own output file`).toEqual({
           allow: true,

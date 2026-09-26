@@ -1196,6 +1196,7 @@ async function buildExecutorDeps(
               autonomy: autonomyFor(api),
               worktreePath: checkout.path,
               outputPath: input.outputPath ?? null,
+              skillsMount: null,
             }),
           onPending: (pending) => {
             // Asks reach the console as well as the inbox. A refusal is posted

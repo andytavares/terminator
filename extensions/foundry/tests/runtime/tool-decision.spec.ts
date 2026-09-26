@@ -24,6 +24,7 @@ function request(over: Partial<ToolRequest> = {}): ToolRequest {
     autonomy: 'standard',
     worktreePath: '/work/checkout',
     outputPath: null,
+    skillsMount: null,
     ...over,
   }
 }
@@ -346,5 +347,111 @@ describe('where a read-only rung hands back what it found', () => {
         })
       )
     ).toEqual({ allow: false, reason: expect.stringContaining('builder') })
+  })
+})
+
+// The mount a node's skills are copied into and passed to the agent with
+// `--add-dir`. Every tool call goes through `decideTool`, and anything it
+// does not decide is held for five minutes — so a read of the mount that
+// fell through to "ask" would cost the run five minutes for looking at its
+// own skill.
+describe('a skill mounted for this node', () => {
+  const mount = '/data/orders/WO-1/skills'
+
+  it.each(['Read', 'Glob', 'Grep', 'LS'])('allows %s of the mount for a writing role', (tool) => {
+    const decision = decideTool(
+      request({
+        tool,
+        input: { file_path: `${mount}/scout.md`, path: `${mount}/scout.md` },
+        skillsMount: mount,
+      })
+    )
+    expect(decision).toEqual({ allow: true, reason: expect.any(String) })
+  })
+
+  it.each(['Read', 'Glob', 'Grep', 'LS'])('allows %s of the mount for a read-only role', (tool) => {
+    const decision = decideTool(
+      request({
+        readOnly: true,
+        role: 'verifier',
+        tool,
+        input: { file_path: `${mount}/scout.md`, path: `${mount}/scout.md` },
+        skillsMount: mount,
+      })
+    )
+    expect(decision).toEqual({ allow: true, reason: expect.any(String) })
+  })
+
+  it.each(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])(
+    'denies %s inside the mount for a writing role',
+    (tool) => {
+      const decision = decideTool(
+        request({
+          tool,
+          input: { file_path: `${mount}/scout.md`, notebook_path: `${mount}/scout.md` },
+          skillsMount: mount,
+        })
+      )
+      expect(decision?.allow).toBe(false)
+      expect(decision?.reason).toContain('read-only')
+    }
+  )
+
+  it.each(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])(
+    'denies %s inside the mount for a read-only role',
+    (tool) => {
+      const decision = decideTool(
+        request({
+          readOnly: true,
+          role: 'red-team',
+          tool,
+          input: { file_path: `${mount}/scout.md`, notebook_path: `${mount}/scout.md` },
+          skillsMount: mount,
+        })
+      )
+      expect(decision?.allow).toBe(false)
+      expect(decision?.reason).toContain('read-only')
+    }
+  )
+
+  it('does not treat a sibling path with the mount as a string prefix as inside it', () => {
+    // Not caught by the mount allowance, so it falls through to the ordinary
+    // write rules: outside the checkout, at standard autonomy, that asks.
+    // If the prefix check were wrong this would be granted for the mount
+    // instead of reaching that ordinary "ask".
+    const decision = decideTool(
+      request({
+        tool: 'Write',
+        input: { file_path: `${mount}-other/x.md` },
+        skillsMount: mount,
+      })
+    )
+    expect(decision).toBeNull()
+  })
+
+  it('does not treat a `..` escape from the mount as inside it', () => {
+    // Resolves to /data/orders/WO-1/skills-other/x.md, outside both the mount
+    // and the checkout, so this reaches the ordinary "ask" rather than being
+    // denied or allowed for the mount.
+    const decision = decideTool(
+      request({
+        tool: 'Write',
+        input: { file_path: `${mount}/../skills-other/x.md` },
+        skillsMount: mount,
+      })
+    )
+    expect(decision).toBeNull()
+  })
+
+  it('changes nothing when the node has no mount', () => {
+    expect(
+      decideTool(
+        request({
+          tool: 'Edit',
+          input: { file_path: '/work/checkout/src/a.ts' },
+          skillsMount: null,
+        })
+      )?.allow
+    ).toBe(true)
   })
 })

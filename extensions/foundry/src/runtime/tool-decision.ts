@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import type { PolicyDecision } from './read-only-policy.js'
 import { decideReadOnly } from './read-only-policy.js'
 import { decideByAutonomy, isDestructive, writesOutside } from './autonomy-policy.js'
@@ -51,6 +52,13 @@ export interface ToolRequest {
    * contract says to use Write for exactly that reason.
    */
   readonly outputPath: string | null
+  /**
+   * Where this node's skills were copied for the agent to read, outside the
+   * repository, and passed to it with `--add-dir`. Null when the node has
+   * none. They are the factory's, mounted read-only — a run may read them but
+   * never change them.
+   */
+  readonly skillsMount: string | null
 }
 
 /**
@@ -67,7 +75,54 @@ function targetOf(input: unknown): string | null {
   return typeof target === 'string' ? target : null
 }
 
+/** The fields a tool reading or naming a path can use, checked in this order. */
+const PATH_FIELDS = ['file_path', 'path', 'notebook_path'] as const
+
+/** The path a tool call names, whichever field it used to name it. */
+function pathOf(input: unknown): string | null {
+  if (typeof input !== 'object' || input === null) return null
+  for (const field of PATH_FIELDS) {
+    const value = (input as Record<string, unknown>)[field]
+    if (typeof value === 'string' && value.trim() !== '') return value
+  }
+  return null
+}
+
+const READ_TOOLS = new Set(['Read', 'Glob', 'Grep', 'LS'])
+const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])
+
+/**
+ * Whether a named path resolves to the mount itself or somewhere under it.
+ *
+ * Resolved before comparing, so a `..` segment cannot escape it and a string
+ * prefix that merely starts the same way — `/mnt/skills-other` next to
+ * `/mnt/skills` — is not mistaken for being inside it.
+ */
+function isInsideMount(target: string | null, mount: string | null): boolean {
+  if (mount === null || target === null) return false
+  const resolvedMount = path.resolve(mount)
+  const resolvedTarget = path.resolve(target)
+  return (
+    resolvedTarget === resolvedMount || resolvedTarget.startsWith(`${resolvedMount}${path.sep}`)
+  )
+}
+
 export function decideTool(request: ToolRequest): PolicyDecision | null {
+  // A node's skills, mounted read-only outside the repository and handed to
+  // the agent with `--add-dir`. Anything `decideTool` does not decide is held
+  // for five minutes, so a read of the mount that fell through to "ask" would
+  // cost the run five minutes for looking at its own skill — this runs before
+  // every other branch, for a role that may write and one that may not alike.
+  if (READ_TOOLS.has(request.tool) && isInsideMount(pathOf(request.input), request.skillsMount)) {
+    return { allow: true, reason: 'a skill mounted for this node' }
+  }
+  if (WRITE_TOOLS.has(request.tool) && isInsideMount(pathOf(request.input), request.skillsMount)) {
+    return {
+      allow: false,
+      reason: 'skills are mounted read-only; they are the factory’s, not the run’s',
+    }
+  }
+
   if (request.readOnly) {
     // A role that declared `run_tests` may run the project's own commands, and
     // only those. The verifier's whole job is a verdict from an exit status,
