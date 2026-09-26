@@ -1,0 +1,25 @@
+extensions/foundry/tests/factory/fixtures/recipes/bugfix.yaml
+  s_4f15472be339a2::t_be519bba5f0347 1-61
+extensions/foundry/tests/factory/fixtures/recipes/standard.yaml
+  s_4f15472be339a2::t_32386da4133c2e 1-48
+extensions/foundry/tests/factory/sim.spec.ts
+  s_4f15472be339a2::t_9676a59a34dc4b 79-85,127-128,545,570
+extensions/foundry/tests/factory/layout.spec.ts
+  s_4f15472be339a2::t_639113553814c8 20-26,68-69,132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3582273d1fd573e0d1422840754893fe7a0d44d7",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
