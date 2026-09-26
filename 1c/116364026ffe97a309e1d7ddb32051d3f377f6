@@ -1,0 +1,36 @@
+docs/ARCHITECTURE.md
+  s_ff9afaf52b6925::t_40b802f774942b 568-571,1275
+  s_ff9afaf52b6925::t_0e6a43dd37ab7c 1112-1122
+docs/EXTENSION-DEVELOPMENT.md
+  s_ff9afaf52b6925::t_40b802f774942b 5,652,665-667,705-725,773-779,782
+docs/adr/061-one-project-per-order.md
+  s_ff9afaf52b6925::t_7ea819f0ef4c3e 35
+tests/unit/extensions/api-issues.spec.ts
+  s_ff9afaf52b6925::t_7ea819f0ef4c3e 142
+README.md
+  s_ff9afaf52b6925::t_dad79ba3456e39 22
+tests/unit/extensions/api-supervised-runs.spec.ts
+  s_ff9afaf52b6925::t_7ea819f0ef4c3e 168
+specs/061-one-project-per-order/spec.md
+  s_ff9afaf52b6925::t_7ea819f0ef4c3e 31
+src/main/extensions/api.ts
+  s_ff9afaf52b6925::t_7ea819f0ef4c3e 134,352,394,397,402
+packages/extension-sdk/types/api.d.ts
+  s_ff9afaf52b6925::t_7ea819f0ef4c3e 130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1c116364026ffe97a309e1d7ddb32051d3f377f6",
+  "prompts": {},
+  "sessions": {
+    "s_ff9afaf52b6925": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5562dac0-030b-4795-b6e4-21da34ab4d17",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
