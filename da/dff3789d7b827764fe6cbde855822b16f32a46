@@ -1,0 +1,21 @@
+extensions/foundry/src/line/ci.ts
+  s_4f15472be339a2::t_56cb0341ce11ee 20-22,50,56,66-77,79-85
+extensions/foundry/tests/line/ci.spec.ts
+  s_4f15472be339a2::t_01e4e8323c3910 64-67,69,72-79,86-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dadff3789d7b827764fe6cbde855822b16f32a46",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
