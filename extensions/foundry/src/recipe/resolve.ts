@@ -2,6 +2,8 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { parseRecipe, parseRole, parseRule } from './parse.js'
 import type { ParseResult, Recipe, Role, Rule } from './parse.js'
+import { parseSensor } from '../sensors/schema.js'
+import type { SensorDef } from '../sensors/types.js'
 
 // Resolving a recipe, role or rule by name.
 //
@@ -11,7 +13,7 @@ import type { ParseResult, Recipe, Role, Rule } from './parse.js'
 // directory, because writing into a target repository is the one thing it does
 // not do.
 
-export type Kind = 'recipes' | 'roles' | 'rules'
+export type Kind = 'recipes' | 'roles' | 'rules' | 'sensors'
 
 export type Rung = 'data-root' | 'repository' | 'built-in'
 
@@ -122,6 +124,10 @@ export function resolveRule(name: string, sources: ResolveSources) {
   return resolveParsed<Rule>('rules', name, sources, parseRule)
 }
 
+export function resolveSensor(name: string, sources: ResolveSources) {
+  return resolveParsed<SensorDef>('sensors', name, sources, parseSensor)
+}
+
 /**
  * Every rule that loads, with the malformed ones reported rather than thrown.
  *
@@ -138,6 +144,21 @@ export function loadAllRules(sources: ResolveSources): { rules: Rule[]; problems
     else problems.push(result.reason)
   }
   return { rules, problems }
+}
+
+/**
+ * Every sensor that loads, most specific rung winning per id, with the
+ * malformed ones dropped rather than thrown — a sensor stays off until an
+ * operator enables it, so a bad file in the data root must not hide the
+ * built-ins.
+ */
+export function availableSensors(sources: ResolveSources): { def: SensorDef; rung: Rung }[] {
+  const found: { def: SensorDef; rung: Rung }[] = []
+  for (const name of availableNames('sensors', sources)) {
+    const result = resolveSensor(name, sources)
+    if (result.ok) found.push({ def: result.resolved.value, rung: result.resolved.rung })
+  }
+  return found
 }
 
 // ── skills ───────────────────────────────────────────────────────────────

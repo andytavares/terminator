@@ -1,0 +1,11 @@
+schemaVersion: 1
+id: tracker-query
+description: Your assigned open issues
+# Ships built in, but does nothing until an operator enables it in Settings
+# (ADR-066) — a signal proposes work, it never starts any on its own.
+every: 60m
+severity: medium
+source:
+  kind: tracker
+  query: null # null means the operator's own assigned open issues
+  limit: 25
