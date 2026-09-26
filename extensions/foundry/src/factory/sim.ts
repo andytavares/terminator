@@ -5,6 +5,7 @@ import { gateNodeId, hasStarted } from './events.js'
 import type { Observation } from './events.js'
 import type { NodeState, RunNode } from '../line/run-graph.js'
 import type { StepKind } from '../recipe/parse.js'
+import type { Check } from '../line/ci.js'
 
 // The world a scene renders: crew walking a hall, crates riding belts.
 //
@@ -56,6 +57,13 @@ export interface OpenCall {
   readonly at: number
 }
 
+/** What the dispatch tower shows: a round, and each check's own lamp. */
+export interface WorldCi {
+  readonly round: number
+  readonly max: number
+  readonly checks: Readonly<Record<string, Check['bucket']>>
+}
+
 export interface World {
   readonly map: HallMap
   readonly crew: readonly Crew[]
@@ -63,6 +71,8 @@ export interface World {
   readonly gatesWaiting: readonly string[]
   readonly openCalls: readonly OpenCall[]
   readonly clockMs: number
+  /** Null until the order has shipped a pull and CI has something to say. */
+  readonly ci: WorldCi | null
 }
 
 const WALK_PX_PER_S = 46
@@ -227,7 +237,18 @@ export function createWorld(map: HallMap, observation: Observation): World {
     )
     .map((belt) => ({ id: `${belt.id}@queued`, beltId: belt.id, progress: 1, parks: true }))
 
-  return { map, crew, crates, gatesWaiting: [...gatesWaiting], openCalls: [], clockMs: 0 }
+  const ci: WorldCi | null =
+    observation.ci === null
+      ? null
+      : {
+          round: observation.ci.round,
+          max: observation.ci.max,
+          checks: Object.fromEntries(
+            observation.ci.pulls.flatMap((pull) => pull.checks.map((c) => [c.name, c.bucket]))
+          ),
+        }
+
+  return { map, crew, crates, gatesWaiting: [...gatesWaiting], openCalls: [], clockMs: 0, ci }
 }
 
 /**

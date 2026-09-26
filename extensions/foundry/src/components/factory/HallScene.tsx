@@ -96,7 +96,7 @@ function draw(
   paint.globalCompositeOperation = 'source-over'
   paint.drawImage(bake, 0, 0)
 
-  const context = { crew: world.crew, states, gatesWaiting: world.gatesWaiting }
+  const context = { crew: world.crew, states, gatesWaiting: world.gatesWaiting, ci: world.ci }
 
   const moving = new Set(world.crates.map((c) => c.beltId))
   drawBelts(paint, map, moving, tMs)

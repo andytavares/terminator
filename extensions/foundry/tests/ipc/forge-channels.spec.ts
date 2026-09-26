@@ -5,6 +5,7 @@ import * as path from 'node:path'
 import { createForgeChannels } from '../../src/ipc/forge-channels.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { raiseGate } from '../../src/gates/rules.js'
+import { writeCiState } from '../../src/line/ci-state.js'
 import type { Standing } from '../../src/order/standing.js'
 import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -347,6 +348,45 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].standing.kind).toBe('shaping')
     expect(r.orders[0].standing.turn).toBe('you')
     expect(r.orders[0].openQuestions).toBe(1)
+  })
+
+  it('carries no ci field when this host has no records location wired', async () => {
+    const c = channels()
+    await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
+    const r = (await c.list()) as { orders: Record<string, unknown>[] }
+    expect(r.orders[0].ci).toBeUndefined()
+    expect('ci' in r.orders[0]).toBe(false)
+  })
+
+  it('says an order has no CI yet when nothing has shipped', async () => {
+    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const r = (await c.list()) as { orders: { id: string; ci: unknown }[] }
+    expect(r.orders.find((o) => o.id === seeded.order.id)?.ci).toBeNull()
+  })
+
+  it("reports a shipped order's CI round and status", async () => {
+    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    await writeCiState(root, seeded.order.id, {
+      round: 2,
+      max: 3,
+      status: 'red',
+      pulls: [],
+      reason: '',
+      at: NOW,
+    })
+    const r = (await c.list()) as {
+      orders: { id: string; ci: { status: string; round: number; max: number } }[]
+    }
+    const row = r.orders.find((o) => o.id === seeded.order.id)
+    expect(row?.ci).toEqual({ status: 'red', round: 2, max: 3 })
   })
 })
 

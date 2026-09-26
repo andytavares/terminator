@@ -144,6 +144,38 @@ describe('calloutFor', () => {
       tone: 'fail',
     })
   })
+
+  it('puts a CI round callout at the exit station', () => {
+    expect(at({ kind: 'ci-round', round: 2, max: 3 })).toMatchObject({
+      nodeId: 'ci',
+      tone: 'start',
+      text: 'Round 2 of 3',
+    })
+  })
+
+  it('says a failed check failed, at the exit station', () => {
+    expect(at({ kind: 'ci-check', name: 'test', bucket: 'fail' })).toMatchObject({
+      nodeId: 'ci',
+      tone: 'fail',
+      text: 'test failed',
+    })
+    expect(at({ kind: 'ci-check', name: 'test', bucket: 'cancel' })).toMatchObject({
+      tone: 'fail',
+    })
+  })
+
+  it('says a passing check passed, at the exit station', () => {
+    expect(at({ kind: 'ci-check', name: 'lint', bucket: 'pass' })).toMatchObject({
+      nodeId: 'ci',
+      tone: 'done',
+      text: 'lint passed',
+    })
+  })
+
+  it('stays quiet for a check still in flight', () => {
+    expect(at({ kind: 'ci-check', name: 'test', bucket: 'pending' })).toBeNull()
+    expect(at({ kind: 'ci-check', name: 'test', bucket: 'skipping' })).toBeNull()
+  })
 })
 
 describe('interruptionsFor', () => {

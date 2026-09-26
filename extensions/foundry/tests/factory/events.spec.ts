@@ -9,6 +9,7 @@ import type { RunGraph } from '../../src/line/run-graph.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
+import type { CiState } from '../../src/line/ci-state.js'
 
 // diffObservation is the honesty rule made concrete: a scene may move only for
 // one of these reasons, and never twice for the same underlying change. Every
@@ -51,7 +52,19 @@ function graph(): RunGraph {
 }
 
 function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
-  return { graph: g, orphaned: [], stranded: [], waiting: [], activity: {}, ...over }
+  return { graph: g, orphaned: [], stranded: [], waiting: [], activity: {}, ci: null, ...over }
+}
+
+function ci(over: Partial<CiState> = {}): CiState {
+  return {
+    round: 1,
+    max: 3,
+    status: 'watching',
+    pulls: [],
+    reason: '',
+    at: '2026-09-06T10:00:00.000Z',
+    ...over,
+  }
 }
 
 function activity(over: Partial<ToolActivity> = {}): ToolActivity {
@@ -338,5 +351,71 @@ describe('describeEvent', () => {
 
   it('falls back to the node id when there is no label', () => {
     expect(describeEvent({ kind: 'orphaned', nodeId: 'zzz' }, {})).toBe("zzz's agent is gone.")
+  })
+
+  it.each<[FactoryEvent, string]>([
+    [{ kind: 'ci-round', round: 2, max: 3 }, 'CI round 2 of 3.'],
+    [{ kind: 'ci-check', name: 'test', bucket: 'fail' }, 'test is now fail.'],
+  ])('describes %o as %s', (event, sentence) => {
+    expect(describeEvent(event, labels)).toBe(sentence)
+  })
+})
+
+describe('CI events', () => {
+  it('raises no event before there is CI to report', () => {
+    const g = graph()
+    expect(diffObservation(obs(g), obs(g))).toEqual([])
+  })
+
+  it('raises a ci-round event when a fresh CI state first appears', () => {
+    const g = graph()
+    const events = diffObservation(obs(g), obs(g, { ci: ci({ round: 1, max: 3 }) }))
+    expect(events).toContainEqual({ kind: 'ci-round', round: 1, max: 3 })
+  })
+
+  it('raises a ci-round event only when the round grows', () => {
+    const g = graph()
+    const prev = obs(g, { ci: ci({ round: 1 }) })
+    const same = diffObservation(prev, obs(g, { ci: ci({ round: 1 }) }))
+    expect(same.some((e) => e.kind === 'ci-round')).toBe(false)
+
+    const grown = diffObservation(prev, obs(g, { ci: ci({ round: 2 }) }))
+    expect(grown).toContainEqual({ kind: 'ci-round', round: 2, max: 3 })
+  })
+
+  it('raises a ci-check event for a new check, and for one whose bucket changed', () => {
+    const g = graph()
+    const prev = obs(g, {
+      ci: ci({
+        pulls: [
+          { url: 'u', checks: [{ name: 'test', bucket: 'pending', link: 'l', workflow: 'w' }] },
+        ],
+      }),
+    })
+    const next = obs(g, {
+      ci: ci({
+        pulls: [
+          {
+            url: 'u',
+            checks: [
+              { name: 'test', bucket: 'fail', link: 'l', workflow: 'w' },
+              { name: 'lint', bucket: 'pass', link: 'l', workflow: 'w' },
+            ],
+          },
+        ],
+      }),
+    })
+    const events = diffObservation(prev, next)
+    expect(events).toContainEqual({ kind: 'ci-check', name: 'test', bucket: 'fail' })
+    expect(events).toContainEqual({ kind: 'ci-check', name: 'lint', bucket: 'pass' })
+  })
+
+  it('raises nothing when a check reports the same bucket again', () => {
+    const g = graph()
+    const state = ci({
+      pulls: [{ url: 'u', checks: [{ name: 'test', bucket: 'pass', link: 'l', workflow: 'w' }] }],
+    })
+    const events = diffObservation(obs(g, { ci: state }), obs(g, { ci: state }))
+    expect(events.some((e) => e.kind === 'ci-check')).toBe(false)
   })
 })

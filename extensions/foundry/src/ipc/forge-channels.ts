@@ -9,6 +9,7 @@ import type { OrderStore } from '../order/store.js'
 import { readStanding } from '../order/standing.js'
 import { intakeRefusal, lastIntake } from '../forge/intake-outcome.js'
 import { runFailure } from '../line/run-outcome.js'
+import { readCiState } from '../line/ci-state.js'
 import type { StandingSources } from '../order/standing.js'
 import { TransitionIntentSchema, WorkOrderSchema, WriteBackSchema } from '../order/schema.js'
 import type { Budgets, TransitionIntent, WorkOrder, WriteBack } from '../order/schema.js'
@@ -162,6 +163,15 @@ export interface ForgeDeps {
   readonly capability?: (order: WorkOrder) => Promise<CapabilityReport>
   /** The agreement write-back. Its failure never fails the agreement. */
   readonly onAgreed?: (order: WorkOrder) => Promise<void>
+  /**
+   * Where the records live, so the list can read each order's `ci.json`.
+   *
+   * Resolved on every call, like the other read-only deps here: the records
+   * location follows the open workspace. Absent means the row carries no `ci`
+   * field at all, which is what a host that has never wired CI is actually
+   * true of.
+   */
+  readonly dataRoot?: () => string
 }
 
 export interface ForgeChannels {
@@ -602,6 +612,17 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
             intakeRefusedFor: async (orderId) => intakeRefusal(await deps.store.entries(orderId)),
             runFailureFor: async (orderId) => runFailure(await deps.store.entries(orderId)),
           }),
+          // Absent when this host has never wired a records location for CI;
+          // null once it has one and this order has not shipped a pull yet.
+          ...(deps.dataRoot === undefined
+            ? {}
+            : {
+                ci: await readCiState(deps.dataRoot(), order.id).then((state) =>
+                  state === null
+                    ? null
+                    : { status: state.status, round: state.round, max: state.max }
+                ),
+              }),
         }))
       ),
     }

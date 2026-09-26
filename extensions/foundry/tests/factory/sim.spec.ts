@@ -69,7 +69,7 @@ function graph(): RunGraph {
 }
 
 function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
-  return { graph: g, orphaned: [], stranded: [], waiting: [], activity: {}, ...over }
+  return { graph: g, orphaned: [], stranded: [], waiting: [], activity: {}, ci: null, ...over }
 }
 
 // Duplicated from tests/factory/layout.spec.ts: builds a real run graph from
@@ -129,6 +129,34 @@ function graphFor(recipeFile: string, lanes: number[], dir = SHIPPED_RECIPES): R
   const order = orderFor(recipe.id, lanes)
   return buildRunGraph(order, recipe)
 }
+
+describe('createWorld: CI', () => {
+  it('starts with no CI when the observation carries none', () => {
+    const g = graph()
+    const world = createWorld(layoutHall(g), obs(g))
+    expect(world.ci).toBeNull()
+  })
+
+  it('carries the round and each check bucket the observation reports', () => {
+    const g = graph()
+    const world = createWorld(
+      layoutHall(g),
+      obs(g, {
+        ci: {
+          round: 2,
+          max: 3,
+          status: 'red',
+          reason: '',
+          at: '2026-09-06T10:00:00.000Z',
+          pulls: [
+            { url: 'u', checks: [{ name: 'test', bucket: 'fail', link: 'l', workflow: 'w' }] },
+          ],
+        },
+      })
+    )
+    expect(world.ci).toEqual({ round: 2, max: 3, checks: { test: 'fail' } })
+  })
+})
 
 describe('createWorld', () => {
   it('settles a running node at its seat, doing its own kind of work', () => {

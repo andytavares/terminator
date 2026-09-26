@@ -63,6 +63,20 @@ describe('FactorySite', () => {
     expect(screen.getByRole('button').querySelector('.fdry-hall-card-beacon')).not.toBeNull()
   })
 
+  it('shows the CI round and status when the order carries one', async () => {
+    mount([
+      { id: 'WO-1', title: 'Shipping', status: 'running', ci: { status: 'red', round: 2, max: 3 } },
+    ])
+    await waitFor(() => screen.getByText('Shipping'))
+    expect(screen.getByText('CI 2/3 · red')).toBeTruthy()
+  })
+
+  it('says nothing about CI for an order that has not shipped one', async () => {
+    mount([{ id: 'WO-1', title: 'Fresh', status: 'running', ci: null }])
+    await waitFor(() => screen.getByText('Fresh'))
+    expect(screen.queryByText(/CI \d/)).toBeNull()
+  })
+
   it('opens the order it is given', async () => {
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await waitFor(() => screen.getByText('Only one'))

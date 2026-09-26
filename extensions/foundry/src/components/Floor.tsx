@@ -13,6 +13,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import type { RunNode } from '../line/run-graph.js'
+import type { CiState } from '../line/ci-state.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
@@ -169,6 +170,15 @@ function laneName(view: FloorView, lane: number): string {
   if (lane === 0) return 'the whole order'
   const named = view.lanes?.find((row) => row.ord === lane)
   return named === undefined ? `lane ${lane}` : named.repo
+}
+
+/** What the CI band says about a status, in words rather than the raw enum. */
+const CI_STATUS_LABEL: Record<CiState['status'], string> = {
+  watching: 'Watching',
+  green: 'Green',
+  red: 'Red',
+  not_measured: 'Not measured',
+  reworking: 'Sending the failures back',
 }
 
 export interface FloorProps {
@@ -848,6 +858,35 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               </li>
             ))}
           </ol>
+        </section>
+      ) : null}
+
+      {/* Present only when the ship tail has actually written a CI state — a
+          draft that has never shipped a pull says nothing here (ADR-060). */}
+      {view.ci ? (
+        <section className="fdry-panel" style={{ marginBottom: 12 }} aria-labelledby="fdry-ci-h">
+          <h3 className="fdry-panel-h" id="fdry-ci-h">
+            CI
+          </h3>
+          <p>
+            {CI_STATUS_LABEL[view.ci.status]}
+            {view.ci.status === 'not_measured' ? `: ${view.ci.reason}` : ''}
+          </p>
+          <p>
+            Round {view.ci.round} of {view.ci.max}
+          </p>
+          <ul className="fdry-ci-checks">
+            {view.ci.pulls.flatMap((pull, pullIndex) =>
+              pull.checks.map((check, checkIndex) => (
+                <li key={`${pullIndex}-${checkIndex}`}>
+                  <a href={check.link} target="_blank" rel="noreferrer noopener">
+                    {check.name}
+                  </a>
+                  <u>{check.bucket}</u>
+                </li>
+              ))
+            )}
+          </ul>
         </section>
       ) : null}
 

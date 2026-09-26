@@ -41,6 +41,7 @@ const ALL_PROP_KINDS: readonly PropKind[] = [
   'fridge',
   'coffeebar',
   'vending',
+  'dispatch',
 ]
 
 const PROP_DEFAULTS: Readonly<Partial<Record<PropKind, Partial<HallProp>>>> = {
@@ -236,6 +237,26 @@ describe('factory/art/props drawProp', () => {
     const empty = createRecordingPaint()
     drawProp(empty, prop('chair'), context(), 0)
     expect(containsColor(empty.calls, '#3a4150')).toBe(true)
+  })
+
+  it('lights the dispatch tower with one lamp per check, coloured by bucket', () => {
+    const paint = createRecordingPaint()
+    drawProp(
+      paint,
+      prop('dispatch'),
+      context({ ci: { checks: { test: 'fail', lint: 'pass', typecheck: 'pending' } } }),
+      0
+    )
+    expect(containsColor(paint.calls, HALL.red)).toBe(true)
+    expect(containsColor(paint.calls, HALL.green)).toBe(true)
+    expect(containsColor(paint.calls, HALL.amber)).toBe(true)
+  })
+
+  it('draws no lamps for a dispatch tower nothing has reported checks for', () => {
+    const paint = createRecordingPaint()
+    drawProp(paint, prop('dispatch'), context({ ci: { checks: {} } }), 0)
+    expect(containsColor(paint.calls, HALL.red)).toBe(false)
+    expect(containsColor(paint.calls, HALL.green)).toBe(false)
   })
 })
 

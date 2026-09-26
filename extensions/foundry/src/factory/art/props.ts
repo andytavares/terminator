@@ -2,6 +2,7 @@ import type { HallMap, HallProp, PropKind, Side, BeltTile } from '../layout.js'
 import { TILE_PX } from '../layout.js'
 import type { Crew } from '../sim.js'
 import type { NodeState } from '../../line/run-graph.js'
+import type { Check } from '../../line/ci.js'
 import type { Paint } from './kit.js'
 import { rect, bevel, rivets, wear, mulberry32 } from './kit.js'
 import { HALL, CODE_LINE_COLORS } from './palette.js'
@@ -23,6 +24,8 @@ export interface SceneContext {
   readonly crew: readonly Crew[]
   readonly states: Readonly<Record<string, NodeState>>
   readonly gatesWaiting: readonly string[]
+  /** The dispatch tower's own state: null until CI has something to show. */
+  readonly ci?: { readonly checks: Readonly<Record<string, Check['bucket']>> } | null
 }
 
 /** Rows 0–2 are the top wall on every `HallMap` — see `layout.ts`'s contract. */
@@ -665,6 +668,40 @@ function drawStatuswall(paint: Paint, prop: HallProp, context: SceneContext): vo
   rect(paint, x + 2 + filled, y - 4, w - 4 - filled, 2, '#1d3440')
 }
 
+function lampColor(bucket: Check['bucket']): string {
+  switch (bucket) {
+    case 'pass':
+      return HALL.green
+    case 'fail':
+    case 'cancel':
+      return HALL.red
+    case 'pending':
+    case 'skipping':
+      return HALL.amber
+    /* v8 ignore next 3 -- exhaustive union, unreachable */
+    default: {
+      const never: never = bucket
+      throw new Error(`unhandled check bucket: ${String(never)}`)
+    }
+  }
+}
+
+/** A small tower beside the exit, one lamp per check the ship tail is watching. */
+function drawDispatch(paint: Paint, prop: HallProp, context: SceneContext): void {
+  const x = prop.x * TILE_PX
+  const y = prop.y * TILE_PX
+
+  rect(paint, x + 3, y - 24, 10, 24, '#20242c')
+  bevel(paint, x + 3, y - 24, 10, 24, '#3a414d', '#12151b')
+
+  const buckets = Object.values(context.ci?.checks ?? {})
+  buckets.forEach((bucket, index) => {
+    const ly = y - 21 + index * 5
+    if (ly < y - 24) return
+    rect(paint, x + 5, ly, 6, 3, lampColor(bucket))
+  })
+}
+
 function drawLockers(paint: Paint, prop: HallProp): void {
   const x = prop.x * TILE_PX
   const y = prop.y * TILE_PX
@@ -867,6 +904,8 @@ export function drawProp(paint: Paint, prop: HallProp, context: SceneContext, tM
       return counter(paint, x, y)
     case 'vending':
       return drawVendingProp(paint, prop)
+    case 'dispatch':
+      return drawDispatch(paint, prop, context)
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = kind

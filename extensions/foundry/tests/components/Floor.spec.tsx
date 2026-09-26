@@ -173,6 +173,81 @@ describe('the merge order section', () => {
   })
 })
 
+describe('the CI band', () => {
+  it('shows nothing when the run has no CI state', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText('CI')).toBeNull()
+  })
+
+  it('says a green run is green, and its round', async () => {
+    mount(
+      reply({
+        ci: {
+          round: 2,
+          max: 3,
+          status: 'green',
+          pulls: [{ url: 'https://github.com/x/y/pull/1', checks: [] }],
+          reason: '',
+          at: '2026-09-06T10:00:00.000Z',
+        },
+      })
+    )
+    await waitFor(() => screen.getByText('CI'))
+    expect(screen.getByText('Green')).toBeTruthy()
+    expect(screen.getByText('Round 2 of 3')).toBeTruthy()
+  })
+
+  it('says why CI is not measured', async () => {
+    mount(
+      reply({
+        ci: {
+          round: 1,
+          max: 3,
+          status: 'not_measured',
+          pulls: [],
+          reason: 'no checks were reported',
+          at: '2026-09-06T10:00:00.000Z',
+        },
+      })
+    )
+    await waitFor(() => screen.getByText('CI'))
+    expect(screen.getByText(/Not measured: no checks were reported/)).toBeTruthy()
+  })
+
+  it('lists each check by name, bucket and a link to it', async () => {
+    mount(
+      reply({
+        ci: {
+          round: 1,
+          max: 3,
+          status: 'red',
+          pulls: [
+            {
+              url: 'https://github.com/x/y/pull/1',
+              checks: [
+                {
+                  name: 'test',
+                  bucket: 'fail',
+                  link: 'https://github.com/x/y/actions/runs/1',
+                  workflow: 'CI',
+                },
+              ],
+            },
+          ],
+          reason: '',
+          at: '2026-09-06T10:00:00.000Z',
+        },
+      })
+    )
+    await waitFor(() => screen.getByText('CI'))
+    expect(screen.getByText('test')).toBeTruthy()
+    expect(screen.getByText('fail')).toBeTruthy()
+    const link = screen.getByRole('link', { name: /test/i })
+    expect(link.getAttribute('href')).toBe('https://github.com/x/y/actions/runs/1')
+  })
+})
+
 describe('the units', () => {
   it('names each row by its repository rather than by a lane number', async () => {
     mount(reply({ lanes: TWO_LANES }))

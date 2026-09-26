@@ -197,11 +197,16 @@ export function FactoryHall({
       stranded: view.stranded ?? [],
       waiting: view.waiting ?? [],
       activity,
+      ci: view.ci ?? null,
     }
 
-    const nodeKey = [...view.graph.nodes.map((n) => n.id)].sort().join(',')
+    // CI presence joins the key: the dispatch tower has to appear the moment
+    // a run first ships a pull, not only the next time the node set changes.
+    const nodeKey =
+      [...view.graph.nodes.map((n) => n.id)].sort().join(',') +
+      (observation.ci === null ? '' : '+ci')
     if (mapKeyRef.current !== nodeKey) {
-      const nextMap = layoutHall(view.graph, view.labels ?? {})
+      const nextMap = layoutHall(view.graph, view.labels ?? {}, observation.ci !== null)
       mapKeyRef.current = nodeKey
       setMap(nextMap)
       worldRef.current = createWorld(nextMap, observation)

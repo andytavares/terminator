@@ -12,6 +12,8 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
 import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
+import { writeCiState } from '../../src/line/ci-state.js'
+import type { CiState } from '../../src/line/ci-state.js'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -176,6 +178,29 @@ describe('foundry:run.observe', () => {
   it('reports no run before one has started', async () => {
     await store.save(order())
     expect(await channels().observe({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
+  })
+
+  it('reports the CI state a written ci.json carries', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const state: CiState = {
+      round: 1,
+      max: 3,
+      status: 'watching',
+      pulls: [{ url: 'https://github.com/x/y/pull/1', checks: [] }],
+      reason: '',
+      at: '2026-09-06T10:00:00.000Z',
+    }
+    await writeCiState(dataRoot, 'WO-1', state)
+    const r = (await channels().observe({ id: 'WO-1' })) as { ci: CiState | null }
+    expect(r.ci).toEqual(state)
+  })
+
+  it('reports no CI when nothing has written one', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as { ci: CiState | null }
+    expect(r.ci).toBeNull()
   })
 })
 

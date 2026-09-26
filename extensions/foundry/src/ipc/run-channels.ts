@@ -16,6 +16,7 @@ import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
 import { runFailure } from '../line/run-outcome.js'
+import { readCiState } from '../line/ci-state.js'
 import type { Gate } from '../gates/rules.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import { recordGraph, readTimeline } from '../factory/timeline-store.js'
@@ -474,6 +475,10 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     return {
       graph,
       labels,
+      // The draft's CI, read from the ship tail's own file rather than
+      // re-derived here — a surface that only wants "where does CI stand"
+      // reads one small file instead of walking nodes and feedback.
+      ci: await readCiState(deps.dataRoot(), parsed.data.id),
       // What the operator called it. The surface's heading was the order id
       // and the recipe name — two identifiers nobody chose — so the screen
       // showing a run never said which piece of work it was.

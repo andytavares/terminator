@@ -17,6 +17,13 @@ export interface FactoryOrderRow {
    * guessing.
    */
   readonly standing?: Standing
+  /**
+   * Where this order's CI stands, in brief.
+   *
+   * Null when nothing has shipped a pull yet, and absent (like `standing`)
+   * when the host answering the list has never heard of CI.
+   */
+  readonly ci?: { readonly status: string; readonly round: number; readonly max: number } | null
 }
 
 export interface FactorySiteProps {
@@ -63,6 +70,9 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
           {row.standing === undefined ? null : (
             <span className="fdry-hall-card-state">{row.standing.label}</span>
           )}
+          {row.ci ? (
+            <span className="fdry-hall-card-ci">{`CI ${row.ci.round}/${row.ci.max} · ${row.ci.status}`}</span>
+          ) : null}
         </button>
       ))}
     </div>
