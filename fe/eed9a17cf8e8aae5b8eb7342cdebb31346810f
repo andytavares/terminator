@@ -1,0 +1,33 @@
+docs/research/foundry-factory-view.md
+  s_ada067fd581084::t_730711ce1cf827 18-19
+  s_ada067fd581084::t_f58009396a4ce3 107
+  s_ada067fd581084::t_776e80e96196c9 118
+  s_ada067fd581084::t_b71e352097188a 128
+  s_ada067fd581084::t_7f10a43defe9c0 100
+  s_ada067fd581084::t_be5139d5bfcca2 9-10
+  s_ada067fd581084::t_4a7df0a54c93a1 155,176,195
+docs/research/foundry-hall-breakroom-belts.md
+  s_ada067fd581084::t_bd0a0249d238a2 3
+  s_ada067fd581084::t_a7bdd2adbdde65 254-260
+  s_ada067fd581084::t_e69be5bcf4cc23 1-2,4-253,261-280
+docs/adr/060-a-factory-is-a-projection.md
+  s_ada067fd581084::t_a0f77f3368c4fc 45-48
+  s_ada067fd581084::t_921543cdd51c79 24
+  s_ada067fd581084::t_2be94baa109425 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "feeed9a17cf8e8aae5b8eb7342cdebb31346810f",
+  "prompts": {},
+  "sessions": {
+    "s_ada067fd581084": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37ef5476-deb7-4867-9476-00f095ba1d89",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
