@@ -1,0 +1,31 @@
+extensions/foundry/tests/line/brief.spec.ts
+  s_4f15472be339a2::t_f3cd73113de39e 175-274
+  s_4f15472be339a2::t_9bd8710ce82088 6
+  s_4f15472be339a2::t_efab0a91bf9042 21
+extensions/foundry/src/line/brief.ts
+  s_4f15472be339a2::t_8f69cf109ff1ec 46-47
+  s_4f15472be339a2::t_270a07c8f95218 20-28
+  s_4f15472be339a2::t_e0b4d8261cc325 189
+  s_4f15472be339a2::t_9f3e2f52d8e61e 244-247
+  s_4f15472be339a2::t_d3d3615c10fde2 103-117,119-127
+  s_4f15472be339a2::t_0572f6ae90d85c 6
+  s_4f15472be339a2::t_552172ded15959 118
+extensions/foundry/roles/builder.yaml
+  s_4f15472be339a2::t_c532dc7ae5f2bc 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "03b607317ab6ef50d565408ff1dc1d63ead13617",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
