@@ -1,0 +1,36 @@
+extensions/foundry/tests/line/order-shape.spec.ts
+  s_4f15472be339a2::t_0abf7ce6399ac1 130-140
+extensions/foundry/recipes/bugfix.yaml
+  s_4f15472be339a2::t_0d881cd5037294 24-33,38,40
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_4f15472be339a2::t_86ee401686884b 413-482
+  s_4f15472be339a2::t_081b87bd6727b1 176,178
+  s_4f15472be339a2::t_86b7d7eb278af8 82-84
+  s_4f15472be339a2::t_ae545949a02449 483
+extensions/foundry/recipes/poc.yaml
+  s_4f15472be339a2::t_5ac9a74412abc9 15-24,32
+extensions/foundry/recipes/refactor.yaml
+  s_4f15472be339a2::t_e454df61153cc1 34
+extensions/foundry/recipes/quick.yaml
+  s_4f15472be339a2::t_dce930832d5813 25-34,38,40
+extensions/foundry/recipes/standard.yaml
+  s_4f15472be339a2::t_6a620aecc19e8d 22-30,38
+extensions/foundry/recipes/direct.yaml
+  s_4f15472be339a2::t_5fecf582c2c244 17-25,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "68dd9f63fd76fe0aba25c637af786b871568e496",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
