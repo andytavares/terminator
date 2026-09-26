@@ -226,6 +226,13 @@ describe('layoutHall — properties, across every recipe and lane count', () => 
           }
         })
 
+        // A gap between two yard stations is where a belt turns down to get
+        // round the next one; an anchor standing in it forces a detour.
+        it('stands the wait anchor under a station, never in a gap between two', () => {
+          const { wait } = map.anchors
+          expect(map.solid[wait.y - 1][wait.x]).toBe(true)
+        })
+
         it('reaches every station seat, rest seat, anchor and the exit from the intake', () => {
           const stationSeats = map.props.filter((p) => p.seat !== null).map((p) => p.seat as Tile)
           const targets: Tile[] = [
