@@ -957,7 +957,8 @@ test('the Ledger’s Factory tab reads the numbers off what was recorded', async
   })
   writeFileSync(join('test-results', 'site-status-wall.png'), Buffer.from(site, 'base64'))
   // Back to the list, which the tests after this one expect.
-  await clickByName('button', 'List view')
+  expect(await clickByName('button', 'List view')).toBe(true)
+  await handle.page.waitForTimeout(800)
 })
 
 test('an order’s budgets are set on the Plan step, and raised at the gate that stopped it', async () => {
