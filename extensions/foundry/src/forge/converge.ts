@@ -4,7 +4,7 @@ import { orderDir } from '../data-root.js'
 import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
 import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
-import { settleFindings } from './red-team.js'
+import { resolveFindings, settleFindings } from './red-team.js'
 import { decideConfidentQuestions, dismissConfidentFindings } from './autonomy.js'
 import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
@@ -80,6 +80,7 @@ function outputContract(file: string, order: WorkOrder): string {
     '    { "id": "Q-1", "text": "…", "why": "…", "options": ["…"], "recommended": 0, "answer": null, "rank": 1, "confidence": 0.6 }',
     '  ],',
     '  "dismissFindings": [{ "id": "RT-…", "reason": "why it does not apply here", "confidence": 0.95 }],',
+    '  "resolveFindings": [{ "id": "RT-…", "how": "what you changed so it no longer holds, in one line" }],',
     '  "note": "what you changed, in one line"',
     '}',
     '```',
@@ -137,9 +138,11 @@ function outputContract(file: string, order: WorkOrder): string {
     'gets built — never more than three, each with `recommended` and your',
     '`confidence` (0–1) in it. A question at 0.9 or above is decided for you.',
     '',
-    'Fix each open finding in the plan where you can. A low or medium one you are',
-    'at least 90% sure does not apply here goes in `dismissFindings` with the',
-    'reason; a high one is fixed or left for the operator.',
+    'Fix each open finding in the plan where you can, and list every one you',
+    'fixed in `resolveFindings` with what you changed — a finding you fixed but',
+    'did not list stays open. A low or medium one you are at least 90% sure does',
+    'not apply here goes in `dismissFindings` with the reason; a high one is',
+    'fixed or left for the operator.',
     '',
     '## How big the plan should be',
     '',
@@ -312,11 +315,14 @@ export function readProposal(order: WorkOrder, proposalPath: string, at: string)
     return {
       ok: true,
       order: settleFindings(
-        decideConfidentQuestions(
-          dismissConfidentFindings(
-            applyProposal(order, proposal, at),
-            proposal.dismissFindings ?? []
-          )
+        resolveFindings(
+          decideConfidentQuestions(
+            dismissConfidentFindings(
+              applyProposal(order, proposal, at),
+              proposal.dismissFindings ?? []
+            )
+          ),
+          proposal.resolveFindings ?? []
         )
       ),
       note: proposal.note,

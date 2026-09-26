@@ -15,3 +15,8 @@ prompt: |
   project says about itself.
 
   Say what is wrong and why it matters. Do not fix it.
+
+  Write each finding to be read at a glance: its first line is the claim, in
+  one sentence of plain words. Then a blank line, and the evidence and the
+  consequence as short `- ` bullets, file:line references in backticks. No
+  paragraph of prose — the operator scans the first lines and opens the rest.

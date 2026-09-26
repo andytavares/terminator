@@ -3,7 +3,7 @@ import { seedOrder, newOrderId } from '../forge/intake-source.js'
 import type { IssueLike } from '../forge/intake-source.js'
 import { answerQuestion, surfacedQuestions } from '../forge/interview.js'
 import { strikeAssumption } from '../forge/assumptions.js'
-import { applyFindings, resolveFinding, acceptFinding } from '../forge/red-team.js'
+import { applyFindings, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
 import { readStanding } from '../order/standing.js'
@@ -55,16 +55,16 @@ const TurnPayload = z.object({
     .object({ questionId: z.string(), option: z.union([z.string(), z.number()]) })
     .optional(),
   /**
-   * Clear an adversarial finding.
+   * Accept an adversarial finding: it stands, and the operator has said why.
    *
-   * `resolved` means it was fixed; `accepted` means it stands and the operator
-   * has said why. Without one of these the compile gate refuses the order for
-   * ever, which is what it did before this existed.
+   * Fixing one is not a decision here. It is the architect's, through a
+   * converge turn that changes the order and reports it in `resolveFindings`;
+   * a bare "fixed" cleared the gate while the order stayed as it was.
    */
   finding: z
     .object({
       id: z.string(),
-      decision: z.enum(['resolved', 'accepted']),
+      decision: z.literal('accepted'),
       reason: z.string().default(''),
     })
     .optional(),
@@ -320,15 +320,12 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
 
     if (parsed.data.finding !== undefined) {
       const { id: findingId, decision, reason } = parsed.data.finding
-      if (decision === 'accepted' && reason.trim() === '') {
+      if (reason.trim() === '') {
         // An accepted finding with no reason is a shrug, and the compile check
         // would refuse it anyway — said here rather than silently ignored.
         return { ...view(order), error: 'Accepting a finding costs a written reason.' }
       }
-      const next =
-        decision === 'resolved'
-          ? resolveFinding(order, findingId)
-          : acceptFinding(order, findingId, reason)
+      const next = acceptFinding(order, findingId, reason)
 
       await deps.store.save(next)
       await deps.store.record({
@@ -337,7 +334,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
         actor: 'operator',
         action: `finding.${decision}`,
         subject: findingId,
-        reason: reason.trim() === '' ? 'fixed' : reason.trim(),
+        reason: reason.trim(),
         evidence: [],
       })
       return view(next, ['redTeam'])

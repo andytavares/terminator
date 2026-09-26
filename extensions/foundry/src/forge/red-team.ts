@@ -191,10 +191,25 @@ export function settleFindings(order: WorkOrder): WorkOrder {
   }
 }
 
-export function resolveFinding(order: WorkOrder, id: string): WorkOrder {
+/**
+ * Close the open findings the architect says its redraft cleared.
+ *
+ * The reason carries how, so the operator can check the claim against the
+ * order rather than take it on trust.
+ */
+export function resolveFindings(
+  order: WorkOrder,
+  resolutions: readonly { readonly id: string; readonly how: string }[]
+): WorkOrder {
+  if (resolutions.length === 0) return order
   return {
     ...order,
-    redTeam: order.redTeam.map((f) => (f.id === id ? { ...f, status: 'resolved' as const } : f)),
+    redTeam: order.redTeam.map((f) => {
+      const resolution = resolutions.find((r) => r.id === f.id)
+      return resolution === undefined || f.status !== 'open'
+        ? f
+        : { ...f, status: 'resolved' as const, reason: `architect: ${resolution.how.trim()}` }
+    }),
   }
 }
 

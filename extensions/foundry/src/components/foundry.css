@@ -486,7 +486,8 @@
 }
 
 .fdry-remedy button,
-.fdry-finding-actions button {
+.fdry-finding-actions button,
+.fdry-accept button {
   appearance: none;
   font: inherit;
   font-size: 12px;
@@ -499,12 +500,14 @@
 }
 
 .fdry-remedy button:hover:not(:disabled),
-.fdry-finding-actions button:hover:not(:disabled) {
+.fdry-finding-actions button:hover:not(:disabled),
+.fdry-accept button:hover:not(:disabled) {
   background: var(--tm-bg-card-hover);
 }
 
 .fdry-remedy button:disabled,
-.fdry-finding-actions button:disabled {
+.fdry-finding-actions button:disabled,
+.fdry-accept button:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -886,10 +889,10 @@
 /* A finding, and the two ways to clear it. Showing them without a way to
    clear them is what blocked the compile gate for ever. */
 .fdry-finding-actions {
-  display: inline-flex;
-  flex: none;
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  margin-left: auto;
+  margin-top: 8px;
 }
 
 .fdry-finding-actions button {
@@ -902,7 +905,21 @@
   margin-top: 8px;
 }
 
-.fdry-accept input {
+/* A fix is sentences, not a phrase: the box takes the row, the send sits under it. */
+.fdry-accept.is-fix {
+  flex-direction: column;
+}
+
+.fdry-accept textarea {
+  resize: vertical;
+}
+
+.fdry-accept button {
+  align-self: flex-start;
+}
+
+.fdry-accept input,
+.fdry-accept textarea {
   flex: 1;
   min-width: 0;
   padding: 5px 8px;
@@ -1664,6 +1681,59 @@
   flex: none;
   margin-top: 3px;
   color: var(--tm-warning);
+}
+
+/* The finding gets the full width; its moves sit under it. Beside it, three
+   buttons squeezed a reviewer's paragraph into a narrow column. */
+.fdry-finding-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fdry-finding-headline {
+  display: block;
+  font-weight: 500;
+}
+
+.fdry-finding-detail {
+  margin-top: 4px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-finding-detail > summary {
+  width: fit-content;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fdry-finding-detail[open] > summary {
+  margin-bottom: 4px;
+}
+
+.fdry-cleared {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fdry-finding.is-cleared {
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-finding.is-cleared > svg {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.fdry-finding.is-cleared .fdry-finding-headline {
+  font-weight: 400;
+}
+
+.fdry-finding-reason {
+  display: block;
+  margin-top: 2px;
+  font-style: italic;
 }
 
 .fdry-input {

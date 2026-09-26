@@ -54,6 +54,12 @@ export const ProposalSchema = z
           .strict()
       )
       .optional(),
+    // Findings the architect changed the order to clear, and how. A reviewer's
+    // finding is judgement, not re-derivable like a structural one, so without
+    // this a redraft that answered it left it open and looking untouched.
+    resolveFindings: z
+      .array(z.object({ id: z.string(), how: z.string().trim().min(1) }).strict())
+      .optional(),
     /** What the agent changed and why, for the ledger. */
     note: z.string().default(''),
   })

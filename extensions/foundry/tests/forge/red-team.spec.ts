@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   structuralFindings,
   applyFindings,
-  resolveFinding,
+  resolveFindings,
   acceptFinding,
   settleFindings,
 } from '../../src/forge/red-team.js'
@@ -218,13 +218,16 @@ describe('applyFindings', () => {
   })
 })
 
-describe('resolveFinding and acceptFinding', () => {
+describe('resolveFindings and acceptFinding', () => {
   const dirty = (): WorkOrder => order({ intent: { problem: 'p', outcome: 'p', nonGoals: [] } })
 
-  it('resolves a finding', () => {
+  it('resolves a finding, and keeps how with it', () => {
     const o = applyFindings(dirty(), '2026-09-06T12:00:00.000Z')
-    const after = resolveFinding(o, o.redTeam[0].id)
-    expect(after.redTeam[0].status).toBe('resolved')
+    const after = resolveFindings(o, [{ id: o.redTeam[0].id, how: 'the outcome is observable' }])
+    expect(after.redTeam[0]).toMatchObject({
+      status: 'resolved',
+      reason: 'architect: the outcome is observable',
+    })
   })
 
   it('accepts a finding, and keeps the reason with it', () => {
@@ -242,7 +245,7 @@ describe('resolveFinding and acceptFinding', () => {
 
   it('ignores an unknown finding id rather than throwing', () => {
     const o = applyFindings(dirty(), '2026-09-06T12:00:00.000Z')
-    expect(() => resolveFinding(o, 'RT-nope')).not.toThrow()
+    expect(resolveFindings(o, [{ id: 'RT-nope', how: 'x' }]).redTeam).toEqual(o.redTeam)
   })
 })
 

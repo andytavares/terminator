@@ -137,7 +137,10 @@ const EXAMPLE: Record<Collectable, string[]> = {
   ],
   findings: [
     '  "redTeam": [',
-    '    { "severity": "low | medium | high", "text": "what is wrong, and why it matters" }',
+    '    {',
+    '      "severity": "low | medium | high",',
+    '      "text": "first line: what is wrong, in one sentence\\n\\n- the evidence, with file:line\\n- why it matters"',
+    '    }',
     '  ],',
   ],
   plan: [

@@ -136,8 +136,14 @@ One turn of intake. Exactly one of `message`, `strike` or `answer` is present. R
   message?: string          // free text
   strike?: string           // assumption id
   answer?: { questionId: string; option: number | string }
+  finding?: { id: string; decision: 'accepted'; reason: string } // red-team finding
 }
 ```
+
+`finding` accepts a red-team finding with the operator's reason; an empty reason
+is refused. There is no operator "resolved": a finding is fixed by a
+`foundry:order.converge` turn whose proposal lists it in `resolveFindings`
+(ADR 068).
 
 **Response**: `{ order: WorkOrder; compile: CompileResult; changed: string[] } | { error: string }`
 
