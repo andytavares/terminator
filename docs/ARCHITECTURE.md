@@ -1268,6 +1268,26 @@ citing the entries. It imports no filesystem module and schedules nothing, and
 the append path cannot reach it — an assistant that volunteers rules is one
 whose rules get accepted without being read.
 
+**Factory metrics** (`factory/metrics.ts`, `foundry:factory.metrics`) are a pure
+function of what is already recorded — ledgers, gates and run graphs — so they
+store nothing and can always be recomputed. Per order and over 30 days or all
+time:
+
+| Metric                 | Definition                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| Lead time              | first `order.seeded` → first `ship.draft_opened`                                                        |
+| Build time             | first `run.started` → first `ship.draft_opened`                                                         |
+| Your time              | Σ (decided − raised) over gates the operator decided                                                    |
+| First-pass yield       | shipped orders with no `rework.started`, `ci.round` or Send back, over shipped orders                   |
+| Reworks, CI rounds     | counts of `rework.started`, `ci.round`                                                                  |
+| Sessions               | Σ attempts over agent and fan-out nodes                                                                 |
+| Forge follow-ups       | count of `converge.followed_up`, the turns the Forge started itself                                     |
+| Forge decisions struck | struck `A-Q-*` assumptions over all of them — how well the architect's ≥ 90% confidence holds (ADR-062) |
+
+The Ledger shows them under **Factory**, the factory site on its status wall,
+and each hall's status wall draws its own order's time to ship, reworks and CI
+rounds.
+
 ### Surfaces
 
 ```
