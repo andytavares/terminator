@@ -91,6 +91,8 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
+export const SIGNAL_POLL_MS = 4000
+
 export function Inbox(): JSX.Element {
   const [view, setView] = useState<InboxView | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -139,6 +141,13 @@ export function Inbox(): JSX.Element {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  // Sensors record signals on their own tick, so the list is read again while
+  // the Inbox is open rather than only when it mounts.
+  useEffect(() => {
+    const timer = setInterval(() => void refreshSignals(), SIGNAL_POLL_MS)
+    return () => clearInterval(timer)
+  }, [refreshSignals])
 
   const [raising, setRaising] = useState<string | null>(null)
   const answer = useCallback(

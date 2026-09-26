@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
-import { Inbox } from '../../src/components/Inbox.js'
+import { Inbox, SIGNAL_POLL_MS } from '../../src/components/Inbox.js'
 import { raiseGate, GATE_RULES } from '../../src/gates/rules.js'
 import type { Signal } from '../../src/sensors/types.js'
 
@@ -407,6 +407,28 @@ describe("from the factory's sensors", () => {
       (el) => el.querySelector('b')?.textContent
     )
     expect(titles).toEqual(['test-foo flakes on main', 'many issues opened against auth'])
+  })
+
+  // Seen live: a sensor recorded a signal while the Inbox was open, and the
+  // Inbox went on saying "Nothing needs you." until something remounted it.
+  it('shows a signal that arrives while the Inbox is open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      mount({ signals: [] })
+      await waitFor(() => screen.getByText('Nothing needs you.'))
+      const before = invoke.getMockImplementation() as (c: string, p?: unknown) => Promise<unknown>
+      invoke.mockImplementation(async (channel: string, payload?: unknown) =>
+        channel === 'foundry:signals.list'
+          ? { signals: [highSignal()], counts: { open: 1 } }
+          : before(channel, payload)
+      )
+      await act(async () => {
+        vi.advanceTimersByTime(SIGNAL_POLL_MS)
+      })
+      await waitFor(() => screen.getByText('test-foo flakes on main'))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not show the section when there are no open signals', async () => {
