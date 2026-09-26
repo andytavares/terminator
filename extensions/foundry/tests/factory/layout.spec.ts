@@ -17,8 +17,13 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // like one. The golden fixtures pin the prototype's exact output; the
 // property tests sweep every recipe the repo ships, at every lane count.
 
-function recipeFrom(file: string): Recipe {
-  const text = fs.readFileSync(path.join(__dirname, '..', '..', 'recipes', file), 'utf-8')
+const SHIPPED_RECIPES = path.join(__dirname, '..', '..', 'recipes')
+// The recipes the prototype's golden output was recorded against. The shipped
+// ones change as shapes gain steps; the recording cannot be re-run.
+const RECORDED_RECIPES = path.join(__dirname, 'fixtures', 'recipes')
+
+function recipeFrom(file: string, dir = SHIPPED_RECIPES): Recipe {
+  const text = fs.readFileSync(path.join(dir, file), 'utf-8')
   const parsed = parseRecipe(text, file)
   if (!parsed.ok) throw new Error(parsed.reason)
   return parsed.value
@@ -60,8 +65,8 @@ function orderFor(recipeId: string, lanes: number[]): WorkOrder {
   }
 }
 
-function graphFor(recipeFile: string, lanes: number[]): RunGraph {
-  const recipe = recipeFrom(recipeFile)
+function graphFor(recipeFile: string, lanes: number[], dir = SHIPPED_RECIPES): RunGraph {
+  const recipe = recipeFrom(recipeFile, dir)
   const order = orderFor(recipe.id, lanes)
   return buildRunGraph(order, recipe)
 }
@@ -124,7 +129,7 @@ describe('layoutHall — golden output', () => {
 
   for (const [key, { file, lanes }] of Object.entries(GOLDEN)) {
     it(`matches the prototype's output for ${key}`, () => {
-      const map = layoutHall(graphFor(file, lanes))
+      const map = layoutHall(graphFor(file, lanes, RECORDED_RECIPES))
       const expected = golden[key] as {
         width: number
         height: number
@@ -219,6 +224,13 @@ describe('layoutHall — properties, across every recipe and lane count', () => 
               expect(map.walk[tile.y][tile.x]).toBe(true)
             }
           }
+        })
+
+        // A gap between two yard stations is where a belt turns down to get
+        // round the next one; an anchor standing in it forces a detour.
+        it('stands the wait anchor under a station, never in a gap between two', () => {
+          const { wait } = map.anchors
+          expect(map.solid[wait.y - 1][wait.x]).toBe(true)
         })
 
         it('reaches every station seat, rest seat, anchor and the exit from the intake', () => {

@@ -397,8 +397,22 @@ export function layoutHall(graph: RunGraph, _labels?: Readonly<Record<string, st
     x: nearestClearColumn(solid, TOP_WALL_ROWS, fixtureCol('racks'), width),
     y: TOP_WALL_ROWS,
   }
+  // Under a station's body, beside its seat: a gap between two stations is
+  // where a belt turns down to get round the next one.
+  const underStation = [...Array(width).keys()].filter(
+    (x) =>
+      solid[yardStationRow][x] &&
+      !solid[yardSeatRow][x] &&
+      !blockedForBelt.has(key({ x, y: yardSeatRow }))
+  )
+  const statuswallCol = fixtureCol('statuswall')
   const wait: Tile = {
-    x: nearestClearColumn(solid, yardSeatRow, fixtureCol('statuswall'), width),
+    x:
+      underStation.length === 0
+        ? nearestClearColumn(solid, yardSeatRow, statuswallCol, width)
+        : underStation.reduce((best, x) =>
+            Math.abs(x - statuswallCol) < Math.abs(best - statuswallCol) ? x : best
+          ),
     y: yardSeatRow,
   }
   for (const anchor of [archive, rack, wait]) blockedForBelt.add(key(anchor))

@@ -76,8 +76,13 @@ function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
 // a shipped recipe file and a lane count, the same way that spec does, so
 // the golden crew fixture below is exercised against the exact graph the
 // prototype was run against.
-function recipeFrom(file: string): Recipe {
-  const text = fs.readFileSync(path.join(__dirname, '..', '..', 'recipes', file), 'utf-8')
+const SHIPPED_RECIPES = path.join(__dirname, '..', '..', 'recipes')
+// The recipes the prototype's golden output was recorded against. The shipped
+// ones change as shapes gain steps; the recording cannot be re-run.
+const RECORDED_RECIPES = path.join(__dirname, 'fixtures', 'recipes')
+
+function recipeFrom(file: string, dir = SHIPPED_RECIPES): Recipe {
+  const text = fs.readFileSync(path.join(dir, file), 'utf-8')
   const parsed = parseRecipe(text, file)
   if (!parsed.ok) throw new Error(parsed.reason)
   return parsed.value
@@ -119,8 +124,8 @@ function orderFor(recipeId: string, lanes: number[]): WorkOrder {
   }
 }
 
-function graphFor(recipeFile: string, lanes: number[]): RunGraph {
-  const recipe = recipeFrom(recipeFile)
+function graphFor(recipeFile: string, lanes: number[], dir = SHIPPED_RECIPES): RunGraph {
+  const recipe = recipeFrom(recipeFile, dir)
   const order = orderFor(recipe.id, lanes)
   return buildRunGraph(order, recipe)
 }
@@ -537,7 +542,7 @@ describe('createWorld — golden crew', () => {
   }
 
   it("matches the prototype's initial placement, idle-settle sequence and all-passed layout", () => {
-    let g0 = graphFor('standard.yaml', [1, 2, 3])
+    let g0 = graphFor('standard.yaml', [1, 2, 3], RECORDED_RECIPES)
     for (const id of ['scout', 'challenge', 'build:lane-1', 'build:lane-2', 'build:lane-3']) {
       g0 = withNode(g0, id, { state: 'running' })
     }
@@ -562,7 +567,7 @@ describe('createWorld — golden crew', () => {
     }
     expect(project(world)).toEqual(golden.crew.afterIdle)
 
-    let allPassed = graphFor('standard.yaml', [1, 2, 3])
+    let allPassed = graphFor('standard.yaml', [1, 2, 3], RECORDED_RECIPES)
     for (const node of allPassed.nodes)
       allPassed = withNode(allPassed, node.id, { state: 'passed' })
     const allPassedWorld = createWorld(layoutHall(allPassed), obs(allPassed))
