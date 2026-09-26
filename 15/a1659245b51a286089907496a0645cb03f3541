@@ -1,0 +1,54 @@
+extensions/foundry/src/components/Ledger.tsx
+  s_4f15472be339a2::t_35ef715050f58b 32-36,40
+  s_4f15472be339a2::t_812ff7a597cea3 294-306
+  s_4f15472be339a2::t_27a81dbe20218d 77
+extensions/foundry/src/renderer/use-run-observation.ts
+  s_4f15472be339a2::t_438510bdb7d2a4 61-62
+extensions/foundry/src/ipc/run-channels.ts
+  s_4f15472be339a2::t_8efe0b75fcabb1 496-510,514
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_4f15472be339a2::t_275b7f9c36dfec 326-340
+extensions/foundry/tests/recipe/resolve.spec.ts
+  s_4f15472be339a2::t_f21907dedc8818 12
+  s_4f15472be339a2::t_cf72e5094fa4eb 204-222
+extensions/foundry/tests/ipc/ledger-channels.spec.ts
+  s_4f15472be339a2::t_1fec28961542c0 5,17-21
+  s_4f15472be339a2::t_1af1a45e2e9346 367-376
+  s_4f15472be339a2::t_6172e0823af954 51,57
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_4f15472be339a2::t_2735044c9f42d3 233-251
+extensions/foundry/src/recipe/resolve.ts
+  s_4f15472be339a2::t_0384458dc71137 174-198
+  s_4f15472be339a2::t_e414be06e5f5b6 199
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_4f15472be339a2::t_1c0a3a8516daea 365-367
+  s_4f15472be339a2::t_e31d8fe3fc7c41 214-215
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_4f15472be339a2::t_736fe0b8a9d695 336-350
+extensions/foundry/src/ipc/ledger-channels.ts
+  s_4f15472be339a2::t_da736f98c72479 176
+  s_4f15472be339a2::t_a7a534c14b4ba0 68-73
+  s_4f15472be339a2::t_24edd48710c5af 18-19
+extensions/foundry/src/index.ts
+  s_4f15472be339a2::t_926bacaa63253b 2415
+extensions/foundry/src/components/Floor.tsx
+  s_4f15472be339a2::t_b01a77ce88d9af 945-947
+extensions/foundry/src/components/foundry.css
+  s_4f15472be339a2::t_3b71090af4992e 2369-2375
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "15a1659245b51a286089907496a0645cb03f3541",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
