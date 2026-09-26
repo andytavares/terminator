@@ -1,0 +1,36 @@
+extensions/foundry/sensors/tracker-query.yaml
+  s_4f15472be339a2::t_69c878da90f3d5 1-11
+extensions/foundry/tests/sensors/resolve.spec.ts
+  s_4f15472be339a2::t_fa9ebda295abb6 1-73
+extensions/foundry/src/sensors/schema.ts
+  s_4f15472be339a2::t_7ff0726062280c 1-115
+extensions/foundry/tests/sensors/schema.spec.ts
+  s_4f15472be339a2::t_ae6b0d94eb84d7 1-94
+extensions/foundry/sensors/ci-main-red.yaml
+  s_4f15472be339a2::t_b2e4c0351daf28 1-11
+extensions/foundry/tests/sensors/built-ins.spec.ts
+  s_4f15472be339a2::t_ac5b5d5332cdea 1-44
+extensions/foundry/src/recipe/resolve.ts
+  s_4f15472be339a2::t_8fe253ec330d1b 5-6
+  s_4f15472be339a2::t_b878260b67ece8 127-130
+  s_4f15472be339a2::t_4f25d1625dcd37 16
+  s_4f15472be339a2::t_a0c0c8fba1a386 149-163
+extensions/foundry/src/sensors/types.ts
+  s_4f15472be339a2::t_a0007ad6f99f9c 1-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e1578428cbb8d45ad54e96b5414bd56dbe21b488",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
