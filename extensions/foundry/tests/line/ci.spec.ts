@@ -61,19 +61,39 @@ describe('watchChecks', () => {
     expect(verdict.kind).toBe('green')
   })
 
-  it('empty checks list is not_measured, never green', async () => {
-    const exec = queuedExec([ok([])])
-    const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
+  it('empty checks list is not_measured once the wait for checks is over, never green', async () => {
+    const exec = queuedExec([ok([]), ok([]), ok([])])
+    const sleep = vi.fn(noopSleep())
+    const verdict = await watchChecks(pull, exec, { sleep, pollMs: 10, appearWithinMs: 20 })
     expect(verdict.kind).toBe('not_measured')
+    expect(sleep).toHaveBeenCalledTimes(2)
   })
 
-  it('"no checks reported" exit 1 is not_measured', async () => {
-    const exec = queuedExec([fail("no checks reported on the 'foo' branch")])
-    const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
+  it('"no checks reported" exit 1 is not_measured once the wait for checks is over', async () => {
+    const none = fail("no checks reported on the 'foo' branch")
+    const exec = queuedExec([none, none])
+    const verdict = await watchChecks(pull, exec, {
+      sleep: noopSleep(),
+      pollMs: 10,
+      appearWithinMs: 10,
+    })
     expect(verdict.kind).toBe('not_measured')
     if (verdict.kind === 'not_measured') {
       expect(verdict.reason).toMatch(/no checks/i)
     }
+  })
+
+  // Seen live: the draft was polled two seconds after `gh pr create`, before
+  // GitHub had registered the workflow that started seven seconds later.
+  it('waits for checks to appear after the draft opens', async () => {
+    const exec = queuedExec([
+      fail("no checks reported on the 'foo' branch"),
+      ok([]),
+      ok([check({ bucket: 'pending' })]),
+      ok([check({ bucket: 'fail' })]),
+    ])
+    const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
+    expect(verdict.kind).toBe('red')
   })
 
   it('cancel is red', async () => {

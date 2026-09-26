@@ -17,6 +17,9 @@ export type CiVerdict =
 
 const DEFAULT_POLL_MS = 15_000
 const DEFAULT_TIMEOUT_MS = 30 * 60_000
+// A draft is polled seconds after `gh pr create`, before GitHub has registered
+// the workflows a push starts; until this has passed, "no checks" means "not yet".
+const DEFAULT_APPEAR_WITHIN_MS = 2 * 60_000
 
 /** Parses `gh pr checks --json ...` output, or null if it doesn't parse. */
 function parseChecks(stdout: string): Check[] | null {
@@ -30,9 +33,6 @@ function parseChecks(stdout: string): Check[] | null {
 }
 
 function verdictFor(checks: readonly Check[]): CiVerdict | null {
-  if (checks.length === 0) {
-    return { kind: 'not_measured', checks, reason: 'no checks were reported' }
-  }
   if (checks.some((c) => c.bucket === 'pending')) return null
   if (checks.some((c) => c.bucket === 'fail' || c.bucket === 'cancel')) {
     return { kind: 'red', checks }
@@ -47,11 +47,13 @@ export async function watchChecks(
     sleep: (ms: number) => Promise<void>
     pollMs?: number
     timeoutMs?: number
+    appearWithinMs?: number
     onPoll?: (checks: readonly Check[]) => void
   }
 ): Promise<CiVerdict> {
   const pollMs = opts.pollMs ?? DEFAULT_POLL_MS
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const appearWithinMs = opts.appearWithinMs ?? DEFAULT_APPEAR_WITHIN_MS
   let waited = 0
 
   for (;;) {
@@ -61,12 +63,26 @@ export async function watchChecks(
       cwd: pull.cwd,
     })
 
-    if (result.exitCode !== 0) {
-      const message = `${result.stderr}${result.stdout}`
-      if (/no checks reported/i.test(message)) {
-        return { kind: 'not_measured', checks: [], reason: message.trim() }
+    const message = `${result.stderr}${result.stdout}`.trim()
+    const noneYet =
+      result.exitCode === 0
+        ? parseChecks(result.stdout)?.length === 0
+        : /no checks reported/i.test(message)
+    if (noneYet) {
+      if (waited >= appearWithinMs) {
+        return {
+          kind: 'not_measured',
+          checks: [],
+          reason: message === '[]' ? 'no checks were reported' : message,
+        }
       }
-      return { kind: 'not_measured', checks: [], reason: result.stderr.trim() || message.trim() }
+      await opts.sleep(pollMs)
+      waited += pollMs
+      continue
+    }
+
+    if (result.exitCode !== 0) {
+      return { kind: 'not_measured', checks: [], reason: result.stderr.trim() || message }
     }
 
     const checks = parseChecks(result.stdout)
