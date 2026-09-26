@@ -295,3 +295,25 @@ describe('every gate rule can be rendered', () => {
     expect(document.querySelector('.fdry-gate')?.className).toMatch(/\bis-(p0|warn|info|ok)\b/)
   })
 })
+
+describe('ci.red', () => {
+  it('renders a row with its summary and both options', async () => {
+    mount({
+      gates: [
+        gate({
+          id: 'g-ci-red',
+          rule: 'ci.red',
+          summary: 'PR #200 has been red for two fix rounds',
+          why: 'checks: lint, unit',
+        }),
+      ],
+      autonomy: 'lights-out',
+      silenced: [],
+      summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
+    })
+    await waitFor(() => expect(screen.getByText('ci.red')).toBeTruthy())
+    expect(screen.getByText(/PR #200 has been red/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Another round' })).toBeTruthy()
+    expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+  })
+})

@@ -19,6 +19,7 @@ export const GATE_RULES = [
   'forge-defect',
   'unit.boundary',
   'run.interrupted',
+  'ci.red',
 ] as const
 
 export type GateRuleId = (typeof GATE_RULES)[number]
@@ -42,6 +43,7 @@ const RULE_IN_WORDS: Record<GateRuleId, string> = {
   'forge-defect': 'an order that contradicts itself',
   'unit.boundary': 'each unit of work as it finishes',
   'run.interrupted': 'a run whose agents are gone, so nothing is moving it',
+  'ci.red': 'a draft whose CI stays red after the automatic fix rounds',
 }
 
 /** One rule, in plain words. Falls back to the id rather than inventing one. */
@@ -197,6 +199,18 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
     // Never resume on a timer. Restarting agents in somebody's repository
     // because they did not answer is the one default that spends money and
     // changes files without being asked.
+    defaultIfIgnored: 'hold',
+  },
+  'ci.red': {
+    options: [
+      {
+        id: 'send_back',
+        label: 'Another round',
+        consequence:
+          "The failed logs go back to the lane's builder for one more fix, then CI is watched again.",
+      },
+      HOLD,
+    ],
     defaultIfIgnored: 'hold',
   },
 }

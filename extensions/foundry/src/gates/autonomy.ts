@@ -4,7 +4,7 @@ import type { GateRuleId } from './rules.js'
 // The autonomy dial.
 //
 // It is not "how chatty is the agent". It selects which rules are allowed to
-// stop for you, and four of them are live at every setting — so the most
+// stop for you, and six of them are live at every setting — so the most
 // permissive setting is still not unattended shipping. It will open a draft
 // pull request without you; it will not mark one ready, and it will not merge.
 
@@ -22,6 +22,9 @@ export type Autonomy = (typeof AUTONOMY_LEVELS)[number]
  * ask about work; it says the work stopped. A dial that can silence "your run
  * has no agents left" is a dial that lets a dead run look like a busy one for
  * as long as nobody goes and checks — which is the failure that put it here.
+ *
+ * `ci.red` is here because a red CI must never be silently treated as
+ * shippable at any autonomy level.
  */
 export const UNCONDITIONAL: readonly GateRuleId[] = [
   'risk.p0',
@@ -29,6 +32,7 @@ export const UNCONDITIONAL: readonly GateRuleId[] = [
   'destructive',
   'ready-for-review',
   'run.interrupted',
+  'ci.red',
 ]
 
 const STANDARD_EXTRA: readonly GateRuleId[] = [

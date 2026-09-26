@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ShieldAlert,
   GitPullRequest,
+  GitPullRequestClosed,
   HelpCircle,
   Gauge,
   CheckCircle2,
@@ -55,6 +56,7 @@ const RULE_ICON: Record<GateRuleId, React.ComponentType> = {
   'forge-defect': HelpCircle,
   'unit.boundary': CheckCircle2,
   'run.interrupted': Unplug,
+  'ci.red': GitPullRequestClosed,
 }
 
 /** Severity is carried by a stripe, so what needs attention reads at a glance. */
@@ -69,6 +71,7 @@ const RULE_TONE: Record<GateRuleId, string> = {
   'unit.boundary': 'is-info',
   'ready-for-review': 'is-ok',
   'run.interrupted': 'is-warn',
+  'ci.red': 'is-warn',
 }
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {

@@ -166,6 +166,10 @@ describe('autonomy', () => {
     expect(silencedRules('lights-out')).toContain('unit.boundary')
     expect(silencedRules('lights-out')).not.toContain('risk.p0')
   })
+
+  it('never silences a draft whose CI stays red, even at lights-out', () => {
+    expect(isLive('ci.red', 'lights-out')).toBe(true)
+  })
 })
 
 describe('ranking', () => {
@@ -265,5 +269,53 @@ describe('run.interrupted', () => {
 
   it('says what it is in words somebody who did not write it can read', () => {
     expect(ruleInWords('run.interrupted')).toMatch(/agents/)
+  })
+})
+
+// ── A draft whose CI stays red ──────────────────────────────────────────
+//
+// The automatic fix rounds ran out and the pull request is still red. This
+// rule asks the operator what now, and it must never be silenced — a red CI
+// treated as shippable at any autonomy level is the exact failure it exists
+// to prevent.
+
+describe('ci.red', () => {
+  it('is live at every autonomy setting', () => {
+    for (const level of AUTONOMY_LEVELS) expect(isLive('ci.red', level)).toBe(true)
+  })
+
+  it('is never silenced', () => {
+    for (const level of AUTONOMY_LEVELS) {
+      expect(silencedRules(level)).not.toContain('ci.red')
+    }
+  })
+
+  it('offers another round, and holding', () => {
+    const gate = raiseGate({
+      id: 'g',
+      rule: 'ci.red',
+      orderId: 'WO-1',
+      summary: 's',
+      why: 'w',
+      at: '2026-09-06T10:00:00.000Z',
+    })
+    expect(gate.options.map((o) => o.id)).toEqual(['send_back', 'hold'])
+    expect(gate.options.find((o) => o.id === 'send_back')?.label).toBe('Another round')
+  })
+
+  it('defaults to holding rather than shipping on silence', () => {
+    const gate = raiseGate({
+      id: 'g',
+      rule: 'ci.red',
+      orderId: 'WO-1',
+      summary: 's',
+      why: 'w',
+      at: '2026-09-06T10:00:00.000Z',
+    })
+    expect(gate.defaultIfIgnored).toBe('hold')
+  })
+
+  it('says what it is in words somebody who did not write it can read', () => {
+    expect(ruleInWords('ci.red')).toMatch(/CI/)
   })
 })
