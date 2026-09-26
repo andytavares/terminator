@@ -46,3 +46,7 @@ A run can be replayed. The replay is another source of observations, fed through
 ## Addendum: breakroom, seats and routed belts (2026-09-26)
 
 Idling's one place is now the breakroom: an enclosed room centred on the median crewed station, replacing the lounge strip. Idle crew take the nearest free seat by walked distance, one person per seat, reserved on the crew member, with a deterministic tie-break by seat id. Crew walk a `walk` grid in which stations, furniture, seats and belts are solid, crossing belts only at drawn step-over plates, placed for connectivity or to cap a detour at 8 tiles. Belts are a routed network, port to port (east side out, west side in), sharing tiles only within one source (splitters) or one target (mergers), with unrelated belts crossing only at right angles. See `docs/research/foundry-hall-breakroom-belts.md` for the full design.
+
+## Addendum: nobody walks behind a station (2026-09-26)
+
+The row directly above a station is where its screens and its nameplate are drawn, so a crew member on it was hidden behind the station. Every Read or Bash burst sent one there, because the archive and the rack stood on the head row behind the yard stations. That row is now solid in the `walk` grid for each station's width. The archive and the rack stand on the nearest head-row column that is reachable from the front once the step-over plates are placed, and their wall fixture moves over them.

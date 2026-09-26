@@ -298,6 +298,25 @@ describe('layoutHall — properties, across every recipe and lane count', () => 
             }
           }
         })
+
+        // The row above a station is where its screens and its nameplate
+        // are drawn; a crew member walking there is hidden behind both.
+        it('never lets a crew member walk the row behind a station', () => {
+          const stations = stationsOf(map.props)
+          expect(stations.length).toBeGreaterThan(0)
+          for (const s of stations) {
+            for (let x = s.x; x < s.x + s.w; x++) expect(map.walk[s.y - 1][x]).toBe(true)
+          }
+        })
+
+        it('stands the archive and the rack under their own wall fixture', () => {
+          const shelves = map.props.find((p) => p.kind === 'shelves') as HallProp
+          const racks = map.props.find((p) => p.kind === 'racks') as HallProp
+          expect(map.anchors.archive.x).toBe(shelves.x)
+          expect(map.anchors.rack.x).toBe(racks.x)
+          expect(map.anchors.archive.y).toBe(shelves.y + 1)
+          expect(map.anchors.rack.y).toBe(racks.y + 1)
+        })
       })
     }
   }
