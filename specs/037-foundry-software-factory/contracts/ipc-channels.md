@@ -380,6 +380,52 @@ Refused for any id not in `foundry:rules.inForce`.
 
 ---
 
+## Sensors (ADR-066)
+
+Signals read the product's own state — failing CI runs, open issues — back into the factory while the app is open. A signal proposes work; it never starts any. A sensor runs only while enabled and pointed at a repository; nothing runs by default.
+
+### `foundry:signals.list`
+
+**Payload**: `{}`
+
+**Response**: `{ signals: Signal[]; counts: { open: number } }` — open signals only, ranked by impact (occurrences × severity weight), most recent first among ties.
+
+### `foundry:signals.dismiss`
+
+**Payload**: `{ id: string }`
+
+**Response**: `{ signal: Signal }`, or `{ error }` for an unknown id. A dismissed signal reopens once its evidence grows by half again.
+
+### `foundry:signals.promote`
+
+Seed a draft order from a signal — the same intake path as a typed idea or a tracker issue, so nothing starts: the Forge still has to converge it. Marks the signal `promoted` with the new order's id and writes `signal.promoted` to that order's ledger.
+
+**Payload**: `{ id: string; repoPaths: string[] }`
+
+**Response**: `{ order: WorkOrder }`, or `{ error }` for an unknown id.
+
+### `foundry:sensors.list`
+
+**Response**: `{ sensors: { def: SensorDef; rung: 'data-root' | 'repository' | 'built-in'; state: SensorState; nextDueAt: string | null }[] }` — every sensor resolved the same way a recipe, role or rule is, with a defaulted state (`enabled: false, repoPath: null, lastRunAt: null, lastProblem: null`) for one that has never been configured.
+
+### `foundry:sensors.set`
+
+Turn a sensor on or off, or point it at a repository. Refused when it would leave a sensor enabled with no repository to watch.
+
+**Payload**: `{ id: string; enabled?: boolean; repoPath?: string | null }`
+
+**Response**: `{ state: SensorState }`, or `{ error }`.
+
+### `foundry:sensors.run-now`
+
+Run one sensor once, immediately, outside its own schedule.
+
+**Payload**: `{ id: string }`
+
+**Response**: `{ recorded: number; problem: string | null }`, or `{ error }` for an unknown sensor or one with no repository set.
+
+---
+
 ## Settings
 
 Registered via `api.settings.register`; not channels, but part of the surface. **Every key here is read by the extension** — a setting nothing reads is a control the operator can move while the factory ignores it, and `channel-registry.spec.ts` now fails on one.

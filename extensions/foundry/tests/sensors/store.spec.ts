@@ -120,6 +120,15 @@ describe('createSignalStore', () => {
     })
   })
 
+  it('merges which repository a sensor watches', async () => {
+    const root = tempRoot()
+    const store = createSignalStore(root)
+    await store.setSensorState('sensor-a', { enabled: true, repoPath: '/repo' })
+    const merged = await store.setSensorState('sensor-a', { repoPath: null })
+
+    expect(merged['sensor-a'].repoPath).toBeNull()
+  })
+
   it('writes nothing outside <dataRoot>/signals', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)

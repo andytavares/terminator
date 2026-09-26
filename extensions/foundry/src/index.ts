@@ -3,14 +3,21 @@ import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { app } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { modelCatalog } from './state/model-catalog.js'
 
 import { createForgeChannels } from './ipc/forge-channels.js'
 import { createRunChannels, writeRunGraph, readRunGraph } from './ipc/run-channels.js'
 import { createInboxChannels } from './ipc/inbox-channels.js'
 import { createLedgerChannels } from './ipc/ledger-channels.js'
+import { createSensorChannels } from './ipc/sensor-channels.js'
+import { newOrderId } from './forge/intake-source.js'
+import { createSignalStore } from './sensors/store.js'
+import type { SignalStore } from './sensors/store.js'
+import { dueSensors, runSensor } from './sensors/schedule.js'
+import type { CollectDeps } from './sensors/collect.js'
 import { rulesFor, rulesAtRung } from './verify/rules.js'
-import { availableNames, resolveRule } from './recipe/resolve.js'
+import { availableNames, availableSensors, resolveRule } from './recipe/resolve.js'
 import { RUNGS } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore, createGateStore } from './gates/store.js'
@@ -425,6 +432,12 @@ let stallWatcher: StallWatcher | null = null
 let paletteRegistrations: Disposable[] = []
 let paletteSignature = ''
 let paletteTimer: NodeJS.Timeout | null = null
+/**
+ * The sensor tick (ADR-066): every due, enabled sensor runs sequentially once
+ * a minute while the app is open. Nothing runs when no sensor is enabled —
+ * `dueSensors` filters on that before anything is collected.
+ */
+let sensorTimer: NodeJS.Timeout | null = null
 // Auto-expires so a late manual visit to the Forge doesn't surprise the
 // operator with an intake that opened itself for no reason they can see.
 let pendingNewOrder = false
@@ -717,6 +730,84 @@ function issuesPortFor(api: ExtensionAPI): IssuesPort | null {
       issues.transition(tracker as never, key, intent, optionId),
     states: async (tracker, key) => issues.states(tracker as never, key),
     supportsTransitions: (tracker) => issues.supportsTransitions(tracker as never),
+  }
+}
+
+/**
+ * The application's tracker connection, narrowed to what a sensor's `tracker`
+ * source needs (`collect.ts`). Null when nothing is connected — a sensor of
+ * this kind then reports "no tracker is connected" rather than throwing.
+ */
+function sensorIssuesFor(api: ExtensionAPI): CollectDeps['issues'] {
+  const issues = api.issues
+  if (issues === undefined) return null
+  return {
+    search: async (query, opts) =>
+      (await issues.search(query, opts)).issues.map((issue) => ({
+        key: issue.key,
+        title: issue.title,
+        url: issue.url,
+      })),
+    listMine: async (opts) =>
+      (await issues.listMine(opts)).issues.map((issue) => ({
+        key: issue.key,
+        title: issue.title,
+        url: issue.url,
+      })),
+  }
+}
+
+/**
+ * One `CollectDeps` for a sensor watching `repoPath`, over the extension's own
+ * `gh`/`git` exec and tracker connection.
+ */
+function sensorCollectDepsFor(api: ExtensionAPI, repoPath: string): CollectDeps {
+  return {
+    exec: (options) => api.shell.exec(options),
+    cwd: repoPath,
+    issues: sensorIssuesFor(api),
+    now: () => new Date().toISOString(),
+  }
+}
+
+/**
+ * A signal store whose root is resolved on every call — the records location
+ * follows the open workspace, the same reason `createLiveOrderStore` exists.
+ */
+function liveSignalStore(root: () => string): SignalStore {
+  return {
+    list: () => createSignalStore(root()).list(),
+    save: (signals) => createSignalStore(root()).save(signals),
+    get: (id) => createSignalStore(root()).get(id),
+    sensorState: () => createSignalStore(root()).sensorState(),
+    setSensorState: (id, patch) => createSignalStore(root()).setSensorState(id, patch),
+  }
+}
+
+/**
+ * Every due, enabled sensor, run once, sequentially — one interval tick,
+ * whether it is the live 60-second one or a manual "run now".
+ */
+async function tickSensors(api: ExtensionAPI, root: string, store: SignalStore): Promise<void> {
+  const sources = resolveSources(api, root)
+  const defs = availableSensors(sources).map(({ def }) => def)
+  const states = await store.sensorState()
+  const now = new Date().toISOString()
+  for (const def of dueSensors(defs, states, now)) {
+    // `dueSensors` already refused anything without a repository; the null
+    // check here is only so the type checker agrees.
+    const repoPath = states[def.id].repoPath
+    if (repoPath === null) continue
+    try {
+      await runSensor(def, {
+        store,
+        collectDeps: sensorCollectDepsFor(api, repoPath),
+        now: () => new Date().toISOString(),
+        newId: () => randomUUID(),
+      })
+    } catch (error) {
+      api.log.error(`sensor ${def.id} failed to run`, error)
+    }
   }
 }
 
@@ -1885,6 +1976,19 @@ export function activate(api: ExtensionAPI): void {
   // to change — so the operator is told what it costs and what avoids it.
   noteUntrackedDataRoot(api, dataRoot())
   const issuesPort = issuesPortFor(api)
+
+  // ── Sensors (ADR-066) ────────────────────────────────────────────────────
+  //
+  // Signals read the product back into the factory while the app is open. One
+  // tick a minute, over whichever sensors are enabled and have a repository —
+  // nothing runs while none are, which is the default. Resolved on every tick
+  // rather than once, the same reason `dataRoot` is a function: the records
+  // location, and which repository each sensor watches, both follow the
+  // operator's own configuration.
+  const signalStore = liveSignalStore(dataRoot)
+  sensorTimer = setInterval(() => {
+    void tickSensors(api, dataRoot(), signalStore)
+  }, 60_000)
   // Where every surface's answer to "what is this order doing" comes from.
   //
   // Assembled once and handed to both the order list and the Floor, because
@@ -2421,6 +2525,22 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:rules.decide', (payload) => ledger.decideProposal(payload))
   reg(api, 'foundry:rules.inForce', (payload) => ledger.rulesInForce(payload))
   reg(api, 'foundry:rules.remove', (payload) => ledger.removeAcceptedRule(payload))
+
+  // ── Signals (ADR-066) ────────────────────────────────────────────────────
+  const sensors = createSensorChannels({
+    store: signalStore,
+    orderStore: createLiveOrderStore(dataRoot),
+    availableSensors: () => availableSensors(resolveSources(api, dataRoot())),
+    collectDepsFor: (repoPath) => sensorCollectDepsFor(api, repoPath),
+    now: () => new Date().toISOString(),
+    newId: () => newOrderId(new Date()),
+  })
+  reg(api, 'foundry:signals.list', (payload) => sensors.list(payload))
+  reg(api, 'foundry:signals.dismiss', (payload) => sensors.dismiss(payload))
+  reg(api, 'foundry:signals.promote', (payload) => sensors.promote(payload))
+  reg(api, 'foundry:sensors.list', (payload) => sensors.sensorsList(payload))
+  reg(api, 'foundry:sensors.set', (payload) => sensors.sensorsSet(payload))
+  reg(api, 'foundry:sensors.run-now', (payload) => sensors.sensorsRunNow(payload))
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands
@@ -3000,6 +3120,8 @@ export function deactivate(): void {
   stallWatcher = null
   if (paletteTimer !== null) clearInterval(paletteTimer)
   paletteTimer = null
+  if (sensorTimer !== null) clearInterval(sensorTimer)
+  sensorTimer = null
   for (const registration of paletteRegistrations) registration.dispose()
   paletteRegistrations = []
   paletteSignature = ''

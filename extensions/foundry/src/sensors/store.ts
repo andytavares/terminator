@@ -19,6 +19,8 @@ import type { Signal } from './types'
 
 export interface SensorState {
   readonly enabled: boolean
+  /** Which repository it watches. A sensor only runs when this is set. */
+  readonly repoPath: string | null
   readonly lastRunAt: string | null
   readonly lastProblem: string | null
 }

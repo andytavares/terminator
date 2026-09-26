@@ -5,6 +5,7 @@ import { acceptanceFromTicket } from './acceptance-from-ticket.js'
 import type { OrderSource, WorkOrder } from '../order/schema.js'
 import { probeToolchain, unavailableChecks } from '../verify/toolchain-probe.js'
 import type { CheckName } from '../verify/toolchain-probe.js'
+import type { Signal } from '../sensors/types.js'
 
 // Seeding an order.
 //
@@ -51,11 +52,14 @@ export interface SeedDeps {
    * "nothing on file" — which is the common case and costs nothing.
    */
   readonly priorArtFor?: (paths: readonly string[]) => Promise<string[]>
+  /** A signal a sensor recorded, read back for a promotion (ADR-066). */
+  readonly readSignal?: (id: string) => Promise<Signal | null>
 }
 
 export type SeedInput =
   | { kind: 'typed'; text: string; repoPaths: readonly string[] }
   | { kind: 'tracker'; tracker: 'linear' | 'jira'; key: string; repoPaths: readonly string[] }
+  | { kind: 'signal'; signalId: string; repoPaths: readonly string[] }
 
 export type SeedResult =
   | { order: WorkOrder; unavailableChecks: CheckName[] }
@@ -115,7 +119,7 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
     title = titleFrom(input.text)
     problem = input.text.trim()
     source = { kind: 'typed', tracker: null, key: null, url: null }
-  } else {
+  } else if (input.kind === 'tracker') {
     const existing = deps.existingOrderFor?.(input.tracker, input.key) ?? null
     if (existing !== null) return { existing }
 
@@ -129,6 +133,22 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
     problem = issue.description.trim() === '' ? issue.title : issue.description.trim()
     source = { kind: 'tracker', tracker: input.tracker, key: issue.key, url: issue.url }
     branchName = issue.branchName
+  } else {
+    const signal = (await deps.readSignal?.(input.signalId)) ?? null
+    if (signal === null) {
+      return { error: `Could not read signal ${input.signalId}.` }
+    }
+    title = signal.title
+    // One line per piece of evidence, so the order states what was seen and
+    // not only that something was — the same reason a ticket's description
+    // is preferred over its title alone.
+    problem = [signal.title, ...signal.evidence.map((e) => `- ${e.title} (${e.url})`)].join('\n')
+    source = {
+      kind: 'signal',
+      tracker: null,
+      key: signal.id,
+      url: signal.evidence[0]?.url ?? null,
+    }
   }
 
   const order = draftOrder({
