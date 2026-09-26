@@ -1,0 +1,21 @@
+extensions/foundry/src/components/foundry.css
+  s_4f15472be339a2::t_7884e68d7f8558 3504-3622
+tests/e2e/foundry.spec.ts
+  s_4f15472be339a2::t_df7b25a5ff1ad0 4,886-962
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5ce860b968449e9d62bc10a2a900be3396d685e4",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
