@@ -1,0 +1,19 @@
+extensions/foundry/src/index.ts
+  s_4f15472be339a2::t_b4c7a9a311e612 1,2468-2478,2480-2482,2487-2489,2494-2496
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bdf9fa0d8bd61c5f4635f8c475a220661079b7ab",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
