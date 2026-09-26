@@ -199,9 +199,16 @@ export async function readRunGraph(dataRoot: string, orderId: string): Promise<R
  * here then sees one shape.
  */
 function withUnitIds(node: RunNode): RunNode {
-  if (Array.isArray(node.unitIds)) return node
-  const legacy = (node as unknown as { unitId?: string | null }).unitId ?? null
-  return { ...node, unitIds: legacy === null ? [] : [legacy] }
+  const unitIds = Array.isArray(node.unitIds)
+    ? node.unitIds
+    : ((node as unknown as { unitId?: string | null }).unitId ?? null) === null
+      ? []
+      : [(node as unknown as { unitId: string }).unitId]
+  // Graphs written before reworks and feedback existed have neither on disk;
+  // every reader from here on sees the same shape.
+  const reworks = node.reworks ?? 0
+  const feedback = node.feedback ?? []
+  return { ...node, unitIds, reworks, feedback }
 }
 
 /** A proposed shape and the reason it fits this order (FR-014). */

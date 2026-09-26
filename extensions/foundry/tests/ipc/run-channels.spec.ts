@@ -410,6 +410,38 @@ describe('a graph written before a node could carry a lane', () => {
     const graph = await readRunGraph(dataRoot, 'WO-1')
     expect(graph?.nodes[0].unitIds).toEqual([])
   })
+
+  it('reads a graph written before reworks and feedback existed as having neither', async () => {
+    const dir = path.join(dataRoot, 'orders', 'WO-1')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dir, 'run-graph.json'),
+      JSON.stringify({
+        orderId: 'WO-1',
+        recipe: 'direct',
+        nodes: [
+          {
+            id: 'lint',
+            stepId: 'lint',
+            kind: 'agent',
+            state: 'waiting',
+            unitIds: [],
+            lane: null,
+            role: null,
+            dependsOn: [],
+            attempts: 0,
+            sessionId: null,
+            worktreePath: null,
+            startedAt: null,
+            endedAt: null,
+          },
+        ],
+      })
+    )
+    const graph = await readRunGraph(dataRoot, 'WO-1')
+    expect(graph?.nodes[0].reworks).toBe(0)
+    expect(graph?.nodes[0].feedback).toEqual([])
+  })
 })
 
 describe('the records location', () => {

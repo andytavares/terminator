@@ -1,5 +1,5 @@
 import { nodeById, withNode } from './run-graph.js'
-import type { RunGraph, RunNode } from './run-graph.js'
+import type { RunGraph, RunNode, Feedback } from './run-graph.js'
 import type { Budgets } from '../order/schema.js'
 
 // What may start now.
@@ -157,6 +157,105 @@ export function retry(graph: RunGraph, id: string): RunGraph {
       next = withNode(next, dependent.id, { state: 'waiting' })
     }
   }
+  return next
+}
+
+/** Every node id reachable from `id` by following `dependsOn` (its ancestors). */
+function ancestorsOf(graph: RunGraph, id: string): Set<string> {
+  const seen = new Set<string>()
+  const stack = [...(nodeById(graph, id)?.dependsOn ?? [])]
+  while (stack.length > 0) {
+    const next = stack.pop() as string
+    if (seen.has(next)) continue
+    seen.add(next)
+    stack.push(...(nodeById(graph, next)?.dependsOn ?? []))
+  }
+  return seen
+}
+
+/** Every node id that depends on `id`, directly or transitively (its descendants). */
+function descendantsOf(graph: RunGraph, id: string): Set<string> {
+  const seen = new Set<string>()
+  let frontier = [id]
+  while (frontier.length > 0) {
+    const next = graph.nodes
+      .filter((n) => !seen.has(n.id) && n.dependsOn.some((dep) => frontier.includes(dep)))
+      .map((n) => n.id)
+    for (const n of next) seen.add(n)
+    frontier = next
+  }
+  return seen
+}
+
+/** Which targets take the work back, given where the failure landed. */
+function reworkTargets(targets: readonly RunNode[], failedLane: number | null): RunNode[] {
+  if (targets.some((t) => t.lane === failedLane)) {
+    return targets.filter((t) => t.lane === failedLane)
+  }
+  if (failedLane === null) {
+    const lanes = targets.map((t) => t.lane).filter((l): l is number => l !== null)
+    if (lanes.length > 0) {
+      const lowest = Math.min(...lanes)
+      return targets.filter((t) => t.lane === lowest)
+    }
+  }
+  return []
+}
+
+/**
+ * Send a check's failure back to the step that has to answer it.
+ *
+ * The failed check and its targets go back to `waiting` with the failure
+ * attached; anything the targets produced on the way to the failure — a
+ * fmt between build and lint, say — is rerun too, but only what sits on
+ * that path. Nothing downstream of the failure is touched, except a node a
+ * previous failure had already blocked, which is unblocked the same way
+ * `retry` unblocks one.
+ */
+export function rework(
+  graph: RunGraph,
+  failedId: string,
+  targetStepId: string,
+  feedback: Feedback
+): RunGraph {
+  const failed = nodeById(graph, failedId)
+  if (failed === undefined) return graph
+
+  const candidates = graph.nodes.filter((n) => n.stepId === targetStepId)
+  if (candidates.length === 0) return graph
+  const targets = reworkTargets(candidates, failed.lane)
+  const chosen = targets.length > 0 ? targets : candidates
+
+  const ancestorsOfFailed = ancestorsOf(graph, failedId)
+  const between = new Set<string>()
+  for (const target of chosen) {
+    for (const id of descendantsOf(graph, target.id)) {
+      if (ancestorsOfFailed.has(id)) between.add(id)
+    }
+  }
+
+  const resetIds = new Set([...chosen.map((t) => t.id), ...between, failedId])
+
+  let next = graph
+  for (const target of chosen) {
+    const current = nodeById(next, target.id) as RunNode
+    next = withNode(next, target.id, {
+      state: 'waiting',
+      endedAt: null,
+      feedback: [...current.feedback, feedback],
+    })
+  }
+  for (const id of between) {
+    next = withNode(next, id, { state: 'waiting', endedAt: null })
+  }
+  next = withNode(next, failedId, { state: 'waiting', endedAt: null, reworks: failed.reworks + 1 })
+
+  for (const n of next.nodes) {
+    if (n.state === 'blocked' && n.dependsOn.some((dep) => resetIds.has(dep))) {
+      next = withNode(next, n.id, { state: 'waiting' })
+    }
+  }
+
   return next
 }
 

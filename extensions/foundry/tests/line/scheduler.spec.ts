@@ -5,6 +5,7 @@ import {
   markPassed,
   markFailed,
   retry,
+  rework,
   isComplete,
   hasStalled,
   blockedNodes,
@@ -19,7 +20,7 @@ import { buildRunGraph, nodeById, withNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { Budgets, WorkOrder } from '../../src/order/schema.js'
-import type { RunGraph } from '../../src/line/run-graph.js'
+import type { RunGraph, RunNode, Feedback } from '../../src/line/run-graph.js'
 
 // Two rules carry nearly all of this: a node starts only when everything it
 // waits on has passed, and the number in flight never exceeds the agent budget
@@ -317,5 +318,146 @@ describe('raisedLimitProblem', () => {
     const late = { kind: 'wall_clock' as const, limit: 45, actual: 45.4 }
     expect(raisedLimitProblem(late, 45)).not.toBeNull()
     expect(raisedLimitProblem(late, 46)).toBeNull()
+  })
+})
+
+describe('rework', () => {
+  const mkNode = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
+    kind: 'agent',
+    state: 'passed',
+    unitIds: [],
+    lane: null,
+    role: null,
+    dependsOn: [],
+    attempts: 1,
+    reworks: 0,
+    feedback: [],
+    sessionId: null,
+    worktreePath: null,
+    startedAt: null,
+    endedAt: 'ended',
+    ...over,
+  })
+
+  const rg = (nodes: RunNode[]): RunGraph => ({ orderId: 'WO-1', recipe: 'r', nodes })
+
+  const fb = (over: Partial<Feedback> = {}): Feedback => ({
+    from: 'lint',
+    attempt: 1,
+    source: 'check',
+    command: 'npm run lint',
+    exitCode: 1,
+    excerpt: 'error',
+    logPath: null,
+    ...over,
+  })
+
+  it('sends a one-lane build back with the failure attached', () => {
+    const graph = rg([
+      mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
+      mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
+    ])
+    const after = rework(graph, 'lint', 'build', fb())
+    expect(nodeById(after, 'build')?.state).toBe('waiting')
+    expect(nodeById(after, 'build')?.endedAt).toBeNull()
+    expect(nodeById(after, 'build')?.feedback).toEqual([fb()])
+    expect(nodeById(after, 'lint')?.state).toBe('waiting')
+    expect(nodeById(after, 'lint')?.endedAt).toBeNull()
+    expect(nodeById(after, 'lint')?.reworks).toBe(1)
+  })
+
+  it('resets a node between the target and the failure, without giving it feedback', () => {
+    const graph = rg([
+      mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
+      mkNode({ id: 'fmt', stepId: 'fmt', dependsOn: ['build'], state: 'passed' }),
+      mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['fmt'], state: 'failed' }),
+    ])
+    const after = rework(graph, 'lint', 'build', fb())
+    expect(nodeById(after, 'fmt')?.state).toBe('waiting')
+    expect(nodeById(after, 'fmt')?.endedAt).toBeNull()
+    expect(nodeById(after, 'fmt')?.feedback).toEqual([])
+  })
+
+  it('leaves a node downstream of the failure alone unless it was blocked', () => {
+    const graph = rg([
+      mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
+      mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
+      mkNode({ id: 'verify', stepId: 'verify', dependsOn: ['lint'], state: 'blocked' }),
+    ])
+    const after = rework(graph, 'lint', 'build', fb())
+    expect(nodeById(after, 'verify')?.state).toBe('waiting')
+  })
+
+  it('does not touch a node downstream of the failure that was only waiting', () => {
+    const graph = rg([
+      mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
+      mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
+      mkNode({ id: 'verify', stepId: 'verify', dependsOn: ['lint'], state: 'waiting' }),
+    ])
+    const after = rework(graph, 'lint', 'build', fb())
+    expect(nodeById(after, 'verify')?.state).toBe('waiting')
+    expect(nodeById(after, 'verify')?.feedback).toEqual([])
+  })
+
+  it('resets only the lane the failed node belongs to, in a two-lane build', () => {
+    const graph = rg([
+      mkNode({ id: 'build:lane1', stepId: 'build', lane: 1, state: 'passed' }),
+      mkNode({ id: 'build:lane2', stepId: 'build', lane: 2, state: 'passed' }),
+      mkNode({
+        id: 'lint',
+        stepId: 'lint',
+        lane: null,
+        dependsOn: ['build:lane1', 'build:lane2'],
+        state: 'failed',
+      }),
+    ])
+    const after = rework(graph, 'lint', 'build', fb())
+    expect(nodeById(after, 'build:lane1')?.state).toBe('waiting')
+    expect(nodeById(after, 'build:lane1')?.feedback).toEqual([fb()])
+    expect(nodeById(after, 'build:lane2')?.state).toBe('passed')
+    expect(nodeById(after, 'build:lane2')?.feedback).toEqual([])
+  })
+
+  it('uses every target when none of them share the failed node lowest lane', () => {
+    const graph = rg([
+      mkNode({ id: 'build:lane1', stepId: 'build', lane: 1, state: 'passed' }),
+      mkNode({ id: 'build:lane2', stepId: 'build', lane: 2, state: 'passed' }),
+      mkNode({
+        id: 'lint',
+        stepId: 'lint',
+        lane: 9,
+        dependsOn: ['build:lane1', 'build:lane2'],
+        state: 'failed',
+      }),
+    ])
+    const after = rework(graph, 'lint', 'build', fb())
+    expect(nodeById(after, 'build:lane1')?.state).toBe('waiting')
+    expect(nodeById(after, 'build:lane2')?.state).toBe('waiting')
+  })
+
+  it('leaves the graph unchanged for an unknown failed node', () => {
+    const graph = rg([
+      mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
+      mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
+    ])
+    expect(rework(graph, 'nope', 'build', fb())).toEqual(graph)
+  })
+
+  it('leaves the graph unchanged when no node matches the target step', () => {
+    const graph = rg([
+      mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
+      mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
+    ])
+    expect(rework(graph, 'lint', 'nope', fb())).toEqual(graph)
+  })
+
+  it('does not touch attempts — the next start counts that', () => {
+    const graph = rg([
+      mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed', attempts: 1 }),
+      mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed', attempts: 2 }),
+    ])
+    const after = rework(graph, 'lint', 'build', fb())
+    expect(nodeById(after, 'build')?.attempts).toBe(1)
+    expect(nodeById(after, 'lint')?.attempts).toBe(2)
   })
 })

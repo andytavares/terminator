@@ -410,6 +410,14 @@ steps:
     expect(node?.endedAt).toBeNull()
   })
 
+  it('starts every node with no reworks and no feedback', () => {
+    const r = parseRecipe(MINIMAL, 'minimal.yaml')
+    if (!r.ok) throw new Error(r.reason)
+    const node = nodeById(buildRunGraph(order(), r.value), 'only')
+    expect(node?.reworks).toBe(0)
+    expect(node?.feedback).toEqual([])
+  })
+
   it('has no step for a node that is not from this recipe', () => {
     const r = parseRecipe(MINIMAL, 'minimal.yaml')
     if (!r.ok) throw new Error(r.reason)
@@ -432,6 +440,8 @@ describe('what to call a node', () => {
     role: null,
     dependsOn: [],
     attempts: 0,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,
