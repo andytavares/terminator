@@ -31,6 +31,7 @@ steps:
     command: '${toolchain.test}'
     after: [change]
     expect: { exit_code: '== 0' }
+    onFail: { rework: change, max: 1 }
 
   # One verifier, not one per unit. A fresh context is what makes verification
   # independent of the work; a fresh context *per unit* adds nothing on top of

@@ -127,6 +127,17 @@ describe('the shape WO-0907-3c1 would get now', () => {
     expect(graph.nodes.length).toBeLessThanOrEqual(8)
   })
 
+  // The lint step added after `build` is a `run` node, not a session — it
+  // counts toward the graph above but not toward the agent-session totals in
+  // this file, and with no lint command measured on this order it settles as
+  // skipped rather than blocking `verify`.
+  it('adds a lint node after build that is skipped, not a session, when no lint command is measured', () => {
+    const graph = buildRunGraph(allTextRed(), recipe('direct'))
+    const lint = graph.nodes.find((node) => node.id === 'lint')
+    expect(lint?.kind).toBe('run')
+    expect(lint?.state).toBe('skipped')
+  })
+
   // The heavy shape still exists and is still heavy — what changed is that a
   // one-lane order is no longer sent to it, and that it no longer spends a
   // session per unit twice over when it is.
