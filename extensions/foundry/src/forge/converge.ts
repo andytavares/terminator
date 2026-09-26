@@ -5,6 +5,7 @@ import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
 import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
 import { settleFindings } from './red-team.js'
+import { decideConfidentQuestions, dismissConfidentFindings } from './autonomy.js'
 import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role, Rule } from '../recipe/parse.js'
@@ -76,8 +77,9 @@ function outputContract(file: string, order: WorkOrder): string {
     '  },',
     '  "assumptions":   [{ "id": "A-1", "text": "…", "struck": false, "affects": [] }],',
     '  "openQuestions": [',
-    '    { "id": "Q-1", "text": "…", "why": "…", "options": ["…"], "recommended": 0, "answer": null, "rank": 1 }',
+    '    { "id": "Q-1", "text": "…", "why": "…", "options": ["…"], "recommended": 0, "answer": null, "rank": 1, "confidence": 0.6 }',
     '  ],',
+    '  "dismissFindings": [{ "id": "RT-…", "reason": "why it does not apply here", "confidence": 0.95 }],',
     '  "note": "what you changed, in one line"',
     '}',
     '```',
@@ -125,9 +127,19 @@ function outputContract(file: string, order: WorkOrder): string {
       ? 'Nothing, as it stands. Keep it that way.'
       : failures.map((failure) => `- **${failure.check}** — ${failure.detail}`).join('\n'),
     '',
-    'Ask a question only where the repository genuinely cannot answer it, and',
-    'never more than three. Anything you decided for yourself is an assumption',
-    'the operator can strike, not a fact.',
+    ...openFindings(order),
+    '## Decide, do not ask',
+    '',
+    'Every question you ask stops the operator. For each open decision, work out',
+    'the best option yourself and how sure you are of it. If you are at least 90%',
+    'sure, take it: write it as an assumption the operator can strike, not as a',
+    'question. Ask only when no option reaches 90% *and* the choice changes what',
+    'gets built — never more than three, each with `recommended` and your',
+    '`confidence` (0–1) in it. A question at 0.9 or above is decided for you.',
+    '',
+    'Fix each open finding in the plan where you can. A low or medium one you are',
+    'at least 90% sure does not apply here goes in `dismissFindings` with the',
+    'reason; a high one is fixed or left for the operator.',
     '',
     '## How big the plan should be',
     '',
@@ -140,6 +152,18 @@ function outputContract(file: string, order: WorkOrder): string {
     'unit genuinely cannot begin until an earlier one has landed. Not because',
     'it touches different files, and not to make the plan look thorough.',
   ].join('\n')
+}
+
+/** The red team's open findings, named — a count alone is not something anyone can fix. */
+function openFindings(order: WorkOrder): string[] {
+  const open = order.redTeam.filter((finding) => finding.status === 'open')
+  if (open.length === 0) return []
+  return [
+    '## Open red-team findings',
+    '',
+    ...open.map((finding) => `- ${finding.id} (${finding.severity}) — ${finding.text}`),
+    '',
+  ]
 }
 
 /**
@@ -271,7 +295,14 @@ export function readProposal(order: WorkOrder, proposalPath: string, at: string)
     const proposal = parseProposal(JSON.parse(raw))
     return {
       ok: true,
-      order: settleFindings(applyProposal(order, proposal, at)),
+      order: settleFindings(
+        decideConfidentQuestions(
+          dismissConfidentFindings(
+            applyProposal(order, proposal, at),
+            proposal.dismissFindings ?? []
+          )
+        )
+      ),
       note: proposal.note,
     }
   } catch (error) {

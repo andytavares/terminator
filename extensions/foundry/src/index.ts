@@ -25,6 +25,9 @@ import type { Checkout } from './line/worktree.js'
 import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
 import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
+import { followUpFor } from './forge/autonomy.js'
+import { endAndWait } from './runtime/end-session.js'
+import { compileOrder } from './order/compile.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
 import type { RunCommand } from './runtime/diff-metrics.js'
 import { convergeBrief, readProposal } from './forge/converge.js'
@@ -1741,6 +1744,81 @@ export function activate(api: ExtensionAPI): void {
       executingOrders.has(orderId) ? [] : orphanedNodes(graph, isLiveSession).map((n) => n.id),
   }
 
+  /**
+   * One architect turn, and the ones the Forge starts on its own after it.
+   *
+   * A plan that still fails a check the architect can close goes straight
+   * back to it, up to MAX_AUTO_TURNS times, instead of waiting for someone to
+   * click "Ask for the gap to be closed" (spec 062). Only unanswered questions,
+   * or a plan still failing when the turns run out, reach the operator.
+   */
+  const convergeWithFollowUps = (
+    order: WorkOrder,
+    message: string,
+    autoTurns: number
+  ): Promise<ConvergeStarted> =>
+    convergeOnce(api, dataRoot(), order, message, async (outcome) => {
+      const store = createOrderStore(dataRoot())
+      if (!outcome.ok) {
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'role:architect',
+          action: 'converge.refused',
+          subject: order.id,
+          reason: outcome.reason,
+          evidence: [],
+        })
+        // Out loud, once, because a refusal changes nothing and therefore
+        // shows up nowhere the operator happens to be looking. The Forge
+        // renders it whenever they open the order; this is for the minutes
+        // between the turn ending and them going back to look — which on
+        // the run that found this was the rest of the afternoon.
+        api.notifications.showToast(
+          'warning',
+          `${order.title}: the architect's plan was refused and nothing changed.`,
+          `foundry.converge.refused.${order.id}`
+        )
+        return
+      }
+      await store.save(outcome.order)
+      await store.record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'role:architect',
+        action: 'order.redrafted',
+        subject: order.id,
+        reason: outcome.note === '' ? 'redrafted the plan' : outcome.note,
+        evidence: [],
+      })
+
+      const next = followUpFor(compileOrder(outcome.order).failures, autoTurns)
+      if (next === null) return
+      // The finished turn's process is still at its prompt; the follow-up
+      // resumes the same conversation, so end it first.
+      const previous = intakeSessions.get(order.id)
+      if (previous !== undefined) {
+        await endAndWait(
+          {
+            stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
+            isLive: isLiveSession,
+          },
+          previous,
+          'continuing in a follow-up turn'
+        )
+      }
+      const started = await convergeWithFollowUps(outcome.order, next, autoTurns + 1)
+      await store.record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'role:architect',
+        action: started.ok ? 'converge.started' : 'converge.refused',
+        subject: started.ok ? started.sessionId : order.id,
+        reason: started.ok ? 'closing the failing checks on its own' : started.reason,
+        evidence: [],
+      })
+    })
+
   const forge = createForgeChannels({
     store: createLiveOrderStore(dataRoot),
     now: () => new Date().toISOString(),
@@ -1751,42 +1829,7 @@ export function activate(api: ExtensionAPI): void {
     priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
     // The redraft lands here, when the architect's turn ends — minutes after
     // the channel that started it answered.
-    converge: (order, message) =>
-      convergeOnce(api, dataRoot(), order, message, async (outcome) => {
-        const store = createOrderStore(dataRoot())
-        if (!outcome.ok) {
-          await store.record({
-            at: new Date().toISOString(),
-            orderId: order.id,
-            actor: 'role:architect',
-            action: 'converge.refused',
-            subject: order.id,
-            reason: outcome.reason,
-            evidence: [],
-          })
-          // Out loud, once, because a refusal changes nothing and therefore
-          // shows up nowhere the operator happens to be looking. The Forge
-          // renders it whenever they open the order; this is for the minutes
-          // between the turn ending and them going back to look — which on
-          // the run that found this was the rest of the afternoon.
-          api.notifications.showToast(
-            'warning',
-            `${order.title}: the architect's plan was refused and nothing changed.`,
-            `foundry.converge.refused.${order.id}`
-          )
-          return
-        }
-        await store.save(outcome.order)
-        await store.record({
-          at: new Date().toISOString(),
-          orderId: order.id,
-          actor: 'role:architect',
-          action: 'order.redrafted',
-          subject: order.id,
-          reason: outcome.note === '' ? 'redrafted the plan' : outcome.note,
-          evidence: [],
-        })
-      }),
+    converge: (order, message) => convergeWithFollowUps(order, message, 0),
     // FR-059a: asked when the order is agreed, so an issue that will never
     // move is known before the run rather than after it.
     capability:
