@@ -1,0 +1,24 @@
+tests/unit/renderer/sidebar/screen.spec.ts
+  s_0f24e553b5329a::t_29d91d3d3b3299 19-36
+src/renderer/sidebar/screen.ts
+  s_0f24e553b5329a::t_a872ee675dd15c 9,15
+  s_0f24e553b5329a::t_cdf212ddb089da 1-2
+specs/054-session-home-wall/data-model.md
+  s_0f24e553b5329a::t_5148e275e58f8d 73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ed050dcaff9cb38ebc300eda7dfd67d82af8a99b",
+  "prompts": {},
+  "sessions": {
+    "s_0f24e553b5329a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af7e2c3-2eb0-4869-9f43-9efc8b9b4bad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
