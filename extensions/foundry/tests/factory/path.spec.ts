@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findPath } from '../../src/factory/path.js'
+import { findPath, distancesFrom } from '../../src/factory/path.js'
 
 // A 4-neighbour path over a tile grid: `solid[y][x]` blocks movement, except
 // that the destination itself is always a legal place to arrive even when it
@@ -54,5 +54,33 @@ describe('findPath', () => {
     const path = findPath(solid, { x: 0, y: 0 }, { x: 2, y: 1 })
     expect(path[path.length - 1]).toEqual({ x: 2, y: 1 })
     expect(path.length).toBeGreaterThan(0)
+  })
+})
+
+describe('distancesFrom', () => {
+  it('gives the origin distance 0 and its neighbours increasing distances', () => {
+    const solid = grid(['.....', '.....', '.....'])
+    const d = distancesFrom(solid, { x: 2, y: 1 })
+    expect(d.get('2,1')).toBe(0)
+    expect(d.get('1,1')).toBe(1)
+    expect(d.get('3,1')).toBe(1)
+    expect(d.get('2,0')).toBe(1)
+    expect(d.get('2,2')).toBe(1)
+    expect(d.get('0,1')).toBe(2)
+  })
+
+  it('detours around a wall instead of counting straight-line distance', () => {
+    const solid = grid(['.....', '.###.', '.....'])
+    const d = distancesFrom(solid, { x: 0, y: 1 })
+    // straight-line distance to (4,1) is 4, but the wall forces a detour
+    // up-and-over (or down-and-under).
+    expect(d.get('4,1')).toBe(6)
+  })
+
+  it('omits a tile the flood never reaches', () => {
+    const solid = grid(['.....', '#####', '.....'])
+    const d = distancesFrom(solid, { x: 0, y: 0 })
+    expect(d.has('0,2')).toBe(false)
+    expect(d.get('0,0')).toBe(0)
   })
 })

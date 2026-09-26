@@ -1,0 +1,4241 @@
+{
+  "standard-3": {
+    "width": 42,
+    "height": 25,
+    "props": [
+      {
+        "id": "station-scout",
+        "kind": "desk",
+        "x": 3,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "scout",
+        "seat": {
+          "x": 4,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-scout",
+        "kind": "chair",
+        "x": 4,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-challenge",
+        "kind": "desk",
+        "x": 8,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "challenge",
+        "seat": {
+          "x": 9,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-challenge",
+        "kind": "chair",
+        "x": 9,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-build:lane-1",
+        "kind": "desk",
+        "x": 13,
+        "y": 7,
+        "w": 3,
+        "h": 1,
+        "nodeId": "build:lane-1",
+        "seat": {
+          "x": 14,
+          "y": 8
+        }
+      },
+      {
+        "id": "chair-build:lane-1",
+        "kind": "chair",
+        "x": 14,
+        "y": 8,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-build:lane-2",
+        "kind": "desk",
+        "x": 13,
+        "y": 11,
+        "w": 3,
+        "h": 1,
+        "nodeId": "build:lane-2",
+        "seat": {
+          "x": 14,
+          "y": 12
+        }
+      },
+      {
+        "id": "chair-build:lane-2",
+        "kind": "chair",
+        "x": 14,
+        "y": 12,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-build:lane-3",
+        "kind": "desk",
+        "x": 13,
+        "y": 15,
+        "w": 3,
+        "h": 1,
+        "nodeId": "build:lane-3",
+        "seat": {
+          "x": 14,
+          "y": 16
+        }
+      },
+      {
+        "id": "chair-build:lane-3",
+        "kind": "chair",
+        "x": 14,
+        "y": 16,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-verify",
+        "kind": "desk",
+        "x": 18,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "verify",
+        "seat": {
+          "x": 19,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-verify",
+        "kind": "chair",
+        "x": 19,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-inspect",
+        "kind": "desk",
+        "x": 23,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "inspect",
+        "seat": {
+          "x": 24,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-inspect",
+        "kind": "chair",
+        "x": 24,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-document",
+        "kind": "desk",
+        "x": 28,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "document",
+        "seat": {
+          "x": 29,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-document",
+        "kind": "chair",
+        "x": 29,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-integrate",
+        "kind": "press",
+        "x": 33,
+        "y": 4,
+        "w": 3,
+        "h": 2,
+        "nodeId": "integrate",
+        "seat": {
+          "x": 34,
+          "y": 6
+        }
+      },
+      {
+        "id": "station-ship",
+        "kind": "gate",
+        "x": 38,
+        "y": 4,
+        "w": 1,
+        "h": 1,
+        "nodeId": "ship",
+        "seat": {
+          "x": 38,
+          "y": 5
+        }
+      },
+      {
+        "id": "fixture-shelves",
+        "kind": "shelves",
+        "x": 10,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-racks",
+        "kind": "racks",
+        "x": 17,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-statuswall",
+        "kind": "statuswall",
+        "x": 25,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-lockers",
+        "kind": "lockers",
+        "x": 32,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-partition",
+        "kind": "partition",
+        "x": 7,
+        "y": 19,
+        "w": 15,
+        "h": 5,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-fridge",
+        "kind": "fridge",
+        "x": 8,
+        "y": 21,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-coffee",
+        "kind": "coffeebar",
+        "x": 8,
+        "y": 22,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-plant-l",
+        "kind": "plant",
+        "x": 8,
+        "y": 23,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-vending",
+        "kind": "vending",
+        "x": 20,
+        "y": 21,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-plant-r",
+        "kind": "plant",
+        "x": 20,
+        "y": 23,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-0",
+        "kind": "restbench",
+        "x": 11,
+        "y": 21,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-0",
+        "kind": "table",
+        "x": 11,
+        "y": 22,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-0",
+        "kind": "restbench",
+        "x": 11,
+        "y": 23,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-1",
+        "kind": "sofa",
+        "x": 14,
+        "y": 21,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-1",
+        "kind": "lowtable",
+        "x": 14,
+        "y": 22,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-1",
+        "kind": "restbench",
+        "x": 14,
+        "y": 23,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-2",
+        "kind": "restbench",
+        "x": 17,
+        "y": 21,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-2",
+        "kind": "table",
+        "x": 17,
+        "y": 22,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-2",
+        "kind": "restbench",
+        "x": 17,
+        "y": 23,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      }
+    ],
+    "belts": [
+      {
+        "id": "scout->challenge",
+        "fromNodeId": "scout",
+        "toNodeId": "challenge",
+        "path": [
+          {
+            "x": 6,
+            "y": 4
+          },
+          {
+            "x": 7,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "challenge->build:lane-1",
+        "fromNodeId": "challenge",
+        "toNodeId": "build:lane-1",
+        "path": [
+          {
+            "x": 11,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "id": "challenge->build:lane-2",
+        "fromNodeId": "challenge",
+        "toNodeId": "build:lane-2",
+        "path": [
+          {
+            "x": 11,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 10
+          },
+          {
+            "x": 12,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "id": "challenge->build:lane-3",
+        "fromNodeId": "challenge",
+        "toNodeId": "build:lane-3",
+        "path": [
+          {
+            "x": 11,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 10
+          },
+          {
+            "x": 12,
+            "y": 11
+          },
+          {
+            "x": 12,
+            "y": 12
+          },
+          {
+            "x": 12,
+            "y": 13
+          },
+          {
+            "x": 12,
+            "y": 14
+          },
+          {
+            "x": 12,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "id": "build:lane-1->verify",
+        "fromNodeId": "build:lane-1",
+        "toNodeId": "verify",
+        "path": [
+          {
+            "x": 16,
+            "y": 7
+          },
+          {
+            "x": 17,
+            "y": 7
+          },
+          {
+            "x": 17,
+            "y": 6
+          },
+          {
+            "x": 17,
+            "y": 5
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "build:lane-2->verify",
+        "fromNodeId": "build:lane-2",
+        "toNodeId": "verify",
+        "path": [
+          {
+            "x": 16,
+            "y": 11
+          },
+          {
+            "x": 17,
+            "y": 11
+          },
+          {
+            "x": 17,
+            "y": 10
+          },
+          {
+            "x": 17,
+            "y": 9
+          },
+          {
+            "x": 17,
+            "y": 8
+          },
+          {
+            "x": 17,
+            "y": 7
+          },
+          {
+            "x": 17,
+            "y": 6
+          },
+          {
+            "x": 17,
+            "y": 5
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "build:lane-3->verify",
+        "fromNodeId": "build:lane-3",
+        "toNodeId": "verify",
+        "path": [
+          {
+            "x": 16,
+            "y": 15
+          },
+          {
+            "x": 17,
+            "y": 15
+          },
+          {
+            "x": 17,
+            "y": 14
+          },
+          {
+            "x": 17,
+            "y": 13
+          },
+          {
+            "x": 17,
+            "y": 12
+          },
+          {
+            "x": 17,
+            "y": 11
+          },
+          {
+            "x": 17,
+            "y": 10
+          },
+          {
+            "x": 17,
+            "y": 9
+          },
+          {
+            "x": 17,
+            "y": 8
+          },
+          {
+            "x": 17,
+            "y": 7
+          },
+          {
+            "x": 17,
+            "y": 6
+          },
+          {
+            "x": 17,
+            "y": 5
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "verify->inspect",
+        "fromNodeId": "verify",
+        "toNodeId": "inspect",
+        "path": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "verify->document",
+        "fromNodeId": "verify",
+        "toNodeId": "document",
+        "path": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 5
+          },
+          {
+            "x": 22,
+            "y": 6
+          },
+          {
+            "x": 23,
+            "y": 6
+          },
+          {
+            "x": 24,
+            "y": 6
+          },
+          {
+            "x": 25,
+            "y": 6
+          },
+          {
+            "x": 26,
+            "y": 6
+          },
+          {
+            "x": 27,
+            "y": 6
+          },
+          {
+            "x": 27,
+            "y": 5
+          },
+          {
+            "x": 27,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "inspect->integrate",
+        "fromNodeId": "inspect",
+        "toNodeId": "integrate",
+        "path": [
+          {
+            "x": 26,
+            "y": 4
+          },
+          {
+            "x": 26,
+            "y": 5
+          },
+          {
+            "x": 26,
+            "y": 6
+          },
+          {
+            "x": 26,
+            "y": 7
+          },
+          {
+            "x": 27,
+            "y": 7
+          },
+          {
+            "x": 28,
+            "y": 7
+          },
+          {
+            "x": 29,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 31,
+            "y": 7
+          },
+          {
+            "x": 32,
+            "y": 7
+          },
+          {
+            "x": 32,
+            "y": 6
+          },
+          {
+            "x": 32,
+            "y": 5
+          },
+          {
+            "x": 32,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "document->integrate",
+        "fromNodeId": "document",
+        "toNodeId": "integrate",
+        "path": [
+          {
+            "x": 31,
+            "y": 4
+          },
+          {
+            "x": 32,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "integrate->ship",
+        "fromNodeId": "integrate",
+        "toNodeId": "ship",
+        "path": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 37,
+            "y": 4
+          }
+        ]
+      }
+    ],
+    "beltTiles": [
+      {
+        "x": 6,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 7,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 11,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["S"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 6,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 7,
+        "ins": ["N"],
+        "outs": ["E", "S"],
+        "kind": "split",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 8,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 9,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 10,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 11,
+        "ins": ["N"],
+        "outs": ["E", "S"],
+        "kind": "split",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 12,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 13,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 14,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 15,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 16,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 7,
+        "ins": ["W", "S"],
+        "outs": ["N"],
+        "kind": "merge",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 6,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 4,
+        "ins": ["S"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 16,
+        "y": 11,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 11,
+        "ins": ["W", "S"],
+        "outs": ["N"],
+        "kind": "merge",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 10,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 9,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 8,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 16,
+        "y": 15,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 15,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 14,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 13,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 12,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 21,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E", "S"],
+        "kind": "split",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 6,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 23,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 24,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 25,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "cross",
+        "over": {
+          "from": "N",
+          "to": "S"
+        }
+      },
+      {
+        "x": 27,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 4,
+        "ins": ["S"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["S"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 7,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 28,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 29,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 30,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 31,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 6,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 4,
+        "ins": ["S", "W"],
+        "outs": ["E"],
+        "kind": "merge",
+        "over": null
+      },
+      {
+        "x": 31,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 36,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 37,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      }
+    ],
+    "crossovers": [
+      {
+        "x": 22,
+        "y": 5
+      },
+      {
+        "x": 25,
+        "y": 6
+      },
+      {
+        "x": 32,
+        "y": 6
+      },
+      {
+        "x": 12,
+        "y": 8
+      },
+      {
+        "x": 12,
+        "y": 12
+      }
+    ],
+    "restSeats": [
+      {
+        "id": 0,
+        "tile": {
+          "x": 11,
+          "y": 21
+        },
+        "facing": "S"
+      },
+      {
+        "id": 1,
+        "tile": {
+          "x": 12,
+          "y": 21
+        },
+        "facing": "S"
+      },
+      {
+        "id": 2,
+        "tile": {
+          "x": 11,
+          "y": 23
+        },
+        "facing": "N"
+      },
+      {
+        "id": 3,
+        "tile": {
+          "x": 12,
+          "y": 23
+        },
+        "facing": "N"
+      },
+      {
+        "id": 4,
+        "tile": {
+          "x": 14,
+          "y": 21
+        },
+        "facing": "S"
+      },
+      {
+        "id": 5,
+        "tile": {
+          "x": 15,
+          "y": 21
+        },
+        "facing": "S"
+      },
+      {
+        "id": 6,
+        "tile": {
+          "x": 14,
+          "y": 23
+        },
+        "facing": "N"
+      },
+      {
+        "id": 7,
+        "tile": {
+          "x": 15,
+          "y": 23
+        },
+        "facing": "N"
+      },
+      {
+        "id": 8,
+        "tile": {
+          "x": 17,
+          "y": 21
+        },
+        "facing": "S"
+      },
+      {
+        "id": 9,
+        "tile": {
+          "x": 18,
+          "y": 21
+        },
+        "facing": "S"
+      },
+      {
+        "id": 10,
+        "tile": {
+          "x": 17,
+          "y": 23
+        },
+        "facing": "N"
+      },
+      {
+        "id": 11,
+        "tile": {
+          "x": 18,
+          "y": 23
+        },
+        "facing": "N"
+      }
+    ],
+    "breakroom": {
+      "x": 7,
+      "y": 19,
+      "w": 15,
+      "h": 5,
+      "door": [
+        {
+          "x": 13,
+          "y": 19
+        },
+        {
+          "x": 14,
+          "y": 19
+        }
+      ]
+    },
+    "lights": [
+      {
+        "x": 3,
+        "y": 6
+      },
+      {
+        "x": 9,
+        "y": 6
+      },
+      {
+        "x": 15,
+        "y": 6
+      },
+      {
+        "x": 21,
+        "y": 6
+      },
+      {
+        "x": 27,
+        "y": 6
+      },
+      {
+        "x": 33,
+        "y": 6
+      },
+      {
+        "x": 39,
+        "y": 6
+      },
+      {
+        "x": 3,
+        "y": 9
+      },
+      {
+        "x": 9,
+        "y": 9
+      },
+      {
+        "x": 15,
+        "y": 9
+      },
+      {
+        "x": 21,
+        "y": 9
+      },
+      {
+        "x": 27,
+        "y": 9
+      },
+      {
+        "x": 33,
+        "y": 9
+      },
+      {
+        "x": 39,
+        "y": 9
+      },
+      {
+        "x": 3,
+        "y": 13
+      },
+      {
+        "x": 9,
+        "y": 13
+      },
+      {
+        "x": 15,
+        "y": 13
+      },
+      {
+        "x": 21,
+        "y": 13
+      },
+      {
+        "x": 27,
+        "y": 13
+      },
+      {
+        "x": 33,
+        "y": 13
+      },
+      {
+        "x": 39,
+        "y": 13
+      },
+      {
+        "x": 3,
+        "y": 17
+      },
+      {
+        "x": 9,
+        "y": 17
+      },
+      {
+        "x": 15,
+        "y": 17
+      },
+      {
+        "x": 21,
+        "y": 17
+      },
+      {
+        "x": 27,
+        "y": 17
+      },
+      {
+        "x": 33,
+        "y": 17
+      },
+      {
+        "x": 39,
+        "y": 17
+      },
+      {
+        "x": 14,
+        "y": 21
+      }
+    ],
+    "anchors": {
+      "intake": {
+        "x": 0,
+        "y": 6
+      },
+      "exit": {
+        "x": 41,
+        "y": 6
+      },
+      "archive": {
+        "x": 10,
+        "y": 3
+      },
+      "rack": {
+        "x": 17,
+        "y": 3
+      },
+      "wait": {
+        "x": 25,
+        "y": 5
+      }
+    },
+    "walk": [
+      "##########################################",
+      "##########################################",
+      "##########################################",
+      "#........................................#",
+      "#..##########....######################..#",
+      "#...#....#..#....#.#....#.##.#..####..#..#",
+      "............#....#....###.##......#.......",
+      "#...........######........#######........#",
+      "#.............#..#.......................#",
+      "#...........#....#.......................#",
+      "#...........#....#.......................#",
+      "#...........######.......................#",
+      "#.............#..#.......................#",
+      "#...........#....#.......................#",
+      "#...........#....#.......................#",
+      "#...........######.......................#",
+      "#.............#..........................#",
+      "#........................................#",
+      "#........................................#",
+      "#......######..#######...................#",
+      "#......#.............#...................#",
+      "#......##..##.##.##.##...................#",
+      "#......##..##.##.##..#...................#",
+      "#......##..##.##.##.##...................#",
+      "##########################################"
+    ]
+  },
+  "bugfix-1": {
+    "width": 42,
+    "height": 17,
+    "props": [
+      {
+        "id": "station-reproduce",
+        "kind": "desk",
+        "x": 3,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "reproduce",
+        "seat": {
+          "x": 4,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-reproduce",
+        "kind": "chair",
+        "x": 4,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-fix:lane-1",
+        "kind": "desk",
+        "x": 8,
+        "y": 7,
+        "w": 3,
+        "h": 1,
+        "nodeId": "fix:lane-1",
+        "seat": {
+          "x": 9,
+          "y": 8
+        }
+      },
+      {
+        "id": "chair-fix:lane-1",
+        "kind": "chair",
+        "x": 9,
+        "y": 8,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-flip",
+        "kind": "rig",
+        "x": 13,
+        "y": 4,
+        "w": 2,
+        "h": 1,
+        "nodeId": "flip",
+        "seat": {
+          "x": 14,
+          "y": 5
+        }
+      },
+      {
+        "id": "station-verify",
+        "kind": "desk",
+        "x": 18,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "verify",
+        "seat": {
+          "x": 19,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-verify",
+        "kind": "chair",
+        "x": 19,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-inspect",
+        "kind": "desk",
+        "x": 23,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "inspect",
+        "seat": {
+          "x": 24,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-inspect",
+        "kind": "chair",
+        "x": 24,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-document",
+        "kind": "desk",
+        "x": 28,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "document",
+        "seat": {
+          "x": 29,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-document",
+        "kind": "chair",
+        "x": 29,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-integrate",
+        "kind": "press",
+        "x": 33,
+        "y": 4,
+        "w": 3,
+        "h": 2,
+        "nodeId": "integrate",
+        "seat": {
+          "x": 34,
+          "y": 6
+        }
+      },
+      {
+        "id": "station-ship",
+        "kind": "gate",
+        "x": 38,
+        "y": 4,
+        "w": 1,
+        "h": 1,
+        "nodeId": "ship",
+        "seat": {
+          "x": 38,
+          "y": 5
+        }
+      },
+      {
+        "id": "fixture-shelves",
+        "kind": "shelves",
+        "x": 10,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-racks",
+        "kind": "racks",
+        "x": 17,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-statuswall",
+        "kind": "statuswall",
+        "x": 25,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-lockers",
+        "kind": "lockers",
+        "x": 32,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-partition",
+        "kind": "partition",
+        "x": 12,
+        "y": 11,
+        "w": 15,
+        "h": 5,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-fridge",
+        "kind": "fridge",
+        "x": 13,
+        "y": 13,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-coffee",
+        "kind": "coffeebar",
+        "x": 13,
+        "y": 14,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-plant-l",
+        "kind": "plant",
+        "x": 13,
+        "y": 15,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-vending",
+        "kind": "vending",
+        "x": 25,
+        "y": 13,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-plant-r",
+        "kind": "plant",
+        "x": 25,
+        "y": 15,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-0",
+        "kind": "restbench",
+        "x": 16,
+        "y": 13,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-0",
+        "kind": "table",
+        "x": 16,
+        "y": 14,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-0",
+        "kind": "restbench",
+        "x": 16,
+        "y": 15,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-1",
+        "kind": "sofa",
+        "x": 19,
+        "y": 13,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-1",
+        "kind": "lowtable",
+        "x": 19,
+        "y": 14,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-1",
+        "kind": "restbench",
+        "x": 19,
+        "y": 15,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-2",
+        "kind": "restbench",
+        "x": 22,
+        "y": 13,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-2",
+        "kind": "table",
+        "x": 22,
+        "y": 14,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-2",
+        "kind": "restbench",
+        "x": 22,
+        "y": 15,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      }
+    ],
+    "belts": [
+      {
+        "id": "reproduce->fix:lane-1",
+        "fromNodeId": "reproduce",
+        "toNodeId": "fix:lane-1",
+        "path": [
+          {
+            "x": 6,
+            "y": 4
+          },
+          {
+            "x": 7,
+            "y": 4
+          },
+          {
+            "x": 7,
+            "y": 5
+          },
+          {
+            "x": 7,
+            "y": 6
+          },
+          {
+            "x": 7,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "id": "fix:lane-1->flip",
+        "fromNodeId": "fix:lane-1",
+        "toNodeId": "flip",
+        "path": [
+          {
+            "x": 11,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "flip->verify",
+        "fromNodeId": "flip",
+        "toNodeId": "verify",
+        "path": [
+          {
+            "x": 15,
+            "y": 4
+          },
+          {
+            "x": 16,
+            "y": 4
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "verify->inspect",
+        "fromNodeId": "verify",
+        "toNodeId": "inspect",
+        "path": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "verify->document",
+        "fromNodeId": "verify",
+        "toNodeId": "document",
+        "path": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 5
+          },
+          {
+            "x": 22,
+            "y": 6
+          },
+          {
+            "x": 23,
+            "y": 6
+          },
+          {
+            "x": 24,
+            "y": 6
+          },
+          {
+            "x": 25,
+            "y": 6
+          },
+          {
+            "x": 26,
+            "y": 6
+          },
+          {
+            "x": 27,
+            "y": 6
+          },
+          {
+            "x": 27,
+            "y": 5
+          },
+          {
+            "x": 27,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "inspect->integrate",
+        "fromNodeId": "inspect",
+        "toNodeId": "integrate",
+        "path": [
+          {
+            "x": 26,
+            "y": 4
+          },
+          {
+            "x": 26,
+            "y": 5
+          },
+          {
+            "x": 26,
+            "y": 6
+          },
+          {
+            "x": 26,
+            "y": 7
+          },
+          {
+            "x": 27,
+            "y": 7
+          },
+          {
+            "x": 28,
+            "y": 7
+          },
+          {
+            "x": 29,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 31,
+            "y": 7
+          },
+          {
+            "x": 32,
+            "y": 7
+          },
+          {
+            "x": 32,
+            "y": 6
+          },
+          {
+            "x": 32,
+            "y": 5
+          },
+          {
+            "x": 32,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "document->integrate",
+        "fromNodeId": "document",
+        "toNodeId": "integrate",
+        "path": [
+          {
+            "x": 31,
+            "y": 4
+          },
+          {
+            "x": 32,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "integrate->ship",
+        "fromNodeId": "integrate",
+        "toNodeId": "ship",
+        "path": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 37,
+            "y": 4
+          }
+        ]
+      }
+    ],
+    "beltTiles": [
+      {
+        "x": 6,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 7,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["S"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 7,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 7,
+        "y": 6,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 7,
+        "y": 7,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 11,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 6,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 4,
+        "ins": ["S"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 15,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 16,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 21,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E", "S"],
+        "kind": "split",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 6,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 23,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 24,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 25,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "cross",
+        "over": {
+          "from": "N",
+          "to": "S"
+        }
+      },
+      {
+        "x": 27,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 4,
+        "ins": ["S"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["S"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 7,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 28,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 29,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 30,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 31,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 6,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 4,
+        "ins": ["S", "W"],
+        "outs": ["E"],
+        "kind": "merge",
+        "over": null
+      },
+      {
+        "x": 31,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 36,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 37,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      }
+    ],
+    "crossovers": [
+      {
+        "x": 22,
+        "y": 5
+      },
+      {
+        "x": 25,
+        "y": 6
+      },
+      {
+        "x": 32,
+        "y": 6
+      }
+    ],
+    "restSeats": [
+      {
+        "id": 0,
+        "tile": {
+          "x": 16,
+          "y": 13
+        },
+        "facing": "S"
+      },
+      {
+        "id": 1,
+        "tile": {
+          "x": 17,
+          "y": 13
+        },
+        "facing": "S"
+      },
+      {
+        "id": 2,
+        "tile": {
+          "x": 16,
+          "y": 15
+        },
+        "facing": "N"
+      },
+      {
+        "id": 3,
+        "tile": {
+          "x": 17,
+          "y": 15
+        },
+        "facing": "N"
+      },
+      {
+        "id": 4,
+        "tile": {
+          "x": 19,
+          "y": 13
+        },
+        "facing": "S"
+      },
+      {
+        "id": 5,
+        "tile": {
+          "x": 20,
+          "y": 13
+        },
+        "facing": "S"
+      },
+      {
+        "id": 6,
+        "tile": {
+          "x": 19,
+          "y": 15
+        },
+        "facing": "N"
+      },
+      {
+        "id": 7,
+        "tile": {
+          "x": 20,
+          "y": 15
+        },
+        "facing": "N"
+      },
+      {
+        "id": 8,
+        "tile": {
+          "x": 22,
+          "y": 13
+        },
+        "facing": "S"
+      },
+      {
+        "id": 9,
+        "tile": {
+          "x": 23,
+          "y": 13
+        },
+        "facing": "S"
+      },
+      {
+        "id": 10,
+        "tile": {
+          "x": 22,
+          "y": 15
+        },
+        "facing": "N"
+      },
+      {
+        "id": 11,
+        "tile": {
+          "x": 23,
+          "y": 15
+        },
+        "facing": "N"
+      }
+    ],
+    "breakroom": {
+      "x": 12,
+      "y": 11,
+      "w": 15,
+      "h": 5,
+      "door": [
+        {
+          "x": 18,
+          "y": 11
+        },
+        {
+          "x": 19,
+          "y": 11
+        }
+      ]
+    },
+    "lights": [
+      {
+        "x": 3,
+        "y": 6
+      },
+      {
+        "x": 9,
+        "y": 6
+      },
+      {
+        "x": 15,
+        "y": 6
+      },
+      {
+        "x": 21,
+        "y": 6
+      },
+      {
+        "x": 27,
+        "y": 6
+      },
+      {
+        "x": 33,
+        "y": 6
+      },
+      {
+        "x": 39,
+        "y": 6
+      },
+      {
+        "x": 3,
+        "y": 9
+      },
+      {
+        "x": 9,
+        "y": 9
+      },
+      {
+        "x": 15,
+        "y": 9
+      },
+      {
+        "x": 21,
+        "y": 9
+      },
+      {
+        "x": 27,
+        "y": 9
+      },
+      {
+        "x": 33,
+        "y": 9
+      },
+      {
+        "x": 39,
+        "y": 9
+      },
+      {
+        "x": 19,
+        "y": 13
+      }
+    ],
+    "anchors": {
+      "intake": {
+        "x": 0,
+        "y": 6
+      },
+      "exit": {
+        "x": 41,
+        "y": 6
+      },
+      "archive": {
+        "x": 10,
+        "y": 3
+      },
+      "rack": {
+        "x": 17,
+        "y": 3
+      },
+      "wait": {
+        "x": 25,
+        "y": 5
+      }
+    },
+    "walk": [
+      "##########################################",
+      "##########################################",
+      "##########################################",
+      "#........................................#",
+      "#..#####....###########################..#",
+      "#...#..#....#.#....#....#.##.#..####..#..#",
+      ".......#....#.........###.##......#.......",
+      "#......######.............#######........#",
+      "#........#...............................#",
+      "#........................................#",
+      "#........................................#",
+      "#...........######..#######..............#",
+      "#...........#.............#..............#",
+      "#...........##..##.##.##.##..............#",
+      "#...........##..##.##.##..#..............#",
+      "#...........##..##.##.##.##..............#",
+      "##########################################"
+    ]
+  },
+  "standard-2": {
+    "width": 42,
+    "height": 21,
+    "props": [
+      {
+        "id": "station-scout",
+        "kind": "desk",
+        "x": 3,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "scout",
+        "seat": {
+          "x": 4,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-scout",
+        "kind": "chair",
+        "x": 4,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-challenge",
+        "kind": "desk",
+        "x": 8,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "challenge",
+        "seat": {
+          "x": 9,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-challenge",
+        "kind": "chair",
+        "x": 9,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-build:lane-1",
+        "kind": "desk",
+        "x": 13,
+        "y": 7,
+        "w": 3,
+        "h": 1,
+        "nodeId": "build:lane-1",
+        "seat": {
+          "x": 14,
+          "y": 8
+        }
+      },
+      {
+        "id": "chair-build:lane-1",
+        "kind": "chair",
+        "x": 14,
+        "y": 8,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-build:lane-2",
+        "kind": "desk",
+        "x": 13,
+        "y": 11,
+        "w": 3,
+        "h": 1,
+        "nodeId": "build:lane-2",
+        "seat": {
+          "x": 14,
+          "y": 12
+        }
+      },
+      {
+        "id": "chair-build:lane-2",
+        "kind": "chair",
+        "x": 14,
+        "y": 12,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-verify",
+        "kind": "desk",
+        "x": 18,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "verify",
+        "seat": {
+          "x": 19,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-verify",
+        "kind": "chair",
+        "x": 19,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-inspect",
+        "kind": "desk",
+        "x": 23,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "inspect",
+        "seat": {
+          "x": 24,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-inspect",
+        "kind": "chair",
+        "x": 24,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-document",
+        "kind": "desk",
+        "x": 28,
+        "y": 4,
+        "w": 3,
+        "h": 1,
+        "nodeId": "document",
+        "seat": {
+          "x": 29,
+          "y": 5
+        }
+      },
+      {
+        "id": "chair-document",
+        "kind": "chair",
+        "x": 29,
+        "y": 5,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "station-integrate",
+        "kind": "press",
+        "x": 33,
+        "y": 4,
+        "w": 3,
+        "h": 2,
+        "nodeId": "integrate",
+        "seat": {
+          "x": 34,
+          "y": 6
+        }
+      },
+      {
+        "id": "station-ship",
+        "kind": "gate",
+        "x": 38,
+        "y": 4,
+        "w": 1,
+        "h": 1,
+        "nodeId": "ship",
+        "seat": {
+          "x": 38,
+          "y": 5
+        }
+      },
+      {
+        "id": "fixture-shelves",
+        "kind": "shelves",
+        "x": 10,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-racks",
+        "kind": "racks",
+        "x": 17,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-statuswall",
+        "kind": "statuswall",
+        "x": 25,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "fixture-lockers",
+        "kind": "lockers",
+        "x": 32,
+        "y": 2,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-partition",
+        "kind": "partition",
+        "x": 7,
+        "y": 15,
+        "w": 15,
+        "h": 5,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-fridge",
+        "kind": "fridge",
+        "x": 8,
+        "y": 17,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-coffee",
+        "kind": "coffeebar",
+        "x": 8,
+        "y": 18,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-plant-l",
+        "kind": "plant",
+        "x": 8,
+        "y": 19,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-vending",
+        "kind": "vending",
+        "x": 20,
+        "y": 17,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-plant-r",
+        "kind": "plant",
+        "x": 20,
+        "y": 19,
+        "w": 1,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-0",
+        "kind": "restbench",
+        "x": 11,
+        "y": 17,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-0",
+        "kind": "table",
+        "x": 11,
+        "y": 18,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-0",
+        "kind": "restbench",
+        "x": 11,
+        "y": 19,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-1",
+        "kind": "sofa",
+        "x": 14,
+        "y": 17,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-1",
+        "kind": "lowtable",
+        "x": 14,
+        "y": 18,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-1",
+        "kind": "restbench",
+        "x": 14,
+        "y": 19,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-top-2",
+        "kind": "restbench",
+        "x": 17,
+        "y": 17,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-table-2",
+        "kind": "table",
+        "x": 17,
+        "y": 18,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      },
+      {
+        "id": "room-bot-2",
+        "kind": "restbench",
+        "x": 17,
+        "y": 19,
+        "w": 2,
+        "h": 1,
+        "nodeId": null,
+        "seat": null
+      }
+    ],
+    "belts": [
+      {
+        "id": "scout->challenge",
+        "fromNodeId": "scout",
+        "toNodeId": "challenge",
+        "path": [
+          {
+            "x": 6,
+            "y": 4
+          },
+          {
+            "x": 7,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "challenge->build:lane-1",
+        "fromNodeId": "challenge",
+        "toNodeId": "build:lane-1",
+        "path": [
+          {
+            "x": 11,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "id": "challenge->build:lane-2",
+        "fromNodeId": "challenge",
+        "toNodeId": "build:lane-2",
+        "path": [
+          {
+            "x": 11,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 10
+          },
+          {
+            "x": 12,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "id": "build:lane-1->verify",
+        "fromNodeId": "build:lane-1",
+        "toNodeId": "verify",
+        "path": [
+          {
+            "x": 16,
+            "y": 7
+          },
+          {
+            "x": 17,
+            "y": 7
+          },
+          {
+            "x": 17,
+            "y": 6
+          },
+          {
+            "x": 17,
+            "y": 5
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "build:lane-2->verify",
+        "fromNodeId": "build:lane-2",
+        "toNodeId": "verify",
+        "path": [
+          {
+            "x": 16,
+            "y": 11
+          },
+          {
+            "x": 17,
+            "y": 11
+          },
+          {
+            "x": 17,
+            "y": 10
+          },
+          {
+            "x": 17,
+            "y": 9
+          },
+          {
+            "x": 17,
+            "y": 8
+          },
+          {
+            "x": 17,
+            "y": 7
+          },
+          {
+            "x": 17,
+            "y": 6
+          },
+          {
+            "x": 17,
+            "y": 5
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "verify->inspect",
+        "fromNodeId": "verify",
+        "toNodeId": "inspect",
+        "path": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "verify->document",
+        "fromNodeId": "verify",
+        "toNodeId": "document",
+        "path": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 5
+          },
+          {
+            "x": 22,
+            "y": 6
+          },
+          {
+            "x": 23,
+            "y": 6
+          },
+          {
+            "x": 24,
+            "y": 6
+          },
+          {
+            "x": 25,
+            "y": 6
+          },
+          {
+            "x": 26,
+            "y": 6
+          },
+          {
+            "x": 27,
+            "y": 6
+          },
+          {
+            "x": 27,
+            "y": 5
+          },
+          {
+            "x": 27,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "inspect->integrate",
+        "fromNodeId": "inspect",
+        "toNodeId": "integrate",
+        "path": [
+          {
+            "x": 26,
+            "y": 4
+          },
+          {
+            "x": 26,
+            "y": 5
+          },
+          {
+            "x": 26,
+            "y": 6
+          },
+          {
+            "x": 26,
+            "y": 7
+          },
+          {
+            "x": 27,
+            "y": 7
+          },
+          {
+            "x": 28,
+            "y": 7
+          },
+          {
+            "x": 29,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 31,
+            "y": 7
+          },
+          {
+            "x": 32,
+            "y": 7
+          },
+          {
+            "x": 32,
+            "y": 6
+          },
+          {
+            "x": 32,
+            "y": 5
+          },
+          {
+            "x": 32,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "document->integrate",
+        "fromNodeId": "document",
+        "toNodeId": "integrate",
+        "path": [
+          {
+            "x": 31,
+            "y": 4
+          },
+          {
+            "x": 32,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "id": "integrate->ship",
+        "fromNodeId": "integrate",
+        "toNodeId": "ship",
+        "path": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 37,
+            "y": 4
+          }
+        ]
+      }
+    ],
+    "beltTiles": [
+      {
+        "x": 6,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 7,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 11,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["S"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 6,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 7,
+        "ins": ["N"],
+        "outs": ["E", "S"],
+        "kind": "split",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 8,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 9,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 10,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 12,
+        "y": 11,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 16,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 7,
+        "ins": ["W", "S"],
+        "outs": ["N"],
+        "kind": "merge",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 6,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 4,
+        "ins": ["S"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 16,
+        "y": 11,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 11,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 10,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 9,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 17,
+        "y": 8,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 21,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E", "S"],
+        "kind": "split",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 22,
+        "y": 6,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 23,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 24,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 25,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "cross",
+        "over": {
+          "from": "N",
+          "to": "S"
+        }
+      },
+      {
+        "x": 27,
+        "y": 6,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 4,
+        "ins": ["S"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["S"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 5,
+        "ins": ["N"],
+        "outs": ["S"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 26,
+        "y": 7,
+        "ins": ["N"],
+        "outs": ["E"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 27,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 28,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 29,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 30,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 31,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 7,
+        "ins": ["W"],
+        "outs": ["N"],
+        "kind": "corner",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 6,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 5,
+        "ins": ["S"],
+        "outs": ["N"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 32,
+        "y": 4,
+        "ins": ["S", "W"],
+        "outs": ["E"],
+        "kind": "merge",
+        "over": null
+      },
+      {
+        "x": 31,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 36,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      },
+      {
+        "x": 37,
+        "y": 4,
+        "ins": ["W"],
+        "outs": ["E"],
+        "kind": "straight",
+        "over": null
+      }
+    ],
+    "crossovers": [
+      {
+        "x": 22,
+        "y": 5
+      },
+      {
+        "x": 25,
+        "y": 6
+      },
+      {
+        "x": 32,
+        "y": 6
+      },
+      {
+        "x": 12,
+        "y": 8
+      }
+    ],
+    "restSeats": [
+      {
+        "id": 0,
+        "tile": {
+          "x": 11,
+          "y": 17
+        },
+        "facing": "S"
+      },
+      {
+        "id": 1,
+        "tile": {
+          "x": 12,
+          "y": 17
+        },
+        "facing": "S"
+      },
+      {
+        "id": 2,
+        "tile": {
+          "x": 11,
+          "y": 19
+        },
+        "facing": "N"
+      },
+      {
+        "id": 3,
+        "tile": {
+          "x": 12,
+          "y": 19
+        },
+        "facing": "N"
+      },
+      {
+        "id": 4,
+        "tile": {
+          "x": 14,
+          "y": 17
+        },
+        "facing": "S"
+      },
+      {
+        "id": 5,
+        "tile": {
+          "x": 15,
+          "y": 17
+        },
+        "facing": "S"
+      },
+      {
+        "id": 6,
+        "tile": {
+          "x": 14,
+          "y": 19
+        },
+        "facing": "N"
+      },
+      {
+        "id": 7,
+        "tile": {
+          "x": 15,
+          "y": 19
+        },
+        "facing": "N"
+      },
+      {
+        "id": 8,
+        "tile": {
+          "x": 17,
+          "y": 17
+        },
+        "facing": "S"
+      },
+      {
+        "id": 9,
+        "tile": {
+          "x": 18,
+          "y": 17
+        },
+        "facing": "S"
+      },
+      {
+        "id": 10,
+        "tile": {
+          "x": 17,
+          "y": 19
+        },
+        "facing": "N"
+      },
+      {
+        "id": 11,
+        "tile": {
+          "x": 18,
+          "y": 19
+        },
+        "facing": "N"
+      }
+    ],
+    "breakroom": {
+      "x": 7,
+      "y": 15,
+      "w": 15,
+      "h": 5,
+      "door": [
+        {
+          "x": 13,
+          "y": 15
+        },
+        {
+          "x": 14,
+          "y": 15
+        }
+      ]
+    },
+    "lights": [
+      {
+        "x": 3,
+        "y": 6
+      },
+      {
+        "x": 9,
+        "y": 6
+      },
+      {
+        "x": 15,
+        "y": 6
+      },
+      {
+        "x": 21,
+        "y": 6
+      },
+      {
+        "x": 27,
+        "y": 6
+      },
+      {
+        "x": 33,
+        "y": 6
+      },
+      {
+        "x": 39,
+        "y": 6
+      },
+      {
+        "x": 3,
+        "y": 9
+      },
+      {
+        "x": 9,
+        "y": 9
+      },
+      {
+        "x": 15,
+        "y": 9
+      },
+      {
+        "x": 21,
+        "y": 9
+      },
+      {
+        "x": 27,
+        "y": 9
+      },
+      {
+        "x": 33,
+        "y": 9
+      },
+      {
+        "x": 39,
+        "y": 9
+      },
+      {
+        "x": 3,
+        "y": 13
+      },
+      {
+        "x": 9,
+        "y": 13
+      },
+      {
+        "x": 15,
+        "y": 13
+      },
+      {
+        "x": 21,
+        "y": 13
+      },
+      {
+        "x": 27,
+        "y": 13
+      },
+      {
+        "x": 33,
+        "y": 13
+      },
+      {
+        "x": 39,
+        "y": 13
+      },
+      {
+        "x": 14,
+        "y": 17
+      }
+    ],
+    "anchors": {
+      "intake": {
+        "x": 0,
+        "y": 6
+      },
+      "exit": {
+        "x": 41,
+        "y": 6
+      },
+      "archive": {
+        "x": 10,
+        "y": 3
+      },
+      "rack": {
+        "x": 17,
+        "y": 3
+      },
+      "wait": {
+        "x": 25,
+        "y": 5
+      }
+    },
+    "walk": [
+      "##########################################",
+      "##########################################",
+      "##########################################",
+      "#........................................#",
+      "#..##########....######################..#",
+      "#...#....#..#....#.#....#.##.#..####..#..#",
+      "............#....#....###.##......#.......",
+      "#...........######........#######........#",
+      "#.............#..#.......................#",
+      "#...........#....#.......................#",
+      "#...........#....#.......................#",
+      "#...........######.......................#",
+      "#.............#..........................#",
+      "#........................................#",
+      "#........................................#",
+      "#......######..#######...................#",
+      "#......#.............#...................#",
+      "#......##..##.##.##.##...................#",
+      "#......##..##.##.##..#...................#",
+      "#......##..##.##.##.##...................#",
+      "##########################################"
+    ]
+  },
+  "crew": {
+    "initial": [
+      {
+        "nodeId": "scout",
+        "x": 72,
+        "y": 92,
+        "facing": "S",
+        "anim": "type"
+      },
+      {
+        "nodeId": "challenge",
+        "x": 152,
+        "y": 92,
+        "facing": "S",
+        "anim": "type"
+      },
+      {
+        "nodeId": "build:lane-1",
+        "x": 232,
+        "y": 140,
+        "facing": "S",
+        "anim": "type"
+      },
+      {
+        "nodeId": "build:lane-2",
+        "x": 232,
+        "y": 204,
+        "facing": "S",
+        "anim": "type"
+      },
+      {
+        "nodeId": "build:lane-3",
+        "x": 232,
+        "y": 268,
+        "facing": "S",
+        "anim": "type"
+      },
+      {
+        "nodeId": "verify",
+        "x": 232,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "inspect",
+        "x": 248,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "document",
+        "x": 200,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      }
+    ],
+    "afterIdle": [
+      {
+        "nodeId": "scout",
+        "x": 184,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "challenge",
+        "x": 200,
+        "y": 380,
+        "facing": "N",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "build:lane-1",
+        "x": 232,
+        "y": 140,
+        "facing": "S",
+        "anim": "type"
+      },
+      {
+        "nodeId": "build:lane-2",
+        "x": 232,
+        "y": 380,
+        "facing": "N",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "build:lane-3",
+        "x": 232,
+        "y": 268,
+        "facing": "S",
+        "anim": "type"
+      },
+      {
+        "nodeId": "verify",
+        "x": 232,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "inspect",
+        "x": 248,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "document",
+        "x": 200,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      }
+    ],
+    "allPassed": [
+      {
+        "nodeId": "scout",
+        "x": 200,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "challenge",
+        "x": 232,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "build:lane-1",
+        "x": 184,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "build:lane-2",
+        "x": 248,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "build:lane-3",
+        "x": 280,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "verify",
+        "x": 200,
+        "y": 380,
+        "facing": "N",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "inspect",
+        "x": 232,
+        "y": 380,
+        "facing": "N",
+        "anim": "couch"
+      },
+      {
+        "nodeId": "document",
+        "x": 296,
+        "y": 348,
+        "facing": "S",
+        "anim": "couch"
+      }
+    ]
+  }
+}

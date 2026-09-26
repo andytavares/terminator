@@ -19,6 +19,35 @@ function passable(solid: HallMap['solid'], tile: Tile, to: Tile): boolean {
   return !row[tile.x]
 }
 
+/**
+ * BFS flood from `from` over tiles where `grid` is `false`, keyed `"x,y"`.
+ * `from` itself is distance 0. A tile the flood never reaches is absent from
+ * the returned map rather than `Infinity` — nearest-seat picking treats
+ * "absent" as unreachable.
+ */
+export function distancesFrom(grid: HallMap['solid'], from: Tile): Map<string, number> {
+  const distances = new Map<string, number>([[key(from), 0]])
+  const queue: Tile[] = [from]
+  for (let head = 0; head < queue.length; head++) {
+    const current = queue[head]
+    const currentDistance = distances.get(key(current)) as number
+    const neighbours: Tile[] = [
+      { x: current.x + 1, y: current.y },
+      { x: current.x - 1, y: current.y },
+      { x: current.x, y: current.y + 1 },
+      { x: current.x, y: current.y - 1 },
+    ]
+    for (const next of neighbours) {
+      const k = key(next)
+      if (distances.has(k)) continue
+      if (grid[next.y]?.[next.x] !== false) continue
+      distances.set(k, currentDistance + 1)
+      queue.push(next)
+    }
+  }
+  return distances
+}
+
 export function findPath(solid: HallMap['solid'], from: Tile, to: Tile): Tile[] {
   if (from.x === to.x && from.y === to.y) return []
 

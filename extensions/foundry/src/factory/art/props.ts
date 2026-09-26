@@ -1,4 +1,4 @@
-import type { HallMap, HallBelt, HallProp, PropKind } from '../layout.js'
+import type { HallMap, HallProp, PropKind, Side, BeltTile } from '../layout.js'
 import { TILE_PX } from '../layout.js'
 import type { Crew } from '../sim.js'
 import type { NodeState } from '../../line/run-graph.js'
@@ -6,7 +6,7 @@ import type { Paint } from './kit.js'
 import { rect, bevel, rivets, wear, mulberry32 } from './kit.js'
 import { HALL, CODE_LINE_COLORS } from './palette.js'
 
-// One draw function per `PropKind`, plus the floor/wall bake and the belt and
+// One draw function per `PropKind`, plus the floor/wall bake and the belts and
 // crate that move over it.
 //
 // The honesty rule lives in what each function reads out of `SceneContext`:
@@ -14,7 +14,10 @@ import { HALL, CODE_LINE_COLORS } from './palette.js'
 // present crew member actually doing the thing that would light this up"
 // rather than animating on a clock. Ambient decor (a plant's sway, a rack's
 // idle blink) is the one exception — nothing about a run makes those true or
-// false, so a clock is the only honest input they have.
+// false, so a clock is the only honest input they have. Breakroom furniture
+// (a bench, a sofa, a table, a fridge, a coffeebar, a vending machine, a
+// partition) is decor too: it never carries a `nodeId` and never reads
+// `SceneContext` at all.
 
 export interface SceneContext {
   readonly crew: readonly Crew[]
@@ -121,7 +124,10 @@ function paintFloorTile(paint: Paint, tx: number, ty: number): void {
   wear(paint, px, py, TILE_PX, TILE_PX, tx * 131 + ty * 977, HALL.wear)
 }
 
-/** Floor plates, then the four walls with their door gaps. Deterministic: no `tMs`. */
+/**
+ * Floor plates, the four walls with their door gaps, and the breakroom's own
+ * floor, rug and door threshold. Deterministic: no `tMs`.
+ */
 export function bakeHall(map: HallMap, paint: Paint): void {
   const w = map.width * TILE_PX
   const faceH = (TOP_WALL_ROWS - 1) * TILE_PX
@@ -130,44 +136,14 @@ export function bakeHall(map: HallMap, paint: Paint): void {
     for (let x = 1; x < map.width - 1; x++) paintFloorTile(paint, x, y)
   }
 
-  // Walkway lines flanking every belt row, and the hazard hatch on the floor
-  // tile before every press or gate — floor decals, so they bake once.
-  for (const belt of map.belts) {
-    belt.path.forEach((tile, i) => {
-      if (i % 2 !== 0) return
-      const x = tile.x * TILE_PX
-      const y = tile.y * TILE_PX
-      rect(paint, x + 2, y + 1, 5, 2, HALL.amberDim)
-      rect(paint, x + 2, y + TILE_PX - 3, 5, 2, HALL.amberDim)
-    })
-  }
+  // The hazard hatch on the floor tile before every press or gate — a floor
+  // decal, so it bakes once.
   for (const prop of map.props) {
     if (prop.kind !== 'press' && prop.kind !== 'gate') continue
     hazardHatch(paint, (prop.x - 1) * TILE_PX, prop.y * TILE_PX, TILE_PX, prop.h * TILE_PX)
   }
 
-  // A rug under the lounge band, and a lane number stencil at the left edge
-  // of every lane's belt row.
-  if (map.anchors.lounge.length > 0) {
-    const xs = map.anchors.lounge.map((t) => t.x)
-    const ys = map.anchors.lounge.map((t) => t.y)
-    const x0 = Math.min(...xs)
-    const x1 = Math.max(...xs)
-    const y0 = Math.min(...ys)
-    const y1 = Math.max(...ys)
-    for (let ry = y0; ry <= y1; ry++) {
-      for (let rx = x0; rx <= x1; rx++) {
-        rect(
-          paint,
-          rx * TILE_PX,
-          ry * TILE_PX,
-          TILE_PX,
-          TILE_PX,
-          (rx + ry) % 2 ? HALL.rug : HALL.rug2
-        )
-      }
-    }
-  }
+  // A lane number stencil at the left edge of every lane's belt row.
   for (const lane of map.lanes) {
     const digit = lane.label.match(/\d+/)?.[0]
     if (digit === undefined) continue
@@ -201,28 +177,231 @@ export function bakeHall(map: HallMap, paint: Paint): void {
   }
 
   rect(paint, 0, (map.height - 1) * TILE_PX, w, TILE_PX, HALL.wallTrim)
+
+  // The breakroom's own floor, rug and door threshold — ported verbatim
+  // from the prototype's `bakeHall2` tail, reading `map.breakroom` in place
+  // of its `room`.
+  const r = map.breakroom
+  for (let y = r.y + 1; y < r.y + r.h; y++) {
+    for (let x = r.x + 1; x < r.x + r.w - 1; x++) {
+      rect(paint, x * TILE_PX, y * TILE_PX, TILE_PX, TILE_PX, (x + y) % 2 ? '#4a4038' : '#524740')
+      rect(paint, x * TILE_PX, y * TILE_PX + 15, TILE_PX, 1, '#3a322b')
+      rect(paint, x * TILE_PX + 15, y * TILE_PX, 1, TILE_PX, '#3a322b')
+    }
+  }
+  rect(
+    paint,
+    (r.x + 3) * TILE_PX + 4,
+    (r.y + 2) * TILE_PX + 2,
+    (r.w - 6) * TILE_PX + 8,
+    3 * TILE_PX - 4,
+    '#3a2f3a'
+  )
+  for (let x = (r.x + 3) * TILE_PX + 6; x < (r.x + r.w - 3) * TILE_PX + 10; x += 6) {
+    rect(paint, x, (r.y + 2) * TILE_PX + 4, 2, 1, '#524252')
+    rect(paint, x, (r.y + 5) * TILE_PX - 5, 2, 1, '#524252')
+  }
+  for (const d of r.door) {
+    rect(paint, d.x * TILE_PX, d.y * TILE_PX, TILE_PX, TILE_PX, '#524740')
+    rect(paint, d.x * TILE_PX, d.y * TILE_PX + 6, TILE_PX, 3, HALL.amberDim)
+  }
 }
 
-/** A full conveyor: rails and a dark bed, with treads that scroll only while a crate rides it. */
-export function drawBelt(paint: Paint, belt: HallBelt, moving: boolean, tMs: number): void {
-  const top = 3
-  const bedH = 10
-  const offset = moving ? Math.floor(tMs / 70) % 6 : 0
-  for (const tile of belt.path) {
-    const x = tile.x * TILE_PX
-    const y = tile.y * TILE_PX
+const BED = '#15181d'
+const TREAD = '#2b3038'
+const RAIL = HALL.steelLight
+const RAIL_LO = '#0a0c0f'
+const WOOD = '#6e5238'
+const WOOD_HI = '#8a6a4a'
+const WOOD_LO = '#4a3624'
 
-    rect(paint, x, y + top - 1, TILE_PX, 1, HALL.steelLight)
-    rect(paint, x, y + top, TILE_PX, bedH, '#15181d')
-    rect(paint, x, y + top + bedH, TILE_PX, 1, HALL.steelLight)
-    rect(paint, x, y + top + bedH + 1, TILE_PX, 1, '#0a0c0f')
+/** Bed rectangle for the hub (3..12) plus an arm to each connected side. */
+function bedParts(sides: ReadonlySet<Side>): [number, number, number, number][] {
+  const parts: [number, number, number, number][] = [[3, 3, 10, 10]]
+  if (sides.has('N')) parts.push([3, 0, 10, 3])
+  if (sides.has('S')) parts.push([3, 13, 10, 3])
+  if (sides.has('W')) parts.push([0, 3, 3, 10])
+  if (sides.has('E')) parts.push([13, 3, 3, 10])
+  return parts
+}
 
-    for (let tx = -6 + offset; tx < TILE_PX; tx += 6) {
-      if (tx < 0) continue
-      rect(paint, x + tx, y + top + 1, 1, bedH - 2, '#2b3038')
+function rails(paint: Paint, x: number, y: number, sides: ReadonlySet<Side>): void {
+  // A rail runs along every edge of the bed that is not an opening.
+  const r = (a: number, b: number, w: number, h: number): void =>
+    rect(paint, x + a, y + b, w, h, RAIL)
+  if (!sides.has('N')) r(2, 2, 12, 1)
+  if (!sides.has('S')) {
+    r(2, 13, 12, 1)
+    rect(paint, x + 2, y + 14, 12, 1, RAIL_LO)
+  }
+  if (!sides.has('W')) r(2, 2, 1, 12)
+  if (!sides.has('E')) r(13, 2, 1, 12)
+  if (sides.has('N')) {
+    r(2, 0, 1, 3)
+    r(13, 0, 1, 3)
+  }
+  if (sides.has('S')) {
+    r(2, 13, 1, 3)
+    r(13, 13, 1, 3)
+  }
+  if (sides.has('W')) {
+    r(0, 2, 3, 1)
+    r(0, 13, 3, 1)
+  }
+  if (sides.has('E')) {
+    r(13, 2, 3, 1)
+    r(13, 13, 3, 1)
+  }
+}
+
+function chevron(paint: Paint, cx: number, cy: number, d: Side, color: string): void {
+  const pts: Record<Side, [number, number][]> = {
+    E: [
+      [-1, -2],
+      [0, -1],
+      [1, 0],
+      [0, 1],
+      [-1, 2],
+    ],
+    W: [
+      [1, -2],
+      [0, -1],
+      [-1, 0],
+      [0, 1],
+      [1, 2],
+    ],
+    S: [
+      [-2, -1],
+      [-1, 0],
+      [0, 1],
+      [1, 0],
+      [2, -1],
+    ],
+    N: [
+      [-2, 1],
+      [-1, 0],
+      [0, -1],
+      [1, 0],
+      [2, 1],
+    ],
+  }
+  for (const [dx, dy] of pts[d]) rect(paint, cx + dx, cy + dy, 1, 1, color)
+}
+
+function treads(paint: Paint, x: number, y: number, d: Side, offset: number): void {
+  const horiz = d === 'E' || d === 'W'
+  const sign = d === 'E' || d === 'S' ? 1 : -1
+  for (let i = 0; i < 16; i += 4) {
+    const p = (i + sign * offset + 16) % 16
+    if (horiz) rect(paint, x + p, y + 4, 1, 8, TREAD)
+    else rect(paint, x + 4, y + p, 8, 1, TREAD)
+  }
+}
+
+/** One belt tile: its bed, rails, direction chevron and — on a crossing — the raised deck. */
+function drawBeltTile(
+  paint: Paint,
+  tx: number,
+  ty: number,
+  tile: BeltTile,
+  moving: boolean,
+  tMs: number
+): void {
+  const x = tx * TILE_PX
+  const y = ty * TILE_PX
+  const sides = new Set<Side>([...tile.ins, ...tile.outs])
+  const offset = moving ? Math.floor(tMs / 70) % 4 : 0
+  for (const [a, b, w, h] of bedParts(sides)) rect(paint, x + a, y + b, w, h, BED)
+  const out = tile.outs[0]
+  if (tile.kind === 'straight' || tile.kind === 'corner') {
+    treads(paint, x, y, out, offset)
+    rails(paint, x, y, sides)
+    if (tile.kind === 'corner') {
+      rect(paint, x + 6, y + 6, 4, 4, '#20252c')
+      rect(paint, x + 7, y + 7, 2, 2, HALL.steelDark)
     }
-    rect(paint, x + 1, y + top + 1, 1, bedH - 2, HALL.steelDark)
-    rect(paint, x + TILE_PX - 2, y + top + 1, 1, bedH - 2, HALL.steelDark)
+    chevron(paint, x + 8, y + 8, out, HALL.amberDim)
+  } else {
+    // Junction: a turntable in the hub — amber diverter for a split, steel for a merge.
+    rails(paint, x, y, sides)
+    const disc = tile.kind === 'split' ? HALL.amber : HALL.steel
+    rect(paint, x + 4, y + 5, 8, 6, disc)
+    rect(paint, x + 5, y + 4, 6, 8, disc)
+    rect(paint, x + 6, y + 6, 4, 4, tile.kind === 'split' ? HALL.amberDim : HALL.steelDark)
+    const chevronOffset: Record<Side, [number, number]> = {
+      E: [5, 0],
+      W: [-5, 0],
+      N: [0, -5],
+      S: [0, 5],
+    }
+    for (const d of tile.outs) {
+      const [ox, oy] = chevronOffset[d]
+      chevron(paint, x + 8 + ox, y + 8 + oy, d, HALL.amber)
+    }
+  }
+  if (tile.kind === 'cross' && tile.over !== null) {
+    // The crossing belt rides over on a raised deck.
+    const { from: a, to: b } = tile.over
+    const horiz = a === 'E' || a === 'W'
+    if (horiz) {
+      rect(paint, x, y + 2, 16, 12, '#20252c')
+      rect(paint, x, y + 1, 16, 1, HALL.steelLight)
+      rect(paint, x, y + 14, 16, 1, RAIL_LO)
+      treads(paint, x, y, b, offset)
+    } else {
+      rect(paint, x + 2, y, 12, 16, '#20252c')
+      rect(paint, x + 1, y, 1, 16, HALL.steelLight)
+      rect(paint, x + 14, y, 1, 16, RAIL_LO)
+      treads(paint, x, y, b, offset)
+    }
+    chevron(paint, x + 8, y + 8, b, HALL.amberDim)
+  }
+}
+
+/** A steel step-over plate with hazard edges, spanning the belt at right angles to its flow. */
+function drawCrossover(paint: Paint, tx: number, ty: number, tile: BeltTile): void {
+  const x = tx * TILE_PX
+  const y = ty * TILE_PX
+  const horizBelt = tile.outs.includes('E') || tile.outs.includes('W')
+  if (horizBelt) {
+    rect(paint, x + 3, y, 10, 16, HALL.steelDark)
+    bevel(paint, x + 3, y, 10, 16, HALL.steelLight, '#262b33')
+    for (let i = 0; i < 16; i += 4) rect(paint, x + 3, y + i, 10, 1, '#4a525e')
+    for (let i = 0; i < 16; i += 4) {
+      rect(paint, x + 2, y + i, 1, 2, HALL.amber)
+      rect(paint, x + 13, y + i + 2, 1, 2, HALL.amber)
+    }
+  } else {
+    rect(paint, x, y + 3, 16, 10, HALL.steelDark)
+    bevel(paint, x, y + 3, 16, 10, HALL.steelLight, '#262b33')
+    for (let i = 0; i < 16; i += 4) rect(paint, x + i, y + 3, 1, 10, '#4a525e')
+    for (let i = 0; i < 16; i += 4) {
+      rect(paint, x + i, y + 2, 2, 1, HALL.amber)
+      rect(paint, x + i + 2, y + 13, 2, 1, HALL.amber)
+    }
+  }
+}
+
+/** Every belt tile, then every crossover's step-over plate on top of it. */
+export function drawBelts(
+  paint: Paint,
+  map: HallMap,
+  movingBeltIds: ReadonlySet<string>,
+  tMs: number
+): void {
+  const movingTiles = new Set(
+    map.belts
+      .filter((b) => movingBeltIds.has(b.id))
+      .flatMap((b) => b.path.map((t) => `${t.x},${t.y}`))
+  )
+  const tileAt = new Map(map.beltTiles.map((t) => [`${t.x},${t.y}`, t]))
+  for (const tile of map.beltTiles) {
+    const key = `${tile.x},${tile.y}`
+    drawBeltTile(paint, tile.x, tile.y, tile, movingTiles.has(key), tMs)
+  }
+  for (const t of map.crossovers) {
+    const tile = tileAt.get(`${t.x},${t.y}`)
+    if (tile !== undefined) drawCrossover(paint, t.x, t.y, tile)
   }
 }
 
@@ -498,26 +677,6 @@ function drawLockers(paint: Paint, prop: HallProp): void {
   }
 }
 
-function drawCouch(paint: Paint, prop: HallProp): void {
-  const x = prop.x * TILE_PX
-  const y = prop.y * TILE_PX
-  const w = prop.w * TILE_PX
-
-  rect(paint, x, y - 2, w, 8, '#5a3f4f')
-  bevel(paint, x, y - 2, w, 8, '#74536a', '#3a2833')
-  rect(paint, x + 1, y + 6, w - 2, 7, '#6a4b5e')
-}
-
-function drawCoffee(paint: Paint, prop: HallProp): void {
-  const x = prop.x * TILE_PX
-  const y = prop.y * TILE_PX
-
-  rect(paint, x + 2, y - 8, 12, 22, '#2c3139')
-  bevel(paint, x + 2, y - 8, 12, 22, '#4b5260', '#12161b')
-  rect(paint, x + 4, y - 5, 8, 5, '#12161b')
-  rect(paint, x + 6, y + 4, 4, 5, '#1a1e24')
-}
-
 function drawPlant(paint: Paint, prop: HallProp, tMs: number): void {
   const x = prop.x * TILE_PX
   const y = prop.y * TILE_PX
@@ -536,17 +695,6 @@ function drawPlant(paint: Paint, prop: HallProp, tMs: number): void {
   })
 }
 
-function drawBooth(paint: Paint, prop: HallProp): void {
-  const x = prop.x * TILE_PX
-  const y = prop.y * TILE_PX
-  const w = prop.w * TILE_PX
-
-  rect(paint, x, y + 2, w, 9, '#4a4136')
-  bevel(paint, x, y + 2, w, 9, '#6a5d4c', '#332c25')
-  rect(paint, x + w - 12, y - 3, 8, 6, '#14171c')
-  rect(paint, x + w - 11, y - 2, 6, 4, '#10262e')
-}
-
 function drawChair(paint: Paint, prop: HallProp, context: SceneContext): void {
   const x = prop.x * TILE_PX
   const y = prop.y * TILE_PX
@@ -561,8 +709,125 @@ function drawChair(paint: Paint, prop: HallProp, context: SceneContext): void {
   rect(paint, x + 4, y, 8, 7, '#343b49')
 }
 
+/**
+ * The breakroom's partition: two side walls, a half wall with glazing along
+ * the top broken by the door, a door frame and a mug-plaque sign above it.
+ * The door columns come from the prop's own footprint — `x + floor(w/2) − 1`
+ * and the tile beside it — the same pair `layoutHall` cuts through the wall.
+ */
+function partition(paint: Paint, prop: HallProp): void {
+  const x0 = prop.x * TILE_PX
+  const y0 = prop.y * TILE_PX
+  const w = prop.w * TILE_PX
+  const h = prop.h * TILE_PX
+  const doorCol0 = prop.x + Math.floor(prop.w / 2) - 1
+  const doors = new Set([doorCol0, doorCol0 + 1])
+
+  // Side walls: thin, inset against the room.
+  for (const sx of [x0 + 10, x0 + w - 16]) {
+    rect(paint, sx, y0 - 6, 6, h + 6, HALL.wallFace)
+    bevel(paint, sx, y0 - 6, 6, h + 6, HALL.wallTrim, '#1a1e25')
+  }
+  // Top: a half wall with glazing, broken by the door.
+  for (let i = 0; i < prop.w; i++) {
+    const x = x0 + i * TILE_PX
+    if (doors.has(prop.x + i)) continue
+    rect(paint, x, y0 + 4, 16, 10, HALL.wallFace)
+    rect(paint, x, y0 + 4, 16, 1, HALL.wallTrim)
+    rect(paint, x, y0 + 13, 16, 1, '#1a1e25')
+    rect(paint, x, y0 - 12, 16, 16, 'rgba(114,216,242,.16)')
+    rect(paint, x, y0 - 13, 16, 1, HALL.wallTrim)
+    rect(paint, x + 3, y0 - 10, 1, 6, 'rgba(255,255,255,.25)')
+    if (i % 2 === 0) rect(paint, x + 15, y0 - 12, 1, 16, HALL.wallTrim)
+  }
+  const dx = doorCol0 * TILE_PX
+  rect(paint, dx - 2, y0 - 16, 2, 30, HALL.steel)
+  rect(paint, dx + 32, y0 - 16, 2, 30, HALL.steel)
+  rect(paint, dx - 2, y0 - 17, 36, 2, HALL.steel)
+  // Sign: a mug on a plaque.
+  rect(paint, dx + 9, y0 - 28, 14, 10, '#1a1e25')
+  bevel(paint, dx + 9, y0 - 28, 14, 10, HALL.wallTrim, '#0d1015')
+  rect(paint, dx + 12, y0 - 25, 6, 5, '#e9ecef')
+  rect(paint, dx + 18, y0 - 24, 2, 3, '#e9ecef')
+  rect(paint, dx + 13, y0 - 27, 1, 1, '#9aa2ac')
+  rect(paint, dx + 16, y0 - 27, 1, 1, '#9aa2ac')
+}
+
+/** A wooden bench: a seat slab, two legs and a floor shadow. */
+function benchS(paint: Paint, x: number, y: number, w: number): void {
+  rect(paint, x + 1, y + 4, w - 2, 5, WOOD)
+  bevel(paint, x + 1, y + 4, w - 2, 5, WOOD_HI, WOOD_LO)
+  rect(paint, x + 3, y + 9, 2, 5, WOOD_LO)
+  rect(paint, x + w - 5, y + 9, 2, 5, WOOD_LO)
+  rect(paint, x + 2, y + 14, w - 4, 1, 'rgba(0,0,0,.3)')
+}
+
+/** A two-cushion sofa: a back cushion, a seat cushion and two arms. */
+function sofa(paint: Paint, x: number, y: number, w: number): void {
+  rect(paint, x, y - 3, w, 9, '#3f5a6e')
+  bevel(paint, x, y - 3, w, 9, '#56768e', '#2a3c4a')
+  rect(paint, x, y + 5, w, 8, '#4a6a82')
+  bevel(paint, x, y + 5, w, 8, '#5f84a0', '#2a3c4a')
+  rect(paint, x + w / 2, y + 6, 1, 6, '#2a3c4a')
+  rect(paint, x - 1, y + 1, 3, 12, '#35505f')
+  rect(paint, x + w - 2, y + 1, 3, 12, '#35505f')
+}
+
+/** A table, low (a coffee table) or standard height, with a mug and a plate fixed per table. */
+function table(paint: Paint, x: number, y: number, w: number, low: boolean, seed: number): void {
+  const top = low ? 5 : 1
+  rect(paint, x + 2, y + top, w - 4, 8, low ? WOOD : '#c9ccd1')
+  bevel(paint, x + 2, y + top, w - 4, 8, low ? WOOD_HI : '#e9ecef', low ? WOOD_LO : '#8a929c')
+  rect(paint, x + 4, y + top + 8, 2, 16 - top - 9, '#2a2f37')
+  rect(paint, x + w - 6, y + top + 8, 2, 16 - top - 9, '#2a2f37')
+  rect(paint, x + 7 + (seed % 3) * 3, y + top + 2, 3, 3, '#e9ecef')
+  rect(paint, x + w - 12, y + top + 3, 3, 3, '#b8574a')
+  if (!low) {
+    rect(paint, x + 12, y + top + 2, 6, 4, '#e9ecef')
+    rect(paint, x + 13, y + top + 3, 4, 2, '#d0a040')
+  }
+}
+
+function drawFridge(paint: Paint, prop: HallProp): void {
+  const x = prop.x * TILE_PX
+  const y = prop.y * TILE_PX
+  rect(paint, x + 1, y - 16, 14, 31, '#c9ccd1')
+  bevel(paint, x + 1, y - 16, 14, 31, '#e9ecef', '#8a929c')
+  rect(paint, x + 1, y - 4, 14, 1, '#8a929c')
+  rect(paint, x + 11, y - 13, 2, 6, '#8a929c')
+  rect(paint, x + 11, y - 1, 2, 6, '#8a929c')
+}
+
+/** A break-room counter: a countertop, and — for the coffeebar — a coffee maker with a green light. */
+function counter(paint: Paint, x: number, y: number): void {
+  rect(paint, x + 1, y + 1, 14, 14, '#353b45')
+  rect(paint, x + 1, y + 1, 14, 4, '#9aa2ac')
+  bevel(paint, x + 1, y + 1, 14, 14, '#b8c2cc', '#1c2026')
+  rect(paint, x + 4, y - 8, 9, 12, '#2c3139')
+  bevel(paint, x + 4, y - 8, 9, 12, '#4b5260', '#12161b')
+  rect(paint, x + 6, y - 6, 5, 3, '#12161b')
+  rect(paint, x + 7, y - 2, 3, 3, '#e9ecef')
+  rect(paint, x + 11, y - 7, 1, 1, HALL.green)
+}
+
+function drawVendingProp(paint: Paint, prop: HallProp): void {
+  const x = prop.x * TILE_PX
+  const y = prop.y * TILE_PX
+  rect(paint, x + 1, y - 17, 14, 32, '#8a2f2a')
+  bevel(paint, x + 1, y - 17, 14, 32, '#b04a3c', '#4a1512')
+  rect(paint, x + 3, y - 14, 7, 18, '#10151a')
+  const cs = [HALL.amber, HALL.cyan, HALL.green, '#e9ecef']
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 2; c++) rect(paint, x + 4 + c * 3, y - 13 + r * 4, 2, 2, cs[(r + c) % 4])
+  }
+  rect(paint, x + 3, y + 7, 9, 5, '#1a1d22')
+}
+
 export function drawProp(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
   const kind: PropKind = prop.kind
+  const x = prop.x * TILE_PX
+  const y = prop.y * TILE_PX
+  const w = prop.w * TILE_PX
   switch (kind) {
     case 'desk':
       return drawDesk(paint, prop, context, tMs)
@@ -582,16 +847,26 @@ export function drawProp(paint: Paint, prop: HallProp, context: SceneContext, tM
       return drawStatuswall(paint, prop, context)
     case 'lockers':
       return drawLockers(paint, prop)
-    case 'couch':
-      return drawCouch(paint, prop)
-    case 'coffee':
-      return drawCoffee(paint, prop)
     case 'plant':
       return drawPlant(paint, prop, tMs)
-    case 'booth':
-      return drawBooth(paint, prop)
     case 'chair':
       return drawChair(paint, prop, context)
+    case 'partition':
+      return partition(paint, prop)
+    case 'restbench':
+      return benchS(paint, x, y, w)
+    case 'sofa':
+      return sofa(paint, x, y, w)
+    case 'table':
+      return table(paint, x, y, w, false, prop.x)
+    case 'lowtable':
+      return table(paint, x, y, w, true, prop.x)
+    case 'fridge':
+      return drawFridge(paint, prop)
+    case 'coffeebar':
+      return counter(paint, x, y)
+    case 'vending':
+      return drawVendingProp(paint, prop)
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = kind

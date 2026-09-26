@@ -1,6 +1,6 @@
 import { hasStarted } from './events.js'
 import type { FactoryEvent } from './events.js'
-import { seatOf, loungeSpot } from './sim.js'
+import { seatOf, nearestRestSeat, tileOf } from './sim.js'
 import type { World, Crew, Crate, OpenCall } from './sim.js'
 
 // Turns events into motion.
@@ -24,7 +24,35 @@ function withCrew(world: World, nodeId: string, update: (crew: Crew) => Crew): W
 }
 
 function sendTo(crew: Crew, goal: Crew['goal'], then: Crew['then']): Crew {
-  return { ...crew, goal, then }
+  return { ...crew, goal, then, restSeat: null, settle: null }
+}
+
+/**
+ * Send a crew member from wherever they currently stand to the nearest free
+ * breakroom seat, and mark that seat theirs.
+ *
+ * `taken` is every *other* crew member's `restSeat` — the node's own past
+ * seat, if any, is released first, so a node that goes idle twice in a row
+ * can still pick the same seat it just left.
+ */
+function sendToRest(world: World, nodeId: string): World {
+  const crew = world.crew.find((c) => c.nodeId === nodeId)
+  if (crew === undefined) return world
+  const taken = new Set(
+    world.crew
+      .filter((c) => c.nodeId !== nodeId && c.restSeat !== null)
+      .map((c) => c.restSeat as number)
+  )
+  const seat = nearestRestSeat(world.map, tileOf(crew.x, crew.y), taken)
+  /* v8 ignore next -- a hall always has at least (crewed + 2) rest seats */
+  if (seat === null) return world
+  return withCrew(world, nodeId, (c) => ({
+    ...c,
+    goal: seat.tile,
+    then: 'couch',
+    settle: seat.facing,
+    restSeat: seat.id,
+  }))
 }
 
 /**
@@ -80,33 +108,32 @@ function consumeQueued(world: World, nodeId: string): World {
 
 function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node-state' }>): World {
   const fed = hasStarted(event.to) ? consumeQueued(world, event.nodeId) : world
-  return withCrew(fed, event.nodeId, (crew) => {
-    switch (event.to) {
-      case 'ready':
-      case 'running':
-      case 'verifying': {
+  switch (event.to) {
+    case 'ready':
+    case 'running':
+    case 'verifying':
+      return withCrew(fed, event.nodeId, (crew) => {
         const kind = world.map.props.find((p) => p.nodeId === event.nodeId)?.kind ?? 'desk'
         const anim = kind === 'rig' || kind === 'bench' ? 'scan' : 'type'
         const seat = seatOf(world.map, event.nodeId)
         return seat === null ? crew : sendTo(crew, seat, anim)
-      }
-      case 'passed':
-        return sendTo(crew, loungeSpot(world.map, event.nodeId), 'couch')
-      case 'failed': {
+      })
+    case 'failed':
+      return withCrew(fed, event.nodeId, (crew) => {
         const seat = seatOf(world.map, event.nodeId)
         return seat === null ? crew : sendTo(crew, seat, 'slump')
-      }
-      case 'waiting':
-      case 'skipped':
-      case 'blocked':
-        return sendTo(crew, loungeSpot(world.map, event.nodeId), 'idle')
-      /* v8 ignore next 3 -- exhaustive union, unreachable */
-      default: {
-        const never: never = event.to
-        throw new Error(`unhandled node state: ${String(never)}`)
-      }
+      })
+    case 'passed':
+    case 'waiting':
+    case 'skipped':
+    case 'blocked':
+      return sendToRest(fed, event.nodeId)
+    /* v8 ignore next 3 -- exhaustive union, unreachable */
+    default: {
+      const never: never = event.to
+      throw new Error(`unhandled node state: ${String(never)}`)
     }
-  })
+  }
 }
 
 function applyOrphaned(world: World, event: Extract<FactoryEvent, { kind: 'orphaned' }>): World {

@@ -79,6 +79,8 @@ function ghostCrew(nodeId: string, role: string | null = null): Crew {
     goal: null,
     then: 'idle',
     present: true,
+    restSeat: null,
+    settle: null,
   }
 }
 
@@ -95,7 +97,7 @@ describe('direct: node-state', () => {
     expect(crew.then).toBe('type')
   })
 
-  it('sends a passed node to the lounge', () => {
+  it('sends a passed node to a breakroom rest seat', () => {
     const g = graph()
     const world = worldFor(g)
     const next = direct(
@@ -106,6 +108,8 @@ describe('direct: node-state', () => {
     const crew = next.crew.find((c) => c.nodeId === 'a')!
     expect(crew.then).toBe('couch')
     expect(crew.goal).not.toBe(null)
+    expect(crew.restSeat).not.toBe(null)
+    expect(crew.settle).not.toBe(null)
   })
 
   it('slumps a failed node at its seat', () => {
@@ -121,7 +125,7 @@ describe('direct: node-state', () => {
     expect(crew.goal).toEqual(seatOf(world.map, 'a'))
   })
 
-  it('sends a blocked/waiting/skipped node to the lounge, idle', () => {
+  it('sends a blocked/waiting/skipped node to a rest seat, to sit', () => {
     const g = graph()
     const world = worldFor(g)
     const next = direct(
@@ -129,7 +133,9 @@ describe('direct: node-state', () => {
       [{ kind: 'node-state', nodeId: 'a', from: 'ready', to: 'blocked' }],
       0
     )
-    expect(next.crew.find((c) => c.nodeId === 'a')!.then).toBe('idle')
+    const crew = next.crew.find((c) => c.nodeId === 'a')!
+    expect(crew.then).toBe('couch')
+    expect(crew.restSeat).not.toBe(null)
   })
 
   it('has no effect on a node with no crew of its own', () => {
@@ -164,7 +170,7 @@ describe('direct: node-state', () => {
     }
   })
 
-  it('sends a skipped node to the lounge, distinctly from blocked', () => {
+  it('sends a skipped node to a rest seat too', () => {
     const g = graph()
     const world = worldFor(g)
     const next = direct(
@@ -172,7 +178,20 @@ describe('direct: node-state', () => {
       [{ kind: 'node-state', nodeId: 'a', from: 'waiting', to: 'skipped' }],
       0
     )
-    expect(next.crew.find((c) => c.nodeId === 'a')!.then).toBe('idle')
+    const crew = next.crew.find((c) => c.nodeId === 'a')!
+    expect(crew.then).toBe('couch')
+    expect(crew.restSeat).not.toBe(null)
+  })
+
+  it('has no effect on an idle transition for a node with no crew of its own', () => {
+    const g = graph()
+    const world = worldFor(g)
+    const next = direct(
+      world,
+      [{ kind: 'node-state', nodeId: 'g', from: 'waiting', to: 'skipped' }],
+      0
+    )
+    expect(next).toEqual(world)
   })
 
   it('leaves a crew member with no station untouched on ready/running/verifying', () => {

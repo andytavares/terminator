@@ -15,12 +15,18 @@ function fakeMap(): HallMap {
   const width = 6
   const height = 6
   const solid = Array.from({ length: height }, () => Array(width).fill(false))
+  const walk = solid.map((row) => [...row])
   return {
     width,
     height,
     solid,
+    walk,
     props: [],
     belts: [],
+    beltTiles: [],
+    crossovers: [],
+    breakroom: { x: 1, y: 4, w: 3, h: 1, door: [] },
+    restSeats: [],
     lanes: [],
     anchors: {
       intake: { x: 0, y: 3 },
@@ -28,7 +34,6 @@ function fakeMap(): HallMap {
       archive: { x: 1, y: 2 },
       rack: { x: 2, y: 2 },
       wait: { x: 3, y: 2 },
-      lounge: [{ x: 1, y: 4 }],
     },
     lights: [{ x: 3, y: 3 }],
   }
