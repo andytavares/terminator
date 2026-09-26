@@ -1,3 +1,4 @@
+import { runIdFrom } from './ci.js'
 import type { Check, CiVerdict } from './ci.js'
 import type { Feedback } from './run-graph.js'
 import type { CiState } from './ci-state.js'
@@ -31,7 +32,11 @@ interface Pull {
 interface CiRoundsInput {
   readonly pulls: readonly Pull[]
   readonly rounds: number | null
-  readonly watch: (pull: Pull, onPoll: (checks: readonly Check[]) => void) => Promise<CiVerdict>
+  readonly watch: (
+    pull: Pull,
+    onPoll: (checks: readonly Check[]) => void,
+    judged: ReadonlySet<string>
+  ) => Promise<CiVerdict>
   readonly failedLogs: (checks: readonly Check[], cwd: string) => Promise<string>
   readonly sendBack: (feedback: Feedback) => Promise<boolean>
   readonly record: (action: string, subject: string, reason: string) => Promise<void>
@@ -67,6 +72,7 @@ export async function ciRounds(input: CiRoundsInput): Promise<CiOutcome> {
   const rounds = input.rounds
   const subject = subjectOf(input.pulls)
   const latest = new Map<string, readonly Check[]>()
+  const judged = new Map<string, Set<string>>(input.pulls.map((p) => [p.url, new Set<string>()]))
 
   const snapshot = (): readonly { url: string; checks: readonly Check[] }[] =>
     input.pulls.map((p) => ({ url: p.url, checks: latest.get(p.url) ?? [] }))
@@ -76,9 +82,13 @@ export async function ciRounds(input: CiRoundsInput): Promise<CiOutcome> {
 
     const results: Result[] = await Promise.all(
       input.pulls.map(async (pull) => {
-        const verdict = await input.watch(pull, (checks) => {
-          latest.set(pull.url, checks)
-        })
+        const verdict = await input.watch(
+          pull,
+          (checks) => {
+            latest.set(pull.url, checks)
+          },
+          new Set(judged.get(pull.url))
+        )
         latest.set(pull.url, verdict.checks)
         return { pull, verdict }
       })
@@ -138,6 +148,12 @@ export async function ciRounds(input: CiRoundsInput): Promise<CiOutcome> {
         reason: `CI red on ${names}`,
       })
 
+      for (const { pull, verdict } of results) {
+        for (const c of verdict.checks) {
+          const id = runIdFrom(c.link)
+          if (id !== null) (judged.get(pull.url) as Set<string>).add(id)
+        }
+      }
       const ok = await input.sendBack(feedback)
       if (!ok) return { kind: 'halted', reason: 'the fix round could not finish' }
 

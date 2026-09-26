@@ -48,6 +48,8 @@ export async function watchChecks(
     pollMs?: number
     timeoutMs?: number
     appearWithinMs?: number
+    /** Run ids a previous round already judged; a pushed fix starts new ones. */
+    ignoreRuns?: ReadonlySet<string>
     onPoll?: (checks: readonly Check[]) => void
   }
 ): Promise<CiVerdict> {
@@ -64,10 +66,12 @@ export async function watchChecks(
     })
 
     const message = `${result.stderr}${result.stdout}`.trim()
-    const noneYet =
+    const fresh =
       result.exitCode === 0
-        ? parseChecks(result.stdout)?.length === 0
-        : /no checks reported/i.test(message)
+        ? parseChecks(result.stdout)?.filter((c) => !opts.ignoreRuns?.has(runIdFrom(c.link) ?? ''))
+        : undefined
+    const noneYet =
+      result.exitCode === 0 ? fresh?.length === 0 : /no checks reported/i.test(message)
     if (noneYet) {
       if (waited >= appearWithinMs) {
         return {
@@ -85,7 +89,7 @@ export async function watchChecks(
       return { kind: 'not_measured', checks: [], reason: result.stderr.trim() || message }
     }
 
-    const checks = parseChecks(result.stdout)
+    const checks = fresh
     if (!checks) {
       return {
         kind: 'not_measured',
@@ -110,7 +114,7 @@ export async function watchChecks(
 }
 
 /** Pulls the numeric run id out of a `.../actions/runs/<id>/job/<id>` link. */
-function runIdFrom(link: string): string | null {
+export function runIdFrom(link: string): string | null {
   const match = link.match(/\/actions\/runs\/(\d+)/)
   return match ? match[1] : null
 }

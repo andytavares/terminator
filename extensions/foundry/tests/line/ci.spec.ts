@@ -96,6 +96,33 @@ describe('watchChecks', () => {
     expect(verdict.kind).toBe('red')
   })
 
+  // Seen live: right after a fix was pushed, `gh pr checks` still listed the
+  // previous commit's failed run, and a second round began for a fix that had
+  // already worked.
+  it('ignores the runs it has already judged, waiting for the new ones', async () => {
+    const stale = check({ bucket: 'fail', link: 'https://github.com/o/r/actions/runs/111/job/1' })
+    const fresh = (bucket: Check['bucket']) =>
+      check({ bucket, link: 'https://github.com/o/r/actions/runs/222/job/2' })
+    const exec = queuedExec([ok([stale]), ok([fresh('pending')]), ok([fresh('pass')])])
+    const verdict = await watchChecks(pull, exec, {
+      sleep: noopSleep(),
+      ignoreRuns: new Set(['111']),
+    })
+    expect(verdict.kind).toBe('green')
+  })
+
+  it('is not measured when only judged runs are listed once the wait is over', async () => {
+    const stale = check({ bucket: 'fail', link: 'https://github.com/o/r/actions/runs/111/job/1' })
+    const exec = queuedExec([ok([stale]), ok([stale])])
+    const verdict = await watchChecks(pull, exec, {
+      sleep: noopSleep(),
+      pollMs: 10,
+      appearWithinMs: 10,
+      ignoreRuns: new Set(['111']),
+    })
+    expect(verdict.kind).toBe('not_measured')
+  })
+
   it('cancel is red', async () => {
     const exec = queuedExec([ok([check({ bucket: 'cancel' })])])
     const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })

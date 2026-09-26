@@ -861,15 +861,20 @@ function ciRoundDepsFor(
 ): {
   watch: (
     pull: { url: string; cwd: string },
-    onPoll: (checks: readonly Check[]) => void
+    onPoll: (checks: readonly Check[]) => void,
+    judged: ReadonlySet<string>
   ) => Promise<CiVerdict>
   failedLogs: (checks: readonly Check[], cwd: string) => Promise<string>
   record: (action: string, subject: string, reason: string) => Promise<void>
   state: (state: Omit<CiState, 'at'>) => Promise<void>
 } {
   return {
-    watch: (pull, onPoll) =>
-      watchChecks(pull, exec, { sleep: (ms) => new Promise((r) => setTimeout(r, ms)), onPoll }),
+    watch: (pull, onPoll, judged) =>
+      watchChecks(pull, exec, {
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        onPoll,
+        ignoreRuns: judged,
+      }),
     failedLogs: (checks, cwd) => failedLogs(checks, cwd, exec),
     record: async (action, subject, reason) => {
       await createOrderStore(root).record({

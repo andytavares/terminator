@@ -32,6 +32,20 @@ function harness(verdicts: CiVerdict[], opts: { sendBack?: boolean } = {}) {
 }
 
 describe('ciRounds', () => {
+  it('watches the next round past the runs the last one judged', async () => {
+    const red = check({ bucket: 'fail', link: 'https://github.com/o/r/actions/runs/111/job/1' })
+    const h = harness([
+      { kind: 'red', checks: [red] },
+      { kind: 'green', checks: [check()] },
+    ])
+    await ciRounds({ pulls: [PULL], rounds: 2, ...h })
+    expect(h.watch).toHaveBeenCalledTimes(2)
+    const firstIgnored = h.watch.mock.calls[0][2] as ReadonlySet<string>
+    const secondIgnored = h.watch.mock.calls[1][2] as ReadonlySet<string>
+    expect([...firstIgnored]).toEqual([])
+    expect([...secondIgnored]).toEqual(['111'])
+  })
+
   it('declares none when the recipe has no ci', async () => {
     const h = harness([])
     const outcome = await ciRounds({
