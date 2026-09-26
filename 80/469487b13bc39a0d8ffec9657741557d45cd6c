@@ -1,0 +1,58 @@
+extensions/foundry/src/components/SettingsView.tsx
+  s_4f15472be339a2::t_df6c9c1342701b 172-230
+  s_4f15472be339a2::t_9b40e896bc7d0b 14-36,44-109,111
+  s_4f15472be339a2::t_652fce72e19a33 110,112-113,231-232
+extensions/foundry/src/components/foundry.css
+  s_4f15472be339a2::t_48d9757bb746d9 1473-1478
+  s_4f15472be339a2::t_7dce6ab3952907 3086-3165
+  s_4f15472be339a2::t_f500774a8cba19 2579-2674
+  s_4f15472be339a2::t_1de36b372257a8 2276-2395
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_4f15472be339a2::t_5564d2785c33f3 176-196,199,202-204
+  s_4f15472be339a2::t_f0662c056e83d7 197-198,200-201
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_4f15472be339a2::t_e4761b9f44baae 5,10-15
+  s_4f15472be339a2::t_9301ae10074f8c 90-133
+  s_4f15472be339a2::t_005b763a621d55 145-189
+  s_4f15472be339a2::t_18ac93ae7c56c7 56-61
+  s_4f15472be339a2::t_e9fcd1581e6a06 16
+extensions/foundry/src/components/Inbox.tsx
+  s_4f15472be339a2::t_36bf46014ac5d4 99-113,118
+  s_4f15472be339a2::t_0456bf9681fc62 16
+  s_4f15472be339a2::t_6a7337b0070693 167-203
+  s_4f15472be339a2::t_d86eff45614e91 298-366
+  s_4f15472be339a2::t_aff2551dd43b0d 137
+  s_4f15472be339a2::t_6ef9a2a91721d3 49-60
+extensions/foundry/tests/components/SettingsView.spec.tsx
+  s_4f15472be339a2::t_bea8a975ad832c 1-140
+extensions/foundry/tests/gates/attention.spec.ts
+  s_4f15472be339a2::t_581b9bb41db6e0 131-147
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_4f15472be339a2::t_502bbc9843fdd2 162-202
+  s_4f15472be339a2::t_76d00f79736310 43-47,49,52-60
+  s_4f15472be339a2::t_1967d37e60b517 6-24
+extensions/foundry/src/components/Forge.tsx
+  s_4f15472be339a2::t_84da4ad73a8091 638-647
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_4f15472be339a2::t_30c37bf06ba67b 29-53,78,80-83,89
+  s_4f15472be339a2::t_34dd0b341de94c 361-431,434-475
+  s_4f15472be339a2::t_aadfc8c3452b9c 6
+  s_4f15472be339a2::t_985a1ba65af405 432-433
+  s_4f15472be339a2::t_f38b67007ebed8 55-58,79,84-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "80469487b13bc39a0d8ffec9657741557d45cd6c",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
