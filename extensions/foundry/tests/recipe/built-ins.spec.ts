@@ -481,3 +481,36 @@ describe('the lint pass every code-producing shape adds after its build', () => 
     expect(baseline?.onFail).toBeUndefined()
   })
 })
+
+// CI is watched on the draft a `ready-for-review` gate opens: every shape
+// that opens one gets two rounds back to the lane's builder before it holds
+// for the operator. Only spike opens none — it is a question, not a change,
+// and ships no pull request at all.
+describe('ci rounds on every shape that ships code', () => {
+  // A document shape's draft carries prose; a red CI on the code around it is
+  // not something its scribe can fix.
+  const DOCUMENT_SHAPES = ['research.yaml', 'design-doc.yaml']
+  const withReadyForReviewGate = recipeFiles.filter((file) =>
+    recipe(file).steps.some((s) => s.kind === 'gate' && s.rule === 'ready-for-review')
+  )
+  const watched = withReadyForReviewGate.filter((file) => !DOCUMENT_SHAPES.includes(file))
+  const unwatched = recipeFiles.filter((file) => !watched.includes(file))
+
+  it('finds a ready-for-review gate in every shape but spike', () => {
+    expect(recipeFiles.filter((file) => !withReadyForReviewGate.includes(file))).toEqual([
+      'spike.yaml',
+    ])
+  })
+
+  it.each(watched)('%s gives its draft two rounds of CI', (file) => {
+    expect(recipe(file).ci).toEqual({ rounds: 2 })
+  })
+
+  it.each(unwatched)('%s declares no ci', (file) => {
+    expect(recipe(file).ci).toBeUndefined()
+  })
+
+  it('leaves exactly spike and the document shapes unwatched', () => {
+    expect([...unwatched].sort()).toEqual(['design-doc.yaml', 'research.yaml', 'spike.yaml'])
+  })
+})

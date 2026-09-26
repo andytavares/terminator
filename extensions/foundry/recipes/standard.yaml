@@ -4,6 +4,9 @@ description: The default for work spanning more than one lane, or graded above P
 # More than one lane, or graded above P2: one level above the model's default.
 effort: high
 requires: []
+ci:
+  # A red CI goes back to the lane's builder with the failed logs twice, then to you.
+  rounds: 2
 steps:
   - id: scout
     kind: agent

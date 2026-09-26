@@ -13,6 +13,9 @@ requires:
   # repository that cannot run one is offered a different shape rather than
   # this one with its only check quietly missing.
   - toolchain: test
+ci:
+  # A red CI goes back to the lane's builder with the failed logs twice, then to you.
+  rounds: 2
 steps:
   # No scout and no adversarial pass. Intake already read the repository and
   # already ran the structural red team, and on a one-lane order graded at the

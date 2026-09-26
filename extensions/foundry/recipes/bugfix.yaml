@@ -6,6 +6,9 @@ description: Reproduce first, then fix, then prove the reproduction flips.
 effort: high
 requires:
   - toolchain: test
+ci:
+  # A red CI goes back to the lane's builder with the failed logs twice, then to you.
+  rounds: 2
 steps:
   # The reproduction has to FAIL. A bug fix whose test passed before the fix
   # proves nothing at all, and this is the one place a green command is the

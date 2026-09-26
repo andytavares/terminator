@@ -4,6 +4,9 @@ description: One lane, but something worth a second look. Build it, prove it, in
 # Worth a second look means one level above the model's default.
 effort: high
 requires: []
+ci:
+  # A red CI goes back to the lane's builder with the failed logs twice, then to you.
+  rounds: 2
 steps:
   # No `plan` step. The Forge's converge *is* the architect, and the plan it
   # produced is the one the compile gate agreed. Running it again over an

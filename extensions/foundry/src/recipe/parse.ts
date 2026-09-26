@@ -132,6 +132,10 @@ const RecipeSchema = z.object({
   description: z.string().default(''),
   requires: z.array(RequirementSchema).default([]),
   effort: z.enum(EFFORT_LEVELS).optional(),
+  // CI is watched on the draft a `ready-for-review` gate opens. A shape that
+  // never opens one has no draft to watch, so a recipe declaring `ci` with no
+  // such gate is refused by parseRecipe rather than silently doing nothing.
+  ci: z.strictObject({ rounds: z.number().int().min(1).max(3) }).optional(),
   steps: z.array(StepSchema).min(1),
 })
 
@@ -197,6 +201,18 @@ export function parseRecipe(text: string, file: string): ParseResult<Recipe> {
 
   const onFailProblem = checkOnFail(recipe.steps, file)
   if (onFailProblem !== null) return onFailProblem
+
+  if (recipe.ci !== undefined) {
+    const hasReadyForReviewGate = recipe.steps.some(
+      (step) => step.kind === 'gate' && step.rule === 'ready-for-review'
+    )
+    if (!hasReadyForReviewGate) {
+      return fail(
+        file,
+        'declares ci, but opens no ready-for-review gate — there is no draft for CI to watch'
+      )
+    }
+  }
 
   return { ok: true, value: recipe }
 }

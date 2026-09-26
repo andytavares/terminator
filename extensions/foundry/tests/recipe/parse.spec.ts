@@ -439,3 +439,45 @@ steps:
     if (!r.ok) expect(r.reason).toMatch(/^direct\.yaml: /)
   })
 })
+
+// CI is watched on the draft a `ready-for-review` gate opens. A recipe that
+// never opens one has no draft for CI to watch, so `ci` without that gate is
+// refused rather than silently doing nothing.
+describe('ci rounds', () => {
+  it('accepts a recipe that declares ci alongside a ready-for-review gate', () => {
+    const r = parseRecipe(`ci:\n  rounds: 2\n${RECIPE}`, 'bugfix.yaml')
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    if (r.ok) expect(r.value.ci).toEqual({ rounds: 2 })
+  })
+
+  it('leaves ci undefined where nothing declared it', () => {
+    const r = parseRecipe(RECIPE, 'bugfix.yaml')
+    if (r.ok) expect(r.value.ci).toBeUndefined()
+  })
+
+  it('rejects a rounds of 0', () => {
+    const r = parseRecipe(`ci:\n  rounds: 0\n${RECIPE}`, 'bugfix.yaml')
+    expect(r.ok).toBe(false)
+  })
+
+  it('rejects a rounds of 4', () => {
+    const r = parseRecipe(`ci:\n  rounds: 4\n${RECIPE}`, 'bugfix.yaml')
+    expect(r.ok).toBe(false)
+  })
+
+  it('refuses ci on a recipe with no ready-for-review gate', () => {
+    const noGate = `
+schemaVersion: ${RECIPE_SCHEMA_VERSION}
+id: bugfix
+ci:
+  rounds: 2
+steps:
+  - id: reproduce
+    kind: agent
+    role: builder
+`
+    const r = parseRecipe(noGate, 'bugfix.yaml')
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/ready-for-review/)
+  })
+})
