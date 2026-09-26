@@ -176,6 +176,15 @@ describe('workspace.listProjects and deleteProject', () => {
     ])
   })
 
+  it('announces the deletion, so what hangs off the project is cleaned up too', () => {
+    const api = build()
+    const heard = vi.fn()
+    const off = api.workspace.onProjectDelete(heard)
+    api.workspace.deleteProject('proj-1')
+    off.dispose()
+    expect(heard).toHaveBeenCalledWith('proj-1')
+  })
+
   it('tells the sidebar a deleted project is gone', () => {
     const api = build()
     api.workspace.deleteProject('proj-1')

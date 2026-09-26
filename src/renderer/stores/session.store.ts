@@ -129,6 +129,8 @@ interface SessionState {
     scrollbackLimit: number
   }) => void
   closeSession: (sessionId: string) => Promise<void>
+  /** Forget a deleted project's tabs; the main process already ended them. */
+  dropProjectSessions: (projectId: string) => void
   getSessionsForProject: (projectId: string) => TerminalSession[]
   getScratchSessions: () => TerminalSession[]
   moveSession: (sessionId: string, targetProjectId: string) => void
@@ -297,6 +299,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         activeSessionId: view.activeSessionId ?? sessionId,
       })
       return { sessions, projectViews }
+    })
+  },
+
+  dropProjectSessions: (projectId) => {
+    set((s) => {
+      const sessions = new Map(s.sessions)
+      const terminalInstances = new Map(s.terminalInstances)
+      for (const session of s.sessions.values()) {
+        if (session.projectId !== projectId) continue
+        terminalInstances.get(session.id)?.dispose?.()
+        terminalInstances.delete(session.id)
+        sessions.delete(session.id)
+      }
+      const projectViews = new Map(s.projectViews)
+      projectViews.delete(projectId)
+      return { sessions, terminalInstances, projectViews }
     })
   },
 

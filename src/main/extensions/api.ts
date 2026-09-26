@@ -508,7 +508,7 @@ import {
   createProject as createProjectInStore,
   deleteProject as deleteProjectFromStore,
 } from '../storage/workspace-store.js'
-import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
+import { onWorkspaceDelete, onProjectDelete, emitProjectDelete } from './workspace-events.js'
 import { getIssueService } from '../integrations/index.js'
 import { listConnections as listTrackerConnections } from '../integrations/tracker-store.js'
 import {
@@ -924,6 +924,7 @@ export function createExtensionAPI(
       },
       deleteProject(projectId: string): void {
         deleteProjectFromStore(projectId)
+        emitProjectDelete(projectId)
         deps?.broadcastToWindows?.('workspace:project-removed', { id: projectId })
       },
       onDelete(handler: (workspaceId: string) => void): Disposable {
