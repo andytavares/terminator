@@ -18,8 +18,15 @@ import type { LedgerEntry } from '../ledger/append.js'
 // So the ledger is the record of the turn, and this is how the turn is read
 // back out of it.
 
-/** The three lines one intake turn can leave. */
+/**
+ * The lines one intake turn can leave.
+ *
+ * A follow-up the Forge starts on its own, closing a gap the architect left
+ * behind rather than waiting for the operator to ask again, is still a turn
+ * running — every reader here treats it the same as an operator-started one.
+ */
 const STARTED = 'converge.started'
+const FOLLOWED_UP = 'converge.followed_up'
 const REFUSED = 'converge.refused'
 const REDRAFTED = 'order.redrafted'
 
@@ -51,7 +58,7 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
     const entry = entries[i]
     if (entry.action === REFUSED) return { kind: 'refused', at: entry.at, reason: entry.reason }
     if (entry.action === REDRAFTED) return { kind: 'redrafted', at: entry.at, note: entry.reason }
-    if (entry.action === STARTED) {
+    if (entry.action === STARTED || entry.action === FOLLOWED_UP) {
       return { kind: 'running', at: entry.at, sessionId: entry.subject, asked: entry.reason }
     }
   }

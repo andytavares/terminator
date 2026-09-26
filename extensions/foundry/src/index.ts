@@ -1981,7 +1981,7 @@ export function activate(api: ExtensionAPI): void {
         at: new Date().toISOString(),
         orderId: order.id,
         actor: 'role:architect',
-        action: started.ok ? 'converge.started' : 'converge.refused',
+        action: started.ok ? 'converge.followed_up' : 'converge.refused',
         subject: started.ok ? started.sessionId : order.id,
         reason: started.ok ? 'closing the failing checks on its own' : started.reason,
         evidence: [],
@@ -2411,6 +2411,7 @@ export function activate(api: ExtensionAPI): void {
     now: () => new Date().toISOString(),
   })
   reg(api, 'foundry:ledger.query', (payload) => ledger.query(payload))
+  reg(api, 'foundry:factory.metrics', (payload) => ledger.factoryMetrics(payload))
   reg(api, 'foundry:rules.propose', (payload) => ledger.proposeRules(payload))
   reg(api, 'foundry:rules.decide', (payload) => ledger.decideProposal(payload))
   reg(api, 'foundry:rules.inForce', (payload) => ledger.rulesInForce(payload))

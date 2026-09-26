@@ -297,6 +297,18 @@ Read by the tab strip on every surface. Foundry holds work for a person in three
 
 ---
 
+## `foundry:factory.metrics`
+
+The factory's own dashboard: every order's records, reduced to lead time, first-pass yield and the rest of `FactoryMetrics`. Nothing here is stored — it is recomputed on every call from the same ledger, gates and run graph the order screens already read.
+
+**Payload**: `{ window?: '30d' | 'all' }` (default `'30d'`)
+
+**Response**: `FactoryMetrics` (see `src/factory/metrics.ts`)
+
+A follow-up turn the Forge starts on its own — closing a gap the architect left behind rather than waiting for the operator to ask again (spec 062) — is recorded as `converge.followed_up`, not `converge.started`. Every reader of the ledger's intake outcome treats the two the same way: a turn is running. Only `converge.followed_up` is counted separately, as `forgeFollowUps`, in the factory's metrics.
+
+---
+
 ## `foundry:rules.propose`
 
 Run the curator over the ledger and return proposals. On request only — never scheduled, never unprompted (FR-080).
