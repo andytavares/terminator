@@ -31,6 +31,11 @@ interface SensorRow {
   readonly nextDueAt: string | null
 }
 
+const ASK_MODEL_CHOICES = [
+  { id: 'sonnet', label: 'Sonnet (latest)', note: 'default — an amendment is a narrow change' },
+  { id: 'opus', label: 'Opus (latest)', note: 'for an ask that needs deeper reasoning' },
+] as const
+
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
@@ -40,6 +45,7 @@ export function SettingsView(): JSX.Element {
   const [selected, setSelected] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  const [askModel, setAskModel] = useState<string>('sonnet')
 
   const [sensors, setSensors] = useState<SensorRow[]>([])
   const [repoDrafts, setRepoDrafts] = useState<Record<string, string>>({})
@@ -125,6 +131,28 @@ export function SettingsView(): JSX.Element {
     })()
   }, [])
 
+  useEffect(() => {
+    void (async () => {
+      const answer = (await invoke('foundry:ask-model')) as { selected?: unknown }
+      if (typeof answer?.selected === 'string') setAskModel(answer.selected)
+    })()
+  }, [])
+
+  const chooseAskModel = useCallback(async (id: string) => {
+    setSaving(true)
+    setProblem(null)
+    try {
+      const result = (await invoke('foundry:ask-model-set', { model: id })) as { error?: string }
+      if (result.error !== undefined) {
+        setProblem(result.error)
+        return
+      }
+      setAskModel(id)
+    } finally {
+      setSaving(false)
+    }
+  }, [])
+
   const choose = useCallback(async (id: string) => {
     setSaving(true)
     setProblem(null)
@@ -162,6 +190,31 @@ export function SettingsView(): JSX.Element {
               <small>
                 {model.floating ? 'alias — follows the latest of its family' : model.id}
               </small>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <h2 className="fdry-panel-h" style={{ marginTop: 20 }}>
+        Answering asks
+      </h2>
+      <p className="fdry-note">
+        What the architect runs on when it amends a drafted plan: an ask, an answer, or a failing
+        check it closes on its own. The first draft stays on the model above.
+      </p>
+
+      <ul className="fdry-models">
+        {ASK_MODEL_CHOICES.map((choice) => (
+          <li key={choice.id}>
+            <button
+              type="button"
+              aria-pressed={choice.id === askModel}
+              className={choice.id === askModel ? 'is-on' : ''}
+              disabled={saving}
+              onClick={() => void chooseAskModel(choice.id)}
+            >
+              <b>{choice.label}</b>
+              <small>{choice.note}</small>
             </button>
           </li>
         ))}

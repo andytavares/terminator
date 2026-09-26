@@ -30,6 +30,9 @@ function mount(over: Record<string, unknown> = {}) {
   const sensors = [...(((over.sensors as unknown[] | undefined) ?? [sensorRow()]) as unknown[])]
   invoke = vi.fn(async (channel: string, payload?: unknown) => {
     if (channel === 'foundry:models-list') return { models: [], selected: '' }
+    if (channel === 'foundry:ask-model') return { selected: over.askModel ?? 'sonnet' }
+    if (channel === 'foundry:ask-model-set')
+      return { ok: true, selected: (payload as { model: string }).model }
     if (channel === 'foundry:sensors.list') return { sensors }
     if (channel === 'foundry:sensors.set') {
       const { id, enabled, repoPath } = payload as {
@@ -136,5 +139,32 @@ describe('the sensors panel', () => {
     await waitFor(() => screen.getByText('CI flake watch'))
     fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
     expect(await screen.findByText(/could not reach the repository/)).toBeTruthy()
+  })
+})
+
+describe('the model that answers asks', () => {
+  it('shows Sonnet chosen by default', async () => {
+    mount()
+    const sonnet = await screen.findByRole('button', { name: /Sonnet/ })
+    expect(sonnet.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: /Opus/ }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('switches asks to Opus and saves the choice', async () => {
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: /Opus/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:ask-model-set', { model: 'opus' })
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Opus/ }).getAttribute('aria-pressed')).toBe('true')
+    )
+  })
+
+  it('shows Opus chosen when that is what was saved', async () => {
+    mount({ askModel: 'opus' })
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Opus/ }).getAttribute('aria-pressed')).toBe('true')
+    )
   })
 })

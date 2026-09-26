@@ -3,7 +3,12 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { convergeBrief, readProposal, NoArchitectError } from '../../src/forge/converge.js'
+import {
+  architectModel,
+  convergeBrief,
+  readProposal,
+  NoArchitectError,
+} from '../../src/forge/converge.js'
 import { draftOrder, EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
@@ -513,5 +518,24 @@ describe('amending an order the architect has already written', () => {
       },
     })
     expect(prompt(refused)).not.toContain('This turn amends the order above')
+  })
+})
+
+// Answering an ask is a narrow change to a plan that already exists; the
+// operator's model drafts it, and the ask model amends it.
+describe('which model a turn runs on', () => {
+  const models = { draft: 'opus', ask: 'sonnet' }
+
+  it("drafts on the operator's model when nothing was typed", () => {
+    expect(architectModel(undefined, models)).toBe('opus')
+    expect(architectModel('   ', models)).toBe('opus')
+  })
+
+  it('answers an ask on the ask model', () => {
+    expect(architectModel('The coverage check fails.', models)).toBe('sonnet')
+  })
+
+  it('answers on Opus when the operator chose it for asks', () => {
+    expect(architectModel('Close the gap.', { draft: 'opus', ask: 'opus' })).toBe('opus')
   })
 })

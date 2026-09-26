@@ -416,14 +416,6 @@ export function layoutHall(
     const prop = props.find((p) => p.id === `fixture-${kind}`) as HallProp
     return prop.x
   }
-  const archive: Tile = {
-    x: nearestClearColumn(solid, TOP_WALL_ROWS, fixtureCol('shelves'), width),
-    y: TOP_WALL_ROWS,
-  }
-  const rack: Tile = {
-    x: nearestClearColumn(solid, TOP_WALL_ROWS, fixtureCol('racks'), width),
-    y: TOP_WALL_ROWS,
-  }
   // Under a station's body, beside its seat: a gap between two stations is
   // where a belt turns down to get round the next one.
   const underStation = [...Array(width).keys()].filter(
@@ -442,7 +434,7 @@ export function layoutHall(
           ),
     y: yardSeatRow,
   }
-  for (const anchor of [archive, rack, wait]) blockedForBelt.add(key(anchor))
+  blockedForBelt.add(key(wait))
 
   // Breakroom: a room in the bottom band, centred on the median crewed
   // station column and clamped inside the hall, with a two-tile door in the
@@ -545,12 +537,24 @@ export function layoutHall(
     ...props.filter((p) => p.seat !== null).map((p) => key(p.seat as Tile)),
     ...restSeats.map((s) => key(s.tile)),
   ])
+  // The row above a station is where its screens and nameplate are drawn,
+  // so a crew member walking there disappears behind the station.
+  const behindStation = new Set<string>()
+  for (const p of props.filter((q) => q.nodeId !== null)) {
+    for (let x = p.x; x < p.x + p.w; x++) behindStation.add(key({ x, y: p.y - 1 }))
+  }
   const beltTileAt = new Map(beltTiles.map((t) => [key(t), t]))
   const walk: boolean[][] = solid.map((row, y) =>
-    row.map((v, x) => v || beltTileAt.has(key({ x, y })) || seatKeys.has(key({ x, y })))
+    row.map(
+      (v, x) =>
+        v ||
+        beltTileAt.has(key({ x, y })) ||
+        seatKeys.has(key({ x, y })) ||
+        behindStation.has(key({ x, y }))
+    )
   )
   const free: boolean[][] = solid.map((row, y) =>
-    row.map((v, x) => v || seatKeys.has(key({ x, y })))
+    row.map((v, x) => v || seatKeys.has(key({ x, y })) || behindStation.has(key({ x, y })))
   )
 
   const crossovers: Tile[] = []
@@ -571,7 +575,7 @@ export function layoutHall(
     walk[t.y][t.x] = false
     crossovers.push(t)
   }
-  const requiredKeys = [...seatKeys, key(archive), key(rack), key(wait), key(exit)]
+  const requiredKeys = [...seatKeys, key(wait), key(exit)]
   const required: Tile[] = requiredKeys.map((k) => {
     const [x, y] = k.split(',').map(Number)
     return { x, y }
@@ -607,6 +611,35 @@ export function layoutHall(
     if (candidates.length === 0) break
     open(candidates[0])
   }
+
+  // The archive and the rack stand at the wall in a column nobody has to
+  // walk behind a station to reach, and their fixture moves over them.
+  const reachedFromIntake = distancesFrom(walk, intake)
+  const standAtWall = (kind: FixtureKind): Tile => {
+    const others = new Set(FIXTURE_KINDS.filter((k) => k !== kind).map((k) => fixtureCol(k)))
+    const preferred = fixtureCol(kind)
+    const usable = (x: number): boolean =>
+      x >= 1 &&
+      x <= width - 2 &&
+      !others.has(x) &&
+      reachedFromIntake.has(key({ x, y: TOP_WALL_ROWS }))
+    let x = preferred
+    for (let offset = 0; offset < width; offset++) {
+      if (usable(preferred + offset)) {
+        x = preferred + offset
+        break
+      }
+      if (usable(preferred - offset)) {
+        x = preferred - offset
+        break
+      }
+    }
+    const index = props.findIndex((p) => p.id === `fixture-${kind}`)
+    props[index] = { ...props[index], x }
+    return { x, y: TOP_WALL_ROWS }
+  }
+  const archive = standAtWall('shelves')
+  const rack = standAtWall('racks')
 
   for (const p of props.filter((q) => q.seat !== null)) {
     for (let i = 0; i < 3; i++) {

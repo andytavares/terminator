@@ -354,3 +354,31 @@ describe('toggling the Forge view', () => {
     expect(api.window.broadcast).toHaveBeenCalledWith('foundry:ui.view-changed', { view: 'list' })
   })
 })
+
+describe('the model that answers asks', () => {
+  function handler(channel: string): (payload: unknown) => Promise<unknown> {
+    const h = getHandler(channel)
+    if (h === undefined) throw new Error(`${channel} is not registered`)
+    return h
+  }
+
+  it('is Sonnet until the operator chooses otherwise', async () => {
+    ;(api.settings.get as ReturnType<typeof vi.fn>).mockReturnValue(undefined)
+    expect(await handler('foundry:ask-model')({})).toEqual({ selected: 'sonnet' })
+  })
+
+  it('saves Opus when the operator overrides it', async () => {
+    expect(await handler('foundry:ask-model-set')({ model: 'opus' })).toEqual({
+      ok: true,
+      selected: 'opus',
+    })
+    expect(api.settings.set).toHaveBeenCalledWith('terminator.foundry.askModel', 'opus')
+  })
+
+  it('refuses a model that is not Sonnet or Opus', async () => {
+    expect(await handler('foundry:ask-model-set')({ model: 'haiku' })).toEqual({
+      error: 'model must be one of sonnet, opus',
+    })
+    expect(api.settings.set).not.toHaveBeenCalled()
+  })
+})
