@@ -153,6 +153,8 @@ describe('compileOrder', () => {
         compileOrder(order).failures.find((f) => f.check === 'verifiable')?.detail ?? ''
       expect(detail).toContain('One')
       expect(detail).toMatch(/already touches|already changes/)
+      expect(detail).toContain('“widen the row container” changes what a person sees')
+      expect(detail).not.toContain('U-1')
     })
 
     it('names the criterion that cannot be proven', () => {
@@ -184,6 +186,37 @@ describe('compileOrder', () => {
       })
       const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
       expect(f?.subjectIds).toContain('U-2')
+    })
+
+    // The detail is read by a person on the Plan step. "Nothing in the plan
+    // builds AC-1" names a code only an agent can look up.
+    it('quotes the uncovered criterion, not its id', () => {
+      const order = complete()
+      order.plan.units[0].satisfies = ['AC-2']
+      const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
+      expect(f?.detail).toContain('“a full-width row renders its final glyph”')
+      expect(f?.detail).not.toContain('AC-1')
+    })
+
+    it('quotes the orphan unit and a dangling claim by title, not id', () => {
+      const order = complete()
+      order.plan.units.push({
+        id: 'U-2',
+        title: 'rename the config key',
+        role: 'builder',
+        lane: 1,
+        dependsOn: [],
+        satisfies: [],
+        touches: [],
+        verify: [],
+      })
+      order.plan.units[0].satisfies.push('AC-9')
+      const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
+      expect(f?.detail).toContain('“rename the config key” satisfies no criterion.')
+      expect(f?.detail).toContain(
+        '“widen the row container” claims a criterion that does not exist'
+      )
+      expect(f?.detail).not.toMatch(/U-\d/)
     })
 
     it('fails an order with no criteria at all', () => {

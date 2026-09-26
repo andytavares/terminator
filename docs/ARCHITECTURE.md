@@ -970,6 +970,11 @@ ways, so every surface a criterion names is one the plan then has to touch, and
 an architect that answered "no criterion asks for a picture" with three of them
 across five extension panels turned a one-line ask into a 41-file plan.
 
+A failure names a criterion by its statement and a unit by its title, never
+by id alone: the detail is read by a person on the Plan step, and `AC-1` means
+nothing to them. The architect still finds the row, because the rendered order
+it amends carries each statement beside its id.
+
 Budgets are the operator's (ADR 052), and there are two: agents at once and
 minutes. A count of files is not one (ADR 056). The architect's proposal never changes
 them. A draft's budgets are set on the Forge's Plan step

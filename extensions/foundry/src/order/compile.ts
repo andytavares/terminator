@@ -88,7 +88,7 @@ function checkPicture(order: WorkOrder): CompileFailure | null {
 
   return {
     check: 'verifiable',
-    detail: `${seen.map((u) => u.id).join(', ')} change what a person sees, and no criterion asks for a picture of the running application. A command cannot say whether it renders. One such criterion closes this — of a surface the plan already touches, not of new ones added to satisfy it, because every surface a criterion names is one the plan then has to touch to stay covered.`,
+    detail: `${seen.map(unitName).join(', ')} change${seen.length === 1 ? 's' : ''} what a person sees, and no criterion asks for a picture of the running application. A command cannot say whether it renders. One such criterion closes this — of a surface the plan already touches, not of new ones added to satisfy it, because every surface a criterion names is one the plan then has to touch to stay covered.`,
     subjectIds: seen.map((unit) => unit.id),
   }
 }
@@ -118,6 +118,16 @@ function checkVerifiable(order: WorkOrder): CompileFailure | null {
   }
 }
 
+// A person reads these on the Plan step, so a criterion or unit is named by
+// what it says; the id is a fallback for one written with no text.
+function quoted(text: string, id: string): string {
+  return text.trim() === '' ? id : `“${text.trim()}”`
+}
+
+function unitName(unit: WorkOrder['plan']['units'][number]): string {
+  return quoted(unit.title, unit.id)
+}
+
 function checkCoverage(order: WorkOrder): CompileFailure | null {
   const matrix = coverageMatrix(order)
   if (matrix.complete) return null
@@ -125,13 +135,19 @@ function checkCoverage(order: WorkOrder): CompileFailure | null {
   const parts: string[] = []
   if (matrix.reason !== null) parts.push(matrix.reason)
   if (matrix.uncoveredCriteria.length > 0) {
-    parts.push(`Nothing in the plan builds ${matrix.uncoveredCriteria.join(', ')}.`)
+    const names = order.acceptance
+      .filter((c) => matrix.uncoveredCriteria.includes(c.id))
+      .map((c) => quoted(c.statement, c.id))
+    parts.push(`Nothing in the plan builds ${names.join(', ')}.`)
   }
   if (matrix.orphanUnits.length > 0) {
-    parts.push(`${matrix.orphanUnits.join(', ')} satisfies no criterion.`)
+    const names = order.plan.units.filter((u) => matrix.orphanUnits.includes(u.id)).map(unitName)
+    parts.push(`${names.join(', ')} satisf${names.length === 1 ? 'ies' : 'y'} no criterion.`)
   }
   for (const ref of matrix.danglingRefs) {
-    parts.push(`${ref.unitId} claims ${ref.criterionId}, which does not exist.`)
+    const unit = order.plan.units.find((u) => u.id === ref.unitId)
+    const name = unit === undefined ? ref.unitId : unitName(unit)
+    parts.push(`${name} claims a criterion that does not exist (${ref.criterionId}).`)
   }
 
   return {
