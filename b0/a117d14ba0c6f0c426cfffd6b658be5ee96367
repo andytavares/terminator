@@ -1,0 +1,23 @@
+extensions/foundry/src/line/refinery.ts
+  s_4f15472be339a2::t_72a340de05d681 1-98
+  s_4f15472be339a2::t_fb3e121a61ec6f 99-102
+extensions/foundry/tests/line/refinery.spec.ts
+  s_4f15472be339a2::t_84f2af072effd8 1-115
+  s_4f15472be339a2::t_a6b8172417fc9c 116-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b0a117d14ba0c6f0c426cfffd6b658be5ee96367",
+  "prompts": {},
+  "sessions": {
+    "s_4f15472be339a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9fee4a8d-67a9-4cd3-94e0-a61328b8fea4",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
