@@ -359,6 +359,28 @@ describe('ci.red', () => {
   })
 })
 
+describe('refinery.conflict', () => {
+  it('renders a row with its summary and "Take it over"', async () => {
+    mount({
+      gates: [
+        gate({
+          id: 'g-refinery-conflict',
+          rule: 'refinery.conflict',
+          summary: "WO-2's draft no longer rebases onto main after WO-1 merged",
+          why: 'rebase conflicted in src/line/refinery.ts',
+        }),
+      ],
+      autonomy: 'lights-out',
+      silenced: [],
+      summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
+    })
+    await waitFor(() => expect(screen.getByText('refinery.conflict')).toBeTruthy())
+    expect(screen.getByText(/no longer rebases onto main/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take it over' })).toBeTruthy()
+    expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+  })
+})
+
 // From the factory's sensors: an open signal never starts anything by
 // itself. The two moves the operator has over one live here, below the
 // gates band, because gates are the surface's whole point and a heuristic's

@@ -25,6 +25,10 @@ export type Autonomy = (typeof AUTONOMY_LEVELS)[number]
  *
  * `ci.red` is here because a red CI must never be silently treated as
  * shippable at any autonomy level.
+ *
+ * `refinery.conflict` is here because a draft that cannot land must never be
+ * silently skipped: rebasing it back onto its base is a decision, not a
+ * default.
  */
 export const UNCONDITIONAL: readonly GateRuleId[] = [
   'risk.p0',
@@ -33,6 +37,7 @@ export const UNCONDITIONAL: readonly GateRuleId[] = [
   'ready-for-review',
   'run.interrupted',
   'ci.red',
+  'refinery.conflict',
 ]
 
 const STANDARD_EXTRA: readonly GateRuleId[] = [

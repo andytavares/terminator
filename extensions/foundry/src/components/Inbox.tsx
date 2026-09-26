@@ -5,6 +5,7 @@ import {
   ShieldAlert,
   GitPullRequest,
   GitPullRequestClosed,
+  GitMerge,
   HelpCircle,
   Gauge,
   CheckCircle2,
@@ -70,6 +71,7 @@ const RULE_ICON: Record<GateRuleId, React.ComponentType> = {
   'unit.boundary': CheckCircle2,
   'run.interrupted': Unplug,
   'ci.red': GitPullRequestClosed,
+  'refinery.conflict': GitMerge,
 }
 
 /** Severity is carried by a stripe, so what needs attention reads at a glance. */
@@ -85,6 +87,7 @@ const RULE_TONE: Record<GateRuleId, string> = {
   'ready-for-review': 'is-ok',
   'run.interrupted': 'is-warn',
   'ci.red': 'is-warn',
+  'refinery.conflict': 'is-warn',
 }
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {

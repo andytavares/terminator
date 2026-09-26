@@ -20,6 +20,7 @@ export const GATE_RULES = [
   'unit.boundary',
   'run.interrupted',
   'ci.red',
+  'refinery.conflict',
 ] as const
 
 export type GateRuleId = (typeof GATE_RULES)[number]
@@ -44,6 +45,8 @@ const RULE_IN_WORDS: Record<GateRuleId, string> = {
   'unit.boundary': 'each unit of work as it finishes',
   'run.interrupted': 'a run whose agents are gone, so nothing is moving it',
   'ci.red': 'a draft whose CI stays red after the automatic fix rounds',
+  'refinery.conflict':
+    'a draft that no longer rebases cleanly onto its base after another order merged',
 }
 
 /** One rule, in plain words. Falls back to the id rather than inventing one. */
@@ -208,6 +211,18 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
         label: 'Another round',
         consequence:
           "The failed logs go back to the lane's builder for one more fix, then CI is watched again.",
+      },
+      HOLD,
+    ],
+    defaultIfIgnored: 'hold',
+  },
+  'refinery.conflict': {
+    options: [
+      {
+        id: 'take_over',
+        label: 'Take it over',
+        consequence:
+          "Resolve the conflict yourself in the lane's checkout; Foundry leaves it alone.",
       },
       HOLD,
     ],
