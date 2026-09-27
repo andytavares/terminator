@@ -356,13 +356,13 @@ describe('nearestRestSeat', () => {
     const scoutSeat = next.crew.find((c) => c.nodeId === 'scout')!.restSeat
     next = direct(
       next,
-      [{ kind: 'node-state', nodeId: 'challenge', from: 'running', to: 'passed' }],
+      [{ kind: 'node-state', nodeId: 'verify', from: 'running', to: 'passed' }],
       0
     )
-    const challengeSeat = next.crew.find((c) => c.nodeId === 'challenge')!.restSeat
+    const verifySeat = next.crew.find((c) => c.nodeId === 'verify')!.restSeat
     expect(scoutSeat).not.toBe(null)
-    expect(challengeSeat).not.toBe(null)
-    expect(scoutSeat).not.toBe(challengeSeat)
+    expect(verifySeat).not.toBe(null)
+    expect(scoutSeat).not.toBe(verifySeat)
   })
 })
 
@@ -475,8 +475,12 @@ describe('tick', () => {
     w = direct(w, [{ kind: 'node-state', nodeId: 'scout', from: 'passed', to: 'running' }], 0)
     expect(w.crew.find((c) => c.nodeId === 'scout')!.restSeat).toBe(null)
 
-    w = direct(w, [{ kind: 'node-state', nodeId: 'challenge', from: 'running', to: 'passed' }], 0)
-    expect(w.crew.find((c) => c.nodeId === 'challenge')!.restSeat).toBe(seatId)
+    // Nothing holds it any more, so the next crew member to look for a seat
+    // from beside it is given it.
+    const taken = new Set(w.crew.map((c) => c.restSeat).filter((id): id is number => id !== null))
+    expect(taken.has(seatId!)).toBe(false)
+    const freed = map.restSeats.find((s) => s.id === seatId)!
+    expect(nearestRestSeat(map, freed.tile, taken)?.id).toBe(seatId)
   })
 
   it('a crate bound for a started step advances and is consumed on arrival', () => {
