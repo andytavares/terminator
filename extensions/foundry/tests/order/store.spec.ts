@@ -31,6 +31,20 @@ afterEach(() => {
 })
 
 describe('createOrderStore', () => {
+  it('never shows a reader a half-written order while it is being saved', async () => {
+    const store = createOrderStore(root)
+    await store.save(order())
+    const seen: (WorkOrder | null)[] = []
+    for (let i = 0; i < 200; i++) {
+      const [, loaded] = await Promise.all([
+        store.save(order({ title: `Save ${i}` })),
+        store.load('WO-0913-c71'),
+      ])
+      seen.push(loaded)
+    }
+    expect(seen.filter((o) => o === null)).toHaveLength(0)
+  })
+
   it('writes the truth and its rendering side by side', async () => {
     const store = createOrderStore(root)
     await store.save(order())

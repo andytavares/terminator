@@ -1,5 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { orderDir, ledgerPath } from '../data-root.js'
 import { appendEntry, readEntries } from '../ledger/append.js'
 import type { LedgerEntry } from '../ledger/append.js'
@@ -51,20 +52,24 @@ export function createLiveOrderStore(root: () => string): OrderStore {
   }
 }
 
+// The Forge polls load() while saves happen; writing in place lets a read land
+// between the truncate and the write and see a half-written order as missing.
+async function writeAtomically(file: string, content: string): Promise<void> {
+  const tmp = `${file}.${process.pid}.${randomUUID()}.tmp`
+  await fs.promises.writeFile(tmp, content, 'utf8')
+  await fs.promises.rename(tmp, file)
+}
+
 export function createOrderStore(root: string): OrderStore {
   const dirFor = (id: string): string => orderDir(root, id)
 
   async function save(order: WorkOrder): Promise<void> {
     const dir = dirFor(order.id)
     await fs.promises.mkdir(dir, { recursive: true })
-    await fs.promises.writeFile(
-      path.join(dir, 'order.json'),
-      `${JSON.stringify(order, null, 2)}\n`,
-      'utf8'
-    )
+    await writeAtomically(path.join(dir, 'order.json'), `${JSON.stringify(order, null, 2)}\n`)
     // Regenerated, never hand-edited: anything the operator wants to change
     // goes through intake so it lands in the truth.
-    await fs.promises.writeFile(path.join(dir, 'order.md'), renderOrder(order), 'utf8')
+    await writeAtomically(path.join(dir, 'order.md'), renderOrder(order))
   }
 
   async function load(id: string): Promise<WorkOrder | null> {
