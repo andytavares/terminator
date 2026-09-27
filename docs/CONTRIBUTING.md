@@ -41,6 +41,17 @@ npm run test:e2e        # E2E — launches real Electron app (Playwright)
 npm run test:coverage   # Coverage report in coverage/
 ```
 
+### E2E rules
+
+E2E runs with no retries, so a test that fails once fails the build ([ADR 070](adr/070-e2e-is-deterministic-and-selective.md)).
+
+- Never sleep. Wait on the condition you assert next: a locator assertion, or `expect.poll`. ESLint rejects `waitForTimeout` in `tests/e2e`.
+- Every test passes alone (`npx playwright test tests/e2e/<file>:<line>`), unless it is part of a `test.describe.serial` story, which runs as a whole. Use serial only for a sequence that cannot be split.
+- Before sending keys to a surface you just opened, assert that it has focus.
+- Launch the app through `launchApp()`. It isolates the profile, runs the terminals on a fixture zsh config (`tests/e2e/fixtures/zdotdir`) whose `claude` is a stub, so no real agent runs, and turns off macOS window restore, whose crash prompt blocks startup.
+- A new spec goes in `scripts/e2e-select.mjs`: under the extension it covers, or in `CORE_SPECS`. The selector's unit test fails for a spec that is in neither.
+- CI runs only the specs your diff selects, plus the smoke set. Changed specs run three times. To see what your branch selects: `node scripts/e2e-select.mjs origin/main`.
+
 ### Build extensions
 
 Extension TypeScript is compiled to CommonJS bundles by esbuild. The output is gitignored — never commit `extensions/*/src/index.js`. Always rebuild after changing extension source files:
