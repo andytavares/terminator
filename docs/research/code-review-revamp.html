@@ -1083,7 +1083,7 @@
       <li><a href="#sequence">Sequence</a></li>
       <li><a href="#testing">Testing</a></li>
       <li><a href="#risks">Risks</a></li>
-      <li><a href="#open">Open questions</a></li>
+      <li><a href="#open">Decisions</a></li>
       <li><a href="#rejected">Rejected</a></li>
     </ol>
   </nav>
@@ -1316,8 +1316,8 @@
     <section class="prose">
       <h2 id="inspiration">Inspiration</h2>
       <p>
-        <span class="unv">[UNVERIFIED]</span> I could not read the linked article. WebFetch got HTTP
-        403, curl got Cloudflare's "Sorry, you have been blocked", the r.jina.ai reader got a
+        I could not read the linked article; you later named its tools (see Decisions). WebFetch got
+        HTTP 403, curl got Cloudflare's "Sorry, you have been blocked", the r.jina.ai reader got a
         CAPTCHA page, it isn't in Stackademic's RSS feed, and the Wayback Machine has no copy. I did
         not try to get past the bot check. I drew instead on the tools in the same category, each
         checked at its own repo or page on 2026-09-27:
@@ -1993,13 +1993,13 @@ flowchart LR
               </div>
               <div class="score">
                 <div class="lbl">Test coverage</div>
-                <div class="val">84% of new lines</div>
+                <div class="val">5 of 7 functions tested</div>
                 <div>
-                  2 changed functions have no covered lines: <code>shardByDuration</code>,
-                  <code>readBurnIn</code>.
-                  <div class="meter"><i style="width: 84%; background: var(--a-ok)"></i></div>
+                  2 changed functions have no test: <code>shardByDuration</code>,
+                  <code>readBurnIn</code>. CI reports 84% of new lines covered.
+                  <div class="meter"><i style="width: 71%; background: var(--a-warn)"></i></div>
                 </div>
-                <div class="src">CI check codecov/patch</div>
+                <div class="src">test files referencing each changed function</div>
               </div>
               <div class="score">
                 <div class="lbl">Code health</div>
@@ -2048,8 +2048,8 @@ flowchart LR
                   <span
                     class="chip hi"
                     style="font-size: 10px; padding: 0 5px"
-                    title="No covered lines"
-                    >0%</span
+                    title="No test references this function"
+                    >untested</span
                   >
                 </td>
                 <td class="mk">+</td>
@@ -2067,7 +2067,7 @@ flowchart LR
           Illustrative values for #211. <code>selectSpecs</code>, <code>shardByDuration</code>,
           <code>loadTimings</code> and <code>readBurnIn</code> are placeholders for the real
           function names the parser would report. The gutter marks show a function's added branches
-          and its patch coverage.
+          and whether any test references it.
         </figcaption>
       </figure>
       <div class="tbl">
@@ -2099,15 +2099,13 @@ flowchart LR
             <tr>
               <td>Test coverage</td>
               <td>
-                1. The patch-coverage status check, when CI publishes one (<code
-                  >COVERAGE_CHECK_NAMES</code
-                >
-                already lists codecov, coveralls, sonar and others). 2.
-                <code>coverage/</code> inside the review worktree, only if its <code>HEAD</code> is
-                the PR head.
+                Does each changed function have a test: tested when a test file in the PR, or
+                already in the repo (<code>git grep</code>), references it. A CI patch-coverage
+                percentage, when CI publishes one, is shown second.
               </td>
               <td>
-                "Not measured", plus how many changed source files have a changed test beside them.
+                "No functions changed", plus how many changed source files have a changed test
+                beside them.
               </td>
             </tr>
             <tr>
@@ -2295,6 +2293,14 @@ flowchart LR
                     <button type="button" aria-pressed="true">Review</button
                     ><button type="button" aria-pressed="false">Explain</button
                     ><button type="button" aria-pressed="false">Ask…</button>
+                  </div>
+                  <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px">
+                    <span class="note">Model</span>
+                    <div class="seg" role="group" aria-label="Model">
+                      <button type="button" aria-pressed="true">Sonnet</button
+                      ><button type="button" aria-pressed="false">Opus</button>
+                    </div>
+                    <span style="flex: 1"></span><button class="btn ag" type="button">Run</button>
                   </div>
                 </div>
                 <div class="p2" hidden>
@@ -3007,30 +3013,25 @@ npx playwright test tests/e2e/git-integration-smoke.spec.ts</pre
     </section>
 
     <section class="prose">
-      <h2 id="open">Open questions</h2>
+      <h2 id="open">Decisions on the open questions</h2>
       <ol>
         <li>
-          Which five tools does the Stackademic article name? I couldn't read it; if it lists
-          something not in the table above, it may change S3 or S4.
+          <b>Article's tools:</b> gh-dash,
+          <a href="https://github.com/jesseduffield/lazygit">lazygit</a>,
+          <a href="https://github.com/modem-dev/hunk">hunk</a>, difftastic, delta. hunk's inline
+          agent notes and lazygit's keyboard panels match R5 and S3; neither changes the plan.
         </li>
         <li>
-          <span class="unv">[UNVERIFIED]</span> Does
-          <code>team-review-requested-user:@me</code> accept <code>@me</code>? The docs example uses
-          a login. If not, the query uses the login from <code>github:current-user</code>.
+          <b>Team query:</b> uses the login from <code>github:current-user</code>, not
+          <code>@me</code>.
         </li>
+        <li><b>Agent model:</b> Sonnet by default; you can pick Opus per run and in settings.</li>
+        <li><b>Coverage:</b> "does this changed function have a test", not a percentage.</li>
         <li>
-          Agent model: <code>opus</code> for every scope, or <code>sonnet</code> for line and hunk
-          scopes to save time?
+          <b>Uncloned repos:</b> diff-only review by default; "Clone and review" appears when you
+          set a clone folder.
         </li>
-        <li>
-          Coverage for repos whose CI doesn't publish a patch-coverage check: is "not measured"
-          acceptable, or should the worktree run the test suite on request?
-        </li>
-        <li>
-          Dashboard for a repo not cloned locally: clone on demand into a Terminator-managed folder,
-          or open a diff-only review with no local metrics?
-        </li>
-        <li>Should dismissed agent findings sync anywhere, or stay on this machine only?</li>
+        <li><b>Dismissed findings:</b> stay on this machine.</li>
       </ol>
     </section>
 

@@ -62,7 +62,7 @@ Tests => risk-score.spec.ts[t2]
 
 ## Inspiration
 
-**[UNVERIFIED]** I could not read the linked article. WebFetch got HTTP 403, curl got Cloudflare's "Sorry, you have been blocked", the r.jina.ai reader got a CAPTCHA page, it isn't in Stackademic's RSS feed, and the Wayback Machine has no copy. I did not try to get past the bot check. Tools in the same category, checked on 2026-09-27:
+I could not read the linked article; you later named its tools (see Decisions below). WebFetch got HTTP 403, curl got Cloudflare's "Sorry, you have been blocked", the r.jina.ai reader got a CAPTCHA page, it isn't in Stackademic's RSS feed, and the Wayback Machine has no copy. I did not try to get past the bot check. Tools in the same category, checked on 2026-09-27:
 
 | Tool                                                                                        | What it does well                                                                                    | Taken into         |
 | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------ |
@@ -444,14 +444,14 @@ Then a live run on PR #213 (109 files): screenshot every surface in the running 
 | Worktrees pile up                | Keep 5 most recent; remove on PR close; `git worktree prune` at start.                                                  |
 | Force-push removed your old SHA  | Old heads fetched into `refs/terminator/review/*`; if absent, whole file with a note.                                   |
 
-## Open questions
+## Decisions on the open questions (2026-09-27)
 
-1. Which five tools does the Stackademic article name? If it lists something not above, it may change S3 or S4.
-2. **[UNVERIFIED]** Does `team-review-requested-user:@me` accept `@me`? The docs example uses a login; fallback is the login from `github:current-user`.
-3. Agent model: `opus` for every scope, or `sonnet` for line and hunk scopes?
-4. Repos whose CI publishes no patch-coverage check: is "not measured" acceptable, or should the worktree run tests on request?
-5. Dashboard rows for repos not cloned locally: clone on demand, or a diff-only review without local metrics?
-6. Should dismissed agent findings sync anywhere, or stay on this machine?
+1. **Article's tools:** gh-dash, [lazygit](https://github.com/jesseduffield/lazygit), [hunk](https://github.com/modem-dev/hunk), difftastic, delta. hunk's inline agent notes and lazygit's keyboard panels match R5 and S3; neither changes the plan.
+2. **Team query:** uses the login from `github:current-user`, not `@me`.
+3. **Agent model:** Sonnet by default; you can pick Opus per run (and in settings).
+4. **Coverage:** the question is "does this changed function have a test", not a percentage. A function counts as tested when a test file in the PR or already in the repo references it. A CI patch-coverage percentage, when CI publishes one, is shown second.
+5. **Uncloned repos:** diff-only review by default (GitHub's patches, no local metrics). "Clone and review" appears when you set `review.cloneFolder`.
+6. **Dismissed findings:** stay on this machine.
 
 ## Alternatives rejected
 
