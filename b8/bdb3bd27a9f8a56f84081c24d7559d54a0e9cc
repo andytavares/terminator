@@ -1,0 +1,23 @@
+extensions/foundry/tests/order/proposal.spec.ts
+  s_638bab37880ed1::t_064d29e912b372 164-200
+extensions/foundry/src/forge/converge.ts
+  s_638bab37880ed1::t_87ca722735c925 40-42
+extensions/foundry/src/order/proposal.ts
+  s_638bab37880ed1::t_242d55c44a48ca 35-37,40,43,47,115,126-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b8bdb3bd27a9f8a56f84081c24d7559d54a0e9cc",
+  "prompts": {},
+  "sessions": {
+    "s_638bab37880ed1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "566f71f2-6e08-45d4-b02d-e3a5db9672a8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
