@@ -252,7 +252,30 @@ async function openFoundry(): Promise<void> {
     await button.click()
   }
   await expect(panel).toHaveCount(1, { timeout: 30_000 })
-  await handle.page.waitForTimeout(2500)
+  // The channel answers through the main window's own bridge, which needs
+  // nothing from the extension's own WebContentsView, so it is checked
+  // first; only once the extension has activated is the view itself worth
+  // polling for.
+  await expect
+    .poll(async () => (await foundry('foundry:order.list').catch(() => null)) !== null, {
+      timeout: 30_000,
+    })
+    .toBe(true)
+  // The WebContentsView `inFoundry` reaches attaches a little after the
+  // channel answers — polled with its rejection caught, since `expect.poll`
+  // does not retry a callback that throws, only one whose value mismatches.
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await inFoundry<number>(`document.querySelectorAll('button').length`)
+        } catch {
+          return 0
+        }
+      },
+      { timeout: 30_000 }
+    )
+    .toBeGreaterThan(0)
 }
 
 test.beforeAll(async () => {
@@ -373,7 +396,15 @@ test('the Floor carries the same move, above the graph', async () => {
 
   // The Forge tab, then the running order — which opens on the Floor.
   expect(await clickByName('Forge')).toBe(true)
-  await handle.page.waitForTimeout(800)
+  await expect
+    .poll(
+      () =>
+        inFoundry<string>(
+          `Array.from(document.querySelectorAll('.fdry-orders button')).map(b => b.textContent || '').join('|')`
+        ),
+      { timeout: 15_000 }
+    )
+    .toContain(ORDER_ID)
   expect(
     await inFoundry<boolean>(`(function () {
       var rows = document.querySelectorAll('.fdry-orders button')
@@ -386,8 +417,8 @@ test('the Floor carries the same move, above the graph', async () => {
     })()`),
     'no row for the running order'
   ).toBe(true)
-  await handle.page.waitForTimeout(1500)
 
+  await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Halted — your move')
   const text = await bodyText()
   // `Halted — your move`, not `Nothing is running this`. An orphan always
   // raises `run.interrupted` (adopt.ts), and ADR-045 puts an unanswered gate
@@ -419,10 +450,14 @@ test('a run that finished every step and still failed to ship says so, with a mo
   test.setTimeout(90_000)
   await openFoundry()
 
-  // The previous test left an order open on the Forge tab, which is already
-  // selected — clicking it again does not remount the list, so the way back
-  // to it is the frame's own control.
-  expect(await clickByName('All orders')).toBe(true)
+  // Get to the Forge regardless of what an earlier test left on screen — this
+  // test seeds and reads its own order, so it passes the same way whether the
+  // suite runs it or it runs alone.
+  expect(await clickByName('Forge')).toBe(true)
+  // An order may already be open (from an earlier test, or the click above
+  // landing on a still-open one) — "All orders" is the way back to the list
+  // either way, and a no-op if the list is already showing.
+  await clickByName('All orders')
   // The list refetches on its own 4s timer, and the previous test left the
   // view mid-navigation — a fixed pause here was a flake waiting to happen.
   await expect
@@ -446,8 +481,8 @@ test('a run that finished every step and still failed to ship says so, with a mo
     })()`),
     'no row for the unshipped order'
   ).toBe(true)
-  await handle.page.waitForTimeout(1500)
 
+  await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Finished, but not shipped')
   const text = await bodyText()
   expect(text, `the Floor rendered:\n${text}`).toContain('Finished, but not shipped')
   expect(text).toContain('Opening the pull request for fixture failed: exit code 1')
