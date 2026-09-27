@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 
 const execFile = vi.fn()
 const access = vi.fn()
@@ -18,6 +18,14 @@ function present(...paths: string[]): void {
     throw new Error('ENOENT')
   })
 }
+
+// What is asserted here is the macOS path (an app under /Applications, opened
+// with `open -a`), so it is pinned rather than taken from the host.
+const hostPlatform = process.platform
+Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+afterAll(() => {
+  Object.defineProperty(process, 'platform', { value: hostPlatform, configurable: true })
+})
 
 beforeEach(() => {
   vi.clearAllMocks()

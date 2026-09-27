@@ -214,15 +214,20 @@ describe('a write outside the checkout (FR-050)', () => {
   // every ordinary edit inside the unit's own worktree asked — at every
   // setting. The same coin flip that left agents sitting at the trust dialog.
   describe('a directory with two names', () => {
+    let base: string
     let checkout: string
 
+    // The checkout is reached through a symlink, so its real path is its
+    // other name on every platform, not only where the temp dir is one.
     beforeEach(() => {
-      checkout = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-outside-'))
-      fs.mkdirSync(path.join(checkout, 'src'))
+      base = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-outside-'))
+      fs.mkdirSync(path.join(base, 'real', 'src'), { recursive: true })
+      checkout = path.join(base, 'link')
+      fs.symlinkSync(path.join(base, 'real'), checkout)
     })
 
     afterEach(() => {
-      fs.rmSync(checkout, { recursive: true, force: true })
+      fs.rmSync(base, { recursive: true, force: true })
     })
 
     it("takes a file under the checkout's other name", () => {
