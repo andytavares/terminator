@@ -1,0 +1,21 @@
+docs/adr/070-e2e-is-deterministic-and-selective.md
+  s_af088fe0b546b8::t_e3b50058f2d558 24
+docs/adr/071-ci-is-sharded-by-duration-and-warns-nothing.md
+  s_af088fe0b546b8::t_b7215210e55c8d 1-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5225cfdb3be29603173a0e0b63f0f587ccd34a0a",
+  "prompts": {},
+  "sessions": {
+    "s_af088fe0b546b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "864c9e9e-c424-4396-81af-3d272ad50cda",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
