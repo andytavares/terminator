@@ -19,6 +19,7 @@ describe('ReviewSubmitPanel', () => {
   const defaultProps = {
     repoRoot: '/repo',
     prNumber: 42,
+    headSHA: 'abc123',
     onClose: vi.fn(),
   }
 
@@ -133,6 +134,7 @@ describe('ReviewSubmitPanel', () => {
         prNumber: 42,
         event: 'COMMENT',
         body: 'LGTM',
+        comments: [],
       })
     )
   })

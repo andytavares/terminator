@@ -164,4 +164,86 @@ describe('FullFileList', () => {
     expect(rows[0].getAttribute('title')).toBe('src/bar.ts')
     expect(rows[1].getAttribute('title')).toBe('src/foo.ts')
   })
+
+  it('shows "changed" for a file the store lists as changed since viewed', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      fileOrderOverrides: {},
+      changedSince: new Set(['src/foo.ts']),
+      viewedAt: {},
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<FullFileList {...defaultProps} />)
+    expect(screen.getByText('changed')).toBeTruthy()
+  })
+
+  it('shows "viewed" for a file marked viewed and unchanged since', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(['src/foo.ts']),
+      fileOrderOverrides: {},
+      changedSince: new Set<string>(),
+      viewedAt: { 'src/foo.ts': 'abc' },
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<FullFileList {...defaultProps} />)
+    expect(screen.getByText('viewed')).toBeTruthy()
+  })
+
+  it('shows "new file" for a file a push added since your last look', () => {
+    const pr = makePr([
+      {
+        id: 'ch-1',
+        name: 'Core',
+        estimatedMinutes: 10,
+        files: [{ ...makeFile('src/new.ts'), changeType: 'added' }],
+      },
+    ])
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      fileOrderOverrides: {},
+      changedSince: new Set<string>(),
+      newSinceLook: new Set(['src/new.ts']),
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<FullFileList {...defaultProps} pr={pr} />)
+    expect(screen.getByText('new file')).toBeTruthy()
+  })
+
+  it('does not call an added file new on a first review', () => {
+    const pr = makePr([
+      {
+        id: 'ch-1',
+        name: 'Core',
+        estimatedMinutes: 10,
+        files: [{ ...makeFile('src/new.ts'), changeType: 'added' }],
+      },
+    ])
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      fileOrderOverrides: {},
+      changedSince: new Set<string>(),
+      newSinceLook: new Set<string>(),
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<FullFileList {...defaultProps} pr={pr} />)
+    expect(screen.queryByText('new file')).toBeNull()
+  })
+
+  it('shows the reading-order reason under the file name', () => {
+    const pr = makePr([
+      {
+        id: 'ch-1',
+        name: 'Core',
+        estimatedMinutes: 10,
+        files: [makeFile('src/foo.ts')],
+      },
+    ])
+    pr.readingOrder = [
+      { step: 1, path: 'src/foo.ts', symbol: null, reason: 'Defines RiskScore', uses: [] },
+    ]
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      fileOrderOverrides: {},
+      changedSince: new Set<string>(),
+      viewedAt: {},
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<FullFileList {...defaultProps} pr={pr} />)
+    expect(screen.getByText('Defines RiskScore')).toBeTruthy()
+  })
 })

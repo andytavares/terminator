@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { githubAPI } from '../../api/github'
-import { usePrReviewStore } from '../../stores/pr-review.store'
+import { usePrReviewStore, sessionKey, legacySessionKey } from '../../stores/pr-review.store'
+import { useReviewUiStore } from '../../stores/review-ui.store'
 import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
+import type { SinceInfo } from './PrReviewView'
 import { PrOverviewPanel } from './PrOverviewPanel'
 import { MergeFlowView } from '../merge-flow/MergeFlowView'
 import {
@@ -12,8 +14,57 @@ import {
   useLoadIssueComments,
 } from '../../hooks/usePrReview'
 import { ReviewSessionSchema } from '../../schemas/pr-review.schema'
-import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
+import type { ReviewQueuePR, PrReviewDetail } from '../../schemas/pr-review.schema'
 import './pr-review.css'
+
+/**
+ * Reads a stored session for a PR, preferring the v2 (per-PR) key and
+ * falling back to the v1 (per-head) key so a push doesn't start a blank
+ * session. If the session's head is stale, reconciles it against the
+ * fetched detail and returns the S1 banner info to show for it.
+ */
+async function loadAndReconcileSession(
+  repoRoot: string,
+  detail: PrReviewDetail,
+  initSession: ReturnType<typeof usePrReviewStore.getState>['initSession'],
+  reconcileHead: ReturnType<typeof usePrReviewStore.getState>['reconcileHead']
+): Promise<SinceInfo | null> {
+  const key = sessionKey(repoRoot, detail.number)
+  let result = await githubAPI.sessionGet(key)
+  let raw = (result as { session: unknown }).session
+  if (!raw) {
+    const legacyResult = await githubAPI.sessionGet(
+      legacySessionKey(repoRoot, detail.number, detail.headSHA)
+    )
+    raw = (legacyResult as { session: unknown }).session
+    result = legacyResult
+  }
+  if (!raw) return null
+
+  const parsed = ReviewSessionSchema.safeParse(raw)
+  if (!parsed.success) return null
+  initSession(parsed.data)
+
+  if (parsed.data.headSHA === detail.headSHA) return null
+
+  const compare = (await githubAPI.prCompare(repoRoot, parsed.data.headSHA, detail.headSHA)) as {
+    rewritten: boolean
+    commits: number
+    files: Array<{ path: string; status?: string }>
+  }
+  reconcileHead(
+    repoRoot,
+    detail.number,
+    detail.headSHA,
+    compare.rewritten ? 'all' : compare.files.map((f) => f.path),
+    compare.files.filter((f) => f.status === 'added').map((f) => f.path)
+  )
+  return {
+    commitCount: compare.commits,
+    changedCount: compare.files.length,
+    historyRewritten: compare.rewritten,
+  }
+}
 
 interface Props {
   repoRoot: string | null
@@ -27,6 +78,7 @@ export function PrReviewTab({ repoRoot }: Props) {
     activePr,
     setActivePr,
     initSession,
+    reconcileHead,
     reset,
     markPrInProgress,
     dismissPr,
@@ -47,6 +99,7 @@ export function PrReviewTab({ repoRoot }: Props) {
   const [showOverview, setShowOverview] = useState(false)
   const [activeQueuePr, setActiveQueuePr] = useState<ReviewQueuePR | null>(null)
   const [mergeFlowWorktree, setMergeFlowWorktree] = useState<string | null>(null)
+  const [sinceInfo, setSinceInfo] = useState<SinceInfo | null>(null)
 
   useEffect(() => {
     if (isPopoutWindow) return
@@ -106,32 +159,32 @@ export function PrReviewTab({ repoRoot }: Props) {
     if (!repoRoot) return
     setActiveQueuePr(pr)
     await loadPrDetail(pr.number, async (detail) => {
-      const key = `${repoRoot}:::${pr.number}:::${detail.headSHA}`
-      const result = await githubAPI.sessionGet(key)
-      const raw = (result as { session: unknown }).session
-      if (raw) {
-        const parsed = ReviewSessionSchema.safeParse(raw)
-        if (parsed.success) initSession(parsed.data)
-      } else {
-        // Persist an initial session so the PR shows as in-progress on next queue load.
-        await githubAPI.sessionSet(key, {
-          repoRoot,
-          prNumber: pr.number,
-          headSHA: detail.headSHA,
-          currentChapterId: null,
-          currentFilePath: null,
-          viewedFiles: [],
-          fileOrderOverrides: {},
-          scrollPosition: null,
-          pausedAt: null,
-          lastAccessedAt: new Date().toISOString(),
-        })
+      const since = await loadAndReconcileSession(repoRoot, detail, initSession, reconcileHead)
+      setSinceInfo(since)
+      if (!since) {
+        const hasSession = !!(await githubAPI.sessionGet(sessionKey(repoRoot, pr.number))).session
+        if (!hasSession) {
+          // Persist an initial session so the PR shows as in-progress on next queue load.
+          await githubAPI.sessionSet(sessionKey(repoRoot, pr.number), {
+            repoRoot,
+            prNumber: pr.number,
+            headSHA: detail.headSHA,
+            currentChapterId: null,
+            currentFilePath: null,
+            viewedFiles: [],
+            fileOrderOverrides: {},
+            scrollPosition: null,
+            pausedAt: null,
+            lastAccessedAt: new Date().toISOString(),
+          })
+        }
       }
       // Persist the PR snapshot so it always appears in the in-progress section,
       // even if it falls beyond the first page on next load.
       void githubAPI.saveActiveReview(repoRoot, pr)
       // Immediately reflect in-progress in the queue without waiting for a refresh.
       markPrInProgress(pr.number)
+      useReviewUiStore.getState().resetForPr()
       setActivePr(detail)
       setShowOverview(true)
       // Kick off risk score computation in the background (non-blocking).
@@ -145,8 +198,7 @@ export function PrReviewTab({ repoRoot }: Props) {
     // Persist paused state synchronously before resetting, so mergeSessionStatuses
     // on the next queue load reliably finds this session and shows it as paused.
     if (repoRoot && activePr) {
-      const key = `${repoRoot}:::${activePr.number}:::${activePr.headSHA}`
-      await githubAPI.sessionSet(key, {
+      await githubAPI.sessionSet(sessionKey(repoRoot, activePr.number), {
         repoRoot,
         prNumber: activePr.number,
         headSHA: activePr.headSHA,
@@ -162,7 +214,9 @@ export function PrReviewTab({ repoRoot }: Props) {
     setShowOverview(false)
     setActiveQueuePr(null)
     setActivePr(null)
+    setSinceInfo(null)
     reset()
+    useReviewUiStore.getState().resetForPr()
     if (repoRoot) void loadQueue({ search: undefined })
   }
 
@@ -203,13 +257,9 @@ export function PrReviewTab({ repoRoot }: Props) {
     if (isNaN(prNumber)) return
     const shouldShowOverview = urlParams.get('showOverview') === 'true'
     loadPrDetail(prNumber, async (detail) => {
-      const key = `${repoRoot}:::${prNumber}:::${detail.headSHA}`
-      const result = await githubAPI.sessionGet(key)
-      const raw = (result as { session: unknown }).session
-      if (raw) {
-        const parsed = ReviewSessionSchema.safeParse(raw)
-        if (parsed.success) initSession(parsed.data)
-      }
+      const since = await loadAndReconcileSession(repoRoot, detail, initSession, reconcileHead)
+      setSinceInfo(since)
+      useReviewUiStore.getState().resetForPr()
       setActivePr(detail)
       setShowOverview(shouldShowOverview)
       fetchFileMetrics(detail)
@@ -253,6 +303,7 @@ export function PrReviewTab({ repoRoot }: Props) {
         onRefresh={handleRefreshPr}
         onShowOverview={() => setShowOverview(true)}
         onPopOut={isPoppedOut ? undefined : handlePopOut}
+        sinceInfo={sinceInfo}
       />
     )
   }

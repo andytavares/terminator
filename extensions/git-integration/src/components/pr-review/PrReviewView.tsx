@@ -1,18 +1,34 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, TriangleAlert } from 'lucide-react'
+import { RefreshCw, TriangleAlert, Sparkles } from 'lucide-react'
 import { Dialog } from '@terminator/extension-ui'
 import { usePrReviewStore } from '../../stores/pr-review.store'
+import { useReviewUiStore } from '../../stores/review-ui.store'
 import { ChapterNav } from './ChapterNav'
 import { ChapterFileList } from './ChapterFileList'
 import { FullFileList } from './FullFileList'
 import { ReviewDiffPane } from './ReviewDiffPane'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { ReviewSubmitPanel } from './ReviewSubmitPanel'
+import { AgentPanel } from './AgentPanel'
+import { SinceBanner } from './SinceBanner'
+import { ResumeCard } from './ResumeCard'
+import { KeyboardHelp } from './KeyboardHelp'
+import { SubmitBar } from './SubmitBar'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
+import { useAgentRuns } from '../../hooks/useAgentRuns'
+import { useReviewKeys } from '../../hooks/useReviewKeys'
 import { QUEUE_RISK_HIGH_LINES } from '../../github/pr-review-service'
 import { useResizePanel } from '../../hooks/useResizePanel'
 import { StatusChecksBar } from './StatusChecksBar'
 import type { PrReviewDetail, PrChangedFile } from '../../schemas/pr-review.schema'
+import './review-chrome.css'
+
+/** S1 banner info, computed by PrReviewTab from a prCompare against the stored session's head. */
+export interface SinceInfo {
+  commitCount: number
+  changedCount: number
+  historyRewritten: boolean
+}
 
 interface Props {
   repoRoot: string
@@ -21,7 +37,10 @@ interface Props {
   onRefresh: () => Promise<void>
   onShowOverview?: () => void
   onPopOut?: () => void
+  sinceInfo?: SinceInfo | null
 }
+
+const RESUME_CARD_STALE_MS = 15 * 60 * 1000
 
 export function PrReviewView({
   repoRoot,
@@ -30,6 +49,7 @@ export function PrReviewView({
   onRefresh,
   onShowOverview,
   onPopOut,
+  sinceInfo,
 }: Props) {
   const {
     currentChapterId,
@@ -41,7 +61,29 @@ export function PrReviewView({
     markFileViewed,
     setPaused,
     currentUserLogin,
+    changedSince,
+    lastAccessedAt,
+    notes,
+    drafts,
   } = usePrReviewStore()
+
+  const keyboardHelpOpen = useReviewUiStore((s) => s.keyboardHelpOpen)
+  const setKeyboardHelpOpen = useReviewUiStore((s) => s.setKeyboardHelpOpen)
+  const agentRuns = useReviewUiStore((s) => s.agentRuns)
+  const agentPanelScope = useReviewUiStore((s) => s.agentPanelScope)
+
+  useAgentRuns(repoRoot, pr)
+
+  const [showResume, setShowResume] = useState(
+    () => !!lastAccessedAt && Date.now() - new Date(lastAccessedAt).getTime() > RESUME_CARD_STALE_MS
+  )
+  useEffect(() => {
+    setShowResume(
+      !!lastAccessedAt && Date.now() - new Date(lastAccessedAt).getTime() > RESUME_CARD_STALE_MS
+    )
+    // Only re-evaluate when a different PR opens, not on every persist.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pr.number])
 
   const loadInlineComments = useLoadInlineComments(repoRoot)
   const [showSubmit, setShowSubmit] = useState(false)
@@ -169,6 +211,19 @@ export function PrReviewView({
     if (nextIndex < orderedFiles.length) setCurrentFile(orderedFiles[nextIndex].path)
   }
 
+  const handleNextUnviewedFile = () => {
+    const allFiles = displayPr.chapters.flatMap((c) => c.files.map((f) => ({ chapterId: c.id, f })))
+    const startAt = allFiles.findIndex((entry) => entry.f.path === currentFilePath)
+    const rest = [...allFiles.slice(startAt + 1), ...allFiles.slice(0, Math.max(startAt, 0))]
+    const next = rest.find((entry) => !viewedFiles.has(entry.f.path))
+    if (next) {
+      if (next.chapterId !== activeChapterId) setCurrentChapter(next.chapterId)
+      setCurrentFile(next.f.path)
+    }
+  }
+
+  const handleContinueResume = () => setShowResume(false)
+
   const handleFinishChapter = () => {
     if (!activeChapter) return
     orderedFiles.forEach((f) => {
@@ -201,6 +256,15 @@ export function PrReviewView({
   const reviewedCount = [...viewedFiles].filter((p) => displayedPaths.has(p)).length
   const reviewPct =
     totalFiles > 0 ? Math.min(100, Math.round((reviewedCount / totalFiles) * 100)) : 0
+
+  useReviewKeys({
+    nextFile: handleNextFile,
+    prevFile: handlePrevFile,
+    nextUnviewedFile: handleNextUnviewedFile,
+    markViewed: handleMarkViewed,
+    toggleInsights: () => (onShowOverview ? onShowOverview() : undefined),
+    openSubmit: () => setShowSubmit(true),
+  })
 
   const leftPanel =
     viewMode === 'full' ? (
@@ -292,6 +356,25 @@ export function PrReviewView({
           >
             {focusMode ? 'All files' : 'Focus mode'}
           </button>
+          <button
+            className="pr-review-ask-agent-btn"
+            onClick={() =>
+              useReviewUiStore.getState().openAgentPanel(
+                {
+                  kind: 'pr',
+                  path: null,
+                  startLine: null,
+                  endLine: null,
+                  side: null,
+                  chapter: null,
+                },
+                'review'
+              )
+            }
+            title="Ask agent about this PR"
+          >
+            <Sparkles aria-hidden="true" /> Ask agent about this PR
+          </button>
           {onShowOverview && (
             <button
               className="pr-review-overview-btn"
@@ -318,6 +401,17 @@ export function PrReviewView({
 
       {/* Status checks */}
       <StatusChecksBar checks={pr.statusChecks ?? []} />
+
+      {/* S1: commits since the stored session was last opened */}
+      {sinceInfo && (
+        <SinceBanner
+          commitCount={sinceInfo.commitCount}
+          changedCount={sinceInfo.changedCount}
+          stillViewedCount={viewedFiles.size}
+          lastAccessedAt={lastAccessedAt}
+          historyRewritten={sinceInfo.historyRewritten}
+        />
+      )}
 
       {/* Review progress bar */}
       <div
@@ -375,29 +469,70 @@ export function PrReviewView({
           ) : (
             <div className="pr-review-empty-state">Select a file to review.</div>
           )}
+
+          {/* S2: resume card, over the diff area until dismissed */}
+          {showResume && (
+            <ResumeCard
+              pr={pr}
+              lastAccessedAt={lastAccessedAt ?? new Date().toISOString()}
+              viewedCount={reviewedCount}
+              totalFiles={totalFiles}
+              currentChapterId={activeChapterId}
+              currentFilePath={currentFilePath}
+              lastLine={null}
+              notes={notes}
+              drafts={drafts}
+              agentRuns={agentRuns}
+              changedSinceCount={changedSince.size}
+              onContinue={handleContinueResume}
+            />
+          )}
         </main>
 
-        {/* Right panel: risk breakdown (shown on demand) */}
-        {showRiskFor && activeFile && activeFile.path === showRiskFor && (
+        {/* Right panel: the agent panel wins when both it and the risk panel are open */}
+        {agentPanelScope ? (
           <>
             <div className="pr-resize-handle" onMouseDown={handleRightDividerMouseDown} />
             <aside className="pr-review-panel pr-review-panel--right" style={{ width: rightWidth }}>
-              <button
-                className="pr-review-panel-close"
-                onClick={() => setShowRiskFor(null)}
-                aria-label="Close risk panel"
-              >
-                ×
-              </button>
-              <RiskBreakdownPanel
-                filePath={activeFile.path}
-                riskScore={activeFile.riskScore}
-                repoRoot={repoRoot}
-              />
+              <AgentPanel repoRoot={repoRoot} pr={pr} />
             </aside>
           </>
+        ) : (
+          showRiskFor &&
+          activeFile &&
+          activeFile.path === showRiskFor && (
+            <>
+              <div className="pr-resize-handle" onMouseDown={handleRightDividerMouseDown} />
+              <aside
+                className="pr-review-panel pr-review-panel--right"
+                style={{ width: rightWidth }}
+              >
+                <button
+                  className="pr-review-panel-close"
+                  onClick={() => setShowRiskFor(null)}
+                  aria-label="Close risk panel"
+                >
+                  ×
+                </button>
+                <RiskBreakdownPanel
+                  filePath={activeFile.path}
+                  riskScore={activeFile.riskScore}
+                  repoRoot={repoRoot}
+                />
+              </aside>
+            </>
+          )
         )}
       </div>
+
+      {/* S5: draft comments pinned to the bottom until submitted */}
+      <SubmitBar
+        repoRoot={repoRoot}
+        prNumber={pr.number}
+        headSHA={pr.headSHA}
+        drafts={drafts}
+        onReviewDrafts={() => setShowSubmit(true)}
+      />
 
       {/* Submit review overlay */}
       {showSubmit && (
@@ -407,11 +542,15 @@ export function PrReviewView({
           <ReviewSubmitPanel
             repoRoot={repoRoot}
             prNumber={pr.number}
+            headSHA={pr.headSHA}
             isOwnPr={!!currentUserLogin && currentUserLogin === pr.author}
             onClose={() => setShowSubmit(false)}
           />
         </Dialog>
       )}
+
+      {/* S3: keyboard shortcut sheet */}
+      {keyboardHelpOpen && <KeyboardHelp onClose={() => setKeyboardHelpOpen(false)} />}
     </div>
   )
 }

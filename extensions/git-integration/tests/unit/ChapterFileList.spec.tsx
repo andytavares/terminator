@@ -177,4 +177,44 @@ describe('ChapterFileList', () => {
     fireEvent.dragEnd(rows[0])
     expect(container.querySelector('.chapter-file-row--drag-over')).toBeNull()
   })
+
+  it('shows "changed" for a file changed since it was viewed', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      fileOrderOverrides: {},
+      reorderFiles: mockReorderFiles,
+      changedSince: new Set(['src/foo.ts']),
+      viewedAt: {},
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ChapterFileList {...defaultProps} />)
+    expect(screen.getByText('changed')).toBeTruthy()
+  })
+
+  it('shows "new file" for a file a push added since your last look', () => {
+    const chapter = makeChapter()
+    chapter.files[1] = { ...chapter.files[1], changeType: 'added' } as Chapter['files'][number]
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      fileOrderOverrides: {},
+      reorderFiles: mockReorderFiles,
+      changedSince: new Set<string>(),
+      newSinceLook: new Set([chapter.files[1].path]),
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ChapterFileList {...defaultProps} chapter={chapter} />)
+    expect(screen.getByText('new file')).toBeTruthy()
+  })
+
+  it('does not call an added file new on a first review', () => {
+    const chapter = makeChapter()
+    chapter.files[1] = { ...chapter.files[1], changeType: 'added' } as Chapter['files'][number]
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      fileOrderOverrides: {},
+      reorderFiles: mockReorderFiles,
+      changedSince: new Set<string>(),
+      newSinceLook: new Set<string>(),
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ChapterFileList {...defaultProps} chapter={chapter} />)
+    expect(screen.queryByText('new file')).toBeNull()
+  })
 })

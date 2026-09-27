@@ -1,16 +1,20 @@
 import React, { useState } from 'react'
 import { githubAPI } from '../../api/github'
+import { usePrReviewStore } from '../../stores/pr-review.store'
 
 interface Props {
   repoRoot: string
   prNumber: number
+  headSHA: string
   isOwnPr?: boolean
   onClose: () => void
 }
 
 type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
 
-export function ReviewSubmitPanel({ repoRoot, prNumber, isOwnPr, onClose }: Props) {
+export function ReviewSubmitPanel({ repoRoot, prNumber, headSHA, isOwnPr, onClose }: Props) {
+  const drafts = usePrReviewStore((s) => s.drafts)
+  const clearDrafts = usePrReviewStore((s) => s.clearDrafts)
   const [event, setEvent] = useState<ReviewEvent>('COMMENT')
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -18,7 +22,7 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, isOwnPr, onClose }: Prop
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
-    if (event !== 'APPROVE' && !body.trim()) {
+    if (event !== 'APPROVE' && !body.trim() && drafts.length === 0) {
       setError('A comment body is required for this review type.')
       return
     }
@@ -30,8 +34,16 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, isOwnPr, onClose }: Prop
         prNumber,
         event,
         body,
+        comments: drafts.map((d) => ({
+          path: d.path,
+          line: d.line,
+          startLine: d.startLine,
+          side: d.side,
+          body: d.body,
+        })),
       })
       if ('error' in result) throw new Error((result as { error: string }).error)
+      if (drafts.length > 0) clearDrafts(repoRoot, prNumber, headSHA)
       setSubmitted(true)
     } catch (e) {
       setError(String(e).replace(/^Error:\s*/, ''))

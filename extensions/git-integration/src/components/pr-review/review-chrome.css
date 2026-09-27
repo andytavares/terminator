@@ -1,0 +1,281 @@
+/*
+ * Chrome for the review surface's supporting UI: the "since you last looked"
+ * banner (S1), the resume card (S2), the keyboard-help sheet (S3) and the
+ * submit bar (S5). Ported 1:1 from docs/research/code-review-revamp.html —
+ * class names keep the `rc-` prefix, tokens map onto the app's --tm-* set.
+ */
+
+.rc-band {
+  margin: 10px 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--tm-accent-dim);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  font: 13px/1.45 var(--tm-font-ui);
+  color: var(--tm-text-primary);
+}
+
+.rc-band b {
+  font-weight: 600;
+}
+
+.rc-band .rc-sp {
+  flex: 1;
+}
+
+.rc-note {
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.rc-seg {
+  display: inline-flex;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.rc-seg button {
+  background: transparent;
+  border: 0;
+  padding: 4px 10px;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rc-seg button + button {
+  border-left: 1px solid var(--tm-border-strong);
+}
+
+.rc-seg button[aria-pressed='true'] {
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+  font-weight: 600;
+}
+
+.rc-kbd {
+  font: 500 11px/1 var(--tm-font-mono);
+  border: 1px solid var(--tm-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: var(--tm-text-secondary);
+  background: var(--tm-bg-elevated);
+}
+
+.rc-btn {
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font: inherit;
+  color: var(--tm-text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rc-btn.rc-pri {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: #fff;
+}
+
+.rc-btn.rc-ag {
+  border-color: var(--tm-agent);
+  color: var(--tm-agent);
+  background: var(--tm-agent-dim);
+}
+
+/* ── S1: file-list state rows ─────────────────────────────────────────── */
+
+.rc-frow-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+.rc-frow-state svg {
+  width: 12px;
+  height: 12px;
+}
+
+.rc-frow-sub {
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.rc-frow-sub--changed {
+  color: var(--tm-warning);
+}
+
+.rc-frow-sub--new {
+  color: var(--tm-accent-text);
+}
+
+.rc-frow-sub--viewed {
+  color: var(--tm-success);
+}
+
+.full-file-row-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rc-frow-reason {
+  display: block;
+  line-height: 1.35;
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.rc-frow-reason--viewed {
+  color: var(--tm-success);
+}
+
+/* ── S2: resume card ───────────────────────────────────────────────────── */
+
+.rc-resume {
+  margin: 14px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 10px;
+  background: var(--tm-bg-elevated);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  font: 13px/1.45 var(--tm-font-ui);
+  color: var(--tm-text-primary);
+}
+
+.rc-resume-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.rc-resume ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.rc-resume li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+}
+
+.rc-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+  font: 600 10px/1 var(--tm-font-ui);
+}
+
+.rc-pip.rc-ag {
+  background: var(--tm-agent-dim);
+  color: var(--tm-agent);
+  outline: 1px dashed var(--tm-agent);
+}
+
+/* ── S3: keyboard help sheet ───────────────────────────────────────────── */
+
+.rc-keys-overlay {
+  color: var(--tm-text-primary);
+  font: 13px/1.45 var(--tm-font-ui);
+}
+
+.rc-keys-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  background: var(--tm-bg-surface);
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.rc-keys-bar .rc-t {
+  font-weight: 600;
+}
+
+.rc-keys-bar .rc-sp {
+  flex: 1;
+}
+
+.rc-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px 22px;
+  padding: 14px;
+}
+
+.rc-keys > div {
+  white-space: nowrap;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.rc-keys .rc-kbd {
+  min-width: 26px;
+  text-align: center;
+}
+
+/* ── S5: submit bar ────────────────────────────────────────────────────── */
+
+.rc-submit {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--tm-bg-elevated);
+  border-top: 1px solid var(--tm-border);
+  font: 13px/1.45 var(--tm-font-ui);
+  color: var(--tm-text-primary);
+}
+
+.rc-submit-error {
+  color: var(--tm-danger);
+  font-size: 12px;
+}
+
+/* ── topbar: ask agent about this PR ──────────────────────────────────── */
+
+.pr-review-ask-agent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--tm-agent);
+  color: var(--tm-agent);
+  background: var(--tm-agent-dim);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pr-review-ask-agent-btn svg {
+  width: 13px;
+  height: 13px;
+}
