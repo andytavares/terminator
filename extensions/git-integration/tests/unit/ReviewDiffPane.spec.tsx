@@ -2,8 +2,13 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
+import { useReviewUiStore } from '../../src/stores/review-ui.store'
 
 vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
+vi.mock('../../src/stores/review-ui.store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/stores/review-ui.store')>()
+  return { ...actual, useReviewUiStore: vi.fn() }
+})
 vi.mock('../../src/components/pr-review/HealthChips', () => ({
   HealthChips: () => <div data-testid="health-chips" />,
 }))
@@ -27,8 +32,57 @@ vi.mock('../../src/github/pr-review-service', async (importOriginal) => {
 })
 
 const mockPatchFileComplexity = vi.fn()
+const mockAddNote = vi.fn()
+const mockRemoveNote = vi.fn()
+const mockAddDraft = vi.fn()
+const mockUpdateDraft = vi.fn()
+const mockRemoveDraft = vi.fn()
+const mockSetCurrentChapter = vi.fn()
+const mockSetCurrentFile = vi.fn()
+const mockSetSelection = vi.fn()
+const mockSetCommentVisibility = vi.fn()
+const mockSetAgentNotesOn = vi.fn()
+const mockRequestComposer = vi.fn()
+const mockOpenAgentPanel = vi.fn()
 const mockPrFileDiff = vi.fn()
+const mockPrCompare = vi.fn()
 const mockInvoke = vi.fn()
+
+function basePrReviewStoreState() {
+  return {
+    viewedFiles: new Set<string>(),
+    threads: {},
+    patchFileComplexity: mockPatchFileComplexity,
+    changedSince: new Set<string>(),
+    viewedAt: {},
+    historyRewritten: false,
+    notes: [],
+    drafts: [],
+    addNote: mockAddNote,
+    removeNote: mockRemoveNote,
+    addDraft: mockAddDraft,
+    updateDraft: mockUpdateDraft,
+    removeDraft: mockRemoveDraft,
+    setCurrentChapter: mockSetCurrentChapter,
+    setCurrentFile: mockSetCurrentFile,
+  }
+}
+
+function baseReviewUiStoreState() {
+  return {
+    commentVisibility: 'all' as const,
+    setCommentVisibility: mockSetCommentVisibility,
+    agentNotesOn: true,
+    setAgentNotesOn: mockSetAgentNotesOn,
+    diffRange: 'whole' as const,
+    selection: null,
+    setSelection: mockSetSelection,
+    composerRequest: null,
+    requestComposer: mockRequestComposer,
+    agentRuns: [],
+    openAgentPanel: mockOpenAgentPanel,
+  }
+}
 
 const mockFile = {
   path: 'src/foo.ts',
@@ -78,6 +132,9 @@ const mockPr = {
       files: [mockFile],
     },
   ],
+  readingOrder: [] as never[],
+  movedBlocks: [] as never[],
+  insights: null,
 }
 
 const defaultProps = {
@@ -98,18 +155,21 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockPrFileDiff.mockResolvedValue({ diff: { hunks: [] } })
+  mockPrCompare.mockResolvedValue({ rewritten: false, commits: [], files: [] })
   mockInvoke.mockImplementation((channel: string, payload: unknown) => {
     if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
+    if (channel === 'github:pr-compare') return mockPrCompare(payload)
     return Promise.resolve({})
   })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke: mockInvoke },
   }
-  vi.mocked(usePrReviewStore).mockReturnValue({
-    viewedFiles: new Set<string>(),
-    threads: {},
-    patchFileComplexity: mockPatchFileComplexity,
-  } as unknown as ReturnType<typeof usePrReviewStore>)
+  vi.mocked(usePrReviewStore).mockReturnValue(
+    basePrReviewStoreState() as unknown as ReturnType<typeof usePrReviewStore>
+  )
+  vi.mocked(useReviewUiStore).mockReturnValue(
+    baseReviewUiStoreState() as unknown as ReturnType<typeof useReviewUiStore>
+  )
 })
 
 afterEach(() => {
@@ -168,9 +228,8 @@ describe('ReviewDiffPane', () => {
 
   it('shows viewed badge when file is already viewed', async () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
+      ...basePrReviewStoreState(),
       viewedFiles: new Set(['src/foo.ts']),
-      threads: {},
-      patchFileComplexity: mockPatchFileComplexity,
     } as unknown as ReturnType<typeof usePrReviewStore>)
     await renderPane()
     expect(screen.getByText(/Viewed/)).toBeTruthy()
@@ -272,7 +331,7 @@ describe('ReviewDiffPane', () => {
     await waitFor(() => expect(container.querySelector('.diff-table--split')).toBeTruthy())
   })
 
-  it('opens composer when gutter button is clicked', async () => {
+  it('gutter drag no longer opens the composer, but calls setSelection', async () => {
     const diff = {
       path: 'src/foo.ts',
       isBinary: false,
@@ -298,10 +357,20 @@ describe('ReviewDiffPane', () => {
     fireEvent.mouseDown(btn)
     fireEvent.mouseUp(btn)
 
-    await waitFor(() => expect(screen.getByTestId('composer')).toBeTruthy())
+    expect(mockSetSelection).toHaveBeenCalledWith({
+      path: 'src/foo.ts',
+      side: 'RIGHT',
+      startLine: 1,
+      endLine: 1,
+    })
+    expect(screen.queryByTestId('composer')).toBeNull()
   })
 
-  it('closes composer when cancel is clicked', async () => {
+  it('shows the float bar under a selection, with Comment opening the composer', async () => {
+    vi.mocked(useReviewUiStore).mockReturnValue({
+      ...baseReviewUiStoreState(),
+      selection: { path: 'src/foo.ts', side: 'RIGHT' as const, startLine: 1, endLine: 1 },
+    } as unknown as ReturnType<typeof useReviewUiStore>)
     const diff = {
       path: 'src/foo.ts',
       isBinary: false,
@@ -323,13 +392,52 @@ describe('ReviewDiffPane', () => {
     await renderPane()
     await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
 
-    const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
-    fireEvent.mouseDown(btn)
-    fireEvent.mouseUp(btn)
+    expect(screen.queryByTestId('composer')).toBeNull()
+    fireEvent.click(screen.getByText('Comment'))
     await waitFor(() => expect(screen.getByTestId('composer')).toBeTruthy())
 
     fireEvent.click(screen.getByText('Cancel'))
     await waitFor(() => expect(screen.queryByTestId('composer')).toBeNull())
+  })
+
+  it('calls openAgentPanel with the lines scope when Ask agent is clicked', async () => {
+    vi.mocked(useReviewUiStore).mockReturnValue({
+      ...baseReviewUiStoreState(),
+      selection: { path: 'src/foo.ts', side: 'RIGHT' as const, startLine: 1, endLine: 1 },
+    } as unknown as ReturnType<typeof useReviewUiStore>)
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,1 +1,1 @@',
+          lines: [
+            {
+              type: 'context' as const,
+              content: 'const x = 1',
+              oldLineNumber: 1,
+              newLineNumber: 1,
+            },
+          ],
+        },
+      ],
+    }
+    mockPrFileDiff.mockResolvedValue({ diff })
+    await renderPane()
+    await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+
+    fireEvent.click(screen.getByText(/Ask agent/))
+    expect(mockOpenAgentPanel).toHaveBeenCalledWith(
+      {
+        kind: 'lines',
+        path: 'src/foo.ts',
+        startLine: 1,
+        endLine: 1,
+        side: 'RIGHT',
+        chapter: null,
+      },
+      'review'
+    )
   })
 
   it('renders inline comment threads on matching lines', async () => {
@@ -362,9 +470,8 @@ describe('ReviewDiffPane', () => {
       ],
     }
     vi.mocked(usePrReviewStore).mockReturnValue({
-      viewedFiles: new Set<string>(),
+      ...basePrReviewStoreState(),
       threads: { 'src/foo.ts': [thread] },
-      patchFileComplexity: mockPatchFileComplexity,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
     const diff = {
@@ -405,5 +512,753 @@ describe('ReviewDiffPane', () => {
     const medFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'medium' as const } }
     await renderPane({ file: medFile })
     expect(screen.getByText(/Medium risk/)).toBeTruthy()
+  })
+
+  describe('comment visibility (R2)', () => {
+    const singleLineDiff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,1 +1,1 @@',
+          lines: [{ type: 'context' as const, content: 'x', oldLineNumber: 1, newLineNumber: 1 }],
+        },
+      ],
+    }
+    const openThread = {
+      id: 'thread-open',
+      path: 'src/foo.ts',
+      line: 1,
+      startLine: null,
+      side: 'RIGHT' as const,
+      outdated: false,
+      collapsed: false,
+      resolved: false,
+      comments: [
+        {
+          id: 1,
+          author: 'a',
+          authorAvatarUrl: '',
+          body: 'x',
+          createdAt: '',
+          updatedAt: '',
+          path: 'src/foo.ts',
+          line: 1,
+          startLine: null,
+          side: 'RIGHT' as const,
+          diffHunk: '',
+          outdated: false,
+          threadId: 'thread-open',
+          isReply: false,
+          parentId: null,
+        },
+      ],
+    }
+    const resolvedThread = {
+      ...openThread,
+      id: 'thread-resolved',
+      resolved: true,
+      comments: [{ ...openThread.comments[0], threadId: 'thread-resolved' }],
+    }
+
+    it('Hidden removes thread rendering and shows a gutter pip with the count', async () => {
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...basePrReviewStoreState(),
+        threads: { 'src/foo.ts': [openThread, resolvedThread] },
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        commentVisibility: 'hidden',
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      mockPrFileDiff.mockResolvedValue({ diff: singleLineDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+
+      expect(screen.queryByTestId('thread')).toBeNull()
+      expect(screen.getByText('2')).toBeTruthy()
+    })
+
+    it('clicking a hidden pip sets visibility back to all', async () => {
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...basePrReviewStoreState(),
+        threads: { 'src/foo.ts': [openThread] },
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        commentVisibility: 'hidden',
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      mockPrFileDiff.mockResolvedValue({ diff: singleLineDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+
+      fireEvent.click(screen.getByRole('button', { name: '1 hidden comments' }))
+      expect(mockSetCommentVisibility).toHaveBeenCalledWith('all')
+    })
+
+    it('Unresolved hides a resolved thread but keeps an open one', async () => {
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...basePrReviewStoreState(),
+        threads: { 'src/foo.ts': [openThread, resolvedThread] },
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        commentVisibility: 'unresolved',
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      mockPrFileDiff.mockResolvedValue({ diff: singleLineDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+
+      expect(screen.getAllByTestId('thread')).toHaveLength(1)
+    })
+
+    it('All shows every thread, including resolved ones', async () => {
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...basePrReviewStoreState(),
+        threads: { 'src/foo.ts': [openThread, resolvedThread] },
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      mockPrFileDiff.mockResolvedValue({ diff: singleLineDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+
+      expect(screen.getAllByTestId('thread')).toHaveLength(2)
+    })
+  })
+
+  describe('agent notes (R5)', () => {
+    const singleLineDiff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ fetchFileMetrics @@',
+          lines: [
+            { type: 'context' as const, content: 'x', oldLineNumber: 317, newLineNumber: 317 },
+          ],
+        },
+      ],
+    }
+    const agentRun = {
+      id: 'run-1',
+      repoRoot: '/repo',
+      prNumber: 1,
+      headSHA: 'abc',
+      sessionId: 's1',
+      scope: {
+        kind: 'lines' as const,
+        path: 'src/foo.ts',
+        startLine: 309,
+        endLine: 317,
+        side: 'RIGHT' as const,
+        chapter: null,
+      },
+      request: 'review' as const,
+      question: null,
+      status: 'done' as const,
+      startedAt: '',
+      finishedAt: '',
+      activity: [],
+      summary: null,
+      findings: [
+        {
+          id: 'f1',
+          severity: 'suggestion' as const,
+          path: 'src/foo.ts',
+          startLine: 317,
+          endLine: 317,
+          side: 'RIGHT' as const,
+          title: 'Risk scored twice per file',
+          body: 'usePrReview.ts:317 calls computeRiskScore again.',
+          suggestedCode: null,
+          dismissed: false,
+        },
+      ],
+      walkthrough: [],
+      error: null,
+    }
+
+    it('renders the agent note text after the finding line when agent notes are on', async () => {
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        agentRuns: [agentRun],
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      mockPrFileDiff.mockResolvedValue({ diff: singleLineDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText(/calls computeRiskScore again/)).toBeTruthy())
+      expect(screen.getByText(/Agent note ·/)).toBeTruthy()
+    })
+
+    it('shows an agent pip instead of the note when agent notes are off', async () => {
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        agentRuns: [agentRun],
+        agentNotesOn: false,
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      mockPrFileDiff.mockResolvedValue({ diff: singleLineDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ fetchFileMetrics @@')).toBeTruthy())
+      expect(screen.queryByText(/Agent note ·/)).toBeNull()
+      expect(screen.getByText('1')).toBeTruthy()
+    })
+  })
+
+  describe('moved code (S4)', () => {
+    it('collapses a moved-here block into one row', async () => {
+      const diff = {
+        path: 'review/reading-order.ts',
+        isBinary: false,
+        hunks: [
+          {
+            header: '@@ -0,0 +1,3 @@',
+            lines: [
+              { type: 'add' as const, content: 'a', oldLineNumber: null, newLineNumber: 41 },
+              { type: 'add' as const, content: 'b', oldLineNumber: null, newLineNumber: 42 },
+            ],
+          },
+        ],
+      }
+      mockPrFileDiff.mockResolvedValue({ diff })
+      const movedFile = { ...mockFile, path: 'review/reading-order.ts' }
+      const prWithMove = {
+        ...mockPr,
+        movedBlocks: [
+          {
+            fromPath: 'github/pr-review-service.ts',
+            fromLine: 360,
+            toPath: 'review/reading-order.ts',
+            toLine: 41,
+            lineCount: 28,
+            symbol: 'UnionFind',
+          },
+        ],
+      }
+      await renderPane({ file: movedFile, pr: prWithMove })
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            (_, node) =>
+              node?.textContent ===
+              'UnionFind · 28 lines, unchanged, from github/pr-review-service.ts:360'
+          )
+        ).toBeTruthy()
+      )
+      expect(screen.getByText('Moved')).toBeTruthy()
+    })
+
+    it('collapses a moved-away (removed) block into one row', async () => {
+      const diff = {
+        path: 'github/pr-review-service.ts',
+        isBinary: false,
+        hunks: [
+          {
+            header: '@@ -360,2 +360,0 @@',
+            lines: [
+              { type: 'remove' as const, content: 'a', oldLineNumber: 360, newLineNumber: null },
+              { type: 'remove' as const, content: 'b', oldLineNumber: 361, newLineNumber: null },
+            ],
+          },
+        ],
+      }
+      mockPrFileDiff.mockResolvedValue({ diff })
+      const movedFromFile = { ...mockFile, path: 'github/pr-review-service.ts' }
+      const prWithMove = {
+        ...mockPr,
+        movedBlocks: [
+          {
+            fromPath: 'github/pr-review-service.ts',
+            fromLine: 360,
+            toPath: 'review/reading-order.ts',
+            toLine: 41,
+            lineCount: 28,
+            symbol: 'UnionFind',
+          },
+        ],
+      }
+      await renderPane({ file: movedFromFile, pr: prWithMove })
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            (_, node) =>
+              node?.textContent ===
+              'UnionFind · 28 lines, unchanged, moved to review/reading-order.ts:41'
+          )
+        ).toBeTruthy()
+      )
+      expect(screen.getByText('Moved')).toBeTruthy()
+    })
+  })
+
+  describe('split view parity', () => {
+    const splitDiff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -85,3 +88,3 @@',
+          lines: [
+            { type: 'add' as const, content: 'a', oldLineNumber: null, newLineNumber: 88 },
+            { type: 'add' as const, content: 'b', oldLineNumber: null, newLineNumber: 89 },
+          ],
+        },
+      ],
+    }
+
+    async function renderSplit(overrides: Partial<typeof defaultProps> = {}) {
+      mockPrFileDiff.mockResolvedValue({ diff: splitDiff })
+      const view = await renderPane(overrides)
+      await waitFor(() => expect(screen.getByText('@@ -85,3 +88,3 @@')).toBeTruthy())
+      fireEvent.click(screen.getByTitle('Split diff view'))
+      await waitFor(() => expect(document.querySelector('.diff-table--split')).toBeTruthy())
+      return view
+    }
+
+    it('renders the agent note text and pip in the split view', async () => {
+      const agentRun = {
+        id: 'run-1',
+        repoRoot: '/repo',
+        prNumber: 1,
+        headSHA: 'abc',
+        sessionId: 's1',
+        scope: {
+          kind: 'lines' as const,
+          path: 'src/foo.ts',
+          startLine: 88,
+          endLine: 89,
+          side: 'RIGHT' as const,
+          chapter: null,
+        },
+        request: 'review' as const,
+        question: null,
+        status: 'done' as const,
+        startedAt: '',
+        finishedAt: '',
+        activity: [],
+        summary: null,
+        findings: [
+          {
+            id: 'f1',
+            severity: 'nit' as const,
+            path: 'src/foo.ts',
+            startLine: 89,
+            endLine: 89,
+            side: 'RIGHT' as const,
+            title: 'x',
+            body: 'split-view agent note body',
+            suggestedCode: null,
+            dismissed: false,
+          },
+        ],
+        walkthrough: [],
+        error: null,
+      }
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        agentRuns: [agentRun],
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      const first = await renderSplit()
+      expect(screen.getByText(/split-view agent note body/)).toBeTruthy()
+      first.unmount()
+
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        agentRuns: [agentRun],
+        agentNotesOn: false,
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      await renderSplit()
+      expect(screen.queryByText(/split-view agent note body/)).toBeNull()
+      expect(screen.getByText('1')).toBeTruthy()
+    })
+
+    it('collapses moved blocks (both directions) in the split view', async () => {
+      const prWithMove = {
+        ...mockPr,
+        movedBlocks: [
+          {
+            fromPath: 'github/pr-review-service.ts',
+            fromLine: 360,
+            toPath: 'src/foo.ts',
+            toLine: 88,
+            lineCount: 28,
+            symbol: 'UnionFind',
+          },
+        ],
+      }
+      await renderSplit({ pr: prWithMove })
+      expect(screen.getByText('Moved')).toBeTruthy()
+      expect(
+        screen.getByText(
+          (_, node) =>
+            node?.textContent ===
+            'UnionFind · 28 lines, unchanged, from github/pr-review-service.ts:360'
+        )
+      ).toBeTruthy()
+    })
+
+    it('shows the R4 gutter insight chips in the split view', async () => {
+      const prWithInsights = {
+        ...mockPr,
+        insights: {
+          complexity: {
+            branchDelta: 6,
+            functions: [{ path: 'src/foo.ts', name: 'shardByDuration', line: 88, branchDelta: 6 }],
+            source: 'tree-sitter',
+          },
+          coverage: {
+            changedFunctions: 1,
+            testedFunctions: 1,
+            untestedFunctions: [],
+            patchPercent: null,
+            source: 'test files',
+            changedSourceFiles: 1,
+            changedSourceFilesWithTests: 1,
+          },
+          health: { flags: [], source: 'tree-sitter' },
+          understandability: {
+            level: 'moderate' as const,
+            linesToRead: 10,
+            newExports: 1,
+            longestChain: 1,
+            crossChapterRefs: 0,
+            source: 'reading-order',
+          },
+        },
+      }
+      await renderSplit({ pr: prWithInsights })
+      expect(screen.getByText('+6')).toBeTruthy()
+    })
+  })
+
+  describe('private notes side (S2)', () => {
+    it('renders a LEFT-side note under the removed line', async () => {
+      const diff = {
+        path: 'src/foo.ts',
+        isBinary: false,
+        hunks: [
+          {
+            header: '@@ -5,1 +5,0 @@',
+            lines: [
+              { type: 'remove' as const, content: 'x', oldLineNumber: 5, newLineNumber: null },
+            ],
+          },
+        ],
+      }
+      mockPrFileDiff.mockResolvedValue({ diff })
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...basePrReviewStoreState(),
+        notes: [
+          {
+            id: 'n1',
+            path: 'src/foo.ts',
+            line: 5,
+            side: 'LEFT' as const,
+            body: 'left side note',
+            createdAt: '',
+          },
+        ],
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('left side note')).toBeTruthy())
+    })
+  })
+
+  describe('keyboard events (REVIEW_KEY_EVENTS)', () => {
+    const twoHunkDiff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,1 +1,1 @@',
+          lines: [{ type: 'context' as const, content: 'a', oldLineNumber: 1, newLineNumber: 1 }],
+        },
+        {
+          header: '@@ -10,1 +10,1 @@',
+          lines: [{ type: 'context' as const, content: 'b', oldLineNumber: 10, newLineNumber: 10 }],
+        },
+      ],
+    }
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn()
+    })
+
+    it('nextHunk scrolls the next hunk header into view', async () => {
+      mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+      const headers = screen.getAllByText(/@@/)
+      const spy = vi.spyOn(headers[1], 'scrollIntoView')
+      window.dispatchEvent(new CustomEvent('review:next-hunk'))
+      expect(spy).toHaveBeenCalledWith({ block: 'start' })
+    })
+
+    it('nextHunk at the last hunk calls onNextFile', async () => {
+      const singleHunkDiff = {
+        path: 'src/foo.ts',
+        isBinary: false,
+        hunks: [
+          {
+            header: '@@ -1,1 +1,1 @@',
+            lines: [{ type: 'context' as const, content: 'a', oldLineNumber: 1, newLineNumber: 1 }],
+          },
+        ],
+      }
+      mockPrFileDiff.mockResolvedValue({ diff: singleHunkDiff })
+      const onNextFile = vi.fn()
+      await renderPane({ onNextFile })
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+      window.dispatchEvent(new CustomEvent('review:next-hunk'))
+      expect(onNextFile).toHaveBeenCalled()
+    })
+
+    it('prevHunk scrolls the previous hunk header into view', async () => {
+      mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+      const headers = screen.getAllByText(/@@/)
+      window.dispatchEvent(new CustomEvent('review:next-hunk')) // move to hunk 1 first
+      const spy = vi.spyOn(headers[0], 'scrollIntoView')
+      window.dispatchEvent(new CustomEvent('review:prev-hunk'))
+      expect(spy).toHaveBeenCalledWith({ block: 'start' })
+    })
+
+    it('askAgent with no selection opens the agent panel scoped to the nearest hunk', async () => {
+      mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+      window.dispatchEvent(new CustomEvent('review:ask-agent'))
+      expect(mockOpenAgentPanel).toHaveBeenCalledWith(
+        {
+          kind: 'hunk',
+          path: 'src/foo.ts',
+          startLine: 1,
+          endLine: 1,
+          side: 'RIGHT',
+          chapter: null,
+        },
+        'review'
+      )
+    })
+
+    it('explain requests explain with autoStart', async () => {
+      mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+      window.dispatchEvent(new CustomEvent('review:explain'))
+      expect(mockOpenAgentPanel).toHaveBeenCalledWith(
+        {
+          kind: 'hunk',
+          path: 'src/foo.ts',
+          startLine: 1,
+          endLine: 1,
+          side: 'RIGHT',
+          chapter: null,
+        },
+        'explain',
+        true
+      )
+    })
+
+    it('comment opens the composer on the selection', async () => {
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        selection: { path: 'src/foo.ts', side: 'RIGHT' as const, startLine: 1, endLine: 1 },
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+      expect(screen.queryByTestId('composer')).toBeNull()
+      window.dispatchEvent(new CustomEvent('review:comment'))
+      await waitFor(() => expect(screen.getByTestId('composer')).toBeTruthy())
+    })
+
+    it('note opens the note composer on the selection', async () => {
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        selection: { path: 'src/foo.ts', side: 'RIGHT' as const, startLine: 1, endLine: 1 },
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
+      await renderPane()
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+      window.dispatchEvent(new CustomEvent('review:note'))
+      await waitFor(() => expect(screen.getByPlaceholderText('Private note…')).toBeTruthy())
+    })
+
+    it('peekDefinition selects the definition file', async () => {
+      const prWithOrder = {
+        ...mockPr,
+        readingOrder: [
+          {
+            step: 4,
+            path: 'src/foo.ts',
+            symbol: 'fetchFileMetrics',
+            reason: 'Uses computeRiskScore (step 2)',
+            uses: [{ symbol: 'computeRiskScore', definedInStep: 2, definedInPath: 'src/other.ts' }],
+          },
+        ],
+        chapters: [
+          {
+            id: 'ch-1',
+            name: 'Ch',
+            estimatedMinutes: 5,
+            status: 'not-started' as const,
+            files: [mockFile],
+          },
+          {
+            id: 'ch-2',
+            name: 'Ch2',
+            estimatedMinutes: 5,
+            status: 'not-started' as const,
+            files: [{ ...mockFile, path: 'src/other.ts' }],
+          },
+        ],
+      }
+      mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
+      await renderPane({ pr: prWithOrder })
+      await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+      window.dispatchEvent(new CustomEvent('review:peek-definition'))
+      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('src/other.ts')
+    })
+  })
+
+  describe('reading order (R3)', () => {
+    it('shows "Step N of M" and a use chip for a defined-and-read symbol', async () => {
+      const prWithOrder = {
+        ...mockPr,
+        readingOrder: [
+          {
+            step: 4,
+            path: 'src/foo.ts',
+            symbol: 'fetchFileMetrics',
+            reason: 'Uses computeRiskScore (step 2)',
+            uses: [{ symbol: 'computeRiskScore', definedInStep: 2, definedInPath: 'src/other.ts' }],
+          },
+        ],
+      }
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...basePrReviewStoreState(),
+        viewedFiles: new Set(['src/other.ts']),
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      await renderPane({ pr: prWithOrder })
+      expect(screen.getByText('Step 4 of 1')).toBeTruthy()
+      expect(screen.getByText('computeRiskScore · read in step 2')).toBeTruthy()
+    })
+
+    it('calls setCurrentChapter/setCurrentFile when Peek definition is clicked', async () => {
+      const prWithOrder = {
+        ...mockPr,
+        readingOrder: [
+          {
+            step: 4,
+            path: 'src/foo.ts',
+            symbol: 'fetchFileMetrics',
+            reason: 'Uses computeRiskScore (step 2)',
+            uses: [{ symbol: 'computeRiskScore', definedInStep: 2, definedInPath: 'src/other.ts' }],
+          },
+        ],
+        chapters: [
+          {
+            id: 'ch-1',
+            name: 'Ch',
+            estimatedMinutes: 5,
+            status: 'not-started' as const,
+            files: [mockFile],
+          },
+          {
+            id: 'ch-2',
+            name: 'Ch2',
+            estimatedMinutes: 5,
+            status: 'not-started' as const,
+            files: [{ ...mockFile, path: 'src/other.ts' }],
+          },
+        ],
+      }
+      await renderPane({ pr: prWithOrder })
+      fireEvent.click(screen.getByText('Peek definition'))
+      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('src/other.ts')
+    })
+  })
+
+  describe('since-my-review diff (S1)', () => {
+    it('calls prCompare with the viewed sha when the file changed since the review', async () => {
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...basePrReviewStoreState(),
+        changedSince: new Set(['src/foo.ts']),
+        viewedAt: { 'src/foo.ts': '9f0c76eb0000000000000000000000000000000' },
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...baseReviewUiStoreState(),
+        diffRange: 'since',
+      } as unknown as ReturnType<typeof useReviewUiStore>)
+      mockPrCompare.mockResolvedValue({
+        rewritten: false,
+        commits: [],
+        files: [{ path: 'src/foo.ts', status: 'modified', patch: '@@ -1,1 +1,1 @@\n-a\n+b' }],
+      })
+      await renderPane()
+      await waitFor(() =>
+        expect(mockPrCompare).toHaveBeenCalledWith({
+          repoRoot: '/repo',
+          fromSha: '9f0c76eb0000000000000000000000000000000',
+          toSha: 'abc',
+        })
+      )
+      await waitFor(() => expect(screen.getByText(/Showing 9f0c76eb/)).toBeTruthy())
+      expect(mockPrFileDiff).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('insight gutter chips (R4)', () => {
+    it('shows a warning "+N" chip and a danger "untested" chip', async () => {
+      const diff = {
+        path: 'src/foo.ts',
+        isBinary: false,
+        hunks: [
+          {
+            header: '@@ -85,3 +88,3 @@',
+            lines: [
+              { type: 'add' as const, content: 'a', oldLineNumber: null, newLineNumber: 88 },
+              { type: 'add' as const, content: 'b', oldLineNumber: null, newLineNumber: 89 },
+            ],
+          },
+        ],
+      }
+      mockPrFileDiff.mockResolvedValue({ diff })
+      const prWithInsights = {
+        ...mockPr,
+        insights: {
+          complexity: {
+            branchDelta: 6,
+            functions: [
+              { path: 'src/foo.ts', name: 'shardByDuration', line: 88, branchDelta: 6 },
+              { path: 'src/foo.ts', name: 'readBurnIn', line: 89, branchDelta: 3 },
+            ],
+            source: 'tree-sitter',
+          },
+          coverage: {
+            changedFunctions: 2,
+            testedFunctions: 0,
+            untestedFunctions: ['readBurnIn'],
+            patchPercent: null,
+            source: 'test files',
+            changedSourceFiles: 1,
+            changedSourceFilesWithTests: 0,
+          },
+          health: { flags: [], source: 'tree-sitter' },
+          understandability: {
+            level: 'moderate' as const,
+            linesToRead: 10,
+            newExports: 1,
+            longestChain: 1,
+            crossChapterRefs: 0,
+            source: 'reading-order',
+          },
+        },
+      }
+      await renderPane({ pr: prWithInsights })
+      await waitFor(() => expect(screen.getByText('@@ -85,3 +88,3 @@')).toBeTruthy())
+      expect(screen.getByText('+6')).toBeTruthy()
+      expect(screen.getByText('untested')).toBeTruthy()
+    })
   })
 })

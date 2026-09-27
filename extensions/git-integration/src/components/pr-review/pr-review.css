@@ -1053,128 +1053,6 @@
   overflow: hidden;
 }
 
-.review-diff-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 7px 14px;
-  border-bottom: 1px solid var(--tm-border);
-  flex-shrink: 0;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.review-diff-header-left,
-.review-diff-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.review-diff-risk-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.review-diff-risk-dot--low {
-  background: var(--tm-success);
-}
-.review-diff-risk-dot--medium {
-  background: var(--tm-warning);
-}
-.review-diff-risk-dot--high {
-  background: var(--tm-danger);
-}
-
-.review-diff-filename {
-  font-weight: 500;
-  font-family: monospace;
-  font-size: 12px;
-  color: var(--tm-text-primary);
-}
-
-.review-diff-change-badge {
-  padding: 1px 7px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 600;
-  background: var(--tm-overlay);
-  color: var(--tm-text-muted);
-}
-
-.review-diff-risk-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 700;
-}
-.review-diff-risk-label--high {
-  color: var(--tm-danger);
-}
-.review-diff-risk-label--medium {
-  color: var(--tm-warning);
-}
-.review-diff-risk-label--low {
-  color: var(--tm-success);
-}
-
-.review-diff-why-btn {
-  background: none;
-  border: 1px solid currentColor;
-  color: inherit;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 5px;
-  opacity: 0.8;
-}
-.review-diff-why-btn:hover {
-  opacity: 1;
-  background: var(--tm-overlay-soft);
-}
-
-.review-diff-changes {
-  font-size: 12px;
-  color: var(--tm-text-muted);
-  font-family: monospace;
-}
-
-.review-diff-viewed-badge {
-  font-size: 11px;
-  color: var(--tm-success);
-  font-weight: 600;
-}
-
-.review-diff-view-toggle {
-  display: flex;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.review-diff-view-btn {
-  background: none;
-  border: none;
-  padding: 2px 8px;
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  transition:
-    background 0.1s,
-    color 0.1s;
-}
-.review-diff-view-btn:hover {
-  background: var(--tm-overlay-soft);
-  color: var(--tm-text-primary);
-}
-.review-diff-view-btn--active {
-  background: var(--tm-overlay);
-  color: var(--tm-text-primary);
-  font-weight: 600;
-}
-
 .review-diff-scroll {
   flex: 1;
   overflow: auto;
@@ -1361,34 +1239,6 @@
   background: color-mix(in srgb, var(--tm-accent) 80%, transparent);
   pointer-events: none;
   z-index: var(--tm-layer-panel);
-}
-
-/* Semantic-only filter toggle — standalone button next to the Unified/Split toggle */
-.review-diff-filter-btn {
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  transition:
-    background 0.1s,
-    color 0.1s,
-    border-color 0.1s;
-}
-
-.review-diff-filter-btn:hover {
-  background: var(--tm-overlay-soft);
-  color: var(--tm-text-primary);
-  border-color: var(--tm-border-strong);
-}
-
-.review-diff-filter-btn--active {
-  background: color-mix(in srgb, var(--tm-accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--tm-accent) 35%, transparent);
-  color: var(--tm-accent);
-  font-weight: 500;
 }
 
 /* Formatting-only hunks hidden notice */
@@ -2308,15 +2158,6 @@
 }
 .full-file-row-del {
   color: var(--tm-danger);
-}
-
-/* Principle XII: an SVG does not read font-size. */
-.full-file-row-check {
-  width: 11px;
-  height: 11px;
-  flex-shrink: 0;
-  color: var(--tm-success);
-  flex-shrink: 0;
 }
 
 /* ─── Overview button in review topbar ────────────────────────────────────── */
