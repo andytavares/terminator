@@ -26,7 +26,9 @@ interface FileNode {
 
 function referenceKind(addedText: string, symbol: string): ReferenceKind {
   const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  if (new RegExp(`<${escaped}\\b`).test(addedText)) return 'render'
+  // A JSX element opens after whitespace, `(`, `{`, `=`, `>` or `?`/`:`; a type
+  // argument (`Record<Priority, …>`) follows an identifier, so it is a use.
+  if (new RegExp(`(^|[\\s({=>?:,])<${escaped}\\b`, 'm').test(addedText)) return 'render'
   if (new RegExp(`\\b${escaped}\\s*\\(`).test(addedText)) return 'call'
   return 'use'
 }

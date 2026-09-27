@@ -201,3 +201,29 @@ describe('buildReadingOrder() — edge cases', () => {
     expect(steps[0].path).toBe(orphanSpec.path)
   })
 })
+
+describe('buildReadingOrder() — reference wording', () => {
+  it('says "Uses" for a type argument such as Record<Priority, number>, not "Renders"', async () => {
+    const files = [
+      {
+        filename: 'src/test-batch/pr-050/types.ts',
+        additions: 1,
+        deletions: 0,
+        patch: "@@ -0,0 +1,1 @@\n+export type Priority = 'low' | 'medium' | 'high' | 'critical'",
+      },
+      {
+        filename: 'src/test-batch/pr-050/utils.ts',
+        additions: 3,
+        deletions: 0,
+        patch: [
+          '@@ -0,0 +1,3 @@',
+          "+import type { Priority } from './types'",
+          '+const PRIORITY_WEIGHT: Record<Priority, number> = { low: 1, medium: 2, high: 3, critical: 4 }',
+          '+export const weightOf = (p: Priority) => PRIORITY_WEIGHT[p]',
+        ].join('\n'),
+      },
+    ]
+    const order = await buildReadingOrder(files)
+    expect(order.find((s) => s.path.endsWith('utils.ts'))?.reason).toBe('Uses Priority (step 1)')
+  })
+})
