@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowLeft, History, Pause, Play, Radio, ShieldQuestion, Terminal, X } from 'lucide-react'
 import { useRunObservation } from '../../renderer/use-run-observation.js'
 import type { FloorView, PendingAsk } from '../../renderer/use-run-observation.js'
@@ -9,8 +9,8 @@ import type { World } from '../../factory/sim.js'
 import { diffObservation, describeEvent } from '../../factory/events.js'
 import type { FactoryEvent, Observation } from '../../factory/events.js'
 import { direct } from '../../factory/director.js'
-import { calloutFor, interruptionsFor, stateWord } from '../../factory/callouts.js'
-import type { Callout, Interruption } from '../../factory/callouts.js'
+import { calloutLevels, calloutsFor, interruptionsFor, stateWord } from '../../factory/callouts.js'
+import type { Callout, CalloutBox, Interruption, Obstacle } from '../../factory/callouts.js'
 import { momentsOf, observationAt, replayClock } from '../../factory/replay.js'
 import type { ReplayClock, Timeline } from '../../factory/replay.js'
 import type { Gate } from '../../gates/rules.js'
@@ -70,8 +70,12 @@ function clockText(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-/** Percent of the hall's width within which two callouts count as neighbours. */
-const CALLOUT_NEAR = 16
+/** Pixels between a station's top edge and a callout's tail on the ground level. */
+const CALLOUT_BASE_PX = 30
+/** Pixels each level of a callout stack lifts it: a callout's height, plus air. */
+const CALLOUT_PITCH_PX = 26
+/** Pixels between a station's top edge and its nameplate. */
+const PLATE_GAP_PX = 10
 /** Tiles a nameplate may span: a column pitch, less a gap. */
 const PLATE_COLUMNS = 4.6
 
@@ -123,6 +127,8 @@ export function FactoryHall({
   const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
   const [map, setMap] = useState<HallMap | null>(null)
   const [callouts, setCallouts] = useState<readonly Callout[]>([])
+  const [calloutLift, setCalloutLift] = useState<Readonly<Record<string, number>>>({})
+  const overlayRef = useRef<HTMLDivElement | null>(null)
   const [spoken, setSpoken] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
@@ -192,9 +198,7 @@ export function FactoryHall({
     (events: readonly FactoryEvent[], labels: Readonly<Record<string, string>>) => {
       if (events.length === 0) return
       const now = Date.now()
-      const raised = events
-        .map((event) => calloutFor(event, labels, now))
-        .filter((c): c is Callout => c !== null)
+      const raised = calloutsFor(events, labels, now)
       if (raised.length > 0) {
         const owners = new Set(raised.map((c) => c.nodeId))
         setCallouts((live) => [...live.filter((c) => !owners.has(c.nodeId)), ...raised])
@@ -332,6 +336,53 @@ export function FactoryHall({
     return () => clearInterval(timer)
   }, [replayPlaying, moveReplay])
 
+  // Callouts are sized by their text, so only the laid-out page knows which
+  // ones would cover each other or a nameplate. Measured before paint, so a
+  // callout is never seen at the level it is about to leave.
+  const liveMap = replay?.map ?? map
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current
+    if (overlay === null || liveMap === null) return
+    const width = overlay.clientWidth
+    const height = overlay.clientHeight
+    const ground = (nodeId: string | null) => {
+      const at = anchorOf(liveMap, nodeId)
+      return { x: (at.left / 100) * width, y: (at.top / 100) * height }
+    }
+    const plates: Obstacle[] = [...overlay.querySelectorAll<HTMLElement>('[data-plate-for]')].map(
+      (el) => {
+        const { x, y } = ground(el.dataset.plateFor ?? null)
+        const bottom = y - PLATE_GAP_PX
+        const w = el.offsetWidth
+        return { left: x - w / 2, top: bottom - el.offsetHeight, right: x + w / 2, bottom }
+      }
+    )
+    const raised = new Map(
+      [...overlay.querySelectorAll<HTMLElement>('[data-callout-id]')].map((el) => [
+        el.dataset.calloutId,
+        el,
+      ])
+    )
+    const boxes: CalloutBox[] = callouts.map((c) => {
+      const el = raised.get(c.id)
+      const { x, y } = ground(c.nodeId)
+      return {
+        id: c.id,
+        x,
+        y: y - CALLOUT_BASE_PX,
+        w: el?.offsetWidth ?? 0,
+        h: el?.offsetHeight ?? 0,
+      }
+    })
+    setCalloutLift((kept) => {
+      const next = calloutLevels(boxes, plates, kept, CALLOUT_PITCH_PX)
+      const same =
+        Object.keys(next).length === Object.keys(kept).length &&
+        Object.entries(next).every(([id, level]) => kept[id] === level)
+      return same ? kept : next
+    })
+  }, [callouts, liveMap])
+
   const openStation = useCallback(
     async (nodeId: string) => {
       setSelected(nodeId)
@@ -427,26 +478,38 @@ export function FactoryHall({
     pending: replay === null ? pending : [],
   })
   const flaggedNodes = new Set(interruptions.map((i) => i.nodeId))
+  const needsYou = [...flaggedNodes].filter((id): id is string => id !== null)
   const states: Record<string, NodeState> = {}
   for (const n of shownGraph.nodes) states[n.id] = n.state
   const selectedNode =
     selected === null ? null : (view.graph.nodes.find((n) => n.id === selected) ?? null)
 
   return (
-    <div className="fdry-hall-shell">
+    <div
+      className="fdry-hall-shell"
+      style={{ '--fdry-hall-aspect': shownMap.width / shownMap.height } as React.CSSProperties}
+    >
+      <HallHud
+        view={view}
+        shownGraph={shownGraph}
+        replaying={replay !== null}
+        waitingCount={interruptions.length}
+        note={replayNote}
+        onBack={onBack}
+        onReplay={() => void startReplay()}
+        onOpenInbox={onOpenInbox}
+        onOpenInList={onOpenInList}
+      />
       <div
         className="fdry-hall-frame"
-        style={
-          {
-            aspectRatio: `${shownMap.width} / ${shownMap.height}`,
-            '--fdry-hall-aspect': shownMap.width / shownMap.height,
-          } as React.CSSProperties
-        }
+        style={{ aspectRatio: `${shownMap.width} / ${shownMap.height}` }}
       >
         <HallScene
           map={shownMap}
           worldRef={shownWorldRef}
           states={states}
+          needsYou={needsYou}
+          orphaned={[...orphaned]}
           speed={replay?.speed ?? 1}
           metrics={
             orderMetrics === null
@@ -459,7 +522,7 @@ export function FactoryHall({
           }
         />
 
-        <div className="fdry-hall-overlay">
+        <div className="fdry-hall-overlay" ref={overlayRef}>
           {shownMap.props
             .filter((prop) => prop.nodeId !== null)
             .map((prop) => {
@@ -467,14 +530,15 @@ export function FactoryHall({
               if (node === undefined) return null
               const label = labels[node.id] ?? node.id
               const gone = orphaned.has(node.id)
+              const standing = gone ? 'no agent' : stateWord(node.state)
               return (
                 <React.Fragment key={prop.id}>
                   <button
                     type="button"
                     className="fdry-hall-station"
-                    title={label}
+                    title={`${label} · ${standing}${node.attempts > 1 ? ` · try ${node.attempts}` : ''}`}
                     style={stationStyle(shownMap, prop)}
-                    aria-label={`${label}, ${node.role ?? 'unassigned'}, ${node.state}, attempt ${node.attempts}`}
+                    aria-label={`${label}, ${node.role ?? 'unassigned'}, ${standing}, attempt ${node.attempts}`}
                     onClick={() => void openStation(node.id)}
                   >
                     {flaggedNodes.has(node.id) ? (
@@ -485,51 +549,42 @@ export function FactoryHall({
                   </button>
                   <div
                     className="fdry-plate"
-                    data-state={gone ? 'gone' : node.state}
+                    data-plate-for={node.id}
                     aria-hidden="true"
                     style={{
                       left: `${anchorOf(shownMap, node.id).left}%`,
                       top: `${anchorOf(shownMap, node.id).top}%`,
+                      transform: `translate(-50%, calc(-100% - ${PLATE_GAP_PX}px))`,
                       // Neighbouring stations are one column pitch apart; a
                       // plate wider than that runs into the next one's.
                       maxWidth: `${(PLATE_COLUMNS / shownMap.width) * 100}%`,
                     }}
                   >
-                    <span className="fdry-plate__name">{label}</span>
-                    <span className="fdry-plate__state">
-                      {gone ? 'No agent' : stateWord(node.state)}
-                      {node.attempts > 1 ? ` · try ${node.attempts}` : ''}
-                    </span>
+                    {label}
                   </div>
                 </React.Fragment>
               )
             })}
 
-          {callouts.map((c, index) => {
+          {callouts.map((c) => {
             const at = anchorOf(shownMap, c.nodeId)
-            // Neighbouring stations raise callouts into the same air; each one
-            // stacks above the earlier ones near it instead of covering them.
-            const stack = callouts.slice(0, index).filter((other) => {
-              const there = anchorOf(shownMap, other.nodeId)
-              return (
-                Math.abs(there.left - at.left) < CALLOUT_NEAR && Math.abs(there.top - at.top) < 1
-              )
-            }).length
+            const lift = CALLOUT_BASE_PX + (calloutLift[c.id] ?? 0) * CALLOUT_PITCH_PX
             return (
               <div
                 key={c.id}
                 className="fdry-callout"
                 data-tone={c.tone}
+                data-callout-id={c.id}
                 aria-hidden="true"
                 style={
                   {
                     left: `${at.left}%`,
                     top: `${at.top}%`,
-                    '--fdry-stack': stack,
+                    '--fdry-lift': `${lift}px`,
                   } as React.CSSProperties
                 }
               >
-                {c.text}
+                <span className="fdry-callout__text">{c.text}</span>
               </div>
             )
           })}
@@ -557,18 +612,6 @@ export function FactoryHall({
             />
           ))}
         </div>
-
-        <HallHud
-          view={view}
-          shownGraph={shownGraph}
-          replaying={replay !== null}
-          waitingCount={interruptions.length}
-          note={replayNote}
-          onBack={onBack}
-          onReplay={() => void startReplay()}
-          onOpenInbox={onOpenInbox}
-          onOpenInList={onOpenInList}
-        />
 
         {replay === null ? null : (
           <div className="fdry-replay" role="group" aria-label="Replay">

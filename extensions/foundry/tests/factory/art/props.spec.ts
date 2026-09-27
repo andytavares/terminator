@@ -212,14 +212,44 @@ describe('factory/art/props drawProp', () => {
     expect(open.calls.length).toBeGreaterThan(0)
   })
 
-  it('lights the passed lamp only when that node state is passed', () => {
-    const passed = createRecordingPaint()
-    drawProp(passed, prop('desk'), context({ states: { n1: 'passed' } }), 0)
-    expect(containsColor(passed.calls, HALL.green)).toBe(true)
+  describe.each(['desk', 'rig', 'bench', 'press'] as const)('the %s status lamp', (kind) => {
+    const lamp = (over: Partial<SceneContext>, tMs = 0) => {
+      const paint = createRecordingPaint()
+      drawProp(paint, prop(kind), context(over), tMs)
+      return paint.calls
+    }
 
-    const running = createRecordingPaint()
-    drawProp(running, prop('desk'), context({ states: { n1: 'running' } }), 0)
-    expect(containsColor(running.calls, HALL.green)).toBe(false)
+    it('flashes while its step is working, on and off with the clock', () => {
+      const on = lamp({ states: { n1: 'running' } }, 0)
+      const off = lamp({ states: { n1: 'running' } }, 500)
+      expect(containsColor(on, HALL.cyan)).toBe(true)
+      expect(containsColor(off, HALL.cyan)).toBe(false)
+      expect(containsColor(lamp({ states: { n1: 'verifying' } }, 0), HALL.cyan)).toBe(true)
+    })
+
+    it('burns orange while its step needs you, over the working flash', () => {
+      const calls = lamp({ states: { n1: 'running' }, needsYou: ['n1'] })
+      expect(containsColor(calls, HALL.orange)).toBe(true)
+      expect(containsColor(calls, HALL.cyan)).toBe(false)
+    })
+
+    it('burns red while its step has failed, is blocked, or has lost its agent', () => {
+      expect(containsColor(lamp({ states: { n1: 'failed' } }), HALL.red)).toBe(true)
+      expect(containsColor(lamp({ states: { n1: 'blocked' } }), HALL.red)).toBe(true)
+      expect(containsColor(lamp({ states: { n1: 'running' }, orphaned: ['n1'] }), HALL.red)).toBe(
+        true
+      )
+    })
+
+    it('burns green once its step is done, and stays dark before it starts', () => {
+      expect(containsColor(lamp({ states: { n1: 'passed' } }), HALL.green)).toBe(true)
+      for (const state of ['waiting', 'ready', 'skipped'] as const) {
+        const calls = lamp({ states: { n1: state } })
+        for (const lit of [HALL.cyan, HALL.orange, HALL.red, HALL.green]) {
+          expect(containsColor(calls, lit)).toBe(false)
+        }
+      }
+    })
   })
 
   it('flashes the gate beacon only while its node is in gatesWaiting', () => {
