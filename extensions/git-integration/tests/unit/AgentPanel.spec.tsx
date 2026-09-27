@@ -186,6 +186,18 @@ describe('AgentPanel', () => {
     expect(screen.getByText('usePrReview.ts:317')).toBeTruthy()
   })
 
+  it('renders a finding body as markdown, so code reads as code', () => {
+    const run = makeRun({
+      status: 'done',
+      findings: [{ ...finding1, body: '`computeRiskScore` runs twice per file.' }],
+    })
+    setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
+    const { container } = render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    const code = container.querySelector('.ap-fnd-body code')
+    expect(code?.textContent).toBe('computeRiskScore')
+    expect(container.querySelector('.ap-fnd-body')?.textContent).not.toContain('`')
+  })
+
   it('posts a finding as a comment with fromFindingId and the finding line', () => {
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })

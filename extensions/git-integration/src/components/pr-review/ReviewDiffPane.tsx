@@ -514,6 +514,18 @@ export function ReviewDiffPane({
     [pr.insights, file.path]
   )
 
+  // The gutter column is as wide as the widest chip it holds; a table squeezes
+  // an unsized cell below its content, which let the chip overlap the code.
+  const gutterWidth = useMemo(() => {
+    const labels = (pr.insights?.complexity.functions ?? [])
+      .filter((f) => f.path === file.path && f.line != null && f.branchDelta > 0)
+      .map((f) =>
+        pr.insights?.coverage.untestedFunctions.includes(f.name) ? 'untested' : `+${f.branchDelta}`
+      )
+    const widest = Math.max(0, ...labels.map((l) => l.length))
+    return widest === 0 ? 18 : 22 + widest * 7
+  }, [pr.insights, file.path])
+
   const hotspots = diff ? detectComplexityHotspots(diff) : []
   const hotspotHunks = new Set(hotspots.map((h) => h.hunkIndex))
 
@@ -1064,7 +1076,10 @@ export function ReviewDiffPane({
                                   </button>
                                 )}
                               </td>
-                              <td className="rs-gut">
+                              <td
+                                className="rs-gut"
+                                style={{ width: gutterWidth, minWidth: gutterWidth }}
+                              >
                                 {side === 'RIGHT' && insightsChipForLine(lineNum) && (
                                   <span
                                     className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(lineNum)!.kind}`}
@@ -1266,6 +1281,11 @@ export function ReviewDiffPane({
                                       >
                                         +
                                       </button>
+                                    </td>
+                                    <td
+                                      className="rs-gut"
+                                      style={{ width: gutterWidth, minWidth: gutterWidth }}
+                                    >
                                       {insightsChipForLine(rightLineNum) && (
                                         <span
                                           className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(rightLineNum)!.kind}`}
@@ -1288,7 +1308,7 @@ export function ReviewDiffPane({
                                   </tr>
                                 ) : (
                                   <tr className="diff-line">
-                                    <td colSpan={3} className="diff-line__empty-cell" />
+                                    <td colSpan={4} className="diff-line__empty-cell" />
                                   </tr>
                                 )}
                               </tbody>

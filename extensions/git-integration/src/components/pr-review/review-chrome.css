@@ -279,3 +279,18 @@
   width: 13px;
   height: 13px;
 }
+
+/* The card sits over the top of the diff until Continue, not after it. */
+.pr-review-panel--centre {
+  position: relative;
+}
+
+.pr-review-panel--centre > .rc-resume {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  margin: 0;
+  z-index: var(--tm-layer-overlay);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}

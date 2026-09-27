@@ -368,7 +368,9 @@ export function AgentPanel({ repoRoot, pr }: Props) {
                 <div className="ap-note">
                   {fileName(finding.path)}:{finding.startLine}
                 </div>
-                <div className="ap-fnd-body">{finding.body}</div>
+                <div className="ap-fnd-body">
+                  <RichContent>{finding.body}</RichContent>
+                </div>
                 <div className="ap-acts">
                   <button
                     type="button"

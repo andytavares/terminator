@@ -1259,6 +1259,10 @@ describe('ReviewDiffPane', () => {
       await waitFor(() => expect(screen.getByText('@@ -85,3 +88,3 @@')).toBeTruthy())
       expect(screen.getByText('+6')).toBeTruthy()
       expect(screen.getByText('untested')).toBeTruthy()
+      // The gutter column is sized to its widest chip ("untested"), so it never overlaps code.
+      const gut = screen.getByText('untested').closest('td') as HTMLElement
+      expect(gut.className).toBe('rs-gut')
+      expect(gut.style.width).toBe('78px')
     })
   })
 })
