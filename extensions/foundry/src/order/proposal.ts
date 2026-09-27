@@ -32,16 +32,19 @@ const FindingsSchema = z
   })
   .strict()
 
+// The object-valued fields merge key by key, because an amending turn is told
+// to send only what it changed: `plan.units` alone is an edit, not a plan with
+// no lanes.
 export const ProposalSchema = z
   .object({
-    intent: orderShape.intent.optional(),
+    intent: orderShape.intent.partial().optional(),
     findings: FindingsSchema.optional(),
     acceptance: orderShape.acceptance.optional(),
-    risk: orderShape.risk.optional(),
+    risk: orderShape.risk.partial().optional(),
     // Read and never applied. Refusing it would throw away the whole turn over
     // a field an architect that saw budgets in a rendered order may still write.
     budgets: orderShape.budgets.optional(),
-    plan: orderShape.plan.optional(),
+    plan: orderShape.plan.partial().optional(),
     assumptions: orderShape.assumptions.optional(),
     openQuestions: orderShape.openQuestions.optional(),
     // Findings the architect is sure do not apply. Only low and medium ones are
@@ -109,7 +112,7 @@ export function parseProposal(value: unknown): Proposal {
 export function applyProposal(order: WorkOrder, proposal: Proposal, at: string): WorkOrder {
   const next: WorkOrder = {
     ...order,
-    intent: proposal.intent ?? order.intent,
+    intent: { ...order.intent, ...proposal.intent },
     // Findings only. `repos`, `toolchain` and `houseDocs` are what Foundry
     // measured, and an agent that could rewrite them could tell the ladder a
     // command exists that does not.
@@ -120,8 +123,8 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
       priorArt: proposal.findings?.priorArt ?? order.context.priorArt,
     },
     acceptance: proposal.acceptance ?? order.acceptance,
-    risk: proposal.risk ?? order.risk,
-    plan: proposal.plan ?? order.plan,
+    risk: { ...order.risk, ...proposal.risk },
+    plan: { ...order.plan, ...proposal.plan },
     // An operator's struck assumption stays struck: the proposal's version of
     // one already on the order does not resurrect it.
     assumptions: (proposal.assumptions ?? order.assumptions).map((assumption) => {
