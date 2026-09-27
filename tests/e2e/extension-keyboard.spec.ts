@@ -77,14 +77,19 @@ test('a dialog puts focus inside itself, keeps Tab there, and closes on Escape',
     .toBe(true)
 
   // Open the composer without touching it with a mouse afterwards.
-  await inView(
-    'notepad',
-    `(() => {
+  // Polled: the view reports loaded before React has drawn the button.
+  await expect
+    .poll(() =>
+      inView<boolean>(
+        'notepad',
+        `(() => {
       const b = [...document.querySelectorAll('button')].find((x) => /new note/i.test(x.textContent || ''))
       if (b) b.click()
       return !!b
     })()`
-  )
+      )
+    )
+    .toBe(true)
   await expect
     .poll(() => inView<boolean>('notepad', `!!document.querySelector('[data-tmui-surface]')`), {
       timeout: 10000,
@@ -198,16 +203,23 @@ for (const { id, label, part, open } of SURFACES) {
       })
       .toBe(true)
 
-    await inView(
-      part,
-      `(() => {
+    // Polled: the view reports loaded before React has drawn the button.
+    await expect
+      .poll(
+        () =>
+          inView<boolean>(
+            part,
+            `(() => {
         const b = [...document.querySelectorAll('button')].find((x) =>
           (x.textContent || '').toLowerCase().includes(${JSON.stringify(open)})
         )
         if (b) b.click()
         return !!b
       })()`
-    )
+          ),
+        { message: `${label} never offered "${open}"` }
+      )
+      .toBe(true)
     await expect
       .poll(
         () =>

@@ -146,7 +146,7 @@ test('an order fits the view it is shown in', async () => {
     source: { kind: 'typed', text: 'Read the session TTL from the environment' },
     repoPaths: [${'' + JSON.stringify(repoPath) + ''}],
   })`)
-  await clickByName('Forge')
+  await expect.poll(() => clickByName('Forge')).toBe(true)
   await expect
     .poll(() => inFoundry<number>(`document.querySelectorAll('.fdry-orders button').length`), {
       timeout: 15_000,

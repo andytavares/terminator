@@ -84,14 +84,18 @@ test.beforeAll(async () => {
   }, BODY)
   await expect.poll(extensionViewReady, { timeout: 20000 }).toBe(true)
 
-  await inNotepad(`(async () => {
+  await expect
+    .poll(() =>
+      inNotepad<boolean>(`(() => {
     const row = document.querySelector('.notepad-note-list__notes button, [class*="note-row"]')
     if (row) row.click()
-    for (let i = 0; i < 60; i++) {
-      if (document.querySelectorAll('.notepad-outline__item').length > 0) break
-      await new Promise((r) => requestAnimationFrame(r))
-    }
+    return !!row
   })()`)
+    )
+    .toBe(true)
+  await expect
+    .poll(() => inNotepad<number>(`document.querySelectorAll('.notepad-outline__item').length`))
+    .toBeGreaterThan(0)
 })
 
 test('the rail lists the open note headings, nested by level', async () => {

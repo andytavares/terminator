@@ -132,13 +132,17 @@ function blurEverything(): Promise<void> {
  * "open Foundry" is not enough to reach a text field any more.
  */
 async function openForge(): Promise<void> {
-  await inFoundry(`(function () {
+  await expect
+    .poll(() =>
+      inFoundry<boolean>(`(function () {
     var all = document.querySelectorAll('button')
     for (var i = 0; i < all.length; i++) {
       if ((all[i].textContent || '').trim() === 'Forge') { all[i].click(); return true }
     }
     return false
   })()`)
+    )
+    .toBe(true)
   await expect
     .poll(() => inFoundry<boolean>(`!!document.querySelector(${JSON.stringify(FOUNDRY_IDEA)})`), {
       timeout: 10000,
