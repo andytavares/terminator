@@ -213,6 +213,16 @@ const dataRootMemo = new Map<string, string>()
  */
 const intakeSessions = new Map<string, string>()
 
+/**
+ * Orders deleted while a Forge session was still running for them.
+ *
+ * Deleting the project ends the session's terminal, and a session ending is
+ * what moves the Forge on: the scout's end starts the architect, the
+ * architect's end saves its redraft. Arriving after the delete, each of those
+ * cut the checkout again, opened a new project, or wrote the order back.
+ */
+const deletedOrders = new Set<string>()
+
 function resolveFoundryDataRoot(api: ExtensionAPI): string {
   // Every read here is optional. Activation is called synchronously by the
   // host and must not throw because one capability is absent — a host that
@@ -1965,6 +1975,7 @@ async function convergeOnce(
   // model rather than the ask model. See `architectModel`.
   options?: { readonly loop?: boolean }
 ): Promise<ConvergeStarted> {
+  if (deletedOrders.has(order.id)) return { ok: false, reason: 'The order was deleted.' }
   const runner = supervisedRunner
   if (runner === null) {
     return { ok: false, reason: 'The supervision runtime is not running, so intake cannot start.' }
@@ -2050,7 +2061,7 @@ async function convergeOnce(
      * nothing.
      */
     const collect = (deadline: boolean, code: number | null): void => {
-      if (done) return
+      if (done || deletedOrders.has(order.id)) return
       if (!deadline && !fs.existsSync(plan.proposalPath)) return
       done = true
       // The session is over either way, so it must not be resumed: `--resume`
@@ -2150,6 +2161,7 @@ async function readOnlyRound(input: {
   readonly onStarted?: (sessionId: string) => void
 }): Promise<void> {
   const { api, root, order, roleId, nodeId, startedAction, startedReason, onFinished } = input
+  if (deletedOrders.has(order.id)) return
   const runner = supervisedRunner
   const store = createOrderStore(root)
   const record = (action: string, reason: string, subject: string): Promise<void> =>
@@ -2205,7 +2217,7 @@ async function readOnlyRound(input: {
   }
 
   const collect = async (deadline: boolean): Promise<void> => {
-    if (done) return
+    if (done || deletedOrders.has(order.id)) return
     if (!deadline && !fs.existsSync(outputPath)) return
     done = true
     const current = (await store.load(order.id)) ?? order
@@ -2857,6 +2869,7 @@ export function activate(api: ExtensionAPI): void {
     const order = await createOrderStore(root).load(id)
     if (order === null) return { error: `No order ${id}.` }
 
+    deletedOrders.add(id)
     // Its agents first. Deleting the records out from under a live session
     // leaves an agent writing into a worktree whose order no longer exists.
     await stopOrder(root, id, 'the order was deleted')
