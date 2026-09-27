@@ -1,0 +1,21 @@
+extensions/git-integration/tests/unit/reading-order.spec.ts
+  s_ccef6bf06cd549::t_588c7fcf103b25 204-229
+extensions/git-integration/src/review/reading-order.ts
+  s_ccef6bf06cd549::t_78dbb18e661200 29-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e7c085cfb8dd61aa5301a25e4ab6b06b99032ecf",
+  "prompts": {},
+  "sessions": {
+    "s_ccef6bf06cd549": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e87f48c-11ea-4fe7-83e0-74518a15e2a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
