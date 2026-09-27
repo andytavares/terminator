@@ -21,7 +21,7 @@ test.beforeAll(async () => {
   await createWorkspace(handle.page, 'terminator', process.cwd())
   // A second repo with a longer name: the count must not follow the name.
   await createWorkspace(handle.page, 'A Much Longer Repo Name', process.cwd())
-  await handle.page.waitForTimeout(2500)
+  await expect(handle.page.locator('.repo-header__count')).toHaveCount(2, { timeout: 15000 })
 })
 
 test.afterAll(async () => {

@@ -17,7 +17,7 @@ let handle: AppHandle
 test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, 'terminator', process.cwd())
-  await handle.page.waitForTimeout(2000)
+  await expect(handle.page.locator('.app-band__entry').first()).toBeVisible({ timeout: 20000 })
 })
 
 test.afterAll(async () => {
@@ -25,6 +25,21 @@ test.afterAll(async () => {
 })
 
 const FOUNDRY_IDEA = 'input[aria-label="Describe what you want built or fixed"]'
+
+/**
+ * Waits out real wall-clock time. The double-Escape gesture is timed against
+ * `Date.now()`/`performance.now()` inside the extension's own
+ * WebContentsView (`src/main/preload-webview.ts`), which Playwright cannot
+ * attach a fake clock to, so proving presses fall inside or outside
+ * `DOUBLE_ESCAPE_WINDOW_MS` genuinely requires that much time to elapse. Not
+ * a settle-and-hope sleep: the duration is the feature's own timing contract.
+ */
+async function realDelay(ms: number): Promise<void> {
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+  }
+}
 
 /** Run script inside the Foundry extension view and return its result. */
 function inFoundry<T>(script: string): Promise<T> {
@@ -48,7 +63,12 @@ async function pressEscape(times: number, gapMs = 100): Promise<void> {
       for (let i = 0; i < count; i++) {
         view.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
         view.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
-        if (i < count - 1) await new Promise((r) => setTimeout(r, gap))
+        if (i < count - 1) {
+          const deadline = Date.now() + gap
+          while (Date.now() < deadline) {
+            await new Promise((done) => setImmediate(done))
+          }
+        }
       }
     },
     { count: times, gap: gapMs }
@@ -91,7 +111,9 @@ async function openFoundry(): Promise<void> {
   await expect(button).toBeVisible({ timeout: 15000 })
   await button.click()
   await expect.poll(extensionShowing, { timeout: 20000 }).toBe(true)
-  await handle.page.waitForTimeout(500)
+  await expect
+    .poll(() => inFoundry<boolean>('!!document.querySelector("button")'), { timeout: 10000 })
+    .toBe(true)
 }
 
 /** Move focus off any text field, so the text-field guard is not what is being tested. */
@@ -117,7 +139,11 @@ async function openForge(): Promise<void> {
     }
     return false
   })()`)
-  await handle.page.waitForTimeout(600)
+  await expect
+    .poll(() => inFoundry<boolean>(`!!document.querySelector(${JSON.stringify(FOUNDRY_IDEA)})`), {
+      timeout: 10000,
+    })
+    .toBe(true)
 }
 
 async function focusIdeaAndType(value: string): Promise<string> {
@@ -154,7 +180,7 @@ test('Escape twice in a text field keeps the extension open and the draft intact
   expect(await focusIdeaAndType('my unsaved draft')).toBe('my unsaved draft')
 
   await pressEscape(2)
-  await handle.page.waitForTimeout(1000)
+  await realDelay(50)
 
   // The defect: before the guard, both of these failed — the extension closed
   // and the text went with it.
@@ -168,7 +194,7 @@ test('Escape twice while a dialog is open does not exit the extension', async ()
   await setModalDepth(1)
 
   await pressEscape(2)
-  await handle.page.waitForTimeout(1000)
+  await realDelay(50)
 
   expect(await extensionShowing()).toBe(true)
   await setModalDepth(0)
@@ -180,7 +206,7 @@ test('Escape twice with nested dialogs open does not exit the extension', async 
   await setModalDepth(3)
 
   await pressEscape(2)
-  await handle.page.waitForTimeout(1000)
+  await realDelay(50)
 
   expect(await extensionShowing()).toBe(true)
   await setModalDepth(0)
@@ -207,9 +233,9 @@ test('two Escapes further apart than the gesture window never pair', async () =>
   await blurEverything()
 
   await pressEscape(1)
-  await handle.page.waitForTimeout(900)
+  await realDelay(900)
   await pressEscape(1)
-  await handle.page.waitForTimeout(600)
+  await realDelay(600)
 
   expect(await extensionShowing()).toBe(true)
 })

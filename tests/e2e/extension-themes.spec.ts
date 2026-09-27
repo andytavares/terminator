@@ -24,7 +24,7 @@ let handle: AppHandle
 test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, 'terminator', process.cwd())
-  await handle.page.waitForTimeout(2000)
+  await expect(handle.page.locator('.app-band__entry').first()).toBeVisible({ timeout: 20000 })
 })
 
 test.afterAll(async () => {
@@ -45,6 +45,17 @@ function inView<T>(urlPart: string, script: string): Promise<T> {
   ) as Promise<T>
 }
 
+/** True once the extension surface's own WebContentsView has finished loading. */
+function viewReady(urlPart: string): Promise<boolean> {
+  return handle.app.evaluate(
+    ({ webContents }, part) =>
+      webContents
+        .getAllWebContents()
+        .some((wc) => !wc.isDestroyed() && wc.getURL().includes(part) && !wc.isLoading()),
+    urlPart
+  )
+}
+
 async function setTheme(theme: 'dark' | 'light'): Promise<void> {
   // Driven through the same API the settings panel uses, as a script string —
   // `window.electronAPI` is injected by the preload and has no type here.
@@ -53,7 +64,11 @@ async function setTheme(theme: 'dark' | 'light'): Promise<void> {
     window.electronAPI.extension.setTheme('${theme}')
     document.documentElement.setAttribute('data-theme', '${theme}')
   })()`)
-  await handle.page.waitForTimeout(400)
+  await expect
+    .poll(() => handle.page.evaluate(() => document.documentElement.getAttribute('data-theme')), {
+      timeout: 5000,
+    })
+    .toBe(theme)
 }
 
 /**
@@ -76,7 +91,12 @@ async function openExtension(id: string, urlPart: string): Promise<void> {
     await button.click()
   }
   await expect.poll(showing, { timeout: 20000 }).toBe(true)
-  await handle.page.waitForTimeout(800)
+  await expect
+    .poll(() => viewReady(urlPart), {
+      timeout: 20000,
+      message: `${urlPart} view never finished loading`,
+    })
+    .toBe(true)
   await inView(urlPart, '1')
 }
 
@@ -134,7 +154,33 @@ for (const { id, label, urlPart } of SURFACES) {
     test(`${label} text meets WCAG AA in the ${theme} theme`, async () => {
       await openExtension(id, urlPart)
       await setTheme(theme)
-      await handle.page.waitForTimeout(300)
+      // Dark is the absence of the attribute (extension-view-host.ts
+      // `applyTheme` removes it rather than setting 'dark'), so light is the
+      // only value to match against directly.
+      await expect
+        .poll(
+          () =>
+            inView<string | null>(urlPart, "document.documentElement.getAttribute('data-theme')"),
+          {
+            timeout: 5000,
+            message: `${label} view never adopted the ${theme} theme`,
+          }
+        )
+        .toBe(theme === 'light' ? 'light' : null)
+      // The attribute flip is synchronous, but many colours are declared with
+      // a CSS `transition` (e.g. `.vault-sidebar__item { transition: color
+      // 0.1s }` in task-vault.css), so the computed colour right after the
+      // flip can still be mid-interpolation. Wait for the view's own CSS
+      // transitions to finish rather than a fixed delay.
+      await inView(
+        urlPart,
+        `(async () => {
+          for (let i = 0; i < 60; i++) {
+            if (document.getAnimations().length === 0) break
+            await new Promise((r) => requestAnimationFrame(r))
+          }
+        })()`
+      )
 
       const probes = await inView<Probe[]>(urlPart, CONTRAST_PROBE)
       expect(probes.length, `${label} rendered no text to measure`).toBeGreaterThan(0)

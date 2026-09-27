@@ -50,14 +50,15 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
     ).electronAPI.extensionBridge
     await bridge.invoke('remote:port-change', { port })
     await bridge.invoke('remote:toggle', { enabled: true })
-    for (let i = 0; i < 30; i++) {
+    const deadline = Date.now() + 6000
+    while (Date.now() < deadline) {
       const s = (await bridge.invoke('remote:get-settings', {})) as {
         password: string
         lanUrl?: string
         port: number
       }
       if (s.lanUrl) return s
-      await new Promise((r) => setTimeout(r, 200))
+      await new Promise((r) => requestAnimationFrame(r))
     }
     throw new Error('remote server did not start (no lanUrl after 6s)')
   }, TEST_PORT)

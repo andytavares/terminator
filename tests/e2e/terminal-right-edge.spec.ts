@@ -38,7 +38,11 @@ test.beforeAll(async () => {
   await addAndSelectProject(page, 'WS-Edge', 'Proj-Edge')
   await expect(page.locator('.terminal-pane').first()).toBeVisible()
   await page.waitForSelector('.xterm-screen', { timeout: 15000 })
-  await page.waitForTimeout(1500)
+  // Wait for xterm's own layout to settle at its pinned scrollbar width rather
+  // than a fixed delay — the geometry assertions below depend on it.
+  await expect
+    .poll(async () => (await measure('.terminal-pane__container')).scrollbarPx, { timeout: 15000 })
+    .toBe(SCROLLBAR_WIDTH_PX)
 })
 
 test.afterAll(async () => {
@@ -155,7 +159,11 @@ test('split-pane: rendered text never extends under the scrollbar', async () => 
   const { page } = handle
   await page.keyboard.press('Meta+d')
   await page.waitForSelector('.leaf-pane', { timeout: 15000 })
-  await page.waitForTimeout(1500)
+  // Wait for the new pane's own layout to settle at its pinned scrollbar
+  // width rather than a fixed delay.
+  await expect
+    .poll(async () => (await measure('.leaf-pane__container')).scrollbarPx, { timeout: 15000 })
+    .toBe(SCROLLBAR_WIDTH_PX)
 
   const g = await measure('.leaf-pane__container')
   // Exact, not just non-zero: the width is pinned by our ::-webkit-scrollbar rule. Any

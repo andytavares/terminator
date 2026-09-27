@@ -51,6 +51,21 @@ async function pressEscapeInExtensionView(times: number): Promise<void> {
 // render no extension panel and are deliberately not exitable.
 const EXTENSION_TAB_TITLE = 'Notes'
 
+/**
+ * Waits out real wall-clock time. The double-Escape gesture is timed against
+ * `Date.now()` inside the extension's own WebContentsView
+ * (`src/main/preload-webview.ts`), which Playwright cannot attach a fake
+ * clock to, so proving a press falls outside `DOUBLE_ESCAPE_WINDOW_MS`
+ * genuinely requires that much time to elapse. Not a settle-and-hope sleep:
+ * the duration is the feature's own timing contract, not a guess.
+ */
+async function realDelay(ms: number): Promise<void> {
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+  }
+}
+
 async function openExtensionGlobalTab(): Promise<void> {
   // Global tabs now live in the labelled app band, addressed by accessible name.
   const tab = handle.page.locator(`.app-band__entry[aria-label="${EXTENSION_TAB_TITLE}"]`)
@@ -79,7 +94,7 @@ test('a single Escape leaves the extension open', async () => {
   await openExtensionGlobalTab()
 
   await pressEscapeInExtensionView(1)
-  await handle.page.waitForTimeout(1000)
+  await realDelay(1000)
 
   expect(await activeGlobalTab()).not.toBeNull()
 
@@ -92,9 +107,9 @@ test('two Escapes further apart than the gesture window do not exit', async () =
   await openExtensionGlobalTab()
 
   await pressEscapeInExtensionView(1)
-  await handle.page.waitForTimeout(900)
+  await realDelay(900)
   await pressEscapeInExtensionView(1)
-  await handle.page.waitForTimeout(500)
+  await realDelay(500)
 
   expect(await activeGlobalTab()).not.toBeNull()
 

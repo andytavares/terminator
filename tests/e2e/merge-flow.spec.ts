@@ -42,6 +42,23 @@ function makeConflictedRepo(): string {
   return dir
 }
 
+/** True once the git-integration view for `viewParam` has finished loading. */
+function gitViewReady(viewParam: string): Promise<boolean> {
+  return handle.app.evaluate(
+    ({ webContents }, param) =>
+      webContents
+        .getAllWebContents()
+        .some(
+          (wc) =>
+            !wc.isDestroyed() &&
+            wc.getURL().includes('git-integration') &&
+            wc.getURL().includes(`view=${param}`) &&
+            !wc.isLoading()
+        ),
+    viewParam
+  )
+}
+
 /** Run a script inside the git-integration view matching `viewParam`. */
 function inGit<T>(viewParam: string, script: string): Promise<T> {
   return handle.app.evaluate(
@@ -66,7 +83,9 @@ test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, 'Conflict Workspace', repo)
   await handle.page.locator('.branch-row').first().click()
-  await handle.page.waitForTimeout(1500)
+  await expect(
+    handle.page.locator('.tab-bar--primary .tab-bar__tab').filter({ hasText: 'Git' }).first()
+  ).toBeVisible({ timeout: 15000 })
 })
 
 test.afterAll(async () => {
@@ -86,19 +105,36 @@ test('MergeFlow opens on a real conflict and reads in both themes', async () => 
       '[data-extension-panel="terminator.git-integration"][data-view-param="project"]'
     )
   ).toBeVisible({ timeout: 15000 })
-  await handle.page.waitForTimeout(2000)
+  await expect
+    .poll(() => gitViewReady('project'), {
+      timeout: 20000,
+      message: 'git project view never finished loading',
+    })
+    .toBe(true)
 
-  await inGit<boolean>(
-    'project',
-    `(() => {
-      const b = [...document.querySelectorAll('button')].find((x) =>
-        /resolve conflicts/i.test(x.textContent || '')
-      )
-      if (b) b.click()
-      return !!b
-    })()`
-  )
-  await handle.page.waitForTimeout(2500)
+  // Retries the click itself on every poll attempt, not just the read: the
+  // button can exist before its handler is wired (or get replaced by a
+  // re-render before the click lands), so a single click-then-poll can wait
+  // out the timeout on a click that never did anything.
+  await expect
+    .poll(
+      () =>
+        inGit<string>(
+          'project',
+          `(() => {
+            const b = [...document.querySelectorAll('button')].find((x) =>
+              /resolve conflicts/i.test(x.textContent || '')
+            )
+            if (b) b.click()
+            return document.body.innerText
+          })()`
+        ),
+      {
+        timeout: 15000,
+        message: 'ConflictHub never rendered after clicking Resolve conflicts',
+      }
+    )
+    .toMatch(/Files conflicted|Total conflicts|Needs your attention/)
 
   const text = await inGit<string>('project', 'document.body.innerText')
   // ConflictHub's own headings, in sentence case rather than the caps they were.
@@ -131,7 +167,11 @@ async function setTheme(theme: 'dark' | 'light'): Promise<void> {
     window.electronAPI.extension.setTheme('${theme}')
     document.documentElement.setAttribute('data-theme', '${theme}')
   })()`)
-  await handle.page.waitForTimeout(500)
+  await expect
+    .poll(() => handle.page.evaluate(() => document.documentElement.getAttribute('data-theme')), {
+      timeout: 5000,
+    })
+    .toBe(theme)
 }
 
 /** The project view only exists while its tab is selected. */
@@ -146,7 +186,12 @@ async function openGitProjectTab(): Promise<void> {
       .first()
       .click()
     await expect(panel).toBeVisible({ timeout: 15000 })
-    await handle.page.waitForTimeout(1500)
+    await expect
+      .poll(() => gitViewReady('project'), {
+        timeout: 20000,
+        message: 'git project view never finished loading',
+      })
+      .toBe(true)
   }
 }
 
@@ -155,6 +200,29 @@ for (const viewParam of ['project'] as const) {
     test(`Git Integration (${viewParam}) meets WCAG AA in the ${theme} theme`, async () => {
       await openGitProjectTab()
       await setTheme(theme)
+      // Mirrors extension-themes.spec.ts: dark is the absence of the
+      // attribute (extension-view-host.ts `applyTheme` removes it rather
+      // than setting 'dark'), and colours declared with a CSS `transition`
+      // can still be mid-interpolation right after the flip.
+      await expect
+        .poll(
+          () =>
+            inGit<string | null>(viewParam, "document.documentElement.getAttribute('data-theme')"),
+          {
+            timeout: 5000,
+            message: `git-integration ${viewParam} view never adopted the ${theme} theme`,
+          }
+        )
+        .toBe(theme === 'light' ? 'light' : null)
+      await inGit(
+        viewParam,
+        `(async () => {
+          for (let i = 0; i < 60; i++) {
+            if (document.getAnimations().length === 0) break
+            await new Promise((r) => requestAnimationFrame(r))
+          }
+        })()`
+      )
       const probes = await inGit<Probe[]>(viewParam, CONTRAST_PROBE)
       expect(probes.length, `${viewParam} rendered no text to measure`).toBeGreaterThan(0)
       const failures = probes.filter((p) => p.ratio < p.required)

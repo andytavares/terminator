@@ -22,75 +22,85 @@ function git(...args: string[]): string {
   return execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim()
 }
 
-test.beforeAll(async () => {
-  repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-repo-'))
-  git('init', '--initial-branch=main')
-  git('config', 'user.email', 'e2e@example.com')
-  git('config', 'user.name', 'E2E')
-  git('commit', '--allow-empty', '-m', 'root')
+// One story: each test builds on git/app state the previous one left (the
+// branch created outside the app, the rename check on that same branch).
+// Serial keeps them running together, in order, even when only one is
+// selected to run alone.
+test.describe.serial('branch naming', () => {
+  test.beforeAll(async () => {
+    repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-repo-'))
+    git('init', '--initial-branch=main')
+    git('config', 'user.email', 'e2e@example.com')
+    git('config', 'user.name', 'E2E')
+    git('commit', '--allow-empty', '-m', 'root')
 
-  handle = await launchApp()
-  await createWorkspace(handle.page, WS, repo)
-})
+    handle = await launchApp()
+    await createWorkspace(handle.page, WS, repo)
+  })
 
-test.afterAll(async () => {
-  await closeApp(handle)
-})
+  test.afterAll(async () => {
+    await closeApp(handle)
+  })
 
-test('a workspace over a repo names its first card after the checked-out branch', async () => {
-  const { page } = handle
-  await expect(page.locator('.branch-row__name', { hasText: /^main$/ }).first()).toBeVisible()
-})
+  test('a workspace over a repo names its first card after the checked-out branch', async () => {
+    const { page } = handle
+    await expect(page.locator('.branch-row__name', { hasText: /^main$/ }).first()).toBeVisible()
+  })
 
-test('the create dialog asks for a branch and no other name', async () => {
-  const { page } = handle
-  await workspaceRow(page, WS).locator('.repo-header__action[aria-label^="New branch in"]').click()
-  await expect(page.locator('.dialog__title')).toContainText('Create Branch')
-  // The Name field only exists where there is no branch to take a name from.
-  await expect(page.getByPlaceholder('My branch')).toHaveCount(0)
-  // The branch is the only thing it asks for, so submitting without one is
-  // refused for the branch rather than for a missing name.
-  await page.click('.dialog__btn-primary')
-  await expect(page.locator('.dialog__error')).toContainText('Select or enter a branch name')
-  await page.getByRole('button', { name: 'Cancel' }).click()
-  await expect(page.locator('.dialog__title')).toHaveCount(0)
-})
+  test('the create dialog asks for a branch and no other name', async () => {
+    const { page } = handle
+    await workspaceRow(page, WS)
+      .locator('.repo-header__action[aria-label^="New branch in"]')
+      .click()
+    await expect(page.locator('.dialog__title')).toContainText('Create Branch')
+    // The Name field only exists where there is no branch to take a name from.
+    await expect(page.getByPlaceholder('My branch')).toHaveCount(0)
+    // The branch is the only thing it asks for, so submitting without one is
+    // refused for the branch rather than for a missing name.
+    await page.click('.dialog__btn-primary')
+    await expect(page.locator('.dialog__error')).toContainText('Select or enter a branch name')
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.locator('.dialog__title')).toHaveCount(0)
+  })
 
-test('the card follows a checkout made outside the app', async () => {
-  const { page } = handle
-  git('checkout', '-b', 'feature/renamed-by-git')
-  // Polled, so allow more than one interval before calling it a failure.
-  await expect(
-    page.locator('.branch-row__name', { hasText: 'feature/renamed-by-git' }).first()
-  ).toBeVisible({ timeout: 20000 })
-  await expect(page.locator('.branch-row__name', { hasText: /^main$/ })).toHaveCount(0)
-})
+  test('the card follows a checkout made outside the app', async () => {
+    const { page } = handle
+    git('checkout', '-b', 'feature/renamed-by-git')
+    // Polled, so allow more than one interval before calling it a failure.
+    await expect(
+      page.locator('.branch-row__name', { hasText: 'feature/renamed-by-git' }).first()
+    ).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('.branch-row__name', { hasText: /^main$/ })).toHaveCount(0)
+  })
 
-test('a branch offers no rename, because there is nothing else to name', async () => {
-  const { page } = handle
-  await page
-    .locator('.branch-row')
-    .filter({ hasText: 'feature/renamed-by-git' })
-    .last()
-    .click({ button: 'right' })
-  await expect(page.locator('.ctx-menu__item').filter({ hasText: 'Rename' })).toHaveCount(0)
-  await page.keyboard.press('Escape')
-})
+  test('a branch offers no rename, because there is nothing else to name', async () => {
+    const { page } = handle
+    await page
+      .locator('.branch-row')
+      .filter({ hasText: 'feature/renamed-by-git' })
+      .last()
+      .click({ button: 'right' })
+    await expect(page.locator('.ctx-menu__item').filter({ hasText: 'Rename' })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+  })
 
-// The complaint this covers: pressing Create sat there for seconds with no sign
-// anything was happening. The button now says so while git works, and the
-// dialog goes when it is done.
-test('creating a worktree says it is working, then closes', async () => {
-  const { page } = handle
-  await workspaceRow(page, WS).locator('.repo-header__action[aria-label^="New branch in"]').click()
-  await expect(page.locator('.dialog__title')).toContainText('Create Branch')
-  await page.getByRole('button', { name: 'Worktree' }).click()
-  await page.getByPlaceholder('feature/my-feature').fill('feature/busy-state')
+  // The complaint this covers: pressing Create sat there for seconds with no sign
+  // anything was happening. The button now says so while git works, and the
+  // dialog goes when it is done.
+  test('creating a worktree says it is working, then closes', async () => {
+    const { page } = handle
+    await workspaceRow(page, WS)
+      .locator('.repo-header__action[aria-label^="New branch in"]')
+      .click()
+    await expect(page.locator('.dialog__title')).toContainText('Create Branch')
+    await page.getByRole('button', { name: 'Worktree' }).click()
+    await page.getByPlaceholder('feature/my-feature').fill('feature/busy-state')
 
-  await page.click('.dialog__btn-primary')
-  // Either caught mid-flight or already done — both prove it is not inert.
-  await expect(page.locator('.dialog__title')).toHaveCount(0, { timeout: 30_000 })
-  await expect(
-    page.locator('.branch-row__name', { hasText: /^feature\/busy-state$/ }).first()
-  ).toBeVisible()
+    await page.click('.dialog__btn-primary')
+    // Either caught mid-flight or already done — both prove it is not inert.
+    await expect(page.locator('.dialog__title')).toHaveCount(0, { timeout: 30_000 })
+    await expect(
+      page.locator('.branch-row__name', { hasText: /^feature\/busy-state$/ }).first()
+    ).toBeVisible()
+  })
 })
