@@ -1,0 +1,36 @@
+extensions/git-integration/src/components/pr-review/insights.css
+  s_ccef6bf06cd549::t_cf895d03771cc0 1-109
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_ccef6bf06cd549::t_3b75ad2892a9a6 130
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_ccef6bf06cd549::t_e36f65a9b49984 17
+  s_ccef6bf06cd549::t_3c919d31b9bfe6 300-301
+extensions/git-integration/tests/unit/InsightsPanel.spec.tsx
+  s_ccef6bf06cd549::t_32ea93d23efcad 56
+  s_ccef6bf06cd549::t_146e1a764dc205 161-214
+  s_ccef6bf06cd549::t_032ba741552327 54-55
+  s_ccef6bf06cd549::t_1dc5ca39e7abf1 1-53,57-109,111-160,215-243,245-246,258-259,261-264,269-275,278-279,281-284,288-295,298,300-349
+  s_ccef6bf06cd549::t_f4df2902801b2f 244,247-257,260,265-268,276-277,280,285-287,296-297,299
+  s_ccef6bf06cd549::t_602cdfffd3633a 110
+extensions/git-integration/src/components/pr-review/InsightsPanel.tsx
+  s_ccef6bf06cd549::t_0473415cdd1fba 149,155,162,172,179,181,183,185,195-196,198
+  s_ccef6bf06cd549::t_602cdfffd3633a 27-28,39-43,150-152,161,209-210,233-236,253-254
+  s_ccef6bf06cd549::t_b4ee8c95ea4e2a 1-26,29-38,44-49,57-139,153-154,156-157,163-170,177-178,180,182,184,186-194,197,199-208,211-232,237-252,255-295
+  s_ccef6bf06cd549::t_4099c75d914034 50-56,140-148,158-160,171,173-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "80aeeebddadba972fc07875e6fd41f9e0da12466",
+  "prompts": {},
+  "sessions": {
+    "s_ccef6bf06cd549": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e87f48c-11ea-4fe7-83e0-74518a15e2a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
