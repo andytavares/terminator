@@ -1,0 +1,21 @@
+docs/research/code-review-revamp.md
+  s_ccef6bf06cd549::t_a0053f3f0c33d8 1-463
+docs/research/code-review-revamp.html
+  s_ccef6bf06cd549::t_f7edd5ada68b62 1-3130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6159671af6e189bbc90de29b3c6c19954237f09b",
+  "prompts": {},
+  "sessions": {
+    "s_ccef6bf06cd549": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e87f48c-11ea-4fe7-83e0-74518a15e2a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
