@@ -1,0 +1,43 @@
+tests/e2e/session-home.spec.ts
+  s_3a9e30cc08778f::t_fbff3adb0f4f9d 74,109,171
+tests/e2e/close-session.spec.ts
+  s_3a9e30cc08778f::t_fbff3adb0f4f9d 70
+tests/e2e/quick-actions.spec.ts
+  s_3a9e30cc08778f::t_fbff3adb0f4f9d 306
+tests/e2e/fixtures/bin/claude
+  s_3a9e30cc08778f::t_d8eff3d1e5a8fc 1-8
+playwright.config.ts
+  s_3a9e30cc08778f::t_bb5d022e0927b9 17-21,23-24,26
+tests/e2e/global-setup.ts
+  s_3a9e30cc08778f::t_5d13b4916cf514 1-18
+tests/e2e/monitor-wall.spec.ts
+  s_3a9e30cc08778f::t_fbff3adb0f4f9d 66
+tests/e2e/foundry-factory-view.spec.ts
+  s_3a9e30cc08778f::t_fbff3adb0f4f9d 406
+tests/e2e/remote-app.spec.ts
+  s_3a9e30cc08778f::t_fa30e290f7a63e 1-2,16-17,21-25,29
+tests/e2e/resume-session.spec.ts
+  s_3a9e30cc08778f::t_fbff3adb0f4f9d 193
+tests/e2e/helpers.ts
+  s_3a9e30cc08778f::t_7a2b014d4ac713 77,98-105
+  s_3a9e30cc08778f::t_3ca1d49ebe10bf 3-4,17-53,56-57,59,62
+  s_3a9e30cc08778f::t_173c41bdf9402b 2
+tests/e2e/global-teardown.ts
+  s_3a9e30cc08778f::t_5c3c0201267332 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ed7d730cdd14ccafdc0b7f64002a79e2b77bf6fa",
+  "prompts": {},
+  "sessions": {
+    "s_3a9e30cc08778f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd240882-012b-446b-a7ae-7442478ea77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
