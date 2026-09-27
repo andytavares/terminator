@@ -1,0 +1,70 @@
+extensions/foundry/src/line/rung-output.ts
+  s_541ac35f18f1af::t_0562700caf6a7e 524-525,541
+extensions/foundry/tests/line/rung-output.spec.ts
+  s_541ac35f18f1af::t_e570fabd67a6d2 556-596
+extensions/foundry/tests/forge/intake-outcome.spec.ts
+  s_541ac35f18f1af::t_cfdb3706b41bab 119-186
+extensions/foundry/src/index.ts
+  s_541ac35f18f1af::t_4bfff0c415e346 1954-1958
+  s_541ac35f18f1af::t_a8c1ae25cca61d 1919-1935
+  s_541ac35f18f1af::t_f8d796baf20292 2119-2231,2233-2253,2259-2262
+  s_541ac35f18f1af::t_6a101ea07579bb 240-245
+  s_541ac35f18f1af::t_a8e1973981b122 2414-2420
+  s_541ac35f18f1af::t_10e1f22aa13bfa 2631-2685,2688
+  s_541ac35f18f1af::t_5a5c683d30158b 71,73
+  s_541ac35f18f1af::t_09468ef4d68ca1 2232
+  s_541ac35f18f1af::t_0d6163b4c582c3 2072-2076
+  s_541ac35f18f1af::t_e66c1dfd1469ae 69
+  s_541ac35f18f1af::t_e1aee427afd4df 2080
+  s_541ac35f18f1af::t_dc5651aebba921 2254-2258,2422-2451,2456,2458,2461-2483,2485-2497,2557-2559
+  s_541ac35f18f1af::t_5d4c3bebb983e5 2597-2608,2611-2612,2614,2617-2623
+  s_541ac35f18f1af::t_db7fc41001673e 3176-3185
+  s_541ac35f18f1af::t_59c4e29eb31a39 2484,2498-2556,2560-2596,2624-2629
+  s_541ac35f18f1af::t_3793356ab05689 74-75
+  s_541ac35f18f1af::t_64d95485fdceba 83
+  s_541ac35f18f1af::t_31ce2321fb2e0a 2701
+  s_541ac35f18f1af::t_9732d22aa40c5d 1918
+  s_541ac35f18f1af::t_289e51826fbfd3 2118
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_541ac35f18f1af::t_dc5651aebba921 551-553
+  s_541ac35f18f1af::t_71bf4b6d20cf2d 549-550,554-555
+extensions/foundry/tests/forge/review-loop.spec.ts
+  s_541ac35f18f1af::t_e0d0fc6585ad79 1-163,165-166,171-219
+  s_541ac35f18f1af::t_dc5651aebba921 167-170
+  s_541ac35f18f1af::t_46cc35dcb9f8e9 164
+extensions/foundry/src/forge/review-loop.ts
+  s_541ac35f18f1af::t_dc5651aebba921 82-85
+  s_541ac35f18f1af::t_1b1450d76d2e00 1-81,86-102
+extensions/foundry/tests/forge/converge.spec.ts
+  s_541ac35f18f1af::t_b4ce4828fcdbb3 601-607
+extensions/foundry/src/forge/converge.ts
+  s_541ac35f18f1af::t_5f543c4f6daef0 244-247,251-252,254
+extensions/foundry/src/components/SettingsView.tsx
+  s_541ac35f18f1af::t_5543d9d0830db3 49
+  s_541ac35f18f1af::t_4e753219304a76 236-245,248-249
+  s_541ac35f18f1af::t_dc5651aebba921 246-247
+  s_541ac35f18f1af::t_8ef1661c424f56 142-153
+extensions/foundry/src/forge/intake-outcome.ts
+  s_541ac35f18f1af::t_7a35adb6b4cb1b 78-94
+  s_541ac35f18f1af::t_dc5651aebba921 95-96
+  s_541ac35f18f1af::t_5c337fcb118d93 33-46
+extensions/foundry/tests/components/SettingsView.spec.tsx
+  s_541ac35f18f1af::t_4a2221f3bd4445 174-201
+  s_541ac35f18f1af::t_f021f07d72f22f 36-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ac0b65e0529249ff3b9dd6fb4f2a997ae3e0d08c",
+  "prompts": {},
+  "sessions": {
+    "s_541ac35f18f1af": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c7d94eb-e3b3-4bb9-88a5-8f50c142a463",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
