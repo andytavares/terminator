@@ -963,7 +963,7 @@ _completeness_. Five checks, none of which can be waved through:
 | `verifiable` | a criterion has no executable proof and was not accepted as unverifiable **in writing**                        |
 | `coverage`   | a criterion has no unit, a unit satisfies no criterion, or two lanes change one file with no declared producer |
 | `risk`       | the plan touches something outside the blast radius the grade was taken over                                   |
-| `redTeam`    | an adversarial finding is neither resolved nor accepted with a reason                                          |
+| `redTeam`    | a blocking adversarial finding is neither resolved nor accepted with a reason (ADR 069)                        |
 
 A check names what is missing **and what is enough**, because one that names
 only the first gets over-served (ADR-049). `verifiable`'s picture rule says one
@@ -1023,18 +1023,28 @@ architect it wrote something it did not is the same class of defect in the
 other direction.
 
 **An ask is answered where it was asked.** A failing check's "Ask for…"
-button, and the "Ask the architect" and "Fix it…" buttons on each open red team
-finding, start
-a turn whose instruction the ledger's `converge.started` line keeps; `lastIntake`
-hands it back as `asked`, so the row that sent it shows "Asked — the architect
-is working on it" in place of its button, across leaving the step and coming
-back. While any turn runs, no ask is offered, because a second turn would race
-the first. A redraft closes the structural findings it cleared
-(`settleFindings`, run by `readProposal` on every applied proposal); a
-reviewer's finding closes only when the proposal lists it in `resolveFindings`
-with how, and the Red team step shows that reason under **Cleared** (ADR 068).
-The operator accepts a finding with a reason, or tells the architect how to fix
-it; there is no bare "Fixed".
+button starts a turn whose instruction the ledger's `converge.started` line
+keeps; `lastIntake` hands it back as `asked`. Everything waiting on the operator
+(open questions and open _blocking_ red-team findings) sits in the "Needs you"
+band. There each question is answered, and each finding is asked about, told how
+to fix, or accepted with a reason. One Send carries all of it as a `settle` on
+`foundry:order.converge`: answers and accepts apply at once, and every ask and
+fix goes to the architect in a single turn. The band stays usable while a turn
+runs; a Send made then waits and goes out when the turn ends. A redraft closes
+the structural findings it cleared (`settleFindings`). A reviewer's finding
+closes only when the proposal lists it in `resolveFindings` with how (ADR 068).
+
+**The red team argues before agreement (ADR 069).** A finding carries a
+`category`, and only `wrong-outcome`, `regression` and `unprovable` block. The
+others (`scope`, `process`, `pre-existing`, `infra`) are notes the builder sees.
+Once a redraft passes every other check, `src/forge/review-loop.ts` runs a
+red-team round in the Forge. The architect gets every blocking finding in one
+turn, and the next round attacks only what changed. The red team reads what
+earlier rounds settled and may reopen a finding only with new evidence. After
+three rounds the order goes to the operator. A clean round hands off on its own
+unless `terminator.foundry.autoHandOff` is off, and a failed hand-off is
+recorded as `handoff.failed`. Before the first draft, the scout reads the
+repository.
 
 ### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
 
@@ -1092,8 +1102,8 @@ it; there is no bare "Fixed".
   passes no flag, and a fast-tier role is never passed one — the fast model
   does not take it.
 - **Three shapes produce a document or a demonstration, not a code change**:
-  `research` (scout, author, fresh verifier), `design-doc` (scout, red team on
-  the order, author, fresh verifier) and `poc` (builders by lane, fresh
+  `research` (scout, author, fresh verifier), `design-doc` (scout, author, fresh
+  verifier; the order was already attacked in the Forge) and `poc` (builders by lane, fresh
   verifier, scribe). All three still end in a draft pull request — the
   deliverable has to land somewhere a reviewer looks — and none is proposed by
   the ladder; an operator picks them in the Forge. The **author** role is the
