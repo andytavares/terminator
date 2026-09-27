@@ -1,0 +1,56 @@
+tests/e2e/foundry-resume.spec.ts
+  s_3a9e30cc08778f::t_173d432e5b5434 264-266,268-277
+  s_3a9e30cc08778f::t_61b8e56237ae31 255-263
+  s_3a9e30cc08778f::t_339142dbf548b1 485
+  s_3a9e30cc08778f::t_b6c7beb92418d0 267,278
+  s_3a9e30cc08778f::t_487e218494bd63 399-407,421
+  s_3a9e30cc08778f::t_b8b37999a2fa6f 453-460
+tests/e2e/foundry-forge.spec.ts
+  s_3a9e30cc08778f::t_f49e9aeb73e0fa 46-48,239-241,424-433,437-440
+  s_3a9e30cc08778f::t_d3c4ee7f787798 401-410
+  s_3a9e30cc08778f::t_721d7a53cc75d1 267-270,274-276,293-298
+  s_3a9e30cc08778f::t_99be38a98b20df 1-45,49-238,242-266,271-273,277-292,299-400,411-423,434-436,441-497
+tests/e2e/foundry-floor.spec.ts
+  s_3a9e30cc08778f::t_32d3543b487c52 182
+  s_3a9e30cc08778f::t_f49e9aeb73e0fa 41-43
+  s_3a9e30cc08778f::t_01757d6b9df8de 2
+  s_3a9e30cc08778f::t_4788c6e7465110 1,3-40,44-181,183-219
+tests/e2e/foundry-factory-view.spec.ts
+  s_3a9e30cc08778f::t_f49e9aeb73e0fa 54-56,60-62,74-76,354-356
+  s_3a9e30cc08778f::t_93dc730d636399 2,5-16,21,24-38,40-43,45-53,57-59,63-73,77-84,94-96,98,100-119,121-129,131-136,138-142,145-182,185-194,197-213,216-310,312-338,341-343,346-349,351-353,357-386,388,390-395,397
+tests/e2e/foundry-intake.spec.ts
+  s_3a9e30cc08778f::t_f49e9aeb73e0fa 6-12,50-52
+  s_3a9e30cc08778f::t_b85dfd2100a4e3 1-5,13-49,53-217
+tests/e2e/foundry-typography.spec.ts
+  s_3a9e30cc08778f::t_da66184b4adc43 54-56,58-67
+  s_3a9e30cc08778f::t_4159fb3ca9b119 167-175
+  s_3a9e30cc08778f::t_c44ad5f529359e 150-154
+  s_3a9e30cc08778f::t_a28fb9397fe08f 33-43,47-53
+  s_3a9e30cc08778f::t_e4787c6ec2ca06 30,32,57,68
+  s_3a9e30cc08778f::t_6b6bdcc41b2fc4 44-46
+tests/e2e/foundry-harness.ts
+  s_3a9e30cc08778f::t_5078f3bddeab45 193-208
+  s_3a9e30cc08778f::t_f49e9aeb73e0fa 186-191
+  s_3a9e30cc08778f::t_721930cabc3017 180-184
+  s_3a9e30cc08778f::t_fa365567b23ac3 216
+  s_3a9e30cc08778f::t_53d41ae36cbc08 1-179,185,192,209-215,217-261
+tests/e2e/foundry-channels.spec.ts
+  s_3a9e30cc08778f::t_bd6335d05acfba 1-62,67-130
+  s_3a9e30cc08778f::t_f49e9aeb73e0fa 63-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "73e40c71e8c2a91d126e2ced5c3cc844ce6779f9",
+  "prompts": {},
+  "sessions": {
+    "s_3a9e30cc08778f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd240882-012b-446b-a7ae-7442478ea77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
