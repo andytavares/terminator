@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
-import hljs from 'highlight.js'
+import hljs from '../utils/hljs'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 
 type ViewMode = 'unified' | 'split'

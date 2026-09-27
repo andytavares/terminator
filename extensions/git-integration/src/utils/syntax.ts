@@ -1,4 +1,4 @@
-import hljs from 'highlight.js'
+import hljs from './hljs'
 
 function escapeHtml(str: string): string {
   return str
