@@ -292,21 +292,28 @@ jobs:
         with:
           name: app-build
 
-      # No retries: a test that fails once fails the build.
+      # No retries: a test that fails once fails the build. Shards are split by
+      # recorded duration (scripts/e2e-shard.mjs), not Playwright's test count.
       - name: Run E2E suite
         env:
           MODE: ${{ needs.e2e-select.outputs.mode }}
           SPECS: ${{ needs.e2e-select.outputs.specs }}
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.shard }}.zip
         run: |
           if [ "$MODE" = all ]; then SPECS=""; fi
-          npx playwright test $SPECS --shard=${{ matrix.shard }}/5 --pass-with-no-tests --reporter=blob,dot
+          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 $SPECS)
+          if [ -z "$ARGS" ]; then echo "Nothing selected for this shard."; exit 0; fi
+          npx playwright test $ARGS --reporter=blob,dot
         timeout-minutes: 10
 
       # A new or edited spec must pass three times before it merges: once in the
-      # suite above and twice here, split across the shards like the suite.
+      # suite above and twice here, split across the shards the same way.
       - name: Burn in changed specs
         if: needs.e2e-select.outputs.changed != ''
-        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=2 --shard=${{ matrix.shard }}/5 --pass-with-no-tests --reporter=dot
+        run: |
+          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 ${{ needs.e2e-select.outputs.changed }})
+          if [ -z "$ARGS" ]; then echo "Nothing changed on this shard."; exit 0; fi
+          npx playwright test $ARGS --repeat-each=2 --reporter=dot
         timeout-minutes: 10
 
       - name: Upload blob report
