@@ -1186,6 +1186,35 @@ describe('an ask the architect is working on', () => {
     await openStep('Plan')
     expect(await screen.findByRole('status', { name: /Asked/ })).toBeTruthy()
   })
+
+  // Reported: accepting items while the architect worked ended in refusals.
+  // Its proposal is merged over the order as it stood when the turn started,
+  // so an edit made meanwhile is one the architect never saw.
+  it('holds every other move on the order until the turn ends', async () => {
+    mountAsking({
+      ...orderBlockedOnPictures(),
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'which token?',
+          why: '',
+          options: ['a', 'b'],
+          recommended: 0,
+          answer: null,
+          rank: 1,
+          confidence: null,
+        },
+      ],
+      assumptions: [{ id: 'A-1', text: 'tokens are JWTs', struck: false, affects: [] }],
+    } as WorkOrder)
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
+    await screen.findByRole('status', { name: /Asked/ })
+
+    expect(screen.getByRole('button', { name: 'a (recommended)' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'b' })).toHaveProperty('disabled', true)
+    await openStep('Plan')
+    expect(screen.getByRole('button', { name: 'tokens are JWTs' })).toHaveProperty('disabled', true)
+  })
 })
 
 describe('a failing check says how to clear it', () => {
