@@ -1,0 +1,26 @@
+extensions/foundry/CLAUDE.md
+  s_541ac35f18f1af::t_153772f8e21cfd 17-18
+extensions/foundry/tests/line/worktree.spec.ts
+  s_541ac35f18f1af::t_7258122de42513 1,3-4,9,14
+  s_541ac35f18f1af::t_5652e4a8d58864 232-257,260-287,291-355,358-366
+  s_541ac35f18f1af::t_ae384dc75c557e 258-259,288-290,356-357
+extensions/foundry/src/line/worktree.ts
+  s_541ac35f18f1af::t_83b614c4b44397 1
+  s_541ac35f18f1af::t_5c62c09c25b56c 89-91,105-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "82222221dc749d6d53d0ddbea4b8f849beb37a6d",
+  "prompts": {},
+  "sessions": {
+    "s_541ac35f18f1af": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c7d94eb-e3b3-4bb9-88a5-8f50c142a463",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
