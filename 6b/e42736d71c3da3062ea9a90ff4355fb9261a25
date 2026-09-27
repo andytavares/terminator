@@ -1,0 +1,21 @@
+vitest.config.ts
+  s_af088fe0b546b8::t_c38339faea96a4 31-36
+tests/unit/config/electron-module.spec.ts
+  s_af088fe0b546b8::t_32cfb09f2eaa8f 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6be42736d71c3da3062ea9a90ff4355fb9261a25",
+  "prompts": {},
+  "sessions": {
+    "s_af088fe0b546b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "864c9e9e-c424-4396-81af-3d272ad50cda",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
