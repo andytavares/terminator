@@ -42,12 +42,30 @@ function e2eProfileDir(): string {
  */
 const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'bin')
 
+/**
+ * A minimal zsh config the app's terminals read instead of the developer's
+ * real ~/.zshenv, ~/.zprofile and ~/.zshrc. Terminals are login shells
+ * (`pty.spawn(opts.shell, ['-l'], …)`, src/main/terminal/pty-manager.ts) run
+ * against whatever `terminal.defaultShell` resolves to, which defaults to
+ * `process.env.SHELL` — on a developer machine that's zsh, and the
+ * developer's own ~/.zshrc typically re-prepends `~/.local/bin` (where a
+ * real `claude` lives) ahead of anything this harness puts on PATH. Pointing
+ * ZDOTDIR here, at a shell that is forced to zsh, makes the fixture rc files
+ * below the only ones a spawned terminal ever reads.
+ */
+const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
+
 /** The environment every e2e-launched Electron process gets. */
 export function e2eEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     NODE_ENV: 'test',
     PATH: `${CLAUDE_STUB_DIR}${delimiter}${process.env.PATH ?? ''}`,
+    // Pins terminal.defaultShell's process.env.SHELL fallback to zsh
+    // regardless of the developer's or CI runner's own $SHELL (CI's macOS
+    // runners default to bash), so ZDOTDIR below is guaranteed to apply.
+    SHELL: '/bin/zsh',
+    ZDOTDIR: CLAUDE_STUB_ZDOTDIR,
   }
 }
 
