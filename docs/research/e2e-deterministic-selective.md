@@ -75,7 +75,6 @@ Two-thirds of all flaky occurrences (30 of 45) are **C1**. `closeApp` (`tests/e2
 - Local full run, 2 workers, `claude` hidden from PATH, retries 0: **3.9 min**, 2 failed, 188 passed, 0 flaky. Command: `PATH=<without ~/.local/bin> CI=1 npx playwright test --retries=0 --workers=2 --reporter=json,dot`.
 - Per-file time from that JSON report: `foundry.spec.ts` alone is **164 s** of 450 s total test time (19 tests serialised in one worker, 10 × `openFoundry()` each sleeping 2.5 s). Next: `session-home` 28 s, `session-surfaces` 27 s, `extension-keyboard` 27 s. 25 of 35 files take under 10 s.
 - Parallelism is per file (`fullyParallel` unset), 2 workers on a 3-core M1 runner ([GitHub runner specs](https://docs.github.com/en/actions/reference/runners/github-hosted-runners): macos-14 public = 3 CPU, 7 GB).
-- The E2E job installs Playwright Chromium (10 s), but every spec drives `_electron`; nothing launches Chromium.
 
 ### What PRs actually touch (last 60 merged)
 
@@ -199,7 +198,7 @@ Changed spec files also run with `--repeat-each=3` in the same job (a burn-in). 
 
 - `build`: remove `needs`. It runs in parallel with lint and test.
 - New `e2e-select` job on `ubuntu-latest` (checkout with `fetch-depth: 0`, run `scripts/e2e-select.mjs`, output `mode` and `specs`).
-- `e2e`: `needs: [build, e2e-select]`, `if: needs.e2e-select.outputs.mode != 'none'`, `strategy.matrix.shard: [1, 2]`, run `npx playwright test ${{ specs }} --shard=${{ matrix.shard }}/2`. Blob reporter; drop the Chromium install step.
+- `e2e`: `needs: [build, e2e-select]`, `if: needs.e2e-select.outputs.mode != 'none'`, `strategy.matrix.shard: [1, 2]`, run `npx playwright test ${{ specs }} --shard=${{ matrix.shard }}/2`. Blob reporter.
 - New `e2e-result` job: `needs: [e2e]`, `if: always()`, fails unless `e2e` is `success` or `skipped`. Merges blob reports into one HTML report.
 - Branch protection: add `e2e-result` and `Build` to the required checks, currently `["codecov/patch","Format","Lint","Test","Typecheck"]` (`gh api repos/andytavares/terminator/branches/main/protection`).
 

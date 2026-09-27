@@ -207,6 +207,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # remote-app.spec.ts drives the browser remote renderer in Chromium.
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
       # The Electron binary on macOS arm64 can have an invalid code signature
       # (dyld errno=85), causing intermittent "Process failed to launch"
       # failures. Force-extract the binary (install.js is idempotent) and
