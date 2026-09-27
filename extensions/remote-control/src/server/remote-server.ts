@@ -46,6 +46,9 @@ const EXTENSION_BASE_CSS = `
   --tm-danger: #e05c5c;
   --tm-success: #4ade80;
   --tm-warning: #facc15;
+  /* Work an agent produced for the reader alone: private notes, findings. */
+  --tm-agent: #b39cf5;
+  --tm-agent-dim: rgba(179,156,245,0.10);
   --tm-diff-added-bg: rgba(152,195,121,0.12);
   --tm-diff-removed-bg: rgba(224,108,117,0.12);
   --tm-syntax-comment: #8585b8;
@@ -192,6 +195,8 @@ button:has(> svg) {
   --tm-danger: #962d20;
   --tm-success: #0f5c2a;
   --tm-warning: #a85a00;
+  --tm-agent: #6b4fbf;
+  --tm-agent-dim: rgba(107,79,191,0.08);
   --tm-diff-added-bg: rgba(15,92,42,0.10);
   --tm-diff-removed-bg: rgba(150,45,32,0.10);
   --tm-syntax-comment: #5c5c94;
