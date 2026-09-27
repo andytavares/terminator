@@ -195,8 +195,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # A warning is a failure. The ones this catches were real: a renderer
+      # bundle with node:fs stubbed out, and chunks past their size budget.
       - name: Build
-        run: npm run build
+        run: |
+          npm run build 2>&1 | tee build.log
+          if grep -nE '\(!\)|\[plugin |\[WARNING\]|⚠|is not exported by|externalized for browser' build.log; then
+            echo "::error::npm run build printed the warnings above"
+            exit 1
+          fi
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
