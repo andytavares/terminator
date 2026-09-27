@@ -1,0 +1,50 @@
+extensions/git-integration/src/review/review-agent.ts
+  s_ccef6bf06cd549::t_1dde4f5f4121b7 1-100,104-301,308-479,483-491,499-506,516-529
+  s_ccef6bf06cd549::t_231a20d9107e46 101-103,302-307,480-482,492-498,507-515
+extensions/git-integration/src/index.ts
+  s_ccef6bf06cd549::t_14f25721e0facd 4
+  s_ccef6bf06cd549::t_5d25daf907af6f 80-86,88-103
+  s_ccef6bf06cd549::t_d4d140fbd7e8d4 187-196,204-212
+  s_ccef6bf06cd549::t_f6c0ba30ef37f5 131-135,197-203
+  s_ccef6bf06cd549::t_3a6a5a4f7a8a14 73-77
+  s_ccef6bf06cd549::t_231a20d9107e46 87
+  s_ccef6bf06cd549::t_3eb3cbb31cf366 130
+extensions/git-integration/src/review/worktree.ts
+  s_ccef6bf06cd549::t_98d5a229dc5eeb 1-109
+extensions/git-integration/tests/unit/review-agent-api.spec.ts
+  s_ccef6bf06cd549::t_a3ff8e7e77d023 1-95
+extensions/git-integration/tests/unit/review-agent-ipc.spec.ts
+  s_ccef6bf06cd549::t_231a20d9107e46 149-153
+  s_ccef6bf06cd549::t_d519f4de7f1dbf 1-148,154-308
+extensions/git-integration/tests/unit/review-agent.spec.ts
+  s_ccef6bf06cd549::t_231a20d9107e46 13-18,23-30,57-64,87-89,114-119,127-133,140-146,192-196,232-239
+  s_ccef6bf06cd549::t_7179bceb2e921a 1-12,19-22,31-56,65-86,90-113,120-126,134-139,147-191,197-231,240-405
+extensions/git-integration/src/ipc/review-agent.ipc.ts
+  s_ccef6bf06cd549::t_f29f2da600e025 108-110
+  s_ccef6bf06cd549::t_1b179dd297ba70 185-190
+  s_ccef6bf06cd549::t_b2ca29390fa489 91-92
+  s_ccef6bf06cd549::t_f3a58d9094a238 1-90,93-107,111-184,191-252
+extensions/git-integration/src/api/review-agent.ts
+  s_ccef6bf06cd549::t_f896b62bedd397 1-40,42
+  s_ccef6bf06cd549::t_2bab2713afe208 41
+extensions/git-integration/tests/unit/worktree.spec.ts
+  s_ccef6bf06cd549::t_af2bd2fbfffade 2-3,111-162
+  s_ccef6bf06cd549::t_82918eccdae7d9 1,4-63,65-66,68-110,163-164
+  s_ccef6bf06cd549::t_231a20d9107e46 64,67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b0a4c7f1dd6e2f1ae2c2b60699caa04ddbd3e940",
+  "prompts": {},
+  "sessions": {
+    "s_ccef6bf06cd549": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e87f48c-11ea-4fe7-83e0-74518a15e2a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
