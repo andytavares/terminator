@@ -1,0 +1,24 @@
+extensions/foundry/tests/runtime/autonomy-policy.spec.ts
+  s_af088fe0b546b8::t_d8af71fc35de72 217,220-221,223-226,230
+tests/unit/main/editor/open-in-editor.spec.ts
+  s_af088fe0b546b8::t_5bd724ca22394a 1,22-28
+  s_af088fe0b546b8::t_f87d759773415d 29
+tests/unit/main/extensions/extension-view-host.spec.ts
+  s_af088fe0b546b8::t_5bd724ca22394a 1,530-535
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c7a8b58e5191d38d8552b8375255f75f5a258a27",
+  "prompts": {},
+  "sessions": {
+    "s_af088fe0b546b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "864c9e9e-c424-4396-81af-3d272ad50cda",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
