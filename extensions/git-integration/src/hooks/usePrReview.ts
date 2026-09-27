@@ -413,8 +413,13 @@ export function useLoadInlineComments(repoRoot: string | null) {
       const result = await githubAPI.prInlineComments(repoRoot, activePr.number)
       if ('error' in result) return
       const { buildThreads } = await import('../github/pr-review-service-renderer')
-      const comments = (result as { comments: unknown[] }).comments
-      const threads = buildThreads(comments as Parameters<typeof buildThreads>[0])
+      const comments = (result as { comments: unknown[]; resolvedCommentIds?: number[] }).comments
+      const resolvedCommentIds = new Set(
+        (result as { resolvedCommentIds?: number[] }).resolvedCommentIds ?? []
+      )
+      const threads = buildThreads(comments as Parameters<typeof buildThreads>[0]).map((thread) =>
+        resolvedCommentIds.has(thread.comments[0]?.id) ? { ...thread, resolved: true } : thread
+      )
       // Group threads by file path
       const byPath: Record<string, typeof threads> = {}
       for (const thread of threads) {

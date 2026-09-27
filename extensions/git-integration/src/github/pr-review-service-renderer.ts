@@ -28,6 +28,7 @@ export function buildThreads(comments: InlineComment[]): Thread[] {
       outdated: sorted.some((c) => c.outdated),
       comments: sorted,
       collapsed: replies >= 4,
+      resolved: false,
     })
   }
 

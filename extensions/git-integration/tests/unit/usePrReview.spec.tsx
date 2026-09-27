@@ -593,6 +593,70 @@ describe('useLoadInlineComments', () => {
     })
     expect(mockSetThreads).not.toHaveBeenCalled()
   })
+
+  it('marks a thread resolved when its first comment id is in resolvedCommentIds', async () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setThreads: mockSetThreads,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    const { buildThreads } = await import('../../src/github/pr-review-service-renderer')
+    const baseComment = {
+      id: 1,
+      author: 'alice',
+      authorAvatarUrl: '',
+      body: 'hi',
+      createdAt: '2025-01-01T00:00:00Z',
+      updatedAt: '2025-01-01T00:00:00Z',
+      path: 'src/foo.ts',
+      line: 10,
+      startLine: null,
+      side: 'RIGHT' as const,
+      diffHunk: '',
+      outdated: false,
+      threadId: 't1',
+      isReply: false,
+      parentId: null,
+    }
+    const otherComment = { ...baseComment, id: 2, threadId: 't2', path: 'src/bar.ts' }
+    vi.mocked(buildThreads).mockReturnValueOnce([
+      {
+        id: 't1',
+        path: 'src/foo.ts',
+        line: 10,
+        startLine: null,
+        side: 'RIGHT',
+        outdated: false,
+        comments: [baseComment],
+        collapsed: false,
+        resolved: false,
+      },
+      {
+        id: 't2',
+        path: 'src/bar.ts',
+        line: 10,
+        startLine: null,
+        side: 'RIGHT',
+        outdated: false,
+        comments: [otherComment],
+        collapsed: false,
+        resolved: false,
+      },
+    ])
+    mockPrInlineComments.mockResolvedValue({
+      comments: [baseComment, otherComment],
+      resolvedCommentIds: [1],
+    })
+    const { result } = renderHook(() => useLoadInlineComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const calls = mockSetThreads.mock.calls
+    const fooCall = calls.find((c) => c[0] === 'src/foo.ts')
+    const barCall = calls.find((c) => c[0] === 'src/bar.ts')
+    expect(fooCall?.[1][0].resolved).toBe(true)
+    expect(barCall?.[1][0].resolved).toBe(false)
+  })
 })
 
 describe('useFetchFileMetrics', () => {

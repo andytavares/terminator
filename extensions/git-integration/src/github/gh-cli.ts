@@ -50,11 +50,16 @@ export async function runGh(
   cwd: string,
   args: string[],
   opts: GhOptions,
-  timeoutMs = 30_000
+  timeoutMs = 30_000,
+  /** Per-call variables, e.g. GH_REPO; never written to the shared process env. */
+  extraEnv?: Record<string, string>
 ): Promise<string> {
   const gh = await resolveGh(opts.getGhPath())
   const token = opts.getToken()
-  const env = token ? { ...process.env, GH_TOKEN: token } : undefined
+  const env =
+    token || extraEnv
+      ? { ...process.env, ...(token ? { GH_TOKEN: token } : {}), ...extraEnv }
+      : undefined
   try {
     const { stdout, stderr } = await execFileAsync(gh, args, { cwd, timeout: timeoutMs, env })
     if (stderr && !stdout) throw new Error(stderr)
@@ -66,7 +71,7 @@ export async function runGh(
       const { stdout, stderr } = await execFileAsync(gh, args, {
         cwd,
         timeout: timeoutMs,
-        env: undefined,
+        env: extraEnv ? { ...process.env, ...extraEnv } : undefined,
       })
       if (stderr && !stdout) throw new Error(stderr)
       return stdout.trim()

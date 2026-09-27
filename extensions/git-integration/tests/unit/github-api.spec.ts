@@ -180,4 +180,23 @@ describe('githubAPI bridge', () => {
       files,
     })
   })
+
+  it('review revamp channels send the payloads their handlers validate', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.dashboardSearch()
+    await githubAPI.fileViewedSet('/repo', 211, 'scripts/e2e-shard.ts', true)
+    await githubAPI.prCompare('/repo', 'aaa111', 'bbb222')
+    await githubAPI.cloneRepo('andytavares/terminator', '/Users/me/src')
+    await githubAPI.reviewSettings()
+    expect(mockInvoke.mock.calls).toEqual([
+      ['github:dashboard-search', {}],
+      [
+        'github:file-viewed-set',
+        { repoRoot: '/repo', prNumber: 211, path: 'scripts/e2e-shard.ts', viewed: true },
+      ],
+      ['github:pr-compare', { repoRoot: '/repo', fromSha: 'aaa111', toSha: 'bbb222' }],
+      ['github:clone-repo', { repo: 'andytavares/terminator', folder: '/Users/me/src' }],
+      ['github:review-settings', {}],
+    ])
+  })
 })

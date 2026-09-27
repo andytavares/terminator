@@ -62,4 +62,17 @@ export const githubAPI = {
 
   fileCoChange: (repoRoot: string, files: string[]) =>
     bridge().invoke('github:file-cochange', { repoRoot, files }),
+
+  dashboardSearch: () => bridge().invoke('github:dashboard-search', {}),
+
+  fileViewedSet: (repoRoot: string, prNumber: number, path: string, viewed: boolean) =>
+    bridge().invoke('github:file-viewed-set', { repoRoot, prNumber, path, viewed }),
+
+  prCompare: (repoRoot: string, fromSha: string, toSha: string) =>
+    bridge().invoke('github:pr-compare', { repoRoot, fromSha, toSha }),
+
+  cloneRepo: (repo: string, folder: string) =>
+    bridge().invoke('github:clone-repo', { repo, folder }),
+
+  reviewSettings: () => bridge().invoke('github:review-settings', {}),
 }
