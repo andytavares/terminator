@@ -1,7 +1,7 @@
 import { _electron as electron, ElectronApplication, Page, expect } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdtempSync } from 'node:fs'
+import { dirname, delimiter, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
 // throwaway profile (via Chromium's --user-data-dir, which Electron honours for
@@ -15,15 +15,51 @@ export interface AppHandle {
 }
 
 /**
- * `userDataDir` relaunches onto an existing profile, for a spec that proves
- * something survives a restart; pair it with `closeApp(handle, { keepProfile: true })`.
+ * Directory holding this run's shared profile root, set by
+ * `tests/e2e/global-setup.ts` before any worker starts. Every profile this
+ * run creates lives under it, so `tests/e2e/global-teardown.ts` can delete
+ * everything in one place after every worker has exited, and `closeApp`
+ * never has to delete anything itself.
  */
-export async function launchApp(
-  userDataDir: string = mkdtempSync(join(tmpdir(), 'terminator-e2e-'))
-): Promise<AppHandle> {
+function e2eRunRoot(): string {
+  const root = process.env.TERMINATOR_E2E_RUN_ROOT
+  if (!root) {
+    throw new Error(
+      'TERMINATOR_E2E_RUN_ROOT is not set — is global-setup wired in playwright.config.ts?'
+    )
+  }
+  return root
+}
+
+function e2eProfileDir(): string {
+  return mkdtempSync(join(e2eRunRoot(), 'profile-'))
+}
+
+/**
+ * A stand-in `claude` binary that prints its argv and idles until killed.
+ * Prepended to PATH by `launchApp` so a spec — however it drives the app's
+ * terminals — can never start a real Claude Code agent.
+ */
+const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'bin')
+
+/** The environment every e2e-launched Electron process gets. */
+export function e2eEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    NODE_ENV: 'test',
+    PATH: `${CLAUDE_STUB_DIR}${delimiter}${process.env.PATH ?? ''}`,
+  }
+}
+
+/**
+ * `userDataDir` relaunches onto an existing profile, for a spec that proves
+ * something survives a restart; `closeApp` never deletes it, so relaunching
+ * after a close just works.
+ */
+export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<AppHandle> {
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${userDataDir}`],
-    env: { ...process.env, NODE_ENV: 'test' },
+    env: e2eEnv(),
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
@@ -38,10 +74,7 @@ export async function launchApp(
 // and fails the whole job as a non-test error).
 const GRACEFUL_CLOSE_MS = 5000
 
-export async function closeApp(
-  handle: AppHandle | undefined,
-  { keepProfile = false }: { keepProfile?: boolean } = {}
-): Promise<void> {
+export async function closeApp(handle: AppHandle | undefined): Promise<void> {
   if (!handle) return
   // Capture the OS process up front: once app.close() resolves, Playwright
   // tears down its internal handle and app.process() would throw.
@@ -62,17 +95,14 @@ export async function closeApp(
       // Process already exited between the check and the kill — nothing to do.
     }
   }
-  // Retried, because the profile is still being written to as the app dies —
-  // a terminal's scrollback, an extension's state, a transcript — and the
-  // directory disappearing out from under those races the delete. Without this
-  // a spec that ran a real agent fails in teardown as ENOTEMPTY, which reads
-  // as a broken test rather than as tidying up too eagerly.
-  if (handle.userDataDir && !keepProfile) {
-    // Two seconds of retries, not half of one: the supervision runtime keeps
-    // its control-server settings, hook script and feed under userData, and on
-    // a loaded CI machine those are still being flushed when the window goes.
-    rmSync(handle.userDataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 })
-  }
+  // The profile is not deleted here. It is still being written to as the app
+  // dies — a terminal's scrollback, an extension's state, a transcript — and
+  // the directory disappearing out from under those raced the delete: a spec
+  // that ran a real agent used to fail in teardown as ENOTEMPTY, which read as
+  // a broken test rather than as tidying up too eagerly. Every profile lives
+  // under this run's shared root (see `e2eRunRoot`), which
+  // `tests/e2e/global-teardown.ts` removes once every worker has exited, so
+  // cleanup can never fail a test.
 }
 
 /**

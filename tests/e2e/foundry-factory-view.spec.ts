@@ -403,7 +403,7 @@ test('the List/Factory toggle switches the Forge, survives a restart, and switch
 
   // Relaunch on the same profile: the preference is per-operator, not per-run.
   const userDataDir = handle.userDataDir
-  await closeApp(handle, { keepProfile: true })
+  await closeApp(handle)
   handle = await launchApp(userDataDir)
   await openFoundry()
   await openForge()

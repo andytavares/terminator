@@ -303,7 +303,7 @@ test.describe('pins and recent survive a relaunch', () => {
 
     // Restart the app on the same profile.
     const userDataDir = handle.userDataDir
-    await closeApp(handle, { keepProfile: true })
+    await closeApp(handle)
     handle = await launchApp(userDataDir)
 
     await openPanel(handle.page)

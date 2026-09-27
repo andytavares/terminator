@@ -190,7 +190,7 @@ test('a conversation from the last run is offered under Closed, and nothing rest
   reportConversation(profile, before, 'conv-e2e-3', transcript)
   await awaitCaptured(page, before)
 
-  await closeApp(handle, { keepProfile: true })
+  await closeApp(handle)
   handle = await launchApp(profile)
   const restarted = handle.page
   await openHome(restarted)
