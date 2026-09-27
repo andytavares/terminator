@@ -108,6 +108,8 @@ export async function closeApp(handle: AppHandle | undefined): Promise<void> {
   const closed = handle.app.close().catch(() => {})
   await Promise.race([
     closed,
+    // A deadline, not a sleep: the race ends as soon as the app closes.
+    // eslint-disable-next-line no-restricted-syntax
     new Promise<void>((resolve) => setTimeout(resolve, GRACEFUL_CLOSE_MS)),
   ])
   if (proc.exitCode === null && !proc.killed) {
