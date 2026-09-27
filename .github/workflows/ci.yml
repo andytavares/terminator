@@ -12,7 +12,7 @@ env:
 jobs:
   lint:
     name: Lint
-    runs-on: macos-14
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
 
   typecheck:
     name: Typecheck
-    runs-on: macos-14
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -84,9 +84,16 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
-  test:
-    name: Test
+  # Unit tests exercise macOS behaviour (`open -a`, the Cmd leader), so they run
+  # on macOS, split three ways. Each shard writes a blob; the coverage
+  # threshold only means something over the whole suite, so it is enforced
+  # once, in the merge.
+  unit:
+    name: Unit (${{ matrix.shard }}/3)
     runs-on: macos-14
+    strategy:
+      matrix:
+        shard: [1, 2, 3]
 
     steps:
       - uses: actions/checkout@v4
@@ -100,8 +107,50 @@ jobs:
         run: npm ci
 
       - name: Test
-        run: npm run test:coverage
-        timeout-minutes: 10
+        run: >-
+          npx vitest run --coverage --shard=${{ matrix.shard }}/3 --reporter=blob --reporter=dot
+          --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
+          --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+        timeout-minutes: 5
+
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-blob-${{ matrix.shard }}
+          path: .vitest-reports/
+          include-hidden-files: true
+          retention-days: 1
+
+  # The required "Test" check. macOS, because the blobs carry the shards'
+  # absolute source paths and coverage is remapped against them.
+  test:
+    name: Test
+    needs: unit
+    if: ${{ !cancelled() }}
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: unit-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+
+      - name: Merge reports and enforce coverage
+        run: >-
+          npx vitest run --merge-reports --coverage --reporter=dot --reporter=junit
+          --outputFile.junit=test-report.junit.xml
 
       - name: Upload test report
         if: always()
@@ -121,6 +170,12 @@ jobs:
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
+
+      # Runs even when a shard failed, so a shard that died before writing its
+      # blob cannot leave a green merge of the other two.
+      - name: Verdict
+        if: always()
+        run: test "${{ needs.unit.result }}" = success
 
   # Nothing the build does depends on the other checks, and E2E waits on it,
   # so it starts with them rather than five minutes after them. Merge still
@@ -188,13 +243,13 @@ jobs:
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
   e2e:
-    name: E2E (${{ matrix.shard }}/2)
+    name: E2E (${{ matrix.shard }}/4)
     needs: [build, e2e-select]
     if: needs.e2e-select.outputs.mode != 'none'
     runs-on: macos-14
     strategy:
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
 
     steps:
       - uses: actions/checkout@v4
@@ -232,13 +287,14 @@ jobs:
           SPECS: ${{ needs.e2e-select.outputs.specs }}
         run: |
           if [ "$MODE" = all ]; then SPECS=""; fi
-          npx playwright test $SPECS --shard=${{ matrix.shard }}/2 --pass-with-no-tests --reporter=blob,dot
+          npx playwright test $SPECS --shard=${{ matrix.shard }}/4 --pass-with-no-tests --reporter=blob,dot
         timeout-minutes: 10
 
-      # A new or edited spec must pass three times in a row before it merges.
+      # A new or edited spec must pass three times before it merges: once in the
+      # suite above and twice here, split across the shards like the suite.
       - name: Burn in changed specs
-        if: matrix.shard == 1 && needs.e2e-select.outputs.changed != ''
-        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=3 --reporter=dot
+        if: needs.e2e-select.outputs.changed != ''
+        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=2 --shard=${{ matrix.shard }}/4 --pass-with-no-tests --reporter=dot
         timeout-minutes: 10
 
       - name: Upload blob report

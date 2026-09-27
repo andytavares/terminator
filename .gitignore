@@ -27,3 +27,4 @@ playwright-report/
 # Forge install-time rollback snapshots — not product code
 .forge-backups/
 *.tsbuildinfo
+.vitest-reports/
