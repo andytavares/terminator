@@ -1,0 +1,29 @@
+tests/e2e/monitor-wall.spec.ts
+  s_af088fe0b546b8::t_c8a397f255adcf 11-14
+.github/workflows/ci.yml
+  s_af088fe0b546b8::t_c8a397f255adcf 87-91,93-94,97,110-113,116,130-131,136,258,264,302,309
+tests/e2e/resume-session.spec.ts
+  s_af088fe0b546b8::t_c8a397f255adcf 19-22
+tests/e2e/close-session.spec.ts
+  s_af088fe0b546b8::t_c8a397f255adcf 10-13
+tests/e2e/session-surfaces.spec.ts
+  s_af088fe0b546b8::t_c8a397f255adcf 14-17
+tests/e2e/session-home.spec.ts
+  s_af088fe0b546b8::t_c8a397f255adcf 18-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "58623210376532308764df3ff9c5f6f1c1283baa",
+  "prompts": {},
+  "sessions": {
+    "s_af088fe0b546b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "864c9e9e-c424-4396-81af-3d272ad50cda",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
