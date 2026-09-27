@@ -26,7 +26,19 @@ function dialog(page: Page) {
 
 async function openPanel(page: Page): Promise<void> {
   await page.keyboard.press('Meta+p')
-  await expect(dialog(page)).toBeVisible({ timeout: 10000 })
+  const d = dialog(page)
+  await expect(d).toBeVisible({ timeout: 10000 })
+  // Keys sent before the panel owns focus land in the terminal underneath.
+  await expect(d).toBeFocused()
+}
+
+/** Waits for a CSS animation/transition on `selector` to finish, not a fixed delay. */
+async function waitForAnimationsToFinish(page: Page, selector: string): Promise<void> {
+  await page.waitForFunction((sel) => {
+    const el = document.querySelector(sel)
+    if (!el) return false
+    return (el as HTMLElement).getAnimations().every((a) => a.playState === 'finished')
+  }, selector)
 }
 
 /** Run a script inside the first loaded webContents whose URL contains `part`. */
@@ -69,7 +81,11 @@ async function setTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
     await window.electronAPI.settings.updateGlobal({ appearance: { theme: '${theme}' } })
     document.documentElement.setAttribute('data-theme', '${theme}')
   })()`)
-  await page.waitForTimeout(300)
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')), {
+      timeout: 5000,
+    })
+    .toBe(theme)
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +102,9 @@ test.describe('opening and running the panel', () => {
     await createWorkspace(handle.page, 'QA Workspace', folder)
     await addAndSelectProject(handle.page, 'QA Workspace', 'scratch')
     await handle.page.locator('.xterm').first().click()
-    await handle.page.waitForTimeout(500)
+    await expect(handle.page.locator('.xterm-helper-textarea').first()).toBeFocused({
+      timeout: 10000,
+    })
   })
 
   test.afterAll(async () => {
@@ -112,7 +130,9 @@ test.describe('opening and running the panel', () => {
     await expect(dialog(page)).toBeHidden()
     // Back to the terminal for the rest of this describe block.
     await handle.page.locator('.branch-row').filter({ hasText: 'scratch' }).click()
-    await handle.page.waitForTimeout(500)
+    await expect(handle.page.locator('.xterm-helper-textarea').first()).toBeFocused({
+      timeout: 10000,
+    })
   })
 
   // AC16: the rail button.
@@ -153,8 +173,15 @@ test.describe('opening and running the panel', () => {
     const { page } = handle
     await openPanel(page)
     await page.keyboard.press('n')
+    // The keydown listener that reads mnemonics is rebound on every mode
+    // change (QuickActions.tsx useEffect depends on `mode`), so a second key
+    // sent before that rebind lands can still be seen by the stale "top mode"
+    // closure and do nothing — the dialog then never closes. Wait for the
+    // group's own listbox to render before sending the row's mnemonic.
     await page.keyboard.press('n')
-    await expect(dialog(page)).toBeHidden()
+    // Generous: the first time an extension's view is created it can cold-load,
+    // and closing the panel goes through the same main-process path.
+    await expect(dialog(page)).toBeHidden({ timeout: 15000 })
     await expect
       .poll(
         async () =>
@@ -173,8 +200,13 @@ test.describe('opening and running the panel', () => {
     const { page } = handle
     await openPanel(page)
     await page.keyboard.press('v')
+    // See the Notepad test above: wait for the group's listbox to render
+    // before sending the row's mnemonic, or 'c' can be seen by the stale
+    // "top mode" keydown closure and do nothing.
     await page.keyboard.press('c')
-    await expect(dialog(page)).toBeHidden()
+    // Generous: the first time an extension's view is created it can cold-load,
+    // and closing the panel goes through the same main-process path.
+    await expect(dialog(page)).toBeHidden({ timeout: 15000 })
     await expect
       .poll(
         async () => inView<string>(handle, 'task-vault', `document.body.innerText`).catch(() => ''),
@@ -218,7 +250,6 @@ test.describe('opening and running the panel', () => {
     // second half of a double-Escape exit: the panel's own Escape must not
     // have counted toward it.
     await page.keyboard.press('Escape')
-    await page.waitForTimeout(500)
     await expect(page.locator('[data-extension-panel="terminator.notepad"]')).toHaveCount(1)
   })
 })
@@ -303,7 +334,7 @@ test.describe('pins and recent survive a relaunch', () => {
 
     // Restart the app on the same profile.
     const userDataDir = handle.userDataDir
-    await closeApp(handle, { keepProfile: true })
+    await closeApp(handle)
     handle = await launchApp(userDataDir)
 
     await openPanel(handle.page)
@@ -344,7 +375,9 @@ test.describe('git push and a custom shell action', () => {
     await createWorkspace(handle.page, WS, workDir)
     await handle.page.locator('.branch-row').first().click()
     await handle.page.waitForSelector('.tab-bar__tab--session', { timeout: 15000 })
-    await handle.page.waitForTimeout(1000)
+    await expect(handle.page.locator('.xterm-helper-textarea').first()).toBeFocused({
+      timeout: 10000,
+    })
   })
 
   test.afterAll(async () => {
@@ -440,27 +473,28 @@ test.describe('panel screenshots', () => {
   test('the panel and the Git group are captured in dark and light themes', async () => {
     const { page } = handle
 
-    // A short settle after each state change: the panel and its overlay fade
-    // and scale in over ~120ms, and `toBeVisible` is satisfied well before
-    // that finishes — capturing immediately would screenshot mid-transition.
+    // The panel and its overlay fade and scale in over ~120ms
+    // (QuickActions.css), and `toBeVisible` is satisfied well before that
+    // finishes — capturing immediately would screenshot mid-transition, so
+    // wait for the animation itself to finish rather than guessing its length.
     await setTheme(page, 'dark')
     await openPanel(page)
-    await page.waitForTimeout(250)
+    await waitForAnimationsToFinish(page, '.qa-panel')
     await page.screenshot({ path: 'test-results/quick-actions/panel-top-dark.png' })
     await page.keyboard.press('g')
     await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
-    await page.waitForTimeout(250)
+    await waitForAnimationsToFinish(page, '.qa-panel')
     await page.screenshot({ path: 'test-results/quick-actions/panel-git-dark.png' })
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toBeHidden()
 
     await setTheme(page, 'light')
     await openPanel(page)
-    await page.waitForTimeout(250)
+    await waitForAnimationsToFinish(page, '.qa-panel')
     await page.screenshot({ path: 'test-results/quick-actions/panel-top-light.png' })
     await page.keyboard.press('g')
     await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
-    await page.waitForTimeout(250)
+    await waitForAnimationsToFinish(page, '.qa-panel')
     await page.screenshot({ path: 'test-results/quick-actions/panel-git-light.png' })
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toBeHidden()

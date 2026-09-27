@@ -103,7 +103,9 @@ test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, 'Git Smoke', repo)
   await handle.page.locator('.branch-row').first().click()
-  await handle.page.waitForTimeout(1500)
+  await expect(
+    handle.page.locator('.tab-bar--primary .tab-bar__tab').filter({ hasText: 'Git' }).first()
+  ).toBeVisible({ timeout: 15000 })
 })
 
 test.afterAll(async () => {
@@ -140,6 +142,22 @@ test('the git project view renders, and everything on it is styled', async () =>
   await expect(handle.page.locator(`${PANEL}[data-view-param="project"]`)).toHaveCount(1, {
     timeout: 15000,
   })
-  await handle.page.waitForTimeout(2500)
+  await expect
+    .poll(
+      () =>
+        handle.app.evaluate(({ webContents }) =>
+          webContents
+            .getAllWebContents()
+            .some(
+              (wc) =>
+                !wc.isDestroyed() &&
+                wc.getURL().includes('git-integration') &&
+                wc.getURL().includes('view=project') &&
+                !wc.isLoading()
+            )
+        ),
+      { timeout: 20000, message: 'git-integration project view never finished loading' }
+    )
+    .toBe(true)
   assertClean('project', await inGit('project', PROBE))
 })

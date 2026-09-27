@@ -9,8 +9,10 @@ vi.mock('../../../../src/renderer/stores/session.store', () => ({
 }))
 const mockModalDepth = vi.fn(() => 0)
 vi.mock('../../../../src/renderer/stores/modal.store', () => ({
-  useModalStore: (selector: (s: { depth: number }) => unknown) =>
-    selector({ depth: mockModalDepth() }),
+  useModalStore: Object.assign(
+    (selector: (s: { depth: number }) => unknown) => selector({ depth: mockModalDepth() }),
+    { getState: () => ({ depth: mockModalDepth() }) }
+  ),
 }))
 vi.mock('../../../../src/renderer/components/terminal/SplitContainer', () => ({
   SplitContainer: ({
@@ -358,6 +360,36 @@ describe('TerminalPane', () => {
         focusRequest: { sessionId: 'ses-1', nonce: 1 },
       } as unknown as ReturnType<typeof useSessionStore>)
       render(<TerminalPane projectId="proj-1" />)
+      expect(mockFocus).not.toHaveBeenCalled()
+    })
+    it('does not take focus from a modal that opened before the frame ran', () => {
+      let frame: FrameRequestCallback | undefined
+      vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+        frame = cb as FrameRequestCallback
+        return 0
+      })
+      const mockFocus = vi.fn()
+      mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+      mockGetActive.mockReturnValue('ses-1')
+      mockGetInstance.mockReturnValue({
+        terminal: { focus: mockFocus, scrollToBottom: vi.fn() },
+        mount: vi.fn(),
+        unmount: vi.fn(),
+      })
+      vi.mocked(useSessionStore).mockReturnValue({
+        getSessionsForProject: mockGetSessions,
+        getActiveSessionForProject: mockGetActive,
+        getTerminalInstance: mockGetInstance,
+        clearBellCount: mockClearBell,
+        getPaneLayout: mockGetPaneLayout,
+        setSplitRatio: mockSetSplitRatio,
+        setFocusedSession: mockSetFocusedSession,
+        focusRequest: { sessionId: 'ses-1', nonce: 1 },
+      } as unknown as ReturnType<typeof useSessionStore>)
+      render(<TerminalPane projectId="proj-1" />)
+      mockFocus.mockClear()
+      mockModalDepth.mockReturnValue(1)
+      frame?.(0)
       expect(mockFocus).not.toHaveBeenCalled()
     })
   })

@@ -122,9 +122,11 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
+  # Nothing the build does depends on the other checks, and E2E waits on it,
+  # so it starts with them rather than five minutes after them. Merge still
+  # needs every job.
   build:
     name: Build
-    needs: [lint, typecheck, format, test]
     runs-on: macos-14
 
     steps:
@@ -154,10 +156,45 @@ jobs:
             extensions/*/dist/
           retention-days: 1
 
+  e2e-select:
+    name: E2E select
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      specs: ${{ steps.select.outputs.specs }}
+      changed: ${{ steps.select.outputs.changed }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Which specs this diff can affect: scripts/e2e-select.mjs. A push to main
+      # runs everything, and any path the map does not know runs everything.
+      - name: Select specs
+        id: select
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
+        run: |
+          result=$(node scripts/e2e-select.mjs "$BASE")
+          echo "$result"
+          echo "mode=$(echo "$result" | jq -r .mode)" >> "$GITHUB_OUTPUT"
+          echo "specs=$(echo "$result" | jq -r '.specs | join(" ")')" >> "$GITHUB_OUTPUT"
+          changed=$(git diff --name-only --diff-filter=AM "$BASE"...HEAD -- 'tests/e2e/*.spec.ts' | tr '\n' ' ')
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
   e2e:
-    name: E2E
-    needs: build
+    name: E2E (${{ matrix.shard }}/2)
+    needs: [build, e2e-select]
+    if: needs.e2e-select.outputs.mode != 'none'
     runs-on: macos-14
+    strategy:
+      matrix:
+        shard: [1, 2]
 
     steps:
       - uses: actions/checkout@v4
@@ -170,6 +207,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # remote-app.spec.ts drives the browser remote renderer in Chromium.
       - name: Install Playwright Chromium
         run: npx playwright install chromium
 
@@ -187,16 +225,78 @@ jobs:
         with:
           name: app-build
 
+      # No retries: a test that fails once fails the build.
       - name: Run E2E suite
-        run: npx playwright test
-        timeout-minutes: 15
+        env:
+          MODE: ${{ needs.e2e-select.outputs.mode }}
+          SPECS: ${{ needs.e2e-select.outputs.specs }}
+        run: |
+          if [ "$MODE" = all ]; then SPECS=""; fi
+          npx playwright test $SPECS --shard=${{ matrix.shard }}/2 --pass-with-no-tests --reporter=blob,dot
+        timeout-minutes: 10
 
-      - name: Upload Playwright report
+      # A new or edited spec must pass three times in a row before it merges.
+      - name: Burn in changed specs
+        if: matrix.shard == 1 && needs.e2e-select.outputs.changed != ''
+        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=3 --reporter=dot
+        timeout-minutes: 10
+
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 14
+
+      - name: Upload failure traces
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
+          name: test-results-${{ matrix.shard }}
+          path: test-results/
           retention-days: 14
+
+  # The one E2E check branch protection requires: green when every shard
+  # passed or when the diff needed no E2E at all.
+  e2e-result:
+    name: E2E result
+    needs: [e2e-select, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: needs.e2e.result != 'skipped'
+        run: npm ci --ignore-scripts
+
+      - uses: actions/download-artifact@v4
+        if: needs.e2e.result != 'skipped'
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: HTML report
+        if: needs.e2e.result != 'skipped'
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+
+      - uses: actions/upload-artifact@v4
+        if: needs.e2e.result != 'skipped'
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Verdict
+        run: |
+          echo "select: ${{ needs.e2e-select.result }}, e2e: ${{ needs.e2e.result }}"
+          test "${{ needs.e2e-select.result }}" = success
+          case "${{ needs.e2e.result }}" in success|skipped) ;; *) exit 1 ;; esac

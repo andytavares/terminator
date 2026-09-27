@@ -121,6 +121,10 @@ test('a stopped session offers Resume once its conversation is known', async () 
   // End the agent's terminal the way an agent ending would.
   await goToTerminal(page)
   await page.locator('.terminal-pane').click()
+  // Typing 'exit' before the terminal owns focus lets the keys land on the
+  // page instead of the shell, which never sees 'exit' and never closes —
+  // exactly the silent failure that made Resume never appear.
+  await expect(page.locator('.xterm-helper-textarea').first()).toBeFocused({ timeout: 10000 })
   await page.keyboard.type('exit')
   await page.keyboard.press('Enter')
   await openHome(page)
@@ -141,6 +145,10 @@ test('a conversation whose transcript has gone says so instead', async () => {
 
   await goToTerminal(page)
   await page.locator('.terminal-pane').click()
+  // Typing 'exit' before the terminal owns focus lets the keys land on the
+  // page instead of the shell, which never sees 'exit' and never closes —
+  // exactly the silent failure that made Resume never appear.
+  await expect(page.locator('.xterm-helper-textarea').first()).toBeFocused({ timeout: 10000 })
   await page.keyboard.type('exit')
   await page.keyboard.press('Enter')
   await openHome(page)
@@ -165,6 +173,10 @@ test('a conversation that goes while the app is running stops being offered', as
   await awaitCaptured(page, captured)
   await goToTerminal(page)
   await page.locator('.terminal-pane').click()
+  // Typing 'exit' before the terminal owns focus lets the keys land on the
+  // page instead of the shell, which never sees 'exit' and never closes —
+  // exactly the silent failure that made Resume never appear.
+  await expect(page.locator('.xterm-helper-textarea').first()).toBeFocused({ timeout: 10000 })
   await page.keyboard.type('exit')
   await page.keyboard.press('Enter')
   await openHome(page)
@@ -190,7 +202,7 @@ test('a conversation from the last run is offered under Closed, and nothing rest
   reportConversation(profile, before, 'conv-e2e-3', transcript)
   await awaitCaptured(page, before)
 
-  await closeApp(handle, { keepProfile: true })
+  await closeApp(handle)
   handle = await launchApp(profile)
   const restarted = handle.page
   await openHome(restarted)

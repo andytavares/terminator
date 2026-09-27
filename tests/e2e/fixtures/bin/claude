@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stand-in for the real `claude` binary. tests/e2e/helpers.ts prepends this
+# script's directory to PATH so no e2e run can ever launch a real Claude Code
+# agent (which on a developer machine costs quota and takes real time, and on
+# CI simply isn't there). It announces itself and its argv, then idles until
+# whatever spawned it kills it — a real launch never exits on its own either.
+echo "claude-stub $*"
+exec sleep 86400

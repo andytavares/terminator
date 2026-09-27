@@ -36,7 +36,7 @@ const SURFACES: { id: string; label: string; part: string; expand?: string }[] =
 test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, 'terminator', process.cwd())
-  await handle.page.waitForTimeout(2000)
+  await expect(handle.page.locator('.app-band__entry').first()).toBeVisible({ timeout: 20000 })
 })
 
 test.afterAll(async () => {
@@ -56,6 +56,17 @@ function inView<T>(part: string, script: string): Promise<T> {
   ) as Promise<T>
 }
 
+/** True once the extension surface's own WebContentsView has finished loading. */
+function viewReady(part: string): Promise<boolean> {
+  return handle.app.evaluate(
+    ({ webContents }, p) =>
+      webContents
+        .getAllWebContents()
+        .some((wc) => !wc.isDestroyed() && wc.getURL().includes(p) && !wc.isLoading()),
+    part
+  )
+}
+
 for (const { id, label, part, expand } of SURFACES) {
   test(`${label} renders, and everything on it is styled`, async () => {
     const panel = handle.page.locator(`[data-extension-panel="${id}"]`)
@@ -63,7 +74,12 @@ for (const { id, label, part, expand } of SURFACES) {
       await handle.page.locator(`button[aria-label="${label}"]`).click()
     }
     await expect(panel).toHaveCount(1, { timeout: 20000 })
-    await handle.page.waitForTimeout(2500)
+    await expect
+      .poll(() => viewReady(part), {
+        timeout: 20000,
+        message: `${label} view never finished loading`,
+      })
+      .toBe(true)
 
     await inView(
       part,
@@ -92,9 +108,12 @@ for (const { id, label, part, expand } of SURFACES) {
       // the default screen — which is how a crashing settings panel and two
       // unstyled inputs both went unnoticed here.
       expect(opened, `${label}: found no control matching /${expand}/i to open`).toBe(true)
-      await handle.page.waitForTimeout(2000)
-      const after = await inView<number>(part, 'document.body.innerText.length')
-      expect(after, `${label}: opening "${expand}" changed nothing on screen`).not.toBe(before)
+      await expect
+        .poll(() => inView<number>(part, 'document.body.innerText.length'), {
+          timeout: 5000,
+          message: `${label}: opening "${expand}" changed nothing on screen`,
+        })
+        .not.toBe(before)
     }
 
     const report = await inView<{

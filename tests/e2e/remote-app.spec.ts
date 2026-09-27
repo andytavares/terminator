@@ -1,8 +1,5 @@
-import { test, expect, ElectronApplication, Page } from '@playwright/test'
-import { _electron as electron } from 'playwright'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { test, expect } from '@playwright/test'
+import { AppHandle, launchApp, closeApp } from './helpers'
 
 // End-to-end guard for the browser `/app/` remote surface — the feature that
 // silently broke when the bridge default-deny enforcement shipped without an
@@ -16,26 +13,20 @@ import { join } from 'node:path'
 const TEST_PORT = 17682
 const WS_NAME = 'E2E-Remote-WS'
 
-let electronApp: ElectronApplication
-let page: Page
+let handle: AppHandle
+let page: AppHandle['page']
 let userDataDir: string
 
 test.beforeAll(async () => {
-  // Hermetic, isolated profile so the test starts from a clean workspace store
-  // and never touches the developer's real Terminator data.
-  userDataDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-'))
-  electronApp = await electron.launch({
-    args: ['.', `--user-data-dir=${userDataDir}`],
-    env: { ...process.env, NODE_ENV: 'test' },
-  })
-  page = await electronApp.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  await page.waitForSelector('.unified-sidebar', { timeout: 15000 })
+  // launchApp gives a hermetic, isolated profile under this run's shared
+  // root, and prepends the `claude` stub to PATH, same as every other spec.
+  handle = await launchApp()
+  page = handle.page
+  userDataDir = handle.userDataDir
 })
 
 test.afterAll(async () => {
-  await electronApp.close()
-  if (userDataDir) rmSync(userDataDir, { recursive: true, force: true })
+  await closeApp(handle)
 })
 
 test('/app/ browser remote renderer loads and the IPC bridge serves workspace:list', async ({
@@ -59,14 +50,15 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
     ).electronAPI.extensionBridge
     await bridge.invoke('remote:port-change', { port })
     await bridge.invoke('remote:toggle', { enabled: true })
-    for (let i = 0; i < 30; i++) {
+    const deadline = Date.now() + 6000
+    while (Date.now() < deadline) {
       const s = (await bridge.invoke('remote:get-settings', {})) as {
         password: string
         lanUrl?: string
         port: number
       }
       if (s.lanUrl) return s
-      await new Promise((r) => setTimeout(r, 200))
+      await new Promise((r) => requestAnimationFrame(r))
     }
     throw new Error('remote server did not start (no lanUrl after 6s)')
   }, TEST_PORT)

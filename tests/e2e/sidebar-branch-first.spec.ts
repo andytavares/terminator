@@ -110,6 +110,10 @@ test('each terminal carries its own state on its tab', async () => {
 })
 
 test('the session tab bar states which branch it is showing', async () => {
+  // Self-contained: does not assume an earlier test already opened a
+  // terminal on the branch, so it passes whether run in the file or alone.
+  await branchRow().click()
+  await handle.page.waitForSelector('.tab-bar__tab--session', { timeout: 15000 })
   await expect(handle.page.locator('.tab-bar__scope')).toContainText('main')
 })
 

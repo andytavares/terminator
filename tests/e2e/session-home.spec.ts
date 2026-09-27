@@ -71,7 +71,7 @@ test('a description survives a restart, and a closed session is found by it', as
   await box.press('Enter')
   await expect(page.getByText('Checking the ghostty keybinds')).toBeVisible()
 
-  await closeApp(handle, { keepProfile: true })
+  await closeApp(handle)
   handle = await launchApp(profile)
   const restarted = handle.page
   await expect(restarted.getByRole('heading', { name: 'Home' })).toBeVisible()
@@ -106,7 +106,7 @@ test('the Logbook is remembered, and describing a session there names it in the 
   await page.getByRole('button', { name: 'Save description' }).click()
   await expect(list.getByRole('option', { name: /Trying the Logbook/ })).toBeVisible()
 
-  await closeApp(handle, { keepProfile: true })
+  await closeApp(handle)
   handle = await launchApp(profile)
   await expect(
     handle.page.getByRole('radiogroup', { name: 'Layout' }).getByRole('radio', { name: 'Logbook' })
@@ -168,7 +168,7 @@ test("the Ledger's columns and grouping survive a restart", async () => {
   await page.getByRole('menuitemradio', { name: 'Branch', exact: true }).click()
   await expect(page.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
 
-  await closeApp(handle, { keepProfile: true })
+  await closeApp(handle)
   handle = await launchApp(profile)
   const restarted = handle.page
   // Terminals do not survive a restart, so give the Ledger a row to arrange.

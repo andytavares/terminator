@@ -16,7 +16,7 @@ let handle: AppHandle
 test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, 'terminator', process.cwd())
-  await handle.page.waitForTimeout(2000)
+  await expect(handle.page.locator('.app-band__entry').first()).toBeVisible({ timeout: 20000 })
 })
 
 test.afterAll(async () => {
@@ -36,6 +36,17 @@ function inView<T>(part: string, script: string): Promise<T> {
   ) as Promise<T>
 }
 
+/** True once the extension surface's own WebContentsView has finished loading. */
+function viewReady(part: string): Promise<boolean> {
+  return handle.app.evaluate(
+    ({ webContents }, p) =>
+      webContents
+        .getAllWebContents()
+        .some((wc) => !wc.isDestroyed() && wc.getURL().includes(p) && !wc.isLoading()),
+    part
+  )
+}
+
 /** Send real key events into an extension's own webContents. */
 async function key(part: string, keyCode: string, modifiers: string[] = []): Promise<void> {
   await handle.app.evaluate(
@@ -47,26 +58,44 @@ async function key(part: string, keyCode: string, modifiers: string[] = []): Pro
       v.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: mods as never })
       v.sendInputEvent({ type: 'char', keyCode: k, modifiers: mods as never })
       v.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: mods as never })
+      // Let React commit the resulting state before the next call reads the DOM.
+      await v.executeJavaScript(
+        'new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))'
+      )
     },
     { p: part, k: keyCode, mods: modifiers }
   )
-  await handle.page.waitForTimeout(150)
 }
 
 test('a dialog puts focus inside itself, keeps Tab there, and closes on Escape', async () => {
   await handle.page.locator('button[aria-label="Notes"]').click()
-  await handle.page.waitForTimeout(2500)
+  await expect
+    .poll(() => viewReady('notepad'), {
+      timeout: 20000,
+      message: 'notepad view never finished loading',
+    })
+    .toBe(true)
 
   // Open the composer without touching it with a mouse afterwards.
-  await inView(
-    'notepad',
-    `(() => {
+  // Polled: the view reports loaded before React has drawn the button.
+  await expect
+    .poll(() =>
+      inView<boolean>(
+        'notepad',
+        `(() => {
       const b = [...document.querySelectorAll('button')].find((x) => /new note/i.test(x.textContent || ''))
       if (b) b.click()
       return !!b
     })()`
-  )
-  await handle.page.waitForTimeout(800)
+      )
+    )
+    .toBe(true)
+  await expect
+    .poll(() => inView<boolean>('notepad', `!!document.querySelector('[data-tmui-surface]')`), {
+      timeout: 10000,
+      message: 'the composer surface never opened',
+    })
+    .toBe(true)
 
   // Focus is inside the surface, not left behind it.
   const focusedInside = await inView<boolean>(
@@ -102,6 +131,20 @@ test('a dialog puts focus inside itself, keeps Tab there, and closes on Escape',
 })
 
 test('every focusable control in an extension view shows a focus ring', async () => {
+  // Self-contained: does not assume the previous test left Notes open, so it
+  // passes whether run as part of the file or alone.
+  const panel = handle.page.locator('[data-extension-panel="terminator.notepad"]')
+  if ((await panel.count()) === 0) {
+    await handle.page.locator('button[aria-label="Notes"]').click()
+  }
+  await expect(panel).toHaveCount(1, { timeout: 20000 })
+  await expect
+    .poll(() => viewReady('notepad'), {
+      timeout: 20000,
+      message: 'notepad view never finished loading',
+    })
+    .toBe(true)
+
   const missing = await inView<string[]>(
     'notepad',
     `(() => {
@@ -153,19 +196,40 @@ for (const { id, label, part, open } of SURFACES) {
       await handle.page.locator(`button[aria-label="${label}"]`).click()
     }
     await expect(panel).toHaveCount(1, { timeout: 20000 })
-    await handle.page.waitForTimeout(2000)
+    await expect
+      .poll(() => viewReady(part), {
+        timeout: 20000,
+        message: `${label} view never finished loading`,
+      })
+      .toBe(true)
 
-    await inView(
-      part,
-      `(() => {
+    // Polled: the view reports loaded before React has drawn the button.
+    await expect
+      .poll(
+        () =>
+          inView<boolean>(
+            part,
+            `(() => {
         const b = [...document.querySelectorAll('button')].find((x) =>
           (x.textContent || '').toLowerCase().includes(${JSON.stringify(open)})
         )
         if (b) b.click()
         return !!b
       })()`
-    )
-    await handle.page.waitForTimeout(1500)
+          ),
+        { message: `${label} never offered "${open}"` }
+      )
+      .toBe(true)
+    await expect
+      .poll(
+        () =>
+          inView<boolean>(part, `!!document.querySelector('input:not([type=hidden]),textarea')`),
+        {
+          timeout: 10000,
+          message: `${label} never showed a text field after opening "${open}"`,
+        }
+      )
+      .toBe(true)
 
     // Type into the first field this extension offers, wherever it is.
     const typed = await inView<boolean>(
@@ -183,7 +247,6 @@ for (const { id, label, part, open } of SURFACES) {
 
     await key(part, 'Escape')
     await key(part, 'Escape')
-    await handle.page.waitForTimeout(1000)
 
     const still = await handle.page.evaluate(
       () =>
@@ -208,7 +271,12 @@ test('Remote Control: two Escapes still leave the extension, because nothing is 
     await handle.page.locator('button[aria-label="Remote Control"]').click()
   }
   await expect(panel).toHaveCount(1, { timeout: 20000 })
-  await handle.page.waitForTimeout(2000)
+  await expect
+    .poll(() => viewReady('remote-control'), {
+      timeout: 20000,
+      message: 'Remote Control view never finished loading',
+    })
+    .toBe(true)
 
   // Nothing typed into, nothing open: the two conditions that would suppress.
   const state = await inView<{ fields: number; surfaces: number }>(
@@ -223,11 +291,17 @@ test('Remote Control: two Escapes still leave the extension, because nothing is 
 
   await key('remote-control', 'Escape')
   await key('remote-control', 'Escape')
-  await handle.page.waitForTimeout(1200)
 
-  const still = await handle.page.evaluate(
-    () =>
-      document.querySelector('[data-extension-panel]')?.getAttribute('data-extension-panel') ?? null
-  )
-  expect(still, 'with nothing at risk the exit gesture must still fire').not.toBe(id)
+  await expect
+    .poll(
+      () =>
+        handle.page.evaluate(
+          () =>
+            document
+              .querySelector('[data-extension-panel]')
+              ?.getAttribute('data-extension-panel') ?? null
+        ),
+      { timeout: 6000, message: 'with nothing at risk the exit gesture must still fire' }
+    )
+    .not.toBe(id)
 })

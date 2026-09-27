@@ -50,44 +50,49 @@ test.beforeAll(async () => {
   await addBranch('Alpha', 'a-only')
 })
 
-test('Manual is the stored order, for repos as well as branches', async () => {
-  await pickSort('Manual')
-  expect(await repoOrder()).toEqual(['Zulu', 'Alpha'])
-  expect(await branchOrder()).toEqual(['z-branch', 'a-branch', 'a-only'])
-})
+// One story: each test relies on the sort/order the previous one left (the
+// drag tests explicitly build on "still sorted by name" or the just-dragged
+// position). Serial keeps them running together, in order.
+test.describe.serial('sidebar sorting', () => {
+  test('Manual is the stored order, for repos as well as branches', async () => {
+    await pickSort('Manual')
+    expect(await repoOrder()).toEqual(['Zulu', 'Alpha'])
+    expect(await branchOrder()).toEqual(['z-branch', 'a-branch', 'a-only'])
+  })
 
-test('sorting by name reaches the repo headers, not just the branches under them', async () => {
-  await pickSort('Name')
-  expect(await repoOrder()).toEqual(['Alpha', 'Zulu'])
-  expect(await branchOrder()).toEqual(['a-only', 'a-branch', 'z-branch'])
-})
+  test('sorting by name reaches the repo headers, not just the branches under them', async () => {
+    await pickSort('Name')
+    expect(await repoOrder()).toEqual(['Alpha', 'Zulu'])
+    expect(await branchOrder()).toEqual(['a-only', 'a-branch', 'z-branch'])
+  })
 
-test('dragging a repo writes an order that is actually drawn, and survives a restart', async () => {
-  const { page } = handle
-  // Still sorted by name from the previous test: the drop has to switch the
-  // view to Manual, or the computed sort would recompute over it immediately.
-  await page.locator('.repo-header').first().dragTo(page.locator('.repo-header').last())
-  await expect(page.locator('.repo-header__name').first()).toHaveText('Zulu')
+  test('dragging a repo writes an order that is actually drawn, and survives a restart', async () => {
+    const { page } = handle
+    // Still sorted by name from the previous test: the drop has to switch the
+    // view to Manual, or the computed sort would recompute over it immediately.
+    await page.locator('.repo-header').first().dragTo(page.locator('.repo-header').last())
+    await expect(page.locator('.repo-header__name').first()).toHaveText('Zulu')
 
-  await page.click('.sidebar-menu__button[aria-label="Display"]')
-  await expect(
-    page.locator('.sidebar-menu__item[aria-checked="true"]', { hasText: 'Manual' })
-  ).toBeVisible()
-  await page.click('.sidebar-search input')
+    await page.click('.sidebar-menu__button[aria-label="Display"]')
+    await expect(
+      page.locator('.sidebar-menu__item[aria-checked="true"]', { hasText: 'Manual' })
+    ).toBeVisible()
+    await page.click('.sidebar-search input')
 
-  await page.reload()
-  await page.waitForSelector('.repo-header')
-  await expect(page.locator('.repo-header__name').first()).toHaveText('Zulu')
-})
+    await page.reload()
+    await page.waitForSelector('.repo-header')
+    await expect(page.locator('.repo-header__name').first()).toHaveText('Zulu')
+  })
 
-test('dragging a branch reorders it within its repo, and survives a restart', async () => {
-  const { page } = handle
-  await page
-    .locator('.branch-row', { hasText: 'z-branch' })
-    .dragTo(page.locator('.branch-row', { hasText: 'a-branch' }))
-  await expect(page.locator('.branch-row__name').first()).toHaveText('a-branch')
+  test('dragging a branch reorders it within its repo, and survives a restart', async () => {
+    const { page } = handle
+    await page
+      .locator('.branch-row', { hasText: 'z-branch' })
+      .dragTo(page.locator('.branch-row', { hasText: 'a-branch' }))
+    await expect(page.locator('.branch-row__name').first()).toHaveText('a-branch')
 
-  await page.reload()
-  await page.waitForSelector('.branch-row')
-  expect(await branchOrder()).toEqual(['a-branch', 'z-branch', 'a-only'])
+    await page.reload()
+    await page.waitForSelector('.branch-row')
+    expect(await branchOrder()).toEqual(['a-branch', 'z-branch', 'a-only'])
+  })
 })

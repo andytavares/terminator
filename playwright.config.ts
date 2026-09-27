@@ -14,12 +14,16 @@ export default defineConfig({
     ...(process.env.E2E_LIVE === '1' ? [] : ['**/live/**']),
   ],
   timeout: 30000,
-  // CI runners are resource-constrained and each test launches a full Electron
-  // app, so cap parallelism and allow one retry to absorb rare launch flakes.
-  retries: process.env.CI ? 1 : 0,
+  // No retries: a test that fails once fails the build. See
+  // docs/research/e2e-deterministic-selective.md.
+  retries: 0,
+  // CI runners are resource-constrained and each test launches a full
+  // Electron app, so cap parallelism.
   workers: process.env.CI ? 2 : undefined,
+  globalSetup: './tests/e2e/global-setup.ts',
+  globalTeardown: './tests/e2e/global-teardown.ts',
   use: {
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
   projects: [
     {

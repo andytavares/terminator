@@ -27,9 +27,45 @@ test.beforeAll(async () => {
   execFileSync('git', ['-C', repo, 'commit', '-q', '--allow-empty', '-m', 'initial'])
   handle = await launchApp()
   await createWorkspace(handle.page, 'type', repo)
-  await handle.page.waitForTimeout(2000)
+  const panel = handle.page.locator('[data-extension-panel="terminator.foundry"]')
   await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(3000)
+  await expect(panel).toHaveCount(1, { timeout: 30_000 })
+  // The channel answers through the main window's own bridge, which needs
+  // nothing from the extension's own WebContentsView, so it is checked
+  // first; only once the extension has activated is the view itself worth
+  // polling for.
+  await expect
+    .poll(
+      async () =>
+        (await handle.page
+          .evaluate(() =>
+            (
+              window as unknown as {
+                electronAPI: {
+                  extensionBridge: { invoke(c: string, p: unknown): Promise<unknown> }
+                }
+              }
+            ).electronAPI.extensionBridge.invoke('foundry:order.list', {})
+          )
+          .catch(() => null)) !== null,
+      { timeout: 30_000 }
+    )
+    .toBe(true)
+  // The WebContentsView `inFoundry` reaches attaches a little after the
+  // channel answers — polled with its rejection caught, since `expect.poll`
+  // does not retry a callback that throws, only one whose value mismatches.
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await inFoundry<number>(`document.querySelectorAll('button').length`)
+        } catch {
+          return 0
+        }
+      },
+      { timeout: 30_000 }
+    )
+    .toBeGreaterThan(0)
 })
 
 test.afterAll(async () => {
@@ -110,9 +146,12 @@ test('an order fits the view it is shown in', async () => {
     source: { kind: 'typed', text: 'Read the session TTL from the environment' },
     repoPaths: [${'' + JSON.stringify(repoPath) + ''}],
   })`)
-  await handle.page.waitForTimeout(4000)
-  await clickByName('Forge')
-  await handle.page.waitForTimeout(1500)
+  await expect.poll(() => clickByName('Forge')).toBe(true)
+  await expect
+    .poll(() => inFoundry<number>(`document.querySelectorAll('.fdry-orders button').length`), {
+      timeout: 15_000,
+    })
+    .toBeGreaterThan(0)
   const before = await overflow()
   // eslint-disable-next-line no-console
   console.log(`scrollHeight ${before.scroll} vs viewport ${before.view}`)
@@ -125,7 +164,15 @@ test('no text on any Foundry surface renders at the browser default size', async
   const found: Oversized[] = []
   for (const surface of ['Forge', 'Floor', 'Inbox', 'Ledger']) {
     await clickByName(surface)
-    await handle.page.waitForTimeout(600)
+    // Not every surface is necessarily selectable in this fixture (`Floor`
+    // has nothing running to show), so what is waited for is the view
+    // settling after the click — two animation frames — rather than that
+    // surface's own tab actually becoming active.
+    await inFoundry<void>(
+      `new Promise(function (resolve) {
+        requestAnimationFrame(function () { requestAnimationFrame(resolve) })
+      })`
+    )
     for (const item of await oversized()) found.push({ ...item, cls: `${surface}: ${item.cls}` })
   }
   // eslint-disable-next-line no-console

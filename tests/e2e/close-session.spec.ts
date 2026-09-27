@@ -67,7 +67,7 @@ test('a removed session stays gone across a restart', async () => {
   await page.getByRole('button', { name: /^Remove / }).click()
   await expect(page.getByRole('rowgroup', { name: 'Closed' })).toHaveCount(0, { timeout: 15_000 })
 
-  await closeApp(handle, { keepProfile: true })
+  await closeApp(handle)
   handle = await launchApp(profile)
   await openHome(handle.page)
   await expect(handle.page.getByRole('rowgroup', { name: 'Closed' })).toHaveCount(0)

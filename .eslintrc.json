@@ -15,6 +15,22 @@
   "parser": "@typescript-eslint/parser",
   "overrides": [
     {
+      "files": ["tests/e2e/*.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "CallExpression[callee.property.name='waitForTimeout']",
+            "message": "E2E never sleeps (ADR 070). Wait on the condition you assert next: a locator assertion or expect.poll."
+          },
+          {
+            "selector": "NewExpression[callee.name='Promise'] CallExpression[callee.name='setTimeout']",
+            "message": "E2E never sleeps (ADR 070). Wait on the condition you assert next: a locator assertion or expect.poll."
+          }
+        ]
+      }
+    },
+    {
       "files": ["*.cjs"],
       "rules": {
         "@typescript-eslint/no-var-requires": "off"

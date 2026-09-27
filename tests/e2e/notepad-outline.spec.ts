@@ -84,11 +84,18 @@ test.beforeAll(async () => {
   }, BODY)
   await expect.poll(extensionViewReady, { timeout: 20000 }).toBe(true)
 
-  await inNotepad(`(async () => {
+  await expect
+    .poll(() =>
+      inNotepad<boolean>(`(() => {
     const row = document.querySelector('.notepad-note-list__notes button, [class*="note-row"]')
     if (row) row.click()
-    await new Promise((r) => setTimeout(r, 1500))
+    return !!row
   })()`)
+    )
+    .toBe(true)
+  await expect
+    .poll(() => inNotepad<number>(`document.querySelectorAll('.notepad-outline__item').length`))
+    .toBeGreaterThan(0)
 })
 
 test('the rail lists the open note headings, nested by level', async () => {
@@ -111,7 +118,13 @@ test('clicking a heading scrolls the editor to it', async () => {
        const items = [...document.querySelectorAll('.notepad-outline__item')]
        const click = async (label) => {
          items.find((el) => el.textContent === label).click()
-         await new Promise((r) => setTimeout(r, 900))
+         let prev = scroller.scrollTop
+         for (let i = 0; i < 60; i++) {
+           await new Promise((r) => requestAnimationFrame(r))
+           const cur = scroller.scrollTop
+           if (cur === prev) break
+           prev = cur
+         }
          return scroller.scrollTop
        }
        const before = scroller.scrollTop
@@ -157,12 +170,19 @@ test('one panel takes the whole rail when the other is closed', async () => {
        const byLabel = (text) =>
          [...document.querySelectorAll('.notepad-view__toolbar button')]
            .find((b) => b.textContent === text)
-       byLabel('Hide outline').click()
-       await new Promise((r) => setTimeout(r, 300))
        const rect = (sel) => document.querySelector(sel).getBoundingClientRect().height
-       const out = { comments: rect('.notepad-view__comments'), rail: rect('.notepad-view__rail') }
+       byLabel('Hide outline').click()
+       let out = { comments: rect('.notepad-view__comments'), rail: rect('.notepad-view__rail') }
+       for (let i = 0; i < 30; i++) {
+         await new Promise((r) => requestAnimationFrame(r))
+         out = { comments: rect('.notepad-view__comments'), rail: rect('.notepad-view__rail') }
+         if (Math.abs(out.comments - out.rail) < 2) break
+       }
        byLabel('Outline').click()
-       await new Promise((r) => setTimeout(r, 300))
+       for (let i = 0; i < 30; i++) {
+         await new Promise((r) => requestAnimationFrame(r))
+         if (document.querySelectorAll('.notepad-outline__item').length > 0) break
+       }
        return out
      })()`
   )
@@ -176,13 +196,13 @@ test('the outline closes from the panel and comes back from the toolbar', async 
        const open = count()
 
        document.querySelector('[aria-label="Close outline"]').click()
-       await new Promise((r) => setTimeout(r, 300))
+       for (let i = 0; i < 30 && count() !== 0; i++) await new Promise((r) => requestAnimationFrame(r))
        const closed = count()
 
        const toolbarBtn = [...document.querySelectorAll('.notepad-view__toolbar button')]
          .find((b) => b.textContent === 'Outline')
        toolbarBtn.click()
-       await new Promise((r) => setTimeout(r, 300))
+       for (let i = 0; i < 30 && count() === 0; i++) await new Promise((r) => requestAnimationFrame(r))
        return { open, closed, reopened: count() }
      })()`
   )
@@ -199,12 +219,18 @@ test('closing both rail panels gives the width back to the editor', async () => 
        const withRail = editor.getBoundingClientRect().width
        byLabel('Hide outline').click()
        byLabel('Hide comments').click()
-       await new Promise((r) => setTimeout(r, 400))
-       const withoutRail = editor.getBoundingClientRect().width
+       let withoutRail = editor.getBoundingClientRect().width
+       for (let i = 0; i < 30 && withoutRail <= withRail + 200; i++) {
+         await new Promise((r) => requestAnimationFrame(r))
+         withoutRail = editor.getBoundingClientRect().width
+       }
        // Put it back for whatever runs next.
        byLabel('Outline').click()
        byLabel('Show comments').click()
-       await new Promise((r) => setTimeout(r, 300))
+       for (let i = 0; i < 30; i++) {
+         await new Promise((r) => requestAnimationFrame(r))
+         if (document.querySelectorAll('.notepad-outline__item').length > 0) break
+       }
        return { withRail, withoutRail }
      })()`
   )
@@ -234,7 +260,10 @@ test('a popped-out note window gets the same outline', async () => {
 
   const items = await inNotepad<string[]>(
     `(async () => {
-       await new Promise((r) => setTimeout(r, 1500))
+       for (let i = 0; i < 60; i++) {
+         if (document.querySelectorAll('.notepad-outline__item').length > 0) break
+         await new Promise((r) => requestAnimationFrame(r))
+       }
        return [...document.querySelectorAll('.notepad-outline__item')].map((el) => el.textContent)
      })()`,
     'window'

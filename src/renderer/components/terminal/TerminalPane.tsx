@@ -85,7 +85,10 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     const belongsHere = layout ? leafIds(layout).includes(sessionId) : activeSessionId === sessionId
     if (!belongsHere) return
     if (layout) setFocusedSession(projectId, sessionId)
+    // A modal can open between this effect and the frame (⌘P right after
+    // Settings closes); focusing the terminal then would steal its keys.
     requestAnimationFrame(() => {
+      if (useModalStore.getState().depth > 0) return
       getTerminalInstance(sessionId)?.terminal.focus()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps

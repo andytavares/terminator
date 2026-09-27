@@ -58,7 +58,9 @@ async function sampleDistinct(read: () => Promise<string>, times: number): Promi
   const seen = new Set<string>()
   for (let i = 0; i < times; i++) {
     seen.add(await read())
-    if (i < times - 1) await new Promise((resolve) => setTimeout(resolve, 250))
+    // Stability over time is what is asserted, so the interval is the point.
+    // eslint-disable-next-line no-restricted-syntax
+    if (i < times - 1) await new Promise((done) => setTimeout(done, 250))
   }
   return seen
 }

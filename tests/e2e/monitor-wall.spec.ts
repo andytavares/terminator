@@ -63,7 +63,7 @@ test("the wall's size and pinning survive a restart", async () => {
     .click()
   await handle.page.getByRole('switch', { name: 'Pin sessions that need you' }).click()
 
-  await closeApp(handle, { keepProfile: true })
+  await closeApp(handle)
   handle = await launchApp(profile)
   await openWall(handle.page)
   await expect(
