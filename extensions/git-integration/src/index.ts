@@ -1,6 +1,7 @@
 import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
+import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { registerQuickActionCommands } from './commands.js'
 
 // Every notification kind this extension ever raises, so the user can
@@ -69,8 +70,36 @@ export function activate(api: ExtensionAPI): void {
     },
     // Optional: an older host has no issues namespace, and the review view
     // then renders references exactly as it does today.
-    api.issues
+    api.issues,
+    () =>
+      api.workspace
+        .list()
+        .flatMap((w) => api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath))
   )
+
+  // Read-only review agent: headless `claude -p` in a detached PR-head worktree.
+  registerReviewAgentHandlers(registerFn, {
+    getSetting: (key) => api.settings.get(key),
+    broadcast: (channel, data) => api.window.broadcast(channel, data),
+    openTerminal: ({ repoRoot, cwd, title, command }) => {
+      let projectId: string | undefined
+      for (const ws of api.workspace.list()) {
+        const match = api.workspace.listProjects(ws.id).find((p) => p.worktreePath === repoRoot)
+        if (match) {
+          projectId = match.id
+          break
+        }
+      }
+      if (!projectId) return
+      const sessionId = api.pty.openTerminalTab({
+        projectId,
+        cwd,
+        tabTitle: title,
+        type: 'agent',
+      })
+      if (sessionId) api.pty.write(sessionId, `${command}\r`)
+    },
+  })
 
   // Cross-iframe broadcast: any extension view can invoke this to open the
   // merge-flow view in the GitFullView iframe (which lives in a separate iframe context).
@@ -98,6 +127,12 @@ export function activate(api: ExtensionAPI): void {
 
   // Bridges this extension's renderer (an isolated webview, no direct access to
   // api.notifications) to the shared notification dispatcher.
+  disposables.push(
+    api.ipc.registerHandler('github:review-settings', () => ({
+      cloneFolder: api.settings.get<string>('terminator.git-integration.review.cloneFolder') ?? '',
+    }))
+  )
+
   disposables.push(
     api.ipc.registerHandler('git:notify', (payload) => {
       const { type, title, key, message } = (payload ?? {}) as {
@@ -148,6 +183,32 @@ export function activate(api: ExtensionAPI): void {
           default: 500,
           min: 10,
           max: 5000,
+        },
+        'terminator.git-integration.review.agentModel': {
+          type: 'enum',
+          label: 'Review agent model',
+          options: ['opus', 'sonnet'],
+          default: 'sonnet',
+        },
+        'terminator.git-integration.review.agentEffort': {
+          type: 'enum',
+          label: 'Review agent effort',
+          options: ['', 'low', 'medium', 'high'],
+          default: '',
+        },
+        'terminator.git-integration.review.cloneFolder': {
+          type: 'folder',
+          label: 'Clone folder for reviews',
+          description:
+            'Where "Clone and review" puts repositories you have not cloned. Empty keeps reviews diff-only.',
+          default: '',
+        },
+        'terminator.git-integration.review.agentTimeoutMinutes': {
+          type: 'number',
+          label: 'Review agent timeout (minutes)',
+          default: 5,
+          min: 1,
+          max: 30,
         },
         ...buildNotificationSettingProperties(),
       },
