@@ -1,0 +1,103 @@
+tests/e2e/git-integration-smoke.spec.ts
+  s_3a9e30cc08778f::t_a46723f3fbb52c 106-108
+  s_3a9e30cc08778f::t_a122034b660298 145-161
+tests/e2e/extension-keyboard.spec.ts
+  s_3a9e30cc08778f::t_9bc1a876e19487 19,39-42,46-49,61
+  s_3a9e30cc08778f::t_5f8bdfec8d2f3b 262-267
+  s_3a9e30cc08778f::t_533fad06107acc 43-45,62-64,73-76,195-198,212-219,288-290
+  s_3a9e30cc08778f::t_6449ed4c981ce5 194,199,211,220
+  s_3a9e30cc08778f::t_54b6c18fecdcb3 283-287,291-294
+  s_3a9e30cc08778f::t_123e927fcd2799 129-142
+  s_3a9e30cc08778f::t_52ba1a8b4051ad 72,77,88-93
+tests/e2e/quick-actions.spec.ts
+  s_3a9e30cc08778f::t_534e47b1a75fb6 476-479,482,486,493,497
+  s_3a9e30cc08778f::t_8059b7c78da098 84,88
+  s_3a9e30cc08778f::t_898c27bdcb06f0 207,209
+  s_3a9e30cc08778f::t_7d6037278a7263 182-184
+  s_3a9e30cc08778f::t_784bcfa55155c3 203-205,208
+  s_3a9e30cc08778f::t_363778d3bee446 31
+  s_3a9e30cc08778f::t_0d493ec4d54f63 35-41
+  s_3a9e30cc08778f::t_cfb63d106290f4 32
+  s_3a9e30cc08778f::t_533fad06107acc 85-87,105-107,133-135,378-380
+  s_3a9e30cc08778f::t_9388c9b74df9f4 29-30
+  s_3a9e30cc08778f::t_54f46dbd745940 176-180
+  s_3a9e30cc08778f::t_3b8e7337bf410d 33-34
+tests/e2e/resume-session.spec.ts
+  s_3a9e30cc08778f::t_3f1c07b0658e02 124-127,148-151,176-179
+tests/e2e/sidebar-sorting.spec.ts
+  s_3a9e30cc08778f::t_fa2ec2889daf25 53-97
+tests/e2e/sidebar-alignment.spec.ts
+  s_3a9e30cc08778f::t_e78404a792e052 24
+tests/e2e/notepad-outline.spec.ts
+  s_3a9e30cc08778f::t_c930cf4b3f432e 195,201
+  s_3a9e30cc08778f::t_d7805356c7e110 170-176,178-181
+  s_3a9e30cc08778f::t_dbab7aa7968110 90-93
+  s_3a9e30cc08778f::t_873e1a25292165 117-123
+  s_3a9e30cc08778f::t_92778ecff72b6c 259-262
+  s_3a9e30cc08778f::t_370a9804274d33 218-222,226-229
+tests/e2e/split-panes.spec.ts
+  s_3a9e30cc08778f::t_bdb1090b62903a 19-31,33-35,37-39,41-42,44-45,47-49,51-53,55-58,60-62,64-80,83-84,86-88,90-93
+tests/e2e/extension-smoke.spec.ts
+  s_3a9e30cc08778f::t_533fad06107acc 63-65,78-81
+  s_3a9e30cc08778f::t_a2cb78cacc5bf3 39,59-62,66-67
+  s_3a9e30cc08778f::t_67aedd6820247e 77,82
+  s_3a9e30cc08778f::t_afb7e15147fe92 111-116
+  s_3a9e30cc08778f::t_6ece7d89204d99 68-69
+tests/e2e/extension-escape-exit.spec.ts
+  s_3a9e30cc08778f::t_f87d6cd7baa493 97,110,112
+  s_3a9e30cc08778f::t_249fece80d5e29 54-68
+tests/e2e/extension-escape.spec.ts
+  s_3a9e30cc08778f::t_a9ced0cb6d4f77 66-71
+  s_3a9e30cc08778f::t_860acdb27a667d 20,29-42
+  s_3a9e30cc08778f::t_3b37b2c8a278e2 142-146
+  s_3a9e30cc08778f::t_a6059b9dfbc9d0 183,197,209,236,238
+  s_3a9e30cc08778f::t_fd347942170f74 114-116
+  s_3a9e30cc08778f::t_f7921f164d070d 43
+tests/e2e/extension-themes.spec.ts
+  s_3a9e30cc08778f::t_181652ae3e8aaf 170-183
+  s_3a9e30cc08778f::t_9c9b5015a381bc 27,48-58,67-71,94-99,157-169
+tests/e2e/terminal.spec.ts
+  s_3a9e30cc08778f::t_74f284fb08d624 21-33
+  s_3a9e30cc08778f::t_d4a051c2c1bffc 122
+  s_3a9e30cc08778f::t_b1a9fa56784c99 34-121
+tests/e2e/remote-app.spec.ts
+  s_3a9e30cc08778f::t_81a9e262137759 53-54,61
+tests/e2e/branch-name.spec.ts
+  s_3a9e30cc08778f::t_2023fd7a254d12 25-35,37-39,41-43,45-48,50-64,66-74,76-85,87-97,99-105
+tests/e2e/session-surfaces.spec.ts
+  s_3a9e30cc08778f::t_3406fb36cdcaf8 61
+tests/e2e/project.spec.ts
+  s_3a9e30cc08778f::t_0392952b415a97 23-34,36-45,47-54,56-62,64-68,70-71,73-76
+tests/e2e/merge-flow.spec.ts
+  s_3a9e30cc08778f::t_48bff4bdf261d9 45-61
+  s_3a9e30cc08778f::t_d0488bc2a98ad8 189-194
+  s_3a9e30cc08778f::t_cc9a8d79132f21 108,113,119,137
+  s_3a9e30cc08778f::t_5d50bb9f60b365 115-118,120-136
+  s_3a9e30cc08778f::t_567cd62e4ed638 208-215
+  s_3a9e30cc08778f::t_2828f5a0eeb791 170-174
+  s_3a9e30cc08778f::t_533fad06107acc 109-112
+  s_3a9e30cc08778f::t_9e84d1a67d13de 86-88
+  s_3a9e30cc08778f::t_6b0aa74fb5ed08 203-207,216-225
+tests/e2e/sidebar-branch-first.spec.ts
+  s_3a9e30cc08778f::t_3f4ea1f3477fcc 113-116
+tests/e2e/terminal-right-edge.spec.ts
+  s_3a9e30cc08778f::t_809b0413d2872d 41-45,162-166
+tests/e2e/workspace.spec.ts
+  s_3a9e30cc08778f::t_4524910389fb9e 26-36,38-51,53-64,66-69,71-79,81-85,87-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a276668292c09b778f142e47ce8ab99952ad40ad",
+  "prompts": {},
+  "sessions": {
+    "s_3a9e30cc08778f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd240882-012b-446b-a7ae-7442478ea77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
