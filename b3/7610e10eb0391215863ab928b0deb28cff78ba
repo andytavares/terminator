@@ -1,0 +1,23 @@
+extensions/git-integration/package.json
+  s_ccef6bf06cd549::t_3513f3877d2f91 13,23
+scripts/build-extensions.cjs
+  s_ccef6bf06cd549::t_72c795fec8ac2b 54-57
+package-lock.json
+  s_ccef6bf06cd549::t_3377b3c9d1cd53 115,125,4183-4188,15295-15300
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b37610e10eb0391215863ab928b0deb28cff78ba",
+  "prompts": {},
+  "sessions": {
+    "s_ccef6bf06cd549": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e87f48c-11ea-4fe7-83e0-74518a15e2a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
