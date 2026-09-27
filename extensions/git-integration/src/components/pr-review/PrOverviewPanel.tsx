@@ -14,6 +14,7 @@ import { githubAPI } from '../../api/github'
 import { mergeFlowAPI } from '../../api/merge-flow'
 import { StatusChecksBar } from './StatusChecksBar'
 import { RichContent } from './RichContent'
+import { InsightsPanel } from './InsightsPanel'
 import type { PrReviewDetail, IssueComment } from '../../schemas/pr-review.schema'
 
 interface Props {
@@ -296,6 +297,8 @@ export function PrOverviewPanel({
       )}
 
       <div className="pr-overview-body-scroll">
+        <InsightsPanel pr={pr} />
+
         {/* Metrics row */}
         <div className="pr-overview-metrics">
           <div className="pr-overview-metric">
