@@ -1,0 +1,36 @@
+extensions/git-integration/tests/unit/RichContent.spec.tsx
+  s_af088fe0b546b8::t_4050746d4b52ac 8
+extensions/git-integration/tests/unit/syntax.spec.ts
+  s_af088fe0b546b8::t_4050746d4b52ac 9
+extensions/git-integration/vite.renderer.config.ts
+  s_af088fe0b546b8::t_bad180c5b962f5 11-13
+  s_af088fe0b546b8::t_5a8a5603aa76a8 10,14
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_af088fe0b546b8::t_4050746d4b52ac 5
+extensions/git-integration/tests/unit/hljs.spec.ts
+  s_af088fe0b546b8::t_4050746d4b52ac 1-70
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_af088fe0b546b8::t_9c5976706b9e10 2
+extensions/git-integration/src/components/pr-review/RichContent.tsx
+  s_af088fe0b546b8::t_639a8a54886d50 4
+extensions/git-integration/src/utils/hljs.ts
+  s_af088fe0b546b8::t_9220799950ddbb 1-8
+extensions/git-integration/src/utils/syntax.ts
+  s_af088fe0b546b8::t_d3a5fcfc364d8d 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b0b88a42b76812a4577ffd20522a592be8c6dfd5",
+  "prompts": {},
+  "sessions": {
+    "s_af088fe0b546b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "864c9e9e-c424-4396-81af-3d272ad50cda",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
