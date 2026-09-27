@@ -1,0 +1,21 @@
+extensions/foundry/src/index.ts
+  s_fa8c26d7681c70::t_1490c70b0a2aec 2765-2778
+extensions/foundry/tests/ipc/issues-mine-ipc.spec.ts
+  s_fa8c26d7681c70::t_25474150348898 1-160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c4cab553072701b6d1c9789a92ee506474dc2802",
+  "prompts": {},
+  "sessions": {
+    "s_fa8c26d7681c70": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e480974e-fa60-4f18-89bf-b5e015b08814",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
