@@ -715,13 +715,29 @@ Returns the currently checked-out branch name for the given path.
 
 ### `git:list-branches`
 
-Lists all local (and remote) branches for a git repo.
+Lists a git repo's branches: every local branch, then each branch that exists
+only under a configured remote, by its bare name (`feature/x`, never
+`origin/feature/x`). `isRemote` marks the latter; `git checkout` and
+`git worktree add` resolve the bare name to the remote branch.
 
 **Direction**: renderer → main (invoke/handle)
 
 **Request**: `{ path: string }`
 
 **Response**: `{ branches: Branch[] }` where `Branch = { name, isCurrent, isRemote }`
+
+---
+
+### `git:fetch`
+
+Runs `git fetch --all --prune`, so `git:list-branches` sees branches created
+(or deleted) on a remote since the last fetch. 60s timeout; no terminal prompt.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ path: string }`
+
+**Response**: `{ success: true } | { error: string }`
 
 ---
 

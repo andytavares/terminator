@@ -39,6 +39,7 @@ import {
   getGitRoot,
   getCurrentBranch,
   listBranches,
+  fetchRemotes,
   checkoutBranch,
   suggestWorktreePath,
   listWorktrees,
@@ -212,45 +213,96 @@ describe('getCurrentBranch', () => {
 // ─── listBranches ─────────────────────────────────────────────────────────────
 
 describe('listBranches', () => {
+  // The shape `git branch -a --format=%(HEAD)|%(refname)` prints: full refs,
+  // remote-tracking ones under refs/remotes/<remote>/. `git remote` answers
+  // second.
+  function mockRefs(refs: string, remotes = 'origin\nupstream\n') {
+    customMock().mockImplementation((_cmd: string, args: string[]) =>
+      Promise.resolve({ stdout: args[0] === 'remote' ? remotes : refs, stderr: '' })
+    )
+  }
+
   it('lists local branches', async () => {
-    mockResolve(' |main\n |feature/x\n')
+    mockRefs(' |refs/heads/main\n |refs/heads/feature/x\n')
     const branches = await listBranches('/repo')
-    expect(branches.some((b) => b.name === 'main')).toBe(true)
-    expect(branches.some((b) => b.name === 'feature/x')).toBe(true)
+    expect(branches.map((b) => b.name)).toEqual(['main', 'feature/x'])
   })
 
   it('marks current branch with isCurrent', async () => {
-    mockResolve('*|main\n |other\n')
+    mockRefs('*|refs/heads/main\n |refs/heads/other\n')
     const branches = await listBranches('/repo')
     expect(branches.find((b) => b.name === 'main')?.isCurrent).toBe(true)
     expect(branches.find((b) => b.name === 'other')?.isCurrent).toBe(false)
   })
 
-  it('deduplicates remote branches that have a local equivalent', async () => {
-    mockResolve(' |main\n |remotes/origin/main\n |remotes/origin/remote-only\n')
-    const branches = await listBranches('/repo')
-    const mainBranches = branches.filter((b) => b.name === 'main')
-    expect(mainBranches).toHaveLength(1)
-    expect(mainBranches[0].isRemote).toBe(false)
-    expect(branches.some((b) => b.name === 'remote-only')).toBe(true)
+  it('never lists a remote-tracking ref under its remote prefix', async () => {
+    mockRefs(
+      ' |refs/heads/main\n |refs/remotes/origin/HEAD\n |refs/remotes/origin/main\n |refs/remotes/upstream/feature/y\n'
+    )
+    const names = (await listBranches('/repo')).map((b) => b.name)
+    expect(names.some((n) => n.startsWith('origin') || n.startsWith('upstream'))).toBe(false)
   })
 
-  it('omits HEAD from remote branch list', async () => {
-    mockResolve(' |remotes/origin/HEAD\n |main\n')
+  it('lists a branch that exists only on a remote by its bare name', async () => {
+    mockRefs(' |refs/heads/main\n |refs/remotes/origin/main\n |refs/remotes/origin/remote-only\n')
     const branches = await listBranches('/repo')
-    expect(branches.some((b) => b.name === 'HEAD')).toBe(false)
+    expect(branches.filter((b) => b.name === 'main')).toEqual([
+      { name: 'main', isCurrent: false, isRemote: false },
+    ])
+    expect(branches.find((b) => b.name === 'remote-only')).toEqual({
+      name: 'remote-only',
+      isCurrent: false,
+      isRemote: true,
+    })
+  })
+
+  it('lists a branch on two remotes once', async () => {
+    mockRefs(' |refs/remotes/origin/shared\n |refs/remotes/upstream/shared\n')
+    expect((await listBranches('/repo')).map((b) => b.name)).toEqual(['shared'])
+  })
+
+  it('omits the remote HEAD pointer', async () => {
+    mockRefs(' |refs/remotes/origin/HEAD\n |refs/heads/main\n')
+    const branches = await listBranches('/repo')
+    expect(branches.map((b) => b.name)).toEqual(['main'])
   })
 
   it('filters out pull request refs', async () => {
-    mockResolve(' |main\n |remotes/origin/pull/123/head\n |remotes/origin/pull/456/head\n')
+    mockRefs(
+      ' |refs/heads/main\n |refs/remotes/origin/pull/123/head\n |refs/remotes/origin/pull/456/head\n'
+    )
     const branches = await listBranches('/repo')
-    expect(branches.every((b) => !b.name.startsWith('pull/'))).toBe(true)
-    expect(branches.some((b) => b.name === 'main')).toBe(true)
+    expect(branches.map((b) => b.name)).toEqual(['main'])
+  })
+
+  it('skips remote-tracking refs no configured remote owns', async () => {
+    mockRefs(
+      ' |refs/heads/main\n |refs/remotes/pull/140/head\n |refs/remotes/gone/topic\n',
+      'origin\n'
+    )
+    expect((await listBranches('/repo')).map((b) => b.name)).toEqual(['main'])
   })
 
   it('returns empty array for empty output', async () => {
-    mockResolve('')
+    mockRefs('')
     expect(await listBranches('/repo')).toHaveLength(0)
+  })
+})
+
+// ─── fetchRemotes ─────────────────────────────────────────────────────────────
+
+describe('fetchRemotes', () => {
+  it('fetches every remote and prunes branches deleted upstream', async () => {
+    mockResolve('')
+    await fetchRemotes('/repo')
+    const [, args, opts] = customMock().mock.calls[0]
+    expect(args).toEqual(['fetch', '--all', '--prune'])
+    expect(opts.cwd).toBe('/repo')
+  })
+
+  it('rejects when the fetch fails', async () => {
+    mockReject('Could not resolve host')
+    await expect(fetchRemotes('/repo')).rejects.toThrow('Could not resolve host')
   })
 })
 

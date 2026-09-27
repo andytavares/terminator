@@ -364,6 +364,50 @@ describe('reading back what it wrote', () => {
     expect(result.ok && result.order.redTeam[0].status).toBe('resolved')
   })
 
+  // Reported: "Ask the architect seems to not do anything." The architect
+  // redrafted, but a reviewer's finding is not re-derivable, and it had no
+  // field to say it was cleared — so the finding sat open and unchanged.
+  it('closes a reviewer finding the architect says it cleared, with how', () => {
+    const file = write({
+      resolveFindings: [{ id: 'RT-red-team-1', how: 'AC-1 now pages past 50 tickets' }],
+    })
+    const before = order({
+      redTeam: [
+        {
+          id: 'RT-red-team-1',
+          severity: 'high',
+          text: 'The handler filters after a fixed limit: 50 fetch.',
+          status: 'open',
+          reason: '',
+        },
+      ],
+    })
+    const result = readProposal(before, file, 'now')
+    expect(result.ok && result.order.redTeam[0]).toMatchObject({
+      status: 'resolved',
+      reason: 'architect: AC-1 now pages past 50 tickets',
+    })
+  })
+
+  it('does not reopen or rewrite a finding the operator already accepted', () => {
+    const file = write({ resolveFindings: [{ id: 'RT-red-team-1', how: 'changed it' }] })
+    const accepted = {
+      id: 'RT-red-team-1',
+      severity: 'low' as const,
+      text: 'x',
+      status: 'accepted' as const,
+      reason: 'priced in',
+    }
+    const result = readProposal(order({ redTeam: [accepted] }), file, 'now')
+    expect(result.ok && result.order.redTeam[0]).toEqual(accepted)
+  })
+
+  it('refuses a resolution that does not say how', () => {
+    const file = write({ resolveFindings: [{ id: 'RT-red-team-1', how: '' }] })
+    const result = readProposal(order(), file, 'now')
+    expect(result.ok).toBe(false)
+  })
+
   it('leaves the order a draft — converging is not agreeing', () => {
     const file = write({ acceptance: [CRITERION] })
     const result = readProposal(order(), file, 'now')

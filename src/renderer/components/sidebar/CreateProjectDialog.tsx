@@ -33,6 +33,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   // Creating a worktree is seconds of git work. Without this the dialog sits
   // there looking untouched, and a second press starts the whole thing again.
   const [busy, setBusy] = useState(false)
+  const [fetching, setFetching] = useState(false)
   // Set when the operator started from an issue; drives the prefill and the
   // link made once the project exists.
   const [issue, setIssue] = useState<IssueSummary | null>(null)
@@ -56,7 +57,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         setGitRoot(info.root)
         window.electronAPI.git.listBranches(info.root).then((r) => {
           setBranches(r.branches)
-          const current = r.branches.find((b) => b.isCurrent && !b.isRemote)
+          const current = r.branches.find((b) => b.isCurrent)
           if (current) setSelectedBranch(current.name)
         })
         window.electronAPI.git.listWorktrees(info.root).then((r) => {
@@ -78,6 +79,22 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       setWorktreePath(r.path)
     })
   }, [gitRoot, branchMode, selectedBranch, worktreeIsNewBranch, newBranchName, worktreeBaseDir])
+
+  async function fetchBranches(): Promise<void> {
+    if (!gitRoot) return
+    setFetching(true)
+    setError('')
+    try {
+      const fetched = await window.electronAPI.git.fetch(gitRoot)
+      if ('error' in fetched) {
+        setError(`Could not fetch: ${fetched.error}`)
+        return
+      }
+      setBranches((await window.electronAPI.git.listBranches(gitRoot)).branches)
+    } finally {
+      setFetching(false)
+    }
+  }
 
   /**
    * Fill in from the issue, once.
@@ -112,8 +129,14 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         // eslint-disable-next-line no-control-regex
         .replace(/[~^:?*[\\\x00-\x1f\x7f]/g, '')
         .replace(/\.\.+/g, '.')
-        .replace(/^[./]+|[./]+$/g, '')
+        // Only the leading end: stripping a trailing `/` on every keystroke
+        // made `feature/login` impossible to type. The tail is trimmed on submit.
+        .replace(/^[./]+/, '')
     )
+  }
+
+  function typedBranchName(): string {
+    return newBranchName.trim().replace(/[./]+$/, '')
   }
 
   /** The project exists; give it the issue it was created for (FR-011). */
@@ -156,7 +179,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     if (!gitRoot || branchMode === 'existing') {
       let branch = selectedBranch
       if (gitRoot && isNewBranch) {
-        const branchTrimmed = newBranchName.trim()
+        const branchTrimmed = typedBranchName()
         if (!branchTrimmed) {
           setError('Enter a branch name')
           return false
@@ -194,7 +217,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       await attachIssue(result)
     } else {
       // worktree
-      const branch = worktreeIsNewBranch ? newBranchName.trim() : selectedBranch
+      const branch = worktreeIsNewBranch ? typedBranchName() : selectedBranch
       if (!branch) {
         setError('Select or enter a branch name')
         return false
@@ -231,18 +254,16 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   }
 
   const defaultBranchName =
-    branches.find((b) => b.name === 'main' && !b.isRemote)?.name ??
-    branches.find((b) => b.name === 'master' && !b.isRemote)?.name ??
+    branches.find((b) => b.name === 'main')?.name ??
+    branches.find((b) => b.name === 'master')?.name ??
     null
-  const localBranches = branches
-    .filter((b) => !b.isRemote)
-    .sort((a, b) => {
-      if (a.name === defaultBranchName) return -1
-      if (b.name === defaultBranchName) return 1
-      return 0
-    })
+  const sortedBranches = [...branches].sort((a, b) => {
+    if (a.name === defaultBranchName) return -1
+    if (b.name === defaultBranchName) return 1
+    return 0
+  })
   const usedBranchNames = new Set(worktrees.map((w) => w.branch))
-  const availableWorktreeBranches = localBranches.filter((b) => !usedBranchNames.has(b.name))
+  const availableWorktreeBranches = sortedBranches.filter((b) => !usedBranchNames.has(b.name))
   const worktreeBranchName = worktreeIsNewBranch ? newBranchName : selectedBranch
 
   return (
@@ -316,7 +337,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
           {gitRoot && branchMode === 'existing' && (
             <div className="dialog__field">
               <BranchSelect
-                branches={localBranches}
+                branches={sortedBranches}
                 value={selectedBranch}
                 onChange={(b) => {
                   setIsNewBranch(false)
@@ -325,6 +346,8 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
                 newBranchLabel="+ New branch…"
                 onNewBranch={() => setIsNewBranch(true)}
                 isNewSelected={isNewBranch}
+                onRefresh={() => void fetchBranches()}
+                refreshing={fetching}
               />
             </div>
           )}
@@ -355,6 +378,8 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
                   newBranchLabel="+ New branch…"
                   onNewBranch={() => setWorktreeIsNewBranch(true)}
                   isNewSelected={worktreeIsNewBranch}
+                  onRefresh={() => void fetchBranches()}
+                  refreshing={fetching}
                 />
               </div>
 

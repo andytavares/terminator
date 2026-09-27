@@ -11,6 +11,7 @@ const gitService = vi.hoisted(() => ({
   getGitRoot: vi.fn(),
   getCurrentBranch: vi.fn(),
   listBranches: vi.fn(),
+  fetchRemotes: vi.fn(),
   checkoutBranch: vi.fn(),
   createBranch: vi.fn(),
   suggestWorktreePath: vi.fn(),
@@ -81,6 +82,19 @@ describe('git:list-branches', () => {
     gitService.listBranches.mockRejectedValue(new Error('io'))
     await expect(handler('git:list-branches')({}, { path: '/r' })).resolves.toEqual({
       branches: [],
+    })
+  })
+})
+
+describe('git:fetch', () => {
+  it('fetches, and reports the failure rather than throwing', async () => {
+    gitService.fetchRemotes.mockResolvedValue(undefined)
+    await expect(handler('git:fetch')({}, { path: '/r' })).resolves.toEqual({ success: true })
+    expect(gitService.fetchRemotes).toHaveBeenCalledWith('/r')
+    await expect(handler('git:fetch')({}, {})).resolves.toEqual({ error: 'VALIDATION_ERROR' })
+    gitService.fetchRemotes.mockRejectedValue(new Error('Could not resolve host'))
+    await expect(handler('git:fetch')({}, { path: '/r' })).resolves.toEqual({
+      error: 'Error: Could not resolve host',
     })
   })
 })

@@ -108,6 +108,14 @@ describe('rungOutputContract', () => {
     expect(redTeam).not.toContain('"entryPoints"')
   })
 
+  // Reported: a finding arrived as "a wall of text that is impossible to read
+  // quickly". The Forge shows its first line as the headline.
+  it('asks for a finding as a one-line claim, then its evidence as a list', () => {
+    const text = rungOutputContract('/x.json', ['findings'])
+    expect(text).toMatch(/first line[^\n]*one sentence/i)
+    expect(text).toContain('\\n\\n- ')
+  })
+
   it('is empty when the role has nothing to hand back', () => {
     // A contract with no keys would be an instruction to write `{}`, which is
     // a turn spent producing nothing.

@@ -176,9 +176,56 @@ const CHECK_REMEDIES: Record<CheckId, readonly Remedy[]> = {
   redTeam: [{ kind: 'goto', label: 'Clear them', step: 'redTeam', target: STEP_HEADING }],
 }
 
+type FindingRef = { readonly id: string; readonly text: string }
+
+/** How every ask about one finding starts, so the one running can be found. */
+function findingAskOpening(finding: FindingRef): string {
+  return `The red team finding ${finding.id} is open: "${finding.text}"`
+}
+
 /** What the architect is told when asked to clear one red team finding. */
-function findingAsk(finding: { readonly id: string; readonly text: string }): string {
-  return `The red team finding ${finding.id} is open: "${finding.text}" Change the order so it no longer holds, and change nothing else.`
+function findingAsk(finding: FindingRef): string {
+  return `${findingAskOpening(finding)} Change the order so it no longer holds, and change nothing else. List it in \`resolveFindings\` with what you changed.`
+}
+
+/** What the architect is told when the operator has said how to fix one. */
+function findingFix(finding: FindingRef, how: string): string {
+  return `${findingAskOpening(finding)} The operator says to fix it this way: ${how} Change the order to do that, and change nothing else. List it in \`resolveFindings\` with what you changed.`
+}
+
+/**
+ * A finding's claim, and the argument behind it.
+ *
+ * A reviewer writes a paragraph; read at a glance, only its first sentence is
+ * the finding. A finding written as a headline line and detail splits there.
+ */
+function findingParts(text: string): { headline: string; detail: string } {
+  const trimmed = text.trim()
+  const newline = trimmed.indexOf('\n')
+  if (newline !== -1) {
+    return { headline: trimmed.slice(0, newline).trim(), detail: trimmed.slice(newline).trim() }
+  }
+  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
+  return sentence === null
+    ? { headline: trimmed, detail: '' }
+    : { headline: sentence[1], detail: trimmed.slice(sentence[0].length) }
+}
+
+function FindingText({ text }: { readonly text: string }): JSX.Element {
+  const { headline, detail } = findingParts(text)
+  return (
+    <>
+      <span className="fdry-finding-headline">
+        <MarkdownInline text={headline} />
+      </span>
+      {detail === '' ? null : (
+        <details className="fdry-finding-detail">
+          <summary>Why</summary>
+          <Markdown text={detail} />
+        </details>
+      )}
+    </>
+  )
 }
 
 /**
@@ -243,6 +290,9 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const [moved, setMoved] = useState<string[]>([])
   const [accepting, setAccepting] = useState<string | null>(null)
   const [reason, setReason] = useState('')
+  /** The finding the operator is saying how to fix, and what they have said. */
+  const [fixing, setFixing] = useState<string | null>(null)
+  const [fixHow, setFixHow] = useState('')
   /** The criterion being accepted as unverifiable, and why. Kept apart from
       the red team's own reason so two open forms never share a box. */
   const [unproven, setUnproven] = useState<string | null>(null)
@@ -471,6 +521,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const questions = surfacedQuestions(order.openQuestions)
   const assumptions = liveAssumptions(order)
   const openFindings = order.redTeam.filter((f) => f.status === 'open')
+  const clearedFindings = order.redTeam.filter((f) => f.status !== 'open')
 
   const steps = forgeSteps(compile, {
     shape: (recipes?.recipes?.length ?? 0) > 0 && isDraft,
@@ -937,77 +988,127 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 <p className="fdry-step-intro">
                   {openFindings.length === 0
                     ? 'Nothing is open. An adversarial pass read the plan and left nothing to clear.'
-                    : `${openFindings.length} open. Ask the architect to clear each one, mark it fixed, or accept it with a reason — nothing hands off while one is open.`}
+                    : `${openFindings.length} open. Ask the architect to clear each one, tell it how to fix it, or accept it with a reason — nothing hands off while one is open.`}
                 </p>
                 <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
                   {openFindings.map((finding) => (
                     <div key={finding.id} className="fdry-finding">
                       <CircleDot aria-hidden="true" />
-                      <span>
-                        <MarkdownInline text={finding.text} />
-                        {/* Under the finding rather than beside it: in the
-                            button row it squeezed the finding to one word a
-                            line. */}
-                        {isDraft && drafting && asked === findingAsk(finding) ? <Asked /> : null}
-                      </span>
-                      {isDraft ? (
-                        <span className="fdry-finding-actions">
-                          {drafting ? null : (
+                      <div className="fdry-finding-body">
+                        <FindingText text={finding.text} />
+                        {isDraft && drafting && asked?.startsWith(findingAskOpening(finding)) ? (
+                          <Asked />
+                        ) : null}
+                        {isDraft ? (
+                          <span className="fdry-finding-actions">
+                            {drafting ? null : (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  title="Have the architect change the order so this no longer holds"
+                                  onClick={() => void converge(findingAsk(finding))}
+                                >
+                                  Ask the architect
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  title="Say how, and the architect changes the order that way"
+                                  onClick={() => {
+                                    setAccepting(null)
+                                    setFixing(finding.id)
+                                  }}
+                                >
+                                  Fix it…
+                                </button>
+                              </>
+                            )}
                             <button
                               type="button"
                               disabled={busy}
-                              title="Have the architect change the order so this no longer holds"
-                              onClick={() => void converge(findingAsk(finding))}
+                              title="It stands, and here is why"
+                              onClick={() => {
+                                setFixing(null)
+                                setAccepting(finding.id)
+                              }}
                             >
-                              Ask the architect
+                              Accept
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            disabled={busy}
-                            title="It is fixed"
-                            onClick={() =>
-                              void turn({ finding: { id: finding.id, decision: 'resolved' } })
-                            }
+                          </span>
+                        ) : null}
+                        {fixing === finding.id && !drafting ? (
+                          <form
+                            className="fdry-accept is-fix"
+                            onSubmit={(event) => {
+                              event.preventDefault()
+                              if (fixHow.trim() === '') return
+                              void converge(findingFix(finding, fixHow.trim()))
+                              setFixing(null)
+                              setFixHow('')
+                            }}
                           >
-                            Fixed
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            title="It stands, and here is why"
-                            onClick={() => setAccepting(finding.id)}
+                            <textarea
+                              aria-label="How should it be fixed?"
+                              placeholder="How should it be fixed?"
+                              rows={3}
+                              value={fixHow}
+                              onChange={(event) => setFixHow(event.target.value)}
+                            />
+                            <button type="submit" disabled={fixHow.trim() === ''}>
+                              Send to the architect
+                            </button>
+                          </form>
+                        ) : null}
+                        {accepting === finding.id ? (
+                          <form
+                            className="fdry-accept"
+                            onSubmit={(event) => {
+                              event.preventDefault()
+                              if (reason.trim() === '') return
+                              void turn({
+                                finding: {
+                                  id: finding.id,
+                                  decision: 'accepted',
+                                  reason: reason.trim(),
+                                },
+                              })
+                              setAccepting(null)
+                              setReason('')
+                            }}
                           >
-                            Accept
-                          </button>
-                        </span>
-                      ) : null}
+                            <input
+                              aria-label="Why this finding is accepted"
+                              placeholder="Why it stands…"
+                              value={reason}
+                              onChange={(event) => setReason(event.target.value)}
+                            />
+                            <button type="submit" disabled={reason.trim() === ''}>
+                              Accept it
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
-                  {accepting !== null ? (
-                    <form
-                      className="fdry-accept"
-                      onSubmit={(event) => {
-                        event.preventDefault()
-                        if (reason.trim() === '') return
-                        void turn({
-                          finding: { id: accepting, decision: 'accepted', reason: reason.trim() },
-                        })
-                        setAccepting(null)
-                        setReason('')
-                      }}
-                    >
-                      <input
-                        aria-label="Why this finding is accepted"
-                        placeholder="Why it stands…"
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                      />
-                      <button type="submit" disabled={reason.trim() === ''}>
-                        Accept it
-                      </button>
-                    </form>
-                  ) : null}
+                  {clearedFindings.length === 0 ? null : (
+                    <>
+                      <h3 className="fdry-field-h">Cleared</h3>
+                      <ul className="fdry-cleared" aria-label="Cleared findings">
+                        {clearedFindings.map((finding) => (
+                          <li key={finding.id} className="fdry-finding is-cleared">
+                            <Check aria-hidden="true" />
+                            <div className="fdry-finding-body">
+                              <span className="fdry-finding-headline">
+                                <MarkdownInline text={findingParts(finding.text).headline} />
+                              </span>
+                              <span className="fdry-finding-reason">{finding.reason}</span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </section>
               </>
             ) : null}

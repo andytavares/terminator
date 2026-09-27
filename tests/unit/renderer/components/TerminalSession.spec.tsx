@@ -616,6 +616,16 @@ describe('TerminalInstance', () => {
       expect((result as { text: string }[])[0].text).toBe('https://example.com/path')
     })
 
+    it('URL provider range stops before the full stop that ends a sentence', () => {
+      const provider = getProvider('draft PR https://github.com/x/y/pull/208. Lint', 0)
+      let result: { text: string; range: { end: { x: number } } }[] = []
+      provider.provideLinks(0, (links: typeof result) => {
+        result = links
+      })
+      expect(result[0].text).toBe('https://github.com/x/y/pull/208')
+      expect(result[0].range.end.x).toBe(9 + 'https://github.com/x/y/pull/208'.length)
+    })
+
     it('URL provider activate is a no-op (mousedown handler owns activation)', () => {
       const provider = getProvider('https://example.com', 0)
       let link: { activate: (e: MouseEvent, t: string) => void } | undefined
@@ -841,6 +851,52 @@ describe('TerminalInstance', () => {
         const instance = makeInstanceWithLine("see '/Users/foo bar/x.ts'")
         fire(instance.element, 'mousedown', { metaKey: true, clientX: 6 * 8, clientY: 0 })
         expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo bar/x.ts')
+      })
+
+      // Reported: a URL ending a sentence opened with the full stop on it.
+      it.each([
+        [
+          'draft PR https://github.com/andytavares/terminator/pull/208. Lint',
+          'https://github.com/andytavares/terminator/pull/208',
+        ],
+        ['see https://example.com/a, then', 'https://example.com/a'],
+        ['(https://example.com/a)', 'https://example.com/a'],
+        ['is it https://example.com/a?', 'https://example.com/a'],
+        ['go to https://example.com/a!', 'https://example.com/a'],
+        ['with https://example.com/a; and', 'https://example.com/a'],
+        ['per https://example.com/a: yes', 'https://example.com/a'],
+        ['quoted "https://example.com/a".', 'https://example.com/a'],
+        ['check www.google.com.', 'https://www.google.com'],
+        ['check google.com.', 'https://google.com'],
+      ])('opens %j without the punctuation that ends it', (line, url) => {
+        const instance = makeInstanceWithLine(line)
+        const col = line.indexOf(
+          url.replace('https://www.', 'www.').replace(/^https:\/\/(?=google)/, '')
+        )
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: (col + 2) * 8, clientY: 0 })
+        expect(mockOpenExternal).toHaveBeenCalledWith(url)
+      })
+
+      it('opens a path that ends a sentence without the full stop', () => {
+        const instance = makeInstanceWithLine('Wrote /Users/foo/bar.ts.')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 8 * 8, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo/bar.ts')
+      })
+
+      it('keeps punctuation inside a URL', () => {
+        const url = 'https://example.com/a.b?q=1,2&x=y#frag.c'
+        const instance = makeInstanceWithLine(`${url}.`)
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
+        expect(mockOpenExternal).toHaveBeenCalledWith(url)
+      })
+
+      it('opens a path ending a sentence without the full stop, keeping its line number', () => {
+        const instance = makeInstanceWithLine('Fixed in /Users/foo/bar.ts:12.')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 12 * 8, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith(
+          expect.stringMatching(/^\/Users\/foo\/bar\.ts(:12)?$/)
+        )
+        expect(mockOpenPath.mock.calls[0][0]).not.toMatch(/\.$/)
       })
 
       it('does not open URL without metaKey or ctrlKey', () => {

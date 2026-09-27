@@ -5,6 +5,7 @@ import {
   getGitRoot,
   getCurrentBranch,
   listBranches,
+  fetchRemotes,
   checkoutBranch,
   createBranch,
   suggestWorktreePath,
@@ -50,6 +51,16 @@ export function registerGitHandlers(): void {
       invalid: { branches: [] },
       run: async ({ path }) => ({ branches: await listBranches(path) }),
       onError: () => ({ branches: [] }),
+    }),
+    invokeSpec({
+      channel: 'git:fetch',
+      schema: PathSchema,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: async ({ path }) => {
+        await fetchRemotes(path)
+        return { success: true }
+      },
+      onError: (e) => ({ error: String(e) }),
     }),
     invokeSpec({
       channel: 'git:checkout',

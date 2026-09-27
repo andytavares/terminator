@@ -182,6 +182,12 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toPayload: (path: string) => ({ path }),
   },
   {
+    path: 'git.fetch',
+    kind: 'invoke',
+    channel: 'git:fetch',
+    toPayload: (path: string) => ({ path }),
+  },
+  {
     path: 'git.checkout',
     kind: 'invoke',
     channel: 'git:checkout',

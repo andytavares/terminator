@@ -592,20 +592,43 @@ describe('clearing an adversarial finding', () => {
     withFinding()
     await openStep('Red team')
     expect(screen.getByText(/1 open/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Fixed' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Fix it…' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy()
   })
 
-  it('marks one fixed', async () => {
+  // Reported: "fixed provides no way to fix anything." It marked the finding
+  // resolved with nothing changed. Fixing is now saying how, to the architect.
+  it('sends the operator’s fix to the architect with the finding', async () => {
     withFinding()
     await openStep('Red team')
-    fireEvent.click(screen.getByRole('button', { name: 'Fixed' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Fix it…' }))
+    const how = screen.getByLabelText(/How should it be fixed/)
+    // Nothing goes until there is something to say.
+    expect(
+      (screen.getByRole('button', { name: 'Send to the architect' }) as HTMLButtonElement).disabled
+    ).toBe(true)
+    fireEvent.change(how, { target: { value: 'state what will be observably different' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send to the architect' }))
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.turn', {
-        id: 'WO-1',
-        finding: { id: 'RT-1', decision: 'resolved' },
-      })
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        expect.objectContaining({
+          id: 'WO-1',
+          message: expect.stringMatching(
+            /the outcome restates the problem[\s\S]*state what will be observably different[\s\S]*resolveFindings/
+          ),
+        })
+      )
     )
+    expect(invoke).not.toHaveBeenCalledWith('foundry:order.turn', expect.anything())
+  })
+
+  it('opens the fix box under the finding it is for', async () => {
+    withFinding()
+    await openStep('Red team')
+    fireEvent.click(screen.getByRole('button', { name: 'Fix it…' }))
+    const finding = screen.getByText(/the outcome restates the problem/).closest('.fdry-finding')
+    expect(finding?.querySelector('textarea')).toBeTruthy()
   })
 
   // Reported: "I should be able to ask the agent to close the red team
@@ -667,6 +690,82 @@ describe('clearing an adversarial finding', () => {
         finding: { id: 'RT-1', decision: 'accepted', reason: 'the risk is priced in' },
       })
     )
+  })
+})
+
+describe('reading a finding', () => {
+  function withText(redTeam: WorkOrder['redTeam']) {
+    const current = { ...order(), redTeam }
+    invoke = vi.fn(async (channel: string) =>
+      channel === 'foundry:order.compile' ? { order: current, compile: compileOrder(current) } : {}
+    )
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+  }
+
+  const open = (text: string) => ({
+    id: 'RT-red-team-1',
+    severity: 'high' as const,
+    text,
+    status: 'open' as const,
+    reason: '',
+  })
+
+  // Reported: "a wall of text that is impossible to read quickly." The whole
+  // finding was one inline paragraph beside three buttons.
+  it('leads with its first sentence and folds the rest under it', async () => {
+    withText([
+      open(
+        'The handler filters after a fixed `limit: 50` fetch. Linear has no state filter, so an operator with 50+ closed tickets gets an empty list.'
+      ),
+    ])
+    await openStep('Red team')
+    const headline = screen.getByText(/The handler filters after a fixed/)
+    expect(headline.closest('.fdry-finding-headline')).toBeTruthy()
+    const detail = screen.getByText(/Linear has no state filter/)
+    const folded = detail.closest('details')
+    expect(folded).toBeTruthy()
+    expect(folded?.open).toBe(false)
+  })
+
+  it('renders the detail as markdown, so a list is a list', async () => {
+    withText([
+      open('The proof is circular.\n\n- the builder writes the spec\n- AC-1 checks only that spec'),
+    ])
+    await openStep('Red team')
+    expect(screen.getByText('The proof is circular.')).toBeTruthy()
+    const finding = screen
+      .getByText('The proof is circular.')
+      .closest('.fdry-finding') as HTMLElement
+    const items = within(finding)
+      .getAllByRole('listitem', { hidden: true })
+      .map((li) => li.textContent)
+    expect(items).toEqual(['the builder writes the spec', 'AC-1 checks only that spec'])
+  })
+
+  it('shows a one-sentence finding without an empty fold', async () => {
+    withText([open('The order excludes nothing.')])
+    await openStep('Red team')
+    expect(screen.getByText('The order excludes nothing.')).toBeTruthy()
+    expect(document.querySelector('.fdry-finding details')).toBeNull()
+  })
+
+  // "Ask the architect seems to not do anything": the redraft landed, and
+  // nothing on screen said what it had done about the finding.
+  it('lists what cleared a finding, and how', async () => {
+    withText([
+      {
+        ...open('The handler filters after a fixed `limit: 50` fetch.'),
+        status: 'resolved',
+        reason: 'architect: AC-1 now pages past 50 tickets',
+      },
+    ])
+    await openStep('Red team')
+    const cleared = screen.getByRole('list', { name: 'Cleared findings' })
+    expect(within(cleared).getByText(/The handler filters after a fixed/)).toBeTruthy()
+    expect(within(cleared).getByText('architect: AC-1 now pages past 50 tickets')).toBeTruthy()
   })
 })
 

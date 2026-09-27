@@ -695,3 +695,88 @@ describe('CreateProjectDialog — from an issue', () => {
     })
   })
 })
+
+describe('CreateProjectDialog branch names and fetching', () => {
+  function git(): Record<string, ReturnType<typeof vi.fn>> {
+    return (window.electronAPI as unknown as { git: Record<string, ReturnType<typeof vi.fn>> }).git
+  }
+
+  async function openWorktreeMode(): Promise<void> {
+    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+    await vi.waitFor(() => screen.getByText('Worktree'))
+    fireEvent.click(screen.getByText('Worktree'))
+    await vi.waitFor(() => screen.getByText('Worktree path'))
+  }
+
+  it('keeps a slash while the new branch name is being typed', async () => {
+    setupGitWorkspace()
+    await openWorktreeMode()
+    const input = screen.getByPlaceholderText('feature/my-feature') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'feature/' } })
+    expect(input.value).toBe('feature/')
+    fireEvent.change(input, { target: { value: 'feature/login' } })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() =>
+      expect(git().createWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'feature/login', isNewBranch: true })
+      )
+    )
+  })
+
+  it('drops a trailing slash left on submit', async () => {
+    setupGitWorkspace()
+    await openWorktreeMode()
+    fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
+      target: { value: 'feature/' },
+    })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() =>
+      expect(git().createWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'feature' })
+      )
+    )
+  })
+
+  it('offers a branch that exists only on the remote, by its bare name', async () => {
+    setupGitWorkspace()
+    git().listBranches.mockResolvedValue({
+      branches: [
+        { name: 'main', isCurrent: true, isRemote: false },
+        { name: 'teammate/fix', isCurrent: false, isRemote: true },
+      ],
+    })
+    await openWorktreeMode()
+    fireEvent.click(screen.getByText('+ New branch…'))
+    fireEvent.click(screen.getByText('teammate/fix'))
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() =>
+      expect(git().createWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ branch: 'teammate/fix', isNewBranch: false })
+      )
+    )
+  })
+
+  it('fetches and relists the branches when refresh is pressed', async () => {
+    setupGitWorkspace()
+    git().fetch = vi.fn().mockResolvedValue({ success: true })
+    await openWorktreeMode()
+    git().listBranches.mockResolvedValue({
+      branches: [
+        { name: 'main', isCurrent: true, isRemote: false },
+        { name: 'just-pushed', isCurrent: false, isRemote: true },
+      ],
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch branches' }))
+    await vi.waitFor(() => expect(git().fetch).toHaveBeenCalledWith('/repo'))
+    fireEvent.click(screen.getByText('+ New branch…'))
+    await vi.waitFor(() => screen.getByText('just-pushed'))
+  })
+
+  it('says so when the fetch fails', async () => {
+    setupGitWorkspace()
+    git().fetch = vi.fn().mockResolvedValue({ error: 'Could not resolve host: github.com' })
+    await openWorktreeMode()
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch branches' }))
+    await vi.waitFor(() => screen.getByText('Could not fetch: Could not resolve host: github.com'))
+  })
+})

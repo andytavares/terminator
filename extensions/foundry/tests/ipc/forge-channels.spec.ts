@@ -964,14 +964,16 @@ describe('clearing an adversarial finding — the other thing that blocked the g
     return seed.order
   }
 
-  it('marks one fixed', async () => {
+  // Fixing one is the architect's, told how: an operator "Fixed" with nothing
+  // behind it cleared the gate without changing the order.
+  it('refuses to mark one fixed by decree', async () => {
     const o = await withFinding()
     const r = (await channels().turn({
       id: o.id,
       finding: { id: o.redTeam[0].id, decision: 'resolved' },
-    })) as OrderView
-    expect(r.order.redTeam[0].status).toBe('resolved')
-    expect((await store.load(o.id))?.redTeam[0].status).toBe('resolved')
+    })) as { error?: string }
+    expect(r.error).toBeDefined()
+    expect((await store.load(o.id))?.redTeam[0].status).toBe('open')
   })
 
   it('accepts one, with the reason it stands', async () => {
@@ -1010,7 +1012,10 @@ describe('clearing an adversarial finding — the other thing that blocked the g
   it('unblocks the compile check once every finding is cleared', async () => {
     const o = await withFinding()
     for (const finding of o.redTeam) {
-      await channels().turn({ id: o.id, finding: { id: finding.id, decision: 'resolved' } })
+      await channels().turn({
+        id: o.id,
+        finding: { id: finding.id, decision: 'accepted', reason: 'priced in' },
+      })
     }
     // The one check this used to fail for ever, because nothing could clear a
     // finding.
