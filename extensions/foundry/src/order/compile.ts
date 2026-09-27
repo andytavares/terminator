@@ -1,5 +1,6 @@
 import { coverageMatrix } from './coverage-matrix.js'
 import { collidingLanes, planLanes, sharedFilesFor } from './lanes.js'
+import { isBlocking } from './schema.js'
 import type { WorkOrder } from './schema.js'
 
 // The five checks that decide whether an order may be handed off.
@@ -232,11 +233,11 @@ function checkRisk(order: WorkOrder): CompileFailure | null {
 }
 
 function checkRedTeam(order: WorkOrder): CompileFailure | null {
-  const open = order.redTeam.filter((f) => f.status === 'open')
+  const open = order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
   if (open.length === 0) return null
   return {
     check: 'redTeam',
-    detail: `The adversarial pass left ${open.length} finding${open.length === 1 ? '' : 's'} unresolved. Resolve each, or accept it with a reason.`,
+    detail: `The adversarial pass left ${open.length} blocking finding${open.length === 1 ? '' : 's'} unresolved. Resolve each, or accept it with a reason.`,
     subjectIds: open.map((f) => f.id),
   }
 }

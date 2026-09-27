@@ -4,6 +4,9 @@ import {
   SCHEMA_VERSION,
   SchemaVersionTooNewError,
   draftOrder,
+  RED_TEAM_CATEGORIES,
+  BLOCKING_CATEGORIES,
+  isBlocking,
 } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
@@ -288,6 +291,35 @@ describe('parseWorkOrder', () => {
     expect(order.redTeam[0].status).toBe('open')
   })
 
+  it('defaults a red-team finding with no category to the strictest one, so an old order keeps blocking', () => {
+    const o = valid() as Record<string, unknown>
+    o.redTeam = [{ id: 'RT-1', text: 'ambiguous' }]
+    const order = parseWorkOrder(o)
+    expect(order.redTeam[0].category).toBe('wrong-outcome')
+    expect(isBlocking(order.redTeam[0])).toBe(true)
+  })
+
+  it('defaults a red-team finding with no round to 0', () => {
+    const o = valid() as Record<string, unknown>
+    o.redTeam = [{ id: 'RT-1', text: 'ambiguous' }]
+    const order = parseWorkOrder(o)
+    expect(order.redTeam[0].round).toBe(0)
+  })
+
+  it('accepts every declared category', () => {
+    for (const category of RED_TEAM_CATEGORIES) {
+      const o = valid() as Record<string, unknown>
+      o.redTeam = [{ id: 'RT-1', text: 'x', category }]
+      expect(() => parseWorkOrder(o)).not.toThrow()
+    }
+  })
+
+  it('rejects a category outside the declared set', () => {
+    const o = valid() as Record<string, unknown>
+    o.redTeam = [{ id: 'RT-1', text: 'x', category: 'nonsense' }]
+    expect(() => parseWorkOrder(o)).toThrow()
+  })
+
   it('rejects an order that names no repository', () => {
     const o = valid() as Record<string, unknown>
     ;(o.context as Record<string, unknown>).repos = []
@@ -365,5 +397,16 @@ describe('draftOrder', () => {
     expect(o.acceptance).toEqual([])
     expect(o.plan.units).toEqual([])
     expect(o.recipe).toBeNull()
+  })
+})
+
+describe('isBlocking', () => {
+  it('blocks only wrong-outcome, regression and unprovable', () => {
+    expect(BLOCKING_CATEGORIES).toEqual(['wrong-outcome', 'regression', 'unprovable'])
+    for (const category of RED_TEAM_CATEGORIES) {
+      expect(isBlocking({ category })).toBe(
+        category === 'wrong-outcome' || category === 'regression' || category === 'unprovable'
+      )
+    }
   })
 })

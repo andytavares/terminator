@@ -147,8 +147,40 @@ describe('parseRungOutput', () => {
 
   it('refuses a finding with no text', () => {
     expect(() =>
-      parseRungOutput({ redTeam: [{ severity: 'high', text: '' }] }, ['findings'])
+      parseRungOutput({ redTeam: [{ severity: 'high', category: 'unprovable', text: '' }] }, [
+        'findings',
+      ])
     ).toThrow(RungOutputRejected)
+  })
+
+  it('refuses a finding with no category — the bar is not optional', () => {
+    expect(() =>
+      parseRungOutput({ redTeam: [{ severity: 'high', text: 'x' }] }, ['findings'])
+    ).toThrow(/category/)
+  })
+
+  it('refuses a category outside the declared set', () => {
+    expect(() =>
+      parseRungOutput({ redTeam: [{ category: 'nonsense', text: 'x' }] }, ['findings'])
+    ).toThrow(RungOutputRejected)
+  })
+
+  it('accepts a reopen with new evidence', () => {
+    const parsed = parseRungOutput(
+      {
+        redTeam: [
+          {
+            category: 'unprovable',
+            text: 'x',
+            reopens: 'RT-red-team-1',
+            newEvidence: 'the fix regressed under load',
+          },
+        ],
+      },
+      ['findings']
+    )
+    expect(parsed.redTeam?.[0].reopens).toBe('RT-red-team-1')
+    expect(parsed.redTeam?.[0].newEvidence).toBe('the fix regressed under load')
   })
 })
 
@@ -193,7 +225,11 @@ describe('applyRungOutput', () => {
     const after = applyRungOutput(order(), {
       role: 'red-team',
       output: parseRungOutput(
-        { redTeam: [{ severity: 'high', text: 'AC-2 cannot be falsified.' }] },
+        {
+          redTeam: [
+            { severity: 'high', category: 'unprovable', text: 'AC-2 cannot be falsified.' },
+          ],
+        },
         ['findings']
       ),
       writes: ['findings'],
@@ -217,13 +253,19 @@ describe('applyRungOutput', () => {
   it('raises nothing for a finding it had already made', () => {
     const once = applyRungOutput(order(), {
       role: 'red-team',
-      output: parseRungOutput({ redTeam: [{ severity: 'low', text: 'same' }] }, ['findings']),
+      output: parseRungOutput(
+        { redTeam: [{ severity: 'low', category: 'process', text: 'same' }] },
+        ['findings']
+      ),
       writes: ['findings'],
       at: AT,
     })
     const again = applyRungOutput(once.order, {
       role: 'red-team',
-      output: parseRungOutput({ redTeam: [{ severity: 'low', text: 'same' }] }, ['findings']),
+      output: parseRungOutput(
+        { redTeam: [{ severity: 'low', category: 'process', text: 'same' }] },
+        ['findings']
+      ),
       writes: ['findings'],
       at: AT,
     })
@@ -233,17 +275,176 @@ describe('applyRungOutput', () => {
   it('numbers agent findings so a second turn does not duplicate the first', () => {
     const once = applyRungOutput(order(), {
       role: 'red-team',
-      output: parseRungOutput({ redTeam: [{ severity: 'low', text: 'same' }] }, ['findings']),
+      output: parseRungOutput(
+        { redTeam: [{ severity: 'low', category: 'process', text: 'same' }] },
+        ['findings']
+      ),
       writes: ['findings'],
       at: AT,
     })
     const twice = applyRungOutput(once.order, {
       role: 'red-team',
-      output: parseRungOutput({ redTeam: [{ severity: 'low', text: 'same' }] }, ['findings']),
+      output: parseRungOutput(
+        { redTeam: [{ severity: 'low', category: 'process', text: 'same' }] },
+        ['findings']
+      ),
       writes: ['findings'],
       at: AT,
     })
     expect(twice.order.redTeam).toHaveLength(1)
+  })
+
+  it('appends a non-blocking finding without amending, and raises no defect', () => {
+    const after = applyRungOutput(order(), {
+      role: 'red-team',
+      output: parseRungOutput(
+        { redTeam: [{ severity: 'low', category: 'process', text: 'No ADR for this.' }] },
+        ['findings']
+      ),
+      writes: ['findings'],
+      at: AT,
+    })
+    expect(after.order.redTeam).toHaveLength(1)
+    expect(after.order.redTeam[0]?.category).toBe('process')
+    expect(after.order.status).toBe('agreed')
+    expect(after.defect).toBeNull()
+  })
+
+  it('says how many non-blocking notes landed when the rung wrote no note of its own', () => {
+    const after = applyRungOutput(order(), {
+      role: 'red-team',
+      output: parseRungOutput(
+        { redTeam: [{ severity: 'low', category: 'process', text: 'No ADR for this.' }] },
+        ['findings']
+      ),
+      writes: ['findings'],
+      at: AT,
+    })
+    expect(after.note).toBe('1 non-blocking note')
+  })
+
+  it('stamps the review round onto a fresh finding', () => {
+    const after = applyRungOutput(order(), {
+      role: 'red-team',
+      output: parseRungOutput(
+        {
+          redTeam: [
+            { severity: 'high', category: 'unprovable', text: 'AC-2 cannot be falsified.' },
+          ],
+        },
+        ['findings']
+      ),
+      writes: ['findings'],
+      at: AT,
+      round: 2,
+    })
+    expect(after.order.redTeam[0]?.round).toBe(2)
+  })
+
+  it('reopens a settled finding when new evidence answers what settled it', () => {
+    const settled: WorkOrder = {
+      ...order(),
+      redTeam: [
+        {
+          id: 'RT-red-team-1',
+          severity: 'high',
+          category: 'unprovable',
+          text: 'AC-2 cannot be falsified.',
+          status: 'resolved',
+          reason: 'the architect added a command',
+          round: 0,
+        },
+      ],
+    }
+    const after = applyRungOutput(settled, {
+      role: 'red-team',
+      output: parseRungOutput(
+        {
+          redTeam: [
+            {
+              category: 'unprovable',
+              text: 'ignored',
+              reopens: 'RT-red-team-1',
+              newEvidence: 'the command the architect added does not run in CI',
+            },
+          ],
+        },
+        ['findings']
+      ),
+      writes: ['findings'],
+      at: AT,
+    })
+    expect(after.order.redTeam).toHaveLength(1)
+    expect(after.order.redTeam[0]?.status).toBe('open')
+    expect(after.order.redTeam[0]?.text).toContain(
+      'the command the architect added does not run in CI'
+    )
+    expect(after.order.status).toBe('draft')
+    expect(after.defect).toContain('reopened')
+  })
+
+  it('drops a reopen with no new evidence, leaving the settled finding alone', () => {
+    const settled: WorkOrder = {
+      ...order(),
+      redTeam: [
+        {
+          id: 'RT-red-team-1',
+          severity: 'high',
+          category: 'unprovable',
+          text: 'AC-2 cannot be falsified.',
+          status: 'resolved',
+          reason: 'the architect added a command',
+          round: 0,
+        },
+      ],
+    }
+    const after = applyRungOutput(settled, {
+      role: 'red-team',
+      output: parseRungOutput(
+        { redTeam: [{ category: 'unprovable', text: 'ignored', reopens: 'RT-red-team-1' }] },
+        ['findings']
+      ),
+      writes: ['findings'],
+      at: AT,
+    })
+    expect(after.order.redTeam[0]?.status).toBe('resolved')
+    expect(after.order.status).toBe('agreed')
+    expect(after.defect).toBeNull()
+  })
+
+  it('drops a fresh finding that is a near-duplicate of an existing one by headline', () => {
+    const before: WorkOrder = {
+      ...order(),
+      redTeam: [
+        {
+          id: 'RT-red-team-1',
+          severity: 'low',
+          category: 'process',
+          text: 'The empty state has no copy.\n\n- see EmptyState.tsx',
+          status: 'open',
+          reason: '',
+          round: 0,
+        },
+      ],
+    }
+    const after = applyRungOutput(before, {
+      role: 'red-team',
+      output: parseRungOutput(
+        {
+          redTeam: [
+            {
+              severity: 'low',
+              category: 'process',
+              text: 'The empty state has no copy at all.\n\n- different evidence this time',
+            },
+          ],
+        },
+        ['findings']
+      ),
+      writes: ['findings'],
+      at: AT,
+    })
+    expect(after.order.redTeam).toHaveLength(1)
   })
 
   it('reports a plan the architect disagrees with rather than applying it', () => {
@@ -335,7 +536,9 @@ describe('readRungOutput', () => {
   it('reads what the rung wrote and puts it on the order', () => {
     fs.writeFileSync(
       file,
-      JSON.stringify({ redTeam: [{ severity: 'high', text: 'AC-2 cannot be falsified' }] })
+      JSON.stringify({
+        redTeam: [{ severity: 'high', category: 'unprovable', text: 'AC-2 cannot be falsified' }],
+      })
     )
     const result = readRungOutput({
       order: order(),

@@ -184,6 +184,29 @@ describe('structuralFindings', () => {
   it('does not raise the unavailable-check finding when the repository has a test command', () => {
     expect(ids(order())).not.toContain('no-runnable-check')
   })
+
+  it('categorises every rule as the design decides, blocking or not', () => {
+    const expected: Record<string, string> = {
+      'outcome-restates-problem': 'unprovable',
+      'no-non-goals': 'scope',
+      'unfalsifiable-statement': 'unprovable',
+      'p0-judged-not-run': 'unprovable',
+      'unit-touches-nothing': 'process',
+      'fully-serial-plan': 'process',
+      'touches-release-machinery': 'regression',
+      'no-runnable-check': 'infra',
+    }
+    const o = order({
+      intent: { problem: 'the thing is broken', outcome: 'the thing is broken', nonGoals: [] },
+    })
+    o.acceptance[0].statement = 'it should be nicer'
+    o.acceptance[0].verify = { kind: 'judge', rubric: 'looks right', evidence: ['screenshot'] }
+    o.plan.units[0].touches = ['src/a.css', '.github/workflows/release.yml']
+    o.context.toolchain.test = null
+    for (const finding of structuralFindings(o)) {
+      expect(finding.category).toBe(expected[finding.rule])
+    }
+  })
 })
 
 describe('applyFindings', () => {
@@ -215,6 +238,19 @@ describe('applyFindings', () => {
     const once = applyFindings(dirty, '2026-09-06T12:00:00.000Z')
     const twice = applyFindings(once, '2026-09-06T13:00:00.000Z')
     expect(twice.redTeam).toHaveLength(once.redTeam.length)
+  })
+
+  it('appends a non-blocking finding without amending — nothing here stops the run', () => {
+    // `no-non-goals` is the only structural rule this fixture trips, and it is
+    // a `scope` finding, which does not block.
+    const agreed: WorkOrder = {
+      ...order({ intent: { ...order().intent, nonGoals: [] } }),
+      status: 'agreed',
+    }
+    const after = applyFindings(agreed, '2026-09-06T12:00:00.000Z')
+    expect(after.redTeam).toHaveLength(1)
+    expect(after.redTeam[0].category).toBe('scope')
+    expect(after.status).toBe('agreed')
   })
 })
 

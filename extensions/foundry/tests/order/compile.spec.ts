@@ -281,16 +281,36 @@ describe('compileOrder', () => {
   })
 
   describe('5 — the adversarial pass is resolved', () => {
-    it('fails while a finding is still open', () => {
+    it('fails while a blocking finding is still open', () => {
       const order = complete({
-        redTeam: [{ id: 'RT-1', severity: 'high', text: 'ambiguous', status: 'open', reason: '' }],
+        redTeam: [
+          {
+            id: 'RT-1',
+            severity: 'high',
+            text: 'ambiguous',
+            status: 'open',
+            reason: '',
+            category: 'wrong-outcome',
+            round: 0,
+          },
+        ],
       })
       expect(failures(order)).toContain('redTeam')
     })
 
     it('passes a resolved finding', () => {
       const order = complete({
-        redTeam: [{ id: 'RT-1', severity: 'high', text: 'x', status: 'resolved', reason: '' }],
+        redTeam: [
+          {
+            id: 'RT-1',
+            severity: 'high',
+            text: 'x',
+            status: 'resolved',
+            reason: '',
+            category: 'wrong-outcome',
+            round: 0,
+          },
+        ],
       })
       expect(failures(order)).not.toContain('redTeam')
     })
@@ -298,10 +318,63 @@ describe('compileOrder', () => {
     it('passes a finding explicitly accepted with a reason', () => {
       const order = complete({
         redTeam: [
-          { id: 'RT-1', severity: 'low', text: 'x', status: 'accepted', reason: 'out of scope' },
+          {
+            id: 'RT-1',
+            severity: 'low',
+            text: 'x',
+            status: 'accepted',
+            reason: 'out of scope',
+            category: 'wrong-outcome',
+            round: 0,
+          },
         ],
       })
       expect(failures(order)).not.toContain('redTeam')
+    })
+
+    it('does not fail on an open finding that is only a note, not a blocking category', () => {
+      const order = complete({
+        redTeam: [
+          {
+            id: 'RT-1',
+            severity: 'low',
+            text: 'no ADR',
+            status: 'open',
+            reason: '',
+            category: 'process',
+            round: 0,
+          },
+        ],
+      })
+      expect(failures(order)).not.toContain('redTeam')
+    })
+
+    it('names only the blocking findings, not the notes, in the failure detail', () => {
+      const order = complete({
+        redTeam: [
+          {
+            id: 'RT-block',
+            severity: 'high',
+            text: 'wrong',
+            status: 'open',
+            reason: '',
+            category: 'wrong-outcome',
+            round: 0,
+          },
+          {
+            id: 'RT-note',
+            severity: 'low',
+            text: 'missing docs',
+            status: 'open',
+            reason: '',
+            category: 'process',
+            round: 0,
+          },
+        ],
+      })
+      const failure = compileOrder(order).failures.find((f) => f.check === 'redTeam')
+      expect(failure?.subjectIds).toEqual(['RT-block'])
+      expect(failure?.subjectIds).not.toContain('RT-note')
     })
   })
 
@@ -320,7 +393,17 @@ describe('compileOrder', () => {
       openQuestions: [
         { id: 'Q-1', text: 'q', why: '', options: [], recommended: null, answer: null, rank: 1 },
       ],
-      redTeam: [{ id: 'RT-1', severity: 'low', text: 'x', status: 'open', reason: '' }],
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'low',
+          text: 'x',
+          status: 'open',
+          reason: '',
+          category: 'wrong-outcome',
+          round: 0,
+        },
+      ],
     })
     const checks = failures(order)
     expect(checks).toEqual(expect.arrayContaining(['questions', 'coverage', 'redTeam']))

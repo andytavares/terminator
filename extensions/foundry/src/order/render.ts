@@ -1,5 +1,6 @@
 import { coverageMatrix } from './coverage-matrix.js'
 import { compileOrder } from './compile.js'
+import { isBlocking } from './schema.js'
 import type { Budgets, WorkOrder } from './schema.js'
 
 // The order, rendered for a person.
@@ -28,6 +29,22 @@ function verifyLine(order: WorkOrder, criterionId: string): string {
     case 'screenshot':
       return `screenshot · ${v.target}`
   }
+}
+
+/**
+ * The claim in a finding's text, without its evidence.
+ *
+ * Mirrors `findingParts` in `Forge.tsx` exactly: a first line if the text has
+ * one, otherwise its first sentence. Duplicated rather than imported because
+ * that module is a React component; this one runs wherever an order is
+ * rendered, including outside the application.
+ */
+function findingHeadline(text: string): string {
+  const trimmed = text.trim()
+  const newline = trimmed.indexOf('\n')
+  if (newline !== -1) return trimmed.slice(0, newline).trim()
+  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
+  return sentence === null ? trimmed : sentence[1]
 }
 
 /** The two enforced budgets, e.g. "3 agents · 45 minutes". */
@@ -119,10 +136,36 @@ export function renderOrder(order: WorkOrder): string {
     lines.push('')
   }
 
-  const unresolved = order.redTeam.filter((f) => f.status === 'open')
-  if (unresolved.length > 0) {
-    lines.push('## Red team', '')
-    for (const finding of unresolved) lines.push(`- **${finding.id}** ${finding.text}`)
+  const blocking = order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
+  if (blocking.length > 0) {
+    lines.push('## Red team — blocking', '')
+    for (const finding of blocking) {
+      lines.push(
+        `- **${finding.id}** (${finding.category}, ${finding.severity}) ${findingHeadline(finding.text)}`
+      )
+    }
+    lines.push('')
+  }
+
+  const notes = order.redTeam.filter((f) => f.status === 'open' && !isBlocking(f))
+  if (notes.length > 0) {
+    lines.push('## Red team — notes', '')
+    for (const finding of notes) {
+      lines.push(
+        `- **${finding.id}** (${finding.category}, ${finding.severity}) ${findingHeadline(finding.text)}`
+      )
+    }
+    lines.push('')
+  }
+
+  const settled = order.redTeam.filter((f) => f.status !== 'open')
+  if (settled.length > 0) {
+    lines.push('## Red team — settled', '')
+    for (const finding of settled) {
+      lines.push(
+        `- **${finding.id}** (${finding.status}: ${finding.reason || 'no reason given'}) ${findingHeadline(finding.text)}`
+      )
+    }
     lines.push('')
   }
 

@@ -61,6 +61,13 @@ describe('what the architect is told', () => {
     expect(plan.prompt).toContain('"dismissFindings"')
   })
 
+  it('tells the architect only a blocking finding stops hand-off, and any severity may be dismissed', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('Only a blocking finding')
+    expect(plan.prompt).toContain('wrong-outcome')
+    expect(plan.prompt).not.toContain('a high one is')
+  })
+
   it('names each open finding, so the architect can close it rather than the operator', () => {
     const plan = convergeBrief({
       order: order({
@@ -80,7 +87,10 @@ describe('what the architect is told', () => {
       rules: [],
     })
     expect(plan.prompt).toContain('RT-no-non-goals (low) — The order excludes nothing.')
-    expect(plan.prompt).not.toContain('Settled.')
+    // The rendered order now carries a settled section too (the architect
+    // reads `order`), but the resolved finding must not appear as one it is
+    // being asked to close.
+    expect(plan.prompt).not.toContain('## Open red-team findings\n\n- RT-done')
   })
 
   it("leads with the architect's own prompt and the order", () => {
@@ -299,11 +309,15 @@ describe('reading back what it wrote', () => {
     expect(result.ok && result.order.assumptions.map((a) => a.id)).toContain('A-Q-1')
   })
 
-  it('applies the findings the architect dismissed with confidence, and only low or medium ones', () => {
+  it('applies the findings the architect dismissed with confidence, whatever their severity', () => {
     const file = write({
       dismissFindings: [
         { id: 'RT-no-non-goals', reason: 'nothing to exclude', confidence: 0.95 },
-        { id: 'RT-no-runnable-check', reason: 'r', confidence: 0.99 },
+        {
+          id: 'RT-no-runnable-check',
+          reason: 'this repo has no toolchain by design',
+          confidence: 0.99,
+        },
       ],
     })
     const before = order({
@@ -313,7 +327,7 @@ describe('reading back what it wrote', () => {
       ],
     })
     const result = readProposal(before, file, 'now')
-    expect(result.ok && result.order.redTeam.map((f) => f.status)).toEqual(['accepted', 'open'])
+    expect(result.ok && result.order.redTeam.map((f) => f.status)).toEqual(['accepted', 'accepted'])
   })
 
   it('says so when the architect wrote nothing', () => {
@@ -397,6 +411,8 @@ describe('reading back what it wrote', () => {
       text: 'x',
       status: 'accepted' as const,
       reason: 'priced in',
+      category: 'wrong-outcome' as const,
+      round: 0,
     }
     const result = readProposal(order({ redTeam: [accepted] }), file, 'now')
     expect(result.ok && result.order.redTeam[0]).toEqual(accepted)

@@ -236,7 +236,11 @@ describe('a rung handing back what it found, end to end', () => {
           input.outputPath,
           JSON.stringify({
             redTeam: [
-              { severity: 'high', text: 'AC-1 cannot be falsified: "red" names no measurement.' },
+              {
+                severity: 'high',
+                category: 'unprovable',
+                text: 'AC-1 cannot be falsified: "red" names no measurement.',
+              },
             ],
             note: 'the only criterion is unverifiable',
           })

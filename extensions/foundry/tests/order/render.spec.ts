@@ -143,16 +143,66 @@ describe('renderOrder', () => {
     expect(out).toContain('no acceptance criteria')
   })
 
-  it('shows unresolved red-team findings and hides settled ones', () => {
+  it('shows an open blocking finding under its own heading', () => {
     const o = order({
       redTeam: [
-        { id: 'RT-1', severity: 'high', text: 'ambiguous', status: 'open', reason: '' },
-        { id: 'RT-2', severity: 'low', text: 'settled thing', status: 'resolved', reason: '' },
+        {
+          id: 'RT-1',
+          severity: 'high',
+          text: 'ambiguous',
+          status: 'open',
+          reason: '',
+          category: 'wrong-outcome',
+          round: 0,
+        },
       ],
     })
     const out = renderOrder(o)
+    expect(out).toContain('## Red team — blocking')
     expect(out).toContain('RT-1')
-    expect(out).not.toContain('settled thing')
+    expect(out).toContain('(wrong-outcome, high)')
+  })
+
+  it('shows an open non-blocking finding as a note, not a blocker', () => {
+    const o = order({
+      redTeam: [
+        {
+          id: 'RT-2',
+          severity: 'low',
+          text: 'no ADR for this',
+          status: 'open',
+          reason: '',
+          category: 'process',
+          round: 0,
+        },
+      ],
+    })
+    const out = renderOrder(o)
+    expect(out).toContain('## Red team — notes')
+    expect(out).toContain('RT-2')
+    expect(out).not.toContain('## Red team — blocking')
+  })
+
+  it('shows a settled finding with its status and reason, headline only', () => {
+    const o = order({
+      redTeam: [
+        {
+          id: 'RT-3',
+          severity: 'low',
+          text: 'settled thing\n\n- the evidence',
+          status: 'resolved',
+          reason: 'fixed in the redraft',
+          category: 'process',
+          round: 0,
+        },
+      ],
+    })
+    const out = renderOrder(o)
+    expect(out).toContain('## Red team — settled')
+    expect(out).toContain('RT-3')
+    expect(out).toContain('resolved: fixed in the redraft')
+    expect(out).toContain('settled thing')
+    expect(out).not.toContain('the evidence')
   })
 
   it('shows unanswered questions and hides answered ones', () => {
