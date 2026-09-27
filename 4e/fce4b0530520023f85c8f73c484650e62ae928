@@ -1,0 +1,27 @@
+tests/e2e/fixtures/zdotdir/.zshrc
+  s_3a9e30cc08778f::t_92027040174a15 1-8
+  s_3a9e30cc08778f::t_c942c10c5c7e15 9-10
+tests/e2e/helpers.ts
+  s_3a9e30cc08778f::t_68f6d06a53ebb8 45-57,64-68
+tests/e2e/fixtures/zdotdir/.zshenv
+  s_3a9e30cc08778f::t_53b4ac0b2b5ce8 1-4
+tests/e2e/fixtures/zdotdir/.zprofile
+  s_3a9e30cc08778f::t_209ef8aa5b291f 7
+  s_3a9e30cc08778f::t_ca6198f96ff753 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4efce4b0530520023f85c8f73c484650e62ae928",
+  "prompts": {},
+  "sessions": {
+    "s_3a9e30cc08778f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd240882-012b-446b-a7ae-7442478ea77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
