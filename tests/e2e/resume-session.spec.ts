@@ -16,6 +16,10 @@ import {
 // so the whole path from report to control is exercised without running an
 // agent. Pressing Resume against a real agent is tests/e2e/live/resume-live.spec.ts.
 
+// Every test launches its own app on its own profile and folder, so the
+// shards can split this file by test instead of carrying all of it.
+test.describe.configure({ mode: 'parallel' })
+
 let handle: AppHandle | undefined
 let folder: string
 let transcript: string

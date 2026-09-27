@@ -84,16 +84,17 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
-  # Unit tests exercise macOS behaviour (`open -a`, the Cmd leader), so they run
-  # on macOS, split three ways. Each shard writes a blob; the coverage
-  # threshold only means something over the whole suite, so it is enforced
-  # once, in the merge.
+  # On Linux: GitHub allows five macOS jobs at once, and those go to the build
+  # and E2E, which drive the real app. Tests of macOS behaviour pin
+  # process.platform rather than inheriting the host's. Each shard writes a
+  # blob; the coverage threshold only means something over the whole suite, so
+  # it is enforced once, in the merge.
   unit:
-    name: Unit (${{ matrix.shard }}/3)
-    runs-on: macos-14
+    name: Unit (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
 
     steps:
       - uses: actions/checkout@v4
@@ -106,9 +107,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The supervised-runner specs run each command under /bin/sh and /bin/zsh.
+      - name: Install zsh
+        run: command -v zsh || (sudo apt-get update -qq && sudo apt-get install -y -qq zsh)
+
       - name: Test
         run: >-
-          npx vitest run --coverage --shard=${{ matrix.shard }}/3 --reporter=blob --reporter=dot
+          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob --reporter=dot
           --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
           --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
         timeout-minutes: 5
@@ -122,13 +127,13 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
-  # The required "Test" check. macOS, because the blobs carry the shards'
-  # absolute source paths and coverage is remapped against them.
+  # The required "Test" check. Same OS as the shards, because the blobs carry
+  # their absolute source paths and coverage is remapped against them.
   test:
     name: Test
     needs: unit
     if: ${{ !cancelled() }}
-    runs-on: macos-14
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -250,13 +255,13 @@ jobs:
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
   e2e:
-    name: E2E (${{ matrix.shard }}/4)
+    name: E2E (${{ matrix.shard }}/5)
     needs: [build, e2e-select]
     if: needs.e2e-select.outputs.mode != 'none'
     runs-on: macos-14
     strategy:
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
 
     steps:
       - uses: actions/checkout@v4
@@ -294,14 +299,14 @@ jobs:
           SPECS: ${{ needs.e2e-select.outputs.specs }}
         run: |
           if [ "$MODE" = all ]; then SPECS=""; fi
-          npx playwright test $SPECS --shard=${{ matrix.shard }}/4 --pass-with-no-tests --reporter=blob,dot
+          npx playwright test $SPECS --shard=${{ matrix.shard }}/5 --pass-with-no-tests --reporter=blob,dot
         timeout-minutes: 10
 
       # A new or edited spec must pass three times before it merges: once in the
       # suite above and twice here, split across the shards like the suite.
       - name: Burn in changed specs
         if: needs.e2e-select.outputs.changed != ''
-        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=2 --shard=${{ matrix.shard }}/4 --pass-with-no-tests --reporter=dot
+        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=2 --shard=${{ matrix.shard }}/5 --pass-with-no-tests --reporter=dot
         timeout-minutes: 10
 
       - name: Upload blob report
