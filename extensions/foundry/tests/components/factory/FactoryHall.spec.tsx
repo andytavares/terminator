@@ -133,7 +133,7 @@ describe('FactoryHall', () => {
     mount()
     await waitFor(() =>
       expect(
-        screen.getByRole('button', { name: 'Build the thing, builder, running, attempt 1' })
+        screen.getByRole('button', { name: 'Build the thing, builder, Working, attempt 1' })
       ).toBeTruthy()
     )
   })
@@ -241,12 +241,61 @@ describe('FactoryHall', () => {
     )
   })
 
-  it('shows each station its own nameplate, in the hall, saying where it stands', async () => {
+  it('gives each station a nameplate that spends its whole width on the name', async () => {
     mount()
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    const station = await screen.findByRole('button', { name: /Build the thing/ })
     const plate = document.querySelector('.fdry-hall-overlay .fdry-plate') as HTMLElement
-    expect(plate.textContent).toContain('Build the thing')
-    expect(plate.textContent).toContain('Working')
+    expect(plate.textContent).toBe('Build the thing')
+    // Where it stands is the station's lamp, and its accessible name.
+    expect(station.getAttribute('aria-label')).toContain('Working')
+  })
+
+  it('keeps the order bar above the hall rather than over its top row', async () => {
+    mount()
+    const back = await screen.findByRole('button', { name: /All halls/ })
+    const frame = document.querySelector('.fdry-hall-frame') as HTMLElement
+    expect(frame.contains(back)).toBe(false)
+    expect(back.compareDocumentPosition(frame) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('lifts callouts raised together clear of each other', async () => {
+    // jsdom lays nothing out: give every box a size, and the hall one too.
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+    const two = (state: string) =>
+      view({
+        graph: {
+          orderId: 'WO-1',
+          recipe: 'standard',
+          nodes: [node({ state }), node({ id: 'N-2', sessionId: 's-2', state })],
+        },
+        labels: { 'N-1': 'Build the thing', 'N-2': 'Build the other' },
+      })
+    let current = two('running')
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:run.observe') return current
+      if (channel === 'foundry:permissions-list') return { pending: [] }
+      if (channel === 'foundry:run.activity') return { activity: {} }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(
+      <FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onOpenInList={vi.fn()} onBack={vi.fn()} />
+    )
+    await screen.findByRole('button', { name: /Build the other/ })
+    current = two('passed')
+    await waitFor(
+      () => expect(document.querySelectorAll('.fdry-hall-overlay .fdry-callout')).toHaveLength(2),
+      { timeout: 4000 }
+    )
+    const lifts = [...document.querySelectorAll<HTMLElement>('.fdry-callout')].map((c) =>
+      c.style.getPropertyValue('--fdry-lift')
+    )
+    expect(new Set(lifts).size).toBe(2)
   })
 
   it('raises a callout at the station when its state changes, not a line under the picture', async () => {
@@ -408,7 +457,7 @@ describe('FactoryHall', () => {
   }
 
   const plateText = () =>
-    (document.querySelector('.fdry-hall-overlay .fdry-plate') as HTMLElement).textContent
+    screen.getByRole('button', { name: /Build the thing/ }).getAttribute('aria-label')
 
   it('replays the run from what was recorded, and scrubs to any moment of it', async () => {
     replayable([

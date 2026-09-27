@@ -161,6 +161,43 @@ describe('merging one in', () => {
     expect(after.assumptions.map((a) => a.id)).toEqual(['A-2'])
   })
 
+  // The amending turn is told to send only what it changed. On WO-0927-d2b it
+  // sent `plan.units` and `intent.nonGoals` alone, and every turn was refused
+  // for the halves it had been told not to restate.
+  it('merges a partial plan over the one on the order', () => {
+    const before = order()
+    const unit = {
+      id: 'U-9',
+      title: 'filter in the query',
+      role: 'builder',
+      lane: 1,
+      dependsOn: [],
+      satisfies: [],
+      touches: ['src/'],
+      verify: [],
+    }
+    const after = applyProposal(before, parseProposal({ plan: { units: [unit] } }), NOW)
+    expect(after.plan.units.map((u) => u.id)).toEqual(['U-9'])
+    expect(after.plan.lanes).toEqual(before.plan.lanes)
+  })
+
+  it('merges a partial intent over the one on the order', () => {
+    const before = order({ intent: { problem: 'p', outcome: 'o', nonGoals: [] } })
+    const after = applyProposal(
+      before,
+      parseProposal({ intent: { nonGoals: ['no provider change'] } }),
+      NOW
+    )
+    expect(after.intent).toEqual({ problem: 'p', outcome: 'o', nonGoals: ['no provider change'] })
+  })
+
+  it('merges a partial risk over the one on the order', () => {
+    const before = order()
+    const after = applyProposal(before, parseProposal({ risk: { blastRadius: ['src/'] } }), NOW)
+    expect(after.risk.grade).toBe(before.risk.grade)
+    expect(after.risk.blastRadius).toEqual(['src/'])
+  })
+
   it('refuses a merge that would produce an unreadable order', () => {
     // Readable as a proposal and unreadable as an order is a real difference,
     // and the next reader is the compile gate.

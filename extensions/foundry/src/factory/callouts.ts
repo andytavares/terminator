@@ -219,6 +219,97 @@ export function interruptionsFor(input: InterruptionInput): Interruption[] {
   return [...asks, ...gates, ...parked]
 }
 
+/** How loudly a callout's tone speaks when one station has several things to say. */
+const TONE_WEIGHT: Readonly<Record<CalloutTone, number>> = {
+  fail: 2,
+  done: 1,
+  start: 0,
+  tool: 0,
+  handoff: 0,
+}
+
+/**
+ * The callouts a poll's events raise: one per station, since a station has
+ * one patch of air above it. A failure outranks anything else; otherwise the
+ * latest event speaks.
+ */
+export function calloutsFor(
+  events: readonly FactoryEvent[],
+  labels: Readonly<Record<string, string>>,
+  at: number
+): Callout[] {
+  const byNode = new Map<string, Callout>()
+  for (const event of events) {
+    const raised = calloutFor(event, labels, at)
+    if (raised === null) continue
+    const held = byNode.get(raised.nodeId)
+    if (held !== undefined && TONE_WEIGHT[held.tone] > TONE_WEIGHT[raised.tone]) continue
+    byNode.delete(raised.nodeId)
+    byNode.set(raised.nodeId, raised)
+  }
+  return [...byNode.values()]
+}
+
+/** A raised callout's size, and where its bottom-centre sits on the ground level. */
+export interface CalloutBox {
+  readonly id: string
+  readonly x: number
+  readonly y: number
+  readonly w: number
+  readonly h: number
+}
+
+/** Something already on the hall a callout must not cover, such as a nameplate. */
+export interface Obstacle {
+  readonly left: number
+  readonly top: number
+  readonly right: number
+  readonly bottom: number
+}
+
+/** A stack taller than this is off the top of any hall; the last level is used. */
+const MAX_LEVEL = 12
+
+function overlaps(a: Obstacle, b: Obstacle): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+}
+
+/**
+ * How many `pitch`es each callout is lifted so none covers another or a
+ * nameplate, in the order they were raised.
+ *
+ * A callout in `kept` holds its level, so it never jumps when an older one
+ * leaves; each new one takes the lowest level at which it is clear.
+ */
+export function calloutLevels(
+  boxes: readonly CalloutBox[],
+  obstacles: readonly Obstacle[],
+  kept: Readonly<Record<string, number>>,
+  pitch: number
+): Record<string, number> {
+  const at = (box: CalloutBox, level: number): Obstacle => {
+    const bottom = box.y - level * pitch
+    return { left: box.x - box.w / 2, top: bottom - box.h, right: box.x + box.w / 2, bottom }
+  }
+  const levels: Record<string, number> = {}
+  const placed: Obstacle[] = [...obstacles]
+  for (const box of boxes) {
+    const held = kept[box.id]
+    if (held !== undefined) {
+      levels[box.id] = held
+      placed.push(at(box, held))
+    }
+  }
+  for (const box of boxes) {
+    if (levels[box.id] !== undefined) continue
+    let level = 0
+    while (level < MAX_LEVEL && placed.some((other) => overlaps(at(box, level), other))) level++
+    levels[box.id] = level
+    placed.push(at(box, level))
+  }
+  return levels
+}
+
 /** The one word a nameplate spends on where a step stands. */
 export function stateWord(state: NodeState): string {
   switch (state) {

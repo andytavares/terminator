@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { calloutFor, interruptionsFor, stateWord } from '../../src/factory/callouts.js'
+import {
+  calloutFor,
+  calloutLevels,
+  calloutsFor,
+  interruptionsFor,
+  stateWord,
+} from '../../src/factory/callouts.js'
 import type { FactoryEvent } from '../../src/factory/events.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { NodeState, RunGraph, RunNode } from '../../src/line/run-graph.js'
@@ -296,5 +302,82 @@ describe('stateWord', () => {
     expect(new Set(words).size).toBe(states.length)
     expect(stateWord('running')).toBe('Working')
     expect(stateWord('waiting')).toBe('Queued')
+  })
+})
+
+describe('calloutLevels', () => {
+  // A callout 100 wide and 20 tall, whose level-0 bottom edge sits at y.
+  const bubble = (id: string, x: number, y = 200) => ({ id, x, y, w: 100, h: 20 })
+
+  it('leaves a callout nothing crowds on the ground level', () => {
+    expect(calloutLevels([bubble('a', 100), bubble('b', 400)], [], {}, 26)).toEqual({
+      a: 0,
+      b: 0,
+    })
+  })
+
+  it('lifts a callout that would cover a neighbour raised before it', () => {
+    expect(calloutLevels([bubble('a', 100), bubble('b', 160)], [], {}, 26)).toEqual({
+      a: 0,
+      b: 1,
+    })
+  })
+
+  it('keeps the level a callout was given, so it never jumps when an older one leaves', () => {
+    expect(calloutLevels([bubble('b', 160)], [], { b: 1 }, 26)).toEqual({ b: 1 })
+  })
+
+  it('takes the lowest free level, under a kept callout that sits higher', () => {
+    const levels = calloutLevels(
+      [bubble('a', 100), bubble('b', 160), bubble('c', 160)],
+      [],
+      { a: 0, b: 2 },
+      26
+    )
+    expect(levels.c).toBe(1)
+  })
+
+  it('rises clear of a nameplate from another row in its way', () => {
+    const plate = { left: 60, top: 178, right: 140, bottom: 195 }
+    expect(calloutLevels([bubble('a', 100)], [plate], {}, 26)).toEqual({ a: 1 })
+  })
+
+  it('treats a callout that only touches a neighbour edge to edge as clear of it', () => {
+    expect(calloutLevels([bubble('a', 100), bubble('b', 200)], [], {}, 26)).toEqual({
+      a: 0,
+      b: 0,
+    })
+  })
+})
+
+describe('calloutsFor', () => {
+  it('raises one callout per station, however many things happened to it in one poll', () => {
+    const raised = calloutsFor(
+      [
+        { kind: 'node-state', nodeId: 'build', from: 'ready', to: 'running' },
+        { kind: 'handoff', fromNodeId: 'plan', toNodeId: 'build', targetStarted: true },
+        { kind: 'node-state', nodeId: 'ship', from: 'ready', to: 'running' },
+      ] as FactoryEvent[],
+      labels,
+      1000
+    )
+    expect(raised.map((c) => [c.nodeId, c.text])).toEqual([
+      ['build', 'Work in from plan'],
+      ['ship', 'Started'],
+    ])
+    expect(new Set(raised.map((c) => c.id)).size).toBe(raised.length)
+  })
+
+  it('lets a failure speak over anything else that happened at the station', () => {
+    const raised = calloutsFor(
+      [
+        { kind: 'node-state', nodeId: 'build', from: 'ready', to: 'running' },
+        { kind: 'orphaned', nodeId: 'build' },
+        { kind: 'handoff', fromNodeId: 'plan', toNodeId: 'build', targetStarted: true },
+      ] as FactoryEvent[],
+      labels,
+      1000
+    )
+    expect(raised.map((c) => c.text)).toEqual(['Agent gone'])
   })
 })

@@ -448,6 +448,9 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const drafting = intake.kind === 'running'
   /** The instruction the running turn was started with, to find the ask it answers. */
   const asked = intake.kind === 'running' ? intake.asked : null
+  // The architect's proposal is merged over the order as it stood when its
+  // turn started, so an edit made while it works is one it never saw.
+  const locked = busy || drafting
 
   // The architect answers in minutes, not in the call that started it, so the
   // document is refetched while it works and the outcome — a redraft, or the
@@ -571,7 +574,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                   <button
                     key={remedy.label}
                     type="button"
-                    disabled={busy}
+                    disabled={locked}
                     onClick={() => {
                       if (remedy.kind === 'ask') {
                         void converge(remedy.message)
@@ -628,7 +631,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
             <button
               type="button"
               className="is-recommended"
-              disabled={busy}
+              disabled={locked}
               onClick={() =>
                 void converge(
                   `Your last proposal was refused and nothing was changed. The reason: ${intake.reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
@@ -637,7 +640,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
             >
               Tell the architect what was wrong
             </button>
-            <button type="button" disabled={busy} onClick={() => void converge()}>
+            <button type="button" disabled={locked} onClick={() => void converge()}>
               Start the turn over
             </button>
           </div>
@@ -671,7 +674,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                       key={option}
                       type="button"
                       className={optionIndex === question.recommended ? 'is-recommended' : ''}
-                      disabled={busy}
+                      disabled={locked}
                       onClick={() =>
                         void turn({ answer: { questionId: question.id, option: optionIndex } })
                       }
@@ -729,7 +732,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 <button
                   type="button"
                   className="fdry-converge"
-                  disabled={busy || drafting}
+                  disabled={locked}
                   onClick={() => void converge()}
                 >
                   <Wand aria-hidden="true" />
@@ -851,7 +854,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                               <button
                                 type="button"
                                 className="fdry-ac-excuse"
-                                disabled={busy}
+                                disabled={locked}
                                 onClick={() => setUnproven(criterion.id)}
                               >
                                 Nothing here can prove this
@@ -879,7 +882,10 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                                   value={unprovenReason}
                                   onChange={(event) => setUnprovenReason(event.target.value)}
                                 />
-                                <button type="submit" disabled={unprovenReason.trim() === ''}>
+                                <button
+                                  type="submit"
+                                  disabled={locked || unprovenReason.trim() === ''}
+                                >
                                   Accept it
                                 </button>
                               </form>
@@ -943,7 +949,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         <button
                           key={assumption.id}
                           type="button"
-                          disabled={busy}
+                          disabled={locked}
                           onClick={() => void turn({ strike: assumption.id })}
                         >
                           <MarkdownInline text={assumption.text} /> <X aria-hidden="true" />
@@ -973,7 +979,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         },
                       ]}
                       submitLabel="Save budgets"
-                      disabled={busy}
+                      disabled={locked}
                       onSubmit={(budgets) => void setBudgets(budgets)}
                     />
                   ) : (
@@ -1005,7 +1011,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                               <>
                                 <button
                                   type="button"
-                                  disabled={busy}
+                                  disabled={locked}
                                   title="Have the architect change the order so this no longer holds"
                                   onClick={() => void converge(findingAsk(finding))}
                                 >
@@ -1013,7 +1019,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={busy}
+                                  disabled={locked}
                                   title="Say how, and the architect changes the order that way"
                                   onClick={() => {
                                     setAccepting(null)
@@ -1026,7 +1032,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                             )}
                             <button
                               type="button"
-                              disabled={busy}
+                              disabled={locked}
                               title="It stands, and here is why"
                               onClick={() => {
                                 setFixing(null)
@@ -1055,7 +1061,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                               value={fixHow}
                               onChange={(event) => setFixHow(event.target.value)}
                             />
-                            <button type="submit" disabled={fixHow.trim() === ''}>
+                            <button type="submit" disabled={locked || fixHow.trim() === ''}>
                               Send to the architect
                             </button>
                           </form>
@@ -1083,7 +1089,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                               value={reason}
                               onChange={(event) => setReason(event.target.value)}
                             />
-                            <button type="submit" disabled={reason.trim() === ''}>
+                            <button type="submit" disabled={locked || reason.trim() === ''}>
                               Accept it
                             </button>
                           </form>
@@ -1135,7 +1141,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         type="button"
                         className={`fdry-recipe ${isChosen ? 'is-on' : ''}`}
                         aria-pressed={isChosen}
-                        disabled={!option.available || busy}
+                        disabled={!option.available || locked}
                         onClick={() => setChosen(option.name)}
                       >
                         <span className="fdry-recipe-name">
@@ -1179,6 +1185,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         <span>{INTENT_LABELS[intent]}</span>
                         <select
                           value={states?.mapping?.[intent] ?? ''}
+                          disabled={locked}
                           onChange={(event) =>
                             void mapIntent(
                               intent,
@@ -1213,6 +1220,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         <input
                           type="checkbox"
                           checked={order.writeBack.includes(kind.id)}
+                          disabled={locked}
                           onChange={(event) =>
                             void setWriteBack(
                               event.target.checked
@@ -1263,10 +1271,10 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                   aria-label="Tell the architect what is wrong, or what you want instead"
                   placeholder="Tell the architect what's wrong, or what you want instead…"
                   value={draft}
-                  disabled={busy}
+                  disabled={locked}
                   onChange={(event) => setDraft(event.target.value)}
                 />
-                <button type="submit" disabled={busy || draft.trim() === ''}>
+                <button type="submit" disabled={locked || draft.trim() === ''}>
                   Send
                 </button>
               </form>
@@ -1290,7 +1298,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 <button
                   type="button"
                   className="fdry-nav-next"
-                  disabled={busy}
+                  disabled={locked}
                   onClick={() => void handOff(true)}
                 >
                   <Play aria-hidden="true" /> Start anyway — {heldBack.unreviewed} waiting for
@@ -1301,7 +1309,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 <button
                   type="button"
                   className="fdry-nav-next"
-                  disabled={!compile.ok || busy || !isDraft}
+                  disabled={!compile.ok || locked || !isDraft}
                   onClick={() => void handOff()}
                 >
                   <Play aria-hidden="true" />

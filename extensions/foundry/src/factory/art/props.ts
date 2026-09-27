@@ -39,6 +39,10 @@ export interface SceneContext {
   } | null
   /** This order's place in the refinery's file-overlap queue — null out of a queue. */
   readonly queue?: { readonly position: number } | null
+  /** Stations with a held call, a gate or a parked question waiting on a person. */
+  readonly needsYou?: readonly string[]
+  /** Stations whose step says it is running with no agent left to run it. */
+  readonly orphaned?: readonly string[]
 }
 
 /** Rows 0–2 are the top wall on every `HallMap` — see `layout.ts`'s contract. */
@@ -55,6 +59,36 @@ function scanningAt(context: SceneContext, nodeId: string): boolean {
 
 function hasPassed(context: SceneContext, nodeId: string | null): boolean {
   return nodeId !== null && context.states[nodeId] === 'passed'
+}
+
+const LAMP_OFF = '#3a414b'
+const LAMP_FLASH_MS = 500
+
+/**
+ * A station's status lamp: orange while it needs you, red once it has failed
+ * or lost its agent, green when done, and flashing while it works.
+ */
+function stationLamp(context: SceneContext, nodeId: string, tMs: number): string {
+  if (context.needsYou?.includes(nodeId) === true) return HALL.orange
+  if (context.orphaned?.includes(nodeId) === true) return HALL.red
+  switch (context.states[nodeId]) {
+    case 'failed':
+    case 'blocked':
+      return HALL.red
+    case 'passed':
+      return HALL.green
+    case 'running':
+    case 'verifying':
+      return Math.floor(tMs / LAMP_FLASH_MS) % 2 === 0 ? HALL.cyan : LAMP_OFF
+    default:
+      return LAMP_OFF
+  }
+}
+
+/** The lamp on a dark bezel, so it reads apart from the desk clutter around it. */
+function drawLamp(paint: Paint, x: number, y: number, color: string): void {
+  rect(paint, x - 1, y - 1, 6, 5, '#14171c')
+  rect(paint, x, y, 4, 3, color)
 }
 
 function gateIsWaiting(context: SceneContext, nodeId: string | null): boolean {
@@ -487,12 +521,11 @@ function drawDesk(paint: Paint, prop: HallProp, context: SceneContext, tMs: numb
   for (let k = 0; k < 5; k++) rect(paint, x + Math.floor(w / 2) - 5 + k * 2, y + 9, 1, 1, '#434a55')
   rect(paint, x + 4, y + 7, 3, 4, '#d9dde2')
   rect(paint, x + 5, y + 8, 2, 1, '#9aa2ac')
-  rect(paint, x + w - 7, y + 6, 3, 3, '#b8574a')
-  rect(paint, x + w - 7, y + 6, 3, 1, '#d06a5b')
+  rect(paint, x + w - 7, y + 6, 3, 3, '#4a6f9a')
+  rect(paint, x + w - 7, y + 6, 3, 1, '#6a8fba')
 
-  if (prop.nodeId !== null) {
-    rect(paint, x + w - 4, y, 3, 2, hasPassed(context, prop.nodeId) ? HALL.green : '#3a414b')
-  }
+  if (prop.nodeId !== null)
+    drawLamp(paint, x + w - 6, y - 1, stationLamp(context, prop.nodeId, tMs))
 }
 
 function drawRig(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
@@ -521,9 +554,8 @@ function drawRig(paint: Paint, prop: HallProp, context: SceneContext, tMs: numbe
     rect(paint, x + 3 + p * 3, y + 12, 1, 6, ['#b04a3c', '#e0a13a', '#3a6ea1'][p])
   }
 
-  if (prop.nodeId !== null) {
-    rect(paint, x + w - 5, y - 9, 3, 3, hasPassed(context, prop.nodeId) ? HALL.green : '#3a414b')
-  }
+  if (prop.nodeId !== null)
+    drawLamp(paint, x + w - 7, y + 8, stationLamp(context, prop.nodeId, tMs))
 }
 
 function drawBench(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
@@ -542,9 +574,8 @@ function drawBench(paint: Paint, prop: HallProp, context: SceneContext, tMs: num
     rect(paint, x + 3 + sweep, y - 7, 2, 6, HALL.cyan)
   }
 
-  if (prop.nodeId !== null) {
-    rect(paint, x + w - 5, y - 10, 3, 3, hasPassed(context, prop.nodeId) ? HALL.green : '#3a414b')
-  }
+  if (prop.nodeId !== null)
+    drawLamp(paint, x + w - 6, y + 2, stationLamp(context, prop.nodeId, tMs))
 }
 
 /** The press is the biggest machine on the floor — the lanes converge here. */
@@ -575,10 +606,8 @@ function drawPress(paint: Paint, prop: HallProp, context: SceneContext, tMs: num
   rect(paint, x + 7, headY, w - 14, 10, '#6b7482')
   rect(paint, x + 7, headY, w - 14, 2, '#98a2b2')
 
-  if (prop.nodeId !== null) {
-    const beacon = hasPassed(context, prop.nodeId) ? HALL.green : active ? HALL.amber : '#2c323c'
-    rect(paint, x + w / 2 - 2, top - 4, 4, 3, beacon)
-  }
+  if (prop.nodeId !== null)
+    drawLamp(paint, x + w / 2 - 2, top + PRESS_VISUAL_H + 4, stationLamp(context, prop.nodeId, tMs))
 }
 
 function drawGate(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {

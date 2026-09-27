@@ -30,7 +30,13 @@ export interface HallSceneProps {
   readonly speed?: number
   /** This order's own numbers, for the status wall — see `SceneContext`. */
   readonly metrics?: SceneContext['metrics']
+  /** Stations whose lamp burns orange — see `SceneContext`. */
+  readonly needsYou?: readonly string[]
+  /** Stations whose lamp burns red for want of an agent — see `SceneContext`. */
+  readonly orphaned?: readonly string[]
 }
+
+type Lamps = Pick<SceneContext, 'needsYou' | 'orphaned'>
 
 const DARKNESS = 'rgba(5,8,18,0.42)'
 const LIGHT_RADIUS = 70
@@ -101,7 +107,8 @@ function draw(
   world: World,
   states: Readonly<Record<string, NodeState>>,
   tMs: number,
-  metrics: SceneContext['metrics']
+  metrics: SceneContext['metrics'],
+  lamps: Lamps
 ): void {
   paint.globalCompositeOperation = 'source-over'
   paint.drawImage(bake, 0, 0)
@@ -113,6 +120,7 @@ function draw(
     ci: world.ci,
     metrics,
     queue: world.queue,
+    ...lamps,
   }
 
   const moving = new Set(world.crates.map((c) => c.beltId))
@@ -172,6 +180,8 @@ export function HallScene({
   reducedMotion,
   speed = 1,
   metrics = null,
+  needsYou = [],
+  orphaned = [],
 }: HallSceneProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   // Read by the running loop each frame, so a speed change does not restart it.
@@ -181,6 +191,8 @@ export function HallScene({
   // rAF loop, just be read on the next frame it already draws.
   const metricsRef = useRef(metrics)
   metricsRef.current = metrics
+  const lampsRef = useRef<Lamps>({ needsYou, orphaned })
+  lampsRef.current = { needsYou, orphaned }
   const bakeRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
   const lightRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
 
@@ -222,7 +234,8 @@ export function HallScene({
         worldRef.current,
         states,
         worldRef.current.clockMs,
-        metricsRef.current
+        metricsRef.current,
+        lampsRef.current
       )
       return
     }
@@ -244,7 +257,8 @@ export function HallScene({
         worldRef.current,
         states,
         worldRef.current.clockMs,
-        metricsRef.current
+        metricsRef.current,
+        lampsRef.current
       )
       rafId = requestAnimationFrame(frame)
     }

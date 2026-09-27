@@ -128,3 +128,19 @@ ADR just removed from the other direction.
 A first draft also now carries the rendered order, which for a fresh draft is
 mostly `_No criteria yet._` and `_No units yet._`. That is honest — it is what
 the order says — and it is about twenty lines.
+
+## Addendum: "send only the keys you changed" held one level deeper
+
+The instruction was true of the proposal's top-level keys and false inside
+them: `intent`, `risk` and `plan` were each replaced whole, so an amendment
+sending `plan.units` alone was refused for `plan.lanes: Required`. On
+`WO-0927-d2b` every turn after the first was refused this way.
+
+`ProposalSchema` now takes those three as partial objects and
+`applyProposal` merges them key by key over the order. A list inside them is
+still replaced whole, and the output contract says so. The merged order is
+validated as before.
+
+While a turn runs, the Forge now disables every control that edits the order:
+the proposal is merged over the order as it stood when the turn started, so an
+edit made meanwhile is one the architect never saw.

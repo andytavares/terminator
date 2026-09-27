@@ -17,6 +17,7 @@ export const HALL = {
   door: '#0d1015',
   amber: '#e0a13a',
   amberDim: '#8a5f1c',
+  orange: '#ff7a1a',
   steel: '#5d6674',
   steelDark: '#3c434e',
   steelLight: '#7c8696',

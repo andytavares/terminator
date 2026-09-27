@@ -3360,9 +3360,13 @@
 }
 
 .fdry-hall-shell {
+  /* The order bar sits above the hall at its width, so the frame gives up its height. */
+  --fdry-hall-width: min(100%, calc((100vh - 160px) * var(--fdry-hall-aspect, 1.6)));
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   height: 100%;
   padding: 12px;
   overflow: hidden;
@@ -3375,7 +3379,7 @@
  * chrome, and has to read against the same dark floor whatever the theme. */
 .fdry-hall-frame {
   position: relative;
-  width: min(100%, calc((100vh - 120px) * var(--fdry-hall-aspect, 1.6)));
+  width: var(--fdry-hall-width);
   max-height: 100%;
   overflow: hidden;
   border-radius: var(--tm-radius-md);
@@ -3435,64 +3439,32 @@
   height: 11px;
 }
 
-/* A station's nameplate: which step, and where it stands. */
+/* A station's nameplate: which step. Where it stands is the station's lamp. */
 .fdry-plate {
   position: absolute;
-  transform: translate(-50%, calc(-100% - 10px));
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  width: max-content;
   padding: 2px 6px;
   border: 1px solid #2c3340;
   border-radius: 2px;
   background: rgba(8, 10, 14, 0.86);
   box-shadow: 0 2px 0 0 #07090d;
+  color: #e6e9ee;
   font-size: 10px;
   line-height: 1.35;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.fdry-plate__name {
+  text-align: center;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  color: #e6e9ee;
-}
-
-.fdry-plate__state {
-  flex: none;
-  padding: 0 4px;
-  border-radius: 2px;
-  font-size: 9px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #98a2b1;
-  background: #1a1f28;
-}
-
-.fdry-plate[data-state='running'] .fdry-plate__state,
-.fdry-plate[data-state='verifying'] .fdry-plate__state {
-  color: #06202a;
-  background: #72d8f2;
-}
-
-.fdry-plate[data-state='passed'] .fdry-plate__state {
-  color: #0d1a0b;
-  background: #8fe07e;
-}
-
-.fdry-plate[data-state='failed'] .fdry-plate__state,
-.fdry-plate[data-state='blocked'] .fdry-plate__state,
-.fdry-plate[data-state='gone'] .fdry-plate__state {
-  color: #fff4f1;
-  background: #c8432d;
+  pointer-events: none;
 }
 
 /* A callout rises from the station where something happened, then fades. */
 .fdry-callout {
   position: absolute;
   z-index: var(--tm-layer-panel);
-  transform: translate(-50%, calc(-100% - 30px - var(--fdry-stack, 0) * 24px));
+  transform: translate(-50%, calc(-100% - var(--fdry-lift, 30px)));
   padding: 3px 8px;
   border-radius: 2px;
   box-shadow:
@@ -3504,6 +3476,14 @@
   white-space: nowrap;
   pointer-events: none;
   animation: fdry-callout-rise 5s ease-out forwards;
+}
+
+/* The tail hangs outside the box, so the text clips on its own span. */
+.fdry-callout__text {
+  display: block;
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fdry-callout::after {
@@ -3542,22 +3522,21 @@
   background: #e8c56a;
 }
 
+/* Rises into its level, then holds still: a callout that kept drifting up
+ * would climb into the one stacked above it. */
 @keyframes fdry-callout-rise {
   0% {
     opacity: 0;
-    transform: translate(-50%, calc(-100% - 18px - var(--fdry-stack, 0) * 24px));
+    transform: translate(-50%, calc(-100% - var(--fdry-lift, 30px) + 12px));
   }
-  8% {
+  8%,
+  80% {
     opacity: 1;
-    transform: translate(-50%, calc(-100% - 30px - var(--fdry-stack, 0) * 24px));
-  }
-  75% {
-    opacity: 1;
-    transform: translate(-50%, calc(-100% - 40px - var(--fdry-stack, 0) * 24px));
+    transform: translate(-50%, calc(-100% - var(--fdry-lift, 30px)));
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, calc(-100% - 50px - var(--fdry-stack, 0) * 24px));
+    transform: translate(-50%, calc(-100% - var(--fdry-lift, 30px)));
   }
 }
 
@@ -3666,22 +3645,16 @@
   height: 12px;
 }
 
-/* The order's own status, on the hall's top edge. */
+/* The order's own status, in a bar above the hall so it never covers a station. */
 .fdry-hall-hud {
-  position: absolute;
-  z-index: var(--tm-layer-modal);
-  top: 8px;
-  left: 8px;
-  right: 8px;
+  flex: none;
+  width: var(--fdry-hall-width);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  pointer-events: none;
-}
-
-.fdry-hall-hud > * {
-  pointer-events: auto;
+  font-family: var(--tm-font-mono);
+  color: #e6e9ee;
 }
 
 .fdry-hall-hud__order {
