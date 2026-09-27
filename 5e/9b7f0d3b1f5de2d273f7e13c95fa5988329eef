@@ -1,0 +1,24 @@
+docs/research/foundry-red-team-loop.md
+  s_541ac35f18f1af::t_742ca97862fe88 1-27,35-64,66-69,71-74,76-99,101-108,110-156,163-167,169-176
+  s_541ac35f18f1af::t_b32be6cae83d3f 28-34,65,70,75,100,109,157-162,168
+docs/ARCHITECTURE.md
+  s_541ac35f18f1af::t_b32be6cae83d3f 966,1026-1047,1105-1106
+docs/adr/069-the-red-team-argues-before-agreement.md
+  s_541ac35f18f1af::t_c25d2adcd1eade 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5e9b7f0d3b1f5de2d273f7e13c95fa5988329eef",
+  "prompts": {},
+  "sessions": {
+    "s_541ac35f18f1af": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c7d94eb-e3b3-4bb9-88a5-8f50c142a463",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
