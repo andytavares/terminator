@@ -1,0 +1,53 @@
+extensions/foundry/src/components/Forge.tsx
+  s_541ac35f18f1af::t_5cebfcab2caecc 4
+  s_541ac35f18f1af::t_dc23a3fd524698 739-746,750,764-769,784-878,880-881,883-892,894
+  s_541ac35f18f1af::t_64bcd23949549d 326-331
+  s_541ac35f18f1af::t_b37faebaf0bd1b 607-610,612-615
+  s_541ac35f18f1af::t_f6eb7d9f6b9538 180-188,190-191,194-199,202-228
+  s_541ac35f18f1af::t_a5a9afe7507815 500-544
+  s_541ac35f18f1af::t_e95efcf498c193 771-774
+  s_541ac35f18f1af::t_c773898c7ce6f9 882
+  s_541ac35f18f1af::t_3fffa23a924db9 893
+  s_541ac35f18f1af::t_7322ba13556f74 1200-1202,1205-1213,1215-1234
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_541ac35f18f1af::t_4774267044ff3a 1386-1390,1414
+  s_541ac35f18f1af::t_7c92cb46de0b65 562-565,573,584,595,597-598,604-606,608,610,612-613,616-624,626,631,640,642,644-645,648-656,660-662,669,676,679-683,688,690,694-776,778-784,786-794,796,798,800-808,811-816,820,824-846,850-851,861-886
+  s_541ac35f18f1af::t_10066f6f25c64a 817-819,821-823,856-860,1410-1413
+  s_541ac35f18f1af::t_19866fa6413399 614,646,678,693,795
+  s_541ac35f18f1af::t_0c4ed9bf3c827f 847-849,852-855
+extensions/foundry/tests/components/needs-you.spec.tsx
+  s_541ac35f18f1af::t_91cff0f6da659c 2
+  s_541ac35f18f1af::t_f5bd895cfa5c37 121-180,183
+  s_541ac35f18f1af::t_b7169f2e5b7afa 82,85
+  s_541ac35f18f1af::t_86b6c51cf6e0a4 181-182,184-185
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_541ac35f18f1af::t_c3be264975a480 919-1052
+extensions/foundry/src/ipc/forge-channels.ts
+  s_541ac35f18f1af::t_e95efcf498c193 512-515,559-561,569-571
+  s_541ac35f18f1af::t_a4c467ec7988b1 50-70
+  s_541ac35f18f1af::t_88349f24955d54 430,432-434,436,445,449,452,459,465,469,482,486-511,516-558,562-568,572-600
+  s_541ac35f18f1af::t_3ee1f2b5665bcd 103-107
+  s_541ac35f18f1af::t_6bd07bcb1891bf 601
+extensions/foundry/src/components/foundry.css
+  s_541ac35f18f1af::t_820509dc5fd1ec 1783-1812
+  s_541ac35f18f1af::t_c3b7225bcad15b 707-750
+  s_541ac35f18f1af::t_f073f87d4f5fd0 1813
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_541ac35f18f1af::t_4aad3622f30e0a 148-152,531-538
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "48658fd9d0990d6d5c117bd11debcea8e56f75db",
+  "prompts": {},
+  "sessions": {
+    "s_541ac35f18f1af": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c7d94eb-e3b3-4bb9-88a5-8f50c142a463",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
