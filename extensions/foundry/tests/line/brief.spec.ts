@@ -121,6 +121,53 @@ describe('what each role may read is declared, not assumed', () => {
     expect(text).toContain('an expired token is refused')
   })
 
+  it('tells a builder about an open non-blocking finding, and to leave it if it is not theirs', () => {
+    const text = brief({
+      order: order({
+        redTeam: [
+          {
+            id: 'RT-1',
+            severity: 'low',
+            category: 'process',
+            text: 'No ADR for this change.\n\n- see CLAUDE.md',
+            status: 'open',
+            reason: '',
+            round: 0,
+          },
+        ],
+      }),
+      role: role(),
+      units: [unit()],
+      rules: [],
+    })
+    expect(text).toContain('## Notes from review')
+    expect(text).toContain('RT-1')
+    expect(text).toContain('No ADR for this change.')
+    expect(text).not.toContain('see CLAUDE.md')
+  })
+
+  it('says nothing about a blocking finding — that never reaches a builder', () => {
+    const text = brief({
+      order: order({
+        redTeam: [
+          {
+            id: 'RT-1',
+            severity: 'high',
+            category: 'wrong-outcome',
+            text: 'The outcome is not actually satisfied.',
+            status: 'open',
+            reason: '',
+            round: 0,
+          },
+        ],
+      }),
+      role: role(),
+      units: [unit()],
+      rules: [],
+    })
+    expect(text).not.toContain('## Notes from review')
+  })
+
   // A fan-out `by lane` gives one agent a whole lane. The plan's detail is
   // the point of keeping units at all, so the brief lists every one of them,
   // in the order the graph resolved — not a summary and not just the first.

@@ -916,6 +916,140 @@ describe('foundry:order.converge — the half that was missing', () => {
   })
 })
 
+// The batch that replaces seven serial turns: an answer and an accept change
+// the order directly and need no turn; a fix or an ask is folded into the one
+// turn `converge` starts once, naming every finding it carries.
+describe('foundry:order.converge — settling everything in one submit', () => {
+  async function withQuestionsAndFindings(): Promise<WorkOrder> {
+    const seed = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    const withExtras: WorkOrder = {
+      ...seed.order,
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'which token?',
+          why: '',
+          options: ['a', 'b'],
+          recommended: 0,
+          answer: null,
+          rank: 1,
+        },
+        {
+          id: 'Q-2',
+          text: 'which clock?',
+          why: '',
+          options: ['server', 'client'],
+          recommended: 0,
+          answer: null,
+          rank: 1,
+        },
+      ],
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'high',
+          category: 'wrong-outcome',
+          text: 'finding one is wrong',
+          status: 'open',
+          reason: '',
+          round: 0,
+        },
+        {
+          id: 'RT-2',
+          severity: 'high',
+          category: 'regression',
+          text: 'finding two breaks something',
+          status: 'open',
+          reason: '',
+          round: 0,
+        },
+      ],
+    }
+    await store.save(withExtras)
+    return withExtras
+  }
+
+  it('applies every answer and every accept, with no architect turn', async () => {
+    const order = await withQuestionsAndFindings()
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
+    const c = createForgeChannels({ store, now: () => NOW, converge })
+
+    const r = (await c.converge({
+      id: order.id,
+      settle: {
+        answers: [
+          { questionId: 'Q-1', option: 1 },
+          { questionId: 'Q-2', option: 0 },
+        ],
+        accepts: [{ findingId: 'RT-2', reason: 'priced in' }],
+      },
+    })) as OrderView
+
+    expect(converge).not.toHaveBeenCalled()
+    expect(r.order.openQuestions[0].answer).toBe('b')
+    expect(r.order.openQuestions[1].answer).toBe('server')
+    expect(r.order.redTeam.find((f) => f.id === 'RT-2')).toMatchObject({
+      status: 'accepted',
+      reason: 'priced in',
+    })
+
+    const saved = await store.load(order.id)
+    expect(saved?.openQuestions[0].answer).toBe('b')
+    expect(saved?.redTeam.find((f) => f.id === 'RT-2')?.status).toBe('accepted')
+
+    const ledger = fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')
+    expect(ledger).toContain('question.answered')
+    expect(ledger).toContain('finding.accepted')
+  })
+
+  it('folds every fix and ask into exactly one converge call naming every finding', async () => {
+    const order = await withQuestionsAndFindings()
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
+    const c = createForgeChannels({ store, now: () => NOW, converge })
+
+    await c.converge({
+      id: order.id,
+      settle: {
+        asks: ['RT-1'],
+        fixes: [{ findingId: 'RT-2', how: 'do it this way' }],
+      },
+    })
+
+    expect(converge).toHaveBeenCalledTimes(1)
+    const [, message] = converge.mock.calls[0] as [WorkOrder, string]
+    expect(message).toContain('RT-1')
+    expect(message).toContain('finding one is wrong')
+    expect(message).toContain('RT-2')
+    expect(message).toContain('finding two breaks something')
+    expect(message).toContain('do it this way')
+    expect(message).toContain('resolveFindings')
+  })
+
+  it('refuses the whole settle on a blank accept reason, applying nothing', async () => {
+    const order = await withQuestionsAndFindings()
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
+    const c = createForgeChannels({ store, now: () => NOW, converge })
+
+    const r = (await c.converge({
+      id: order.id,
+      settle: {
+        answers: [{ questionId: 'Q-1', option: 1 }],
+        accepts: [{ findingId: 'RT-2', reason: '   ' }],
+      },
+    })) as OrderView & { error: string }
+
+    expect(r.error).toMatch(/costs a written reason/)
+    expect(converge).not.toHaveBeenCalled()
+
+    const saved = await store.load(order.id)
+    expect(saved?.openQuestions[0].answer).toBeNull()
+    expect(saved?.redTeam.find((f) => f.id === 'RT-2')?.status).toBe('open')
+  })
+})
+
 describe('free text reaches the architect', () => {
   it('goes to intake rather than nowhere', async () => {
     const seed = (await channels().create({

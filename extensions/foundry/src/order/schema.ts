@@ -213,6 +213,44 @@ const OpenQuestionSchema = z.object({
   confidence: z.number().min(0).max(1).nullable().default(null),
 })
 
+/**
+ * What a red-team finding is about.
+ *
+ * Only the first three block a hand-off: a finding blocks when the order's
+ * criteria could pass while the ticket's outcome is false, when the change
+ * breaks something that works today, or when no criterion can actually be
+ * checked. `process`, `pre-existing`, `infra` and `scope` findings are notes
+ * — real, but not a reason to stop the run.
+ *
+ * Exported for the same reason as RISK_TRIGGERS and EVIDENCE_KINDS: an enum
+ * the red team is never shown is one it writes prose into instead.
+ */
+export const RED_TEAM_CATEGORIES = [
+  'wrong-outcome',
+  'regression',
+  'unprovable',
+  'scope',
+  'process',
+  'pre-existing',
+  'infra',
+] as const
+
+export type RedTeamCategory = (typeof RED_TEAM_CATEGORIES)[number]
+
+/** The categories that stop a hand-off. Everything else is a note. */
+export const BLOCKING_CATEGORIES: readonly RedTeamCategory[] = RED_TEAM_CATEGORIES.slice(0, 3)
+
+/**
+ * Whether a finding blocks, derived from its category.
+ *
+ * Never stored on the finding itself — a field an agent could set would be a
+ * second, disagreeing answer to the same question its category already
+ * answers.
+ */
+export function isBlocking(finding: { readonly category: RedTeamCategory }): boolean {
+  return (BLOCKING_CATEGORIES as readonly string[]).includes(finding.category)
+}
+
 const RedTeamFindingSchema = z
   .object({
     id: nonEmpty,
@@ -220,6 +258,10 @@ const RedTeamFindingSchema = z
     text: z.string(),
     status: z.enum(['open', 'resolved', 'accepted']).default('open'),
     reason: z.string().default(''),
+    // Defaults to the strictest category so an order written before this
+    // field existed keeps blocking exactly as it always did.
+    category: z.enum(RED_TEAM_CATEGORIES).default('wrong-outcome'),
+    round: z.number().int().min(0).default(0),
   })
   .refine((f) => f.status !== 'accepted' || f.reason.trim() !== '', {
     message: 'An accepted red-team finding must carry the reason it was accepted.',

@@ -48,7 +48,15 @@ export interface Dismissal {
   readonly confidence: number
 }
 
-/** Accept the low and medium findings the architect is sure do not apply. High ones stay open. */
+/**
+ * Accept any finding the architect is at least this sure does not apply,
+ * whatever its severity.
+ *
+ * The bar moved into `category` (spec: the red-team loop): a finding that
+ * blocks does so because of what it is about, not how loudly it is raised, so
+ * severity alone is no longer a reason to keep it out of the architect's
+ * reach.
+ */
 export function dismissConfidentFindings(
   order: WorkOrder,
   dismissals: readonly Dismissal[]
@@ -61,7 +69,6 @@ export function dismissConfidentFindings(
       if (
         dismissal === undefined ||
         finding.status !== 'open' ||
-        finding.severity === 'high' ||
         dismissal.confidence < CONFIDENCE_BAR ||
         dismissal.reason.trim() === ''
       ) {

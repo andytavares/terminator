@@ -136,11 +136,18 @@ describe('dismissConfidentFindings', () => {
     })
   })
 
-  it('never dismisses a high-severity finding — that one is the operator’s', () => {
+  it('dismisses a high-severity finding too, once the architect is sure and says why', () => {
     const next = dismissConfidentFindings(order({ redTeam: findings }), [
-      { id: 'RT-no-runnable-check', reason: 'r', confidence: 0.99 },
+      {
+        id: 'RT-no-runnable-check',
+        reason: 'this repo has no toolchain by design',
+        confidence: 0.99,
+      },
     ])
-    expect(next.redTeam[2].status).toBe('open')
+    expect(next.redTeam[2]).toMatchObject({
+      status: 'accepted',
+      reason: 'architect, 99% confident: this repo has no toolchain by design',
+    })
   })
 
   it('leaves one dismissed below the bar, or with no reason, open', () => {

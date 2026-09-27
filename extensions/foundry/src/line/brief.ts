@@ -1,5 +1,6 @@
 import { renderOrder } from '../order/render.js'
 import { collectableWrites, rungOutputContract } from './rung-output.js'
+import { isBlocking } from '../order/schema.js'
 import type { PlanUnit, WorkOrder } from '../order/schema.js'
 import type { Role } from '../recipe/parse.js'
 import type { Rule } from '../recipe/parse.js'
@@ -178,6 +179,42 @@ function rulesSection(rules: readonly Rule[]): string[] {
 }
 
 /**
+ * The claim in a finding's text, without its evidence.
+ *
+ * Mirrors `findingParts` in `Forge.tsx` and `findingHeadline` in
+ * `order/render.ts` — the same rule in three places because none of them may
+ * import from either of the other two.
+ */
+function findingHeadline(text: string): string {
+  const trimmed = text.trim()
+  const newline = trimmed.indexOf('\n')
+  if (newline !== -1) return trimmed.slice(0, newline).trim()
+  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
+  return sentence === null ? trimmed : sentence[1]
+}
+
+/**
+ * What earlier review rounds noted but did not block on, for a builder whose
+ * unit might be the place to act on one.
+ *
+ * Handed to the builder as a courtesy, not an instruction: a note outside its
+ * unit's `touches` is somebody else's to pick up, and the builder is told so
+ * rather than left to guess why it was shown one it cannot act on.
+ */
+function notesSection(order: WorkOrder): string[] {
+  const notes = order.redTeam.filter((f) => f.status === 'open' && !isBlocking(f))
+  if (notes.length === 0) return []
+  return [
+    '## Notes from review',
+    '',
+    'Handle one of these only if it falls inside your unit’s `touches` above.',
+    'Otherwise it is not yours — leave it.',
+    '',
+    ...notes.map((f) => `- **${f.id}** ${findingHeadline(f.text)}`),
+  ]
+}
+
+/**
  * The whole message an agent is launched with.
  *
  * The role's own prompt comes first because it is the instruction; everything
@@ -227,7 +264,10 @@ export function brief(input: BriefInput): string {
     )
   }
 
-  if (reads.has('unit') && units.length > 0) sections.push('', ...unitSection(order, units))
+  if (reads.has('unit') && units.length > 0) {
+    sections.push('', ...unitSection(order, units))
+    sections.push('', ...notesSection(order))
+  }
 
   // A role that reads criteria but not units gets all of them — that is the
   // verifier, which is handed the change and the criteria and nothing about

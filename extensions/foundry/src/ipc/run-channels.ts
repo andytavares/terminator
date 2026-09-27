@@ -619,6 +619,13 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     if (order.status !== 'running') {
       return { error: `Only a running order can be resumed; this one is ${order.status}.` }
     }
+    // An executor already going for this order needs no second one — the
+    // scheduler it is already inside offers the same nodes this call would.
+    // Starting another produced `run.halted: waiting on a gate` three times
+    // in 23 seconds on WO-0927-4fd.
+    if (deps.executing?.(order.id) === true) {
+      return { error: 'This run is already going; nothing to resume.' }
+    }
 
     const graph = await loadGraph(parsed.data.id)
     if (graph === null) return { error: `No run for ${parsed.data.id}.` }
@@ -631,8 +638,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     // first. Without this the scheduler has nothing to offer — it offers only
     // `waiting` and `ready` — so a resumed run started nothing and said
     // nothing, which reads exactly like a run that had finished.
-    const taken =
-      deps.executing?.(order.id) === true ? { graph, reclaimed: [] } : reclaim(graph, isLive)
+    const taken = reclaim(graph, isLive)
     if (taken.reclaimed.length > 0) {
       await deps.store.record({
         at: deps.now(),

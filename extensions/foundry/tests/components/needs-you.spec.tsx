@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { Forge } from '../../src/components/Forge.js'
 import { Floor } from '../../src/components/Floor.js'
@@ -79,10 +79,10 @@ function mountForge(questions: OpenQuestion[]) {
 beforeEach(() => vi.clearAllMocks())
 
 describe('the Forge puts its open questions above everything else', () => {
-  it('renders them, with the count in the heading', async () => {
+  it('renders them, with how many of them are decided in the heading', async () => {
     const { container } = mountForge(QUESTIONS)
     await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
-    expect(screen.getByText(/Needs you — 2/)).toBeTruthy()
+    expect(screen.getByText(/Needs you — 0 of 2 decided/)).toBeTruthy()
     expect(screen.getByText(QUESTIONS[0].text)).toBeTruthy()
   })
 
@@ -113,6 +113,71 @@ describe('the Forge puts its open questions above everything else', () => {
 
   it('takes no room at all when nothing is being asked', async () => {
     const { container } = mountForge([])
+    await waitFor(() => expect(container.querySelector('.fdry-wizard')).not.toBeNull())
+    expect(container.querySelector('.fdry-needs-you')).toBeNull()
+  })
+})
+
+// The band now also holds every open blocking red-team finding — the other
+// half of what a run of TAV-15 could not settle in one submit. A finding that
+// does not make the change wrong (`process`, `pre-existing`, `infra`, `scope`)
+// is a note the builder sees, never a reason to interrupt the operator.
+
+function mountForgeWithOrder(over: Partial<WorkOrder>) {
+  const current = order(over)
+  const invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.compile') {
+      return { order: current, compile: compileOrder(current) }
+    }
+    if (channel === 'foundry:run.recipes') {
+      return {
+        recipes: [{ name: 'standard', available: true, unmet: [], rung: 'built-in' }],
+        proposed: 'standard',
+      }
+    }
+    return {}
+  })
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+  }
+  return render(<Forge orderId="WO-1" />)
+}
+
+describe('the band also holds open findings, but only the ones that block', () => {
+  it('puts a blocking finding in the band, with a way to decide it', async () => {
+    const { container } = mountForgeWithOrder({
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'high',
+          category: 'wrong-outcome',
+          text: 'the change would leave the outcome false',
+          status: 'open',
+          reason: '',
+          round: 0,
+        },
+      ],
+    })
+    await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
+    const band = container.querySelector('.fdry-needs-you') as HTMLElement
+    expect(within(band).getByText('the change would leave the outcome false')).toBeTruthy()
+    expect(within(band).getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
+  })
+
+  it('leaves a non-blocking finding out of the band entirely', async () => {
+    const { container } = mountForgeWithOrder({
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'low',
+          category: 'process',
+          text: 'the plan is fully serial',
+          status: 'open',
+          reason: '',
+          round: 0,
+        },
+      ],
+    })
     await waitFor(() => expect(container.querySelector('.fdry-wizard')).not.toBeNull())
     expect(container.querySelector('.fdry-needs-you')).toBeNull()
   })

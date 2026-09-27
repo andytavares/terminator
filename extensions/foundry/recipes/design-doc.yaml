@@ -11,17 +11,15 @@ steps:
     kind: agent
     role: scout
 
-  # Attack the order, not the document: a criterion nobody could falsify or a
-  # scope the intent never asked for is cheaper to catch before the writing.
-  - id: challenge
-    kind: agent
-    role: red-team
-    after: [scout]
-
+  # No `challenge` step: the red team attacks the order inside the Forge,
+  # before agreement, so a criterion nobody could falsify or a scope the
+  # intent never asked for is caught before the writing rather than after —
+  # and with a fixed point instead of one re-run per finding. See
+  # docs/research/foundry-red-team-loop.md ("Design → Line").
   - id: write
     kind: agent
     role: author
-    after: [challenge]
+    after: [scout]
 
   - id: verify
     kind: agent

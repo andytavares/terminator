@@ -2,7 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { z } from 'zod'
 import { amendOrder } from '../order/amend.js'
-import { WorkOrderSchema } from '../order/schema.js'
+import { RED_TEAM_CATEGORIES, WorkOrderSchema, isBlocking } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role } from '../recipe/parse.js'
 
@@ -61,11 +61,20 @@ const FindingsSchema = z
  * No `id` and no `status`: the id is assigned here so a second turn cannot
  * overwrite the first turn's finding by reusing its name, and a reader that
  * could set `status: "resolved"` could close what it just raised.
+ *
+ * `category` is required, not defaulted: the bar an agent doesn't have to
+ * name is a bar it doesn't have to think about. `reopens` names a settled
+ * finding this one contests; `newEvidence` is the answer to the reason it was
+ * settled with, and is what makes a reopen anything other than the same
+ * finding raised twice.
  */
 const AgentFindingSchema = z
   .object({
     severity: z.enum(['low', 'medium', 'high']).default('medium'),
+    category: z.enum(RED_TEAM_CATEGORIES),
     text: z.string().min(1),
+    reopens: z.string().min(1).optional(),
+    newEvidence: z.string().optional(),
   })
   .strict()
 
@@ -139,7 +148,10 @@ const EXAMPLE: Record<Collectable, string[]> = {
     '  "redTeam": [',
     '    {',
     '      "severity": "low | medium | high",',
-    '      "text": "first line: what is wrong, in one sentence\\n\\n- the evidence, with file:line\\n- why it matters"',
+    `      "category": "${RED_TEAM_CATEGORIES.join(' | ')}",`,
+    '      "text": "first line: what is wrong, in one sentence\\n\\n- the evidence, with file:line\\n- why it matters",',
+    '      "reopens": "RT-… (only to contest a settled finding)",',
+    '      "newEvidence": "what the earlier reason did not answer (required with reopens)"',
     '    }',
     '  ],',
   ],
@@ -174,6 +186,18 @@ const EXAMPLE: Record<Collectable, string[]> = {
   ],
 }
 
+/** The bar a finding is held to, shown wherever a role may raise one. */
+const FINDING_BAR = [
+  '',
+  'A finding blocks only when it is `wrong-outcome`, `regression` or',
+  '`unprovable`: the order’s criteria could pass while the ticket’s outcome is',
+  'false, the change breaks something that works today, or no criterion can',
+  'actually be checked. Docs, ADRs, naming and coverage are `process`. A bug',
+  'that already exists is `pre-existing`. A missing tool or permission in this',
+  'environment is `infra`. Work the ask never mentioned is `scope`. None of',
+  'those four stop the run.',
+]
+
 /** What a rung whose plan cannot be applied is told, so it does not retry. */
 const REPORTED_NOT_APPLIED = [
   '',
@@ -195,6 +219,7 @@ export function rungOutputContract(file: string, writes: readonly Collectable[])
 
   const body = writes.flatMap((artefact) => EXAMPLE[artefact])
   const reported = writes.some((w) => w === 'plan' || w === 'acceptance')
+  const findsThings = writes.includes('findings')
 
   return [
     '',
@@ -221,6 +246,7 @@ export function rungOutputContract(file: string, writes: readonly Collectable[])
     '}',
     '```',
     ...(reported ? REPORTED_NOT_APPLIED : []),
+    ...(findsThings ? FINDING_BAR : []),
   ].join('\n')
 }
 
@@ -253,6 +279,8 @@ export interface ApplyRungInput {
   readonly output: RungOutput
   readonly writes: readonly Collectable[]
   readonly at: string
+  /** Which review round this is. Stamped onto every fresh finding. Defaults to 0. */
+  readonly round?: number
 }
 
 export interface AppliedRungOutput {
@@ -275,6 +303,41 @@ function normalise(text: string): string {
 }
 
 /**
+ * The claim in a finding's text, without its evidence.
+ *
+ * Mirrors `findingParts` in `Forge.tsx` exactly, and `findingHeadline` in
+ * `order/render.ts` — the same rule in three places because none of them may
+ * import from either of the other two.
+ */
+function findingHeadline(text: string): string {
+  const trimmed = text.trim()
+  const newline = trimmed.indexOf('\n')
+  if (newline !== -1) return trimmed.slice(0, newline).trim()
+  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
+  return sentence === null ? trimmed : sentence[1]
+}
+
+function headlineTokens(text: string): Set<string> {
+  return new Set(
+    findingHeadline(text)
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 0)
+  )
+}
+
+/** Two empty sets are not "the same claim" — there is no claim to compare. */
+function jaccard(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+  if (a.size === 0 || b.size === 0) return 0
+  let intersection = 0
+  for (const token of a) if (b.has(token)) intersection++
+  return intersection / (a.size + b.size - intersection)
+}
+
+/** At or above this, two findings are the same claim in different words. */
+const DUPLICATE_BAR = 0.6
+
+/**
  * Put a rung's output on the order.
  *
  * Three destinations and three different bindings, which is the whole reason
@@ -283,15 +346,18 @@ function normalise(text: string): string {
  *   - **context** is a finding about the repository. It informs; it does not
  *     contradict. The order stays agreed, because sending it back to draft
  *     would stop builders already working from it over a note about naming.
- *   - **findings** are exactly as binding as the six compile checks, so they
- *     take the amendment path like every other change to an agreed order —
- *     the same rule `applyFindings` follows for the structural half.
+ *   - **findings** that block — `wrong-outcome`, `regression`, `unprovable` —
+ *     take the amendment path like every other change to an agreed order, the
+ *     same rule `applyFindings` follows for the structural half. A finding
+ *     that only notes something is appended without amending: there is
+ *     nothing here for a run already building from the order to be stopped
+ *     for.
  *   - **plan** and **acceptance** are *reported*. The graph was compiled from
  *     the agreed plan before this rung ran, so applying a new one would orphan
  *     every node already in flight. It becomes a question instead.
  */
 export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): AppliedRungOutput {
-  const { output, role, at } = input
+  const { output, role, at, round = 0 } = input
   const note = output.note.trim()
   let next = order
 
@@ -307,32 +373,75 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
     }
   }
 
-  const raised: string[] = []
+  // What forces the order back to draft, named for the defect message.
+  const blockingReasons: string[] = []
+  // True only when a red-team finding is the reason — a disputed plan or
+  // acceptance list is reported as a question and never amends the order.
+  let redTeamBlocked = false
+  // Findings that landed but changed nothing an operator has to act on.
+  let notesAdded = 0
+
   if (output.redTeam !== undefined && output.redTeam.length > 0) {
-    const seen = new Set(next.redTeam.map((f) => normalise(f.text)))
+    let redTeam = next.redTeam
+    const seenText = new Set(redTeam.map((f) => normalise(f.text)))
+    const seenHeadlines = redTeam.map((f) => headlineTokens(f.text))
     const fresh: WorkOrder['redTeam'] = []
+
     for (const finding of output.redTeam) {
-      if (seen.has(normalise(finding.text))) continue
-      seen.add(normalise(finding.text))
+      if (finding.reopens !== undefined) {
+        const target = redTeam.find((f) => f.id === finding.reopens && f.status !== 'open')
+        const evidence = (finding.newEvidence ?? '').trim()
+        // Dropped, not raised: a reopen with nothing the earlier reason did
+        // not already answer is the same finding a second time.
+        if (target === undefined || evidence === '') continue
+
+        redTeam = redTeam.map((f) =>
+          f.id === target.id
+            ? { ...f, status: 'open' as const, text: `${f.text}\n\n${evidence}` }
+            : f
+        )
+        if (isBlocking(target)) {
+          blockingReasons.push(`${target.id} reopened — ${evidence}`)
+          redTeamBlocked = true
+        } else {
+          notesAdded += 1
+        }
+        continue
+      }
+
+      if (seenText.has(normalise(finding.text))) continue
+
+      const headline = headlineTokens(finding.text)
+      const isDuplicate =
+        seenHeadlines.some((h) => jaccard(h, headline) >= DUPLICATE_BAR) ||
+        fresh.some((f) => jaccard(headlineTokens(f.text), headline) >= DUPLICATE_BAR)
+      if (isDuplicate) continue
+
+      seenText.add(normalise(finding.text))
       fresh.push({
         // Numbered from what is already there rather than from this batch, so
         // a second turn's first finding is not the first turn's first finding
         // under a new name.
-        id: `RT-${role}-${next.redTeam.length + fresh.length + 1}`,
+        id: `RT-${role}-${redTeam.length + fresh.length + 1}`,
         severity: finding.severity,
+        category: finding.category,
         text: finding.text,
         status: 'open',
         reason: '',
+        round,
       })
     }
-    if (fresh.length > 0) {
-      next = amendOrder(next, {
-        at,
-        reason: `${role} raised ${fresh.map((f) => f.id).join(', ')}`,
-        change: (o) => ({ ...o, redTeam: [...o.redTeam, ...fresh] }),
-      })
-      raised.push(
-        `${fresh.map((f) => f.id).join(', ')} — ${fresh.map((f) => f.text.trim()).join(' ')}`
+
+    if (fresh.length > 0 || redTeam !== next.redTeam) {
+      next = { ...next, redTeam: [...redTeam, ...fresh] }
+    }
+
+    const blockingFresh = fresh.filter(isBlocking)
+    notesAdded += fresh.length - blockingFresh.length
+    if (blockingFresh.length > 0) {
+      redTeamBlocked = true
+      blockingReasons.push(
+        `${blockingFresh.map((f) => f.id).join(', ')} — ${blockingFresh.map((f) => f.text.trim()).join(' ')}`
       )
     }
   }
@@ -341,15 +450,19 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
     (artefact) => output[artefact] !== undefined
   )
   if (contested.length > 0) {
-    raised.push(
+    blockingReasons.push(
       `it would rewrite the ${contested.join(' and ')} of an order this run is already building from`
     )
   }
 
-  if (raised.length === 0) {
+  if (blockingReasons.length === 0) {
+    const finalNote =
+      note === '' && notesAdded > 0
+        ? `${notesAdded} non-blocking note${notesAdded === 1 ? '' : 's'}`
+        : note
     return {
       order: next === order ? order : WorkOrderSchema.parse(next),
-      note,
+      note: finalNote,
       defect: null,
     }
   }
@@ -359,9 +472,13 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
   // it. At intake a finding is refused by the compile gate; on the Line there
   // is no compile gate, so a finding that raised nothing would revert the
   // order to draft under a run that carried on regardless.
-  const defect = `The ${role} says this order is wrong: ${raised.join('; ')}${
+  const defect = `The ${role} says this order is wrong: ${blockingReasons.join('; ')}${
     note === '' ? '.' : `. ${note}`
   }`
+
+  if (redTeamBlocked) {
+    next = amendOrder(next, { at, reason: `${role}: ${defect}` })
+  }
 
   return {
     order: WorkOrderSchema.parse({
@@ -404,6 +521,8 @@ export function readRungOutput(input: {
   readonly writes: readonly Collectable[]
   readonly outputPath: string
   readonly at: string
+  /** Which review round this is. Stamped onto every fresh finding. Defaults to 0. */
+  readonly round?: number
 }): CollectResult | null {
   let raw: string
   try {
@@ -419,6 +538,7 @@ export function readRungOutput(input: {
       output,
       writes: input.writes,
       at: input.at,
+      round: input.round,
     })
     return { ok: true, ...applied }
   } catch (error) {

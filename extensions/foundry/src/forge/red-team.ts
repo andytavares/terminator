@@ -1,6 +1,7 @@
 import { CHECK_NAMES } from '../verify/toolchain-probe.js'
 import { amendOrder } from '../order/amend.js'
-import type { WorkOrder } from '../order/schema.js'
+import { isBlocking } from '../order/schema.js'
+import type { RedTeamCategory, WorkOrder } from '../order/schema.js'
 
 // The adversarial pass.
 //
@@ -15,6 +16,7 @@ import type { WorkOrder } from '../order/schema.js'
 export interface Finding {
   readonly rule: string
   readonly severity: 'low' | 'medium' | 'high'
+  readonly category: RedTeamCategory
   readonly text: string
   readonly subjectIds: readonly string[]
 }
@@ -39,6 +41,7 @@ export function structuralFindings(order: WorkOrder): Finding[] {
   ) {
     findings.push({
       rule: 'outcome-restates-problem',
+      category: 'unprovable',
       severity: 'medium',
       text: 'The outcome repeats the problem back. Say what will be observably different, not that the problem will be gone.',
       subjectIds: [order.id],
@@ -48,6 +51,7 @@ export function structuralFindings(order: WorkOrder): Finding[] {
   if (order.intent.nonGoals.length === 0) {
     findings.push({
       rule: 'no-non-goals',
+      category: 'scope',
       severity: 'low',
       text: 'The order excludes nothing. An order with no boundary is one an agent can widen without contradicting it.',
       subjectIds: [order.id],
@@ -58,6 +62,7 @@ export function structuralFindings(order: WorkOrder): Finding[] {
   if (vague.length > 0) {
     findings.push({
       rule: 'unfalsifiable-statement',
+      category: 'unprovable',
       severity: 'high',
       text: 'A criterion promises an improvement without saying how anyone would know. Give it a statement that can be false.',
       subjectIds: vague.map((c) => c.id),
@@ -72,6 +77,7 @@ export function structuralFindings(order: WorkOrder): Finding[] {
   if (judgedP0.length > 0) {
     findings.push({
       rule: 'p0-judged-not-run',
+      category: 'unprovable',
       severity: 'high',
       text: 'The highest-priority criterion is proved only by judgement. Give it something with an exit status as well.',
       subjectIds: judgedP0.map((c) => c.id),
@@ -82,6 +88,7 @@ export function structuralFindings(order: WorkOrder): Finding[] {
   if (touchless.length > 0) {
     findings.push({
       rule: 'unit-touches-nothing',
+      category: 'process',
       severity: 'medium',
       text: 'A unit declares no files. Nothing can predict its collisions, and the risk grade cannot see it.',
       subjectIds: touchless.map((u) => u.id),
@@ -95,6 +102,7 @@ export function structuralFindings(order: WorkOrder): Finding[] {
     if (independent.length === 1) {
       findings.push({
         rule: 'fully-serial-plan',
+        category: 'process',
         severity: 'low',
         text: 'Every unit waits on the one before it, so nothing runs in parallel. Check the dependencies are real.',
         subjectIds: order.plan.units.map((u) => u.id),
@@ -106,6 +114,7 @@ export function structuralFindings(order: WorkOrder): Finding[] {
   if (release.length > 0) {
     findings.push({
       rule: 'touches-release-machinery',
+      category: 'regression',
       severity: 'high',
       text: 'A unit changes how the project ships, not what it does. That is rarely what the order asked for.',
       subjectIds: release.map((u) => u.id),
@@ -115,6 +124,7 @@ export function structuralFindings(order: WorkOrder): Finding[] {
   if (CHECK_NAMES.every((name) => order.context.toolchain[name] === null)) {
     findings.push({
       rule: 'no-runnable-check',
+      category: 'infra',
       severity: 'high',
       text: 'This repository has no command for any check. Nothing here can be proved by running it — decide that deliberately before starting.',
       subjectIds: [order.id],
@@ -127,30 +137,37 @@ export function structuralFindings(order: WorkOrder): Finding[] {
 /**
  * Fold this pass's findings into the order.
  *
- * An order that gains a finding goes back to draft: findings are exactly as
+ * A fresh finding that blocks sends the order back to draft: it is exactly as
  * binding as the six checks, and one raised after agreement gets no quieter
- * path for having arrived late. An order the pass finds nothing wrong with is
- * left alone — reopening it for nothing would make the pass a tax.
+ * path for having arrived late. A fresh finding that only notes something —
+ * `process`, `pre-existing`, `infra` or `scope` — is appended without
+ * amending, because there is nothing here for the operator to be stopped for.
+ * An order the pass finds nothing wrong with is left alone — reopening it for
+ * nothing would make the pass a tax.
  */
 export function applyFindings(order: WorkOrder, at: string): WorkOrder {
   const already = new Set(order.redTeam.map((f) => f.id))
   const fresh = structuralFindings(order)
-    .map((finding, index) => ({
+    .map((finding) => ({
       id: `RT-${finding.rule}`,
       severity: finding.severity,
+      category: finding.category,
       text: finding.text,
       status: 'open' as const,
       reason: '',
-      index,
+      round: 0,
     }))
     .filter((f) => !already.has(f.id))
-    .map(({ index: _index, ...f }) => f)
 
   if (fresh.length === 0) return order
 
+  if (!fresh.some(isBlocking)) {
+    return { ...order, redTeam: [...order.redTeam, ...fresh] }
+  }
+
   // Through the amendment path rather than reopening the order by hand: a
-  // finding is exactly as binding as the six checks, so it has to leave the
-  // same trace as any other change to an agreed order.
+  // blocking finding is exactly as binding as the six checks, so it has to
+  // leave the same trace as any other change to an agreed order.
   return amendOrder(order, {
     reason: `red team raised ${fresh.map((f) => f.id).join(', ')}`,
     at,
