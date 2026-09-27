@@ -7,7 +7,7 @@ import {
   mayMergeLane,
 } from '../../src/order/lanes.js'
 import { compileOrder, agreeOrder } from '../../src/order/compile.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { PlanUnit, WorkOrder } from '../../src/order/schema.js'
 
 // Lanes come from the agreed order, not from a file an agent wrote.

@@ -3,7 +3,7 @@ import { render, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Orders } from '../../src/components/Orders.js'
 import { Forge } from '../../src/components/Forge.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 
 // The shape the stylesheet frames.

@@ -7,7 +7,7 @@ import type { Recipe } from '../../src/recipe/parse.js'
 import { resolveSkill } from '../../src/recipe/resolve.js'
 import { createRoleRegistry } from '../../src/line/roles.js'
 import { brief } from '../../src/line/brief.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 
 // The built-ins ship inside the extension, so they are available in a
 // repository that contains nothing of Foundry's. They are data, which means

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { forgeSteps, openingStep } from '../../src/forge/steps.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { CheckId, CompileResult } from '../../src/order/compile.js'
 

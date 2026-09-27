@@ -6,7 +6,7 @@ import {
   reviewNext,
   shouldReview,
 } from '../../src/forge/review-loop.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder, RedTeamFinding } from '../../src/order/schema.js'
 import { resolveRole } from '../../src/recipe/resolve.js'
 import type { Role } from '../../src/recipe/parse.js'

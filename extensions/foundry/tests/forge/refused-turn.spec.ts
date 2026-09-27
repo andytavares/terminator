@@ -8,7 +8,7 @@ import { createForgeChannels } from '../../src/ipc/forge-channels.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { orderDir } from '../../src/data-root.js'
 import type { OrderStore } from '../../src/order/store.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // WO-0909-6db, from the proposal on disk to the screen that had to say so.

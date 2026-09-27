@@ -17,7 +17,7 @@ const USER_DATA = tmpdir()
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { Gate } from '../../src/gates/rules.js'

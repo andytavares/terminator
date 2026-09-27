@@ -9,7 +9,8 @@ import {
   readProposal,
   NoArchitectError,
 } from '../../src/forge/converge.js'
-import { draftOrder, EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schema.js'
+import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
 

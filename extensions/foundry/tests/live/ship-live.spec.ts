@@ -7,7 +7,7 @@ import { shipOrder, markReady } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
 

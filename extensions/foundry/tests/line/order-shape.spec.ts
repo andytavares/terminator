@@ -6,7 +6,7 @@ import { buildRunGraph } from '../../src/line/run-graph.js'
 import { proposeRecipe } from '../../src/ipc/run-channels.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // What one ask costs.

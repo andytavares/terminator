@@ -1,5 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { CHECK_NAMES, type CheckName } from './check-names.js'
 
 // What this project actually runs, discovered rather than assumed.
 //
@@ -13,10 +14,6 @@ import * as path from 'node:path'
 // find is `null`, never a guess: `null` is what makes "not measured" reachable,
 // and a check that reports a pass it did not earn is the failure mode that
 // makes an unattended factory dangerous.
-
-export const CHECK_NAMES = ['test', 'lint', 'format', 'coverage', 'e2e', 'build'] as const
-
-export type CheckName = (typeof CHECK_NAMES)[number]
 
 export type ProbeSource = 'package.json' | 'config' | 'makefile' | 'ci'
 

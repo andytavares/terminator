@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { orderMetrics, factoryMetrics } from '../../src/factory/metrics.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { OrderRecords } from '../../src/factory/metrics.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'

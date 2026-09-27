@@ -1,5 +1,5 @@
 import type { PlanUnit, WorkOrder } from '../order/schema.js'
-import { CHECK_NAMES, type CheckName } from '../verify/toolchain-probe.js'
+import { CHECK_NAMES, type CheckName } from '../verify/check-names.js'
 
 // The small language a recipe is allowed to speak.
 //

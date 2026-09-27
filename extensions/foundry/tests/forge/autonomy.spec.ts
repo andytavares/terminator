@@ -6,7 +6,7 @@ import {
   dismissConfidentFindings,
   followUpFor,
 } from '../../src/forge/autonomy.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { CompileFailure } from '../../src/order/compile.js'
 

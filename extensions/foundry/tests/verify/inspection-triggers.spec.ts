@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { inspectionFor, regrade } from '../../src/verify/inspection-triggers.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // The triggers come from the grader that already exists rather than a second

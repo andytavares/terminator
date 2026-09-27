@@ -1,4 +1,4 @@
-import { CHECK_NAMES } from '../verify/toolchain-probe.js'
+import { CHECK_NAMES } from '../verify/check-names.js'
 import { amendOrder } from '../order/amend.js'
 import { isBlocking } from '../order/schema.js'
 import type { RedTeamCategory, WorkOrder } from '../order/schema.js'

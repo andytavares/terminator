@@ -5,7 +5,7 @@ import {
   checkExpect,
   resolveCommand,
 } from '../../src/recipe/step-kinds.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // The expression surface is deliberately tiny, and the tests are here to keep

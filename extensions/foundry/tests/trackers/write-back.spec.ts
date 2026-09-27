@@ -6,7 +6,7 @@ import {
   MAX_ATTEMPTS,
 } from '../../src/trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from '../../src/trackers/write-back.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder, WriteBack } from '../../src/order/schema.js'
 
 // Three writes back to the issue that started the work, and one rule over all

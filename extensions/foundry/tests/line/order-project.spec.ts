@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { issueOf, projectRemover, workspaceFor } from '../../src/line/order-project.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { OrderSource } from '../../src/order/schema.js'
 
 // One project per order (spec 061): in the repository's own workspace, linked

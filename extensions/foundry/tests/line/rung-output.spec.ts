@@ -12,7 +12,7 @@ import {
   RungOutputRejected,
   readRungOutput,
 } from '../../src/line/rung-output.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Role } from '../../src/recipe/parse.js'
 

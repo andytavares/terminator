@@ -13,7 +13,7 @@ import {
 } from '../../src/recipe/resolve.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
 import { checkRequirements } from '../../src/recipe/requirements.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // Three rungs, most specific first. The middle one — a definition carried by

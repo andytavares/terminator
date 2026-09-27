@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { strikeAssumption, liveAssumptions } from '../../src/forge/assumptions.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // An assumption the operator cannot see is a guess. Striking one has to redraw

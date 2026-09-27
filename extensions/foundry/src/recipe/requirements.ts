@@ -2,8 +2,8 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { WorkOrder } from '../order/schema.js'
 import type { Requirement } from './parse.js'
-import { CHECK_NAMES } from '../verify/toolchain-probe.js'
-import type { CheckName } from '../verify/toolchain-probe.js'
+import { CHECK_NAMES } from '../verify/check-names.js'
+import type { CheckName } from '../verify/check-names.js'
 
 // What a recipe needs of a repository before it can be offered.
 //

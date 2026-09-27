@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { renderOrder } from '../../src/order/render.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // The rendering is a view, never the truth. It has to read well in the
