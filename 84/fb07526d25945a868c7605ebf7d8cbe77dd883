@@ -1,0 +1,42 @@
+extensions/foundry/src/ipc/run-channels.ts
+  s_541ac35f18f1af::t_4cd8c8619a904c 622-628
+  s_541ac35f18f1af::t_0602f1636caa24 641
+extensions/foundry/tests/line/order-shape.spec.ts
+  s_541ac35f18f1af::t_1725fb4e933d63 144
+extensions/foundry/recipes/standard.yaml
+  s_541ac35f18f1af::t_748c54a2e78b28 16-20,24
+extensions/foundry/src/gates/rules.ts
+  s_541ac35f18f1af::t_6f3434c4a0a37f 178-179
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_541ac35f18f1af::t_723d69b56e76cf 1-243
+extensions/foundry/tests/gates/act-decision.spec.ts
+  s_541ac35f18f1af::t_6223cf11ed4673 1-43,47-48
+  s_541ac35f18f1af::t_a40dc237025602 44-46
+extensions/foundry/recipes/design-doc.yaml
+  s_541ac35f18f1af::t_2427a5083b7e2b 14-18,22
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_541ac35f18f1af::t_d8f1fc3ef4e3cb 1207,1214,1217-1219
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_541ac35f18f1af::t_68dc6fb5151b20 215,217-218
+extensions/foundry/src/gates/act-decision.ts
+  s_541ac35f18f1af::t_a40dc237025602 11-15
+  s_541ac35f18f1af::t_4ad093d12010a3 1-10,16-30
+extensions/foundry/src/index.ts
+  s_541ac35f18f1af::t_8e7da101f4d8b2 74-81,3047-3066,3071-3072
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "84fb07526d25945a868c7605ebf7d8cbe77dd883",
+  "prompts": {},
+  "sessions": {
+    "s_541ac35f18f1af": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c7d94eb-e3b3-4bb9-88a5-8f50c142a463",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
