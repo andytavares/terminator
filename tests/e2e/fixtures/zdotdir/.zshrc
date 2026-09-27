@@ -5,6 +5,5 @@
 # framework (oh-my-zsh, starship, etc.) from the real HOME.
 export PATH="${ZDOTDIR}/../bin:${PATH}"
 export PS1='e2e$ '
-unsetopt PROMPT_SP
 # Never write a history file into this fixture directory.
 unset HISTFILE
