@@ -1,0 +1,3130 @@
+<title>Code Review Revamp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap"
+/>
+<style>
+  :root {
+    --paper: #f7f7fb;
+    --ink: #191927;
+    --muted: #5b5b78;
+    --rule: #dcdce8;
+    --soft: #eeeef6;
+    --accent: #4f5bb0;
+    --accent-bg: #e6e8f7;
+    --warn-ink: #8a5a00;
+    --warn-bg: #fdf3d6;
+    --bad-ink: #b3261e;
+    --bad-bg: #fbe4e2;
+    --ok-ink: #17703a;
+    --ok-bg: #dff4e6;
+    /* app mock tokens: mirror EXTENSION_BASE_CSS light values */
+    --a-base: #f0f0f5;
+    --a-surface: #e8e8f0;
+    --a-elev: #ffffff;
+    --a-card: #f5f5fa;
+    --a-hover: #eaeaf5;
+    --a-text: #1c1c2a;
+    --a-text2: #4b4b72;
+    --a-muted: #6a6a92;
+    --a-border: rgba(20, 20, 60, 0.1);
+    --a-border2: rgba(20, 20, 60, 0.18);
+    --a-accent: #5c6bc0;
+    --a-accent-text: #3f4aa0;
+    --a-accent-dim: rgba(92, 107, 192, 0.14);
+    --a-add: rgba(46, 160, 67, 0.13);
+    --a-del: rgba(207, 34, 46, 0.1);
+    --a-add-ink: #1a7f37;
+    --a-del-ink: #b3261e;
+    --a-ok: #17703a;
+    --a-warn: #8a5a00;
+    --a-bad: #b3261e;
+    --a-kw: #8e44ad;
+    --a-str: #1a7f37;
+    --a-fn: #2b6cb0;
+    --a-num: #b35c00;
+    --a-com: #6a6a92;
+    --agent: #6b4fbf;
+    --agent-bg: rgba(107, 79, 191, 0.08);
+    --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --cond: 'IBM Plex Sans Condensed', 'IBM Plex Sans', 'Arial Narrow', sans-serif;
+    --mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+      --paper: #0e0e13;
+      --ink: #e4e4f0;
+      --muted: #9b9bc0;
+      --rule: #25253a;
+      --soft: #16161f;
+      --accent: #8b98e8;
+      --accent-bg: #1b1d33;
+      --warn-ink: #facc15;
+      --warn-bg: #2a2410;
+      --bad-ink: #f08a8a;
+      --bad-bg: #2c1414;
+      --ok-ink: #4ade80;
+      --ok-bg: #0f2618;
+      --a-base: #0c0c0f;
+      --a-surface: #111116;
+      --a-elev: #18181f;
+      --a-card: #1c1c25;
+      --a-hover: #22222e;
+      --a-text: #e2e2ee;
+      --a-text2: #9090c4;
+      --a-muted: #8585b8;
+      --a-border: rgba(255, 255, 255, 0.06);
+      --a-border2: rgba(255, 255, 255, 0.12);
+      --a-accent: #5c6bc0;
+      --a-accent-text: #8b98e8;
+      --a-accent-dim: rgba(92, 107, 192, 0.18);
+      --a-add: rgba(152, 195, 121, 0.12);
+      --a-del: rgba(224, 108, 117, 0.12);
+      --a-add-ink: #98c379;
+      --a-del-ink: #e06c75;
+      --a-ok: #4ade80;
+      --a-warn: #facc15;
+      --a-bad: #e05c5c;
+      --a-kw: #cf9ee8;
+      --a-str: #4ade80;
+      --a-fn: #7fb8f0;
+      --a-num: #e0a361;
+      --a-com: #8585b8;
+      --agent: #b39cf5;
+      --agent-bg: rgba(179, 156, 245, 0.08);
+    }
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --paper: #0e0e13;
+    --ink: #e4e4f0;
+    --muted: #9b9bc0;
+    --rule: #25253a;
+    --soft: #16161f;
+    --accent: #8b98e8;
+    --accent-bg: #1b1d33;
+    --warn-ink: #facc15;
+    --warn-bg: #2a2410;
+    --bad-ink: #f08a8a;
+    --bad-bg: #2c1414;
+    --ok-ink: #4ade80;
+    --ok-bg: #0f2618;
+    --a-base: #0c0c0f;
+    --a-surface: #111116;
+    --a-elev: #18181f;
+    --a-card: #1c1c25;
+    --a-hover: #22222e;
+    --a-text: #e2e2ee;
+    --a-text2: #9090c4;
+    --a-muted: #8585b8;
+    --a-border: rgba(255, 255, 255, 0.06);
+    --a-border2: rgba(255, 255, 255, 0.12);
+    --a-accent: #5c6bc0;
+    --a-accent-text: #8b98e8;
+    --a-accent-dim: rgba(92, 107, 192, 0.18);
+    --a-add: rgba(152, 195, 121, 0.12);
+    --a-del: rgba(224, 108, 117, 0.12);
+    --a-add-ink: #98c379;
+    --a-del-ink: #e06c75;
+    --a-ok: #4ade80;
+    --a-warn: #facc15;
+    --a-bad: #e05c5c;
+    --a-kw: #cf9ee8;
+    --a-str: #4ade80;
+    --a-fn: #7fb8f0;
+    --a-num: #e0a361;
+    --a-com: #8585b8;
+    --agent: #b39cf5;
+    --agent-bg: rgba(179, 156, 245, 0.08);
+  }
+  * {
+    box-sizing: border-box;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.6 var(--sans);
+    padding-inline: 16px;
+    padding-block: 32px 80px;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+  }
+  nav.toc {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+  nav.toc a {
+    color: var(--muted);
+    text-decoration: none;
+    display: block;
+    padding: 3px 8px;
+    border-radius: 5px;
+  }
+  nav.toc a:hover,
+  nav.toc a:focus-visible {
+    color: var(--ink);
+    background: var(--soft);
+    outline: none;
+  }
+  nav.toc .grp {
+    font: 600 11px/1 var(--sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 14px 8px 6px;
+  }
+  main {
+    min-width: 0;
+  }
+  .prose {
+    max-width: 720px;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--cond);
+    text-wrap: balance;
+    line-height: 1.15;
+    margin: 0;
+  }
+  h1 {
+    font-size: 44px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+  }
+  h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-top: 36px;
+  }
+  h2 .id,
+  h3 .id {
+    font-family: var(--mono);
+    font-size: 0.62em;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--accent-bg);
+    padding: 2px 7px;
+    border-radius: 4px;
+    vertical-align: 0.25em;
+    margin-right: 8px;
+  }
+  p,
+  ul,
+  ol {
+    margin: 12px 0;
+  }
+  ul,
+  ol {
+    padding-left: 22px;
+  }
+  li {
+    margin: 4px 0;
+  }
+  code,
+  .mono {
+    font-family: var(--mono);
+    font-size: 0.88em;
+  }
+  p code,
+  li code,
+  td code {
+    background: var(--soft);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  a {
+    color: var(--accent);
+  }
+  .eyebrow {
+    font: 600 12px/1 var(--sans);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 14px;
+  }
+  .meta b {
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .lede {
+    font-size: 17px;
+    max-width: 720px;
+    margin-top: 22px;
+  }
+  .unv {
+    display: inline-block;
+    font: 600 11px/1 var(--mono);
+    color: var(--warn-ink);
+    background: var(--warn-bg);
+    padding: 3px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+  }
+  .map {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 8px;
+    margin-top: 22px;
+  }
+  .map a {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: baseline;
+    text-decoration: none;
+    color: var(--ink);
+    padding: 10px 12px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--paper);
+  }
+  .map a:hover,
+  .map a:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+  }
+  .map .id {
+    font: 500 12px/1 var(--mono);
+    color: var(--accent);
+  }
+  .map small {
+    display: block;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+  .tbl {
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13.5px;
+    min-width: 640px;
+  }
+  th,
+  td {
+    text-align: left;
+    vertical-align: top;
+    padding: 9px 12px 9px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    font: 600 11px/1.2 var(--sans);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  td:first-child {
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .opts {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .opt {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .opt.pick {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+  .opt h4 {
+    margin: 0 0 4px;
+    font: 600 14px/1.3 var(--sans);
+  }
+  .opt p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .opt.pick h4::after {
+    content: 'Chosen';
+    font: 600 10px/1 var(--sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--paper);
+    background: var(--accent);
+    padding: 3px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+    vertical-align: 2px;
+  }
+  .fig {
+    margin: 22px 0 8px;
+  }
+  .fig figcaption {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 8px;
+    max-width: 720px;
+  }
+  .diagram {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 16px;
+    background: var(--paper);
+  }
+  pre.mermaid {
+    margin: 0;
+    background: transparent;
+    font-family: var(--sans);
+  }
+  .how {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 720px;
+  }
+  .how b {
+    color: var(--ink);
+  }
+
+  /* ── app mock frame ─────────────────────────── */
+  .mock {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--rule);
+    background: var(--a-base);
+  }
+  .app {
+    min-width: 760px;
+    background: var(--a-base);
+    color: var(--a-text);
+    font: 13px/1.45 var(--sans);
+  }
+  .app button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .app :focus-visible {
+    outline: 2px solid var(--a-accent);
+    outline-offset: 1px;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    background: var(--a-surface);
+    border-bottom: 1px solid var(--a-border);
+  }
+  .bar .t {
+    font-weight: 600;
+  }
+  .bar .sp {
+    flex: 1;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--a-border2);
+    color: var(--a-text2);
+    white-space: nowrap;
+  }
+  .chip.hi {
+    color: var(--a-bad);
+    border-color: currentColor;
+  }
+  .chip.md {
+    color: var(--a-warn);
+    border-color: currentColor;
+  }
+  .chip.lo {
+    color: var(--a-ok);
+    border-color: currentColor;
+  }
+  .chip.ag {
+    color: var(--agent);
+    border-color: currentColor;
+  }
+  .chip.repo {
+    font-family: var(--mono);
+    font-size: 11px;
+    border-radius: 4px;
+  }
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--a-border2);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .seg button {
+    background: transparent;
+    border: 0;
+    padding: 4px 10px;
+    color: var(--a-text2);
+    font-size: 12px;
+  }
+  .seg button + button {
+    border-left: 1px solid var(--a-border2);
+  }
+  .seg button[aria-pressed='true'] {
+    background: var(--a-accent-dim);
+    color: var(--a-accent-text);
+    font-weight: 600;
+  }
+  .kbd {
+    font: 500 11px/1 var(--mono);
+    border: 1px solid var(--a-border2);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 2px 5px;
+    color: var(--a-text2);
+    background: var(--a-elev);
+  }
+  .btn {
+    background: var(--a-elev);
+    border: 1px solid var(--a-border2);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .btn.pri {
+    background: var(--a-accent);
+    border-color: var(--a-accent);
+    color: #fff;
+  }
+  .btn.ag {
+    border-color: var(--agent);
+    color: var(--agent);
+    background: var(--agent-bg);
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: 230px 1fr;
+  }
+  .side {
+    background: var(--a-surface);
+    border-right: 1px solid var(--a-border);
+    padding: 10px 0;
+    font-size: 12.5px;
+  }
+  .side .h {
+    padding: 4px 12px 6px;
+    font: 600 10.5px/1 var(--sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--a-muted);
+  }
+  .frow {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 12px;
+    color: var(--a-text2);
+  }
+  .frow.cur {
+    background: var(--a-accent-dim);
+    color: var(--a-text);
+  }
+  .frow .st {
+    font: 600 11px/1 var(--mono);
+    text-align: center;
+  }
+  .frow .n {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .frow .sub {
+    font-size: 11px;
+    color: var(--a-muted);
+  }
+  .pane {
+    padding: 0;
+    min-width: 0;
+    overflow-x: auto;
+  }
+  .fh {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--a-border);
+    background: var(--a-elev);
+  }
+  .fh .p {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .code {
+    font: 12px/1.65 var(--mono);
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .code td {
+    padding: 0 10px;
+    border: 0;
+    white-space: pre;
+    vertical-align: top;
+  }
+  .code td.ln {
+    width: 1%;
+    text-align: right;
+    color: var(--a-muted);
+    user-select: none;
+    padding-right: 8px;
+  }
+  .code td.gut {
+    width: 18px;
+    padding: 0 2px;
+    text-align: center;
+  }
+  .code tr.add td {
+    background: var(--a-add);
+  }
+  .code tr.del td {
+    background: var(--a-del);
+  }
+  .code tr.add td.mk {
+    color: var(--a-add-ink);
+  }
+  .code tr.del td.mk {
+    color: var(--a-del-ink);
+  }
+  .code tr.sel td {
+    background: var(--agent-bg);
+  }
+  .code tr.sel td.ln {
+    box-shadow: inset 3px 0 0 var(--agent);
+  }
+  .code tr.hunk td {
+    background: var(--a-surface);
+    color: var(--a-muted);
+  }
+  .k {
+    color: var(--a-kw);
+  }
+  .s {
+    color: var(--a-str);
+  }
+  .f {
+    color: var(--a-fn);
+  }
+  .nm {
+    color: var(--a-num);
+  }
+  .c {
+    color: var(--a-com);
+  }
+  .pip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--a-accent-dim);
+    color: var(--a-accent-text);
+    font: 600 10px/1 var(--sans);
+  }
+  .pip.ag {
+    background: var(--agent-bg);
+    color: var(--agent);
+    outline: 1px dashed var(--agent);
+  }
+  .thread {
+    margin: 6px 14px 8px 56px;
+    border: 1px solid var(--a-border2);
+    border-radius: 8px;
+    background: var(--a-elev);
+    font: 13px/1.5 var(--sans);
+    white-space: normal;
+  }
+  .thread .th {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--a-border);
+    font-size: 12px;
+    color: var(--a-text2);
+  }
+  .thread .bd {
+    padding: 8px 10px;
+  }
+  .thread.resolved {
+    opacity: 0.6;
+  }
+  .thread.agent {
+    border: 1px dashed var(--agent);
+    background: var(--agent-bg);
+  }
+  .thread.agent .th {
+    color: var(--agent);
+  }
+  .av {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--a-accent-dim);
+    color: var(--a-accent-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: 600 10px/1 var(--sans);
+  }
+  .note {
+    font-size: 11.5px;
+    color: var(--a-muted);
+  }
+  .rows {
+    display: grid;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr) 150px 88px 70px 90px;
+    gap: 12px;
+    align-items: center;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--a-border);
+  }
+  .row:hover {
+    background: var(--a-hover);
+  }
+  .row .ti {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row .ti small {
+    display: block;
+    font-weight: 400;
+    color: var(--a-muted);
+    font-size: 11.5px;
+  }
+  .row .num {
+    font-variant-numeric: tabular-nums;
+    color: var(--a-text2);
+    font-size: 12px;
+  }
+  .grp {
+    padding: 12px 14px 6px;
+    font: 600 10.5px/1 var(--sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--a-muted);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .band {
+    margin: 10px 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--a-accent-dim);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .band b {
+    font-weight: 600;
+  }
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0 10px;
+    background: var(--a-surface);
+    border-bottom: 1px solid var(--a-border);
+  }
+  .tabs button {
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 9px 10px;
+    color: var(--a-text2);
+    font-size: 12.5px;
+  }
+  .tabs button[aria-selected='true'] {
+    color: var(--a-text);
+    border-bottom-color: var(--a-accent);
+    font-weight: 600;
+  }
+  .tabs .ct {
+    font-variant-numeric: tabular-nums;
+    color: var(--a-muted);
+    margin-left: 4px;
+  }
+  .two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .two > div + div {
+    border-left: 1px solid var(--a-border);
+  }
+  .ol {
+    list-style: none;
+    margin: 0;
+    padding: 8px 0;
+    counter-reset: s;
+  }
+  .ol li {
+    counter-increment: s;
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 8px;
+    padding: 6px 14px;
+    margin: 0;
+  }
+  .ol li::before {
+    content: counter(s);
+    font: 600 11px/20px var(--mono);
+    color: var(--a-muted);
+    text-align: right;
+  }
+  .ol .fn {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .ol .why {
+    font-size: 11.5px;
+    color: var(--a-muted);
+  }
+  .ol li.bad .why {
+    color: var(--a-bad);
+  }
+  .ol li.good .why {
+    color: var(--a-ok);
+  }
+  .card {
+    background: var(--a-elev);
+    border: 1px solid var(--a-border);
+    border-radius: 10px;
+  }
+  .score {
+    display: grid;
+    grid-template-columns: 150px 110px 1fr 140px;
+    gap: 12px;
+    align-items: start;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--a-border);
+  }
+  .score:last-child {
+    border-bottom: 0;
+  }
+  .score .lbl {
+    font-weight: 600;
+  }
+  .score .val {
+    font-variant-numeric: tabular-nums;
+  }
+  .score .src {
+    font: 500 10.5px/1.3 var(--mono);
+    color: var(--a-muted);
+    text-align: right;
+  }
+  .meter {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--a-surface);
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .meter i {
+    display: block;
+    height: 100%;
+  }
+  .steps {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--a-border);
+    background: var(--a-surface);
+  }
+  .steps button {
+    background: var(--a-elev);
+    border: 1px solid var(--a-border2);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--a-text2);
+  }
+  .steps button[aria-selected='true'] {
+    border-color: var(--agent);
+    color: var(--agent);
+    background: var(--agent-bg);
+    font-weight: 600;
+  }
+  .float {
+    display: inline-flex;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid var(--a-border2);
+    border-radius: 8px;
+    background: var(--a-elev);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+    margin: 4px 0 6px 56px;
+    white-space: normal;
+  }
+  .panel {
+    border-left: 1px solid var(--a-border);
+    background: var(--a-surface);
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    font-size: 12.5px;
+  }
+  .panel h5 {
+    margin: 0;
+    font: 600 12px/1.2 var(--sans);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .fnd {
+    border: 1px solid var(--a-border2);
+    border-radius: 8px;
+    background: var(--a-elev);
+    padding: 9px 10px;
+    display: grid;
+    gap: 5px;
+  }
+  .sev {
+    font: 600 10px/1 var(--mono);
+    padding: 3px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .sev.must {
+    color: var(--a-bad);
+    background: color-mix(in srgb, var(--a-bad) 12%, transparent);
+  }
+  .sev.sug {
+    color: var(--a-accent-text);
+    background: var(--a-accent-dim);
+  }
+  .sev.nit {
+    color: var(--a-muted);
+    background: var(--a-surface);
+  }
+  .sev.q {
+    color: var(--a-warn);
+    background: color-mix(in srgb, var(--a-warn) 14%, transparent);
+  }
+  .fnd .acts {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .spin {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--agent);
+    border-right-color: transparent;
+    display: inline-block;
+    animation: sp 1s linear infinite;
+  }
+  @keyframes sp {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation: none;
+    }
+  }
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+  .moved {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 0;
+    padding: 6px 14px;
+    background: var(--a-surface);
+    border-block: 1px dashed var(--a-border2);
+    font: 12px/1.4 var(--sans);
+    color: var(--a-text2);
+  }
+  .keys {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px 22px;
+    padding: 14px;
+  }
+  .keys div {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 3px 0;
+  }
+  .keys .kbd {
+    min-width: 26px;
+    text-align: center;
+  }
+  .resume {
+    margin: 14px;
+    border: 1px solid var(--a-border2);
+    border-radius: 10px;
+    background: var(--a-elev);
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+  }
+  .resume ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 6px;
+  }
+  .resume li {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    margin: 0;
+  }
+  .submit {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--a-elev);
+    border-top: 1px solid var(--a-border);
+  }
+  [role='tabpanel'][hidden] {
+    display: none;
+  }
+
+  @media (max-width: 900px) {
+    .wrap {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    nav.toc {
+      display: none;
+    }
+    h1 {
+      font-size: 34px;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Contents">
+    <ol>
+      <li><a href="#context">Context</a></li>
+      <li><a href="#goals">Goals</a></li>
+      <li><a href="#current">Current state</a></li>
+      <li><a href="#inspiration">Inspiration</a></li>
+      <li><a href="#decisions">Decisions</a></li>
+      <li class="grp">You asked for</li>
+      <li><a href="#r1">R1 Dashboard</a></li>
+      <li><a href="#r2">R2 Comment visibility</a></li>
+      <li><a href="#r3">R3 Definitions first</a></li>
+      <li><a href="#r4">R4 Insights</a></li>
+      <li><a href="#r5">R5 Agent review</a></li>
+      <li class="grp">Suggested</li>
+      <li><a href="#s1">S1 Since your review</a></li>
+      <li><a href="#s2">S2 Resume and notes</a></li>
+      <li><a href="#s3">S3 Keyboard</a></li>
+      <li><a href="#s4">S4 Moved code</a></li>
+      <li><a href="#s5">S5 One review, not N</a></li>
+      <li class="grp">Build</li>
+      <li><a href="#arch">Architecture</a></li>
+      <li><a href="#sequence">Sequence</a></li>
+      <li><a href="#testing">Testing</a></li>
+      <li><a href="#risks">Risks</a></li>
+      <li><a href="#open">Open questions</a></li>
+      <li><a href="#rejected">Rejected</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header>
+      <div class="eyebrow">Design document · extensions/git-integration</div>
+      <h1>Code Review Revamp</h1>
+      <div class="meta">
+        <span>Status <b>Draft</b></span
+        ><span>Date <b>2026-09-27</b></span
+        ><span>Surface <b>Code Reviews tab + new Reviews global tab</b></span>
+      </div>
+      <p class="lede">
+        Five changes you asked for (R1–R5) and five drawn from current diff and review tools
+        (S1–S5). Every change has a rendering below; the interactive ones respond to clicks.
+      </p>
+      <div class="map">
+        <a href="#r1"
+          ><span class="id">R1</span
+          ><span>Review dashboard<small>Every PR that needs you, across repos</small></span></a
+        >
+        <a href="#r2"
+          ><span class="id">R2</span
+          ><span>Comment visibility<small>All, unresolved, hidden, one key</small></span></a
+        >
+        <a href="#r3"
+          ><span class="id">R3</span
+          ><span>Definitions first<small>Read a function before its callers</small></span></a
+        >
+        <a href="#r4"
+          ><span class="id">R4</span
+          ><span>Insights<small>Five measures, each names its source</small></span></a
+        >
+        <a href="#r5"
+          ><span class="id">R5</span
+          ><span
+            >Agent review<small>PR, file, hunk or lines; private until you post</small></span
+          ></a
+        >
+        <a href="#s1"
+          ><span class="id">S1</span
+          ><span>Since your review<small>A push no longer resets your progress</small></span></a
+        >
+        <a href="#s2"
+          ><span class="id">S2</span
+          ><span>Resume card and notes<small>Where you left off, in one glance</small></span></a
+        >
+        <a href="#s3"
+          ><span class="id">S3</span
+          ><span>Keyboard-first<small>Hunks, files, comments, agent</small></span></a
+        >
+        <a href="#s4"
+          ><span class="id">S4</span
+          ><span>Moved code collapses<small>No red-green wall for a move</small></span></a
+        >
+        <a href="#s5"
+          ><span class="id">S5</span
+          ><span>One review, not N<small>Comments batch into a pending review</small></span></a
+        >
+      </div>
+    </header>
+
+    <section class="prose">
+      <h2 id="context">Context</h2>
+      <p>
+        Code review takes a large share of your day. The Code Reviews tab already splits a PR into
+        chapters, scores risk, and keeps your place. Four things still slow you down. It sees one
+        repository at a time. It shows callers before the code they call. Its coverage and
+        complexity numbers don't measure the PR's own code. It has no agent. And every push from the
+        author wipes your viewed-file progress, which is the worst of these when you are interrupted
+        mid-review.
+      </p>
+
+      <h2 id="goals">Goals and non-goals</h2>
+      <ul>
+        <li>
+          <b>G1</b> One dashboard of every open PR that needs you, across repositories, including
+          requests made to your teams.
+        </li>
+        <li><b>G2</b> Comments show or hide with one key, without losing track that they exist.</li>
+        <li><b>G3</b> A function's hunk is shown before any hunk that calls it.</li>
+        <li>
+          <b>G4</b> Complexity, risk, coverage, health and understandability, each stating where its
+          number came from, or "not measured".
+        </li>
+        <li>
+          <b>G5</b> An agent reviews a PR, chapter, file, hunk or line range on request. Results
+          stay private. Nothing reaches GitHub until you click Post.
+        </li>
+        <li><b>G6</b> A push, a restart or a two-hour meeting never costs you your place.</li>
+      </ul>
+      <p>
+        <b>Non-goals:</b> approving automatically; the agent editing the branch or writing to the
+        PR; GitLab or Bitbucket; merge queues; replacing GitHub for PRs you author.
+      </p>
+    </section>
+
+    <section>
+      <h2 id="current">Current state</h2>
+      <p class="prose">
+        What the code does today. Paths are under
+        <code>extensions/git-integration/src/</code> unless noted.
+      </p>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>What it does</th>
+              <th>Evidence</th>
+              <th>Gap</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Queue scope</td>
+              <td>
+                One repo. <code>repository.pullRequests(first:20, orderBy CREATED_AT DESC)</code>,
+                then up to 10 more pages automatically.
+              </td>
+              <td>
+                <code>ipc/github.ipc.ts:122</code>, <code>MAX_AUTO_PAGES = 10</code> at
+                <code>components/pr-review/PrReviewTab.tsx:23</code>
+              </td>
+              <td>
+                Other repos are invisible. "Needs my review" is computed from loaded pages and
+                matches your login only, not your teams (<code>ReviewQueue.tsx:83-92</code>).
+              </td>
+            </tr>
+            <tr>
+              <td>Reading order</td>
+              <td>
+                Implementation files first, sorted by <code>layerScore</code> descending (route 9 …
+                util 1), then types, then tests.
+              </td>
+              <td><code>github/pr-review-service.ts:538-541</code>, <code>:257-271</code></td>
+              <td>
+                Callers come before callees. This also contradicts ADR-010's own tier table, which
+                puts types first.
+              </td>
+            </tr>
+            <tr>
+              <td>Measured example</td>
+              <td>
+                I ran the real <code>buildChapters</code> on seven paths of a risk-score change
+                (bundled with esbuild, run in node).
+              </td>
+              <td>
+                Output:
+                <code>UI =&gt; ReviewDiffPane.tsx, HealthChips.tsx, RiskBreakdownPanel.tsx</code> ·
+                <code>hooks =&gt; usePrReview.ts</code> ·
+                <code>Data Layer =&gt; pr-review-service.ts, pr-review.schema.ts</code> ·
+                <code>Tests =&gt; risk-score.spec.ts</code>
+              </td>
+              <td>
+                <code>computeRiskScore</code> is defined in the third chapter; its caller
+                <code>usePrReview.ts:312</code> is in the second.
+              </td>
+            </tr>
+            <tr>
+              <td>Comments</td>
+              <td>
+                Each thread collapses on its own. Threads come from REST
+                <code>pulls/{n}/comments</code>.
+              </td>
+              <td><code>components/pr-review/InlineCommentThread.tsx:11</code></td>
+              <td>
+                No global hide. Resolved state is never fetched, so resolved threads look open.
+              </td>
+            </tr>
+            <tr>
+              <td>Complexity</td>
+              <td>
+                Counts <code>if</code>, <code>&amp;&amp;</code>, <code>??</code> and similar
+                keywords in added lines; +5 in a hunk is a hotspot.
+              </td>
+              <td>ADR-010; <code>github/pr-review-service.ts:48</code></td>
+              <td>Counts keywords inside strings and comments; can't name the function.</td>
+            </tr>
+            <tr>
+              <td>Coverage</td>
+              <td>
+                Reads <code>coverage/coverage-summary.json</code> or
+                <code>coverage/lcov.info</code> from the local checkout.
+              </td>
+              <td><code>ipc/github.ipc.ts:755-775</code></td>
+              <td>Measures whatever branch you have checked out, not the PR head.</td>
+            </tr>
+            <tr>
+              <td>Session</td>
+              <td>Keyed <code>repo:::pr:::headSHA</code>.</td>
+              <td><code>stores/pr-review.store.ts:99</code>; <code>PrReviewTab.tsx:109</code></td>
+              <td>Any push creates a new, empty session. Viewed marks are lost.</td>
+            </tr>
+            <tr>
+              <td>Diff controls</td>
+              <td>Unified/split and the Semantic filter are component <code>useState</code>.</td>
+              <td><code>components/pr-review/ReviewDiffPane.tsx:63-64</code></td>
+              <td>Not remembered between files or sessions.</td>
+            </tr>
+            <tr>
+              <td>Keyboard</td>
+              <td>Only Enter (file list) and Cmd+Enter (comment).</td>
+              <td><code>grep "e.key ===" components/pr-review</code>: 2 hits</td>
+              <td>Everything else needs the mouse.</td>
+            </tr>
+            <tr>
+              <td>Posting</td>
+              <td>Each inline comment is POSTed on its own, immediately.</td>
+              <td><code>ipc/github.ipc.ts:507-520</code></td>
+              <td>
+                The author gets one notification per comment, and you can't revise before sending.
+              </td>
+            </tr>
+            <tr>
+              <td>AI</td>
+              <td>
+                MergeFlow's suggestion channel returns <code>NOT_IMPLEMENTED</code>. Review has no
+                agent.
+              </td>
+              <td><code>ipc/merge-flow.ipc.ts:320</code></td>
+              <td>No agent anywhere in the extension.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="prose">
+      <h2 id="inspiration">Inspiration</h2>
+      <p>
+        <span class="unv">[UNVERIFIED]</span> I could not read the linked article. WebFetch got HTTP
+        403, curl got Cloudflare's "Sorry, you have been blocked", the r.jina.ai reader got a
+        CAPTCHA page, it isn't in Stackademic's RSS feed, and the Wayback Machine has no copy. I did
+        not try to get past the bot check. I drew instead on the tools in the same category, each
+        checked at its own repo or page on 2026-09-27:
+      </p>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr>
+              <th>Tool</th>
+              <th>What it does well</th>
+              <th>Taken into</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="https://github.com/Wilfred/difftastic">difftastic</a></td>
+              <td>
+                A structural diff that "compares files based on their syntax"; reformatting shows as
+                no change.
+              </td>
+              <td>S4, and the tree-sitter choice in D1</td>
+            </tr>
+            <tr>
+              <td><a href="https://github.com/dlvhdr/gh-dash">gh-dash</a></td>
+              <td>
+                "User-defined, per-repo, PRs &amp; issues sections", each section a GitHub search
+                filter.
+              </td>
+              <td>R1</td>
+            </tr>
+            <tr>
+              <td><a href="https://github.com/umputun/revdiff">revdiff</a></td>
+              <td>
+                Inline annotations; <code>??</code> marks a question; <code>[</code>
+                <code>]</code> jump hunks across files; <code>t</code> hides the file tree.
+              </td>
+              <td>S2, S3</td>
+            </tr>
+            <tr>
+              <td><a href="https://github.com/nilbuild/diffity">diffity</a></td>
+              <td>
+                An agent reviews the diff and leaves comments in the viewer tagged must-fix,
+                suggestion, nit or question.
+              </td>
+              <td>R5</td>
+            </tr>
+            <tr>
+              <td>
+                <a href="https://linear.app/changelog/2026-05-27-linear-diffs">Linear Diffs</a>
+              </td>
+              <td>
+                Shows "the core of change first", separates glue code, and explains each section:
+                what changed, then its consequences.
+              </td>
+              <td>R3, R5 walkthrough</td>
+            </tr>
+            <tr>
+              <td>
+                <a href="https://github.com/dlvhdr/diffnav">diffnav</a> /
+                <a href="https://github.com/dandavison/delta">delta</a>
+              </td>
+              <td>Syntax-highlighted diff pager with a GitHub-style file tree.</td>
+              <td>Already covered by the Code Reviews tab</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="decisions">Decisions</h2>
+      <h3>D1 · How to find definitions and their uses</h3>
+      <div class="opts prose">
+        <div class="opt">
+          <h4>A. Extend the existing import regex</h4>
+          <p>
+            <code>IMPORT_RE</code> already links files by relative imports. Cheap, but JS/TS only
+            and file-level. It can't see a call inside the same file and can't order hunks.
+          </p>
+        </div>
+        <div class="opt pick">
+          <h4>B. Tree-sitter in WASM</h4>
+          <p>
+            <code>web-tree-sitter</code> 0.27.0 (published 2026-08-30) with the prebuilt grammars in
+            <code>@vscode/tree-sitter-wasm</code> 0.3.1: TypeScript, TSX, JavaScript, Python, Go,
+            Rust, Java, C#, Ruby, PHP, C++, Bash, CSS. Parses base and head of each changed file and
+            gives definitions and references per hunk. No native build. ADR-010 already names
+            Tree-sitter as its v2.
+          </p>
+        </div>
+        <div class="opt">
+          <h4>C. Language servers</h4>
+          <p>
+            Precise, but it needs a server per language and a checkout with dependencies installed.
+            Too slow to start for a review.
+          </p>
+        </div>
+      </div>
+      <p class="prose">
+        Files in a language without a grammar fall back to A, then to today's tiers.
+      </p>
+
+      <h3>D2 · Where the review agent runs</h3>
+      <div class="opts prose">
+        <div class="opt pick">
+          <h4>A. Headless <code>claude -p</code> with a JSON schema, read-only tools</h4>
+          <p>
+            <code
+              >claude -p --output-format json --json-schema … --tools "Read,Grep,Glob" --session-id
+              &lt;uuid&gt;</code
+            >
+            in a detached worktree at the PR head. Structured output, quiet, and it can't post:
+            without Bash it can't run <code>gh</code>. ADR-026 keeps headless spawn for self-review,
+            and this extension already uses
+            <code>child_process</code> (<code>git/git-service.ts</code>,
+            <code>ipc/merge-flow.ipc.ts</code>). Flags checked with <code>claude --help</code> and
+            the <a href="https://code.claude.com/docs/en/headless">headless docs</a>.
+          </p>
+        </div>
+        <div class="opt">
+          <h4>B. Interactive agent in a terminal tab</h4>
+          <p>
+            Foundry's pattern (ADR-026): visible and steerable. But the result has to be handed back
+            through a file, and a new tab for every "what does this line do?" is noise.
+          </p>
+        </div>
+        <div class="opt">
+          <h4>C. Reuse Foundry's supervised runner</h4>
+          <p>
+            Not allowed. Constitution Principle II forbids one extension importing another's code.
+          </p>
+        </div>
+      </div>
+      <p class="prose">
+        A, plus <b>Continue in terminal</b>, which opens
+        <code>claude --resume &lt;session-id&gt;</code> in a terminal tab through
+        <code>api.pty.openTerminalTab</code> when you want a conversation.
+      </p>
+
+      <h3>D3 · Where the dashboard gets its PRs</h3>
+      <div class="opts prose">
+        <div class="opt">
+          <h4>A. Run today's per-repo query for every workspace project</h4>
+          <p>One query per repo, and it misses repos you haven't opened in Terminator.</p>
+        </div>
+        <div class="opt pick">
+          <h4>B. GitHub search, one query per section</h4>
+          <p>
+            Cross-repo, filtered on the server. The
+            <a
+              href="https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests"
+              >documented qualifiers</a
+            >
+            cover this: <code>user-review-requested:@me</code>, <code>team-review-requested:</code>,
+            <code>reviewed-by:</code>, <code>involves:</code>,
+            <code>review:changes_requested</code>, <code>draft:</code>, <code>archived:</code>.
+            <code>gh search prs --review-requested=@me</code> exists in gh 2.97.0.
+          </p>
+        </div>
+      </div>
+
+      <h3>D4 · What a review session is keyed by</h3>
+      <div class="opts prose">
+        <div class="opt">
+          <h4>A. Keep <code>headSHA</code> in the key and copy on push</h4>
+          <p>Smallest change, but "viewed" still means "viewed at some SHA we threw away".</p>
+        </div>
+        <div class="opt pick">
+          <h4>B. Key by repo and PR; store the SHA each file was viewed at</h4>
+          <p>
+            Lets S1 diff from your SHA to the new head. Matches GitHub's own model:
+            <code>FileViewedState.DISMISSED</code> is documented as "The file has new changes since
+            last viewed" (checked by GraphQL introspection).
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── R1 ─────────────── -->
+    <section>
+      <h2 id="r1"><span class="id">R1</span>Review dashboard</h2>
+      <p class="prose">
+        A new global tab, <b>Reviews</b>, registered with
+        <code>api.sidebar.registerGlobalTab</code>. Each section is a saved GitHub search, as in
+        gh-dash, so it covers every repository you can see. The count of PRs waiting on you shows on
+        the tab itself. The per-repo Code Reviews tab stays; opening a row takes you to it.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app" id="dash">
+            <div class="bar">
+              <span class="t">Reviews</span><span class="chip">5 need you</span
+              ><span class="sp"></span><span class="note">Updated 1 min ago</span
+              ><button class="btn" type="button">Refresh</button>
+            </div>
+            <div class="tabs" role="tablist" aria-label="Dashboard sections">
+              <button role="tab" aria-selected="true" data-p="d-need">
+                Needs you<span class="ct">5</span>
+              </button>
+              <button role="tab" aria-selected="false" data-p="d-mine">
+                My PRs<span class="ct">3</span>
+              </button>
+              <button role="tab" aria-selected="false" data-p="d-inv">
+                Involved<span class="ct">7</span>
+              </button>
+            </div>
+            <div role="tabpanel" id="d-need">
+              <div class="band">
+                <b>5 need you</b><span>2 high risk</span><span>About 2 h 10 min of reading</span
+                ><span class="sp"></span><span class="note">Sorted by closest to merging</span>
+              </div>
+              <div class="grp">Re-review · new commits since you reviewed</div>
+              <div class="rows">
+                <div class="row">
+                  <span class="chip repo">terminator</span
+                  ><span class="ti"
+                    >#211 E2E: deterministic, faster, and only the specs a diff needs<small
+                      >3 commits since your review · 4 of 56 files changed · you viewed 51</small
+                    ></span
+                  ><span class="num">+4,043 −2,103 · 56 files</span
+                  ><span><span class="chip hi">High risk</span></span
+                  ><span class="num">~18 min</span
+                  ><span><button class="btn pri" type="button">Re-review</button></span>
+                </div>
+              </div>
+              <div class="grp">Requested of you</div>
+              <div class="rows">
+                <div class="row">
+                  <span class="chip repo">terminator</span
+                  ><span class="ti"
+                    >#210 Foundry: the red team argues before agreement<small
+                      >CI passing · opened 3 d ago · you are 1 of 2 reviewers</small
+                    ></span
+                  ><span class="num">+3,699 −402 · 49 files</span
+                  ><span><span class="chip hi">High risk</span></span
+                  ><span class="num">~72 min</span
+                  ><span><button class="btn" type="button">Review</button></span>
+                </div>
+                <div class="row">
+                  <span class="chip repo">terminator</span
+                  ><span class="ti"
+                    >#209 fix(foundry): architect amendments stop being refused<small
+                      >CI passing · in progress: 9 of 16 files</small
+                    ></span
+                  ><span class="num">+577 −169 · 16 files</span
+                  ><span><span class="chip md">Medium risk</span></span
+                  ><span class="num">~14 min</span
+                  ><span><button class="btn" type="button">Resume</button></span>
+                </div>
+              </div>
+              <div class="grp">Requested of your team</div>
+              <div class="rows">
+                <div class="row">
+                  <span class="chip repo">terminator</span
+                  ><span class="ti"
+                    >#212 ci: split the E2E burn-in across both shards<small
+                      >CI passing · opened 1 d ago</small
+                    ></span
+                  ><span class="num">+3 −3 · 1 file</span
+                  ><span><span class="chip lo">Low risk</span></span
+                  ><span class="num">~1 min</span
+                  ><span><button class="btn" type="button">Review</button></span>
+                </div>
+                <div class="row">
+                  <span class="chip repo">terminator</span
+                  ><span class="ti"
+                    >#207 fix: hall walks, Claude latest output, asks on Sonnet<small
+                      >CI failing · opened 4 d ago</small
+                    ></span
+                  ><span class="num">+317 −34 · 15 files</span
+                  ><span><span class="chip md">Medium risk</span></span
+                  ><span class="num">~9 min</span
+                  ><span><button class="btn" type="button">Review</button></span>
+                </div>
+              </div>
+            </div>
+            <div role="tabpanel" id="d-mine" hidden>
+              <div class="grp">Your open PRs</div>
+              <div class="rows">
+                <div class="row">
+                  <span class="chip repo">terminator</span
+                  ><span class="ti"
+                    >#213 Deterministic, faster CI: no Electron download in unit tests<small
+                      >Changes requested by 1 · 2 unresolved threads</small
+                    ></span
+                  ><span class="num">+1,385 −246 · 109 files</span
+                  ><span><span class="chip md">Changes asked</span></span
+                  ><span class="num">CI passing</span
+                  ><span><button class="btn" type="button">Open</button></span>
+                </div>
+                <div class="row">
+                  <span class="chip repo">terminator</span
+                  ><span class="ti"
+                    >#208 fix: branch list without origin/, fetch button<small
+                      >Approved · ready to merge</small
+                    ></span
+                  ><span class="num">+952 −167 · 31 files</span
+                  ><span><span class="chip lo">Approved</span></span
+                  ><span class="num">CI passing</span
+                  ><span><button class="btn" type="button">Open</button></span>
+                </div>
+              </div>
+            </div>
+            <div role="tabpanel" id="d-inv" hidden>
+              <div class="grp">Mentioned, assigned or commented</div>
+              <div class="rows">
+                <div class="row">
+                  <span class="chip repo">terminator</span
+                  ><span class="ti"
+                    >#205 feat(foundry): the refinery restacks, it never merges<small
+                      >You commented 2 d ago · 1 new reply</small
+                    ></span
+                  ><span class="num">+2,544 −16 · 48 files</span
+                  ><span><span class="chip hi">High risk</span></span
+                  ><span class="num">~42 min</span
+                  ><span><button class="btn" type="button">Open</button></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          Click the section tabs. Rows use real titles and sizes from
+          <code>andytavares/terminator</code> (<code>gh pr list --state all --limit 12</code>);
+          which section each sits in, the risk and the estimates are illustrative.
+        </figcaption>
+      </figure>
+      <div class="how prose">
+        <p><b>Sections and their queries</b> (editable in settings; defaults shown):</p>
+        <ul>
+          <li>
+            <b>Re-review:</b> <code>is:pr is:open archived:false reviewed-by:@me -author:@me</code>,
+            kept only if a commit landed after your latest review.
+          </li>
+          <li>
+            <b>Requested of you:</b>
+            <code>is:pr is:open archived:false user-review-requested:@me</code>
+          </li>
+          <li>
+            <b>Requested of your team:</b>
+            <code>is:pr is:open archived:false team-review-requested-user:@me</code>, minus rows
+            already above.
+          </li>
+          <li>
+            <b>My PRs:</b> <code>is:pr is:open author:@me</code>, labelled by what's blocking:
+            changes asked, CI failing, approved.
+          </li>
+          <li><b>Involved:</b> <code>is:pr is:open involves:@me -author:@me</code></li>
+        </ul>
+        <p>
+          Opening a row needs a local checkout. The dashboard matches the row's
+          <code>owner/repo</code> against the <code>origin</code> remote of each workspace project.
+          With no match it offers <b>Clone and review</b>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ─────────────── R2 ─────────────── -->
+    <section>
+      <h2 id="r2"><span class="id">R2</span>Comment visibility</h2>
+      <p class="prose">
+        One control in the diff toolbar with three states, cycled by <span class="mono">c</span>.
+        <b>All</b> shows every thread; resolved ones are dimmed. <b>Unresolved</b> hides resolved
+        and outdated threads. <b>Hidden</b> removes threads from the flow entirely and leaves a
+        count in the gutter, so you still know a conversation is there. Agent notes (R5) have their
+        own switch, <span class="mono">shift+c</span>. Your choice is remembered.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app" id="cv">
+            <div class="fh">
+              <span class="p">components/pr-review/HealthChips.tsx</span
+              ><span class="chip md">Medium risk</span><span class="sp" style="flex: 1"></span>
+              <span class="note">Comments</span>
+              <div class="seg" role="group" aria-label="Comment visibility">
+                <button type="button" aria-pressed="true" data-v="all">All</button
+                ><button type="button" aria-pressed="false" data-v="unres">Unresolved</button
+                ><button type="button" aria-pressed="false" data-v="hidden">Hidden</button>
+              </div>
+              <span class="note">Agent notes</span>
+              <div class="seg" role="group" aria-label="Agent notes">
+                <button type="button" aria-pressed="true" data-a="on">On</button
+                ><button type="button" aria-pressed="false" data-a="off">Off</button>
+              </div>
+            </div>
+            <table class="code">
+              <tr class="hunk">
+                <td class="ln"></td>
+                <td class="gut"></td>
+                <td class="mk"></td>
+                <td>@@ -56,10 +56,12 @@ export function HealthChips</td>
+              </tr>
+              <tr>
+                <td class="ln">56</td>
+                <td class="gut"></td>
+                <td class="mk"></td>
+                <td>
+                  <span class="k">const</span> covValue = covPct != <span class="k">null</span> ?
+                  <span class="s">`${covPct}%`</span> : <span class="k">null</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="ln">58</td>
+                <td class="gut"><span class="pip gp" data-n="2" hidden>2</span></td>
+                <td class="mk"></td>
+                <td><span class="k">const</span> chips: Chip[] = [</td>
+              </tr>
+              <tr class="tr-thread resolved-row">
+                <td colspan="4">
+                  <div class="thread resolved">
+                    <div class="th"><span class="av">R</span>reviewer · Resolved · 2 d ago</div>
+                    <div class="bd">
+                      Should the chip order match the order <code>RiskBreakdownPanel</code> lists
+                      drivers in?
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr class="del">
+                <td class="ln">60</td>
+                <td class="gut"></td>
+                <td class="mk">−</td>
+                <td>label: <span class="s">'Tests'</span>,</td>
+              </tr>
+              <tr class="add">
+                <td class="ln">60</td>
+                <td class="gut"></td>
+                <td class="mk">+</td>
+                <td>label: <span class="s">'Tests'</span>,</td>
+              </tr>
+              <tr class="add">
+                <td class="ln">61</td>
+                <td class="gut"><span class="pip ag agp" hidden>1</span></td>
+                <td class="mk">+</td>
+                <td>
+                  tooltip:
+                  <span class="s">'Whether a test file exists alongside this changed file.'</span>,
+                </td>
+              </tr>
+              <tr class="tr-agent">
+                <td colspan="4">
+                  <div class="thread agent">
+                    <div class="th">Agent note · private · <span class="sev q">question</span></div>
+                    <div class="bd">
+                      "Alongside" is decided by <code>testsSignal</code>'s stem match in
+                      <code>pr-review-service.ts</code>, which only looks at files inside this PR. A
+                      test that already exists and wasn't touched reads as missing.
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr class="tr-thread">
+                <td colspan="4">
+                  <div class="thread">
+                    <div class="th"><span class="av">A</span>andytavares · 1 h ago</div>
+                    <div class="bd">
+                      Tooltip should say this is only files in the PR, not the repo.
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="ln">62</td>
+                <td class="gut"></td>
+                <td class="mk"></td>
+                <td>value:</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <figcaption>
+          Click All, Unresolved or Hidden, and the Agent notes switch. In Hidden, the gutter pip on
+          line 58 carries the count; clicking a pip opens that one thread.
+        </figcaption>
+      </figure>
+      <p class="how prose">
+        <b>Needs:</b> threads fetched from GraphQL <code>reviewThreads</code> so
+        <code>isResolved</code> is known (the field exists on <code>PullRequestReviewThread</code>,
+        checked by introspection). <code>ThreadSchema</code> gains <code>resolved: boolean</code>.
+      </p>
+    </section>
+
+    <!-- ─────────────── R3 ─────────────── -->
+    <section>
+      <h2 id="r3"><span class="id">R3</span>Definitions first</h2>
+      <p class="prose">
+        The order changes from files to hunks. Tree-sitter reads each changed hunk and records what
+        it defines and what it references. A hunk that calls <code>computeRiskScore</code> depends
+        on the hunk that changes <code>computeRiskScore</code>. A topological sort of that graph
+        gives the reading order; files that reference each other (a cycle) are kept together as one
+        step. Chapters stay: they group the ordered hunks, so a chapter never opens with a call into
+        a later one.
+      </p>
+      <figure class="fig">
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart LR
+  S["pr-review.schema.ts<br/>RiskScoreSchema"] --> R["pr-review-service.ts<br/>computeRiskScore()"]
+  R --> T["risk-score.spec.ts<br/>tests computeRiskScore"]
+  R --> U["usePrReview.ts:312<br/>calls computeRiskScore"]
+  S --> H["HealthChips.tsx<br/>reads RiskScore"]
+  S --> B["RiskBreakdownPanel.tsx<br/>reads RiskScore"]
+  H --> D["ReviewDiffPane.tsx:329<br/>renders &lt;HealthChips&gt;"]
+</pre>
+        </div>
+        <figcaption>
+          The real dependency edges for the seven-file example (checked with
+          <code>grep -rn "computeRiskScore(\|&lt;HealthChips\|RiskScore"</code>). An arrow means
+          "read this before".
+        </figcaption>
+      </figure>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app">
+            <div class="two">
+              <div>
+                <div class="grp">Today (buildChapters output)</div>
+                <ol class="ol">
+                  <li class="bad">
+                    <div>
+                      <span class="fn">ReviewDiffPane.tsx</span>
+                      <div class="why">Renders HealthChips, not read yet</div>
+                    </div>
+                  </li>
+                  <li>
+                    <div>
+                      <span class="fn">HealthChips.tsx</span>
+                      <div class="why">Uses RiskScore, not read yet</div>
+                    </div>
+                  </li>
+                  <li>
+                    <div><span class="fn">RiskBreakdownPanel.tsx</span></div>
+                  </li>
+                  <li class="bad">
+                    <div>
+                      <span class="fn">usePrReview.ts</span>
+                      <div class="why">Calls computeRiskScore, not read yet</div>
+                    </div>
+                  </li>
+                  <li>
+                    <div>
+                      <span class="fn">pr-review-service.ts</span>
+                      <div class="why">Defines computeRiskScore</div>
+                    </div>
+                  </li>
+                  <li>
+                    <div>
+                      <span class="fn">pr-review.schema.ts</span>
+                      <div class="why">Defines RiskScore</div>
+                    </div>
+                  </li>
+                  <li>
+                    <div><span class="fn">risk-score.spec.ts</span></div>
+                  </li>
+                </ol>
+              </div>
+              <div>
+                <div class="grp">Proposed (definitions first)</div>
+                <ol class="ol">
+                  <li class="good">
+                    <div>
+                      <span class="fn">pr-review.schema.ts</span>
+                      <div class="why">Defines RiskScore · depends on nothing in this PR</div>
+                    </div>
+                  </li>
+                  <li class="good">
+                    <div>
+                      <span class="fn">pr-review-service.ts · computeRiskScore</span>
+                      <div class="why">Uses RiskScore (step 1)</div>
+                    </div>
+                  </li>
+                  <li class="good">
+                    <div>
+                      <span class="fn">risk-score.spec.ts</span>
+                      <div class="why">Tests step 2, read right after it</div>
+                    </div>
+                  </li>
+                  <li class="good">
+                    <div>
+                      <span class="fn">usePrReview.ts · fetchFileMetrics</span>
+                      <div class="why">Calls computeRiskScore (step 2)</div>
+                    </div>
+                  </li>
+                  <li class="good">
+                    <div>
+                      <span class="fn">HealthChips.tsx</span>
+                      <div class="why">Uses RiskScore (step 1)</div>
+                    </div>
+                  </li>
+                  <li class="good">
+                    <div>
+                      <span class="fn">RiskBreakdownPanel.tsx</span>
+                      <div class="why">Uses RiskScore (step 1)</div>
+                    </div>
+                  </li>
+                  <li class="good">
+                    <div>
+                      <span class="fn">ReviewDiffPane.tsx</span>
+                      <div class="why">Renders HealthChips (step 5)</div>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+            </div>
+            <div class="fh" style="border-top: 1px solid var(--a-border)">
+              <span class="p">hooks/usePrReview.ts</span><span class="chip">Step 4 of 7</span
+              ><span class="sp" style="flex: 1"></span><span class="note">Uses</span
+              ><span class="chip lo">computeRiskScore · read in step 2</span
+              ><button class="btn" type="button">Peek definition</button>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          Left: what the Code Reviews tab shows today for these files. Right: the proposed order,
+          with the reason each item is where it is. The strip at the bottom is the file header:
+          every symbol a hunk uses is listed with where you read it.
+        </figcaption>
+      </figure>
+      <div class="how prose">
+        <p><b>Rules, in order:</b></p>
+        <ol>
+          <li>A hunk that defines or changes a symbol comes before any hunk that references it.</li>
+          <li>A test comes right after the last hunk it exercises, not at the end of the PR.</li>
+          <li>
+            Among hunks that are free to go next, the one in the same file as the last one wins;
+            then higher risk; then larger.
+          </li>
+          <li>Lock files and generated files (today's tier 3) stay last and collapsed.</li>
+          <li>Your manual drag-reorder (<code>fileOrderOverrides</code>) still wins.</li>
+        </ol>
+        <p>
+          Each step shows a one-line reason, replacing today's fixed <code>whyHere</code> strings.
+        </p>
+      </div>
+    </section>
+
+    <!-- ─────────────── R4 ─────────────── -->
+    <section>
+      <h2 id="r4"><span class="id">R4</span>Insights</h2>
+      <p class="prose">
+        A <b>Review brief</b> at the top of the Overview, plus a line per file and a gutter mark per
+        function. Every figure names its source. When nothing measured it, it says "not measured"
+        rather than showing a guess.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app" style="padding: 14px">
+            <div class="card">
+              <div class="bar" style="border-radius: 10px 10px 0 0">
+                <span class="t">Review brief · #211</span><span class="sp"></span
+                ><span class="chip hi">High risk</span
+                ><span class="chip">~18 min since your review</span>
+              </div>
+              <div class="score">
+                <div class="lbl">Complexity</div>
+                <div class="val">+23 branches</div>
+                <div>
+                  Up in 6 functions. Largest: <code>selectSpecs</code> +9,
+                  <code>shardByDuration</code> +6, <code>loadTimings</code> +4.
+                  <div class="meter"><i style="width: 62%; background: var(--a-warn)"></i></div>
+                </div>
+                <div class="src">tree-sitter · base vs head</div>
+              </div>
+              <div class="score">
+                <div class="lbl">Risk</div>
+                <div class="val">78 / 100</div>
+                <div>
+                  Driven by blast radius (<code>playwright.config.ts</code> read by 41 files) and
+                  churn (<code>scripts/</code> 14 commits in 90 d).
+                  <div class="meter"><i style="width: 78%; background: var(--a-bad)"></i></div>
+                </div>
+                <div class="src">computeRiskScore · git log, git grep at head</div>
+              </div>
+              <div class="score">
+                <div class="lbl">Test coverage</div>
+                <div class="val">84% of new lines</div>
+                <div>
+                  2 changed functions have no covered lines: <code>shardByDuration</code>,
+                  <code>readBurnIn</code>.
+                  <div class="meter"><i style="width: 84%; background: var(--a-ok)"></i></div>
+                </div>
+                <div class="src">CI check codecov/patch</div>
+              </div>
+              <div class="score">
+                <div class="lbl">Code health</div>
+                <div class="val">3 flags</div>
+                <div>
+                  1 function over 80 lines, 1 new <code>eslint-disable</code>, 1 block duplicated in
+                  2 files.
+                </div>
+                <div class="src">tree-sitter · detectDryViolations</div>
+              </div>
+              <div class="score">
+                <div class="lbl">Understandability</div>
+                <div class="val">Moderate</div>
+                <div>
+                  1,120 lines to read once formatting and lock files are set aside. 9 new exported
+                  symbols. Longest chain of definitions you must hold: 4.
+                  <div class="meter"><i style="width: 48%; background: var(--a-warn)"></i></div>
+                </div>
+                <div class="src">reading-order graph</div>
+              </div>
+            </div>
+            <table
+              class="code"
+              style="
+                margin-top: 12px;
+                border: 1px solid var(--a-border);
+                border-radius: 8px;
+                background: var(--a-elev);
+              "
+            >
+              <tr class="add">
+                <td class="ln">88</td>
+                <td class="gut">
+                  <span class="chip md" style="font-size: 10px; padding: 0 5px">+6</span>
+                </td>
+                <td class="mk">+</td>
+                <td>
+                  <span class="k">export function</span>
+                  <span class="f">shardByDuration</span>(timings: Timing[], shards:
+                  <span class="k">number</span>) {
+                </td>
+              </tr>
+              <tr class="add">
+                <td class="ln">89</td>
+                <td class="gut">
+                  <span
+                    class="chip hi"
+                    style="font-size: 10px; padding: 0 5px"
+                    title="No covered lines"
+                    >0%</span
+                  >
+                </td>
+                <td class="mk">+</td>
+                <td>
+                  <span class="k">if</span> (shards &lt; <span class="nm">1</span>)
+                  <span class="k">throw new</span> <span class="f">Error</span>(<span class="s"
+                    >'shards must be ≥ 1'</span
+                  >)
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <figcaption>
+          Illustrative values for #211. <code>selectSpecs</code>, <code>shardByDuration</code>,
+          <code>loadTimings</code> and <code>readBurnIn</code> are placeholders for the real
+          function names the parser would report. The gutter marks show a function's added branches
+          and its patch coverage.
+        </figcaption>
+      </figure>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr>
+              <th>Measure</th>
+              <th>How it's computed</th>
+              <th>When it can't be measured</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Complexity</td>
+              <td>
+                Per-function cyclomatic count on base and head ASTs; the change is head minus base.
+                Replaces the keyword count, as ADR-010's v2 path describes.
+              </td>
+              <td>No grammar: today's keyword count, labelled "approximate".</td>
+            </tr>
+            <tr>
+              <td>Risk</td>
+              <td>
+                Today's <code>computeRiskScore</code>, but churn and blast radius run at the PR head
+                in the review worktree, and coverage uses the row below.
+              </td>
+              <td>Fewer than 2 signals: "not measured" (today's rule).</td>
+            </tr>
+            <tr>
+              <td>Test coverage</td>
+              <td>
+                1. The patch-coverage status check, when CI publishes one (<code
+                  >COVERAGE_CHECK_NAMES</code
+                >
+                already lists codecov, coveralls, sonar and others). 2.
+                <code>coverage/</code> inside the review worktree, only if its <code>HEAD</code> is
+                the PR head.
+              </td>
+              <td>
+                "Not measured", plus how many changed source files have a changed test beside them.
+              </td>
+            </tr>
+            <tr>
+              <td>Code health</td>
+              <td>
+                Counts, in added code only: functions over 80 lines, nesting deeper than 4, more
+                than 5 parameters, new <code>any</code>, <code>@ts-ignore</code>,
+                <code>eslint-disable</code>, <code>TODO</code>; duplicate blocks from the existing
+                <code>detectDryViolations</code>.
+              </td>
+              <td>No grammar: the text-based flags only.</td>
+            </tr>
+            <tr>
+              <td>Understandability</td>
+              <td>
+                From the R3 graph: lines left to read after the Semantic filter and tier 3, new
+                exported symbols, longest definition chain, cross-chapter references. Easy /
+                Moderate / Hard, with the thresholds in settings.
+              </td>
+              <td>Always measurable.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ─────────────── R5 ─────────────── -->
+    <section>
+      <h2 id="r5"><span class="id">R5</span>Agent review</h2>
+      <p class="prose">
+        Select lines, a hunk, a file, a chapter or the whole PR, then press
+        <span class="mono">a</span> or click <b>Ask agent</b>. Pick <b>Review</b>, <b>Explain</b> or
+        type a question. Results arrive in a side panel and as dashed notes in the diff that only
+        you see. Each finding has <b>Post as comment</b>, which opens the comment composer filled in
+        for you to edit; nothing reaches GitHub until you send it.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app" id="ag">
+            <div class="steps" role="tablist" aria-label="Agent review steps">
+              <button role="tab" aria-selected="true" data-s="1">1 · Select</button>
+              <button role="tab" aria-selected="false" data-s="2">2 · Running</button>
+              <button role="tab" aria-selected="false" data-s="3">3 · Findings</button>
+              <button role="tab" aria-selected="false" data-s="4">4 · Post one</button>
+            </div>
+            <div class="split">
+              <div class="pane">
+                <div class="fh">
+                  <span class="p">hooks/usePrReview.ts</span><span class="chip">Step 4 of 7</span>
+                </div>
+                <table class="code">
+                  <tr class="hunk">
+                    <td class="ln"></td>
+                    <td class="gut"></td>
+                    <td class="mk"></td>
+                    <td>@@ fetchFileMetrics @@</td>
+                  </tr>
+                  <tr class="sel">
+                    <td class="ln">309</td>
+                    <td class="gut"></td>
+                    <td class="mk"></td>
+                    <td>
+                      <span class="k">for</span> (<span class="k">const</span> { file, metrics }
+                      <span class="k">of</span> collected) {
+                    </td>
+                  </tr>
+                  <tr class="sel">
+                    <td class="ln">310</td>
+                    <td class="gut"></td>
+                    <td class="mk"></td>
+                    <td>
+                      <span class="k">const</span> chapter = pr.chapters.<span class="f">find</span
+                      >((c) =&gt; c.files.<span class="f">some</span>((f) =&gt; f.path ===
+                      file.path))
+                    </td>
+                  </tr>
+                  <tr class="sel">
+                    <td class="ln">311</td>
+                    <td class="gut"></td>
+                    <td class="mk"></td>
+                    <td><span class="k">if</span> (!chapter) <span class="k">continue</span></td>
+                  </tr>
+                  <tr class="sel">
+                    <td class="ln">312</td>
+                    <td class="gut"></td>
+                    <td class="mk"></td>
+                    <td>
+                      <span class="k">const</span> riskScore =
+                      <span class="f">computeRiskScore</span>(metrics, allMetrics)
+                    </td>
+                  </tr>
+                  <tr class="sel">
+                    <td class="ln">313</td>
+                    <td class="gut"></td>
+                    <td class="mk"></td>
+                    <td>
+                      <span class="f">updateFileRiskScore</span>(chapter.id, file.path, riskScore)
+                    </td>
+                  </tr>
+                  <tr class="sel">
+                    <td class="ln">314</td>
+                    <td class="gut"></td>
+                    <td class="mk"></td>
+                    <td>}</td>
+                  </tr>
+                  <tr class="sel">
+                    <td class="ln">317</td>
+                    <td class="gut"><span class="pip ag ag3" hidden>1</span></td>
+                    <td class="mk"></td>
+                    <td>
+                      <span class="k">const</span> riskLevels = collected.<span class="f">map</span
+                      >((c) =&gt; <span class="f">computeRiskScore</span>(c.metrics,
+                      allMetrics).level)
+                    </td>
+                  </tr>
+                  <tr class="ag-float">
+                    <td colspan="4">
+                      <div class="float">
+                        <button class="btn ag" type="button">
+                          Ask agent <span class="kbd">a</span></button
+                        ><button class="btn" type="button">Explain</button
+                        ><button class="btn" type="button">
+                          Add note <span class="kbd">m</span></button
+                        ><button class="btn" type="button">
+                          Comment <span class="kbd">r</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="ag-note" hidden>
+                    <td colspan="4">
+                      <div class="thread agent">
+                        <div class="th">
+                          Agent note · private · <span class="sev sug">suggestion</span>
+                        </div>
+                        <div class="bd">
+                          Line 317 calls <code>computeRiskScore</code> again for every file already
+                          scored on line 312. Each call normalises across all files, so this doubles
+                          an O(n²) pass. Keep the scores from the loop and read
+                          <code>.level</code> from them.
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="ag-compose" hidden>
+                    <td colspan="4">
+                      <div class="thread">
+                        <div class="th">
+                          <span class="av">A</span>New comment · line 317 · edited from agent
+                          finding
+                        </div>
+                        <div class="bd" style="display: grid; gap: 8px">
+                          <div
+                            style="
+                              border: 1px solid var(--a-border2);
+                              border-radius: 6px;
+                              padding: 8px;
+                              background: var(--a-card);
+                            "
+                          >
+                            Nit: <code>computeRiskScore</code> runs twice per file here (312 and
+                            317). Could we keep the scores from the loop and map
+                            <code>.level</code>?
+                          </div>
+                          <div style="display: flex; gap: 6px">
+                            <button class="btn pri" type="button">Add to pending review</button
+                            ><button class="btn" type="button">Cancel</button
+                            ><span class="note" style="align-self: center"
+                              >Sent when you submit your review (S5)</span
+                            >
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              <aside class="panel" aria-label="Agent panel">
+                <div class="p1">
+                  <h5>Ask about lines 309–317</h5>
+                  <p class="note" style="margin: 6px 0">
+                    Scope: selection · reads the PR head in a private worktree
+                  </p>
+                  <div class="seg" role="group" aria-label="Request">
+                    <button type="button" aria-pressed="true">Review</button
+                    ><button type="button" aria-pressed="false">Explain</button
+                    ><button type="button" aria-pressed="false">Ask…</button>
+                  </div>
+                </div>
+                <div class="p2" hidden>
+                  <h5><span class="spin" aria-hidden="true"></span>Reviewing lines 309–317</h5>
+                  <p class="note" style="margin: 0">
+                    Read <code>pr-review-service.ts</code> · Grep <code>updateFileRiskScore</code> ·
+                    41 s
+                  </p>
+                  <div style="display: flex; gap: 6px">
+                    <button class="btn" type="button">Cancel</button
+                    ><button class="btn" type="button">Continue in terminal</button>
+                  </div>
+                </div>
+                <div class="p3" hidden>
+                  <h5>2 findings · lines 309–317</h5>
+                  <div class="fnd">
+                    <div>
+                      <span class="sev sug">suggestion</span> <b>Risk scored twice per file</b>
+                    </div>
+                    <div class="note">usePrReview.ts:317</div>
+                    <div class="acts">
+                      <button class="btn" type="button">Post as comment</button
+                      ><button class="btn" type="button">Dismiss</button
+                      ><button class="btn" type="button">Ask follow-up</button>
+                    </div>
+                  </div>
+                  <div class="fnd">
+                    <div>
+                      <span class="sev q">question</span> <b>Coverage comes from your checkout</b>
+                    </div>
+                    <div class="note">
+                      pr-review-service.ts:109 · <code>coverage_n</code> uses
+                      <code>patchCoverage</code> read from the local <code>coverage/</code> folder,
+                      which is not the PR head.
+                    </div>
+                    <div class="acts">
+                      <button class="btn" type="button">Post as comment</button
+                      ><button class="btn" type="button">Dismiss</button>
+                    </div>
+                  </div>
+                  <p class="note" style="margin: 0">
+                    Private to you. Saved with this PR; marked stale if the lines change.
+                  </p>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          Click through the four steps. Both findings are real: <code>usePrReview.ts</code> calls
+          <code>computeRiskScore</code> at 312 and again at 317 on the same metrics, and
+          <code>ipc/github.ipc.ts:755</code> reads coverage from the local checkout.
+        </figcaption>
+      </figure>
+
+      <h3>How a request runs</h3>
+      <figure class="fig">
+        <div class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+  actor You
+  participant UI as ReviewDiffPane (renderer)
+  participant IPC as review-agent.ipc.ts (main)
+  participant WT as review worktree at PR head
+  participant C as claude -p (read-only tools)
+  participant GH as GitHub
+  You->>UI: select lines 309–317, press a
+  UI->>IPC: review-agent:start {scope, request, prNumber, headSHA}
+  IPC->>WT: git fetch origin pull/N/head, git worktree add --detach
+  IPC->>C: spawn with --tools "Read,Grep,Glob", --json-schema, --session-id
+  C->>WT: Read, Grep, Glob
+  C-->>IPC: structured_output {summary, findings[]}
+  IPC->>IPC: validate with Zod, save under repo:pr:headSHA
+  IPC-->>UI: review-agent:event {findings}
+  UI-->>You: side panel + dashed notes in the diff
+  You->>UI: Post as comment, edit, Add to pending review
+  UI->>GH: only now, through the existing github:* channels
+</pre
+          >
+        </div>
+        <figcaption>
+          The agent has no Bash and no network tool, so it cannot call <code>gh</code>. GitHub is
+          written to only by the existing channels, and only from your click.
+        </figcaption>
+      </figure>
+      <div class="how prose">
+        <p>
+          <b>Scopes:</b> line range, hunk, file, chapter, PR. For the PR scope the output adds a
+          <b>walkthrough</b>: one paragraph per chapter saying what changed and then what it affects
+          (after Linear Diffs), shown at the top of the Overview and cached per head SHA.
+        </p>
+        <p>
+          <b>Finding shape:</b>
+          <code
+            >{ severity: 'must-fix' | 'suggestion' | 'nit' | 'question', path, startLine, endLine,
+            side, title, body, suggestedCode? }</code
+          >. The severity values are rendered into the prompt from the schema constant, so the agent
+          is always shown the closed set.
+        </p>
+        <p>
+          <b>Controls:</b> model and effort in settings (<code>review.agentModel</code>, default
+          <code>opus</code>), a per-request timeout (default 5 min), one run per scope at a time,
+          Cancel kills the process.
+        </p>
+      </div>
+    </section>
+
+    <!-- ─────────────── S1 ─────────────── -->
+    <section>
+      <h2 id="s1"><span class="id">S1</span>Since your review</h2>
+      <p class="prose">
+        When the author pushes, your progress stays. Each file remembers the SHA you viewed it at.
+        Files unchanged since then stay ticked; changed files show
+        <b>Changed since you viewed</b> and open on the diff from your SHA to the new head. Viewed
+        state is also written to GitHub (<code>markFileAsViewed</code>, input
+        <code>pullRequestId, path</code>), so the web UI and your other machines agree.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app">
+            <div class="band" style="margin: 0; border-radius: 0">
+              <b>3 commits since you last looked</b><span>2 h ago</span
+              ><span>4 files changed · 51 still viewed</span
+              ><span class="sp" style="flex: 1"></span>
+              <div class="seg" role="group" aria-label="Diff range">
+                <button type="button" aria-pressed="true">
+                  Since my review <span class="kbd">s</span></button
+                ><button type="button" aria-pressed="false">Whole PR</button>
+              </div>
+            </div>
+            <div class="cols">
+              <div class="side">
+                <div class="h">Chapter 2 · Sharding</div>
+                <div class="frow">
+                  <span class="st" style="color: var(--a-ok)">✓</span
+                  ><span class="n">scripts/e2e-timings.ts</span><span class="sub">viewed</span>
+                </div>
+                <div class="frow cur">
+                  <span class="st" style="color: var(--a-warn)">●</span
+                  ><span class="n">scripts/e2e-shard.ts</span><span class="sub">changed</span>
+                </div>
+                <div class="frow">
+                  <span class="st" style="color: var(--a-warn)">●</span
+                  ><span class="n">playwright.config.ts</span><span class="sub">changed</span>
+                </div>
+                <div class="frow">
+                  <span class="st" style="color: var(--a-accent-text)">+</span
+                  ><span class="n">scripts/e2e-burn-in.ts</span><span class="sub">new file</span>
+                </div>
+                <div class="frow">
+                  <span class="st" style="color: var(--a-ok)">✓</span
+                  ><span class="n">.github/workflows/ci.yml</span><span class="sub">viewed</span>
+                </div>
+              </div>
+              <div class="pane">
+                <div class="fh">
+                  <span class="p">scripts/e2e-shard.ts</span
+                  ><span class="chip md">Changed since you viewed</span
+                  ><span class="note">Showing 9f0c76eb … head</span>
+                </div>
+                <table class="code">
+                  <tr class="hunk">
+                    <td class="ln"></td>
+                    <td class="gut"></td>
+                    <td class="mk"></td>
+                    <td>@@ -41,6 +41,9 @@</td>
+                  </tr>
+                  <tr class="del">
+                    <td class="ln">42</td>
+                    <td class="gut"></td>
+                    <td class="mk">−</td>
+                    <td>
+                      <span class="k">return</span> shards.<span class="f">map</span>((s) =&gt;
+                      s.specs)
+                    </td>
+                  </tr>
+                  <tr class="add">
+                    <td class="ln">42</td>
+                    <td class="gut"></td>
+                    <td class="mk">+</td>
+                    <td><span class="c">// hooks count toward a spec's time</span></td>
+                  </tr>
+                  <tr class="add">
+                    <td class="ln">43</td>
+                    <td class="gut"></td>
+                    <td class="mk">+</td>
+                    <td>
+                      <span class="k">return</span> shards.<span class="f">map</span>((s) =&gt;
+                      s.specs.<span class="f">concat</span>(s.hooks))
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          Illustrative. File paths, the commit <code>9f0c76eb</code> ("ci: E2E timings count the
+          hooks around each test") and the PR are real; the hunk is invented. ✓ viewed and
+          unchanged, ● changed since you viewed, + new since you viewed.
+        </figcaption>
+      </figure>
+      <figure class="fig">
+        <div class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+  [*] --> Unviewed
+  Unviewed --> Viewed: you mark it (v)\nviewedAtSha = head
+  Viewed --> ChangedSince: a push touches the file
+  ChangedSince --> Viewed: you view the interdiff\nviewedAtSha = new head
+  Viewed --> Unviewed: you unmark it
+  ChangedSince --> Unviewed: you unmark it
+</pre
+          >
+        </div>
+        <figcaption>
+          Per-file state. <code>ChangedSince</code> is GitHub's <code>DISMISSED</code>. After a
+          force-push that removed your SHA, the interdiff falls back to the whole file with a
+          "history rewritten" note; old heads are fetched into
+          <code>refs/terminator/review/&lt;pr&gt;/&lt;sha&gt;</code> while you review, which keeps
+          them available locally.
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- ─────────────── S2 ─────────────── -->
+    <section>
+      <h2 id="s2"><span class="id">S2</span>Resume card and private notes</h2>
+      <p class="prose">
+        Reopen a PR after more than 15 minutes away and a card says where you were and what moved.
+        Press <span class="mono">m</span> on any line to leave yourself a note. A note containing
+        <code>??</code> is a question, and the card offers to send it to the agent (from revdiff).
+        Notes never leave your machine.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app">
+            <div class="resume">
+              <div style="display: flex; gap: 10px; align-items: center">
+                <b>Where you left off · #209</b
+                ><span class="note">Yesterday 17:42 · 9 of 16 files viewed</span
+                ><span class="sp" style="flex: 1"></span
+                ><button class="btn pri" type="button">
+                  Continue
+                  <span
+                    class="kbd"
+                    style="
+                      color: inherit;
+                      background: transparent;
+                      border-color: rgba(255, 255, 255, 0.5);
+                    "
+                    >↵</span
+                  >
+                </button>
+              </div>
+              <ul>
+                <li>
+                  <span>→</span><span>Chapter 2 · <code>forge/amend.ts</code> line 118</span
+                  ><span class="note">last position</span>
+                </li>
+                <li>
+                  <span class="pip">2</span
+                  ><span
+                    >2 notes, 1 is a question: "why does amendOrder skip the ledger here??"</span
+                  ><button class="btn ag" type="button">Ask agent</button>
+                </li>
+                <li>
+                  <span class="pip ag">1</span><span>1 agent finding you haven't opened</span
+                  ><span class="note">must-fix</span>
+                </li>
+                <li>
+                  <span class="pip">3</span><span>3 draft comments not yet submitted</span
+                  ><button class="btn" type="button">Review drafts</button>
+                </li>
+                <li>
+                  <span style="color: var(--a-warn)">●</span
+                  ><span>1 push since · 2 viewed files changed</span><span class="note">S1</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          Illustrative contents for #209. <code>forge/amend.ts</code> and
+          <code>amendOrder</code> are placeholders for wherever you actually stopped.
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- ─────────────── S3 ─────────────── -->
+    <section>
+      <h2 id="s3"><span class="id">S3</span>Keyboard-first review</h2>
+      <p class="prose">
+        Single keys inside the review surface, handled on renderer <code>keydown</code> (never
+        <code>globalShortcut</code>, which takes an OS-wide claim). Escape is left alone because a
+        double Escape leaves the extension. <span class="mono">?</span> shows this sheet.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app">
+            <div class="bar">
+              <span class="t">Keyboard</span><span class="sp"></span><span class="kbd">?</span>
+            </div>
+            <div class="keys">
+              <div><span class="kbd">j</span><span class="kbd">k</span>Next / previous hunk</div>
+              <div><span class="kbd">]</span><span class="kbd">[</span>Next / previous file</div>
+              <div><span class="kbd">n</span>Next unviewed</div>
+              <div><span class="kbd">v</span>Mark file viewed</div>
+              <div><span class="kbd">s</span>Since my review / whole PR</div>
+              <div><span class="kbd">c</span>Cycle comments</div>
+              <div><span class="kbd">⇧C</span>Agent notes on / off</div>
+              <div><span class="kbd">a</span>Ask agent on selection</div>
+              <div><span class="kbd">e</span>Explain selection</div>
+              <div><span class="kbd">r</span>Comment on line</div>
+              <div><span class="kbd">m</span>Private note</div>
+              <div><span class="kbd">g</span><span class="kbd">d</span>Peek definition</div>
+              <div><span class="kbd">t</span>Hide file list</div>
+              <div><span class="kbd">i</span>Insights panel</div>
+              <div><span class="kbd">⌘↵</span>Submit review</div>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          Proposed bindings. <span class="mono">j</span>/<span class="mono">k</span> continue into
+          the next file at a file's end, like revdiff's <code>--cross-file-hunks</code>.
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- ─────────────── S4 ─────────────── -->
+    <section>
+      <h2 id="s4"><span class="id">S4</span>Moved code collapses</h2>
+      <p class="prose">
+        A block deleted in one place and added unchanged elsewhere (3 or more lines, compared with
+        whitespace normalised) collapses to one row that links both ends. A moved block with small
+        edits shows only the edits. This uses the same tree-sitter parse as R3. Today's Semantic
+        filter (<code>classifyHunk</code>) already hides formatting-only hunks and stays.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app">
+            <div class="fh">
+              <span class="p">review/reading-order.ts</span><span class="chip">new file</span>
+            </div>
+            <div class="moved">
+              <span class="chip">Moved</span
+              ><span
+                ><b>UnionFind</b> · 28 lines, unchanged, from
+                <code>github/pr-review-service.ts:360</code></span
+              ><span style="flex: 1"></span><button class="btn" type="button">Show</button
+              ><button class="btn" type="button">Go to origin</button>
+            </div>
+            <table class="code">
+              <tr class="add">
+                <td class="ln">41</td>
+                <td class="gut"></td>
+                <td class="mk">+</td>
+                <td>
+                  <span class="k">export function</span> <span class="f">orderHunks</span>(graph:
+                  HunkGraph): HunkRef[] {
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <figcaption>
+          Illustrative: if R3 moved the existing <code>UnionFind</code> class out of
+          <code>pr-review-service.ts</code>, this is how the move would read instead of 28 red and
+          28 green lines.
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- ─────────────── S5 ─────────────── -->
+    <section>
+      <h2 id="s5"><span class="id">S5</span>One review, not N comments</h2>
+      <p class="prose">
+        Comments you write go into a pending review instead of posting one by one. GitHub supports
+        this directly: "To create a pending review for a pull request, leave the event parameter
+        blank" (<a
+          href="https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request"
+          >REST docs</a
+        >). You can edit or delete drafts until you submit. The author gets one notification.
+      </p>
+      <figure class="fig">
+        <div class="mock">
+          <div class="app">
+            <div class="submit">
+              <span class="pip">3</span><span>3 draft comments on 2 files</span
+              ><span class="note">1 from an agent finding</span><span style="flex: 1"></span
+              ><button class="btn" type="button">Review drafts</button>
+              <div class="seg" role="group" aria-label="Verdict">
+                <button type="button" aria-pressed="false">Comment</button
+                ><button type="button" aria-pressed="true">Approve</button
+                ><button type="button" aria-pressed="false">Request changes</button>
+              </div>
+              <button class="btn pri" type="button">Submit review</button>
+            </div>
+          </div>
+        </div>
+        <figcaption>Proposed submit bar, pinned to the bottom of the review surface.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ─────────────── Architecture ─────────────── -->
+    <section>
+      <h2 id="arch">Architecture</h2>
+      <figure class="fig">
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart TB
+  subgraph R["Renderer (extension view)"]
+    DASH["ReviewDashboard.tsx<br/>R1"]
+    VIEW["PrReviewView / ReviewDiffPane<br/>R2 R3 S1 S3 S4 S5"]
+    INS["InsightsPanel.tsx<br/>R4"]
+    AGP["AgentPanel.tsx<br/>R5"]
+  end
+  subgraph M["Main process (extension handlers)"]
+    GHI["github.ipc.ts<br/>+ dashboard-search, review-threads,<br/>file-viewed-set, pending-review-*"]
+    ORD["review/reading-order.ts<br/>review/symbols.ts (tree-sitter)"]
+    MET["review/insights.ts"]
+    AGI["review-agent.ipc.ts<br/>review/review-agent.ts"]
+    WT["review/worktree.ts<br/>detached worktree at PR head"]
+  end
+  GH[("GitHub via gh")]
+  CL["claude -p<br/>Read, Grep, Glob only"]
+  DASH --> GHI
+  VIEW --> GHI
+  VIEW --> ORD
+  INS --> MET
+  AGP --> AGI
+  GHI --> GH
+  ORD --> WT
+  MET --> WT
+  AGI --> WT
+  AGI --> CL
+  CL --> WT
+</pre>
+        </div>
+        <figcaption>
+          Everything stays inside <code>extensions/git-integration</code>. The only core APIs used
+          already exist: <code>sidebar.registerGlobalTab</code>, <code>pty.openTerminalTab</code>,
+          <code>settings</code>, <code>ipc.registerHandler</code>.
+        </figcaption>
+      </figure>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr>
+              <th>Piece</th>
+              <th>Path (under extensions/git-integration/src)</th>
+              <th>Kind</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Dashboard search</td>
+              <td>
+                <code>github/dashboard-search.ts</code>,
+                <code>components/pr-review/ReviewDashboard.tsx</code>
+              </td>
+              <td>new</td>
+            </tr>
+            <tr>
+              <td>Review threads with resolution</td>
+              <td>
+                <code>ipc/github.ipc.ts</code> channel <code>github:review-threads</code>;
+                <code>ThreadSchema.resolved</code>
+              </td>
+              <td>change</td>
+            </tr>
+            <tr>
+              <td>Symbols and reading order</td>
+              <td>
+                <code>review/symbols.ts</code> (tree-sitter),
+                <code>review/reading-order.ts</code> (pure), replaces ordering inside
+                <code>buildChapters</code>
+              </td>
+              <td>new + change</td>
+            </tr>
+            <tr>
+              <td>Insights</td>
+              <td>
+                <code>review/insights.ts</code> (pure),
+                <code>components/pr-review/InsightsPanel.tsx</code>; <code>HealthChips</code> and
+                <code>RiskBreakdownPanel</code> read from it
+              </td>
+              <td>new + change</td>
+            </tr>
+            <tr>
+              <td>Review worktree</td>
+              <td>
+                <code>review/worktree.ts</code>: fetch <code>pull/N/head</code>,
+                <code>git worktree add --detach</code>, keep the 5 most recent
+              </td>
+              <td>new</td>
+            </tr>
+            <tr>
+              <td>Agent</td>
+              <td>
+                <code>review/review-agent.ts</code>, <code>schemas/review-agent.schema.ts</code>,
+                <code>ipc/review-agent.ipc.ts</code>,
+                <code>components/pr-review/AgentPanel.tsx</code>
+              </td>
+              <td>new</td>
+            </tr>
+            <tr>
+              <td>Session v2</td>
+              <td>
+                <code>schemas/pr-review.schema.ts</code> <code>ReviewSessionSchema</code>: key
+                <code>repo:::pr</code>, <code>files: Record&lt;path, { viewedAtSha }&gt;</code>,
+                <code>notes[]</code>; reads v1 keys once and migrates
+              </td>
+              <td>change</td>
+            </tr>
+            <tr>
+              <td>Keys, resume, moved code, drafts</td>
+              <td>
+                <code>hooks/useReviewKeys.ts</code>,
+                <code>components/pr-review/ResumeCard.tsx</code>,
+                <code>review/moved-blocks.ts</code>, <code>github:pending-review-add</code> /
+                <code>-submit</code>
+              </td>
+              <td>new</td>
+            </tr>
+            <tr>
+              <td>Dependencies</td>
+              <td>
+                <code>web-tree-sitter</code> 0.27.0, <code>@vscode/tree-sitter-wasm</code> 0.3.1, in
+                the extension's own <code>package.json</code>
+              </td>
+              <td>new</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose">
+        New IPC channels are documented in a contract file for this feature, as the repo does for
+        others (<code>specs/006-mergeflow-conflict-resolver/contracts/ipc-channels.md</code>). Two
+        ADRs: one for the hunk-level reading order (superseding ADR-010's ordering), one for the
+        read-only headless review agent.
+      </p>
+    </section>
+
+    <section>
+      <h2 id="sequence">Sequence of changes</h2>
+      <p class="prose">
+        One PR per row, each shippable on its own, ordered by relief per day of work.
+      </p>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Ships</th>
+              <th>Why this position</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>R2 comment visibility, resolved threads</td>
+              <td>Smallest; immediate relief.</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>S1 session v2, since-your-review, GitHub viewed sync</td>
+              <td>Stops pushes wiping progress; R5 and S2 store data in this session.</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>R1 dashboard</td>
+              <td>Independent of the diff surface.</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>Review worktree + R3 reading order + S4 moved code</td>
+              <td>The tree-sitter parse lands once and feeds R3, S4 and R4.</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>R4 insights</td>
+              <td>Needs the parse and the worktree.</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>R5 agent review</td>
+              <td>
+                Needs the worktree; posts through S5 if it has shipped, else through today's
+                composer.
+              </td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td>S3 keyboard, S2 resume card and notes, S5 pending review</td>
+              <td>Binds keys to everything above.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="prose">
+      <h2 id="testing">Testing and verification</h2>
+      <p>
+        Each PR is done when these exit 0 from the worktree, per the constitution and this repo's
+        checklist:
+      </p>
+      <pre class="diagram" style="font: 13px/1.6 var(--mono); white-space: pre-wrap">
+npm run format
+npm run lint
+npx vitest run --coverage          # all pass, patch coverage ≥ 80%
+npx playwright test tests/e2e/git-integration-smoke.spec.ts</pre
+      >
+      <p>Tests written first, per unit:</p>
+      <ul>
+        <li>
+          <code>reading-order.spec.ts</code>: the seven-file example above yields the proposed
+          order; a cycle (A calls B, B calls A) stays together; a file with no grammar falls back to
+          tiers; manual overrides win.
+        </li>
+        <li>
+          <code>symbols.spec.ts</code>: definitions and references for TS, TSX, Python and Go
+          fixtures shaped like real hunks (not empty files).
+        </li>
+        <li>
+          <code>insights.spec.ts</code>: coverage source order (check, then worktree at head, else
+          "not measured"); a <code>&amp;&amp;</code> inside a string is not a branch.
+        </li>
+        <li>
+          <code>review-agent.spec.ts</code>: the spawned argv contains
+          <code>--tools Read,Grep,Glob</code> and no Bash; output failing the schema becomes an
+          error, never a partial list; timeout and cancel kill the process.
+        </li>
+        <li>
+          <code>pr-review.store.spec.ts</code>: a new head keeps viewed files whose content is
+          unchanged; a v1 session migrates.
+        </li>
+        <li>
+          E2E: open a PR, toggle comments, confirm the rendered DOM (not a store call) hides
+          threads; reload and confirm the choice held.
+        </li>
+      </ul>
+      <p>
+        Then a live run on a real PR (#213, 109 files): screenshot every surface in the running app,
+        and time one agent review at each scope.
+      </p>
+    </section>
+
+    <section>
+      <h2 id="risks">Risks and mitigations</h2>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr>
+              <th>Risk</th>
+              <th>Mitigation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Parsing 100+ files blocks the main process</td>
+              <td>Parse in a worker thread; parse only changed files; cache by blob SHA.</td>
+            </tr>
+            <tr>
+              <td>Grammar WASM adds weight to the extension</td>
+              <td>
+                Load a grammar on first use of its language.
+                <span class="unv">[UNVERIFIED]</span> total size not measured yet.
+              </td>
+            </tr>
+            <tr>
+              <td>Agent cost and wait on large PRs</td>
+              <td>
+                Default scope is the selection; PR scope shows the file count first; one run per
+                scope; results cached per head SHA.
+              </td>
+            </tr>
+            <tr>
+              <td>Agent findings are wrong</td>
+              <td>
+                Private by default, never auto-posted, each can be dismissed; dismissals are kept so
+                the same finding isn't shown twice.
+              </td>
+            </tr>
+            <tr>
+              <td>Search API rate limits on the dashboard</td>
+              <td>
+                One GraphQL request for all sections using aliases; refresh on focus and at most
+                every 2 min; show the reset time as today's <code>RATE_LIMITED</code> path does.
+              </td>
+            </tr>
+            <tr>
+              <td>Worktrees pile up on disk</td>
+              <td>
+                Keep the 5 most recent; remove on PR close; <code>git worktree prune</code> at
+                start.
+              </td>
+            </tr>
+            <tr>
+              <td>Force-push removed your old SHA</td>
+              <td>
+                Old heads are fetched into <code>refs/terminator/review/*</code> while you review;
+                if absent, show the whole file with a note.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="prose">
+      <h2 id="open">Open questions</h2>
+      <ol>
+        <li>
+          Which five tools does the Stackademic article name? I couldn't read it; if it lists
+          something not in the table above, it may change S3 or S4.
+        </li>
+        <li>
+          <span class="unv">[UNVERIFIED]</span> Does
+          <code>team-review-requested-user:@me</code> accept <code>@me</code>? The docs example uses
+          a login. If not, the query uses the login from <code>github:current-user</code>.
+        </li>
+        <li>
+          Agent model: <code>opus</code> for every scope, or <code>sonnet</code> for line and hunk
+          scopes to save time?
+        </li>
+        <li>
+          Coverage for repos whose CI doesn't publish a patch-coverage check: is "not measured"
+          acceptable, or should the worktree run the test suite on request?
+        </li>
+        <li>
+          Dashboard for a repo not cloned locally: clone on demand into a Terminator-managed folder,
+          or open a diff-only review with no local metrics?
+        </li>
+        <li>Should dismissed agent findings sync anywhere, or stay on this machine only?</li>
+      </ol>
+    </section>
+
+    <section class="prose">
+      <h2 id="rejected">Alternatives rejected</h2>
+      <ul>
+        <li>
+          Posting agent findings as GitHub review comments by default: you asked for the opposite.
+        </li>
+        <li>LSP for reading order: needs per-language servers and installed dependencies.</li>
+        <li>
+          An interactive terminal agent per question: a tab per question is noise; kept only as
+          "Continue in terminal".
+        </li>
+        <li>
+          Reusing Foundry's runner or risk grader: Principle II forbids cross-extension imports.
+        </li>
+        <li>Octokit for the dashboard: ADR-009 keeps all GitHub calls on <code>gh</code>.</li>
+        <li>
+          A single composite "health score": hides which signal moved; five labelled measures
+          instead.
+        </li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<script>
+  ;(function () {
+    // R1 tabs
+    const dash = document.getElementById('dash')
+    dash.querySelectorAll('[role=tab]').forEach((t) =>
+      t.addEventListener('click', () => {
+        dash.querySelectorAll('[role=tab]').forEach((x) => x.setAttribute('aria-selected', x === t))
+        dash.querySelectorAll('[role=tabpanel]').forEach((p) => (p.hidden = p.id !== t.dataset.p))
+      })
+    )
+    // R2 comment visibility
+    const cv = document.getElementById('cv')
+    let mode = 'all',
+      agent = true
+    function renderCv() {
+      cv.querySelectorAll('[data-v]').forEach((b) =>
+        b.setAttribute('aria-pressed', b.dataset.v === mode)
+      )
+      cv.querySelectorAll('[data-a]').forEach((b) =>
+        b.setAttribute('aria-pressed', (b.dataset.a === 'on') === agent)
+      )
+      cv.querySelectorAll('.tr-thread').forEach((r) => {
+        const resolved = r.classList.contains('resolved-row')
+        r.hidden = mode === 'hidden' || (mode === 'unres' && resolved)
+      })
+      cv.querySelector('.tr-agent').hidden = !agent
+      const gp = cv.querySelector('.gp')
+      gp.hidden = mode !== 'hidden'
+      const agp = cv.querySelector('.agp')
+      agp.hidden = agent
+    }
+    cv.querySelectorAll('[data-v]').forEach((b) =>
+      b.addEventListener('click', () => {
+        mode = b.dataset.v
+        renderCv()
+      })
+    )
+    cv.querySelectorAll('[data-a]').forEach((b) =>
+      b.addEventListener('click', () => {
+        agent = b.dataset.a === 'on'
+        renderCv()
+      })
+    )
+    cv.querySelector('.gp').addEventListener('click', () => {
+      mode = 'all'
+      renderCv()
+    })
+    renderCv()
+    // R5 steps
+    const ag = document.getElementById('ag')
+    function step(n) {
+      ag.querySelectorAll('[data-s]').forEach((b) =>
+        b.setAttribute('aria-selected', b.dataset.s == n)
+      )
+      ag.querySelector('.ag-float').hidden = n != 1
+      ag.querySelectorAll('tr.sel').forEach((r) => r.classList.toggle('sel', true))
+      ag.querySelector('.p1').hidden = n != 1
+      ag.querySelector('.p2').hidden = n != 2
+      ag.querySelector('.p3').hidden = n < 3
+      ag.querySelector('.ag-note').hidden = n < 3
+      ag.querySelector('.ag3').hidden = n < 3
+      ag.querySelector('.ag-compose').hidden = n != 4
+    }
+    ag.querySelectorAll('[data-s]').forEach((b) =>
+      b.addEventListener('click', () => step(+b.dataset.s))
+    )
+    ag.querySelector('.ag-float .btn.ag').addEventListener('click', () => step(2))
+    step(1)
+  })()
+</script>
