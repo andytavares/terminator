@@ -1,0 +1,22 @@
+extensions/foundry/src/index.ts
+  s_af088fe0b546b8::t_07ced04fdc0a84 216-225,1978,2064,2164,2220,2872
+extensions/foundry/tests/ipc/order-delete-intake-ipc.spec.ts
+  s_af088fe0b546b8::t_0f310157a98a4c 168-169
+  s_af088fe0b546b8::t_6f065eaaa06984 1-167,170-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cfa4f72bfb570e91f44f169c4ef6b42b7082caa4",
+  "prompts": {},
+  "sessions": {
+    "s_af088fe0b546b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "864c9e9e-c424-4396-81af-3d272ad50cda",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
