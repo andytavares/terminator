@@ -45,6 +45,12 @@ async function buildExtension(name) {
       'gray-matter',
       'node-ical',
       '@modelcontextprotocol/sdk',
+      // Remote Control's server. Root dependencies, resolved from node_modules
+      // at runtime; bundled, they made a 2.1 MB main-process file.
+      'fastify',
+      '@fastify/static',
+      '@fastify/websocket',
+      'bcryptjs',
     ],
     logLevel: 'info',
   })
