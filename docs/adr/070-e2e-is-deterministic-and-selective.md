@@ -21,7 +21,7 @@ The merge of PR #210 went red in E2E ([run 36290488257](https://github.com/andyt
   - A modal that opens while a terminal refocus is queued keeps its focus.
 - `scripts/e2e-select.mjs` maps the changed paths to spec files. A core path, a push to `main` or any path the map does not know runs everything. A docs-only diff runs nothing.
 - Changed specs run three times in a row before they can merge.
-- Build starts alongside the other checks. E2E runs in two shards and reports through one `E2E result` job. That job is the check branch protection requires.
+- Build starts alongside the other checks. E2E runs in two shards and reports through one `E2E result` job. That job is the check branch protection requires. (Shard count and splitting: ADR 071.)
 
 ## Motivation
 
