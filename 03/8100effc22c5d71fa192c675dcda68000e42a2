@@ -1,0 +1,76 @@
+extensions/git-integration/src/review/test-references.ts
+  s_ccef6bf06cd549::t_c81de3c7156982 1-15,17-33
+  s_ccef6bf06cd549::t_3aabb2da139232 16
+extensions/git-integration/tests/unit/moved-blocks.spec.ts
+  s_ccef6bf06cd549::t_0ecb90bf08735e 79,83,111-118,130-138,148-150,154-156,160-162
+  s_ccef6bf06cd549::t_cd304981f965f3 10-11,17,23,42-43
+  s_ccef6bf06cd549::t_1c3c7512446ea8 108-110,119-129,139-147,151-153,157-159,163-167
+  s_ccef6bf06cd549::t_f59d384d70dddd 1-9,12-16,18-22,24-41,44-78,80-82,84-107,168
+extensions/git-integration/tests/unit/analyse.spec.ts
+  s_ccef6bf06cd549::t_ae88a8e765483f 1-24,31-50
+  s_ccef6bf06cd549::t_0ecb90bf08735e 25-30
+extensions/git-integration/tests/unit/review-wiring.spec.ts
+  s_ccef6bf06cd549::t_9a46c561c4e9f7 95-100
+  s_ccef6bf06cd549::t_c81de3c7156982 1-94,101-122
+extensions/git-integration/src/github/pr-review-service.ts
+  s_ccef6bf06cd549::t_d3e0747cdf32f9 224
+extensions/git-integration/tests/unit/insights.spec.ts
+  s_ccef6bf06cd549::t_146e1a764dc205 41-57
+  s_ccef6bf06cd549::t_e894179f5062b5 1-40,114-119,121-135,142-147,149-203,210-260,266-267,286-369
+  s_ccef6bf06cd549::t_0ecb90bf08735e 120,136-141,148,204-209,261-265,268-285
+  s_ccef6bf06cd549::t_50647cab1ab1f1 78-113
+  s_ccef6bf06cd549::t_10d2c3b3636076 58-77
+extensions/git-integration/tests/unit/reading-order.spec.ts
+  s_ccef6bf06cd549::t_67516578a009a1 1-96,98-191,198-203
+  s_ccef6bf06cd549::t_0ecb90bf08735e 97,192-197
+extensions/git-integration/src/review/symbols.ts
+  s_ccef6bf06cd549::t_df50782b3d20aa 230,234-236
+  s_ccef6bf06cd549::t_d8e15b9df58ddf 1-192,194-229,231-233,237-255,258-265,267-282,284-287,289-301,303-321,323-363,365-413
+  s_ccef6bf06cd549::t_ecd34663390aa4 193
+  s_ccef6bf06cd549::t_00ee6fac49be89 302
+  s_ccef6bf06cd549::t_e46bd0c196dae0 256-257,266
+  s_ccef6bf06cd549::t_7cd4021927c41d 283
+  s_ccef6bf06cd549::t_d992694742c3c3 322
+  s_ccef6bf06cd549::t_72555baebec568 288
+  s_ccef6bf06cd549::t_d2c522283c49ed 364
+extensions/git-integration/src/review/moved-blocks.ts
+  s_ccef6bf06cd549::t_a46262c8f537cc 1-118
+extensions/git-integration/src/review/reading-order.ts
+  s_ccef6bf06cd549::t_0ecb90bf08735e 194,249,277-278
+  s_ccef6bf06cd549::t_880b26a817f0ee 1-193,195-248,250-276,279-290
+extensions/git-integration/tests/unit/symbols.spec.ts
+  s_ccef6bf06cd549::t_d66924fe9307da 126-170
+  s_ccef6bf06cd549::t_d090fb6179cee2 1-125,171-182,201-218
+  s_ccef6bf06cd549::t_be06ead18a3a65 183-200
+extensions/git-integration/src/review/apply-reading-order.ts
+  s_ccef6bf06cd549::t_c81de3c7156982 1-29
+extensions/git-integration/src/review/insights.ts
+  s_ccef6bf06cd549::t_51618fdf00ce21 1-9,17-45,50-54,60-68,79-92,94-99,101-104,111-174,179-221,223-232,235-278,280-293,295-359,365,374-396
+  s_ccef6bf06cd549::t_28fa2baeff1c67 294
+  s_ccef6bf06cd549::t_b0d6863c00e6a6 69-74,93
+  s_ccef6bf06cd549::t_24b0be09894fca 279
+  s_ccef6bf06cd549::t_0ecb90bf08735e 10-16,46-49,59,105-110,175-178,360-364,366-373
+  s_ccef6bf06cd549::t_b9bb02b5d1751a 233-234
+  s_ccef6bf06cd549::t_e0ab4cb548f87b 75-78
+  s_ccef6bf06cd549::t_bdf167579a31ea 55-58,100
+  s_ccef6bf06cd549::t_1e86016e137132 222
+extensions/git-integration/src/review/analyse.ts
+  s_ccef6bf06cd549::t_0ecb90bf08735e 29-31
+  s_ccef6bf06cd549::t_f3833756e7435a 1-28,32-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "038100effc22c5d71fa192c675dcda68000e42a2",
+  "prompts": {},
+  "sessions": {
+    "s_ccef6bf06cd549": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e87f48c-11ea-4fe7-83e0-74518a15e2a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
