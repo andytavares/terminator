@@ -28,6 +28,12 @@ export default defineConfig({
   test: {
     globals: true,
     setupFiles: ['tests/setup.ts'],
+    // Electron 42 downloads its binary on the first require('electron'), which
+    // specs reach through externalised dependencies vi.mock cannot intercept.
+    // No unit test runs the binary; the override makes the require a path join.
+    env: {
+      ELECTRON_OVERRIDE_DIST_PATH: resolve(__dirname, 'node_modules/electron/dist'),
+    },
     projects: [
       {
         extends: true,
