@@ -221,7 +221,7 @@ function isLockOrGeneratedFile(name: string): boolean {
   return false
 }
 
-function classifyTier(path: string): 0 | 1 | 2 | 3 {
+export function classifyTier(path: string): 0 | 1 | 2 | 3 {
   const name = path.split('/').pop() ?? path
   if (
     /\.(d\.ts|types?\.ts|interface\.ts)$/.test(name) ||

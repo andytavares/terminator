@@ -8,6 +8,8 @@ import type {
   IssueComment,
   RiskScore,
   SignalDots,
+  ReviewNote,
+  DraftComment,
 } from '../schemas/pr-review.schema'
 
 interface RateLimitState {
@@ -36,6 +38,20 @@ interface PrReviewStore {
   fileOrderOverrides: Record<string, string[]>
   scrollPosition: number | null
   pausedAt: string | null
+  /** Head SHA each viewed file was viewed at (S1). */
+  viewedAt: Record<string, string>
+  /** Files you viewed that a later push changed. Not counted as viewed. */
+  changedSince: Set<string>
+  /** Files a push added since you last looked (S1 "new file"). */
+  newSinceLook: Set<string>
+  /** The head the stored session last saw, before this open reconciled it. */
+  lastSeenHeadSHA: string | null
+  /** The history was rewritten under a viewed file; its interdiff is unavailable. */
+  historyRewritten: boolean
+  /** When the stored session was last opened, for the resume card (S2). */
+  lastAccessedAt: string | null
+  notes: ReviewNote[]
+  drafts: DraftComment[]
 
   // Inline comments (keyed by path)
   threads: Record<string, Thread[]>
@@ -93,10 +109,37 @@ interface PrReviewStore {
   dismissPr(prNumber: number): void
 
   initSession(session: ReviewSession): void
+  /**
+   * Moves viewed files a push has since changed out of `viewedFiles` and into
+   * `changedSince`. 'all' means the old head is gone (force-push), so every
+   * viewed file must be looked at again.
+   */
+  reconcileHead(
+    repoRoot: string,
+    prNumber: number,
+    headSHA: string,
+    changedPaths: string[] | 'all',
+    addedPaths?: string[]
+  ): void
+
+  addNote(repoRoot: string, prNumber: number, headSHA: string, note: ReviewNote): void
+  removeNote(repoRoot: string, prNumber: number, headSHA: string, id: string): void
+  addDraft(repoRoot: string, prNumber: number, headSHA: string, draft: DraftComment): void
+  updateDraft(repoRoot: string, prNumber: number, headSHA: string, id: string, body: string): void
+  removeDraft(repoRoot: string, prNumber: number, headSHA: string, id: string): void
+  clearDrafts(repoRoot: string, prNumber: number, headSHA: string): void
   reset(): void
 }
 
-function sessionKey(repoRoot: string, prNumber: number, headSHA: string): string {
+/**
+ * v2 sessions are keyed by PR, not by head: a push must not start a blank
+ * session. `legacySessionKey` is only read, to carry a v1 session forward.
+ */
+export function sessionKey(repoRoot: string, prNumber: number): string {
+  return `${repoRoot}:::${prNumber}`
+}
+
+export function legacySessionKey(repoRoot: string, prNumber: number, headSHA: string): string {
   return `${repoRoot}:::${prNumber}:::${headSHA}`
 }
 
@@ -109,6 +152,9 @@ async function persistSession(
     | 'pausedAt'
     | 'currentChapterId'
     | 'currentFilePath'
+    | 'viewedAt'
+    | 'notes'
+    | 'drafts'
   >,
   repoRoot: string,
   prNumber: number,
@@ -126,9 +172,24 @@ async function persistSession(
     scrollPosition: store.scrollPosition,
     pausedAt: store.pausedAt,
     lastAccessedAt: new Date().toISOString(),
+    viewedAt: store.viewedAt,
+    notes: store.notes,
+    drafts: store.drafts,
   }
-  const key = sessionKey(repoRoot, prNumber, headSHA)
+  const key = sessionKey(repoRoot, prNumber)
   await githubAPI.sessionSet(key, session)
+}
+
+/** Mirrors a viewed mark onto GitHub (S1). Best-effort: local state is the source of truth. */
+function syncViewed(repoRoot: string, prNumber: number, path: string, viewed: boolean): void {
+  if (typeof window === 'undefined') return
+  try {
+    void Promise.resolve(githubAPI.fileViewedSet(repoRoot, prNumber, path, viewed)).catch(
+      () => undefined
+    )
+  } catch {
+    // No bridge (a test or a detached view): nothing to mirror to.
+  }
 }
 
 export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
@@ -147,6 +208,14 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   fileOrderOverrides: {},
   scrollPosition: null,
   pausedAt: null,
+  viewedAt: {},
+  changedSince: new Set(),
+  newSinceLook: new Set(),
+  lastSeenHeadSHA: null,
+  historyRewritten: false,
+  lastAccessedAt: null,
+  notes: [],
+  drafts: [],
   threads: {},
   issueComments: [],
   rateLimitState: null,
@@ -170,8 +239,12 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     set((state) => {
       const next = new Set(state.viewedFiles)
       next.add(filePath)
+      const changed = new Set(state.changedSince)
+      changed.delete(filePath)
       return {
         viewedFiles: next,
+        changedSince: changed,
+        viewedAt: { ...state.viewedAt, [filePath]: headSHA },
         prQueue: state.prQueue.map((pr) =>
           pr.number === prNumber
             ? { ...pr, sessionStatus: 'in-progress' as const, viewedFileCount: next.size }
@@ -181,14 +254,21 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     })
     const state = get()
     persistSession(state, repoRoot, prNumber, headSHA)
+    syncViewed(repoRoot, prNumber, filePath, true)
   },
 
   unmarkFileViewed: (repoRoot, prNumber, headSHA, filePath) => {
     set((state) => {
       const next = new Set(state.viewedFiles)
       next.delete(filePath)
+      const changed = new Set(state.changedSince)
+      changed.delete(filePath)
+      const viewedAt = { ...state.viewedAt }
+      delete viewedAt[filePath]
       return {
         viewedFiles: next,
+        changedSince: changed,
+        viewedAt,
         prQueue: state.prQueue.map((pr) =>
           pr.number === prNumber ? { ...pr, viewedFileCount: next.size } : pr
         ),
@@ -196,6 +276,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     })
     const state = get()
     persistSession(state, repoRoot, prNumber, headSHA)
+    syncViewed(repoRoot, prNumber, filePath, false)
   },
 
   reorderFiles: (chapterId, orderedPaths, repoRoot, prNumber, headSHA) => {
@@ -300,7 +381,64 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
       fileOrderOverrides: session.fileOrderOverrides,
       scrollPosition: session.scrollPosition,
       pausedAt: session.pausedAt,
+      viewedAt: session.viewedAt ?? {},
+      changedSince: new Set(),
+      newSinceLook: new Set(),
+      lastSeenHeadSHA: session.headSHA,
+      historyRewritten: false,
+      lastAccessedAt: session.lastAccessedAt,
+      notes: session.notes ?? [],
+      drafts: session.drafts ?? [],
     })
+  },
+
+  reconcileHead: (repoRoot, prNumber, headSHA, changedPaths, addedPaths = []) => {
+    set((state) => {
+      const touched = changedPaths === 'all' ? null : new Set(changedPaths)
+      const viewed = new Set<string>()
+      const changed = new Set(state.changedSince)
+      for (const path of state.viewedFiles) {
+        if (touched === null || touched.has(path)) changed.add(path)
+        else viewed.add(path)
+      }
+      return {
+        viewedFiles: viewed,
+        changedSince: changed,
+        historyRewritten: changedPaths === 'all' && changed.size > 0,
+        newSinceLook: new Set(addedPaths),
+      }
+    })
+    persistSession(get(), repoRoot, prNumber, headSHA)
+  },
+
+  addNote: (repoRoot, prNumber, headSHA, note) => {
+    set((state) => ({ notes: [...state.notes, note] }))
+    persistSession(get(), repoRoot, prNumber, headSHA)
+  },
+
+  removeNote: (repoRoot, prNumber, headSHA, id) => {
+    set((state) => ({ notes: state.notes.filter((n) => n.id !== id) }))
+    persistSession(get(), repoRoot, prNumber, headSHA)
+  },
+
+  addDraft: (repoRoot, prNumber, headSHA, draft) => {
+    set((state) => ({ drafts: [...state.drafts, draft] }))
+    persistSession(get(), repoRoot, prNumber, headSHA)
+  },
+
+  updateDraft: (repoRoot, prNumber, headSHA, id, body) => {
+    set((state) => ({ drafts: state.drafts.map((d) => (d.id === id ? { ...d, body } : d)) }))
+    persistSession(get(), repoRoot, prNumber, headSHA)
+  },
+
+  removeDraft: (repoRoot, prNumber, headSHA, id) => {
+    set((state) => ({ drafts: state.drafts.filter((d) => d.id !== id) }))
+    persistSession(get(), repoRoot, prNumber, headSHA)
+  },
+
+  clearDrafts: (repoRoot, prNumber, headSHA) => {
+    set({ drafts: [] })
+    persistSession(get(), repoRoot, prNumber, headSHA)
   },
 
   reset: () =>
@@ -312,6 +450,14 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
       fileOrderOverrides: {},
       scrollPosition: null,
       pausedAt: null,
+      viewedAt: {},
+      changedSince: new Set(),
+      newSinceLook: new Set(),
+      lastSeenHeadSHA: null,
+      historyRewritten: false,
+      lastAccessedAt: null,
+      notes: [],
+      drafts: [],
       threads: {},
       issueComments: [],
       rateLimitState: null,

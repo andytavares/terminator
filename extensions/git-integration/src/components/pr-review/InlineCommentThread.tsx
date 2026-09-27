@@ -15,7 +15,7 @@ export function InlineCommentThread({ thread, onReply }: Props) {
 
   return (
     <div
-      className={`inline-comment-thread${thread.outdated ? ' inline-comment-thread--outdated' : ''}`}
+      className={`inline-comment-thread${thread.outdated ? ' inline-comment-thread--outdated' : ''}${thread.resolved ? ' inline-comment-thread--resolved rs-thread--resolved' : ''}`}
     >
       {thread.outdated && <span className="inline-comment-outdated-label">Outdated</span>}
 
@@ -33,6 +33,7 @@ export function InlineCommentThread({ thread, onReply }: Props) {
               height={20}
             />
             <strong className="inline-comment-author">{comment.author}</strong>
+            {thread.resolved && <span className="inline-comment-resolved-label">Resolved</span>}
             <time className="inline-comment-time" dateTime={comment.createdAt}>
               {formatTime(comment.createdAt)}
             </time>

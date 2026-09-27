@@ -112,6 +112,83 @@ export const DryViolationSchema = z.object({
   lineCount: z.number(),
 })
 
+// ─── Reading order (R3) ─────────────────────────────────────────────────────────
+
+export const SymbolUseSchema = z.object({
+  symbol: z.string(),
+  /** 1-based step that defines it, when a file in this PR defines it. */
+  definedInStep: z.number().nullable(),
+  definedInPath: z.string().nullable(),
+})
+
+export const ReadingStepSchema = z.object({
+  step: z.number(),
+  path: z.string(),
+  /** The main symbol this step changes, shown after the file name. */
+  symbol: z.string().nullable(),
+  /** One line saying why it sits here, e.g. "Uses RiskScore (step 1)". */
+  reason: z.string(),
+  uses: z.array(SymbolUseSchema),
+})
+
+// ─── Moved blocks (S4) ────────────────────────────────────────────────────────
+
+export const MovedBlockSchema = z.object({
+  fromPath: z.string(),
+  fromLine: z.number(),
+  toPath: z.string(),
+  toLine: z.number(),
+  lineCount: z.number(),
+  symbol: z.string().nullable(),
+})
+
+// ─── Insights (R4) ────────────────────────────────────────────────────────────
+
+export const InsightSourceSchema = z.string()
+
+export const FunctionComplexitySchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  /** New-side line of the function's declaration, when it is in the diff. */
+  line: z.number().nullable(),
+  branchDelta: z.number(),
+})
+
+export const PrInsightsSchema = z.object({
+  complexity: z.object({
+    branchDelta: z.number(),
+    functions: z.array(FunctionComplexitySchema),
+    source: InsightSourceSchema,
+  }),
+  coverage: z.object({
+    /**
+     * The primary question is "does this changed block have a test", not a
+     * percentage: a changed function counts as tested when a test file (in the
+     * PR or already in the repo) references it.
+     */
+    changedFunctions: z.number(),
+    testedFunctions: z.number(),
+    untestedFunctions: z.array(z.string()),
+    /** Percent of new lines covered, from CI, when CI publishes it. Secondary. */
+    patchPercent: z.number().nullable(),
+    source: InsightSourceSchema,
+    changedSourceFiles: z.number(),
+    changedSourceFilesWithTests: z.number(),
+  }),
+  health: z.object({
+    flags: z.array(z.object({ kind: z.string(), label: z.string(), path: z.string() })),
+    source: InsightSourceSchema,
+  }),
+  understandability: z.object({
+    level: z.enum(['easy', 'moderate', 'hard']),
+    linesToRead: z.number(),
+    newExports: z.number(),
+    longestChain: z.number(),
+    crossChapterRefs: z.number(),
+    source: InsightSourceSchema,
+  }),
+})
+
 // ─── PR review detail ─────────────────────────────────────────────────────────
 
 export const PrReviewDetailSchema = z.object({
@@ -136,6 +213,9 @@ export const PrReviewDetailSchema = z.object({
   chapters: z.array(ChapterSchema),
   issueRefs: z.array(IssueRefSchema).default([]),
   dryViolations: z.array(DryViolationSchema).default([]),
+  readingOrder: z.array(ReadingStepSchema).default([]),
+  movedBlocks: z.array(MovedBlockSchema).default([]),
+  insights: PrInsightsSchema.nullable().default(null),
 })
 
 // ─── Review queue PR (lightweight summary) ────────────────────────────────────
@@ -165,6 +245,35 @@ export const ReviewQueuePRSchema = z.object({
   resumeChapter: z.number().optional(),
   resumeChapterTotal: z.number().optional(),
   mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).default('unknown'),
+})
+
+// ─── Review dashboard (R1) ─────────────────────────────────────────────────────
+
+export const DashboardSectionSchema = z.enum(['re-review', 'requested', 'team', 'mine', 'involved'])
+
+export const DashboardPRSchema = z.object({
+  /** owner/name */
+  repo: z.string(),
+  /** Local checkout whose origin is this repo, when there is one. */
+  localRepoRoot: z.string().nullable(),
+  section: DashboardSectionSchema,
+  number: z.number(),
+  title: z.string(),
+  url: z.string(),
+  author: z.string(),
+  isDraft: z.boolean(),
+  createdAt: z.string(),
+  additions: z.number(),
+  deletions: z.number(),
+  fileCount: z.number(),
+  riskLevel: z.enum(['low', 'medium', 'high']),
+  estimatedMinutes: z.number(),
+  ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
+  reviewDecision: z.enum(['approved', 'changes-requested', 'review-required', 'none']),
+  unresolvedThreads: z.number(),
+  /** Re-review only: commits after your latest review. */
+  commitsSinceMyReview: z.number(),
+  reviewerCount: z.number(),
 })
 
 // ─── PR issue (conversation) comments ────────────────────────────────────────
@@ -207,6 +316,29 @@ export const ThreadSchema = z.object({
   outdated: z.boolean(),
   comments: z.array(InlineCommentSchema),
   collapsed: z.boolean(),
+  resolved: z.boolean().default(false),
+})
+
+// ─── Notes and draft comments (S2, S5) ─────────────────────────────────────────
+
+export const ReviewNoteSchema = z.object({
+  id: z.string(),
+  path: z.string(),
+  line: z.number(),
+  side: z.enum(['LEFT', 'RIGHT']).default('RIGHT'),
+  body: z.string(),
+  createdAt: z.string(),
+})
+
+export const DraftCommentSchema = z.object({
+  id: z.string(),
+  path: z.string(),
+  line: z.number(),
+  startLine: z.number().nullable(),
+  side: z.enum(['LEFT', 'RIGHT']),
+  body: z.string(),
+  /** Set when the draft started from an agent finding. */
+  fromFindingId: z.string().nullable().default(null),
 })
 
 // ─── Review session (persisted to electron-store) ────────────────────────────
@@ -224,6 +356,12 @@ export const ReviewSessionSchema = z.object({
   scrollPosition: z.number().nullable(),
   pausedAt: z.string().nullable(),
   lastAccessedAt: z.string(),
+  /** v2: head SHA each file was marked viewed at (S1). */
+  viewedAt: z.record(z.string(), z.string()).default({}),
+  /** v2: private notes (S2). A note containing "??" is a question. */
+  notes: z.array(ReviewNoteSchema).default([]),
+  /** v2: draft comments, sent together on submit (S5). */
+  drafts: z.array(DraftCommentSchema).default([]),
 })
 
 // ─── Type exports ─────────────────────────────────────────────────────────────
@@ -244,3 +382,12 @@ export type Thread = z.infer<typeof ThreadSchema>
 export type ReviewSession = z.infer<typeof ReviewSessionSchema>
 export type IssueRef = z.infer<typeof IssueRefSchema>
 export type DryViolation = z.infer<typeof DryViolationSchema>
+export type SymbolUse = z.infer<typeof SymbolUseSchema>
+export type ReadingStep = z.infer<typeof ReadingStepSchema>
+export type MovedBlock = z.infer<typeof MovedBlockSchema>
+export type FunctionComplexity = z.infer<typeof FunctionComplexitySchema>
+export type PrInsights = z.infer<typeof PrInsightsSchema>
+export type DashboardSection = z.infer<typeof DashboardSectionSchema>
+export type DashboardPR = z.infer<typeof DashboardPRSchema>
+export type ReviewNote = z.infer<typeof ReviewNoteSchema>
+export type DraftComment = z.infer<typeof DraftCommentSchema>

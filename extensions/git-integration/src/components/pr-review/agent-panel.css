@@ -1,0 +1,209 @@
+/* R5 agent side panel. Ported 1:1 from docs/research/code-review-revamp.html
+   (#ag mock, section r5, aside.panel) with the ap- class prefix. */
+
+.ap-panel {
+  border-left: 1px solid var(--tm-border);
+  background: var(--tm-bg-surface);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  font-size: 12.5px;
+  overflow-y: auto;
+}
+
+.ap-panel h5 {
+  margin: 0;
+  font: 600 12px/1.2 inherit;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ap-header-title {
+  font: 600 12.5px/1.2 inherit;
+  color: var(--tm-text-primary);
+}
+
+.ap-close {
+  background: transparent;
+  border: 0;
+  padding: 2px;
+  color: var(--tm-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ap-close svg {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+
+.ap-note {
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+  margin: 0;
+}
+
+.ap-seg {
+  display: inline-flex;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.ap-seg button {
+  background: transparent;
+  border: 0;
+  padding: 4px 10px;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+}
+
+.ap-seg button + button {
+  border-left: 1px solid var(--tm-border-strong);
+}
+
+.ap-seg button[aria-pressed='true'] {
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+  font-weight: 600;
+}
+
+.ap-model-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.ap-model-row .ap-sp {
+  flex: 1;
+}
+
+.ap-question {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 56px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.ap-btn {
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+}
+
+.ap-btn.ap-ag {
+  border-color: var(--tm-agent);
+  color: var(--tm-agent);
+  background: var(--tm-agent-dim);
+}
+
+.ap-actions-row {
+  display: flex;
+  gap: 6px;
+}
+
+.ap-fnd {
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 8px;
+  background: var(--tm-bg-elevated);
+  padding: 9px 10px;
+  display: grid;
+  gap: 5px;
+}
+
+.ap-fnd b {
+  color: var(--tm-text-primary);
+}
+
+.ap-fnd-body {
+  color: var(--tm-text-secondary);
+}
+
+.ap-sev {
+  font: 600 10px/1 monospace;
+  padding: 3px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ap-sev.ap-must {
+  color: var(--tm-danger);
+  background: color-mix(in srgb, var(--tm-danger) 12%, transparent);
+}
+
+.ap-sev.ap-sug {
+  color: var(--tm-accent-text);
+  background: var(--tm-accent-dim);
+}
+
+.ap-sev.ap-nit {
+  color: var(--tm-text-muted);
+  background: var(--tm-bg-surface);
+}
+
+.ap-sev.ap-q {
+  color: var(--tm-warning);
+  background: color-mix(in srgb, var(--tm-warning) 14%, transparent);
+}
+
+.ap-fnd .ap-acts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ap-walkthrough {
+  display: grid;
+  gap: 6px;
+}
+
+.ap-error {
+  color: var(--tm-danger);
+}
+
+.ap-spin-wrap {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  animation: ap-spin 1s linear infinite;
+}
+
+.ap-spin-wrap svg {
+  width: 12px;
+  height: 12px;
+  color: var(--tm-agent);
+}
+
+@keyframes ap-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-spin-wrap {
+    animation: none;
+  }
+}

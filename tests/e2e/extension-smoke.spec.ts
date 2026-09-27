@@ -31,6 +31,9 @@ const SURFACES: { id: string; label: string; part: string; expand?: string }[] =
   { id: 'terminator.notepad', label: 'Notes', part: 'notepad' },
   { id: 'terminator.task-vault', label: 'Task Vault', part: 'task-vault' },
   { id: 'terminator.foundry', label: 'Foundry', part: 'foundry' },
+  // Its other views (the Git project tab, the review window) share the URL, so
+  // the view parameter is what tells this one apart.
+  { id: 'terminator.git-integration', label: 'Reviews', part: 'view=reviews' },
 ]
 
 test.beforeAll(async () => {

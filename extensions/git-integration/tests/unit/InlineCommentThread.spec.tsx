@@ -161,4 +161,15 @@ describe('InlineCommentThread', () => {
     const img = screen.getByRole('img')
     expect(img.getAttribute('alt')).toBe('alice')
   })
+
+  it('shows "Resolved" and dims the thread when resolved', () => {
+    const { container } = render(<InlineCommentThread thread={makeThread({ resolved: true })} />)
+    expect(screen.getByText('Resolved')).toBeTruthy()
+    expect(container.querySelector('.rs-thread--resolved')).toBeTruthy()
+  })
+
+  it('does not show "Resolved" when not resolved', () => {
+    render(<InlineCommentThread thread={makeThread({ resolved: false })} />)
+    expect(screen.queryByText('Resolved')).toBeNull()
+  })
 })

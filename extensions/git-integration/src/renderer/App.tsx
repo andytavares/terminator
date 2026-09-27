@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { GitFullView } from '../components/GitFullView'
 import { PrReviewTab } from '../components/pr-review/PrReviewTab'
+import { ReviewDashboard } from '../components/pr-review/ReviewDashboard'
 
 function getSearchParam(key: string): string | null {
   return new URLSearchParams(window.location.search).get(key)
@@ -18,6 +19,9 @@ export function App(): JSX.Element {
     return off
   }, [])
 
+  if (view === 'reviews') {
+    return <ReviewDashboard />
+  }
   if (view === 'code-reviews' || view === 'pr-review') {
     return <PrReviewTab repoRoot={repoRoot} />
   }

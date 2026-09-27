@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, Dot, Plus } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 
@@ -12,6 +12,20 @@ interface Props {
   onSelectFile: (path: string) => void
 }
 
+type RowState = 'viewed' | 'changed' | 'new' | 'default'
+
+function rowState(
+  file: PrChangedFile,
+  viewedFiles: Set<string>,
+  changedSince: Set<string>,
+  newSinceLook: Set<string>
+): RowState {
+  if (changedSince.has(file.path)) return 'changed'
+  if (newSinceLook.has(file.path)) return 'new'
+  if (viewedFiles.has(file.path)) return 'viewed'
+  return 'default'
+}
+
 export function ChapterFileList({
   repoRoot,
   prNumber,
@@ -20,7 +34,13 @@ export function ChapterFileList({
   currentFilePath,
   onSelectFile,
 }: Props) {
-  const { viewedFiles, fileOrderOverrides, reorderFiles } = usePrReviewStore()
+  const {
+    viewedFiles,
+    fileOrderOverrides,
+    reorderFiles,
+    changedSince = new Set<string>(),
+    newSinceLook = new Set<string>(),
+  } = usePrReviewStore()
   const overrideOrder = fileOrderOverrides[chapter.id]
   const files = overrideOrder
     ? overrideOrder
@@ -67,6 +87,7 @@ export function ChapterFileList({
         const isActive = file.path === currentFilePath
         const isViewed = viewedFiles.has(file.path)
         const isDragOver = dragOverIndex === index
+        const state = rowState(file, viewedFiles, changedSince, newSinceLook)
 
         return (
           <div
@@ -89,7 +110,15 @@ export function ChapterFileList({
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onSelectFile(file.path)}
           >
-            <span className="chapter-file-num">{index + 1}</span>
+            {state === 'default' ? (
+              <span className="chapter-file-num">{index + 1}</span>
+            ) : (
+              <span className="rc-frow-state">
+                {state === 'viewed' && <Check aria-hidden="true" />}
+                {state === 'changed' && <Dot aria-hidden="true" />}
+                {state === 'new' && <Plus aria-hidden="true" />}
+              </span>
+            )}
             <span
               className={`chapter-file-risk-dot chapter-file-risk-dot--${file.riskScore.level}`}
             />
@@ -103,6 +132,11 @@ export function ChapterFileList({
             {isViewed && (
               <span className="chapter-file-viewed-check" aria-label="Viewed">
                 <Check aria-hidden="true" />
+              </span>
+            )}
+            {state !== 'default' && (
+              <span className={`rc-frow-sub rc-frow-sub--${state}`}>
+                {state === 'viewed' ? 'viewed' : state === 'changed' ? 'changed' : 'new file'}
               </span>
             )}
             <span className="chapter-file-why" title={file.whyHere}>

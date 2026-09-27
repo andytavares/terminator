@@ -1,8 +1,22 @@
-import React, { useState } from 'react'
-import { Check, ChevronDown, ChevronRight } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import { Check, ChevronDown, ChevronRight, Dot, Plus } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { PrReviewDetail, Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 import { chapterRiskLevel } from '../../github/pr-review-service'
+
+type RowState = 'viewed' | 'changed' | 'new' | 'default'
+
+function rowState(
+  file: PrChangedFile,
+  viewedFiles: Set<string>,
+  changedSince: Set<string>,
+  newSinceLook: Set<string>
+): RowState {
+  if (changedSince.has(file.path)) return 'changed'
+  if (newSinceLook.has(file.path)) return 'new'
+  if (viewedFiles.has(file.path)) return 'viewed'
+  return 'default'
+}
 
 interface Props {
   pr: PrReviewDetail
@@ -21,7 +35,23 @@ export function FullFileList({
   onSelectFile,
   showChapterHeaders = true,
 }: Props) {
-  const { viewedFiles, fileOrderOverrides } = usePrReviewStore()
+  const {
+    viewedFiles,
+    fileOrderOverrides,
+    changedSince = new Set<string>(),
+    newSinceLook = new Set<string>(),
+  } = usePrReviewStore()
+
+  const reasonByPath = useMemo(() => {
+    const map = new Map<string, { reason: string; allUsesViewed: boolean }>()
+    for (const step of pr.readingOrder ?? []) {
+      const allUsesViewed = step.uses.every(
+        (u) => u.definedInPath == null || viewedFiles.has(u.definedInPath)
+      )
+      map.set(step.path, { reason: step.reason, allUsesViewed })
+    }
+    return map
+  }, [pr.readingOrder, viewedFiles])
 
   const totalFiles = pr.chapters.reduce((n, c) => n + c.files.length, 0)
   const totalViewed = pr.chapters.reduce(
@@ -108,6 +138,8 @@ export function FullFileList({
               files.map((file, fi) => {
                 const isActive = file.path === currentFilePath
                 const isViewed = viewedFiles.has(file.path)
+                const state = rowState(file, viewedFiles, changedSince, newSinceLook)
+                const reasonInfo = reasonByPath.get(file.path)
                 return (
                   <button
                     key={file.path}
@@ -121,16 +153,41 @@ export function FullFileList({
                     onClick={() => onSelectFile(file.path, chapter.id)}
                     title={file.path}
                   >
-                    <span className="full-file-row-num">{fi + 1}</span>
+                    {state === 'default' ? (
+                      <span className="full-file-row-num">{fi + 1}</span>
+                    ) : (
+                      <span className="rc-frow-state">
+                        {state === 'viewed' && <Check aria-hidden="true" />}
+                        {state === 'changed' && <Dot aria-hidden="true" />}
+                        {state === 'new' && <Plus aria-hidden="true" />}
+                      </span>
+                    )}
                     <span
                       className={`full-file-row-risk full-file-row-risk--${file.tier === 3 ? 'none' : file.riskScore.level}`}
                     />
-                    <span className="full-file-row-name">{file.path.split('/').pop()}</span>
+                    <span className="full-file-row-body">
+                      <span className="full-file-row-name">{file.path.split('/').pop()}</span>
+                      {reasonInfo && (
+                        <span
+                          className={`rc-frow-reason${reasonInfo.allUsesViewed ? ' rc-frow-reason--viewed' : ''}`}
+                        >
+                          {reasonInfo.reason}
+                        </span>
+                      )}
+                    </span>
                     <span className="full-file-row-changes">
                       <span className="full-file-row-add">+{file.additions}</span>
                       <span className="full-file-row-del">−{file.deletions}</span>
                     </span>
-                    {isViewed && <Check aria-hidden="true" className="full-file-row-check" />}
+                    {state !== 'default' && (
+                      <span className={`rc-frow-sub rc-frow-sub--${state}`}>
+                        {state === 'viewed'
+                          ? 'viewed'
+                          : state === 'changed'
+                            ? 'changed'
+                            : 'new file'}
+                      </span>
+                    )}
                   </button>
                 )
               })}

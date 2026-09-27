@@ -50,6 +50,10 @@ vi.mock('../../src/components/pr-review/ReviewSubmitPanel', () => ({
     </div>
   ),
 }))
+vi.mock('../../src/components/pr-review/AgentPanel', () => ({
+  AgentPanel: () => <div data-testid="agent-panel" />,
+}))
+vi.mock('../../src/hooks/useAgentRuns', () => ({ useAgentRuns: vi.fn() }))
 
 const mockSetCurrentChapter = vi.fn()
 const mockSetCurrentFile = vi.fn()
@@ -119,6 +123,10 @@ function setupStore(overrides: Record<string, unknown> = {}) {
     fileOrderOverrides: {},
     markFileViewed: mockMarkFileViewed,
     setPaused: mockSetPaused,
+    changedSince: new Set<string>(),
+    lastAccessedAt: null,
+    notes: [],
+    drafts: [],
     ...overrides,
   } as unknown as ReturnType<typeof usePrReviewStore>)
 }

@@ -19,6 +19,13 @@ vi.mock('../../src/api/github', () => ({
   },
 }))
 
+const mockAddDraft = vi.fn()
+
+vi.mock('../../src/stores/pr-review.store', () => ({
+  usePrReviewStore: (selector: (s: { addDraft: typeof mockAddDraft }) => unknown) =>
+    selector({ addDraft: mockAddDraft }),
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -74,59 +81,75 @@ describe('CommentComposer (new comment)', () => {
     expect(onCancel).toHaveBeenCalled()
   })
 
-  it('disables Comment button when body is empty', () => {
+  it('disables the submit button when body is empty', () => {
     render(<CommentComposer {...newCommentProps} />)
-    const commentBtn = screen.getByText('Comment')
+    const commentBtn = screen.getByText('Add to pending review')
     expect(commentBtn.closest('button')?.disabled).toBe(true)
   })
 
-  it('enables Comment button when body has content', () => {
+  it('enables the submit button when body has content', () => {
     render(<CommentComposer {...newCommentProps} />)
     fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'LGTM' } })
-    const commentBtn = screen.getByText('Comment')
+    const commentBtn = screen.getByText('Add to pending review')
     expect(commentBtn.closest('button')?.disabled).toBe(false)
   })
 
-  it('calls prCommentAdd on submit', async () => {
-    mockPrCommentAdd.mockResolvedValue({ success: true })
+  it('shows the "sent when you submit your review" note', () => {
+    render(<CommentComposer {...newCommentProps} />)
+    expect(screen.getByText('Sent when you submit your review')).toBeTruthy()
+  })
+
+  it('calls addDraft, not prCommentAdd, on submit', async () => {
     const onSubmitted = vi.fn()
     render(<CommentComposer {...newCommentProps} onSubmitted={onSubmitted} />)
     fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Nice!' } })
-    fireEvent.click(screen.getByText('Comment'))
-    await waitFor(() =>
-      expect(mockPrCommentAdd).toHaveBeenCalledWith({
-        repoRoot: '/repo',
-        prNumber: 42,
-        commitId: 'abc123',
+    fireEvent.click(screen.getByText('Add to pending review'))
+    await waitFor(() => expect(mockAddDraft).toHaveBeenCalled())
+    expect(mockAddDraft).toHaveBeenCalledWith(
+      '/repo',
+      42,
+      'abc123',
+      expect.objectContaining({
         path: 'src/foo.ts',
         line: 10,
-        startLine: undefined,
+        startLine: null,
         side: 'RIGHT',
         body: 'Nice!',
+        fromFindingId: null,
       })
     )
+    expect(mockPrCommentAdd).not.toHaveBeenCalled()
     expect(onSubmitted).toHaveBeenCalled()
   })
 
-  it('shows error when submission fails', async () => {
-    mockPrCommentAdd.mockRejectedValue(new Error('Network error'))
-    render(<CommentComposer {...newCommentProps} />)
-    fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Hi' } })
-    fireEvent.click(screen.getByText('Comment'))
-    await waitFor(() => screen.getByText(/Network error/))
-    expect(screen.getByText(/Network error/)).toBeTruthy()
+  it('shows "New comment · line N" header, and "edited from agent finding" when fromFindingId is set', () => {
+    render(<CommentComposer {...newCommentProps} fromFindingId="finding-1" />)
+    expect(screen.getByText(/New comment · line 10/)).toBeTruthy()
+    expect(screen.getByText(/edited from agent finding/)).toBeTruthy()
+  })
+
+  it('prefills the body from initialBody', () => {
+    render(<CommentComposer {...newCommentProps} initialBody="drafted text" />)
+    expect((screen.getByPlaceholderText(/Leave a comment/) as HTMLTextAreaElement).value).toBe(
+      'drafted text'
+    )
   })
 })
 
 describe('CommentComposer (reply)', () => {
-  it('calls prCommentReply on submit', async () => {
+  it('renders a Reply submit button', () => {
+    render(<CommentComposer {...replyProps} />)
+    expect(screen.getByText('Reply')).toBeTruthy()
+  })
+
+  it('calls prCommentReply on submit, not addDraft', async () => {
     mockPrCommentReply.mockResolvedValue({ success: true })
     const onSubmitted = vi.fn()
     render(<CommentComposer {...replyProps} onSubmitted={onSubmitted} />)
     fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), {
       target: { value: 'Agreed!' },
     })
-    fireEvent.click(screen.getByText('Comment'))
+    fireEvent.click(screen.getByText('Reply'))
     await waitFor(() =>
       expect(mockPrCommentReply).toHaveBeenCalledWith({
         repoRoot: '/repo',
@@ -135,6 +158,7 @@ describe('CommentComposer (reply)', () => {
         body: 'Agreed!',
       })
     )
+    expect(mockAddDraft).not.toHaveBeenCalled()
     expect(onSubmitted).toHaveBeenCalled()
   })
 
@@ -142,7 +166,7 @@ describe('CommentComposer (reply)', () => {
     mockPrCommentReply.mockResolvedValue({ error: 'FORBIDDEN' })
     render(<CommentComposer {...replyProps} />)
     fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Hi' } })
-    fireEvent.click(screen.getByText('Comment'))
+    fireEvent.click(screen.getByText('Reply'))
     await waitFor(() => screen.getByText(/FORBIDDEN/))
   })
 })

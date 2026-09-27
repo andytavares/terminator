@@ -127,6 +127,7 @@ const basePr: PrReviewDetail = {
       ],
     },
   ],
+  insights: null,
 }
 
 beforeEach(() => {

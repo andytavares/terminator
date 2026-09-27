@@ -1,0 +1,330 @@
+/*
+ * Review surface styling ported 1:1 from docs/research/code-review-revamp.html
+ * (sections R2, R3, R4, R5, S1, S4). Class prefix: rs-. Tokens are translated
+ * from the mock's --a-* variables to EXTENSION_BASE_CSS's --tm-* variables.
+ */
+
+.rs-fh {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--tm-border);
+  background: var(--tm-bg-elevated);
+  flex-wrap: wrap;
+}
+
+.rs-fh--row2 {
+  border-top: 1px solid var(--tm-border);
+}
+
+.rs-fh .rs-p {
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+}
+
+.rs-sp {
+  flex: 1;
+}
+
+.rs-note {
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.rs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--tm-border-strong);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+  background: transparent;
+}
+
+.rs-chip--hi {
+  color: var(--tm-danger);
+  border-color: currentColor;
+}
+
+.rs-chip--md {
+  color: var(--tm-warning);
+  border-color: currentColor;
+}
+
+.rs-chip--lo {
+  color: var(--tm-success);
+  border-color: currentColor;
+}
+
+.rs-chip--ag {
+  color: var(--tm-agent);
+  border-color: currentColor;
+}
+
+.rs-seg {
+  display: inline-flex;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.rs-seg button {
+  background: transparent;
+  border: 0;
+  padding: 4px 10px;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rs-seg button + button {
+  border-left: 1px solid var(--tm-border-strong);
+}
+
+.rs-seg button[aria-pressed='true'] {
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+  font-weight: 600;
+}
+
+.rs-kbd {
+  font: 500 11px/1 var(--tm-font-mono);
+  border: 1px solid var(--tm-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: var(--tm-text-secondary);
+  background: var(--tm-bg-elevated);
+}
+
+.rs-btn {
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  cursor: pointer;
+}
+
+.rs-btn--pri {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: #fff;
+}
+
+.rs-btn--ag {
+  border-color: var(--tm-agent);
+  color: var(--tm-agent);
+  background: var(--tm-agent-dim);
+}
+
+.rs-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+  font: 600 10px/1 var(--tm-font-ui);
+  cursor: pointer;
+  border: 0;
+  padding: 0 3px;
+}
+
+.rs-pip--ag {
+  background: var(--tm-agent-dim);
+  color: var(--tm-agent);
+  outline: 1px dashed var(--tm-agent);
+}
+
+.rs-thread {
+  margin: 6px 14px 8px 56px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 8px;
+  background: var(--tm-bg-elevated);
+  font: 13px/1.5 var(--tm-font-ui);
+  white-space: normal;
+}
+
+.rs-thread .rs-thread-th {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
+.rs-thread .rs-thread-bd {
+  padding: 8px 10px;
+}
+
+.rs-thread--resolved {
+  opacity: 0.6;
+}
+
+.rs-thread--agent {
+  border: 1px dashed var(--tm-agent);
+  background: var(--tm-agent-dim);
+}
+
+.rs-thread--agent .rs-thread-th {
+  color: var(--tm-agent);
+}
+
+.rs-thread-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 10px 8px;
+}
+
+.rs-av {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 10px/1 var(--tm-font-ui);
+}
+
+.rs-float {
+  font: 13px/1.45 var(--tm-font-ui);
+  white-space: normal;
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 8px;
+  background: var(--tm-bg-elevated);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  margin: 4px 0 6px 56px;
+  white-space: normal;
+}
+
+.rs-sev {
+  font: 600 10px/1 var(--tm-font-mono);
+  padding: 3px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rs-sev--must-fix {
+  color: var(--tm-danger);
+  background: color-mix(in srgb, var(--tm-danger) 12%, transparent);
+}
+
+.rs-sev--suggestion {
+  color: var(--tm-accent-text);
+  background: var(--tm-accent-dim);
+}
+
+.rs-sev--nit {
+  color: var(--tm-text-muted);
+  background: var(--tm-bg-surface);
+}
+
+.rs-sev--question {
+  color: var(--tm-warning);
+  background: color-mix(in srgb, var(--tm-warning) 14%, transparent);
+}
+
+.rs-moved {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+  padding: 6px 14px;
+  background: var(--tm-bg-surface);
+  border-block: 1px dashed var(--tm-border-strong);
+  font: 12px/1.4 var(--tm-font-ui);
+  color: var(--tm-text-secondary);
+}
+
+.rs-gut {
+  width: 1%;
+  min-width: 18px;
+  padding: 0 4px;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.rs-gutter-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.rs-gutter-chip--warn {
+  color: var(--tm-warning);
+}
+
+.rs-gutter-chip--danger {
+  color: var(--tm-danger);
+}
+
+.rs-line--selected td {
+  background: var(--tm-agent-dim) !important;
+}
+
+.rs-line--selected td.diff-line__num-gutter {
+  box-shadow: inset 3px 0 0 var(--tm-agent);
+}
+
+.rs-note-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 14px 8px 56px;
+}
+
+.rs-note-composer textarea {
+  font: 12px/1.4 var(--tm-font-ui);
+  padding: 6px 8px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  background: var(--tm-bg-card);
+  color: var(--tm-text-primary);
+  resize: vertical;
+}
+
+.rs-note-composer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.rs-chip-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rs-band {
+  margin: 10px 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--tm-accent-dim);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}

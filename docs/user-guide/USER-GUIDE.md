@@ -549,6 +549,21 @@ clicking it opens the diff. Approving happens after you have read the change, ne
 The count is the repository's real count, not the number loaded so far, and further pages arrive on
 their own — there is no "load more" to press.
 
+### The Reviews tab
+
+**Reviews** in the app band lists every open pull request that needs you, across all your repositories, from GitHub search. **Needs you** groups them into **Re-review** (new commits since you reviewed), **Requested of you** and **Requested of your team**. **My PRs** shows what blocks your own (changes asked, CI failing, approved), and **Involved** shows threads you are in. **Review** opens the PR in the review window. A repository you have not cloned opens diff-only. Set **Clone folder for reviews** in Git Integration's settings and **Clone and review** appears on those rows.
+
+### Reviewing a pull request
+
+- **Reading order.** Files come in the order you need them: a function before the code that calls it, a type before the code that uses it, a test right after what it tests. Each file says why it is where it is, and the file header lists what it **Uses** and the step where you read it. **Peek definition** jumps there.
+- **Comments.** **All**, **Unresolved** or **Hidden** in the file header (`c` cycles). Hidden leaves a count in the gutter; click it to bring them back. **Agent notes** has its own switch (`Shift+C`).
+- **Review brief.** The Overview opens with complexity, risk, test coverage (does each changed function have a test), code health and understandability. Each figure names where it came from.
+- **Agent.** Drag across line numbers and a bar offers **Ask agent**, **Explain**, **Add note** and **Comment**. **Ask agent about this PR** reviews the whole PR. The agent reads the PR in a private worktree with read-only tools. Its findings stay on your machine, as dashed notes in the diff and in the side panel, until you choose **Post as comment**. Sonnet is the default model, and you can pick Opus per run.
+- **Since your review.** When the author pushes, files you viewed that did not change stay viewed. Changed ones show **Changed since you viewed** and open on just what changed since you looked (`s` toggles the whole PR). Viewed marks are mirrored to GitHub.
+- **Where you left off.** Come back after 15 minutes and a card shows your last position, your notes, unread agent findings, unsent drafts and what moved.
+- **Drafts.** New comments collect as a pending review and go to GitHub together when you submit, so the author gets one notification.
+- **Keyboard.** `?` shows every key: `j`/`k` hunks, `]`/`[` files, `n` next unviewed, `v` viewed, `a` ask agent, `m` note, `r` comment, `⌘↵` submit.
+
 ### MergeFlow conflict resolver
 
 When a `git merge` produces conflicts, a **"Resolve conflicts →"** button appears in the Git tab. MergeFlow presents each conflict as a two-panel diff (yours vs. theirs) with author info and commit context for each side.

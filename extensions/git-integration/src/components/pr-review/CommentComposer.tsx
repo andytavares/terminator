@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { RichContent } from './RichContent'
 import { githubAPI } from '../../api/github'
+import { usePrReviewStore } from '../../stores/pr-review.store'
 
 interface NewCommentProps {
   repoRoot: string
@@ -10,6 +11,8 @@ interface NewCommentProps {
   line: number
   startLine?: number
   side: 'LEFT' | 'RIGHT'
+  initialBody?: string
+  fromFindingId?: string | null
   onSubmitted: () => void
   onCancel: () => void
 }
@@ -29,17 +32,18 @@ function isReply(p: Props): p is ReplyProps {
 }
 
 export function CommentComposer(props: Props) {
-  const [body, setBody] = useState('')
+  const [body, setBody] = useState(isReply(props) ? '' : (props.initialBody ?? ''))
   const [tab, setTab] = useState<'write' | 'preview'>('write')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const addDraft = usePrReviewStore((s) => s.addDraft)
 
   const handleSubmit = async () => {
     if (!body.trim()) return
-    setSubmitting(true)
-    setError(null)
-    try {
-      if (isReply(props)) {
+    if (isReply(props)) {
+      setSubmitting(true)
+      setError(null)
+      try {
         const result = await githubAPI.prCommentReply({
           repoRoot: props.repoRoot,
           prNumber: props.prNumber,
@@ -47,29 +51,34 @@ export function CommentComposer(props: Props) {
           body,
         })
         if ('error' in result) throw new Error((result as { error: string }).error)
-      } else {
-        const result = await githubAPI.prCommentAdd({
-          repoRoot: props.repoRoot,
-          prNumber: props.prNumber,
-          commitId: props.commitId,
-          path: props.path,
-          line: props.line,
-          startLine: props.startLine,
-          side: props.side,
-          body,
-        })
-        if ('error' in result) throw new Error((result as { error: string }).error)
+        props.onSubmitted()
+      } catch (e) {
+        setError(String(e))
+      } finally {
+        setSubmitting(false)
       }
-      props.onSubmitted()
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setSubmitting(false)
+      return
     }
+    addDraft(props.repoRoot, props.prNumber, props.commitId, {
+      id: crypto.randomUUID(),
+      path: props.path,
+      line: props.line,
+      startLine: props.startLine ?? null,
+      side: props.side,
+      body,
+      fromFindingId: props.fromFindingId ?? null,
+    })
+    props.onSubmitted()
   }
 
   return (
     <div className="comment-composer" data-testid="composer">
+      {!isReply(props) && (
+        <div className="rs-thread-th">
+          <span className="rs-av">A</span>New comment · line {props.line}
+          {props.fromFindingId ? ' · edited from agent finding' : ''}
+        </div>
+      )}
       <div className="comment-composer-tabs">
         <button
           className={`comment-composer-tab${tab === 'write' ? ' comment-composer-tab--active' : ''}`}
@@ -111,8 +120,9 @@ export function CommentComposer(props: Props) {
           onClick={handleSubmit}
           disabled={submitting || !body.trim()}
         >
-          {submitting ? 'Submitting…' : 'Comment'}
+          {isReply(props) ? (submitting ? 'Submitting…' : 'Reply') : 'Add to pending review'}
         </button>
+        {!isReply(props) && <span className="rs-note">Sent when you submit your review</span>}
       </div>
     </div>
   )

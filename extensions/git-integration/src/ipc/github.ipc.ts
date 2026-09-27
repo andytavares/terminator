@@ -1,14 +1,18 @@
 import { z } from 'zod'
 import Store from 'electron-store'
 import { basename, join } from 'path'
-import { readFile } from 'fs/promises'
+import { existsSync } from 'fs'
+import { readFile, writeFile, unlink } from 'fs/promises'
+import { homedir, tmpdir } from 'os'
 import type {
   ReviewQueuePR,
   PrReviewDetail,
   InlineComment,
   IssueComment,
+  ReviewSession,
 } from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
+import { buildDashboardQuery, parseDashboard } from '../github/dashboard-search.js'
 import {
   buildChapters,
   parseReviewQueuePR,
@@ -36,6 +40,9 @@ import {
   PR_JSON_FIELDS,
   computeCoChangeAffinityFromGit,
 } from '../github/gh-cli.js'
+import { analysePr } from '../review/analyse.js'
+import { applyReadingOrder } from '../review/apply-reading-order.js'
+import { findTestReferencesInRepo } from '../review/test-references.js'
 
 type RegisterFn = (
   channel: string,
@@ -50,13 +57,42 @@ const activeReviewStore = new Store<Record<string, unknown>>({ name: 'pr-active-
 /** The application's tracker connection, when this build's host offers one. */
 type IssuesApi = Parameters<typeof enrichIssueRefs>[1]
 
+// A repoRoot of the form `gh:owner/name` means "no local checkout" — every PR
+// action still goes through the gh CLI (via GH_REPO), it just never touches git.
+export function parseRemoteRepo(root: string): { owner: string; name: string } | null {
+  if (!root.startsWith('gh:')) return null
+  const rest = root.slice('gh:'.length)
+  const parts = rest.split('/')
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null
+  return { owner: parts[0], name: parts[1] }
+}
+
+async function runGhForRemote(
+  owner: string,
+  name: string,
+  args: string[],
+  opts: GhOptions,
+  timeoutMs?: number
+): Promise<string> {
+  return runGh(homedir(), args, opts, timeoutMs, { GH_REPO: `${owner}/${name}` })
+}
+
 export function registerGithubHandlers(
   register: RegisterFn,
   opts: GhOptions,
-  issues?: IssuesApi
+  issues?: IssuesApi,
+  listProjectRoots?: () => string[]
 ): void {
-  const gh = (cwd: string, args: string[], timeoutMs?: number) => runGh(cwd, args, opts, timeoutMs)
-  const ownerAndName = (repoRoot: string) => getRepoOwnerAndName(repoRoot, opts)
+  const gh = (cwd: string, args: string[], timeoutMs?: number) => {
+    const remote = parseRemoteRepo(cwd)
+    if (remote) return runGhForRemote(remote.owner, remote.name, args, opts, timeoutMs)
+    return runGh(cwd, args, opts, timeoutMs)
+  }
+  const ownerAndName = (repoRoot: string) => {
+    const remote = parseRemoteRepo(repoRoot)
+    if (remote) return Promise.resolve({ owner: remote.owner, repo: remote.name })
+    return getRepoOwnerAndName(repoRoot, opts)
+  }
   const catchError = (e: unknown) => {
     if (isAuthError(e)) return { error: 'NOT_AUTHENTICATED' as const }
     const msg = String(e)
@@ -269,7 +305,30 @@ export function registerGithubHandlers(
         chapters,
         issueRefs,
         dryViolations,
+        readingOrder: [],
+        movedBlocks: [],
+        insights: null,
       }
+
+      // Definitions-first order, moved code and insights (R3, S4, R4). Never throws.
+      const analysis = await analysePr(filesData, {
+        readingOrder: [],
+        chapters,
+        statusChecks: Array.isArray(rollup)
+          ? (rollup as Array<Record<string, unknown>>).map((c) => ({
+              name: String(c.name ?? c.context ?? ''),
+              state: String(c.conclusion ?? c.state ?? ''),
+              description: c.description ? String(c.description) : undefined,
+            }))
+          : [],
+        dryViolations,
+        localCoverage: null,
+        findTestReferences: (symbols) => findTestReferencesInRepo(repoRoot, symbols, runGit),
+      })
+      pr.chapters = applyReadingOrder(chapters, analysis.readingOrder)
+      pr.readingOrder = analysis.readingOrder
+      pr.movedBlocks = analysis.movedBlocks
+      pr.insights = analysis.insights
       return { pr }
     } catch (e) {
       return catchError(e)
@@ -284,6 +343,7 @@ export function registerGithubHandlers(
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, files } = parsed.data
+    if (parseRemoteRepo(repoRoot)) return { affinity: {} }
     try {
       const affinity = await computeCoChangeAffinityFromGit(repoRoot, files)
       return { affinity: Object.fromEntries(affinity) }
@@ -328,6 +388,19 @@ export function registerGithubHandlers(
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, path } = parsed.data
     try {
+      // No checkout: GitHub's own per-file patch is the diff.
+      if (parseRemoteRepo(repoRoot)) {
+        const filesRaw = await gh(repoRoot, [
+          'api',
+          '--paginate',
+          `repos/{owner}/{repo}/pulls/${prNumber}/files`,
+          '--jq',
+          '[.[] | {filename, patch}]',
+        ])
+        const files = JSON.parse(filesRaw) as Array<{ filename: string; patch?: string }>
+        const file = files.find((f) => f.filename === path)
+        return { diff: parseDiff(file?.patch ?? '', path) }
+      }
       const prRef = `refs/remotes/pull/${prNumber}/head`
       await runGit(repoRoot, ['fetch', '--force', 'origin', `pull/${prNumber}/head:${prRef}`])
 
@@ -358,6 +431,16 @@ export function registerGithubHandlers(
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, path } = parsed.data
+    if (parseRemoteRepo(repoRoot)) {
+      return {
+        churn90d: 0,
+        blastRadius: 0,
+        topImporters: [],
+        importerCount: 0,
+        testFilePresent: false,
+        patchCoverage: null,
+      }
+    }
     try {
       const isTestFile =
         /\.(spec|test)\.[^.]+$/.test(path) || // JS/TS: foo.spec.ts, foo.test.js
@@ -419,7 +502,50 @@ export function registerGithubHandlers(
       ])
       const items = JSON.parse(raw) as unknown[]
       const comments: InlineComment[] = items.map(mapComment)
-      return { comments }
+
+      // Resolved-thread state (R2). Best-effort: a GraphQL failure must not
+      // fail the whole handler, since the REST comments above already loaded.
+      let resolvedCommentIds: number[] = []
+      try {
+        const { owner, repo } = await ownerAndName(repoRoot)
+        const gql =
+          'query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100){nodes{isResolved comments(first:1){nodes{databaseId}}}}}}}'
+        const threadsRaw = await gh(repoRoot, [
+          'api',
+          'graphql',
+          '-f',
+          `query=${gql}`,
+          '-f',
+          `o=${owner}`,
+          '-f',
+          `r=${repo}`,
+          '-F',
+          `n=${prNumber}`,
+        ])
+        const threadsData = JSON.parse(threadsRaw) as {
+          data?: {
+            repository?: {
+              pullRequest?: {
+                reviewThreads?: {
+                  nodes?: Array<{
+                    isResolved: boolean
+                    comments: { nodes: Array<{ databaseId: number | null }> }
+                  }>
+                }
+              }
+            }
+          }
+        }
+        const nodes = threadsData.data?.repository?.pullRequest?.reviewThreads?.nodes ?? []
+        resolvedCommentIds = nodes
+          .filter((n) => n.isResolved)
+          .map((n) => n.comments.nodes[0]?.databaseId)
+          .filter((id): id is number => id != null)
+      } catch {
+        resolvedCommentIds = []
+      }
+
+      return { comments, resolvedCommentIds }
     } catch (e) {
       return catchError(e)
     }
@@ -563,20 +689,58 @@ export function registerGithubHandlers(
       prNumber: z.number().int().positive(),
       event: z.enum(['APPROVE', 'REQUEST_CHANGES', 'COMMENT']),
       body: z.string(),
+      comments: z
+        .array(
+          z.object({
+            path: z.string().min(1),
+            line: z.number().int().positive(),
+            startLine: z.number().int().positive().nullable().optional(),
+            side: z.enum(['LEFT', 'RIGHT']),
+            body: z.string().min(1),
+          })
+        )
+        .optional(),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, prNumber, event, body } = parsed.data
+    const { repoRoot, prNumber, event, body, comments } = parsed.data
     try {
-      const { owner, repo } = await getRepoOwnerAndName(repoRoot, opts)
-      const args = [
-        'api',
-        `repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
-        '--method',
-        'POST',
-        '--raw-field',
-        `event=${event}`,
-      ]
+      const { owner, repo } = await ownerAndName(repoRoot)
+      const endpoint = `repos/${owner}/${repo}/pulls/${prNumber}/reviews`
+
+      // Draft comments (S5) go in the SAME POST as the review, via --input,
+      // so they land as part of one review rather than separate REST calls.
+      if (comments && comments.length > 0) {
+        const requestBody: Record<string, unknown> = { event }
+        if (body.trim()) requestBody.body = body
+        requestBody.comments = comments.map((c) => {
+          const entry: Record<string, unknown> = {
+            path: c.path,
+            line: c.line,
+            side: c.side,
+            body: c.body,
+          }
+          if (c.startLine != null && c.startLine !== c.line) {
+            entry.start_line = c.startLine
+            entry.start_side = c.side
+          }
+          return entry
+        })
+        const tmpFile = join(
+          tmpdir(),
+          `pr-review-${Date.now()}-${Math.random().toString(36).slice(2)}.json`
+        )
+        await writeFile(tmpFile, JSON.stringify(requestBody))
+        try {
+          const raw = await gh(repoRoot, ['api', endpoint, '--method', 'POST', '--input', tmpFile])
+          const data = JSON.parse(raw) as Record<string, unknown>
+          return { reviewId: Number(data.id) }
+        } finally {
+          await unlink(tmpFile).catch(() => {})
+        }
+      }
+
+      const args = ['api', endpoint, '--method', 'POST', '--raw-field', `event=${event}`]
       // Only include body if non-empty; GitHub rejects empty string body for some events.
       if (body.trim()) {
         args.push('--raw-field', `body=${body}`)
@@ -622,13 +786,22 @@ export function registerGithubHandlers(
     if (!parsed.success) return { sessions: [] }
     const { repoRoot } = parsed.data
     const all = sessionStore.store
-    const sessions: unknown[] = []
+    const prefix = `${repoRoot}:::`
+    // v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha". When both exist
+    // for the same PR, the new key wins — it's the one v2 code keeps current.
+    const byPrNumber = new Map<number, { session: ReviewSession; isNewKey: boolean }>()
     for (const [key, value] of Object.entries(all)) {
-      if (!key.startsWith(`${repoRoot}:::`)) continue
+      if (!key.startsWith(prefix)) continue
       const result = ReviewSessionSchema.safeParse(value)
-      if (result.success) sessions.push(result.data)
+      if (!result.success) continue
+      const rest = key.slice(prefix.length)
+      const isNewKey = !rest.includes(':::')
+      const existing = byPrNumber.get(result.data.prNumber)
+      if (!existing || (isNewKey && !existing.isNewKey)) {
+        byPrNumber.set(result.data.prNumber, { session: result.data, isNewKey })
+      }
     }
-    return { sessions }
+    return { sessions: Array.from(byPrNumber.values()).map((v) => v.session) }
   })
 
   register('github:session-get', (payload) => {
@@ -748,6 +921,155 @@ export function registerGithubHandlers(
       return catchError(e)
     }
   })
+
+  // ─── Review dashboard (R1) ─────────────────────────────────────────────────
+
+  register('github:dashboard-search', async (payload) => {
+    const schema = z.object({})
+    const parsed = schema.safeParse(payload ?? {})
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    try {
+      const cwd = homedir()
+      const login = (await gh(cwd, ['api', 'user', '--jq', '.login'])).trim()
+      const query = buildDashboardQuery(login)
+      const raw = await gh(cwd, ['api', 'graphql', '-f', `query=${query}`], 60_000)
+      const data = JSON.parse(raw)
+
+      const localRoots = new Map<string, string>()
+      if (listProjectRoots) {
+        const roots = listProjectRoots()
+        await Promise.all(
+          roots.map(async (root) => {
+            try {
+              const url = await runGit(root, ['remote', 'get-url', 'origin'])
+              const parsed = parseGitRemoteUrl(url)
+              if (parsed) localRoots.set(`${parsed.owner}/${parsed.name}`, root)
+            } catch {
+              // no origin remote / not a git repo — skip
+            }
+          })
+        )
+      }
+
+      const prs = parseDashboard(data, login, localRoots)
+      return { prs, login, fetchedAt: new Date().toISOString() }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
+
+  // ─── Viewed-file sync (S1) ──────────────────────────────────────────────────
+
+  register('github:file-viewed-set', async (payload) => {
+    const schema = z.object({
+      repoRoot: z.string().min(1),
+      prNumber: z.number().int().positive(),
+      path: z.string().min(1),
+      viewed: z.boolean(),
+    })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, prNumber, path, viewed } = parsed.data
+    try {
+      const { owner, repo } = await ownerAndName(repoRoot)
+      const idRaw = await gh(repoRoot, [
+        'api',
+        'graphql',
+        '-f',
+        'query=query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){id}}}',
+        '-f',
+        `o=${owner}`,
+        '-f',
+        `r=${repo}`,
+        '-F',
+        `n=${prNumber}`,
+      ])
+      const idData = JSON.parse(idRaw) as {
+        data: { repository: { pullRequest: { id: string } } }
+      }
+      const pullRequestId = idData.data.repository.pullRequest.id
+      const mutationName = viewed ? 'markFileAsViewed' : 'unmarkFileAsViewed'
+      const gql = `mutation($id:ID!,$p:String!){${mutationName}(input:{pullRequestId:$id,path:$p}){clientMutationId}}`
+      await gh(repoRoot, [
+        'api',
+        'graphql',
+        '-f',
+        `query=${gql}`,
+        '-f',
+        `id=${pullRequestId}`,
+        '-f',
+        `p=${path}`,
+      ])
+      return { ok: true }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
+
+  // ─── Historical diff compare (S1) ──────────────────────────────────────────
+
+  register('github:pr-compare', async (payload) => {
+    const schema = z.object({
+      repoRoot: z.string().min(1),
+      fromSha: z.string().min(1),
+      toSha: z.string().min(1),
+    })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, fromSha, toSha } = parsed.data
+    try {
+      const { owner, repo } = await ownerAndName(repoRoot)
+      const raw = await gh(repoRoot, [
+        'api',
+        `repos/${owner}/${repo}/compare/${fromSha}...${toSha}`,
+      ])
+      const data = JSON.parse(raw) as {
+        ahead_by?: number
+        files?: Array<{ filename: string; status: string; patch?: string }>
+      }
+      const files = (data.files ?? []).map((f) => ({
+        path: f.filename,
+        status: f.status,
+        patch: f.patch ?? '',
+      }))
+      return { rewritten: false, commits: data.ahead_by ?? 0, files }
+    } catch (e) {
+      const msg = String(e)
+      if (msg.includes('404') || msg.includes('No common ancestor') || msg.includes('Not Found')) {
+        return { rewritten: true, commits: 0, files: [] }
+      }
+      return catchError(e)
+    }
+  })
+
+  // ─── Clone for diff-only review (uncloned PRs) ─────────────────────────────
+
+  register('github:clone-repo', async (payload) => {
+    const schema = z.object({ repo: z.string().min(1), folder: z.string().min(1) })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repo, folder } = parsed.data
+    if (!existsSync(folder)) return { error: 'FOLDER_NOT_FOUND' }
+    try {
+      const name = repo.split('/')[1] ?? repo
+      await gh(folder, ['repo', 'clone', repo, name])
+      return { repoRoot: join(folder, name) }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
+}
+
+// A remote URL is either https (https://github.com/owner/name(.git)) or ssh
+// (git@github.com:owner/name.git) — both map to the same "owner/name" key
+// dashboard-search uses to find a PR's local checkout.
+function parseGitRemoteUrl(url: string): { owner: string; name: string } | null {
+  const trimmed = url.trim()
+  const httpsMatch = trimmed.match(/github\.com\/([^/]+)\/([^/]+?)(\.git)?\/?$/)
+  if (httpsMatch) return { owner: httpsMatch[1], name: httpsMatch[2] }
+  const sshMatch = trimmed.match(/github\.com:([^/]+)\/([^/]+?)(\.git)?\/?$/)
+  if (sshMatch) return { owner: sshMatch[1], name: sshMatch[2] }
+  return null
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
