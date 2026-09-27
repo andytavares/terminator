@@ -521,6 +521,8 @@ export function readRungOutput(input: {
   readonly writes: readonly Collectable[]
   readonly outputPath: string
   readonly at: string
+  /** Which review round this is. Stamped onto every fresh finding. Defaults to 0. */
+  readonly round?: number
 }): CollectResult | null {
   let raw: string
   try {
@@ -536,6 +538,7 @@ export function readRungOutput(input: {
       output,
       writes: input.writes,
       at: input.at,
+      round: input.round,
     })
     return { ok: true, ...applied }
   } catch (error) {

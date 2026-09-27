@@ -598,4 +598,11 @@ describe('which model a turn runs on', () => {
   it('answers on Opus when the operator chose it for asks', () => {
     expect(architectModel('Close the gap.', { draft: 'opus', ask: 'opus' })).toBe('opus')
   })
+
+  // A review-loop turn carries a message — the red team's findings — but it is
+  // still the architect's own drafting, not an operator's ask, so it answers
+  // on the red team's tier rather than the ask model.
+  it('drafts on the draft model for a loop turn, even though it carries a message', () => {
+    expect(architectModel('Fix RT-1.', models, { loop: true })).toBe('opus')
+  })
 })

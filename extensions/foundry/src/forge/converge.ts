@@ -241,11 +241,17 @@ export const DEFAULT_ASK_MODEL: AskModel = 'sonnet'
 /**
  * The model one architect turn runs on: the operator's for a draft, and the
  * ask model for a turn that answers something typed or asked.
+ *
+ * A review-loop turn carries a message too — the red team's findings — but it
+ * is the architect fixing its own plan, not answering an ask, so `loop: true`
+ * keeps it on the draft model regardless of what was typed.
  */
 export function architectModel(
   message: string | undefined,
-  models: { readonly draft: string; readonly ask: string }
+  models: { readonly draft: string; readonly ask: string },
+  options?: { readonly loop?: boolean }
 ): string {
+  if (options?.loop === true) return models.draft
   return message === undefined || message.trim() === '' ? models.draft : models.ask
 }
 

@@ -116,6 +116,74 @@ describe('lastIntake', () => {
   })
 })
 
+// The review loop's lines — see src/forge/review-loop.ts and
+// docs/research/foundry-red-team-loop.md.
+describe('lastIntake, for the review loop', () => {
+  it('is running while a red-team round is the last thing that happened', () => {
+    const out = lastIntake([
+      entry({ action: 'review.started', subject: 'sess-3', reason: 'round 2' }),
+    ])
+    expect(out).toEqual({
+      kind: 'running',
+      at: '2026-09-09T19:30:00Z',
+      sessionId: 'sess-3',
+      asked: 'red team, round 2',
+    })
+  })
+
+  it('is running while the scout is the last thing that happened', () => {
+    const out = lastIntake([entry({ action: 'scout.started', subject: 'sess-4' })])
+    expect(out).toEqual({
+      kind: 'running',
+      at: '2026-09-09T19:30:00Z',
+      sessionId: 'sess-4',
+      asked: 'scout',
+    })
+  })
+
+  it('is not running once a round finished with nothing after it', () => {
+    const out = lastIntake([
+      entry({ action: 'review.started', subject: 'sess-3' }),
+      entry({
+        action: 'review.round',
+        at: '2026-09-09T19:35:00Z',
+        reason: 'round 2: 0 blocking, 1 note',
+      }),
+    ])
+    expect(out).toEqual({
+      kind: 'redrafted',
+      at: '2026-09-09T19:35:00Z',
+      note: 'round 2: 0 blocking, 1 note',
+    })
+  })
+
+  it('is refused when the loop could not converge', () => {
+    const out = lastIntake([
+      entry({
+        action: 'review.exhausted',
+        at: '2026-09-09T19:40:00Z',
+        reason: 'still has 1 blocking finding after 3 rounds',
+      }),
+    ])
+    expect(out).toEqual({
+      kind: 'refused',
+      at: '2026-09-09T19:40:00Z',
+      reason: 'still has 1 blocking finding after 3 rounds',
+    })
+  })
+
+  it('is refused when a review round was refused', () => {
+    const out = lastIntake([
+      entry({ action: 'review.refused', at: '2026-09-09T19:41:00Z', reason: 'no output written' }),
+    ])
+    expect(out).toEqual({
+      kind: 'refused',
+      at: '2026-09-09T19:41:00Z',
+      reason: 'no output written',
+    })
+  })
+})
+
 describe('intakeRefusal', () => {
   it('is the reason when the last turn was refused', () => {
     expect(intakeRefusal([entry({ action: 'converge.refused', reason: 'bad enum' })])).toBe(

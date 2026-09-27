@@ -553,6 +553,47 @@ describe('readRungOutput', () => {
     expect(result.order.redTeam[0]?.text).toBe('AC-2 cannot be falsified')
   })
 
+  it('stamps a passed-through round onto a fresh finding', () => {
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        redTeam: [{ severity: 'high', category: 'unprovable', text: 'AC-2 cannot be falsified' }],
+      })
+    )
+    const result = readRungOutput({
+      order: order(),
+      role: 'red-team',
+      writes: ['findings'],
+      outputPath: file,
+      at: AT,
+      round: 2,
+    })
+
+    expect(result?.ok).toBe(true)
+    if (result?.ok !== true) throw new Error('expected a reading')
+    expect(result.order.redTeam[0]?.round).toBe(2)
+  })
+
+  it('defaults the round to 0 when none is passed', () => {
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        redTeam: [{ severity: 'high', category: 'unprovable', text: 'AC-2 cannot be falsified' }],
+      })
+    )
+    const result = readRungOutput({
+      order: order(),
+      role: 'red-team',
+      writes: ['findings'],
+      outputPath: file,
+      at: AT,
+    })
+
+    expect(result?.ok).toBe(true)
+    if (result?.ok !== true) throw new Error('expected a reading')
+    expect(result.order.redTeam[0]?.round).toBe(0)
+  })
+
   it('clears the file, so the next turn cannot read this one as its own', () => {
     fs.writeFileSync(file, JSON.stringify({ note: 'x' }))
     readRungOutput({ order: order(), role: 'scout', writes: ['context'], outputPath: file, at: AT })

@@ -546,6 +546,13 @@ An architect turn that amends a drafted plan (an ask, an answer, or a follow-up 
 | `foundry:ask-model`     | `{}`                            | `{ selected: 'sonnet' \| 'opus' }` |
 | `foundry:ask-model-set` | `{ model: 'sonnet' \| 'opus' }` | `{ ok, selected }` or `{ error }`  |
 
+Before agreement, the architect and the red team argue to a fixed point on their own (`src/forge/review-loop.ts`; see `docs/research/foundry-red-team-loop.md`). A clean round hands the order off automatically unless this is turned off, in which case the order shows ready and waits for the operator.
+
+| Channel                     | Payload                | Response                         |
+| --------------------------- | ---------------------- | -------------------------------- |
+| `foundry:auto-hand-off`     | `{}`                   | `{ enabled: boolean }`           |
+| `foundry:auto-hand-off-set` | `{ enabled: boolean }` | `{ ok, enabled }` or `{ error }` |
+
 ### Quick actions (057)
 
 The "New work order…" quick action calls `api.window.showSelf('main')` and broadcasts `foundry:ui.open-new-order`, which the main view answers immediately if it is already open. This channel is how a not-yet-created view picks the request back up on its first mount.

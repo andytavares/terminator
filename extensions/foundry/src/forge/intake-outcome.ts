@@ -30,6 +30,20 @@ const FOLLOWED_UP = 'converge.followed_up'
 const REFUSED = 'converge.refused'
 const REDRAFTED = 'order.redrafted'
 
+// The review loop's own lines (see `src/forge/review-loop.ts`). None of them
+// widen the union above: a round in progress is a turn running, the same as
+// an architect's; a round that finished with nothing after it is read as a
+// redraft, because that is exactly what it is — the order changed and no new
+// turn has started; and a loop that gave up is read as a refusal, because
+// both mean the same thing to every surface here: nothing moved on its own
+// and the operator has to look. Forge.tsx reads only the existing kinds, so
+// this file is the only place that has to know the loop exists.
+const REVIEW_STARTED = 'review.started'
+const SCOUT_STARTED = 'scout.started'
+const REVIEW_ROUND = 'review.round'
+const REVIEW_REFUSED = 'review.refused'
+const REVIEW_EXHAUSTED = 'review.exhausted'
+
 export type IntakeOutcome =
   /** Intake has never run on this order. */
   | { readonly kind: 'none' }
@@ -61,6 +75,25 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
     if (entry.action === STARTED || entry.action === FOLLOWED_UP) {
       return { kind: 'running', at: entry.at, sessionId: entry.subject, asked: entry.reason }
     }
+    if (entry.action === REVIEW_REFUSED || entry.action === REVIEW_EXHAUSTED) {
+      return { kind: 'refused', at: entry.at, reason: entry.reason }
+    }
+    if (entry.action === REVIEW_STARTED) {
+      return {
+        kind: 'running',
+        at: entry.at,
+        sessionId: entry.subject,
+        asked: `red team, ${entry.reason}`,
+      }
+    }
+    if (entry.action === SCOUT_STARTED) {
+      return { kind: 'running', at: entry.at, sessionId: entry.subject, asked: 'scout' }
+    }
+    // A round that finished is not a turn running — either a fix turn or the
+    // next round follows it, or nothing does because the order was handed
+    // off. Either way there is no session waiting on an answer right now.
+    if (entry.action === REVIEW_ROUND)
+      return { kind: 'redrafted', at: entry.at, note: entry.reason }
   }
   return { kind: 'none' }
 }
