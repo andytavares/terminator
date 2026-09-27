@@ -10,8 +10,13 @@
 // shard, because its tests share hooks or run in order. Durations come from
 // tests/e2e/timings.json; a test with no recorded time counts as the median.
 //
-//   node scripts/e2e-shard.mjs <shard> <total> [spec ...]  -> this shard's args
-//   node scripts/e2e-shard.mjs --record <report.json>     -> rewrite timings.json
+// A recorded time runs from the end of the test before it, so a file's
+// beforeAll launch and afterAll close are counted: without them a shard of
+// light whole files ran 146s against 63s of test time (run 36345310476). That
+// holds because CI runs one worker per shard.
+//
+//   node scripts/e2e-shard.mjs <shard> <total> [spec ...]      -> this shard's args
+//   node scripts/e2e-shard.mjs --record <shard-report.json>... -> rewrite timings.json
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -28,12 +33,14 @@ export function testsFromReport(report) {
   const walk = (suite, titles) => {
     const path = suite.title === suite.file ? titles : [...titles, suite.title]
     for (const spec of suite.specs ?? []) {
-      const durations = (spec.tests ?? []).flatMap((t) => (t.results ?? []).map((r) => r.duration))
+      const ends = (spec.tests ?? []).flatMap((t) =>
+        (t.results ?? []).map((r) => Date.parse(r.startTime) + r.duration)
+      )
       tests.push({
         file: spec.file,
         line: spec.line,
         key: [spec.file, ...path, spec.title].join(' › '),
-        seconds: durations.length === 0 ? null : Math.max(...durations) / 1000,
+        ended: ends.length === 0 ? null : Math.max(...ends),
       })
     }
     for (const child of suite.suites ?? []) walk(child, path)
@@ -86,17 +93,26 @@ export function pack(unitList, total) {
   return bins
 }
 
+/** One shard's report: each test costs the time since the previous one ended. */
 export function timingsFromReport(report) {
+  const ran = testsFromReport(report)
+    .filter((test) => test.ended !== null)
+    .sort((a, b) => a.ended - b.ended)
   const timings = {}
-  for (const test of testsFromReport(report)) {
-    if (test.seconds !== null) timings[test.key] = Math.round(test.seconds * 10) / 10
+  let previous = Date.parse(report.stats.startTime)
+  for (const test of ran) {
+    timings[test.key] = Math.round((test.ended - previous) / 100) / 10
+    previous = test.ended
   }
   return timings
 }
 
 function main(argv) {
   if (argv[0] === '--record') {
-    const timings = timingsFromReport(JSON.parse(readFileSync(argv[1], 'utf8')))
+    const timings = Object.assign(
+      {},
+      ...argv.slice(1).map((file) => timingsFromReport(JSON.parse(readFileSync(file, 'utf8'))))
+    )
     const sorted = Object.fromEntries(
       Object.entries(timings).sort(([a], [b]) => a.localeCompare(b))
     )

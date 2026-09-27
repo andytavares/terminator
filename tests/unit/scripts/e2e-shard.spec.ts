@@ -7,9 +7,13 @@ import {
   timingsFromReport,
 } from '../../../scripts/e2e-shard.mjs'
 
-const result = (ms: number) => ({ results: [{ duration: ms }] })
+const START = Date.parse('2026-09-27T19:43:39.000Z')
+const result = (startsAfterMs: number, ms: number) => ({
+  results: [{ startTime: new Date(START + startsAfterMs).toISOString(), duration: ms }],
+})
 
 const REPORT = {
+  stats: { startTime: new Date(START).toISOString() },
   suites: [
     {
       title: 'session-home.spec.ts',
@@ -19,7 +23,7 @@ const REPORT = {
           title: 'the app opens on Home',
           file: 'session-home.spec.ts',
           line: 40,
-          tests: [result(6000)],
+          tests: [result(2000, 6000)],
         },
       ],
       suites: [
@@ -31,7 +35,7 @@ const REPORT = {
               title: 'fits its surface',
               file: 'session-home.spec.ts',
               line: 90,
-              tests: [result(8000)],
+              tests: [result(11000, 8000)],
             },
           ],
         },
@@ -46,28 +50,29 @@ const REPORT = {
 }
 
 describe('testsFromReport', () => {
-  it('keys each test by its file and describe titles, and reads its duration', () => {
+  it('keys each test by its file and describe titles, and reads when it ended', () => {
     expect(testsFromReport(REPORT)).toEqual([
       {
         file: 'session-home.spec.ts',
         line: 40,
         key: 'session-home.spec.ts › the app opens on Home',
-        seconds: 6,
+        ended: START + 8000,
       },
       {
         file: 'session-home.spec.ts',
         line: 90,
         key: 'session-home.spec.ts › the Ledger › fits its surface',
-        seconds: 8,
+        ended: START + 19000,
       },
-      { file: 'terminal.spec.ts', line: 10, key: 'terminal.spec.ts › types', seconds: null },
+      { file: 'terminal.spec.ts', line: 10, key: 'terminal.spec.ts › types', ended: null },
     ])
   })
 
-  it('records only tests that ran', () => {
+  it('charges each test the time since the previous one ended, hooks included', () => {
+    // 2s of beforeAll before the first test, 3s of hooks before the second.
     expect(timingsFromReport(REPORT)).toEqual({
-      'session-home.spec.ts › the app opens on Home': 6,
-      'session-home.spec.ts › the Ledger › fits its surface': 8,
+      'session-home.spec.ts › the app opens on Home': 8,
+      'session-home.spec.ts › the Ledger › fits its surface': 11,
     })
   })
 })
