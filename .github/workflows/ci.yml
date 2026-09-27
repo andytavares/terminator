@@ -237,9 +237,9 @@ jobs:
 
       # A new or edited spec must pass three times in a row before it merges.
       - name: Burn in changed specs
-        if: matrix.shard == 1 && needs.e2e-select.outputs.changed != ''
-        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=3 --reporter=dot
-        timeout-minutes: 10
+        if: needs.e2e-select.outputs.changed != ''
+        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=3 --shard=${{ matrix.shard }}/2 --pass-with-no-tests --reporter=dot
+        timeout-minutes: 15
 
       - name: Upload blob report
         if: ${{ !cancelled() }}
