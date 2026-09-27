@@ -76,7 +76,11 @@ export function e2eEnv(): NodeJS.ProcessEnv {
  */
 export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<AppHandle> {
   const app = await electron.launch({
-    args: ['.', `--user-data-dir=${userDataDir}`],
+    // closeApp SIGKILLs an app that will not close, and macOS then shows a
+    // modal "reopen windows?" alert on the next launch of the same bundle,
+    // which blocks startup until firstWindow times out. The argument domain
+    // turns that restore off for this process only.
+    args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
     env: e2eEnv(),
   })
   const page = await app.firstWindow()
