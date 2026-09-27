@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Check, ChevronLeft, TriangleAlert } from 'lucide-react'
 import { HealthChips } from './HealthChips'
 import { InlineCommentThread } from './InlineCommentThread'
+import { RichContent } from './RichContent'
 import { CommentComposer } from './CommentComposer'
 import { AgentNote } from './AgentNote'
 import { SelectionBar } from './SelectionBar'
@@ -788,7 +789,9 @@ export function ReviewDiffPane({
         {lineDrafts.map((d) => (
           <div className="rs-thread" key={d.id}>
             <div className="rs-thread-th">Pending · sent when you submit your review</div>
-            <div className="rs-thread-bd">{d.body}</div>
+            <div className="rs-thread-bd">
+              <RichContent>{d.body}</RichContent>
+            </div>
             <div className="rs-thread-actions">
               <button
                 type="button"

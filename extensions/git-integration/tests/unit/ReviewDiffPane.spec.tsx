@@ -960,6 +960,47 @@ describe('ReviewDiffPane', () => {
     })
   })
 
+  describe('pending drafts (S5)', () => {
+    it('shows a draft under its line, marked pending, with its markdown rendered', async () => {
+      const diff = {
+        path: 'src/foo.ts',
+        isBinary: false,
+        hunks: [
+          {
+            header: '@@ -61,1 +61,1 @@',
+            lines: [
+              {
+                type: 'add' as const,
+                content: 'fetch(filter)',
+                oldLineNumber: null,
+                newLineNumber: 62,
+              },
+            ],
+          },
+        ],
+      }
+      mockPrFileDiff.mockResolvedValue({ diff })
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...basePrReviewStoreState(),
+        drafts: [
+          {
+            id: 'd1',
+            path: 'src/foo.ts',
+            line: 62,
+            startLine: null,
+            side: 'RIGHT' as const,
+            body: '`fetch(filter)` reloads the same page.',
+            fromFindingId: null,
+          },
+        ],
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      const { container } = await renderPane()
+      await waitFor(() => expect(screen.getByText(/sent when you submit your review/)).toBeTruthy())
+      const code = container.querySelector('.rs-thread-bd code')
+      expect(code?.textContent).toBe('fetch(filter)')
+    })
+  })
+
   describe('keyboard events (REVIEW_KEY_EVENTS)', () => {
     const twoHunkDiff = {
       path: 'src/foo.ts',
