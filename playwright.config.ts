@@ -17,9 +17,11 @@ export default defineConfig({
   // No retries: a test that fails once fails the build. See
   // docs/research/e2e-deterministic-selective.md.
   retries: 0,
-  // CI runners are resource-constrained and each test launches a full
-  // Electron app, so cap parallelism.
-  workers: process.env.CI ? 2 : undefined,
+  // One per CI shard: on a 3-core runner two Electron apps only contend. In run
+  // 36344425737 each shard's wall time matched its summed test time with two
+  // workers, and the session specs ran 50% slower than when paired with light
+  // tests. Parallelism comes from the shards (ADR 071).
+  workers: process.env.CI ? 1 : undefined,
   globalSetup: './tests/e2e/global-setup.ts',
   globalTeardown: './tests/e2e/global-teardown.ts',
   use: {
