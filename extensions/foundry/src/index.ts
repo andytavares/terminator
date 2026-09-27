@@ -60,6 +60,7 @@ import {
   readProposal,
 } from './forge/converge.js'
 import type { AskModel } from './forge/converge.js'
+import { convergeMaybeScouted as scoutedConverge } from './forge/scouted-converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
 import { interruptedRuns, interruptedGate } from './line/adopt.js'
@@ -2142,6 +2143,11 @@ async function readOnlyRound(input: {
   readonly onFinished: (order: WorkOrder | null) => Promise<void>
   /** Stamped onto every fresh finding — only meaningful for the red team. */
   readonly round?: number
+  /**
+   * Called the moment the round's session exists, before its turn ends.
+   * Absent for a round nothing else needs to answer early for.
+   */
+  readonly onStarted?: (sessionId: string) => void
 }): Promise<void> {
   const { api, root, order, roleId, nodeId, startedAction, startedReason, onFinished } = input
   const runner = supervisedRunner
@@ -2195,6 +2201,7 @@ async function readOnlyRound(input: {
     if (announced) return
     announced = true
     void record(startedAction, startedReason, subject)
+    input.onStarted?.(subject)
   }
 
   const collect = async (deadline: boolean): Promise<void> => {
@@ -2642,56 +2649,96 @@ export function activate(api: ExtensionAPI): void {
    * Only for a first draft: `provenance.decisions` is empty until a proposal
    * has been applied, and `context.entryPoints` is empty until something has
    * populated it — an amending turn has both, and gets no scout of its own.
+   *
+   * The orchestration itself lives in `forge/scouted-converge.ts`, over
+   * injected collaborators, so it is testable without a runner. This is just
+   * the wiring.
    */
   const convergeMaybeScouted = (order: WorkOrder, message: string): Promise<ConvergeStarted> => {
-    const firstDraft =
-      order.provenance.decisions.length === 0 && order.context.entryPoints.length === 0
-    if (!firstDraft) return convergeWithFollowUps(order, message, 0)
-
     const root = dataRoot()
-    return new Promise<ConvergeStarted>((resolve) => {
-      void readOnlyRound({
-        api,
-        root,
-        order,
-        roleId: 'scout',
-        nodeId: 'forge-scout',
-        prompt: (role) => {
-          const sources = resolveSources(api, root)
-          return brief({
-            order,
-            role,
-            units: [],
-            rules: rulesFor(sources, {
-              repoPaths: sources.repoPaths,
-              houseDocs: [...order.context.houseDocs],
-            }).rules,
-            outputPath: rungOutputPath(orderDir(root, order.id), 'forge-scout'),
+    return scoutedConverge(
+      {
+        startScout: (scoutOrder, onStarted, onFinished) => {
+          void readOnlyRound({
+            api,
+            root,
+            order: scoutOrder,
+            roleId: 'scout',
+            nodeId: 'forge-scout',
+            prompt: (role) => {
+              const sources = resolveSources(api, root)
+              return brief({
+                order: scoutOrder,
+                role,
+                units: [],
+                rules: rulesFor(sources, {
+                  repoPaths: sources.repoPaths,
+                  houseDocs: [...scoutOrder.context.houseDocs],
+                }).rules,
+                outputPath: rungOutputPath(orderDir(root, scoutOrder.id), 'forge-scout'),
+              })
+            },
+            startedAction: 'scout.started',
+            startedReason: 'reading the repository before the first draft',
+            onStarted,
+            onFinished: async (updated) => {
+              // A failure or an empty write was already recorded as
+              // `scout.refused` — the architect still starts, from what it
+              // can read itself, rather than the whole draft waiting on the
+              // scout.
+              if (updated !== null) {
+                await createOrderStore(root).record({
+                  at: new Date().toISOString(),
+                  orderId: scoutOrder.id,
+                  actor: 'role:scout',
+                  action: 'scout.collected',
+                  subject: scoutOrder.id,
+                  reason: `found ${updated.context.entryPoints.length} entry point${
+                    updated.context.entryPoints.length === 1 ? '' : 's'
+                  }`,
+                  evidence: [],
+                })
+              }
+              onFinished(updated)
+            },
           })
         },
-        startedAction: 'scout.started',
-        startedReason: 'reading the repository before the first draft',
-        onFinished: async (updated) => {
-          // A failure or an empty write was already recorded as
-          // `scout.refused` — the architect still starts, from what it can
-          // read itself, rather than the whole draft waiting on the scout.
-          if (updated !== null) {
-            await createOrderStore(root).record({
+        startArchitect: (architectOrder, architectMessage) =>
+          convergeWithFollowUps(architectOrder, architectMessage, 0),
+        // `runArchitectTurn` (forge-channels.ts) is the usual recorder of
+        // `converge.started` / `converge.refused` — it records whatever
+        // `ConvergeStarted` this call resolves with. For a scouted first
+        // draft that is the scout's own session, so by the time the
+        // architect actually starts, that recording has already happened for
+        // the scout and nothing else will happen for the architect.
+        recordArchitectStarted: async (architectOrder, architectMessage, started) => {
+          const store = createOrderStore(root)
+          if (!started.ok) {
+            await store.record({
               at: new Date().toISOString(),
-              orderId: order.id,
-              actor: 'role:scout',
-              action: 'scout.collected',
-              subject: order.id,
-              reason: `found ${updated.context.entryPoints.length} entry point${
-                updated.context.entryPoints.length === 1 ? '' : 's'
-              }`,
+              orderId: architectOrder.id,
+              actor: 'role:architect',
+              action: 'converge.refused',
+              subject: architectOrder.id,
+              reason: started.reason,
               evidence: [],
             })
+            return
           }
-          resolve(await convergeWithFollowUps(updated ?? order, message, 0))
+          await store.record({
+            at: new Date().toISOString(),
+            orderId: architectOrder.id,
+            actor: 'role:architect',
+            action: 'converge.started',
+            subject: started.sessionId,
+            reason: architectMessage === '' ? 'drafting the plan' : architectMessage,
+            evidence: [],
+          })
         },
-      })
-    })
+      },
+      order,
+      message
+    )
   }
 
   const forge = createForgeChannels({
