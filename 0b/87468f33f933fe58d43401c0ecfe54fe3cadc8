@@ -1,0 +1,20 @@
+extensions/foundry/tests/factory/sim.spec.ts
+  s_541ac35f18f1af::t_0e8de688f9cda3 359,362,364-365
+  s_541ac35f18f1af::t_fd51a5311f1094 478-483
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0b87468f33f933fe58d43401c0ecfe54fe3cadc8",
+  "prompts": {},
+  "sessions": {
+    "s_541ac35f18f1af": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c7d94eb-e3b3-4bb9-88a5-8f50c142a463",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
