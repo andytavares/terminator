@@ -1,0 +1,46 @@
+extensions/git-integration/src/components/pr-review/ReviewDashboard.tsx
+  s_ccef6bf06cd549::t_5259e0c6ad4c37 123-126,136-153,156,172,174-175,178-190,200,203-204,211,214,222,225
+  s_ccef6bf06cd549::t_5b6233f4f3a103 392
+  s_ccef6bf06cd549::t_2903cf19671c46 262
+  s_ccef6bf06cd549::t_f6c0ba30ef37f5 3,24,30
+  s_ccef6bf06cd549::t_2c10c1ce425bbd 291-293
+  s_ccef6bf06cd549::t_efd8ea6b5c39f3 395-402,412-419,429-436,453-460,477-484
+  s_ccef6bf06cd549::t_4fefe6557fc96c 1-2,4-23,25-27,35,40-122,127-135,154-155,157-171,173,176-177,191-199,201-202,205-210,212-213,215-221,223-224,226-236,239-261,263-280,299,312-391,393-394,403-411,420-428,437-452,461-476,485-493
+  s_ccef6bf06cd549::t_6f6c622911ce59 28-29,31-34,36-39
+  s_ccef6bf06cd549::t_7b7d452f998428 281-290,294-298,300-311
+  s_ccef6bf06cd549::t_1caf79c365de32 237-238
+extensions/git-integration/src/components/pr-review/review-dashboard.css
+  s_ccef6bf06cd549::t_9b6bf5d3c14977 63-67
+  s_ccef6bf06cd549::t_10532ffdf22da0 188-204
+  s_ccef6bf06cd549::t_3584c0bcabd54b 1-62,68-187,205-218
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_ccef6bf06cd549::t_3ba1822148290e 95-108,111
+  s_ccef6bf06cd549::t_c738d00ffc2330 132-133
+  s_ccef6bf06cd549::t_cf8815f9ca5f25 156
+  s_ccef6bf06cd549::t_f2e3a4d3a5b216 126-130,143-147,149
+  s_ccef6bf06cd549::t_8f6398d6133a52 178,182-183,197-244
+  s_ccef6bf06cd549::t_a9d5ea758269dc 1-94,109-110,112-125,131,134-142,148,150-155,157-177,179-181,184-196,245-253
+extensions/git-integration/manifest.json
+  s_ccef6bf06cd549::t_ce57d1ec2327d4 19-23
+extensions/git-integration/src/renderer/App.tsx
+  s_ccef6bf06cd549::t_20afc5247824ab 22-24
+  s_ccef6bf06cd549::t_8e30b46201bb18 4
+tests/e2e/extension-smoke.spec.ts
+  s_ccef6bf06cd549::t_5d810fe28577cd 34-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d8d65ab087ed44a4f7fcc87f6b688607c6629aa6",
+  "prompts": {},
+  "sessions": {
+    "s_ccef6bf06cd549": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e87f48c-11ea-4fe7-83e0-74518a15e2a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
