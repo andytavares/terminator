@@ -1,14 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as path from 'node:path'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
 import {
   ensureCheckout,
   ensureCheckouts,
   removeCheckout,
+  provisionDependencies,
   branchFor,
   checkoutPath,
   CheckoutFailedError,
 } from '../../src/line/worktree.js'
-import type { CheckoutDeps } from '../../src/line/worktree.js'
+import type { CheckoutDeps, Checkout } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/schema.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
@@ -224,5 +227,140 @@ describe('taking one away', () => {
       timedOut: false,
     }))
     await expect(removeCheckout(checkout, deps({ exec: exec as never }))).resolves.toBe(false)
+  })
+})
+
+describe('provisioning dependencies', () => {
+  const scratch: string[] = []
+
+  function tmpDir(prefix: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+    scratch.push(dir)
+    return dir
+  }
+
+  afterEach(() => {
+    while (scratch.length > 0) {
+      const dir = scratch.pop()
+      if (dir !== undefined) fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  function lsFilesAnd(...manifests: string[]) {
+    return vi.fn(async (options: { args: string[] }) => {
+      if (options.args[0] === 'ls-files')
+        return {
+          exitCode: 0,
+          stdout: manifests.length === 0 ? '' : manifests.join('\0') + '\0',
+          stderr: '',
+          timedOut: false,
+        }
+      if (options.args[0] === 'check-ignore')
+        return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+  }
+
+  it('links the origin root node_modules into the worktree', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    const exec = lsFilesAnd('package.json')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
+
+    expect(linked).toEqual(['node_modules'])
+    expect(fs.lstatSync(path.join(wt, 'node_modules')).isSymbolicLink()).toBe(true)
+  })
+
+  it("links a nested workspace package's node_modules", async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'packages', 'foo', 'node_modules'), { recursive: true })
+    fs.mkdirSync(path.join(wt, 'packages', 'foo'), { recursive: true })
+    const exec = lsFilesAnd('packages/foo/package.json')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
+
+    expect(linked).toEqual(['packages/foo/node_modules'])
+    expect(fs.lstatSync(path.join(wt, 'packages', 'foo', 'node_modules')).isSymbolicLink()).toBe(
+      true
+    )
+  })
+
+  it('does not link when the origin has no node_modules', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    const exec = lsFilesAnd('package.json')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
+
+    expect(linked).toEqual([])
+    expect(fs.existsSync(path.join(wt, 'node_modules'))).toBe(false)
+  })
+
+  it('does not overwrite an existing worktree node_modules', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    fs.mkdirSync(path.join(wt, 'node_modules'))
+    const exec = lsFilesAnd('package.json')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
+
+    expect(linked).toEqual([])
+    expect(fs.lstatSync(path.join(wt, 'node_modules')).isSymbolicLink()).toBe(false)
+  })
+
+  it('removes the link when git check-ignore says the path is not ignored', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    const exec = vi.fn(async (options: { args: string[] }) => {
+      if (options.args[0] === 'ls-files')
+        return { exitCode: 0, stdout: 'package.json\0', stderr: '', timedOut: false }
+      if (options.args[0] === 'check-ignore')
+        return { exitCode: 1, stdout: '', stderr: '', timedOut: false }
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
+
+    expect(linked).toEqual([])
+    expect(fs.existsSync(path.join(wt, 'node_modules'))).toBe(false)
+  })
+
+  it('provisions a reused checkout as well as a freshly created one', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const root = tmpDir('foundry-root-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+
+    const base = order()
+    const ord: WorkOrder = {
+      ...base,
+      context: { ...base.context, repos: [{ ...base.context.repos[0], path: origin }] },
+    }
+    const target = checkoutPath(root, ord, 'app')
+    fs.mkdirSync(target, { recursive: true })
+
+    const exec = vi.fn(async (options: { args: string[] }) => {
+      if (options.args[0] === 'worktree' && options.args[1] === 'list')
+        return { exitCode: 0, stdout: `worktree ${target}\n`, stderr: '', timedOut: false }
+      if (options.args[0] === 'ls-files')
+        return { exitCode: 0, stdout: 'package.json\0', stderr: '', timedOut: false }
+      if (options.args[0] === 'check-ignore')
+        return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+
+    const checkout = await ensureCheckout(ord, 1, deps({ exec: exec as never, root }))
+
+    expect(checkout.created).toBe(false)
+    expect(fs.lstatSync(path.join(target, 'node_modules')).isSymbolicLink()).toBe(true)
   })
 })

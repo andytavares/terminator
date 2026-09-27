@@ -1,3 +1,4 @@
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import type { WorkOrder } from '../order/schema.js'
@@ -85,7 +86,9 @@ export async function ensureCheckout(
     timeoutMs: 30_000,
   })
   if (listed.exitCode === 0 && listed.stdout.includes(`worktree ${target}`)) {
-    return { repo: repo.name, origin: repo.path, path: target, branch, created: false }
+    const checkout = { repo: repo.name, origin: repo.path, path: target, branch, created: false }
+    await provisionDependencies(checkout, deps)
+    return checkout
   }
 
   // `-B` rather than `-b`: a branch left over from a previous attempt is reset
@@ -99,7 +102,87 @@ export async function ensureCheckout(
   })
   if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
 
-  return { repo: repo.name, origin: repo.path, path: target, branch, created: true }
+  const checkout = { repo: repo.name, origin: repo.path, path: target, branch, created: true }
+  await provisionDependencies(checkout, deps)
+  return checkout
+}
+
+/**
+ * Give a lane's worktree the origin's installed dependencies.
+ *
+ * `git worktree add` copies no `node_modules`, so every check command in the
+ * lane — vitest, tsc — fails before it ever reads the change. Symlinking the
+ * origin's `node_modules` in is safe only where the repository already
+ * ignores it: anything else would leave an untracked file in a target
+ * repository, which is the one thing rule 1 forbids, so a link that
+ * `git check-ignore` disowns is removed again immediately. Never throws — a
+ * failure here should not turn "the checkout was fine, the tools were slow"
+ * into a checkout failure.
+ */
+export async function provisionDependencies(
+  checkout: Checkout,
+  deps: CheckoutDeps
+): Promise<string[]> {
+  const linked: string[] = []
+  try {
+    const listed = await deps.exec({
+      command: 'git',
+      args: ['ls-files', '-z', '--', 'package.json', '*/package.json'],
+      cwd: checkout.path,
+      timeoutMs: 30_000,
+    })
+    if (listed.exitCode !== 0) return linked
+
+    const manifests = listed.stdout
+      .split('\0')
+      .filter((p) => p !== '' && !p.includes('node_modules'))
+
+    for (const manifest of manifests) {
+      const dir = path.dirname(manifest)
+      const originModules = path.join(checkout.origin, dir, 'node_modules')
+      const worktreeModules = path.join(checkout.path, dir, 'node_modules')
+      const rel = path.join(dir, 'node_modules')
+
+      try {
+        if (!fs.statSync(originModules).isDirectory()) continue
+      } catch {
+        continue
+      }
+
+      try {
+        fs.lstatSync(worktreeModules)
+        continue // already there — never overwrite what the worktree has
+      } catch {
+        // does not exist yet, proceed to link it
+      }
+
+      try {
+        fs.symlinkSync(originModules, worktreeModules, 'dir')
+      } catch {
+        continue
+      }
+
+      const ignored = await deps.exec({
+        command: 'git',
+        args: ['check-ignore', '-q', rel],
+        cwd: checkout.path,
+        timeoutMs: 30_000,
+      })
+      if (ignored.exitCode !== 0) {
+        try {
+          fs.unlinkSync(worktreeModules)
+        } catch {
+          // best effort — nothing else to do if this fails too
+        }
+        continue
+      }
+
+      linked.push(rel)
+    }
+  } catch {
+    return linked
+  }
+  return linked
 }
 
 /**

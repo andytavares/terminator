@@ -14,6 +14,8 @@ Everything Foundry needs to run ships inside this extension. A repository contri
 
 Foundry's own records go to `terminator.foundry.dataDir` when set, and to `<workdir>/.foundry/` when it is not. That path is resolved **once**, by `src/data-root.ts`; every writer receives an absolute path and never resolves it again.
 
+A lane worktree is the one exception, and it is not really an exception: `src/line/worktree.ts`'s `provisionDependencies` symlinks the origin checkout's installed `node_modules` into the lane's worktree — a fresh `git worktree add` has none, so every check command fails before it reads the change — but only into a directory the repository's own `.gitignore` already covers. It checks with `git check-ignore` after linking and removes the link again if that says otherwise, so a repository that does not ignore `node_modules` gets nothing added, and none ever gets an untracked file it did not already tolerate.
+
 ### 2. Nothing is assumed about a repository's toolchain
 
 There is no hardcoded `npm run lint`. `src/verify/toolchain-probe.ts` reads the target project's manifests — never executes them — and records the real command, or `null`. A `null` means the matching check reports **"not measured"**, never a pass. Boolean-coercing that third value anywhere in the verification path turns "we did not check" into "it is fine", which is the bug the ladder exists to prevent.
