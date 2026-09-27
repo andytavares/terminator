@@ -1,0 +1,22 @@
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_3a9e30cc08778f::t_46935f06c764e6 12-15,365-392
+  s_3a9e30cc08778f::t_fd2d430343f956 393-394
+src/renderer/components/terminal/TerminalPane.tsx
+  s_3a9e30cc08778f::t_6d43628f79031f 88-89,91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "26d61dec7d3cf3cde96ac5a0c510065ab0671715",
+  "prompts": {},
+  "sessions": {
+    "s_3a9e30cc08778f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd240882-012b-446b-a7ae-7442478ea77d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
