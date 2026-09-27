@@ -5,7 +5,7 @@ import { RichContent } from '../../src/components/pr-review/RichContent'
 
 const mockOpenExternal = vi.fn().mockResolvedValue({ ok: true })
 
-vi.mock('highlight.js', () => ({
+vi.mock('../../src/utils/hljs', () => ({
   default: {
     highlight: vi.fn().mockReturnValue({ value: '<span>highlighted</span>' }),
     highlightAuto: vi.fn().mockReturnValue({ value: '<span>auto</span>' }),

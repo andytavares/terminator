@@ -11,6 +11,10 @@ import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } 
 // interactive children) and are addressed the way helpers.ts already does,
 // by CSS class plus visible text.
 
+// Every test launches its own app on its own profile and folder, so the
+// shards can split this file by test instead of carrying all of it.
+test.describe.configure({ mode: 'parallel' })
+
 let handle: AppHandle | undefined
 let folder: string
 

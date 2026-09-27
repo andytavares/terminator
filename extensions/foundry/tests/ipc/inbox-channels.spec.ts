@@ -8,7 +8,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { Autonomy } from '../../src/gates/autonomy.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // One queue, always sorted, every row attributable to a rule. "Nothing needs

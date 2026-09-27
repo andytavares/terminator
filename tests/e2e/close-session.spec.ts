@@ -7,6 +7,10 @@ import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } 
 // Ending a session, and clearing away what is left of one, from the surfaces
 // that draw it — without going to the sidebar or the tab bar.
 
+// Every test launches its own app on its own profile and folder, so the
+// shards can split this file by test instead of carrying all of it.
+test.describe.configure({ mode: 'parallel' })
+
 let handle: AppHandle | undefined
 let folder: string
 

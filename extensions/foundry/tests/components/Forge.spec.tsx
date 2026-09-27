@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { Forge } from '../../src/components/Forge.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 

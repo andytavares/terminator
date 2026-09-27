@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { countAttention } from '../../src/gates/attention.js'
 import { raiseGate } from '../../src/gates/rules.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { Gate, GateRuleId } from '../../src/gates/rules.js'
 import type { OpenQuestion, WorkOrder } from '../../src/order/schema.js'
 

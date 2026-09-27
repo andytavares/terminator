@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { orphanedNodes, reclaim, IN_FLIGHT } from '../../src/line/reclaim.js'
 import { buildRunGraph, withNode, nodeById } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 

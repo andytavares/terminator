@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseProposal, applyProposal, ProposalRejected } from '../../src/order/proposal.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // What an agent is allowed to write into an order — which is not the order.

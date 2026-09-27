@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { compileOrder, agreeOrder, CHECK_IDS } from '../../src/order/compile.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // The six checks. "Ironed out" stops being a feeling and becomes a green light

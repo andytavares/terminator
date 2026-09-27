@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { brief, READABLE } from '../../src/line/brief.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { PlanUnit, WorkOrder } from '../../src/order/schema.js'
 import type { Role, Rule } from '../../src/recipe/parse.js'
 import type { Feedback } from '../../src/line/run-graph.js'

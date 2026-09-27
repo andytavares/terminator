@@ -18,7 +18,7 @@ import {
 } from '../../src/line/scheduler.js'
 import { buildRunGraph, nodeById, withNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { Budgets, WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph, RunNode, Feedback } from '../../src/line/run-graph.js'
 

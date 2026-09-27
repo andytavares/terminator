@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest'
 
 // --- Electron mock ---
 const mockSend = vi.fn()
@@ -527,6 +527,12 @@ describe('ExtensionViewHost quick-actions leader', () => {
   })
 
   it('opens quick actions and focuses the main window on the leader shortcut', async () => {
+    // Cmd is the leader on macOS, which is what this input presses.
+    const hostPlatform = process.platform
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    onTestFinished(() => {
+      Object.defineProperty(process, 'platform', { value: hostPlatform, configurable: true })
+    })
     await host.createView(makeExt(), 'main')
     const preventDefault = vi.fn()
     inputHandlers()[0](

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { convergeMaybeScouted } from '../../src/forge/scouted-converge.js'
 import type { ScoutedConvergeDeps } from '../../src/forge/scouted-converge.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // `converge`'s contract (forge-channels.ts) is to answer once a turn has

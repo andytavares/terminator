@@ -3,11 +3,11 @@ import {
   parseWorkOrder,
   SCHEMA_VERSION,
   SchemaVersionTooNewError,
-  draftOrder,
   RED_TEAM_CATEGORIES,
   BLOCKING_CATEGORIES,
   isBlocking,
 } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // The order is written by an agent and edited through a surface, so nothing

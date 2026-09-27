@@ -12,7 +12,7 @@ import {
   CheckoutFailedError,
 } from '../../src/line/worktree.js'
 import type { CheckoutDeps, Checkout } from '../../src/line/worktree.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // Somewhere for a lane's work to happen, cut from the lane's own repository

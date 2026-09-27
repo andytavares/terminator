@@ -6,7 +6,7 @@ const { mockHighlight, mockHighlightAuto, mockGetLanguage } = vi.hoisted(() => (
   mockGetLanguage: vi.fn(),
 }))
 
-vi.mock('highlight.js', () => ({
+vi.mock('../../src/utils/hljs', () => ({
   default: {
     highlight: mockHighlight,
     highlightAuto: mockHighlightAuto,

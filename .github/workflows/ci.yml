@@ -12,7 +12,7 @@ env:
 jobs:
   lint:
     name: Lint
-    runs-on: macos-14
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
 
   typecheck:
     name: Typecheck
-    runs-on: macos-14
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -84,9 +84,17 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
-  test:
-    name: Test
-    runs-on: macos-14
+  # On Linux: GitHub allows five macOS jobs at once, and those go to the build
+  # and E2E, which drive the real app. Tests of macOS behaviour pin
+  # process.platform rather than inheriting the host's. Each shard writes a
+  # blob; the coverage threshold only means something over the whole suite, so
+  # it is enforced once, in the merge.
+  unit:
+    name: Unit (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
 
     steps:
       - uses: actions/checkout@v4
@@ -99,9 +107,55 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The supervised-runner specs run each command under /bin/sh and /bin/zsh.
+      - name: Install zsh
+        run: command -v zsh || (sudo apt-get update -qq && sudo apt-get install -y -qq zsh)
+
       - name: Test
-        run: npm run test:coverage
-        timeout-minutes: 10
+        run: >-
+          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob --reporter=dot
+          --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
+          --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+        timeout-minutes: 5
+
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-blob-${{ matrix.shard }}
+          path: .vitest-reports/
+          include-hidden-files: true
+          retention-days: 1
+
+  # The required "Test" check. Same OS as the shards, because the blobs carry
+  # their absolute source paths and coverage is remapped against them.
+  test:
+    name: Test
+    needs: unit
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: unit-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+
+      - name: Merge reports and enforce coverage
+        run: >-
+          npx vitest run --merge-reports --coverage --reporter=dot --reporter=junit
+          --outputFile.junit=test-report.junit.xml
 
       - name: Upload test report
         if: always()
@@ -122,12 +176,19 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
+      # Runs even when a shard failed, so a shard that died before writing its
+      # blob cannot leave a green merge of the other two.
+      - name: Verdict
+        if: always()
+        run: test "${{ needs.unit.result }}" = success
+
   # Nothing the build does depends on the other checks, and E2E waits on it,
   # so it starts with them rather than five minutes after them. Merge still
   # needs every job.
+  # The build check. Each E2E shard builds for itself, so nothing waits on this.
   build:
     name: Build
-    runs-on: macos-14
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -140,21 +201,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # A warning is a failure. The ones this catches were real: a renderer
+      # bundle with node:fs stubbed out, and chunks past their size budget.
       - name: Build
-        run: npm run build
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-build
-          path: |
-            out/
-            extensions/*/src/index.js
-            # The extensions' renderer bundles. Without these an extension's UI
-            # is "Not found: dist/index.html" in the E2E job while passing
-            # locally, which is exactly the gap the panel test exists to close.
-            extensions/*/dist/
-          retention-days: 1
+        run: |
+          npm run build 2>&1 | tee build.log
+          if grep -nE '\(!\)|\[plugin |\[WARNING\]|⚠|is not exported by|externalized for browser' build.log; then
+            echo "::error::npm run build printed the warnings above"
+            exit 1
+          fi
 
   e2e-select:
     name: E2E select
@@ -187,14 +242,16 @@ jobs:
           changed=$(git diff --name-only --diff-filter=AM "$BASE"...HEAD -- 'tests/e2e/*.spec.ts' | tr '\n' ' ')
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
+  # Builds its own copy of the app rather than waiting on the Build job: the
+  # build takes 40s, the wait for the Build job and its artifact took 1m20s.
   e2e:
-    name: E2E (${{ matrix.shard }}/2)
-    needs: [build, e2e-select]
+    name: E2E (${{ matrix.shard }}/5)
+    needs: e2e-select
     if: needs.e2e-select.outputs.mode != 'none'
     runs-on: macos-14
     strategy:
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4, 5]
 
     steps:
       - uses: actions/checkout@v4
@@ -207,9 +264,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # remote-app.spec.ts drives the browser remote renderer in Chromium.
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium
+      - name: Build
+        run: npm run build
 
       # The Electron binary on macOS arm64 can have an invalid code signature
       # (dyld errno=85), causing intermittent "Process failed to launch"
@@ -220,25 +276,31 @@ jobs:
           node node_modules/electron/install.js
           codesign --force --deep --sign - node_modules/electron/dist/Electron.app
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-build
-
-      # No retries: a test that fails once fails the build.
+      # No retries: a test that fails once fails the build. Shards are split by
+      # recorded duration (scripts/e2e-shard.mjs), not Playwright's test count.
       - name: Run E2E suite
         env:
           MODE: ${{ needs.e2e-select.outputs.mode }}
           SPECS: ${{ needs.e2e-select.outputs.specs }}
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.shard }}.zip
         run: |
           if [ "$MODE" = all ]; then SPECS=""; fi
-          npx playwright test $SPECS --shard=${{ matrix.shard }}/2 --pass-with-no-tests --reporter=blob,dot
+          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 $SPECS)
+          if [ -z "$ARGS" ]; then echo "Nothing selected for this shard."; exit 0; fi
+          # remote-app.spec.ts drives the browser remote renderer in Chromium.
+          case "$ARGS" in *remote-app.spec.ts*) npx playwright install chromium ;; esac
+          npx playwright test $ARGS --reporter=blob,dot
         timeout-minutes: 10
 
-      # A new or edited spec must pass three times in a row before it merges.
+      # A new or edited spec must pass three times before it merges: once in the
+      # suite above and twice here, split across the shards the same way.
       - name: Burn in changed specs
-        if: matrix.shard == 1 && needs.e2e-select.outputs.changed != ''
-        run: npx playwright test ${{ needs.e2e-select.outputs.changed }} --repeat-each=3 --reporter=dot
+        if: needs.e2e-select.outputs.changed != ''
+        run: |
+          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 ${{ needs.e2e-select.outputs.changed }})
+          if [ -z "$ARGS" ]; then echo "Nothing changed on this shard."; exit 0; fi
+          case "$ARGS" in *remote-app.spec.ts*) npx playwright install chromium ;; esac
+          npx playwright test $ARGS --repeat-each=2 --reporter=dot
         timeout-minutes: 10
 
       - name: Upload blob report
@@ -266,6 +328,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Verdict
+        run: |
+          echo "select: ${{ needs.e2e-select.result }}, e2e: ${{ needs.e2e.result }}"
+          test "${{ needs.e2e-select.result }}" = success
+          case "${{ needs.e2e.result }}" in success|skipped) ;; *) exit 1 ;; esac
+
+  # The merged HTML report, beside the verdict rather than in front of it.
+  e2e-report:
+    name: E2E report
+    needs: e2e
+    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
+    runs-on: ubuntu-latest
+
+    steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -274,29 +350,19 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        if: needs.e2e.result != 'skipped'
         run: npm ci --ignore-scripts
 
       - uses: actions/download-artifact@v4
-        if: needs.e2e.result != 'skipped'
         with:
           pattern: blob-report-*
           path: all-blob-reports
           merge-multiple: true
 
       - name: HTML report
-        if: needs.e2e.result != 'skipped'
         run: npx playwright merge-reports --reporter html ./all-blob-reports
 
       - uses: actions/upload-artifact@v4
-        if: needs.e2e.result != 'skipped'
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
-
-      - name: Verdict
-        run: |
-          echo "select: ${{ needs.e2e-select.result }}, e2e: ${{ needs.e2e.result }}"
-          test "${{ needs.e2e-select.result }}" = success
-          case "${{ needs.e2e.result }}" in success|skipped) ;; *) exit 1 ;; esac

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { queueEntries } from '../../src/line/refinery-entries.js'
 import type { QueueEntriesDeps } from '../../src/line/refinery-entries.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {

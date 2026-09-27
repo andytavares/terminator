@@ -1,4 +1,5 @@
-import type { Toolchain, CheckName } from './toolchain-probe.js'
+import type { Toolchain } from './toolchain-probe.js'
+import type { CheckName } from './check-names.js'
 import type { RiskAssessment } from '../order/schema.js'
 
 // The verification ladder.

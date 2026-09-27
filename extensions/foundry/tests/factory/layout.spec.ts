@@ -8,7 +8,7 @@ import { buildRunGraph } from '../../src/line/run-graph.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // Two real recipes drive most of these tests, the same way

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 
 const { mockShowSaveDialog, mockWriteFileSync, mockMkdirSync } = vi.hoisted(() => ({
@@ -42,19 +42,32 @@ function invoke(channel: string, payload?: unknown): Promise<unknown> {
   return handler(payload)
 }
 
-beforeEach(async () => {
-  vi.clearAllMocks()
-  handlers = new Map()
+let tables: string
+
+beforeAll(async () => {
   pg = new PGlite()
   await pg.waitReady
   db = wrapDb(pg)
   await applyTaskVaultSchema(db)
+  const { rows } = await pg.query<{ names: string }>(
+    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
+  )
+  tables = rows[0].names
+})
+
+afterAll(async () => {
+  await pg.close()
+})
+
+beforeEach(async () => {
+  vi.clearAllMocks()
+  handlers = new Map()
   dispose = registerWeeklyReviewIpcHandlers(mockApi, db)
 })
 
 afterEach(async () => {
   dispose()
-  await pg.close()
+  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
 })
 
 async function startReview(): Promise<string> {

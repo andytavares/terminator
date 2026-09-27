@@ -4,7 +4,7 @@ import React from 'react'
 import { Forge } from '../../src/components/Forge.js'
 import { Floor } from '../../src/components/Floor.js'
 import { App } from '../../src/renderer/App.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { OpenQuestion, WorkOrder } from '../../src/order/schema.js'
 

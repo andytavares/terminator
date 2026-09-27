@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { coverageMatrix } from '../../src/order/coverage-matrix.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // Coverage in both directions is the check that matters most.

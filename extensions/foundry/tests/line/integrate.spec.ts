@@ -14,7 +14,7 @@ import {
 } from '../../src/line/integrate.js'
 import type { IntegrateDeps } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeVerdict } from '../../src/verify/verdict.js'
 import type { Verdict } from '../../src/verify/verdict.js'

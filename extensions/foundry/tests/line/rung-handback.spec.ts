@@ -10,7 +10,7 @@ import { parseRecipe } from '../../src/recipe/parse.js'
 import { createRoleRegistry } from '../../src/line/roles.js'
 import { collectableWrites, readRungOutput } from '../../src/line/rung-output.js'
 import { decideTool } from '../../src/runtime/tool-decision.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // The whole chain, with the real role files and the real policy.

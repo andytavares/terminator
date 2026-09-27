@@ -1,10 +1,10 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { draftOrder } from '../order/schema.js'
+import { draftOrder } from '../order/draft.js'
 import { acceptanceFromTicket } from './acceptance-from-ticket.js'
 import type { OrderSource, WorkOrder } from '../order/schema.js'
 import { probeToolchain, unavailableChecks } from '../verify/toolchain-probe.js'
-import type { CheckName } from '../verify/toolchain-probe.js'
+import type { CheckName } from '../verify/check-names.js'
 import type { Signal } from '../sensors/types.js'
 
 // Seeding an order.

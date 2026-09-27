@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { amendOrder } from '../../src/order/amend.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // An amendment sets the order back to draft and re-runs every check. Running

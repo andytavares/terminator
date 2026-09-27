@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { ladderFor, climb, RUNGS } from '../../src/verify/ladder.js'
 import type { LadderStep } from '../../src/verify/ladder.js'
 import { rulesFor, rulesAtRung } from '../../src/verify/rules.js'
-import { CHECK_NAMES } from '../../src/verify/toolchain-probe.js'
+import { CHECK_NAMES } from '../../src/verify/check-names.js'
 import type { Toolchain } from '../../src/verify/toolchain-probe.js'
 import type { RiskAssessment } from '../../src/order/schema.js'
 

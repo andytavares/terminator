@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 
 vi.mock('electron', () => ({
@@ -39,17 +39,30 @@ let pg: PGlite
 let db: ExtensionDB
 let diagramId: string
 
-beforeEach(async () => {
+let tables: string
+
+beforeAll(async () => {
   pg = new PGlite()
   await pg.waitReady
   db = wrapDb(pg)
   await applyNotepadSchema(db)
+  const { rows } = await pg.query<{ names: string }>(
+    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
+  )
+  tables = rows[0].names
+})
+
+afterAll(async () => {
+  await pg.close()
+})
+
+beforeEach(async () => {
   const r = await createDiagram(db, { title: 'Test diagram' })
   diagramId = (r as { data: { id: string } }).data.id
 })
 
 afterEach(async () => {
-  await pg.close()
+  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
 })
 
 describe('createDiagramComment', () => {

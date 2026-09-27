@@ -8,6 +8,10 @@ import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } 
 // terminal's output as it arrives, and the wall's arrangement survives a restart.
 // Addressed by role and name (contracts/ui-surfaces.md).
 
+// Every test launches its own app on its own profile and folder, so the
+// shards can split this file by test instead of carrying all of it.
+test.describe.configure({ mode: 'parallel' })
+
 let handle: AppHandle | undefined
 let folder: string
 

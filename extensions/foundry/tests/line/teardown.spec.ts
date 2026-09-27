@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { tearDownRun, deleteOrder } from '../../src/line/teardown.js'
 import { orderDir } from '../../src/data-root.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // Taking a run away again.

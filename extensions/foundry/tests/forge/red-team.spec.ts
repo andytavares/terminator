@@ -6,7 +6,7 @@ import {
   acceptFinding,
   settleFindings,
 } from '../../src/forge/red-team.js'
-import { draftOrder } from '../../src/order/schema.js'
+import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 // The adversarial pass reads the order and nothing else — never the intake

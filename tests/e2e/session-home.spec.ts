@@ -15,6 +15,10 @@ import {
 // where it lives, and what the operator writes about a session is still there
 // after a restart. Addressed by role and name (contracts/ui-surfaces.md).
 
+// Every test launches its own app on its own profile and folder, so the
+// shards can split this file by test instead of carrying all of it.
+test.describe.configure({ mode: 'parallel' })
+
 let handle: AppHandle | undefined
 let folder: string
 

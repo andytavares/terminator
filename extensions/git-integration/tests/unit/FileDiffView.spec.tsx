@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
-vi.mock('highlight.js', () => ({
+vi.mock('../../src/utils/hljs', () => ({
   default: {
     highlight: vi.fn((_content: string, _opts: { language: string }) => ({
       value: '<span>highlighted</span>',
