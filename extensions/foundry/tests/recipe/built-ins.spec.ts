@@ -212,9 +212,10 @@ describe('the shapes whose product is a document', () => {
     }
   )
 
-  it('attacks the order before a design document is written', () => {
+  it('has no red-team step on the Line, because the red team argues with the architect in the Forge before agreement', () => {
     const write = recipe('design-doc.yaml').steps.find((s) => s.id === 'write')
-    expect(write?.after).toContain('challenge')
+    expect(recipe('design-doc.yaml').steps.some((s) => s.role === 'red-team')).toBe(false)
+    expect(write?.after).toContain('scout')
   })
 
   it('records what a proof of concept learned before it ships', () => {

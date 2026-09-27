@@ -175,7 +175,8 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
       {
         id: 'answer',
         label: 'Answer',
-        consequence: 'Work resumes, and intake is marked defective.',
+        consequence:
+          'The architect takes every open finding in one turn; the order hands itself off again when the red team is satisfied.',
       },
       HOLD,
     ],

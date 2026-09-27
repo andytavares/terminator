@@ -71,7 +71,14 @@ import { decideReadOnly } from './runtime/read-only-policy.js'
 import { collectableWrites, readRungOutput, rungOutputPath } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
 import { resolveRole } from './recipe/resolve.js'
-import { MAX_REVIEW_ROUNDS, reviewPrompt, reviewNext, shouldReview } from './forge/review-loop.js'
+import {
+  MAX_REVIEW_ROUNDS,
+  reviewPrompt,
+  reviewNext,
+  shouldReview,
+  fixMessage,
+} from './forge/review-loop.js'
+import { forgeDefectAnswer } from './gates/act-decision.js'
 import { brief } from './line/brief.js'
 import { decideTool } from './runtime/tool-decision.js'
 import { ensureTrusted } from './runtime/workspace-trust.js'
@@ -3037,12 +3044,32 @@ export function activate(api: ExtensionAPI): void {
       // `hold` means what it says: the run stays stopped until the operator
       // comes back to it. Everything else is a decision to carry on.
       if (option === 'hold') return
-      await runs.resume({
+
+      // "Answer" on `forge-defect` used to call `resume` no matter what — but
+      // the finding that raised it already sent the order back to `draft`,
+      // and `resume` refuses anything that is not `running`. Read the order
+      // first: a drafted order gets the architect, in one turn, on every open
+      // blocking finding; a still-running order resumes as it always did.
+      if (gate.rule === 'forge-defect' && option === 'answer') {
+        const order = await createOrderStore(dataRoot()).load(gate.orderId)
+        const decision = forgeDefectAnswer({
+          order,
+          fixMessage: order === null ? null : fixMessage(order),
+          gateRule: gate.rule,
+        })
+        if (decision.kind === 'converge' && order !== null) {
+          await convergeWithFollowUps(order, decision.message, 0, 1)
+          return
+        }
+      }
+
+      const resumed = (await runs.resume({
         id: gate.orderId,
         // "Send back" is a retry of the node that failed; the others resume
         // whatever the wave was doing.
         retry: option === 'send_back' && gate.nodeId !== null ? [gate.nodeId] : [],
-      })
+      })) as { error?: string }
+      if (resumed.error !== undefined) throw new Error(resumed.error)
     },
   })
   reg(api, 'foundry:inbox.list', async () => {

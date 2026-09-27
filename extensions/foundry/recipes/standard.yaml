@@ -13,14 +13,15 @@ steps:
     role: scout
   # No `plan` step: the Forge's converge is the architect, and the order this
   # run is building from is the plan it already agreed. See direct.yaml.
-  - id: challenge
-    kind: agent
-    role: red-team
-    after: [scout]
+  #
+  # No `challenge` step either: the red team argues with the architect inside
+  # the Forge, before agreement, to a fixed point — a finding raised here had
+  # nothing left to act on it but a full re-run. See
+  # docs/research/foundry-red-team-loop.md ("Design → Line").
   - id: build
     kind: fanout
     over: plan.units[role=builder] by lane
-    after: [challenge]
+    after: [scout]
     step: { kind: agent, role: builder }
   # Lint runs in the lane, not as a rung of its own: it costs a terminal
   # tab rather than a session, and catching it here is cheaper than a

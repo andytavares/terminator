@@ -1204,20 +1204,19 @@ describe('a run whose agents are gone', () => {
     expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('running')
   })
 
-  it('never reclaims under an executor that is still running this order', async () => {
+  it('refuses to resume, and starts no second executor, while one is already running this order', async () => {
     const execute = vi.fn(async () => undefined)
     const channels = await runningOrder({
       execute: execute as never,
       isLive: nothingLive,
       executing: () => true,
     })
-    const { nodeId } = withRunning()
+    withRunning()
     execute.mockClear()
 
-    const r = (await channels.resume({ id: 'WO-1' })) as { reclaimed: string[] }
-    expect(r.reclaimed).toEqual([])
-    const handed = execute.mock.calls[0][2] as RunGraph
-    expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('running')
+    const r = (await channels.resume({ id: 'WO-1' })) as { error?: string }
+    expect(r.error).toBe('This run is already going; nothing to resume.')
+    expect(execute).not.toHaveBeenCalled()
   })
 
   it('observe names the nodes nothing is running, so the surface can say so', async () => {
