@@ -1,6 +1,7 @@
 import { Markdown, MarkdownInline } from './Markdown.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle, LoaderCircle } from 'lucide-react'
+import { isBlocking } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
@@ -176,21 +177,55 @@ const CHECK_REMEDIES: Record<CheckId, readonly Remedy[]> = {
   redTeam: [{ kind: 'goto', label: 'Clear them', step: 'redTeam', target: STEP_HEADING }],
 }
 
-type FindingRef = { readonly id: string; readonly text: string }
-
-/** How every ask about one finding starts, so the one running can be found. */
-function findingAskOpening(finding: FindingRef): string {
-  return `The red team finding ${finding.id} is open: "${finding.text}"`
+/**
+ * One decision the operator has made about a blocking finding, waiting in the
+ * band until Send collects it with everything else.
+ */
+interface FindingChoice {
+  readonly mode: 'ask' | 'fix' | 'accept'
+  /** The fix or the accept reason; unused for `ask`. */
+  readonly text: string
 }
 
-/** What the architect is told when asked to clear one red team finding. */
-function findingAsk(finding: FindingRef): string {
-  return `${findingAskOpening(finding)} Change the order so it no longer holds, and change nothing else. List it in \`resolveFindings\` with what you changed.`
+function findingDecided(choice: FindingChoice | undefined): boolean {
+  return choice !== undefined && (choice.mode === 'ask' || choice.text.trim() !== '')
 }
 
-/** What the architect is told when the operator has said how to fix one. */
-function findingFix(finding: FindingRef, how: string): string {
-  return `${findingAskOpening(finding)} The operator says to fix it this way: ${how} Change the order to do that, and change nothing else. List it in \`resolveFindings\` with what you changed.`
+/** What one settle turn asks the backend to do in a single converge call. */
+interface Settle {
+  readonly answers: readonly { readonly questionId: string; readonly option: number }[]
+  readonly accepts: readonly { readonly findingId: string; readonly reason: string }[]
+  readonly fixes: readonly { readonly findingId: string; readonly how: string }[]
+  readonly asks: readonly string[]
+}
+
+/**
+ * Fold every local selection into the one payload `foundry:order.converge`
+ * takes as `settle`.
+ *
+ * Only a decided finding counts: choosing "Fix it…" and leaving the box empty
+ * is not a fix, the same shrug a blank accept reason always was.
+ */
+function buildSettle(
+  questionChoices: Readonly<Record<string, number>>,
+  findingChoice: Readonly<Record<string, FindingChoice>>
+): Settle {
+  const answers = Object.entries(questionChoices).map(([questionId, option]) => ({
+    questionId,
+    option,
+  }))
+  const accepts: { findingId: string; reason: string }[] = []
+  const fixes: { findingId: string; how: string }[] = []
+  const asks: string[] = []
+  for (const [findingId, choice] of Object.entries(findingChoice)) {
+    if (choice.mode === 'ask') asks.push(findingId)
+    else if (choice.mode === 'fix' && choice.text.trim() !== '') {
+      fixes.push({ findingId, how: choice.text.trim() })
+    } else if (choice.mode === 'accept' && choice.text.trim() !== '') {
+      accepts.push({ findingId, reason: choice.text.trim() })
+    }
+  }
+  return { answers, accepts, fixes, asks }
 }
 
 /**
@@ -288,11 +323,12 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const [states, setStates] = useState<StatesView | null>(null)
   /** What the last turn moved, so the operator can see the redraw (FR-007). */
   const [moved, setMoved] = useState<string[]>([])
-  const [accepting, setAccepting] = useState<string | null>(null)
-  const [reason, setReason] = useState('')
-  /** The finding the operator is saying how to fix, and what they have said. */
-  const [fixing, setFixing] = useState<string | null>(null)
-  const [fixHow, setFixHow] = useState('')
+  /** Which option the operator picked for each open question, before Send. */
+  const [questionChoices, setQuestionChoices] = useState<Record<string, number>>({})
+  /** What the operator has decided about each blocking finding, before Send. */
+  const [findingChoice, setFindingChoice] = useState<Record<string, FindingChoice>>({})
+  /** A settle made while the architect was working, sent once it stops. */
+  const [queuedSettle, setQueuedSettle] = useState<Settle | null>(null)
   /** The criterion being accepted as unverifiable, and why. Kept apart from
       the red team's own reason so two open forms never share a box. */
   const [unproven, setUnproven] = useState<string | null>(null)
@@ -461,6 +497,51 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     return () => clearInterval(timer)
   }, [drafting, refresh])
 
+  /** Send a settle turn: every answer and accept apply at once, and a fix or
+   *  an ask goes to the architect in the one turn this starts. */
+  const applySettle = useCallback(
+    async (settle: Settle) => {
+      setBusy(true)
+      setProblem(null)
+      try {
+        const next = (await invoke('foundry:order.converge', { id: orderId, settle })) as
+          | (OrderView & { error?: string; converging?: string })
+          | { error: string }
+        if ('order' in next) setView(next)
+        if (next.error !== undefined) setProblem(next.error)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [orderId]
+  )
+
+  /**
+   * Collect every decision in the band and send it as one turn.
+   *
+   * The architect's proposal is merged over the order as it stood when its
+   * turn started, so a settle made mid-turn is one it never saw — it waits,
+   * rather than racing the turn already running, and goes the moment that one
+   * ends (below).
+   */
+  const sendSettle = useCallback(() => {
+    const settle = buildSettle(questionChoices, findingChoice)
+    setQuestionChoices({})
+    setFindingChoice({})
+    if (drafting) {
+      setQueuedSettle(settle)
+      return
+    }
+    void applySettle(settle)
+  }, [drafting, questionChoices, findingChoice, applySettle])
+
+  useEffect(() => {
+    if (drafting || queuedSettle === null) return
+    const toSend = queuedSettle
+    setQueuedSettle(null)
+    void applySettle(toSend)
+  }, [drafting, queuedSettle, applySettle])
+
   /**
    * Compile, agree, and start the Line.
    *
@@ -523,8 +604,15 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const matrix = coverageMatrix(order)
   const questions = surfacedQuestions(order.openQuestions)
   const assumptions = liveAssumptions(order)
-  const openFindings = order.redTeam.filter((f) => f.status === 'open')
+  // Only a blocking finding is a decision the operator has to make; the rest
+  // are notes the builder sees and never held up hand-off.
+  const blockingFindings = order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
+  const nonBlockingOpenFindings = order.redTeam.filter((f) => f.status === 'open' && !isBlocking(f))
   const clearedFindings = order.redTeam.filter((f) => f.status !== 'open')
+  const decided =
+    questions.filter((q) => questionChoices[q.id] !== undefined).length +
+    blockingFindings.filter((f) => findingDecided(findingChoice[f.id])).length
+  const needsYouTotal = questions.length + blockingFindings.length
 
   const steps = forgeSteps(compile, {
     shape: (recipes?.recipes?.length ?? 0) > 0 && isDraft,
@@ -648,18 +736,18 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       ) : null}
 
       {/* The one thing on this screen that is waiting on a person, and so the
-          first thing on it, above whichever step is open.
-
-          It was the third panel down a 260px rail, under six convergence checks
-          and up to six recipe cards. An operator reported it took them for ever
-          to find. A question you have to go hunting for is a question that
-          does not get answered, and every unanswered one holds the whole order
-          at "no open questions" failing. */}
-      {questions.length > 0 ? (
+          first thing on it, above whichever step is open — and the only place
+          left that decides an open question or a blocking finding: seven
+          findings used to cost seven serial turns, one clicked at a time,
+          because the controls that cleared them went away the moment a turn
+          was running. Nothing here sends until Send does, in one turn, and
+          nothing here is ever hidden while that turn runs — a decision made
+          mid-turn waits and goes the moment it ends. */}
+      {needsYouTotal > 0 ? (
         <section className="fdry-needs-you" aria-labelledby="fdry-needs-you-h">
           <h2 className="fdry-needs-you-h" id="fdry-needs-you-h" tabIndex={-1}>
             <AlertCircle aria-hidden="true" />
-            Needs you — {questions.length}
+            Needs you — {decided} of {needsYouTotal} decided
           </h2>
           <div className="fdry-needs-you-list">
             {questions.map((question) => (
@@ -673,10 +761,17 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                     <button
                       key={option}
                       type="button"
-                      className={optionIndex === question.recommended ? 'is-recommended' : ''}
-                      disabled={locked}
+                      aria-pressed={questionChoices[question.id] === optionIndex}
+                      className={
+                        `${optionIndex === question.recommended ? 'is-recommended ' : ''}` +
+                        (questionChoices[question.id] === optionIndex ? 'is-selected' : '')
+                      }
+                      disabled={busy}
                       onClick={() =>
-                        void turn({ answer: { questionId: question.id, option: optionIndex } })
+                        setQuestionChoices((current) => ({
+                          ...current,
+                          [question.id]: optionIndex,
+                        }))
                       }
                     >
                       <MarkdownInline text={option} />
@@ -686,7 +781,117 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 </div>
               </div>
             ))}
+
+            {blockingFindings.map((finding) => {
+              const choice = findingChoice[finding.id]
+              return (
+                <div key={finding.id} className="fdry-finding">
+                  <CircleDot aria-hidden="true" />
+                  <div className="fdry-finding-body">
+                    <FindingText text={finding.text} />
+                    <span className="fdry-finding-actions">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-pressed={choice?.mode === 'ask'}
+                        title="Have the architect change the order so this no longer holds"
+                        onClick={() =>
+                          setFindingChoice((current) => ({
+                            ...current,
+                            [finding.id]: { mode: 'ask', text: '' },
+                          }))
+                        }
+                      >
+                        Ask the architect
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-pressed={choice?.mode === 'fix'}
+                        title="Say how, and the architect changes the order that way"
+                        onClick={() =>
+                          setFindingChoice((current) => ({
+                            ...current,
+                            [finding.id]: {
+                              mode: 'fix',
+                              text: choice?.mode === 'fix' ? choice.text : '',
+                            },
+                          }))
+                        }
+                      >
+                        Fix it…
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-pressed={choice?.mode === 'accept'}
+                        title="It stands, and here is why"
+                        onClick={() =>
+                          setFindingChoice((current) => ({
+                            ...current,
+                            [finding.id]: {
+                              mode: 'accept',
+                              text: choice?.mode === 'accept' ? choice.text : '',
+                            },
+                          }))
+                        }
+                      >
+                        Accept
+                      </button>
+                    </span>
+                    {choice?.mode === 'fix' ? (
+                      <div className="fdry-accept is-fix">
+                        <textarea
+                          aria-label={`How should ${finding.id} be fixed?`}
+                          placeholder="How should it be fixed?"
+                          rows={3}
+                          value={choice.text}
+                          disabled={busy}
+                          onChange={(event) =>
+                            setFindingChoice((current) => ({
+                              ...current,
+                              [finding.id]: { mode: 'fix', text: event.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                    ) : null}
+                    {choice?.mode === 'accept' ? (
+                      <div className="fdry-accept">
+                        <input
+                          aria-label={`Why ${finding.id} is accepted`}
+                          placeholder="Why it stands…"
+                          value={choice.text}
+                          disabled={busy}
+                          onChange={(event) =>
+                            setFindingChoice((current) => ({
+                              ...current,
+                              [finding.id]: { mode: 'accept', text: event.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
           </div>
+
+          {queuedSettle !== null ? (
+            <p role="status" aria-label="Queued" className="fdry-queued">
+              Queued — this will be sent once the architect finishes.
+            </p>
+          ) : null}
+
+          <button
+            type="button"
+            className="fdry-settle-send"
+            disabled={decided === 0 || busy || queuedSettle !== null}
+            onClick={sendSettle}
+          >
+            {drafting ? 'Send when the architect finishes' : 'Send decisions'}
+          </button>
         </section>
       ) : null}
 
@@ -992,111 +1197,41 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
             {step.id === 'redTeam' ? (
               <>
                 <p className="fdry-step-intro">
-                  {openFindings.length === 0
-                    ? 'Nothing is open. An adversarial pass read the plan and left nothing to clear.'
-                    : `${openFindings.length} open. Ask the architect to clear each one, tell it how to fix it, or accept it with a reason — nothing hands off while one is open.`}
+                  {blockingFindings.length === 0
+                    ? 'Nothing here blocks hand-off. An adversarial pass read the plan and left nothing that would make the change wrong.'
+                    : `${blockingFindings.length} open and blocking hand-off. Decide each one in the band above — nothing hands off while one is open.`}
                 </p>
                 <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
-                  {openFindings.map((finding) => (
-                    <div key={finding.id} className="fdry-finding">
-                      <CircleDot aria-hidden="true" />
-                      <div className="fdry-finding-body">
-                        <FindingText text={finding.text} />
-                        {isDraft && drafting && asked?.startsWith(findingAskOpening(finding)) ? (
-                          <Asked />
-                        ) : null}
-                        {isDraft ? (
-                          <span className="fdry-finding-actions">
-                            {drafting ? null : (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={locked}
-                                  title="Have the architect change the order so this no longer holds"
-                                  onClick={() => void converge(findingAsk(finding))}
-                                >
-                                  Ask the architect
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={locked}
-                                  title="Say how, and the architect changes the order that way"
-                                  onClick={() => {
-                                    setAccepting(null)
-                                    setFixing(finding.id)
-                                  }}
-                                >
-                                  Fix it…
-                                </button>
-                              </>
-                            )}
-                            <button
-                              type="button"
-                              disabled={locked}
-                              title="It stands, and here is why"
-                              onClick={() => {
-                                setFixing(null)
-                                setAccepting(finding.id)
-                              }}
-                            >
-                              Accept
+                  {blockingFindings.length === 0 ? null : (
+                    <ul className="fdry-findings-pointer" aria-label="Blocking findings">
+                      {blockingFindings.map((finding) => (
+                        <li key={finding.id} className="fdry-finding">
+                          <CircleDot aria-hidden="true" />
+                          <div className="fdry-finding-body">
+                            <FindingText text={finding.text} />
+                            <button type="button" onClick={() => goTo('fdry-needs-you-h')}>
+                              Decide it above
                             </button>
-                          </span>
-                        ) : null}
-                        {fixing === finding.id && !drafting ? (
-                          <form
-                            className="fdry-accept is-fix"
-                            onSubmit={(event) => {
-                              event.preventDefault()
-                              if (fixHow.trim() === '') return
-                              void converge(findingFix(finding, fixHow.trim()))
-                              setFixing(null)
-                              setFixHow('')
-                            }}
-                          >
-                            <textarea
-                              aria-label="How should it be fixed?"
-                              placeholder="How should it be fixed?"
-                              rows={3}
-                              value={fixHow}
-                              onChange={(event) => setFixHow(event.target.value)}
-                            />
-                            <button type="submit" disabled={locked || fixHow.trim() === ''}>
-                              Send to the architect
-                            </button>
-                          </form>
-                        ) : null}
-                        {accepting === finding.id ? (
-                          <form
-                            className="fdry-accept"
-                            onSubmit={(event) => {
-                              event.preventDefault()
-                              if (reason.trim() === '') return
-                              void turn({
-                                finding: {
-                                  id: finding.id,
-                                  decision: 'accepted',
-                                  reason: reason.trim(),
-                                },
-                              })
-                              setAccepting(null)
-                              setReason('')
-                            }}
-                          >
-                            <input
-                              aria-label="Why this finding is accepted"
-                              placeholder="Why it stands…"
-                              value={reason}
-                              onChange={(event) => setReason(event.target.value)}
-                            />
-                            <button type="submit" disabled={locked || reason.trim() === ''}>
-                              Accept it
-                            </button>
-                          </form>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {nonBlockingOpenFindings.length === 0 ? null : (
+                    <>
+                      <h3 className="fdry-field-h">Notes (don&rsquo;t block hand-off)</h3>
+                      <ul className="fdry-notes" aria-label="Non-blocking findings">
+                        {nonBlockingOpenFindings.map((finding) => (
+                          <li key={finding.id} className="fdry-finding is-note">
+                            <div className="fdry-finding-body">
+                              <FindingText text={finding.text} />
+                              <span className="fdry-finding-category">{finding.category}</span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                   {clearedFindings.length === 0 ? null : (
                     <>
                       <h3 className="fdry-field-h">Cleared</h3>

@@ -704,6 +704,50 @@
   font-weight: 500;
 }
 
+/* The option the operator picked, before Send — a local choice, not yet a
+   turn, so it reads as selected rather than as sent. */
+.fdry-needs-you .fdry-options button.is-selected {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent);
+}
+
+/* The move the operator picked for a blocking finding, before Send. */
+.fdry-finding-actions button[aria-pressed='true'] {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+/* The one button that turns every decision in the band into a turn. */
+.fdry-settle-send {
+  appearance: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-top: 12px;
+  padding: 6px 16px;
+  border: 1px solid var(--tm-accent);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  cursor: pointer;
+}
+
+.fdry-settle-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+  background: transparent;
+  color: var(--tm-text-secondary);
+}
+
+/* A settle made while the architect was already working — waiting rather
+   than lost, and said so rather than left to look like nothing happened. */
+.fdry-queued {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
 /* The last ask in the band has no row under it to be divided from. */
 .fdry-needs-you .fdry-ask:last-child {
   border-bottom: 0;
@@ -1734,6 +1778,37 @@
   display: block;
   margin-top: 2px;
   font-style: italic;
+}
+
+/* A blocking finding, on the Red team step: read-only here, it only points
+   back to the band that actually decides it. */
+.fdry-findings-pointer {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+/* A note the red team raised that does not block hand-off — real, but
+   nothing here for the operator to act on. */
+.fdry-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fdry-finding.is-note {
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-finding-category {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tm-text-secondary);
 }
 
 .fdry-input {

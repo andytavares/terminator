@@ -47,6 +47,27 @@ const CancelPayload = z.object({
   reason: z.string().optional(),
 })
 
+/**
+ * Everything the operator decided in the "Needs you" band, in one submit.
+ *
+ * Seven findings used to cost seven serial turns, one clicked at a time,
+ * because a turn had to land and the order had to be re-agreed before the
+ * next one could be raised. An answer or an accept changes the order directly
+ * and needs no turn; a fix or an ask is the architect's, and every one of
+ * those goes in the single turn `converge` starts once, naming every finding
+ * it carries.
+ */
+const SettlePayload = z.object({
+  answers: z
+    .array(z.object({ questionId: z.string(), option: z.union([z.string(), z.number()]) }))
+    .optional(),
+  accepts: z.array(z.object({ findingId: z.string(), reason: z.string() })).optional(),
+  fixes: z.array(z.object({ findingId: z.string(), how: z.string() })).optional(),
+  asks: z.array(z.string()).optional(),
+})
+
+type SettleInput = z.infer<typeof SettlePayload>
+
 const TurnPayload = z.object({
   id: z.string(),
   message: z.string().optional(),
@@ -79,6 +100,11 @@ const TurnPayload = z.object({
    * at a red check with no move to make.
    */
   unverifiable: z.object({ criterionId: z.string(), reason: z.string().default('') }).optional(),
+  /**
+   * Settle everything the operator decided in the band, in one converge call
+   * — see `SettlePayload`. Only `converge` reads this field.
+   */
+  settle: SettlePayload.optional(),
 })
 
 const CompilePayload = z.object({ id: z.string(), commit: z.boolean().default(false) })
@@ -401,6 +427,153 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
   }
 
   /**
+   * Start one architect turn, on the order and with the message given.
+   *
+   * The half of `converge` that actually talks to the architect — shared by a
+   * plain turn and by a settle that ends in a fix or an ask, so there is one
+   * place that starts a session and one place that records it.
+   */
+  async function runArchitectTurn(order: WorkOrder, message?: string): Promise<unknown> {
+    if (deps.converge === undefined) {
+      return {
+        ...view(order),
+        error:
+          'Intake cannot run: there is no supervision runtime, so no architect can draft the plan.',
+      }
+    }
+
+    const started = await deps.converge(order, message ?? '')
+    if (!started.ok) {
+      await deps.store.record({
+        at: deps.now(),
+        orderId: order.id,
+        actor: 'role:architect',
+        action: 'converge.refused',
+        subject: order.id,
+        reason: started.reason,
+        evidence: [],
+      })
+      return {
+        ...view(order),
+        error: started.reason,
+        intake: lastIntake(await deps.store.entries(order.id)),
+      }
+    }
+
+    await deps.store.record({
+      at: deps.now(),
+      orderId: order.id,
+      actor: 'role:architect',
+      action: 'converge.started',
+      subject: started.sessionId,
+      reason: message === undefined ? 'drafting the plan' : message,
+      evidence: [],
+    })
+    // The order as it stands, plus the session the architect is working in —
+    // so the surface can say it is running and take the operator to it.
+    //
+    // `intake` comes back on this call too, and not only on the poll: the
+    // Forge reads whether a turn is running from it, and a first answer that
+    // omitted it would leave the surface idle until the next poll it was
+    // never going to start.
+    return {
+      ...view(order),
+      converging: started.sessionId,
+      intake: lastIntake(await deps.store.entries(order.id)),
+    }
+  }
+
+  /**
+   * Settle everything the operator decided in the band, in one submit.
+   *
+   * An answer and an accept change the order directly and need no turn — they
+   * are recorded exactly as `turn` records them, one ledger line each. A fix
+   * or an ask is the architect's, and every one of those is folded into the
+   * single turn this starts once, naming every finding it carries, rather
+   * than the one-at-a-time loop that cost seven findings seven serial turns.
+   *
+   * A blank accept reason refuses the whole settle rather than applying the
+   * rest and dropping the one that was a shrug: a partially-applied batch is
+   * a batch the operator did not actually send.
+   */
+  async function settleTurn(
+    order: WorkOrder,
+    settle: SettleInput,
+    message: string | undefined
+  ): Promise<unknown> {
+    const accepts = settle.accepts ?? []
+    if (accepts.some((a) => a.reason.trim() === '')) {
+      return { ...view(order), error: 'Accepting a finding costs a written reason.' }
+    }
+
+    let next = order
+    const answers = settle.answers ?? []
+    for (const answer of answers) {
+      next = {
+        ...next,
+        openQuestions: answerQuestion(next.openQuestions, answer.questionId, answer.option),
+      }
+    }
+    for (const accept of accepts) {
+      next = acceptFinding(next, accept.findingId, accept.reason)
+    }
+
+    if (next !== order) {
+      await deps.store.save(next)
+      for (const answer of answers) {
+        await deps.store.record({
+          at: deps.now(),
+          orderId: order.id,
+          actor: 'operator',
+          action: 'question.answered',
+          subject: answer.questionId,
+          reason: String(answer.option),
+          evidence: [],
+        })
+      }
+      for (const accept of accepts) {
+        await deps.store.record({
+          at: deps.now(),
+          orderId: order.id,
+          actor: 'operator',
+          action: 'finding.accepted',
+          subject: accept.findingId,
+          reason: accept.reason.trim(),
+          evidence: [],
+        })
+      }
+    }
+
+    const fixes = settle.fixes ?? []
+    const asks = settle.asks ?? []
+    if (fixes.length === 0 && asks.length === 0) {
+      const changed = [
+        ...answers.map((a) => a.questionId),
+        ...(accepts.length > 0 ? ['redTeam'] : []),
+      ]
+      return view(next, changed)
+    }
+
+    const findingText = (id: string): string => next.redTeam.find((f) => f.id === id)?.text ?? ''
+    const parts = [
+      ...asks.map(
+        (id) => `${id} is open: ${findingText(id)}. Change the order so it no longer holds.`
+      ),
+      ...fixes.map(
+        (fix) =>
+          `${fix.findingId} is open: ${findingText(fix.findingId)}. The operator says to fix it this way: ${fix.how}.`
+      ),
+      'Change what these name, and list each in `resolveFindings` with what you changed.',
+    ]
+    const composed =
+      message === undefined || message.trim() === ''
+        ? parts.join(' ')
+        : `${parts.join(' ')} ${message}`
+
+    return runArchitectTurn(next, composed)
+  }
+
+  /**
    * One turn of intake.
    *
    * The architect reads the draft and the repository and proposes criteria, a
@@ -418,53 +591,12 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     if (order.status !== 'draft') {
       return { error: `Only a draft can be converged; this order is ${order.status}.` }
     }
-    if (deps.converge === undefined) {
-      return {
-        ...view(order),
-        error:
-          'Intake cannot run: there is no supervision runtime, so no architect can draft the plan.',
-      }
+
+    if (parsed.data.settle !== undefined) {
+      return settleTurn(order, parsed.data.settle, parsed.data.message)
     }
 
-    const started = await deps.converge(order, parsed.data.message ?? '')
-    if (!started.ok) {
-      await deps.store.record({
-        at: deps.now(),
-        orderId: id,
-        actor: 'role:architect',
-        action: 'converge.refused',
-        subject: id,
-        reason: started.reason,
-        evidence: [],
-      })
-      return {
-        ...view(order),
-        error: started.reason,
-        intake: lastIntake(await deps.store.entries(id)),
-      }
-    }
-
-    await deps.store.record({
-      at: deps.now(),
-      orderId: id,
-      actor: 'role:architect',
-      action: 'converge.started',
-      subject: started.sessionId,
-      reason: parsed.data.message === undefined ? 'drafting the plan' : parsed.data.message,
-      evidence: [],
-    })
-    // The order as it stands, plus the session the architect is working in —
-    // so the surface can say it is running and take the operator to it.
-    //
-    // `intake` comes back on this call too, and not only on the poll: the
-    // Forge reads whether a turn is running from it, and a first answer that
-    // omitted it would leave the surface idle until the next poll it was
-    // never going to start.
-    return {
-      ...view(order),
-      converging: started.sessionId,
-      intake: lastIntake(await deps.store.entries(id)),
-    }
+    return runArchitectTurn(order, parsed.data.message)
   }
 
   async function compile(raw: unknown): Promise<unknown> {

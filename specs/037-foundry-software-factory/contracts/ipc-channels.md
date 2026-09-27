@@ -145,6 +145,11 @@ is refused. There is no operator "resolved": a finding is fixed by a
 `foundry:order.converge` turn whose proposal lists it in `resolveFindings`
 (ADR 068).
 
+`settle` (ADR 069) is everything the operator decided in the Forge's "Needs you" band, sent at once:
+`{ answers?: { questionId; option }[]; accepts?: { findingId; reason }[]; fixes?: { findingId; how }[]; asks?: string[] }`.
+Answers and accepts are applied and recorded straight away; a blank accept reason refuses the whole settle. When there are
+fixes or asks, one architect turn starts with a message naming every one of them.
+
 **Response**: `{ order: WorkOrder; compile: CompileResult; changed: string[] } | { error: string }`
 
 `changed` lists the ids of fields the turn redrew, so the surface can mark them without diffing the whole order.
@@ -523,14 +528,14 @@ Thirty channels serve the Floor: the live runs, their permissions, their transcr
 
 ### The order, beyond compiling it
 
-| Channel                   | Payload                                                               | Response                                                                                                                                                        |
-| ------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `foundry:order.list`      | `{}`                                                                  | Every order, for the board                                                                                                                                      |
-| `foundry:order.converge`  | `{ id: string }`                                                      | Runs the architect read-only and reads back its proposal (ADR-043)                                                                                              |
-| `foundry:order.states`    | `{ id: string }`                                                      | The tracker's workflow positions, for the intent mapping (FR-060)                                                                                               |
-| `foundry:order.mapState`  | `{ id: string; intent; optionId }`                                    | `{ ok, mapping }`                                                                                                                                               |
-| `foundry:order.writeBack` | `{ id: string; events: string[] }`                                    | Which write-backs this order will make (FR-062)                                                                                                                 |
-| `foundry:order.budgets`   | `{ id: string; budgets: { agents; wallClockMinutes; filesTouched } }` | The order and its checks. Each limit is a whole number ≥ 1 or `null` for no limit. Drafts only: a running order's budget is raised at its budget gate (ADR 052) |
+| Channel                   | Payload                                                               | Response                                                                                                                                                         |
+| ------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `foundry:order.list`      | `{}`                                                                  | Every order, for the board                                                                                                                                       |
+| `foundry:order.converge`  | `{ id: string; message?: string; settle?: Settle }`                   | Runs the architect read-only and reads back its proposal (ADR-043). `settle` applies every answer and accept, then sends every ask and fix in one turn (ADR 069) |
+| `foundry:order.states`    | `{ id: string }`                                                      | The tracker's workflow positions, for the intent mapping (FR-060)                                                                                                |
+| `foundry:order.mapState`  | `{ id: string; intent; optionId }`                                    | `{ ok, mapping }`                                                                                                                                                |
+| `foundry:order.writeBack` | `{ id: string; events: string[] }`                                    | Which write-backs this order will make (FR-062)                                                                                                                  |
+| `foundry:order.budgets`   | `{ id: string; budgets: { agents; wallClockMinutes; filesTouched } }` | The order and its checks. Each limit is a whole number ≥ 1 or `null` for no limit. Drafts only: a running order's budget is raised at its budget gate (ADR 052)  |
 
 ### The model
 

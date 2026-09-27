@@ -559,7 +559,10 @@ describe('only the parts affected are redrawn (FR-007)', () => {
   })
 })
 
-describe('clearing an adversarial finding', () => {
+// A blocking finding is decided in the "Needs you" band, alongside the open
+// questions — not one at a time on the Red team step, and not sent until the
+// band's own Send button collects every decision into one turn.
+describe('deciding a blocking finding, in the band', () => {
   function withFinding() {
     const current = {
       ...order(),
@@ -567,6 +570,7 @@ describe('clearing an adversarial finding', () => {
         {
           id: 'RT-1',
           severity: 'high' as const,
+          category: 'wrong-outcome' as const,
           text: 'the outcome restates the problem',
           status: 'open' as const,
           reason: '',
@@ -577,7 +581,7 @@ describe('clearing an adversarial finding', () => {
       if (channel === 'foundry:order.compile') {
         return { order: current, compile: compileOrder(current) }
       }
-      if (channel === 'foundry:order.turn') {
+      if (channel === 'foundry:order.converge') {
         return { order: current, compile: compileOrder(current) }
       }
       return {}
@@ -588,44 +592,43 @@ describe('clearing an adversarial finding', () => {
     render(<Forge orderId="WO-1" />)
   }
 
-  it('offers a way to clear it, not just a list of what is blocking', async () => {
+  it('offers a way to decide it, above the steps rather than on the Red team step', async () => {
     withFinding()
-    await openStep('Red team')
-    expect(screen.getByText(/1 open/)).toBeTruthy()
+    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    expect(screen.getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Fix it…' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy()
   })
 
   // Reported: "fixed provides no way to fix anything." It marked the finding
-  // resolved with nothing changed. Fixing is now saying how, to the architect.
-  it('sends the operator’s fix to the architect with the finding', async () => {
+  // resolved with nothing changed. Fixing is now saying how, to the architect,
+  // and only once Send is pressed — not on typing it.
+  it('sends the operator’s fix to the architect only once Send is pressed', async () => {
     withFinding()
-    await openStep('Red team')
+    await waitFor(() => screen.getByText('the outcome restates the problem'))
     fireEvent.click(screen.getByRole('button', { name: 'Fix it…' }))
-    const how = screen.getByLabelText(/How should it be fixed/)
-    // Nothing goes until there is something to say.
-    expect(
-      (screen.getByRole('button', { name: 'Send to the architect' }) as HTMLButtonElement).disabled
-    ).toBe(true)
+    const how = screen.getByLabelText(/How should RT-1 be fixed/)
     fireEvent.change(how, { target: { value: 'state what will be observably different' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send to the architect' }))
+    expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send decisions' }))
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith(
-        'foundry:order.converge',
-        expect.objectContaining({
-          id: 'WO-1',
-          message: expect.stringMatching(
-            /the outcome restates the problem[\s\S]*state what will be observably different[\s\S]*resolveFindings/
-          ),
-        })
-      )
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
+        id: 'WO-1',
+        settle: {
+          answers: [],
+          accepts: [],
+          fixes: [{ findingId: 'RT-1', how: 'state what will be observably different' }],
+          asks: [],
+        },
+      })
     )
-    expect(invoke).not.toHaveBeenCalledWith('foundry:order.turn', expect.anything())
+    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.converge')).toHaveLength(1)
   })
 
   it('opens the fix box under the finding it is for', async () => {
     withFinding()
-    await openStep('Red team')
+    await waitFor(() => screen.getByText('the outcome restates the problem'))
     fireEvent.click(screen.getByRole('button', { name: 'Fix it…' }))
     const finding = screen.getByText(/the outcome restates the problem/).closest('.fdry-finding')
     expect(finding?.querySelector('textarea')).toBeTruthy()
@@ -634,62 +637,253 @@ describe('clearing an adversarial finding', () => {
   // Reported: "I should be able to ask the agent to close the red team
   // findings too." Fixed and Accept were the only moves, and both are the
   // operator doing the work.
-  it('asks the architect to clear it', async () => {
+  it('asks the architect to clear it, once Send is pressed', async () => {
     withFinding()
-    await openStep('Red team')
+    await waitFor(() => screen.getByText('the outcome restates the problem'))
     fireEvent.click(screen.getByRole('button', { name: 'Ask the architect' }))
+    expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send decisions' }))
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith(
-        'foundry:order.converge',
-        expect.objectContaining({
-          id: 'WO-1',
-          message: expect.stringContaining('the outcome restates the problem'),
-        })
-      )
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
+        id: 'WO-1',
+        settle: {
+          answers: [],
+          accepts: [],
+          fixes: [],
+          asks: ['RT-1'],
+        },
+      })
     )
   })
 
-  it('says the architect is on it, and cannot be asked twice', async () => {
+  // Nothing here is hidden while a turn runs, and the settle just sent
+  // cleared its own selection, so there is nothing left to send again.
+  it('keeps the band open while the architect works, with nothing left queued to send', async () => {
     mountAsking({
       ...order(),
       redTeam: [
         {
           id: 'RT-1',
           severity: 'high' as const,
+          category: 'wrong-outcome' as const,
           text: 'the outcome restates the problem',
           status: 'open' as const,
           reason: '',
         },
       ],
     })
-    await openStep('Red team')
+    await waitFor(() => screen.getByText('the outcome restates the problem'))
     fireEvent.click(screen.getByRole('button', { name: 'Ask the architect' }))
-    const status = await screen.findByRole('status', { name: /Asked/ })
-    expect(status.textContent).toMatch(/the architect is working on it/)
-    expect(screen.queryByRole('button', { name: 'Ask the architect' })).toBeNull()
-    expect(converges()).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Send decisions' }))
+    await waitFor(() => expect(converges()).toBe(1))
+
+    expect(screen.getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
+    const send = screen.getByRole('button', { name: /Send when the architect finishes/ })
+    expect((send as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('asks for the reason before accepting one', async () => {
     withFinding()
-    await openStep('Red team')
+    await waitFor(() => screen.getByText('the outcome restates the problem'))
     fireEvent.click(screen.getByRole('button', { name: 'Accept' }))
-    await waitFor(() => expect(screen.getByLabelText(/Why this finding is accepted/)).toBeTruthy())
+    const box = await screen.findByLabelText(/Why RT-1 is accepted/)
 
     // Nothing is sent until there is one — a shrug is not a decision.
-    fireEvent.click(screen.getByRole('button', { name: 'Accept it' }))
-    expect(invoke).not.toHaveBeenCalledWith('foundry:order.turn', expect.anything())
+    const send = () => screen.getByRole('button', { name: 'Send decisions' }) as HTMLButtonElement
+    expect(send().disabled).toBe(true)
 
-    fireEvent.change(screen.getByLabelText(/Why this finding is accepted/), {
-      target: { value: 'the risk is priced in' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Accept it' }))
+    fireEvent.change(box, { target: { value: 'the risk is priced in' } })
+    expect(send().disabled).toBe(false)
+    fireEvent.click(send())
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.turn', {
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
         id: 'WO-1',
-        finding: { id: 'RT-1', decision: 'accepted', reason: 'the risk is priced in' },
+        settle: {
+          answers: [],
+          accepts: [{ findingId: 'RT-1', reason: 'the risk is priced in' }],
+          fixes: [],
+          asks: [],
+        },
       })
     )
+  })
+})
+
+// The band collects every open question and every blocking finding, and one
+// Send turns everything decided into a single call — the fix for the run that
+// cost seven serial turns on seven findings, one clicked at a time.
+describe('settling everything the operator decided in one submit', () => {
+  function withQuestionsAndFindings() {
+    const current = {
+      ...order(),
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'which token?',
+          why: '',
+          options: ['a', 'b'],
+          recommended: 0,
+          answer: null,
+          rank: 2,
+        },
+        {
+          id: 'Q-2',
+          text: 'which clock?',
+          why: '',
+          options: ['server', 'client'],
+          recommended: 0,
+          answer: null,
+          rank: 1,
+        },
+      ],
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'high' as const,
+          category: 'wrong-outcome' as const,
+          text: 'finding one',
+          status: 'open' as const,
+          reason: '',
+        },
+        {
+          id: 'RT-2',
+          severity: 'high' as const,
+          category: 'regression' as const,
+          text: 'finding two',
+          status: 'open' as const,
+          reason: '',
+        },
+      ],
+    }
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: current, compile: compileOrder(current) }
+      }
+      if (channel === 'foundry:order.converge') {
+        return { order: current, compile: compileOrder(current) }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+  }
+
+  it('issues exactly one converge call carrying every decision', async () => {
+    withQuestionsAndFindings()
+    await waitFor(() => screen.getByText('finding one'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'b' }))
+    fireEvent.click(screen.getByRole('button', { name: 'client' }))
+
+    const findingOne = screen.getByText('finding one').closest('.fdry-finding') as HTMLElement
+    fireEvent.click(within(findingOne).getByRole('button', { name: 'Fix it…' }))
+    fireEvent.change(within(findingOne).getByLabelText(/How should RT-1 be fixed/), {
+      target: { value: 'do it this way' },
+    })
+
+    const findingTwo = screen.getByText('finding two').closest('.fdry-finding') as HTMLElement
+    fireEvent.click(within(findingTwo).getByRole('button', { name: 'Accept' }))
+    fireEvent.change(within(findingTwo).getByLabelText(/Why RT-2 is accepted/), {
+      target: { value: 'priced in' },
+    })
+
+    expect(screen.getByText(/Needs you — 4 of 4 decided/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send decisions' }))
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
+        id: 'WO-1',
+        settle: {
+          answers: [
+            { questionId: 'Q-1', option: 1 },
+            { questionId: 'Q-2', option: 1 },
+          ],
+          accepts: [{ findingId: 'RT-2', reason: 'priced in' }],
+          fixes: [{ findingId: 'RT-1', how: 'do it this way' }],
+          asks: [],
+        },
+      })
+    )
+    expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.converge')).toHaveLength(1)
+  })
+
+  it('disables Send until at least one decision is made', async () => {
+    withQuestionsAndFindings()
+    await waitFor(() => screen.getByText('finding one'))
+    expect(
+      (screen.getByRole('button', { name: 'Send decisions' }) as HTMLButtonElement).disabled
+    ).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'b' }))
+    expect(
+      (screen.getByRole('button', { name: 'Send decisions' }) as HTMLButtonElement).disabled
+    ).toBe(false)
+  })
+})
+
+// A settle made while the architect is already working on a different turn
+// cannot race it: the proposal is merged over the order as it stood when that
+// turn started, so a settle sent meanwhile is one it never saw. It waits, and
+// goes the moment the running turn ends.
+describe('a settle made while the architect is drafting', () => {
+  it('is queued, shown as queued, and sent once the turn ends', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const initial = {
+      ...order(),
+      redTeam: [
+        {
+          id: 'RT-1',
+          severity: 'high' as const,
+          category: 'wrong-outcome' as const,
+          text: 'finding one',
+          status: 'open' as const,
+          reason: '',
+        },
+      ],
+    }
+    const running = { kind: 'running', at: '2026-09-17T23:05:42Z', sessionId: 'sess-1' }
+    const ended = { kind: 'redrafted', at: '2026-09-17T23:06:00Z', note: 'redrafted the plan' }
+    let polls = 0
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        polls += 1
+        // The turn the operator asked about ends after the first poll — this
+        // test is about the settle sent afterwards, not about how many polls
+        // a turn takes.
+        return {
+          order: initial,
+          compile: compileOrder(initial),
+          intake: polls > 1 ? ended : running,
+        }
+      }
+      if (channel === 'foundry:order.converge') {
+        return { order: initial, compile: compileOrder(initial) }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+
+    await vi.waitFor(() => screen.getByText('finding one'))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask the architect' }))
+    fireEvent.click(screen.getByRole('button', { name: /Send when the architect finishes/ }))
+
+    expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
+    expect(screen.getByRole('status', { name: /Queued/ })).toBeTruthy()
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
+        id: 'WO-1',
+        settle: { answers: [], accepts: [], fixes: [], asks: ['RT-1'] },
+      })
+    )
+    vi.useRealTimers()
   })
 })
 
@@ -1189,8 +1383,11 @@ describe('an ask the architect is working on', () => {
 
   // Reported: accepting items while the architect worked ended in refusals.
   // Its proposal is merged over the order as it stood when the turn started,
-  // so an edit made meanwhile is one the architect never saw.
-  it('holds every other move on the order until the turn ends', async () => {
+  // so an edit made meanwhile is one the architect never saw — everything
+  // outside the band still holds. The band's own choices are different: they
+  // are a local decision that goes nowhere until Send, so keeping them live
+  // during a different turn loses nothing.
+  it('holds every other move on the order until the turn ends, but not the band', async () => {
     mountAsking({
       ...orderBlockedOnPictures(),
       openQuestions: [
@@ -1210,8 +1407,11 @@ describe('an ask the architect is working on', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
     await screen.findByRole('status', { name: /Asked/ })
 
-    expect(screen.getByRole('button', { name: 'a (recommended)' })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('button', { name: 'b' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'a (recommended)' })).toHaveProperty(
+      'disabled',
+      false
+    )
+    expect(screen.getByRole('button', { name: 'b' })).toHaveProperty('disabled', false)
     await openStep('Plan')
     expect(screen.getByRole('button', { name: 'tokens are JWTs' })).toHaveProperty('disabled', true)
   })
