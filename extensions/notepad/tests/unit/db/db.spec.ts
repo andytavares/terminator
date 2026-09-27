@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { wrapDb } from '../../../../../src/main/db/index'
 import {
@@ -12,9 +12,19 @@ import type { ExtensionDB } from '../../../../../src/main/db/index'
 let pg: PGlite
 let db: ExtensionDB
 
+let template: PGlite
+
+beforeAll(async () => {
+  template = new PGlite()
+  await template.waitReady
+})
+
+afterAll(async () => {
+  await template.close()
+})
+
 beforeEach(async () => {
-  pg = new PGlite()
-  await pg.waitReady
+  pg = await template.clone()
   db = wrapDb(pg)
 })
 

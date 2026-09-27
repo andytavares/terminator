@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
 import { ipcMain } from 'electron'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
@@ -44,11 +44,24 @@ let db: ExtensionDB
 let exportDir: string
 let noteId: string
 
-beforeEach(async () => {
+let tables: string
+
+beforeAll(async () => {
   pg = new PGlite()
   await pg.waitReady
   db = wrapDb(pg)
   await applyNotepadSchema(db)
+  const { rows } = await pg.query<{ names: string }>(
+    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
+  )
+  tables = rows[0].names
+})
+
+afterAll(async () => {
+  await pg.close()
+})
+
+beforeEach(async () => {
   exportDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-dest-'))
 
   noteId = '00000000-0000-0000-0000-000000000001'
@@ -60,7 +73,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await pg.close()
+  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
   fs.rmSync(exportDir, { recursive: true, force: true })
 })
 
