@@ -87,6 +87,7 @@ export function ReviewDiffPane({
     startLine: number
     endLine: number
   }>({ active: false, side: null, startLine: 0, endLine: 0 })
+  const dragJustEndedRef = useRef(false)
   const [dragPreview, setDragPreview] = useState<{
     side: 'LEFT' | 'RIGHT'
     startLine: number
@@ -283,6 +284,12 @@ export function ReviewDiffPane({
       const drag = lineDragRef.current
       if (!drag.active || drag.side == null) return
       drag.active = false
+      // The click that follows a multi-row drag lands on the rows' common
+      // ancestor, not the gutter button; it must not clear this selection.
+      dragJustEndedRef.current = true
+      setTimeout(() => {
+        dragJustEndedRef.current = false
+      }, 0)
       const lo = Math.min(drag.startLine, drag.endLine)
       const hi = Math.max(drag.startLine, drag.endLine)
       setDragPreview(null)
@@ -580,6 +587,7 @@ export function ReviewDiffPane({
 
   const clearSelectionOnBackgroundClick = useCallback(
     (e: React.MouseEvent) => {
+      if (dragJustEndedRef.current) return
       const target = e.target as HTMLElement
       if (target.closest('.rs-float') || target.closest('.diff-gutter-btn')) return
       if (selection?.path === file.path) setSelection(null)
