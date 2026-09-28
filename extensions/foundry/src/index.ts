@@ -49,7 +49,12 @@ import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
 import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
 import { followUpFor } from './forge/autonomy.js'
-import { loopFacts, lastIntake, reviewedCurrentPlan } from './forge/intake-outcome.js'
+import {
+  anotherPassWanted,
+  loopFacts,
+  lastIntake,
+  reviewedCurrentPlan,
+} from './forge/intake-outcome.js'
 import { endAndWait } from './runtime/end-session.js'
 import { compileOrder } from './order/compile.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
@@ -78,6 +83,7 @@ import {
   MAX_REVIEW_ROUNDS,
   reviewPrompt,
   reviewNext,
+  afterFix,
   shouldReview,
   fixMessage,
   nextRound,
@@ -2173,7 +2179,8 @@ async function readOnlyRound(input: {
   readonly prompt: (role: Role) => string
   readonly startedAction: string
   readonly startedReason: string
-  readonly onFinished: (order: WorkOrder | null) => Promise<void>
+  /** `anotherPass` is the red team asking to attack the fix for its findings. */
+  readonly onFinished: (order: WorkOrder | null, anotherPass?: boolean) => Promise<void>
   /** Stamped onto every fresh finding — only meaningful for the red team. */
   readonly round?: number
   /**
@@ -2262,7 +2269,7 @@ async function readOnlyRound(input: {
       return
     }
     await store.save(result.order)
-    await onFinished(result.order)
+    await onFinished(result.order, result.anotherPass)
   }
 
   void runner
@@ -2521,6 +2528,17 @@ export function activate(api: ExtensionAPI): void {
           // If the order is otherwise ready, the red team gets a round before
           // the operator ever sees it — the whole point of the loop.
           if (shouldReview(outcome.order)) {
+            // A fix turn hands off unless the red team asked to see the fix.
+            if (
+              loopRound !== undefined &&
+              afterFix({
+                order: outcome.order,
+                anotherPass: anotherPassWanted(await store.entries(order.id)),
+              }) === 'hand-off'
+            ) {
+              await handOff(outcome.order)
+              return
+            }
             await startReview(
               outcome.order,
               loopRound ?? (await nextReviewRound(order.id)),
@@ -2589,7 +2607,7 @@ export function activate(api: ExtensionAPI): void {
       },
       startedAction: 'review.started',
       startedReason: `round ${round}`,
-      onFinished: async (updated) => {
+      onFinished: async (updated, anotherPass) => {
         // A refusal was already recorded by readOnlyRound — nothing more to
         // decide, and nowhere left for this round to go on its own.
         if (updated === null) return
@@ -2610,6 +2628,17 @@ export function activate(api: ExtensionAPI): void {
           reason: `round ${round}: ${blocking} blocking, ${notes} note${notes === 1 ? '' : 's'}`,
           evidence: [],
         })
+        if (anotherPass === true) {
+          await store.record({
+            at: new Date().toISOString(),
+            orderId: order.id,
+            actor: 'role:red-team',
+            action: 'review.another_pass',
+            subject: order.id,
+            reason: `round ${round} asked to review the fix`,
+            evidence: [],
+          })
+        }
 
         // The operator's hold stops every automatic continuation this round
         // could lead to — the next round, hand-off, or a fix turn — the same

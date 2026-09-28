@@ -1041,7 +1041,8 @@ closes only when the proposal lists it in `resolveFindings` with how (ADR 068).
 others (`scope`, `process`, `pre-existing`, `infra`) are notes the builder sees.
 Once a redraft passes every other check, `src/forge/review-loop.ts` runs a
 red-team round in the Forge. The architect gets every blocking finding in one
-turn, and the next round attacks only what changed. The red team reads what
+turn. The fix hands off unless the red team set `anotherPass` or a blocking
+finding is still open (ADR 075); then the next round attacks only what changed. The red team reads what
 earlier rounds settled and may reopen a finding only with new evidence. After
 three rounds the order goes to the operator. A clean round hands off on its own
 unless `terminator.foundry.autoHandOff` is off, and a failed hand-off is

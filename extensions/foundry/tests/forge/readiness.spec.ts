@@ -139,6 +139,25 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.actions).toEqual(['open-run', 'auto-off'])
   })
 
+  it('1. handed off automatically after the architect answered the last round', () => {
+    const order = wo0928Order({
+      status: 'agreed',
+      agreedAt: T1,
+      redTeam: [blockingFinding({ status: 'resolved' })],
+    })
+    const result = readiness(
+      baseInput({
+        order,
+        agreed: { at: T1, by: 'automatic' },
+        loop: baseLoop({ rounds: [{ round: 1, startedAt: T0, finishedAt: T1 }] }),
+        shape: { name: 'quick', yours: false },
+      })
+    )
+    expect(result.strip.detail).toBe(
+      "The architect answered every blocking finding from the red team's first round, and automatic hand-off is on. Running with the Quick shape, 1 unit."
+    )
+  })
+
   it('1. handed off automatically, no rounds: drops the round clause', () => {
     const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
     const result = readiness(

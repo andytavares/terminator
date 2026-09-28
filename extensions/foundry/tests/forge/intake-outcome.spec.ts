@@ -6,6 +6,7 @@ import {
   agreedFacts,
   turnEndedAt,
   reviewedCurrentPlan,
+  anotherPassWanted,
 } from '../../src/forge/intake-outcome.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
@@ -380,6 +381,40 @@ describe('reviewedCurrentPlan', () => {
   it('is false once the plan was redrafted after the round', () => {
     expect(
       reviewedCurrentPlan([entry({ action: 'review.round' }), entry({ action: 'order.redrafted' })])
+    ).toBe(false)
+  })
+})
+
+describe('anotherPassWanted', () => {
+  it('is false when the last round asked for nothing more', () => {
+    expect(
+      anotherPassWanted([
+        entry({ action: 'review.round' }),
+        entry({ action: 'converge.started', reason: 'red team round 1 fix' }),
+        entry({ action: 'order.redrafted' }),
+      ])
+    ).toBe(false)
+  })
+
+  it('is true when the last round asked for another pass', () => {
+    expect(
+      anotherPassWanted([
+        entry({ action: 'review.round' }),
+        entry({ action: 'review.another_pass' }),
+        entry({ action: 'converge.started', reason: 'red team round 1 fix' }),
+        entry({ action: 'order.redrafted' }),
+      ])
+    ).toBe(true)
+  })
+
+  it('belongs to the round that asked, not the one after it', () => {
+    expect(
+      anotherPassWanted([
+        entry({ action: 'review.round' }),
+        entry({ action: 'review.another_pass' }),
+        entry({ action: 'review.started', reason: 'round 2' }),
+        entry({ action: 'review.round' }),
+      ])
     ).toBe(false)
   })
 })

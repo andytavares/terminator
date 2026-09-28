@@ -7,6 +7,7 @@ import {
   shouldReview,
   nextRound,
   afterRelease,
+  afterFix,
 } from '../../src/forge/review-loop.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder, RedTeamFinding } from '../../src/order/schema.js'
@@ -152,6 +153,22 @@ describe('reviewNext', () => {
       round: MAX_REVIEW_ROUNDS - 1,
     })
     expect(next.kind).toBe('fix')
+  })
+})
+
+describe('afterFix', () => {
+  it('hands off once the architect answered every blocking finding and no pass was asked for', () => {
+    const fixed = order({ redTeam: [finding({ status: 'resolved' })] })
+    expect(afterFix({ order: fixed, anotherPass: false })).toBe('hand-off')
+  })
+
+  it('reviews again when the red team asked for another pass', () => {
+    const fixed = order({ redTeam: [finding({ status: 'resolved' })] })
+    expect(afterFix({ order: fixed, anotherPass: true })).toBe('review')
+  })
+
+  it('reviews again when the architect left a blocking finding open', () => {
+    expect(afterFix({ order: order({ redTeam: [finding()] }), anotherPass: false })).toBe('review')
   })
 })
 

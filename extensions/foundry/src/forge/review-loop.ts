@@ -6,15 +6,15 @@ import type { Role, Rule } from '../recipe/parse.js'
 import { followUpFor } from './autonomy.js'
 import type { LoopFacts } from './readiness.js'
 
-// The Forge's own red team, argued to a fixed point before the operator sees it.
+// The Forge's own red team, argued before the operator sees it.
 //
 // The red team used to run on the Line, after the order was agreed, where
 // every finding stopped a run already building from the order. Here it runs
 // inside the Forge: the architect drafts, the red team attacks, the architect
-// fixes every blocking finding in one turn, and the red team attacks only what
-// changed. See docs/research/foundry-red-team-loop.md ("Design → Loop").
+// fixes every blocking finding in one turn, and the red team attacks the fix
+// only when it asked to (ADR 075). See docs/research/foundry-red-team-loop.md.
 
-/** Argued this many rounds before the operator is asked instead. */
+/** At most this many rounds before the operator is asked instead. */
 export const MAX_REVIEW_ROUNDS = 3
 
 export interface ReviewPromptInput {
@@ -89,6 +89,21 @@ export function reviewNext(input: {
   if (message === null) return { kind: 'clean' }
   if (input.round >= MAX_REVIEW_ROUNDS) return { kind: 'operator' }
   return { kind: 'fix', message }
+}
+
+/**
+ * Where the loop goes once the architect has answered a round's findings.
+ *
+ * One pass is the default: a fix the red team did not ask to see again hands
+ * off. It is reviewed again only when the red team asked for that, or when
+ * the architect left a blocking finding standing — `reviewNext` still stops
+ * the loop at `MAX_REVIEW_ROUNDS`.
+ */
+export function afterFix(input: {
+  readonly order: WorkOrder
+  readonly anotherPass: boolean
+}): 'review' | 'hand-off' {
+  return input.anotherPass || fixMessage(input.order) !== null ? 'review' : 'hand-off'
 }
 
 /**

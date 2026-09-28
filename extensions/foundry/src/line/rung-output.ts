@@ -90,6 +90,7 @@ export interface RungOutput {
   readonly redTeam?: readonly z.infer<typeof AgentFindingSchema>[]
   readonly plan?: WorkOrder['plan']
   readonly acceptance?: WorkOrder['acceptance']
+  readonly anotherPass?: boolean
   readonly note: string
 }
 
@@ -154,6 +155,7 @@ const EXAMPLE: Record<Collectable, string[]> = {
     '      "newEvidence": "what the earlier reason did not answer (required with reopens)"',
     '    }',
     '  ],',
+    '  "anotherPass": false,',
   ],
   plan: [
     '  "plan": {',
@@ -196,6 +198,10 @@ const FINDING_BAR = [
   'that already exists is `pre-existing`. A missing tool or permission in this',
   'environment is `infra`. Work the ask never mentioned is `scope`. None of',
   'those four stop the run.',
+  '',
+  'One pass is the default. Set `anotherPass` to true only when fixing your',
+  'blocking findings will change the plan enough that the fix itself needs',
+  'attacking; say why in `note`. The loop stops after three passes either way.',
 ]
 
 /** What a rung whose plan cannot be applied is told, so it does not retry. */
@@ -262,6 +268,7 @@ export function rungOutputContract(file: string, writes: readonly Collectable[])
 export function parseRungOutput(value: unknown, writes: readonly Collectable[]): RungOutput {
   const shape: Record<string, z.ZodTypeAny> = { note: z.string().default('') }
   for (const artefact of writes) shape[COLLECTABLE[artefact]] = SHAPES[artefact].optional()
+  if (writes.includes('findings')) shape.anotherPass = z.boolean().optional()
 
   const parsed = z.object(shape).strict().safeParse(value)
   if (!parsed.success) {
@@ -296,6 +303,8 @@ export interface AppliedRungOutput {
    * itself and which, until this, nothing ever raised.
    */
   readonly defect: string | null
+  /** The red team asked to attack the fix for its findings too. */
+  readonly anotherPass: boolean
 }
 
 function normalise(text: string): string {
@@ -359,6 +368,7 @@ const DUPLICATE_BAR = 0.6
 export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): AppliedRungOutput {
   const { output, role, at, round = 0 } = input
   const note = output.note.trim()
+  const anotherPass = output.anotherPass === true
   let next = order
 
   if (output.findings !== undefined) {
@@ -464,6 +474,7 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
       order: next === order ? order : WorkOrderSchema.parse(next),
       note: finalNote,
       defect: null,
+      anotherPass,
     }
   }
 
@@ -492,6 +503,7 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
     }),
     note,
     defect,
+    anotherPass,
   }
 }
 
@@ -501,6 +513,7 @@ export type CollectResult =
       readonly order: WorkOrder
       readonly note: string
       readonly defect: string | null
+      readonly anotherPass: boolean
     }
   | { readonly ok: false; readonly reason: string }
 

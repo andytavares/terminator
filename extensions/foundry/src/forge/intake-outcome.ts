@@ -44,6 +44,7 @@ const SCOUT_STARTED = 'scout.started'
 const REVIEW_ROUND = 'review.round'
 const REVIEW_REFUSED = 'review.refused'
 const REVIEW_EXHAUSTED = 'review.exhausted'
+const REVIEW_ANOTHER_PASS = 'review.another_pass'
 
 export type IntakeOutcome =
   /** Intake has never run on this order. */
@@ -245,6 +246,15 @@ export function reviewedCurrentPlan(entries: readonly LedgerEntry[]): boolean {
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     if (entries[i].action === REVIEW_ROUND) return true
     if (entries[i].action === REDRAFTED) return false
+  }
+  return false
+}
+
+/** Whether the last finished red-team round asked to attack the fix too. */
+export function anotherPassWanted(entries: readonly LedgerEntry[]): boolean {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i].action === REVIEW_ANOTHER_PASS) return true
+    if (entries[i].action === REVIEW_ROUND || entries[i].action === REVIEW_STARTED) return false
   }
   return false
 }

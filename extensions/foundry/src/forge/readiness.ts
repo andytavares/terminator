@@ -231,10 +231,13 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
     if (agreed?.by === 'automatic') {
       const t = clock(agreed.at)
       const last = loop.rounds.length > 0 ? loop.rounds[loop.rounds.length - 1].round : null
+      const answered = last !== null && order.redTeam.some((f) => f.round === last && isBlocking(f))
       const clause =
-        last !== null
-          ? `The red team's ${ordinalWord(last)} round found nothing blocking, and automatic hand-off is on.`
-          : `Automatic hand-off is on.`
+        last === null
+          ? `Automatic hand-off is on.`
+          : answered
+            ? `The architect answered every blocking finding from the red team's ${ordinalWord(last)} round, and automatic hand-off is on.`
+            : `The red team's ${ordinalWord(last)} round found nothing blocking, and automatic hand-off is on.`
       return {
         holder: 'nobody',
         strip: {

@@ -720,9 +720,11 @@ terminal.
 architect can close, it gets up to two automatic turns to close it. While it
 works, the step shows **Being revised** in blue rather than a red cross, because
 nothing is wrong yet. Once the plan passes, the red team reviews it. Blocking
-findings go straight back to the architect, and the red team reviews the fix,
-for up to three rounds. You only see orange when that loop stops: after three
-rounds without agreement, or when you press **Hold for me**.
+findings go straight back to the architect. The order then hands off unless the
+red team asked to review the fix, or the architect left a blocking finding
+open, in which case the red team takes another look, up to three rounds. You
+only see orange when that loop stops: after three rounds without agreement, or
+when you press **Hold for me**.
 
 **Hold for me**, in the status strip while Foundry is working, stops it from
 starting anything else on its own. The turn already running finishes. **Let it
