@@ -1,0 +1,40 @@
+extensions/git-integration/src/components/pr-review/ViewMenu.tsx
+  s_6f2763bc197e91::t_7a371161572275 120-127,129
+  s_6f2763bc197e91::t_822f3d67b25942 1-119,128,130-136
+extensions/git-integration/tests/unit/ViewMenu.spec.tsx
+  s_6f2763bc197e91::t_2d44c223f25cdb 78,83-99
+  s_6f2763bc197e91::t_231b9efd050443 1,3-77,79-82,100-123
+  s_6f2763bc197e91::t_dcbff95a13ac9f 2
+extensions/git-integration/tests/unit/review-ui.store.spec.ts
+  s_6f2763bc197e91::t_aa292dc61eefde 79-94,96-97,99,106-107,109,116-117
+  s_6f2763bc197e91::t_34cefd0e4544dd 39-46
+  s_6f2763bc197e91::t_ff69f665650218 95,98,100-105,108,110-115
+extensions/git-integration/src/components/pr-review/view-menu.css
+  s_6f2763bc197e91::t_37558cf976f061 1-162
+extensions/git-integration/tests/unit/UsesPopover.spec.tsx
+  s_6f2763bc197e91::t_d231d86d82b92a 1-69
+extensions/git-integration/src/components/pr-review/UsesPopover.tsx
+  s_6f2763bc197e91::t_057ab321dae311 1-65
+extensions/git-integration/src/stores/review-ui.store.ts
+  s_6f2763bc197e91::t_12d643e71eb7b6 95-96
+  s_6f2763bc197e91::t_0ca6ba7cc1876f 118-119
+  s_6f2763bc197e91::t_079395e59057b6 141-142
+  s_6f2763bc197e91::t_766034718a8a0d 8
+  s_6f2763bc197e91::t_92e29a4a1563a2 47-48,56-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "76e0e91221fde9487b310db346f77984af47a9ba",
+  "prompts": {},
+  "sessions": {
+    "s_6f2763bc197e91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20a95b64-c37e-4c82-914f-a10b3237caab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
