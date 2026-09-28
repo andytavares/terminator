@@ -1,0 +1,2898 @@
+<title>Forge Shaping Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+/>
+<style>
+  /* Tokens are the app's own (src/main/extensions/extension-view-host.ts), so the renderings match both themes. */
+  :root {
+    --bg-base: #f0f0f5;
+    --bg-surface: #e8e8f0;
+    --bg-elevated: #ffffff;
+    --bg-card: #f5f5fa;
+    --bg-input: #ffffff;
+    --text-primary: #1a1a2e;
+    --text-secondary: #555580;
+    --text-muted: #5c5c94;
+    --border: rgba(0, 0, 0, 0.08);
+    --border-strong: rgba(0, 0, 0, 0.15);
+    --accent: #4a57a8;
+    --accent-text: #4a57a8;
+    --accent-dim: rgba(74, 87, 168, 0.12);
+    --on-accent: #ffffff;
+    --danger: #962d20;
+    --success: #0f5c2a;
+    --warning: #a85a00;
+    --danger-dim: rgba(150, 45, 32, 0.08);
+    --success-dim: rgba(15, 92, 42, 0.08);
+    --warning-dim: rgba(168, 90, 0, 0.08);
+    --tip-bg: #1a1a2e;
+    --tip-text: #f0f0f5;
+    --page: #ecebf2;
+    --paper: #ffffff;
+    --rule: rgba(26, 26, 46, 0.12);
+    --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Courier New', monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+      --bg-base: #0c0c0f;
+      --bg-surface: #111116;
+      --bg-elevated: #18181f;
+      --bg-card: #1c1c25;
+      --bg-input: #16161c;
+      --text-primary: #e2e2ee;
+      --text-secondary: #9090c4;
+      --text-muted: #8585b8;
+      --border: rgba(255, 255, 255, 0.06);
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --accent: #5c6bc0;
+      --accent-text: #8b98e8;
+      --accent-dim: rgba(92, 107, 192, 0.18);
+      --on-accent: #ffffff;
+      --danger: #e05c5c;
+      --success: #4ade80;
+      --warning: #facc15;
+      --danger-dim: rgba(224, 92, 92, 0.1);
+      --success-dim: rgba(74, 222, 128, 0.08);
+      --warning-dim: rgba(250, 204, 21, 0.08);
+      --tip-bg: #e2e2ee;
+      --tip-text: #111116;
+      --page: #0f0f14;
+      --paper: #15151b;
+      --rule: rgba(255, 255, 255, 0.08);
+    }
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --bg-base: #0c0c0f;
+    --bg-surface: #111116;
+    --bg-elevated: #18181f;
+    --bg-card: #1c1c25;
+    --bg-input: #16161c;
+    --text-primary: #e2e2ee;
+    --text-secondary: #9090c4;
+    --text-muted: #8585b8;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(255, 255, 255, 0.12);
+    --accent: #5c6bc0;
+    --accent-text: #8b98e8;
+    --accent-dim: rgba(92, 107, 192, 0.18);
+    --on-accent: #ffffff;
+    --danger: #e05c5c;
+    --success: #4ade80;
+    --warning: #facc15;
+    --danger-dim: rgba(224, 92, 92, 0.1);
+    --success-dim: rgba(74, 222, 128, 0.08);
+    --warning-dim: rgba(250, 204, 21, 0.08);
+    --tip-bg: #e2e2ee;
+    --tip-text: #111116;
+    --page: #0f0f14;
+    --paper: #15151b;
+    --rule: rgba(255, 255, 255, 0.08);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    line-height: 1.6;
+    padding-inline: 16px;
+    padding-block: 32px 80px;
+  }
+  .doc {
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  .prose {
+    max-width: 68ch;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    line-height: 1.25;
+  }
+  h1 {
+    font-size: 34px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 56px 0 12px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+  }
+  h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 32px 0 8px;
+  }
+  p {
+    margin: 0 0 12px;
+  }
+  a {
+    color: var(--accent-text);
+  }
+  code,
+  .mono {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+  }
+  code {
+    background: var(--accent-dim);
+    padding: 1px 5px;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--text-secondary);
+    max-width: 68ch;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 16px;
+  }
+  .meta b {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  ul,
+  ol {
+    padding-left: 22px;
+    margin: 0 0 12px;
+  }
+  li {
+    margin-bottom: 6px;
+  }
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: 13px;
+    margin-top: 20px;
+  }
+  .toc a {
+    text-decoration: none;
+  }
+  .toc a:hover {
+    text-decoration: underline;
+  }
+  .unverified {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border: 1px solid var(--warning);
+    color: var(--warning);
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .scroll {
+    overflow-x: auto;
+    margin: 12px 0 20px;
+  }
+  table.t {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13.5px;
+    min-width: 640px;
+  }
+  table.t th,
+  table.t td {
+    text-align: left;
+    vertical-align: top;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+  table.t th {
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  table.t td.time {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--text-secondary);
+  }
+  table.t tr.hl td {
+    background: var(--warning-dim);
+  }
+
+  .defects {
+    display: grid;
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .defect {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .defect h4 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .defect p {
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .defect .where {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .option {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 14px;
+  }
+  .option.chosen {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .option h4 {
+    margin: 0 0 6px;
+    font-size: 15px;
+  }
+  .option .tag {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent-text);
+  }
+  .option ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+  }
+
+  pre.code {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    overflow-x: auto;
+    margin: 12px 0 20px;
+  }
+  pre.mermaid {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+  }
+
+  /* ---------- Renderings ---------- */
+  .render {
+    margin: 20px 0 8px;
+  }
+  .render-h {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 40px 0 6px;
+  }
+  .render-h .n {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .render-h h3 {
+    margin: 0;
+  }
+  .changes {
+    font-size: 14px;
+    color: var(--text-secondary);
+    max-width: 72ch;
+  }
+  .changes li {
+    margin-bottom: 4px;
+  }
+  .frame-wrap {
+    overflow-x: auto;
+    padding: 2px;
+  }
+  .frame {
+    min-width: 820px;
+    background: var(--bg-base);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 18px;
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+  .frame.narrow {
+    min-width: 520px;
+    max-width: 640px;
+  }
+  .frame svg.i {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .frame button,
+  .frame .btn {
+    font: inherit;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 6px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: default;
+    white-space: nowrap;
+  }
+  .frame .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 500;
+  }
+  .frame .btn.quiet {
+    background: transparent;
+  }
+  .frame .btn[aria-disabled='true'] {
+    opacity: 0.55;
+  }
+  .frame .btn.focus {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+  }
+
+  .wiz {
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .wiz-head {
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .wiz-title {
+    flex: 1;
+    min-width: 0;
+  }
+  .wiz-title b {
+    font-size: 16px;
+    font-weight: 600;
+    display: block;
+  }
+  .wiz-sub {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+  }
+  .chip {
+    font-size: 11.5px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  /* The status strip: who holds the order, and what happens next. */
+  .strip {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .strip .who {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+  }
+  .strip .who svg.i {
+    margin-top: 2px;
+  }
+  .strip b {
+    font-weight: 600;
+    display: block;
+  }
+  .strip small {
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    display: block;
+  }
+  .strip.working {
+    background: var(--accent-dim);
+  }
+  .strip.working .who {
+    color: var(--accent-text);
+  }
+  .strip.you {
+    background: var(--warning-dim);
+  }
+  .strip.you .who {
+    color: var(--warning);
+  }
+  .strip.ready {
+    background: var(--success-dim);
+  }
+  .strip.ready .who {
+    color: var(--success);
+  }
+  .strip.bad {
+    background: var(--danger-dim);
+  }
+  .strip.bad .who {
+    color: var(--danger);
+  }
+  .strip .who b,
+  .strip .who small {
+    color: inherit;
+  }
+  .strip .who small {
+    color: var(--text-secondary);
+  }
+  .strip .acts {
+    display: flex;
+    gap: 8px;
+    flex: none;
+  }
+
+  .body {
+    display: grid;
+    grid-template-columns: 210px 1fr;
+    min-height: 320px;
+  }
+  .rail {
+    border-right: 1px solid var(--border);
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--bg-surface);
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    align-items: start;
+  }
+  .step.on {
+    background: var(--bg-card);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .step .mk {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    display: grid;
+    place-items: center;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+  .step .mk svg.i {
+    width: 13px;
+    height: 13px;
+  }
+  .step b {
+    font-weight: 500;
+    display: block;
+    font-size: 13px;
+  }
+  .step small {
+    display: block;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.35;
+  }
+  .step.done small {
+    color: var(--success);
+  }
+  .step.work small {
+    color: var(--accent-text);
+  }
+  .step.you small {
+    color: var(--warning);
+  }
+  .step.bad small {
+    color: var(--danger);
+  }
+
+  .main {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+  .main h5 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .main .intro {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin: -6px 0 0;
+  }
+
+  .checks {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .chk {
+    display: grid;
+    grid-template-columns: 20px 1fr auto;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    align-items: start;
+  }
+  .chk:last-child {
+    border-bottom: 0;
+  }
+  .chk b {
+    font-weight: 500;
+  }
+  .chk small {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+  }
+  .chk .moves {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    font-size: 11.5px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+    border: 1px solid currentColor;
+  }
+  .pill.pass {
+    color: var(--success);
+  }
+  .pill.work {
+    color: var(--accent-text);
+  }
+  .pill.you {
+    color: var(--warning);
+  }
+  .pill.bad {
+    color: var(--danger);
+  }
+  .pill.note {
+    color: var(--text-muted);
+  }
+  .chk.work {
+    background: var(--accent-dim);
+  }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+  }
+  .foot .why {
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .foot .why svg.i {
+    margin-top: 2px;
+  }
+  .toggle {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+  .sw {
+    width: 30px;
+    height: 17px;
+    border-radius: 999px;
+    background: var(--accent);
+    position: relative;
+    flex: none;
+  }
+  .sw::after {
+    content: '';
+    position: absolute;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #fff;
+    top: 2px;
+    left: 15px;
+  }
+  .sw.off {
+    background: var(--border-strong);
+  }
+  .sw.off::after {
+    left: 2px;
+  }
+
+  .tipwrap {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .tip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    width: 300px;
+    background: var(--tip-bg);
+    color: var(--tip-text);
+    font-size: 12.5px;
+    line-height: 1.45;
+    padding: 9px 11px;
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    white-space: normal;
+    z-index: 1;
+  }
+  .tip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    right: 22px;
+    border: 6px solid transparent;
+    border-top-color: var(--tip-bg);
+  }
+  .tip.left {
+    right: auto;
+    left: 0;
+  }
+  .tip.fit {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+  .tip.fit::after {
+    right: 50%;
+  }
+  .tip.left::after {
+    right: auto;
+    left: 22px;
+  }
+
+  .group {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .group-h {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .group-h .cnt {
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .group-h.work {
+    color: var(--accent-text);
+  }
+  .group-h.you {
+    color: var(--warning);
+  }
+  .group-h.note {
+    color: var(--text-secondary);
+  }
+  .group-h.done {
+    color: var(--success);
+  }
+  .fnd {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    gap: 4px;
+  }
+  .fnd:last-child {
+    border-bottom: 0;
+  }
+  .fnd .meta2 {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+  }
+  .fnd .acts {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .fnd .btn.sel {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    color: var(--accent-text);
+  }
+  .fnd input {
+    font: inherit;
+    font-size: 13px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 6px 10px;
+    width: 100%;
+  }
+
+  .shapes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .shape {
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: var(--bg-elevated);
+    display: grid;
+    gap: 4px;
+    align-content: start;
+  }
+  .shape.on {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .shape.off {
+    opacity: 0.6;
+    border-style: dashed;
+  }
+  .shape .nm {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .shape .nm b {
+    font-weight: 600;
+  }
+  .shape small {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .mark {
+    font-size: 10.5px;
+    padding: 0 6px;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    color: var(--accent-text);
+  }
+  .mark.you {
+    border-color: var(--text-primary);
+    color: var(--text-primary);
+  }
+  .saved {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+
+  .mini {
+    display: grid;
+    gap: 8px;
+  }
+  .mini-row {
+    display: grid;
+    grid-template-columns: 120px repeat(6, 1fr);
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .mini-row .t {
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .cell {
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 4px 6px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    background: var(--bg-card);
+    min-height: 30px;
+  }
+  .cell svg.i {
+    width: 13px;
+    height: 13px;
+  }
+  .cell.bad {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+  .cell.work {
+    color: var(--accent-text);
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .cell.ok {
+    color: var(--success);
+  }
+  .cell.you {
+    color: var(--warning);
+    border-color: var(--warning);
+  }
+  .label-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin: 10px 0 4px;
+    color: var(--text-secondary);
+  }
+
+  .anat {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .anat .cellx {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 70px 14px 14px;
+    display: grid;
+    gap: 8px;
+    align-content: end;
+    justify-items: end;
+    position: relative;
+  }
+  .anat .cap {
+    font-size: 12px;
+    color: var(--text-secondary);
+    justify-self: start;
+  }
+  .inline-why {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    border-left: 2px solid var(--accent);
+    padding: 4px 8px;
+    background: var(--accent-dim);
+    border-radius: 0 4px 4px 0;
+    justify-self: stretch;
+  }
+
+  .spin {
+    animation: sp 1.4s linear infinite;
+    transform-origin: 50% 50%;
+  }
+  @keyframes sp {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation: none;
+    }
+  }
+
+  @media (max-width: 640px) {
+    h1 {
+      font-size: 27px;
+    }
+    body {
+      font-size: 14.5px;
+    }
+  }
+</style>
+
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></symbol>
+    <symbol id="i-load" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4M12 16h.01" />
+    </symbol>
+    <symbol id="i-info" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4M12 8h.01" />
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3l14 9-14 9z" /></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8" /></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M10 4H6v16h4zM18 4h-4v16h4z" /></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24">
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </symbol>
+    <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" /></symbol>
+  </defs>
+</svg>
+
+<main class="doc">
+  <header>
+    <div class="eyebrow">Design document · Foundry · 2026-09-28</div>
+    <h1>Forge Shaping Redesign</h1>
+    <p class="lede">
+      The shaping screen hides who is working on an order, disables controls without saying why, and
+      hands orders off on its own without warning. This document traces each symptom you reported to
+      its cause in the code, then redesigns shaping as one walkthrough that always says who holds
+      the order and what happens next.
+    </p>
+    <div class="meta">
+      <span>Evidence order <b>WO-0928-9c6</b> (Linear TAV-15)</span>
+      <span>Ledger <b class="mono">~/repos/orders/WO-0928-9c6/ledger.jsonl</b></span>
+      <span>Component <b class="mono">extensions/foundry/src/components/Forge.tsx</b></span>
+    </div>
+    <nav class="toc" aria-label="Contents">
+      <a href="#problem">Problem</a><a href="#timeline">What happened</a><a href="#goals">Goals</a
+      ><a href="#current">Current state</a><a href="#options">Options</a
+      ><a href="#decision">Decision</a><a href="#design">Design</a
+      ><a href="#renderings">Renderings</a><a href="#reasons">Reason catalogue</a
+      ><a href="#changes">Sequence of changes</a><a href="#testing">Testing</a
+      ><a href="#risks">Risks</a><a href="#questions">Open questions</a
+      ><a href="#rejected">Rejected</a>
+    </nav>
+  </header>
+
+  <section id="problem">
+    <h2>Problem</h2>
+    <div class="prose">
+      <p>
+        An operator shaping an order cannot tell what the Forge is doing or what it is waiting for.
+        On WO-0928-9c6 every check was green and "Compile &amp; hand off" was disabled with no
+        reason. The red team was reviewing the plan, but the header said "The architect is
+        working…". Twenty-four seconds later the order handed itself off using the proposed shape,
+        and nothing on screen had said it would. Earlier in the same order, step marks turned red
+        and cleared three times in eighteen seconds while automatic turns rewrote the plan. The
+        orange "Needs you" band asked for decisions on findings that an automatic fix turn was
+        already handling. A shape the operator picked could not take effect. The screen has become
+        unusable because the machine does most of the shaping now (spec 062 autonomy, ADR 069
+        red-team loop) and the screen was never redesigned to show it.
+      </p>
+    </div>
+  </section>
+
+  <section id="timeline">
+    <h2>What happened on WO-0928-9c6</h2>
+    <p class="prose">
+      Every row is a line from the order's ledger, printed with
+      <code
+        >python3 -c "import json; [print(json.loads(l)['at'], json.loads(l)['action'],
+        json.loads(l)['reason'][:80]) for l in open('ledger.jsonl')]"</code
+      >. Times are local (UTC−4). The screenshot was taken at 13:07:29.
+    </p>
+    <div class="scroll">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>What Foundry did (ledger)</th>
+            <th>What the screen showed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="time">13:02:39</td>
+            <td><code>scout.started</code>, then <code>converge.started</code></td>
+            <td>"The architect is working…" (it was the scout)</td>
+          </tr>
+          <tr>
+            <td class="time">13:04:34</td>
+            <td>
+              <code>order.redrafted</code>, then automatic
+              <code>converge.followed_up</code> "closing the failing checks on its own"
+            </td>
+            <td>Plan step turns red: coverage, then risk</td>
+          </tr>
+          <tr>
+            <td class="time">13:04:44</td>
+            <td><code>order.redrafted</code> (blast radius set), another automatic follow-up</td>
+            <td>Risk mark clears, another turns red</td>
+          </tr>
+          <tr>
+            <td class="time">13:04:52</td>
+            <td>
+              <code>order.redrafted</code> (test file added), then
+              <code>review.started</code> "round 1"
+            </td>
+            <td>All clear. Header says the architect is working (it is the red team)</td>
+          </tr>
+          <tr class="hl">
+            <td class="time">13:05:49</td>
+            <td>
+              <code>review.round</code> "2 blocking, 4 notes". The loop starts a fix turn and
+              <b>writes no ledger line for it</b>
+            </td>
+            <td>
+              Forge reads the order as idle. The orange "Needs you" band asks you to decide the two
+              findings
+            </td>
+          </tr>
+          <tr class="hl">
+            <td class="time">13:05:57</td>
+            <td>
+              Your decision arrives as a second <code>converge.started</code>, into the session the
+              loop's fix turn was using
+            </td>
+            <td>"Asked — the architect is working on it"</td>
+          </tr>
+          <tr>
+            <td class="time">13:06:19</td>
+            <td>
+              <code>order.redrafted</code>, then <code>review.started</code> "round 1" again. Your
+              ask reset the loop's round counter
+            </td>
+            <td>Findings clear, then the red team starts again</td>
+          </tr>
+          <tr class="hl">
+            <td class="time">13:07:29</td>
+            <td>Red team still reviewing</td>
+            <td>
+              <b>Your screenshot.</b> Five green checks, "Compile &amp; hand off" disabled, no
+              reason given
+            </td>
+          </tr>
+          <tr class="hl">
+            <td class="time">13:07:53</td>
+            <td>
+              <code>review.round</code> "2 blocking, 9 notes", then <code>order.agreed</code> "all
+              checks pass" recorded with actor <code>operator</code>, then
+              <code>run.started</code> shape <code>quick</code>
+            </td>
+            <td>
+              Order handed off without anyone pressing hand-off. The "2 blocking" counted findings
+              resolved a round earlier
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="goals">
+    <h2>Goals and non-goals</h2>
+    <div class="prose">
+      <h3>Goals</h3>
+      <ul>
+        <li>
+          At every moment the screen names who holds the order (you, the architect, the red team,
+          the scout) and what happens when they finish.
+        </li>
+        <li>
+          Every control that cannot be used says why, on hover and on keyboard focus, in the same
+          words everywhere.
+        </li>
+        <li>
+          Red means you have something to fix. Orange means only you can decide it. Work in progress
+          by the machine gets its own neutral state and never shows as red or orange.
+        </li>
+        <li>
+          You can always choose the shape of work before hand-off. The choice is saved, and
+          automatic hand-off uses it too.
+        </li>
+        <li>
+          Automatic hand-off is visible before it happens and confirmed after it happens, and it can
+          be switched off from the Forge.
+        </li>
+      </ul>
+      <h3>Non-goals</h3>
+      <ul>
+        <li>Changing what the five compile checks test (<code>src/order/compile.ts</code>).</li>
+        <li>
+          Changing the red-team loop's policy: three rounds, the blocking categories, the 90%
+          confidence bar (ADR 069, spec 062).
+        </li>
+        <li>
+          The Line after hand-off, including the "outside blast radius" gate WO-0928-9c6 raised at
+          13:12:57. See open questions.
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="current">
+    <h2>Current state, from the code</h2>
+    <p class="prose">
+      Each defect below was reproduced from the ledger above or read in the source at the path
+      given.
+    </p>
+    <div class="defects">
+      <div class="defect">
+        <h4>Hand-off is disabled with no reason</h4>
+        <p>
+          The button is disabled when <code>!compile.ok || locked || !isDraft</code>.
+          <code>locked</code> is <code>busy || drafting</code>. When the compile passes and a turn
+          is running, the label stays "Compile &amp; hand off" and nothing explains the lock. The
+          checklist lists only the five compile checks, so "someone is changing the plan" is a
+          hidden sixth condition.
+        </p>
+        <div class="where">Forge.tsx:492, Forge.tsx:1451–1459, Forge.tsx:99</div>
+      </div>
+      <div class="defect">
+        <h4>Every running turn is called "the architect"</h4>
+        <p>
+          <code>lastIntake</code> maps <code>review.started</code> (the red team) and
+          <code>scout.started</code> (the scout) to the same <code>running</code> kind as an
+          architect turn. The header renders "The architect is working…" for all three.
+        </p>
+        <div class="where">src/forge/intake-outcome.ts:70–103, Forge.tsx:947–951</div>
+      </div>
+      <div class="defect">
+        <h4>
+          The loop's fix turn is invisible, so the Forge asks you to do work that is already running
+        </h4>
+        <p>
+          After a red-team round with blocking findings, <code>startReview</code> calls
+          <code>convergeWithFollowUps(updated, next.message, 0, round + 1)</code> and writes no
+          <code>converge.started</code> line. The last line is <code>review.round</code>, which
+          <code>lastIntake</code> reads as a finished redraft. The Forge then shows the orange band
+          with enabled controls for findings the architect is already fixing. A decision sent from
+          there starts a second turn that competes with the first. This is the "orange warnings that
+          do nothing".
+        </p>
+        <div class="where">
+          src/index.ts:2623, src/forge/intake-outcome.ts:95–96, src/ipc/forge-channels.ts:558–571,
+          foundry.css:577–579 and 652–661
+        </div>
+      </div>
+      <div class="defect">
+        <h4>Marks turn red, then clear themselves</h4>
+        <p>
+          Automatic follow-up turns (<code>followUpFor</code>, up to
+          <code>MAX_AUTO_TURNS = 2</code>) rewrite the plan every few seconds. The Forge polls every
+          3 s and re-derives the step marks from each intermediate compile. A check the machine is
+          about to close is drawn with the same red X as one only you can close.
+        </p>
+        <div class="where">
+          src/forge/autonomy.ts:15 and 88–100, Forge.tsx:50 and 963–977, src/forge/steps.ts:30–37
+        </div>
+      </div>
+      <div class="defect">
+        <h4>Automatic hand-off is silent and recorded as yours</h4>
+        <p>
+          <code>terminator.foundry.autoHandOff</code> defaults to on. A clean round calls
+          <code>handOff</code>, which commits the compile and starts the run. The Forge never says
+          this will happen. The agreement is recorded with <code>actor: 'operator'</code> because it
+          goes through the same channel as your button.
+        </p>
+        <div class="where">
+          src/index.ts:259–264, src/index.ts:2599–2601 and 2635–2672,
+          src/ipc/forge-channels.ts:622–631
+        </div>
+      </div>
+      <div class="defect">
+        <h4>Loop rounds reset and miscount</h4>
+        <p>
+          A turn you start runs with <code>loopRound</code> undefined, so the next review starts at
+          round 1 again and the three-round cap starts over. The round summary counts every finding
+          tagged with that round number, including ones already resolved. WO-0928-9c6 logged "2
+          blocking" and then "all checks pass" two milliseconds later.
+        </p>
+        <div class="where">
+          src/index.ts:2462–2467 and 2585–2587; order.json: RT-red-team-2 and -3 are
+          <code>resolved</code> with <code>round: 1</code>
+        </div>
+      </div>
+      <div class="defect">
+        <h4>You cannot override the proposed shape</h4>
+        <p>
+          Yesterday's fix (<code>f1648190</code>, on <code>main</code>) removed
+          <code>|| locked</code> from the shape cards. The app does not run that code. It loads the
+          Foundry view from <code>extensions/foundry/dist/</code> in the registered checkout. That
+          bundle (<code>index-cAczDuzK.js</code>) was built 2026-09-27 22:32, before the fix, and
+          still contains <code>disabled:!y.available||ve</code> where <code>ve=l||ye</code> is
+          <code>busy || drafting</code>. So every shape is disabled while any turn runs.
+        </p>
+        <p>
+          Rebuilding will not fully fix it, for two more reasons. The pick is local React state
+          (<code>chosen</code>) that is never saved, and automatic hand-off calls
+          <code>runs.start({ id })</code> with no shape. So on this order the loop started
+          <code>quick</code> "resolved from built-in" regardless of any pick. Also, the Shape step
+          disappears as soon as the order is no longer a draft.
+        </p>
+        <div class="where">
+          Forge.tsx:340, 578, 621, 1282; src/index.ts:2650; src/ipc/run-channels.ts:271; stat of
+          extensions/foundry/dist/index.html and assets/index-cAczDuzK.js
+        </div>
+      </div>
+      <div class="defect">
+        <h4>Disabled controls never explain themselves</h4>
+        <p>
+          Forge.tsx has 22 <code>disabled=</code> props and 3 <code>title=</code> attributes, all
+          three on the finding buttons. The native <code>disabled</code> attribute also removes a
+          button from the tab order, so a keyboard user can never reach an explanation (<a
+            href="https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-disabled"
+            >MDN, aria-disabled</a
+          >).
+        </p>
+        <div class="where">
+          Command: rg -c "disabled=" / rg -c "title=" extensions/foundry/src/components/Forge.tsx
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="options">
+    <h2>Options considered</h2>
+    <div class="options">
+      <div class="option">
+        <div class="tag">Option A</div>
+        <h4>Patch the current wizard</h4>
+        <p>
+          Add titles to disabled buttons, write the missing ledger line, rename the header by actor.
+        </p>
+        <ul>
+          <li>Small. Fixes the three worst symptoms in a day.</li>
+          <li>
+            Keeps state spread across the header, the band, the step list and the footer. Each still
+            derives its own answer, which is how they came to disagree.
+          </li>
+          <li>Leaves red flicker and silent automatic hand-off unaddressed.</li>
+        </ul>
+      </div>
+      <div class="option chosen">
+        <div class="tag">Option B · chosen</div>
+        <h4>One derivation, one walkthrough</h4>
+        <p>
+          A pure function says who holds the order, what blocks hand-off, and what happens next. The
+          status strip, the step rail, the checklist and every disabled control read from it.
+        </p>
+        <ul>
+          <li>
+            Same pattern the project already uses for <code>order/standing.ts</code> (ADR 045). One
+            answer, many surfaces.
+          </li>
+          <li>Moderate: one new module, a layout change to Forge.tsx, four backend fixes.</li>
+          <li>Needs an ADR and a user-guide update in the same PR.</li>
+        </ul>
+      </div>
+      <div class="option">
+        <div class="tag">Option C</div>
+        <h4>Fully automatic, one approval screen</h4>
+        <p>Remove the steps. Show a summary and a single Approve button once the loop settles.</p>
+        <ul>
+          <li>Simplest screen.</li>
+          <li>
+            Removes the control you asked for: overriding the shape, striking assumptions, editing
+            budgets.
+          </li>
+          <li>Still needs to explain waiting and failure, so it does not remove the core work.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="decision">
+    <h2>Decision</h2>
+    <p class="prose">
+      Option B. Every symptom has the same cause: several surfaces each work out the order's state
+      on their own, from partial inputs, and one of those inputs (the ledger) is missing a line.
+      Patching each surface (A) keeps them drifting apart. Removing the surfaces (C) removes control
+      you need. A single pure derivation, fed by a ledger that records every turn, fixes the cause.
+      Every surface then says the same thing.
+    </p>
+  </section>
+
+  <section id="design">
+    <h2>Design</h2>
+
+    <h3>Who holds the order</h3>
+    <p class="prose">
+      The walkthrough is built on one question with five answers. The status strip shows the current
+      answer. The rail, the checklist and every disabled control explain their state in terms of it.
+    </p>
+    <pre class="mermaid">
+stateDiagram-v2
+  direction LR
+  [*] --> Scout: first draft
+  Scout --> Architect: repository read
+  Architect --> Architect: automatic turn closes a failing check (max 2)
+  Architect --> RedTeam: all other checks pass
+  RedTeam --> ArchitectFixing: blocking findings, round below 3
+  ArchitectFixing --> RedTeam: redraft
+  RedTeam --> You: blocking findings after round 3
+  RedTeam --> Ready: nothing blocking
+  Architect --> You: question under 90% confidence, or plan refused
+  You --> Architect: send decisions
+  Ready --> HandedOff: automatic hand-off on
+  Ready --> You: automatic hand-off off
+  You --> HandedOff: press Hand off
+</pre
+    >
+
+    <h3>Components and interfaces</h3>
+    <p class="prose">
+      <b>Ledger (backend).</b> Every turn writes a start line that names its actor and round. The
+      loop's fix turn writes <code>converge.started</code> with
+      <code>actor: 'role:architect'</code> and reason <code>red team round N fix</code>. Automatic
+      hand-off records <code>actor: 'rule:forge'</code>. Your turns keep the loop's current round
+      instead of resetting it. The round summary counts only open blocking findings.
+    </p>
+    <p class="prose">
+      <b><code>IntakeOutcome</code></b> (<code>src/forge/intake-outcome.ts</code>) gains who and
+      which round, read from lines already in the ledger:
+    </p>
+    <pre class="code">
+| { kind: 'running'; at: string; sessionId: string; asked: string;
+    actor: 'architect' | 'red team' | 'scout';
+    trigger: 'you' | 'automatic';     // your ask, or a follow-up / loop fix
+    round: number | null }            // red-team loop round, when in the loop</pre
+    >
+    <p class="prose">
+      <b><code>src/forge/readiness.ts</code></b> (new, pure). This is the one answer every Forge
+      surface reads. It sits next to <code>standingOf</code>, which keeps answering the order list's
+      "whose move" question. The draft branch of <code>standingOf</code> calls
+      <code>readiness</code> so the two can never disagree.
+    </p>
+    <pre class="code">
+export type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
+
+export interface Blocker {
+  readonly id: CheckId | 'turn' | 'refused' | 'status'
+  readonly state: 'being-fixed' | 'needs-you' | 'failing'
+  readonly text: string            // the reason, in the catalogue's words
+  readonly step: StepId | null     // where the move lives
+  readonly move: Remedy | null     // existing Remedy type from Forge.tsx
+}
+
+export interface Readiness {
+  readonly holder: Holder
+  readonly headline: string        // status strip, first line
+  readonly next: string            // status strip, "what happens next"
+  readonly canHandOff: boolean
+  readonly blockers: readonly Blocker[]  // empty exactly when canHandOff
+  readonly steps: Record&lt;StepId, StepState&gt;  // rail: done | being-revised | needs-you | failing | not-yet
+}
+
+export function readiness(input: {
+  order: WorkOrder; compile: CompileResult; intake: IntakeOutcome;
+  autoHandOff: boolean; now: string
+}): Readiness</pre
+    >
+    <p class="prose">
+      A failing check is <code>being-fixed</code> when a machine turn is running or queued to close
+      it. It is <code>failing</code> only when nothing will close it without you. That rule removes
+      the flicker without hiding a real failure: a check that is still failing after the automatic
+      turns end turns red.
+    </p>
+    <p class="prose">
+      <b><code>ReasonButton</code></b> (<code>src/components/ReasonButton.tsx</code>, new). Every
+      Forge control that can be unavailable uses it. When a <code>reason</code> is present it
+      renders <code>aria-disabled="true"</code> instead of <code>disabled</code>, so it stays
+      focusable. It links the reason with <code>aria-describedby</code>, shows a tooltip on hover
+      and focus, and swallows clicks. It lives in Foundry rather than
+      <code>packages/extension-ui</code> until a second extension needs it.
+    </p>
+    <p class="prose">
+      <b>Shape choice is saved.</b> A new channel <code>foundry:order.recipe</code> writes the pick
+      to <code>order.recipe</code> while the order is a draft and records
+      <code>recipe.chosen</code> with <code>actor: 'operator'</code>.
+      <code>recipeLadder</code> already puts <code>order.recipe</code> first
+      (<code>src/ipc/run-channels.ts:271</code>). As a result, both your hand-off and the automatic
+      one run your pick with no change to <code>runs.start</code>. The channel is documented in
+      <code>ipc-channels.md</code>. Shape cards are enabled during every turn. The only disabled
+      card is one whose repository requirement is not met, and it gives the requirement as its
+      reason.
+    </p>
+    <p class="prose">
+      <b>Automatic hand-off, visible.</b> The hand-off step shows the
+      <code>terminator.foundry.autoHandOff</code> toggle (the same setting Settings shows). While
+      the red team reviews, the status strip says what happens if it comes back clean. Once the
+      order is handed off, the strip shows when and with which shape.
+    </p>
+
+    <h3>Layout</h3>
+    <p class="prose">
+      Foundry's controls stay in one box: the status strip on top, a vertical step rail on the left,
+      the open step on the right, and a bottom bar holding the way forward. The rail puts a state
+      word under every step, so the reason is always in text as well as colour. The existing "Needs
+      you" band moves into the status strip and the Red team step. It appears only when the holder
+      is you.
+    </p>
+  </section>
+
+  <section id="renderings">
+    <h2>Renderings</h2>
+    <p class="prose">
+      Each rendering uses the app's own theme tokens and follows your theme. Content is from
+      WO-0928-9c6. Where a state did not occur on that order, the caption says so.
+    </p>
+
+    <!-- 1 -->
+    <div class="render-h">
+      <span class="n">1 / 9</span>
+      <h3>The moment in your screenshot: red team reviewing</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        The status strip names the red team and the round. It also says what happens when the round
+        finishes, including automatic hand-off and the shape it will use.
+      </li>
+      <li>
+        The checklist has a sixth row, "Nobody is changing the plan". It shows as in progress, not
+        failed.
+      </li>
+      <li>
+        The bottom bar gives the reason next to the unavailable button, and the same reason appears
+        as a tooltip.
+      </li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="wiz">
+          <div class="wiz-head">
+            <div class="wiz-title">
+              <b>Foundry - Forge should only list tickets that are not marked DONE</b>
+              <div class="wiz-sub">
+                <span class="chip">Linear TAV-15</span><span>Low risk</span><span>·</span
+                ><span>1 unit</span><span>·</span><span>Shape: Quick (proposed)</span><span>·</span
+                ><span>Draft</span>
+              </div>
+            </div>
+            <span class="btn quiet"
+              ><svg class="i"><use href="#i-term" /></svg>Watch the red team</span
+            >
+          </div>
+          <div class="strip working">
+            <div class="who">
+              <svg class="i spin"><use href="#i-load" /></svg>
+              <div>
+                <b>The red team is reviewing the plan · round 2 of 3</b
+                ><small
+                  >Started 13:06:19. If it finds nothing blocking, this order hands off on its own
+                  with the Quick shape. The last round took 56 seconds.</small
+                >
+              </div>
+            </div>
+            <div class="acts">
+              <span class="btn"
+                ><svg class="i"><use href="#i-pause" /></svg>Hold for me</span
+              >
+            </div>
+          </div>
+          <div class="body">
+            <div class="rail">
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Intent</b><small>Done</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Plan</b><small>2 criteria, 1 unit</small></div>
+              </div>
+              <div class="step work">
+                <span class="mk"
+                  ><svg class="i spin"><use href="#i-load" /></svg
+                ></span>
+                <div><b>Red team</b><small>Reviewing, round 2 of 3</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Shape</b><small>Quick, proposed</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Tracker</b><small>Comment, state, links</small></div>
+              </div>
+              <div class="step on work">
+                <span class="mk">6</span>
+                <div><b>Hand off</b><small>Waiting on the red team</small></div>
+              </div>
+            </div>
+            <div class="main">
+              <h5>Ready to hand off?</h5>
+              <p class="intro">
+                Hand-off agrees the order and starts the work. Every row must pass.
+              </p>
+              <div class="checks">
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div><b>No open questions</b><small>None were asked.</small></div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>Every criterion can be proven</b
+                    ><small>Both criteria are proven by a named test.</small>
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>Plan and criteria cover each other</b
+                    ><small>1 unit builds both criteria.</small>
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>Risk graded against this plan</b
+                    ><small>Low risk, graded over the 2 files the plan touches.</small>
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>No blocking red-team findings</b
+                    ><small>Round 1's two blocking findings were fixed at 13:06:19.</small>
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk work">
+                  <svg class="i spin"><use href="#i-load" /></svg>
+                  <div>
+                    <b>Nobody is changing the plan</b
+                    ><small
+                      >The red team is reviewing round 2. The checks above can change when it
+                      finishes.</small
+                    >
+                  </div>
+                  <span class="pill work">In progress</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="foot">
+            <span class="btn">Back</span>
+            <span class="why"
+              ><svg class="i"><use href="#i-info" /></svg>Hand-off opens when the red team finishes
+              round 2.</span
+            >
+            <span class="toggle"><span class="sw"></span>Hand off on its own when clean</span>
+            <span class="tipwrap">
+              <span class="tip"
+                >The red team is reviewing the plan (round 2 of 3, started 13:06:19). Hand-off opens
+                when it finishes. If it finds nothing blocking, the order hands off on its
+                own.</span
+              >
+              <span class="btn primary" aria-disabled="true"
+                ><svg class="i"><use href="#i-lock" /></svg>Hand off</span
+              >
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="render-h">
+      <span class="n">2 / 9</span>
+      <h3>Ready to hand off</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        A green strip appears only when you can act. Each passed row says why it passed, so green is
+        a claim you can check.
+      </li>
+      <li>
+        The button names the shape it will run. "Compile &amp;" is dropped because the compile is
+        already shown above.
+      </li>
+      <li>
+        Rendered for the case where automatic hand-off is off. With it on, this state goes straight
+        to rendering 8.
+      </li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="wiz">
+          <div class="strip ready">
+            <div class="who">
+              <svg class="i"><use href="#i-check" /></svg>
+              <div>
+                <b>Ready to hand off</b
+                ><small
+                  >All six rows pass and nobody is changing the plan. Automatic hand-off is off, so
+                  this waits for you.</small
+                >
+              </div>
+            </div>
+          </div>
+          <div class="body">
+            <div class="rail">
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Intent</b><small>Done</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Plan</b><small>2 criteria, 1 unit</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Red team</b><small>Clean after round 2</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Shape</b><small>Direct, your choice</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Tracker</b><small>Comment, state, links</small></div>
+              </div>
+              <div class="step on done">
+                <span class="mk">6</span>
+                <div><b>Hand off</b><small>Ready</small></div>
+              </div>
+            </div>
+            <div class="main">
+              <h5>Ready to hand off?</h5>
+              <div class="checks">
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div><b>No open questions</b><small>None were asked.</small></div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>Every criterion can be proven</b
+                    ><small
+                      >Both criteria are proven by a named test in
+                      tests/unit/integrations/providers/linear.provider.spec.ts.</small
+                    >
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>Plan and criteria cover each other</b
+                    ><small>1 unit builds both criteria.</small>
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>Risk graded against this plan</b
+                    ><small>Low risk, graded over the 2 files the plan touches.</small>
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>No blocking red-team findings</b
+                    ><small>7 resolved. 5 notes that don't block.</small>
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>Nobody is changing the plan</b
+                    ><small>The last turn ended at 13:07:53.</small>
+                  </div>
+                  <span class="pill pass">Passed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="foot">
+            <span class="btn">Back</span>
+            <span class="why"></span>
+            <span class="toggle"><span class="sw off"></span>Hand off on its own when clean</span>
+            <span class="btn primary"
+              ><svg class="i"><use href="#i-play" /></svg>Hand off with Direct</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="render-h">
+      <span class="n">3 / 9</span>
+      <h3>Every unavailable control explains itself</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        Hovering or focusing an unavailable control shows its reason. It stays in the tab order
+        because it uses <code>aria-disabled</code>.
+      </li>
+      <li>
+        Clicking it shows the same reason inline under the control, for touch and for people who
+        click before they hover.
+      </li>
+      <li>A screen reader reads the reason through <code>aria-describedby</code>.</li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="anat">
+          <div class="cellx">
+            <span class="tip"
+              >The architect is fixing 2 red-team findings (started 13:05:49). Hand-off opens when
+              it finishes.</span
+            >
+            <span class="btn primary" aria-disabled="true"
+              ><svg class="i"><use href="#i-lock" /></svg>Hand off</span
+            >
+            <span class="cap">Hover: reason as a tooltip</span>
+          </div>
+          <div class="cellx">
+            <span class="tip"
+              >Type what's wrong or what you want instead, then send it to the architect.</span
+            >
+            <span class="btn focus" aria-disabled="true">Send</span>
+            <span class="cap">Keyboard focus: same tooltip, visible focus ring</span>
+          </div>
+          <div class="cellx" style="padding-top: 14px">
+            <span class="btn" aria-disabled="true">Redraft</span>
+            <span class="inline-why"
+              >The red team is reviewing the plan. A redraft now would be lost when its round
+              finishes. Use "Hold for me" to stop the loop first.</span
+            >
+            <span class="cap">Click: reason shown inline</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="render-h">
+      <span class="n">4 / 9</span>
+      <h3>Automatic turns no longer flash red</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        Today each 3-second poll redraws the rail from the latest intermediate compile, so marks
+        turn red and clear while automatic turns run (13:04:34 to 13:04:52 on WO-0928-9c6).
+      </li>
+      <li>
+        Proposed: while a machine turn is closing a check, the step shows "Being revised" in the
+        neutral accent. Red appears only if the check is still failing after the automatic turns
+        end.
+      </li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="label-row">Today</div>
+        <div class="mini">
+          <div class="mini-row">
+            <span class="t">13:04:34</span
+            ><span class="cell ok"
+              ><svg class="i"><use href="#i-check" /></svg>Intent</span
+            ><span class="cell bad"
+              ><svg class="i"><use href="#i-x" /></svg>Plan</span
+            ><span class="cell">Red team</span><span class="cell">Shape</span
+            ><span class="cell">Tracker</span><span class="cell">Hand off</span>
+          </div>
+          <div class="mini-row">
+            <span class="t">13:04:44</span
+            ><span class="cell ok"
+              ><svg class="i"><use href="#i-check" /></svg>Intent</span
+            ><span class="cell bad"
+              ><svg class="i"><use href="#i-x" /></svg>Plan</span
+            ><span class="cell">Red team</span><span class="cell">Shape</span
+            ><span class="cell">Tracker</span><span class="cell">Hand off</span>
+          </div>
+          <div class="mini-row">
+            <span class="t">13:04:52</span
+            ><span class="cell ok"
+              ><svg class="i"><use href="#i-check" /></svg>Intent</span
+            ><span class="cell">3 Plan</span><span class="cell">Red team</span
+            ><span class="cell">Shape</span><span class="cell">Tracker</span
+            ><span class="cell">Hand off</span>
+          </div>
+        </div>
+        <div class="label-row">Proposed</div>
+        <div class="mini">
+          <div class="mini-row">
+            <span class="t">13:04:34</span
+            ><span class="cell ok"
+              ><svg class="i"><use href="#i-check" /></svg>Intent</span
+            ><span class="cell work"
+              ><svg class="i spin"><use href="#i-load" /></svg>Plan · revising 1 of 2</span
+            ><span class="cell">Red team</span><span class="cell">Shape</span
+            ><span class="cell">Tracker</span><span class="cell">Hand off</span>
+          </div>
+          <div class="mini-row">
+            <span class="t">13:04:44</span
+            ><span class="cell ok"
+              ><svg class="i"><use href="#i-check" /></svg>Intent</span
+            ><span class="cell work"
+              ><svg class="i spin"><use href="#i-load" /></svg>Plan · revising 2 of 2</span
+            ><span class="cell">Red team</span><span class="cell">Shape</span
+            ><span class="cell">Tracker</span><span class="cell">Hand off</span>
+          </div>
+          <div class="mini-row">
+            <span class="t">13:04:52</span
+            ><span class="cell ok"
+              ><svg class="i"><use href="#i-check" /></svg>Intent</span
+            ><span class="cell ok"
+              ><svg class="i"><use href="#i-check" /></svg>Plan</span
+            ><span class="cell work"
+              ><svg class="i spin"><use href="#i-load" /></svg>Red team · round 1</span
+            ><span class="cell">Shape</span><span class="cell">Tracker</span
+            ><span class="cell">Hand off</span>
+          </div>
+          <div class="mini-row">
+            <span class="t">if still failing</span
+            ><span class="cell ok"
+              ><svg class="i"><use href="#i-check" /></svg>Intent</span
+            ><span class="cell bad"
+              ><svg class="i"><use href="#i-x" /></svg>Plan · needs a fix</span
+            ><span class="cell">Red team</span><span class="cell">Shape</span
+            ><span class="cell">Tracker</span><span class="cell">Hand off</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="render-h">
+      <span class="n">5 / 9</span>
+      <h3>Red team step: grouped by who acts</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        Findings are grouped by owner: the architect is fixing, needs your decision, notes, resolved
+        (collapsed, empty here). On WO-0928-9c6 at 13:05:49 the two blocking findings belong in the
+        first group, with no controls.
+      </li>
+      <li>
+        Notes are neutral grey and say "Nothing to do". Only the "Needs your decision" group uses
+        orange, and it is absent here.
+      </li>
+      <li>
+        Category codes show as plain words: "Process", "Setup", "Already true before this change".
+      </li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="wiz">
+          <div class="strip working">
+            <div class="who">
+              <svg class="i spin"><use href="#i-load" /></svg>
+              <div>
+                <b>The architect is fixing 2 red-team findings · round 1 of 3</b
+                ><small
+                  >Started 13:05:49 on its own. The red team reviews the fix next. You don't need to
+                  do anything.</small
+                >
+              </div>
+            </div>
+            <div class="acts">
+              <span class="btn"
+                ><svg class="i"><use href="#i-pause" /></svg>Hold for me</span
+              >
+            </div>
+          </div>
+          <div class="body">
+            <div class="rail">
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Intent</b><small>Done</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Plan</b><small>2 criteria, 1 unit</small></div>
+              </div>
+              <div class="step on work">
+                <span class="mk"
+                  ><svg class="i spin"><use href="#i-load" /></svg
+                ></span>
+                <div><b>Red team</b><small>Architect fixing 2</small></div>
+              </div>
+              <div class="step">
+                <span class="mk">4</span>
+                <div><b>Shape</b><small>Quick, proposed</small></div>
+              </div>
+              <div class="step">
+                <span class="mk">5</span>
+                <div><b>Tracker</b><small>Comment, state, links</small></div>
+              </div>
+              <div class="step work">
+                <span class="mk">6</span>
+                <div><b>Hand off</b><small>Waiting on the architect</small></div>
+              </div>
+            </div>
+            <div class="main">
+              <h5>Red team findings</h5>
+              <div class="group">
+                <div class="group-h work">
+                  <svg class="i spin"><use href="#i-load" /></svg>The architect is fixing
+                  <span class="cnt">2</span>
+                </div>
+                <div class="fnd">
+                  <span
+                    >The first criterion passes on a filter applied after the page is fetched, which
+                    can leave the Forge list short or empty while done tickets still crowd out open
+                    ones.</span
+                  ><span class="meta2"
+                    ><span>Would make the change wrong</span><span>·</span
+                    ><span>Raised 13:05:49</span></span
+                  >
+                </div>
+                <div class="fnd">
+                  <span
+                    >listMine has two query paths and the criteria do not require both to be
+                    filtered.</span
+                  ><span class="meta2"
+                    ><span>Would make the change wrong</span><span>·</span
+                    ><span>Raised 13:05:49</span></span
+                  >
+                </div>
+              </div>
+              <div class="group">
+                <div class="group-h note">
+                  <svg class="i"><use href="#i-note" /></svg>Notes, nothing to do
+                  <span class="cnt">5</span>
+                </div>
+                <div class="fnd">
+                  <span
+                    >Changing the provider's listMine changes every core surface that uses it, and
+                    the order only talks about Forge.</span
+                  ><span class="meta2"><span>Scope</span></span>
+                </div>
+                <div class="fnd">
+                  <span
+                    >The second criterion is already true today, so it proves nothing about this
+                    change beyond "don't break search".</span
+                  ><span class="meta2"><span>Process</span></span>
+                </div>
+                <div class="fnd">
+                  <span>Both criteria are judged from the diff alone, with no check that runs.</span
+                  ><span class="meta2"><span>Process</span></span>
+                </div>
+                <div class="fnd">
+                  <span>The order states no outcome, only the problem.</span
+                  ><span class="meta2"><span>Process</span></span>
+                </div>
+                <div class="fnd">
+                  <span
+                    >The order excludes nothing. An order with no boundary is one an agent can widen
+                    without contradicting it.</span
+                  ><span class="meta2"><span>Scope</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="render-h">
+      <span class="n">6 / 9</span>
+      <h3>When it really is your decision</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        Orange appears only when the loop has stopped: three rounds without agreement, a question
+        under 90% confidence, or "Hold for me" pressed.
+      </li>
+      <li>
+        The strip says why it stopped. Each finding has the existing three choices. Send says how
+        many decisions it carries.
+      </li>
+      <li>
+        Illustrative: WO-0928-9c6 never reached this state. The text is its two round-1 blocking
+        findings.
+      </li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="wiz">
+          <div class="strip you">
+            <div class="who">
+              <svg class="i"><use href="#i-user" /></svg>
+              <div>
+                <b>2 findings need your decision</b
+                ><small
+                  >The red team and the architect did not agree after 3 rounds. Nothing moves until
+                  you decide. Hand-off opens when both are decided and the architect has applied
+                  them.</small
+                >
+              </div>
+            </div>
+          </div>
+          <div class="body">
+            <div class="rail">
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Intent</b><small>Done</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Plan</b><small>2 criteria, 1 unit</small></div>
+              </div>
+              <div class="step on you">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-alert" /></svg
+                ></span>
+                <div><b>Red team</b><small>Needs you: 2 decisions</small></div>
+              </div>
+              <div class="step">
+                <span class="mk">4</span>
+                <div><b>Shape</b><small>Quick, proposed</small></div>
+              </div>
+              <div class="step">
+                <span class="mk">5</span>
+                <div><b>Tracker</b><small>Comment, state, links</small></div>
+              </div>
+              <div class="step you">
+                <span class="mk">6</span>
+                <div><b>Hand off</b><small>Waiting on you</small></div>
+              </div>
+            </div>
+            <div class="main">
+              <h5>Red team findings</h5>
+              <div class="group">
+                <div class="group-h you">
+                  <svg class="i"><use href="#i-alert" /></svg>Needs your decision
+                  <span class="cnt">1 of 2 decided</span>
+                </div>
+                <div class="fnd">
+                  <span
+                    >The first criterion passes on a filter applied after the page is fetched, which
+                    can leave the Forge list short or empty while done tickets still crowd out open
+                    ones.</span
+                  >
+                  <div class="acts">
+                    <span class="btn">Ask the architect</span><span class="btn sel">Fix it…</span
+                    ><span class="btn">Accept it</span>
+                  </div>
+                  <input
+                    id="fix-1"
+                    aria-label="How should it be fixed"
+                    value="Put the state filter in the Linear query on both paths, not after the fetch."
+                  />
+                </div>
+                <div class="fnd">
+                  <span
+                    >listMine has two query paths and the criteria do not require both to be
+                    filtered.</span
+                  >
+                  <div class="acts">
+                    <span class="btn">Ask the architect</span><span class="btn">Fix it…</span
+                    ><span class="btn">Accept it</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="foot">
+            <span class="btn">Back</span>
+            <span class="why"
+              ><svg class="i"><use href="#i-info" /></svg>Send now or decide the second finding
+              first. Undecided findings stay open.</span
+            >
+            <span class="btn primary">Send 1 decision</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <div class="render-h">
+      <span class="n">7 / 9</span>
+      <h3>Shape of work: always your choice, saved</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        Every shape is selectable in every draft state, including while a turn runs. Your pick is
+        saved to the order right away and recorded in the ledger. Both your hand-off and automatic
+        hand-off use it.
+      </li>
+      <li>"Proposed" and "Your choice" are separate marks, and "Use the proposal" goes back.</li>
+      <li>
+        A shape is unavailable only when the repository lacks something it needs, and the card names
+        what. The last card is illustrative: this repository meets every shape's requirements.
+      </li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="wiz">
+          <div class="strip working">
+            <div class="who">
+              <svg class="i spin"><use href="#i-load" /></svg>
+              <div>
+                <b>The red team is reviewing the plan · round 2 of 3</b
+                ><small
+                  >If it finds nothing blocking, this order hands off on its own with the Direct
+                  shape, your choice.</small
+                >
+              </div>
+            </div>
+          </div>
+          <div class="body">
+            <div class="rail">
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Intent</b><small>Done</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Plan</b><small>2 criteria, 1 unit</small></div>
+              </div>
+              <div class="step work">
+                <span class="mk"
+                  ><svg class="i spin"><use href="#i-load" /></svg
+                ></span>
+                <div><b>Red team</b><small>Reviewing, round 2 of 3</small></div>
+              </div>
+              <div class="step on done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Shape</b><small>Direct, your choice</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Tracker</b><small>Comment, state, links</small></div>
+              </div>
+              <div class="step work">
+                <span class="mk">6</span>
+                <div><b>Hand off</b><small>Waiting on the red team</small></div>
+              </div>
+            </div>
+            <div class="main">
+              <h5>Shape of work</h5>
+              <p class="intro">
+                Quick is proposed: one lane, graded low risk, nothing flagged. Pick any shape. Your
+                choice is saved and used at hand-off.
+              </p>
+              <div class="saved">
+                <svg class="i"><use href="#i-check" /></svg>Saved 13:07:02: Direct.
+                <span class="btn quiet">Use the proposal</span>
+              </div>
+              <div class="shapes">
+                <div class="shape">
+                  <div class="nm"><b>Quick</b><span class="mark">Proposed</span></div>
+                  <small
+                    >One lane, nothing flagged. One builder does the work, the project's own test
+                    command says whether it holds, and it ships.</small
+                  >
+                </div>
+                <div class="shape on">
+                  <div class="nm"><b>Direct</b><span class="mark you">Your choice</span></div>
+                  <small
+                    >One lane, but something worth a second look. Build it, prove it, inspect it,
+                    ship it.</small
+                  >
+                </div>
+                <div class="shape">
+                  <div class="nm"><b>Standard</b></div>
+                  <small
+                    >The default for work spanning more than one lane, or graded above ordinary
+                    risk.</small
+                  >
+                </div>
+                <div class="shape">
+                  <div class="nm"><b>Bugfix</b></div>
+                  <small>Reproduce first, then fix, then prove the reproduction flips.</small>
+                </div>
+                <div class="shape">
+                  <div class="nm"><b>Speckit</b></div>
+                  <small
+                    >The ten-stage specification pipeline, kept whole. Offered only where the
+                    repository has the toolkit installed.</small
+                  >
+                </div>
+                <div class="tipwrap" style="align-items: stretch">
+                  <span class="tip fit"
+                    >Refactor needs a test command, and this repository has none. Add a "test"
+                    script to package.json to offer it.</span
+                  >
+                  <div class="shape off" aria-disabled="true">
+                    <div class="nm">
+                      <b>Refactor</b><svg class="i"><use href="#i-lock" /></svg>
+                    </div>
+                    <small>Unavailable: this repository has no test command. (Example)</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8 -->
+    <div class="render-h">
+      <span class="n">8 / 9</span>
+      <h3>Handed off automatically, and said so</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        The strip records when and why the order handed itself off, with the shape it ran. The
+        ledger records the actor as the Forge's rule, not as you.
+      </li>
+      <li>
+        The steps stay readable after hand-off, including Shape, so you can see what was agreed.
+      </li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="wiz">
+          <div class="strip ready">
+            <div class="who">
+              <svg class="i"><use href="#i-play" /></svg>
+              <div>
+                <b>Handed off automatically at 13:07:53</b
+                ><small
+                  >The red team's second round found nothing blocking, and automatic hand-off is on.
+                  Running with the Quick shape, 1 unit.</small
+                >
+              </div>
+            </div>
+            <div class="acts">
+              <span class="btn">Open the run</span
+              ><span class="btn quiet">Turn off automatic hand-off</span>
+            </div>
+          </div>
+          <div class="body" style="min-height: 220px">
+            <div class="rail">
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Intent</b><small>Agreed</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Plan</b><small>Agreed</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Red team</b><small>Clean after round 2</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Shape</b><small>Quick, proposed</small></div>
+              </div>
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Tracker</b><small>Comment, state, links</small></div>
+              </div>
+              <div class="step on done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Hand off</b><small>Handed off 13:07:53</small></div>
+              </div>
+            </div>
+            <div class="main">
+              <h5>Agreed at 13:07:53 by automatic hand-off</h5>
+              <p class="intro">
+                All six rows passed at agreement. The order is now read-only. Changes go through the
+                run.
+              </p>
+              <div class="checks">
+                <div class="chk">
+                  <svg class="i"><use href="#i-check" /></svg>
+                  <div>
+                    <b>Six of six rows passed</b
+                    ><small
+                      >Questions, proof, coverage, risk, red team, nobody changing the plan.</small
+                    >
+                  </div>
+                  <span class="pill pass">Agreed</span>
+                </div>
+                <div class="chk">
+                  <svg class="i"><use href="#i-play" /></svg>
+                  <div>
+                    <b>Run started with Quick</b
+                    ><small>One builder, the project's test command as the check.</small>
+                  </div>
+                  <span class="pill work">Running</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9 -->
+    <div class="render-h">
+      <span class="n">9 / 9</span>
+      <h3>The architect's plan was refused</h3>
+    </div>
+    <ul class="changes">
+      <li>
+        The existing refusal band moves into the status strip, so an error, a wait and your turn all
+        appear in one place.
+      </li>
+      <li>
+        The rail marks every step as waiting on the refusal. The checks show the plan as it stood,
+        and say so.
+      </li>
+      <li>
+        Illustrative: the reason is an example of a closed-set refusal, the kind WO-0909-6db hit.
+      </li>
+    </ul>
+    <div class="frame-wrap">
+      <div class="frame">
+        <div class="wiz">
+          <div class="strip bad">
+            <div class="who">
+              <svg class="i"><use href="#i-alert" /></svg>
+              <div>
+                <b>The architect's plan was refused. Nothing on this order changed.</b
+                ><small
+                  >Why: redTeam[2].category must be one of wrong-outcome, regression, unprovable,
+                  scope, process, pre-existing, infra; got "tests".</small
+                >
+              </div>
+            </div>
+            <div class="acts">
+              <span class="btn primary">Tell the architect what was wrong</span
+              ><span class="btn">Start the turn over</span>
+            </div>
+          </div>
+          <div class="body" style="min-height: 180px">
+            <div class="rail">
+              <div class="step done">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-check" /></svg
+                ></span>
+                <div><b>Intent</b><small>Done</small></div>
+              </div>
+              <div class="step bad">
+                <span class="mk"
+                  ><svg class="i"><use href="#i-x" /></svg
+                ></span>
+                <div><b>Plan</b><small>Last redraft refused</small></div>
+              </div>
+              <div class="step">
+                <span class="mk">3</span>
+                <div><b>Red team</b><small>Waits for a plan</small></div>
+              </div>
+              <div class="step">
+                <span class="mk">4</span>
+                <div><b>Shape</b><small>Quick, proposed</small></div>
+              </div>
+              <div class="step">
+                <span class="mk">5</span>
+                <div><b>Tracker</b><small>Comment, state, links</small></div>
+              </div>
+              <div class="step on bad">
+                <span class="mk">6</span>
+                <div><b>Hand off</b><small>Blocked by the refusal</small></div>
+              </div>
+            </div>
+            <div class="main">
+              <h5>Ready to hand off?</h5>
+              <p class="intro">
+                These rows describe the order as it stood before the refused turn.
+              </p>
+              <div class="checks">
+                <div class="chk">
+                  <svg class="i"><use href="#i-x" /></svg>
+                  <div>
+                    <b>Nobody is changing the plan</b
+                    ><small
+                      >The last turn ended in a refusal, so the plan is not the one the architect
+                      meant to write.</small
+                    >
+                    <div class="moves">
+                      <span class="btn">Tell the architect what was wrong</span>
+                    </div>
+                  </div>
+                  <span class="pill bad">Failing</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="reasons">
+    <h2>Reason catalogue</h2>
+    <p class="prose">
+      Each reason is written once in <code>readiness.ts</code> and used verbatim by the tooltip, the
+      bottom bar and the status strip. Values in braces are filled from the order and the ledger.
+    </p>
+    <div class="scroll">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>Condition</th>
+            <th>Controls affected</th>
+            <th>Reason shown</th>
+            <th>The move</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Scout reading</td>
+            <td>Hand off, Redraft, Send</td>
+            <td>
+              The scout is reading the repository before the first draft (started {time}). The
+              architect drafts next.
+            </td>
+            <td>Watch the scout</td>
+          </tr>
+          <tr>
+            <td>Architect drafting, your ask</td>
+            <td>Hand off, Redraft, Send</td>
+            <td>
+              The architect is working on your request (started {time}). Hand-off opens when it
+              finishes.
+            </td>
+            <td>Watch the architect</td>
+          </tr>
+          <tr>
+            <td>Architect, automatic turn</td>
+            <td>Hand off, Redraft</td>
+            <td>
+              The architect is closing {check} on its own, automatic turn {n} of 2. Hand-off opens
+              when it finishes.
+            </td>
+            <td>Hold for me</td>
+          </tr>
+          <tr>
+            <td>Red team reviewing</td>
+            <td>Hand off, Redraft</td>
+            <td>
+              The red team is reviewing the plan (round {n} of 3, started {time}). Hand-off opens
+              when it finishes. {If auto: If it finds nothing blocking, the order hands off on its
+              own with {shape}.}
+            </td>
+            <td>Hold for me</td>
+          </tr>
+          <tr>
+            <td>Architect fixing findings</td>
+            <td>Hand off, Redraft</td>
+            <td>
+              The architect is fixing {n} red-team findings (round {n} of 3, started {time}).
+              Hand-off opens when it finishes.
+            </td>
+            <td>Hold for me</td>
+          </tr>
+          <tr>
+            <td>Question open</td>
+            <td>Hand off</td>
+            <td>{n} questions need your answer. The architect was less than 90% sure.</td>
+            <td>Answer them</td>
+          </tr>
+          <tr>
+            <td>Criterion unprovable</td>
+            <td>Hand off</td>
+            <td>
+              "{criterion}" has nothing that can prove it: no command, named test or rubric with
+              evidence.
+            </td>
+            <td>Ask for proof · Mark it unprovable</td>
+          </tr>
+          <tr>
+            <td>Screen change, no picture</td>
+            <td>Hand off</td>
+            <td>
+              {unit} changes what a person sees, and no criterion asks for a screenshot of it.
+            </td>
+            <td>Ask for proof</td>
+          </tr>
+          <tr>
+            <td>Coverage gap</td>
+            <td>Hand off</td>
+            <td>Nothing in the plan builds "{criterion}". / "{unit}" satisfies no criterion.</td>
+            <td>Ask for the gap to be closed</td>
+          </tr>
+          <tr>
+            <td>Risk not graded against plan</td>
+            <td>Hand off</td>
+            <td>The plan touches {files}, outside what the risk grade covered.</td>
+            <td>Ask for a regrade</td>
+          </tr>
+          <tr>
+            <td>Blocking findings, loop stopped</td>
+            <td>Hand off</td>
+            <td>{n} red-team findings need your decision. {Why the loop stopped.}</td>
+            <td>Decide them</td>
+          </tr>
+          <tr>
+            <td>Plan refused</td>
+            <td>Hand off</td>
+            <td>The architect's last plan was refused: {reason}. Nothing changed.</td>
+            <td>Tell the architect what was wrong</td>
+          </tr>
+          <tr>
+            <td>Decisions queued</td>
+            <td>Send decisions</td>
+            <td>Your decisions are queued and go to the architect when the current turn ends.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Nothing decided</td>
+            <td>Send decisions</td>
+            <td>Choose an answer or a decision above first.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Empty message</td>
+            <td>Send</td>
+            <td>Type what's wrong or what you want instead, then send it to the architect.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Accept reason empty</td>
+            <td>Accept it</td>
+            <td>Say why it stands. The reason travels with the order.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Saving</td>
+            <td>All</td>
+            <td>Saving your change…</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Shape requirement unmet</td>
+            <td>That shape's card</td>
+            <td>{Shape} needs {requirement}, and this repository has none.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Already handed off</td>
+            <td>Hand off and every edit</td>
+            <td>Handed off at {time} {by you | automatically}. The order is read-only.</td>
+            <td>Open the run</td>
+          </tr>
+          <tr>
+            <td>Review queue full</td>
+            <td>Hand off</td>
+            <td>{n} pull requests are waiting for your review; the limit is {limit}.</td>
+            <td>Start anyway</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="changes">
+    <h2>Sequence of changes</h2>
+    <p class="prose">
+      One commit per step on a feature branch, each with its failing test first, in one draft PR.
+    </p>
+    <ol class="prose">
+      <li>
+        <b>Deliver yesterday's fix now.</b> Run <code>npm run build:extensions</code> in
+        <code>~/repos/terminator</code> and relaunch, so the app loads a bundle that contains
+        <code>f1648190</code>. Find out why the Foundry view bundle was not rebuilt when
+        <code>src/index.js</code> was (see open questions).
+      </li>
+      <li>
+        <b>Ledger records every turn.</b> <code>src/index.ts</code>: the loop's fix turn writes
+        <code>converge.started</code>; automatic hand-off records <code>rule:forge</code> (<code
+          >forge.compile</code
+        >
+        takes an <code>actor</code>); your turns keep <code>loopRound</code>;
+        <code>review.round</code> counts open blocking findings only. Specs:
+        <code>tests/unit/foundry/review-loop*.spec.ts</code>,
+        <code>tests/components/foundry-channels.spec.ts</code>.
+      </li>
+      <li>
+        <b><code>IntakeOutcome</code> names actor, trigger and round.</b>
+        <code>src/forge/intake-outcome.ts</code> and its spec.
+      </li>
+      <li>
+        <b><code>readiness.ts</code></b
+        >, pure, with the reason catalogue. <code>standingOf</code>'s draft branch calls it. Spec:
+        every row of the catalogue, plus "a check being fixed is never failing" and "blockers is
+        empty exactly when canHandOff".
+      </li>
+      <li>
+        <b>Shape choice saved.</b> Channel <code>foundry:order.recipe</code> in
+        <code>src/ipc/forge-channels.ts</code>, ledger <code>recipe.chosen</code>,
+        <code>ipc-channels.md</code> entry. Forge sends it on click, shape cards stay enabled, the
+        Shape step stays visible read-only after hand-off.
+      </li>
+      <li>
+        <b><code>ReasonButton</code></b> and the swap of all 22 <code>disabled=</code> controls in
+        Forge.tsx.
+      </li>
+      <li>
+        <b>Walkthrough layout.</b> Status strip, vertical rail with state words, grouped red-team
+        findings, neutral notes, sixth checklist row, bottom bar, "Hold for me" (pauses the loop
+        through a new <code>review.held</code> ledger line), automatic hand-off toggle.
+        <code>foundry.css</code>: orange only on "needs you".
+      </li>
+      <li>
+        <b>Docs.</b> ADR 074 "The Forge reads one readiness",
+        <code>docs/user-guide/USER-GUIDE.md</code> Forge section, Foundry README,
+        <code>docs/ARCHITECTURE.md</code>.
+      </li>
+    </ol>
+  </section>
+
+  <section id="testing">
+    <h2>Testing and verification</h2>
+    <div class="prose">
+      <p>
+        Unit and component tests assert what is rendered: reason text, <code>aria-disabled</code>,
+        <code>aria-describedby</code>. A mocked call is not enough. The component spec must also
+        check that every <code>button[aria-disabled="true"]</code> in the Forge has a description,
+        across all states the harness can produce.
+      </p>
+    </div>
+    <pre class="code">
+npm run format
+npm run lint                       # 0 errors
+npm run typecheck:extensions       # the only typecheck that covers Foundry
+npx vitest run --coverage; echo "exit $?"   # must print exit 0, patch coverage ≥ 80%
+npx playwright test tests/e2e/foundry-forge.spec.ts; echo "exit $?"</pre
+    >
+    <div class="prose">
+      <p>
+        The e2e addresses controls by role and accessible name. It covers four cases: a ledger
+        ending in <code>review.started</code> shows the red-team reason on Hand off; a shape picked
+        during a running turn survives a reload and is the one
+        <code>foundry:run.start</code> receives; an automatic hand-off shows rendering 8; a loop fix
+        turn shows no orange.
+      </p>
+      <p>
+        A live run follows: seed an order in a temporary repository, let the loop run with automatic
+        hand-off on and then off, and screenshot the running app at each strip state with
+        <code>capturePage</code>. The view is a WebContentsView that Playwright's page cannot see.
+      </p>
+    </div>
+  </section>
+
+  <section id="risks">
+    <h2>Risks and mitigations</h2>
+    <div class="scroll">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>Risk</th>
+            <th>Mitigation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>"Being fixed" hides a check that never gets fixed.</td>
+            <td>
+              It lasts only while a turn is running or queued. When the last automatic turn ends,
+              the check turns red. Covered by a readiness spec.
+            </td>
+          </tr>
+          <tr>
+            <td><code>readiness</code> and <code>standingOf</code> drift apart.</td>
+            <td>
+              The draft branch of <code>standingOf</code> calls <code>readiness</code>. A spec
+              asserts their headlines match for every draft fixture.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              A new holder or blocker kind added without a label blanks the panel. A Record keyed by
+              a union hands React <code>undefined</code>.
+            </td>
+            <td>
+              Labels are carried on the value, as <code>Standing.headline</code> does.
+              <code>npm run typecheck:extensions</code> runs in the checklist.
+            </td>
+          </tr>
+          <tr>
+            <td>Your shape pick races an automatic hand-off.</td>
+            <td>
+              The pick is saved before the click returns. Hand-off reads
+              <code>order.recipe</code> at start, so the later of the two wins. The ledger shows
+              both.
+            </td>
+          </tr>
+          <tr>
+            <td>"Hold for me" is a new way for an order to stall.</td>
+            <td>
+              A held order's holder is "you". The strip says "Held by you since {time}" and offers
+              "Let it continue".
+            </td>
+          </tr>
+          <tr>
+            <td>A stale view bundle ships this redesign invisibly, as happened yesterday.</td>
+            <td>Open question 1. Verify from the packaged app, not the dev build.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="questions">
+    <h2>Open questions</h2>
+    <ol class="prose">
+      <li>
+        <span class="unverified">UNVERIFIED</span> Why was <code>extensions/foundry/dist/</code> not
+        rebuilt? <code>src/index.js</code> was written 2026-09-28 13:01:15, but
+        <code>dist/index.html</code> is from 2026-09-27 22:32:25.
+        <code>scripts/build-extensions.cjs:62–65</code> builds both in one pass. Something wrote
+        <code>src/index.js</code> without the renderer step, or the renderer build failed without
+        failing the script.
+      </li>
+      <li>
+        Should "Hold for me" also stop a running red-team round, or only stop the next step?
+        Stopping mid-round wastes the round. Waiting can take a minute and a half (13:06:19 to
+        13:07:53).
+      </li>
+      <li>
+        Should automatic hand-off stay on by default? This design makes it visible either way. The
+        default is your call.
+      </li>
+      <li>
+        Out of scope but related: WO-0928-9c6's run raised "graded ordinary risk once it was done,
+        planned as low risk", triggered by <code>outside_blast_radius</code>, and the ship was
+        refused at 13:12:57. That may be the "orange warning" you saw after hand-off. It belongs to
+        the Line's gates and needs its own look.
+      </li>
+    </ol>
+  </section>
+
+  <section id="rejected">
+    <h2>Alternatives rejected</h2>
+    <ul class="prose">
+      <li>
+        Patching the current wizard: leaves four surfaces deriving state separately, which caused
+        these bugs.
+      </li>
+      <li>One approval screen: removes shape override and the other controls you need.</li>
+      <li>
+        Freezing the screen during a turn: stops the flicker but hides progress, and you would still
+        wait without a reason.
+      </li>
+      <li>
+        Native <code>title</code> on <code>disabled</code> buttons: a disabled button cannot be
+        focused, so keyboard users never get the reason.
+      </li>
+      <li>
+        A new order field for the shape pick: <code>order.recipe</code> already heads the recipe
+        ladder.
+      </li>
+    </ul>
+  </section>
+</main>

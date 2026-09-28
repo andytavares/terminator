@@ -1048,6 +1048,21 @@ unless `terminator.foundry.autoHandOff` is off, and a failed hand-off is
 recorded as `handoff.failed`. Before the first draft, the scout reads the
 repository.
 
+**The Forge reads one readiness (ADR 074).** `src/forge/readiness.ts` is a pure
+function over the order, its compile result, the last intake turn and the loop
+facts read from the ledger (`loopFacts`, `agreedFacts`, `turnEndedAt` in
+`src/forge/intake-outcome.ts`). It returns who holds the order, the status
+strip, the six hand-off rows, each step's state word, the red-team findings
+grouped by who acts, and the reason each lockable control is locked. The Forge
+draws it and decides nothing. Every turn writes a start line: the loop's fix
+turn records `converge.started` with reason `red team round N fix`, and
+automatic hand-off agrees as `rule:forge`. `foundry:order.hold` records
+`review.held` / `review.released`; every automatic continuation checks it, and
+a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
+`foundry:order.recipe` saves the operator's shape to `order.recipe`, which
+`recipeLadder` reads first. Unavailable controls are `ReasonButton`s:
+`aria-disabled` plus `aria-describedby`, never the native `disabled`.
+
 ### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
 
 - **Recipes** (`recipe/parse.ts`, `recipe/resolve.ts`) are YAML: a list of steps
