@@ -339,9 +339,15 @@ describe('removing an accepted check (FR-081)', () => {
     const id = await accept()
     await channels().removeAcceptedRule({ ruleId: id, reason: 'it fired on everything' })
     const view = (await channels().rulesInForce({})) as {
-      declined: { id: string; reason: string }[]
+      declined: { id: string; reason: string; asserts: string | null }[]
     }
-    expect(view.declined).toEqual([{ id, reason: 'it fired on everything' }])
+    expect(view.declined).toEqual([
+      {
+        id,
+        reason: 'it fired on everything',
+        asserts: 'the timeout is hardcoded rather than read from configuration',
+      },
+    ])
   })
 
   it('never proposes a removed check again', async () => {

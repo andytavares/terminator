@@ -1891,7 +1891,9 @@ async function executeRun(
       // Grouped by rung, so the record says what was in force where rather
       // than listing every rule as though they all applied at once.
       rulesInForce: RUNGS.flatMap((rung) =>
-        rulesAtRung(houseRules, rung).map((rule) => `${rule.id} (${rungLevelInWords(rung)})`)
+        rulesAtRung(houseRules, rung).map(
+          (rule) => `${rule.asserts.trim()} (${rungLevelInWords(rung)})`
+        )
       ),
     },
     {

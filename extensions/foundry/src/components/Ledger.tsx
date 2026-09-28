@@ -40,11 +40,18 @@ interface AvailableSkill {
 
 interface RulesView {
   rules: AcceptedRule[]
-  declined: { id: string; reason: string }[]
+  declined: { id: string; reason: string; asserts?: string | null }[]
   skills: AvailableSkill[]
 }
 
 const PAGE = 200
+
+/** Records from before the assertion was kept have only an id, a slug of the operator's words. */
+function declinedInWords(entry: { id: string; asserts?: string | null }): string {
+  if (entry.asserts) return entry.asserts
+  const words = entry.id.replace(/^curator-/, '').replace(/-/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
@@ -288,7 +295,8 @@ export function Ledger(): JSX.Element {
                 <ul className="fdry-citations">
                   {rules?.declined?.map((entry) => (
                     <li key={entry.id}>
-                      <code>{entry.id}</code> — <MarkdownInline text={entry.reason} />
+                      <MarkdownInline text={declinedInWords(entry)} /> — turned down:{' '}
+                      <MarkdownInline text={entry.reason} />
                     </li>
                   ))}
                 </ul>

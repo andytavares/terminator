@@ -755,7 +755,7 @@ describe('what happened while you were away', () => {
   it('clears one line without hiding the rest', async () => {
     mount(reply(), { feed: [ENTRY] })
     await waitFor(() => screen.getByText('Activity'))
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss f-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: edited session.ts' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:feed-dismiss', { id: 'f-1', sessionId: 's-1' })
     )

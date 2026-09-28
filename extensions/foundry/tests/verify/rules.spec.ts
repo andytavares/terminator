@@ -6,6 +6,7 @@ import {
   acceptProposal,
   declineProposal,
   declinedProposals,
+  declinedWithReasons,
   removeRule,
   rulesFor,
 } from '../../src/verify/rules.js'
@@ -138,6 +139,41 @@ describe('declining a proposal', () => {
       entry({ at: `2026-09-0${n}T10:00:00.000Z`, subject: `U-${n}` })
     )
     expect(propose({ entries, rejectedIds: await declinedProposals(root) })).toEqual([])
+  })
+
+  it('keeps what the check would have asserted, so it can be shown in words', async () => {
+    await declineProposal(
+      root,
+      'curator-x',
+      'we do that on purpose',
+      'The timeout is not hard-coded.'
+    )
+    expect(await declinedWithReasons(root)).toEqual([
+      {
+        id: 'curator-x',
+        reason: 'we do that on purpose',
+        asserts: 'The timeout is not hard-coded.',
+      },
+    ])
+  })
+
+  it('still reads a record written before the assertion was kept', async () => {
+    fs.mkdirSync(path.join(root, 'rules'), { recursive: true })
+    fs.writeFileSync(
+      path.join(root, 'rules', 'declined.json'),
+      JSON.stringify({ 'curator-hardcodes-the-timeout': 'it fired on everything' })
+    )
+    expect(await declinedWithReasons(root)).toEqual([
+      { id: 'curator-hardcodes-the-timeout', reason: 'it fired on everything', asserts: null },
+    ])
+    expect(await declinedProposals(root)).toEqual(['curator-hardcodes-the-timeout'])
+  })
+
+  it('keeps the assertion of a removed rule', async () => {
+    await removeRule(root, 'docs-in-pr', 'too strict', 'Docs change in the same PR.')
+    expect(await declinedWithReasons(root)).toEqual([
+      { id: 'docs-in-pr', reason: 'too strict', asserts: 'Docs change in the same PR.' },
+    ])
   })
 
   it('reads an unreadable record as nothing declined', async () => {

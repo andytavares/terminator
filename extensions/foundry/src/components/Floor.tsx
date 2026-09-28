@@ -1177,7 +1177,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               </span>
               <button
                 type="button"
-                aria-label={`Dismiss ${entry.id}`}
+                aria-label={`Dismiss: ${entry.summary}`}
                 onClick={() => void dismiss(entry, false)}
               >
                 <X aria-hidden="true" />

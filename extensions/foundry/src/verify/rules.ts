@@ -125,12 +125,28 @@ export async function acceptProposal(root: string, proposal: Proposal): Promise<
   return file
 }
 
-async function readDeclined(root: string): Promise<Record<string, string>> {
+interface DeclinedRecord {
+  reason: string
+  asserts: string | null
+}
+
+/** Records written before the assertion was kept hold the reason as a bare string. */
+function toDeclinedRecord(value: unknown): DeclinedRecord {
+  if (typeof value === 'string') return { reason: value, asserts: null }
+  const v = (value ?? {}) as { reason?: unknown; asserts?: unknown }
+  return {
+    reason: typeof v.reason === 'string' ? v.reason : '',
+    asserts: typeof v.asserts === 'string' ? v.asserts : null,
+  }
+}
+
+async function readDeclined(root: string): Promise<Record<string, DeclinedRecord>> {
   try {
     const raw: unknown = JSON.parse(await fs.promises.readFile(declinedFile(root), 'utf8'))
-    return typeof raw === 'object' && raw !== null && !Array.isArray(raw)
-      ? (raw as Record<string, string>)
-      : {}
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+    return Object.fromEntries(
+      Object.entries(raw as Record<string, unknown>).map(([id, v]) => [id, toDeclinedRecord(v)])
+    )
   } catch {
     return {}
   }
@@ -146,10 +162,14 @@ async function readDeclined(root: string): Promise<Record<string, string>> {
 export async function declineProposal(
   root: string,
   proposalId: string,
-  reason: string
+  reason: string,
+  asserts: string | null = null
 ): Promise<void> {
   await fs.promises.mkdir(rulesDir(root), { recursive: true })
-  const declined = { ...(await readDeclined(root)), [proposalId]: reason }
+  const declined = {
+    ...(await readDeclined(root)),
+    [proposalId]: { reason, asserts: asserts?.trim() || null },
+  }
   await fs.promises.writeFile(declinedFile(root), JSON.stringify(declined, null, 2), 'utf8')
 }
 
@@ -164,11 +184,13 @@ export async function declinedProposals(root: string): Promise<string[]> {
  * A removal the operator cannot see afterwards is not a record (FR-081); the
  * ids alone say what was turned down but never why.
  */
-export async function declinedWithReasons(root: string): Promise<{ id: string; reason: string }[]> {
+export async function declinedWithReasons(
+  root: string
+): Promise<{ id: string; reason: string; asserts: string | null }[]> {
   const declined = await readDeclined(root)
   return Object.keys(declined)
     .sort()
-    .map((id) => ({ id, reason: declined[id] }))
+    .map((id) => ({ id, ...declined[id] }))
 }
 
 /**
@@ -178,7 +200,12 @@ export async function declinedWithReasons(root: string): Promise<{ id: string; r
  * against, so proposing it again next time the ledger is read would be the
  * factory arguing with them.
  */
-export async function removeRule(root: string, ruleId: string, reason: string): Promise<boolean> {
+export async function removeRule(
+  root: string,
+  ruleId: string,
+  reason: string,
+  asserts: string | null = null
+): Promise<boolean> {
   let removed = false
   for (const extension of ['.yaml', '.yml']) {
     try {
@@ -188,6 +215,6 @@ export async function removeRule(root: string, ruleId: string, reason: string): 
       // Not under that extension. The other one, or not there at all.
     }
   }
-  await declineProposal(root, ruleId, reason)
+  await declineProposal(root, ruleId, reason, asserts)
   return removed
 }
