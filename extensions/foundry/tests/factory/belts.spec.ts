@@ -36,6 +36,7 @@ function station(id: string, x: number, y: number, w = 1): HallProp {
     solid: true,
     nodeId: id,
     seat: { x, y: y + 1 },
+    sign: null,
   }
 }
 
