@@ -667,8 +667,8 @@ Inside the frame the order is **walked in steps**. The box has four parts:
 
 - **The status strip** at the top says who holds the order right now and what
   happens when they finish, for example **The red team is reviewing the plan ·
-  round 2 of 3 — If it finds nothing blocking, this order hands off on its own
-  with the Quick shape.** Blue means Foundry is working and you don't need to do
+  round 2 of 3 — When it finishes clean, you can hand off.** Foundry never
+  starts the work on its own: nothing builds until you press **Hand off**. Blue means Foundry is working and you don't need to do
   anything. Orange means only you can decide something. Red means something
   failed and needs a fix. Green means you can hand off, or the order has been
   handed off.

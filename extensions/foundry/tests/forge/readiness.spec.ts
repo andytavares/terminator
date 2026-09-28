@@ -95,7 +95,6 @@ function baseInput(
     loop: over.loop ?? baseLoop(),
     agreed: over.agreed ?? null,
     turnEndedAt: over.turnEndedAt ?? null,
-    autoHandOff: over.autoHandOff ?? true,
     shape: over.shape ?? { name: 'Quick', yours: false },
     offers: over.offers ?? { shape: true, tracker: true },
     clock,
@@ -116,35 +115,8 @@ function blockingFinding(over: Partial<RedTeamFinding> = {}): RedTeamFinding {
 }
 
 describe('readiness — holder and strip', () => {
-  it('1. handed off automatically, with a last round: ordinal and shape', () => {
+  it('1. an order an earlier build handed off on its own still says so, with nothing to turn off', () => {
     const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
-    const result = readiness(
-      baseInput(
-        {
-          order,
-          agreed: { at: T1, by: 'automatic' },
-          loop: baseLoop({ rounds: [{ round: 1, startedAt: T0, finishedAt: T1 }] }),
-          shape: { name: 'quick', yours: false },
-        },
-        {}
-      )
-    )
-    expect(result.holder).toBe('nobody')
-    expect(result.strip.tone).toBe('ready')
-    expect(result.strip.icon).toBe('play')
-    expect(result.strip.headline).toBe(`Handed off automatically at ${T1}`)
-    expect(result.strip.detail).toBe(
-      "The red team's first round found nothing blocking, and automatic hand-off is on. Running with the Quick shape, 1 unit."
-    )
-    expect(result.strip.actions).toEqual(['open-run', 'auto-off'])
-  })
-
-  it('1. handed off automatically after the architect answered the last round', () => {
-    const order = wo0928Order({
-      status: 'agreed',
-      agreedAt: T1,
-      redTeam: [blockingFinding({ status: 'resolved' })],
-    })
     const result = readiness(
       baseInput({
         order,
@@ -153,19 +125,12 @@ describe('readiness — holder and strip', () => {
         shape: { name: 'quick', yours: false },
       })
     )
-    expect(result.strip.detail).toBe(
-      "The architect answered every blocking finding from the red team's first round, and automatic hand-off is on. Running with the Quick shape, 1 unit."
-    )
-  })
-
-  it('1. handed off automatically, no rounds: drops the round clause', () => {
-    const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
-    const result = readiness(
-      baseInput({ order, agreed: { at: T1, by: 'automatic' }, loop: baseLoop() })
-    )
-    expect(result.strip.detail).toBe(
-      'Automatic hand-off is on. Running with the Quick shape, 1 unit.'
-    )
+    expect(result.holder).toBe('nobody')
+    expect(result.strip.tone).toBe('ready')
+    expect(result.strip.icon).toBe('play')
+    expect(result.strip.headline).toBe(`Handed off automatically at ${T1}`)
+    expect(result.strip.detail).toBe('Running with the Quick shape, 1 unit.')
+    expect(result.strip.actions).toEqual(['open-run'])
   })
 
   it('1. handed off by you, uses agreed.at', () => {
@@ -220,7 +185,7 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.actions).toEqual(['watch'])
   })
 
-  it('3. running: red team, autoHandOff on, with a previous finished round', () => {
+  it('3. running: red team, with a previous finished round, says the hand-off is yours', () => {
     const result = readiness(
       baseInput({
         intake: {
@@ -239,19 +204,18 @@ describe('readiness — holder and strip', () => {
             { round: 2, startedAt: T2, finishedAt: null },
           ],
         }),
-        autoHandOff: true,
         shape: { name: 'quick', yours: true },
       })
     )
     expect(result.holder).toBe('red team')
     expect(result.strip.headline).toBe('The red team is reviewing the plan · round 2 of 3')
     expect(result.strip.detail).toBe(
-      `Started ${T2}. If it finds nothing blocking, this order hands off on its own with the Quick shape, your choice. The last round took 5 min 49 s.`
+      `Started ${T2}. When it finishes clean, you can hand off. The last round took 5 min 49 s.`
     )
     expect(result.strip.actions).toEqual(['hold'])
   })
 
-  it('3. running: red team, autoHandOff off, no previous round, held shows release', () => {
+  it('3. running: red team, no previous round, held shows release', () => {
     const result = readiness(
       baseInput({
         intake: {
@@ -265,7 +229,6 @@ describe('readiness — holder and strip', () => {
           autoTurn: null,
         },
         loop: baseLoop({ rounds: [{ round: 1, startedAt: T0, finishedAt: null }], heldAt: T1 }),
-        autoHandOff: false,
       })
     )
     expect(result.strip.detail).toBe(`Started ${T0}. When it finishes clean, you can hand off.`)
@@ -459,21 +422,14 @@ describe('readiness — holder and strip', () => {
     )
   })
 
-  it('9. compile ok, autoHandOff on', () => {
-    const result = readiness(baseInput({ autoHandOff: true }))
+  it('9. compile ok waits for you to press Hand off', () => {
+    const result = readiness(baseInput())
     expect(result.holder).toBe('you')
     expect(result.strip.tone).toBe('ready')
     expect(result.strip.icon).toBe('check')
     expect(result.strip.headline).toBe('Ready to hand off')
     expect(result.strip.detail).toBe(
       'All six rows pass and nobody is changing the plan. Press Hand off to start the work.'
-    )
-  })
-
-  it('9. compile ok, autoHandOff off', () => {
-    const result = readiness(baseInput({ autoHandOff: false }))
-    expect(result.strip.detail).toBe(
-      'All six rows pass and nobody is changing the plan. Automatic hand-off is off, so this waits for you.'
     )
   })
 })

@@ -118,10 +118,6 @@ const TurnPayload = z.object({
 const CompilePayload = z.object({
   id: z.string(),
   commit: z.boolean().default(false),
-  // Who is agreeing this order, for the ledger line: the operator clicking
-  // "hand off", or the rule that hands a clean order off on its own. Absent
-  // means a person did it, which is what every caller before this was.
-  actor: z.enum(['operator', 'rule:forge']).default('operator'),
 })
 
 const RecipePayload = z.object({ id: z.string(), recipe: z.string().nullable() })
@@ -659,7 +655,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
   async function compile(raw: unknown): Promise<unknown> {
     const parsed = CompilePayload.safeParse(raw)
     if (!parsed.success) return { error: 'Malformed request.' }
-    const { id, commit, actor } = parsed.data
+    const { id, commit } = parsed.data
 
     const order = await deps.store.load(id)
     if (order === null) return { error: `No order ${id}.` }
@@ -681,11 +677,10 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     await deps.store.record({
       at: deps.now(),
       orderId: id,
-      actor,
+      actor: 'operator',
       action: 'order.agreed',
       subject: id,
-      reason:
-        actor === 'rule:forge' ? 'all checks pass, handed off automatically' : 'all checks pass',
+      reason: 'all checks pass',
       evidence: [],
     })
 

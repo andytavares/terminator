@@ -266,12 +266,6 @@ function resolveFoundryDataRoot(api: ExtensionAPI): string {
 
 const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
 const ASK_MODEL_SETTING_KEY = 'terminator.foundry.askModel'
-const AUTO_HAND_OFF_SETTING_KEY = 'terminator.foundry.autoHandOff'
-
-/** Whether a clean review loop hands off on its own. On unless turned off. */
-function autoHandOff(api: ExtensionAPI): boolean {
-  return api.settings.get<boolean>(AUTO_HAND_OFF_SETTING_KEY) ?? true
-}
 
 /**
  * The model every phase launches with.
@@ -2549,7 +2543,7 @@ export function activate(api: ExtensionAPI): void {
           // If the order is otherwise ready, the red team gets a round before
           // the operator ever sees it — the whole point of the loop.
           if (shouldReview(outcome.order)) {
-            // A fix turn hands off unless the red team asked to see the fix.
+            // A fix turn is ready for hand-off unless the red team asked to see the fix.
             if (
               loopRound !== undefined &&
               afterFix({
@@ -2557,7 +2551,7 @@ export function activate(api: ExtensionAPI): void {
                 anotherPass: anotherPassWanted(await store.entries(order.id)),
               }) === 'hand-off'
             ) {
-              await handOff(outcome.order)
+              sayReady(outcome.order)
               return
             }
             await startReview(
@@ -2662,13 +2656,13 @@ export function activate(api: ExtensionAPI): void {
         }
 
         // The operator's hold stops every automatic continuation this round
-        // could lead to — the next round, hand-off, or a fix turn — the same
+        // could lead to — the next round, "ready", or a fix turn — the same
         // as it stops a redraft's own follow-up.
         if (loopFacts(await store.entries(order.id)).heldAt !== null) return
 
         const next = reviewNext({ order: updated, round })
         if (next.kind === 'clean') {
-          await handOff(updated)
+          sayReady(updated)
           return
         }
         if (next.kind === 'operator') {
@@ -2711,56 +2705,14 @@ export function activate(api: ExtensionAPI): void {
   }
 
   /**
-   * A clean review round: hand off on its own, or say it is ready to.
-   *
-   * Opt-out, not opt-in (`terminator.foundry.autoHandOff` defaults on) — the
-   * whole point of arguing the order to a fixed point before the operator
-   * sees it is that they should not then have to click to move it along too.
+   * A clean review round says the order is ready and stops there. Hand-off is
+   * the operator's: nothing agrees an order or starts the Line on its own.
    */
-  const handOff = async (order: WorkOrder): Promise<void> => {
-    if (!autoHandOff(api)) {
-      api.notifications.showToast(
-        'info',
-        `${order.title} is ready to hand off.`,
-        `foundry.review.ready.${order.id}`
-      )
-      return
-    }
-    const agreed = (await forge.compile({
-      id: order.id,
-      commit: true,
-      actor: 'rule:forge',
-    })) as {
-      error?: string
-      order?: { status: string }
-    }
-    const started =
-      agreed.order?.status === 'agreed'
-        ? ((await runs.start({ id: order.id })) as { error?: string; started?: boolean })
-        : null
-    if (started === null || started.error !== undefined || started.started === false) {
-      const reason =
-        agreed.error ?? started?.error ?? 'the order did not pass its checks when handed off'
-      await createOrderStore(dataRoot()).record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: 'rule:forge',
-        action: 'handoff.failed',
-        subject: order.id,
-        reason,
-        evidence: [],
-      })
-      api.notifications.showToast(
-        'warning',
-        `${order.title} was not handed off: ${reason}`,
-        `foundry.review.handoff.${order.id}`
-      )
-      return
-    }
+  const sayReady = (order: WorkOrder): void => {
     api.notifications.showToast(
       'info',
-      `${order.title} handed off.`,
-      `foundry.review.handoff.${order.id}`
+      `${order.title} is ready to hand off.`,
+      `foundry.review.ready.${order.id}`
     )
   }
 
@@ -2788,7 +2740,7 @@ export function activate(api: ExtensionAPI): void {
       if (next.kind === 'review') {
         await startReview(order, next.round, '')
       } else if (next.kind === 'hand-off') {
-        await handOff(order)
+        sayReady(order)
       } else if (next.kind === 'fix' || next.kind === 'follow-up') {
         const started = await convergeWithFollowUps(
           order,
@@ -3456,16 +3408,6 @@ export function activate(api: ExtensionAPI): void {
     if (chosen === undefined) return { error: `model must be one of ${ASK_MODELS.join(', ')}` }
     api.settings.set(ASK_MODEL_SETTING_KEY, chosen)
     return { ok: true, selected: chosen }
-  })
-
-  // Whether a clean review loop hands off on its own (spec: the red-team loop).
-  reg(api, 'foundry:auto-hand-off', () => ({ enabled: autoHandOff(api) }))
-
-  reg(api, 'foundry:auto-hand-off-set', (payload: unknown) => {
-    const { enabled } = payload as { enabled?: unknown }
-    if (typeof enabled !== 'boolean') return { error: 'enabled must be a boolean' }
-    api.settings.set(AUTO_HAND_OFF_SETTING_KEY, enabled)
-    return { ok: true, enabled }
   })
 
   // The firings, and whether they were recorded or surfaced. Precision is

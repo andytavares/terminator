@@ -1635,20 +1635,20 @@ describe('the backend facts every Forge response carries', () => {
   })
 })
 
-describe('foundry:order.compile — the automatic actor', () => {
-  it('records the rule as the actor, with its own reason, when the actor is rule:forge', async () => {
+describe('foundry:order.compile — who agrees', () => {
+  it('records the operator even when a caller names the rule, since only a person hands off', async () => {
     const order = await completeOrder()
     const r = (await channels().compile({
       id: order.id,
       commit: true,
       actor: 'rule:forge',
     })) as OrderView & { agreed: { by: string } | null }
-    expect(r.agreed).toEqual({ at: NOW, by: 'automatic' })
+    expect(r.agreed).toEqual({ at: NOW, by: 'you' })
 
     const entries = await store.entries(order.id)
     const agreedEntry = entries.find((e) => e.action === 'order.agreed')
-    expect(agreedEntry?.actor).toBe('rule:forge')
-    expect(agreedEntry?.reason).toBe('all checks pass, handed off automatically')
+    expect(agreedEntry?.actor).toBe('operator')
+    expect(agreedEntry?.reason).toBe('all checks pass')
   })
 
   it('defaults to the operator, with the plain reason', async () => {

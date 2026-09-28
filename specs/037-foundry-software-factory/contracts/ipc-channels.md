@@ -596,12 +596,7 @@ An architect turn that amends a drafted plan (an ask, an answer, or a follow-up 
 | `foundry:ask-model`     | `{}`                            | `{ selected: 'sonnet' \| 'opus' }` |
 | `foundry:ask-model-set` | `{ model: 'sonnet' \| 'opus' }` | `{ ok, selected }` or `{ error }`  |
 
-Before agreement, the architect and the red team argue to a fixed point on their own (`src/forge/review-loop.ts`; see `docs/research/foundry-red-team-loop.md`). A clean round hands the order off automatically unless this is turned off, in which case the order shows ready and waits for the operator.
-
-| Channel                     | Payload                | Response                         |
-| --------------------------- | ---------------------- | -------------------------------- |
-| `foundry:auto-hand-off`     | `{}`                   | `{ enabled: boolean }`           |
-| `foundry:auto-hand-off-set` | `{ enabled: boolean }` | `{ ok, enabled }` or `{ error }` |
+Before agreement, the architect and the red team argue to a fixed point on their own (`src/forge/review-loop.ts`; see `docs/research/foundry-red-team-loop.md`). A clean round shows the order ready and waits for the operator: only `foundry:run.start`, from the Forge's Hand off button, starts the Line (ADR 078). `foundry:auto-hand-off` and `foundry:auto-hand-off-set` were removed.
 
 ### Quick actions (057)
 

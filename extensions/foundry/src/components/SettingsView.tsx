@@ -48,7 +48,6 @@ export function SettingsView(): JSX.Element {
   const [saving, setSaving] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [askModel, setAskModel] = useState<string>('sonnet')
-  const [autoHandOff, setAutoHandOff] = useState<boolean>(true)
 
   const [sensors, setSensors] = useState<SensorRow[]>([])
   const [repoDrafts, setRepoDrafts] = useState<Record<string, string>>({})
@@ -141,18 +140,6 @@ export function SettingsView(): JSX.Element {
     })()
   }, [])
 
-  useEffect(() => {
-    void (async () => {
-      const answer = (await invoke('foundry:auto-hand-off')) as { enabled?: unknown }
-      if (typeof answer?.enabled === 'boolean') setAutoHandOff(answer.enabled)
-    })()
-  }, [])
-
-  const toggleAutoHandOff = useCallback(async (enabled: boolean) => {
-    setAutoHandOff(enabled)
-    await invoke('foundry:auto-hand-off-set', { enabled })
-  }, [])
-
   const chooseAskModel = useCallback(async (id: string) => {
     setSaving(true)
     setProblem(null)
@@ -234,20 +221,6 @@ export function SettingsView(): JSX.Element {
           </li>
         ))}
       </ul>
-
-      <label className="fdry-sensor-toggle" style={{ marginTop: 10, display: 'block' }}>
-        <input
-          type="checkbox"
-          aria-label="Hand off automatically once the red team is clean"
-          checked={autoHandOff}
-          onChange={(event) => void toggleAutoHandOff(event.target.checked)}
-        />
-        Hand off automatically once the red team is clean
-      </label>
-      <p className="fdry-note">
-        On: a converged order compiles and starts the Line on its own. Off: it waits for you to say
-        &ldquo;Ready&rdquo;.
-      </p>
 
       {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
 

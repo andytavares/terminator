@@ -333,7 +333,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const [unproven, setUnproven] = useState<string | null>(null)
   const [unprovenReason, setUnprovenReason] = useState('')
   const [recipes, setRecipes] = useState<RecipesView | null>(null)
-  const [autoHandOff, setAutoHandOffState] = useState(true)
   const [picked, setPicked] = useState<StepId | null>(null)
   const [focusTarget, setFocusTarget] = useState<string | null>(null)
 
@@ -374,22 +373,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   useEffect(() => {
     void refreshRecipes()
   }, [refreshRecipes])
-
-  useEffect(() => {
-    let live = true
-    void (async () => {
-      const next = (await invoke('foundry:auto-hand-off', {})) as { enabled?: boolean }
-      if (live && typeof next.enabled === 'boolean') setAutoHandOffState(next.enabled)
-    })()
-    return () => {
-      live = false
-    }
-  }, [])
-
-  const setAutoHandOff = useCallback(async (enabled: boolean) => {
-    setAutoHandOffState(enabled)
-    await invoke('foundry:auto-hand-off-set', { enabled })
-  }, [])
 
   const setWriteBack = useCallback(
     async (writeBack: WriteBack[]) => {
@@ -590,7 +573,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     loop: view.loop ?? { rounds: [], heldAt: null, exhausted: false },
     agreed: view.agreed ?? null,
     turnEndedAt: view.turnEndedAt ?? null,
-    autoHandOff,
     shape: { name: shapeName, yours: shapeYours },
     offers,
     clock: clockOf,
@@ -783,7 +765,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       }
     } else if (action === 'start-over') void converge()
     else if (action === 'open-run') onStarted?.(orderId)
-    else if (action === 'auto-off') void setAutoHandOff(false)
     else if (action === 'draft') void converge()
   }
 
@@ -794,7 +775,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     'tell-architect': 'Tell the architect what was wrong',
     'start-over': 'Start the turn over',
     'open-run': 'Open the run',
-    'auto-off': 'Turn off automatic hand-off',
     draft: 'Draft the plan',
   }
 
@@ -862,7 +842,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 <button
                   key={action}
                   type="button"
-                  className={`fdry-btn${action === 'tell-architect' ? ' fdry-btn--primary' : action === 'auto-off' ? ' fdry-btn--quiet' : ''}`}
+                  className={`fdry-btn${action === 'tell-architect' ? ' fdry-btn--primary' : ''}`}
                   onClick={() => runStripAction(action)}
                 >
                   {action === 'hold' ? <Pause aria-hidden="true" /> : null}
@@ -1588,17 +1568,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
 
             {stepView.id === 'handOff' ? (
               <>
-                <span className="fdry-toggle">
-                  <button
-                    type="button"
-                    className={`fdry-sw${autoHandOff ? '' : ' fdry-sw--off'}`}
-                    role="switch"
-                    aria-checked={autoHandOff}
-                    aria-label="Hand off on its own when clean"
-                    onClick={() => void setAutoHandOff(!autoHandOff)}
-                  />
-                  Hand off on its own when clean
-                </span>
                 {heldBack !== null ? (
                   <button
                     type="button"

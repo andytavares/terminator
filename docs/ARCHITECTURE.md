@@ -1041,13 +1041,13 @@ closes only when the proposal lists it in `resolveFindings` with how (ADR 068).
 others (`scope`, `process`, `pre-existing`, `infra`) are notes the builder sees.
 Once a redraft passes every other check, `src/forge/review-loop.ts` runs a
 red-team round in the Forge. The architect gets every blocking finding in one
-turn. The fix hands off unless the red team set `anotherPass` or a blocking
+turn. The fix is ready for hand-off unless the red team set `anotherPass` or a blocking
 finding is still open (ADR 075); then the next round attacks only what changed. The red team reads what
 earlier rounds settled and may reopen a finding only with new evidence. After
-three rounds the order goes to the operator. A clean round hands off on its own
-unless `terminator.foundry.autoHandOff` is off, and a failed hand-off is
-recorded as `handoff.failed`. Before the first draft, the scout reads the
-repository.
+three rounds the order goes to the operator. A clean round says the order is
+ready and stops: hand-off is always the operator's, and nothing agrees an order
+or starts the Line on its own (ADR 078). Before the first draft, the scout reads
+the repository.
 
 **The Forge reads one readiness (ADR 074).** `src/forge/readiness.ts` is a pure
 function over the order, its compile result, the last intake turn and the loop
@@ -1056,8 +1056,8 @@ facts read from the ledger (`loopFacts`, `agreedFacts`, `turnEndedAt` in
 strip, the six hand-off rows, each step's state word, the red-team findings
 grouped by who acts, and the reason each lockable control is locked. The Forge
 draws it and decides nothing. Every turn writes a start line: the loop's fix
-turn records `converge.started` with reason `red team round N fix`, and
-automatic hand-off agrees as `rule:forge`. `foundry:order.hold` records
+turn records `converge.started` with reason `red team round N fix`. An
+`order.agreed` by `rule:forge` exists only in ledgers from before ADR 078. `foundry:order.hold` records
 `review.held` / `review.released`; every automatic continuation checks it, and
 a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
 `foundry:order.recipe` saves the operator's shape to `order.recipe`, which

@@ -33,9 +33,6 @@ function mount(over: Record<string, unknown> = {}) {
     if (channel === 'foundry:ask-model') return { selected: over.askModel ?? 'sonnet' }
     if (channel === 'foundry:ask-model-set')
       return { ok: true, selected: (payload as { model: string }).model }
-    if (channel === 'foundry:auto-hand-off') return { enabled: over.autoHandOff ?? true }
-    if (channel === 'foundry:auto-hand-off-set')
-      return { ok: true, enabled: (payload as { enabled: boolean }).enabled }
     if (channel === 'foundry:sensors.list') return { sensors }
     if (channel === 'foundry:sensors.set') {
       const { id, enabled, repoPath } = payload as {
@@ -172,30 +169,12 @@ describe('the model that answers asks', () => {
   })
 })
 
-// The review loop's own hand-off, next to the model it argues on.
-describe('automatic hand-off', () => {
-  it('is on by default', async () => {
+// Hand-off is the operator's alone: nothing here can make a clean review
+// start the work on its own.
+describe('hand-off', () => {
+  it('offers no switch to hand off automatically', async () => {
     mount()
-    const toggle = (await screen.findByRole('checkbox', {
-      name: /hand off/i,
-    })) as HTMLInputElement
-    expect(toggle.checked).toBe(true)
-  })
-
-  it('reads off, when that is what was saved', async () => {
-    mount({ autoHandOff: false })
-    const toggle = (await screen.findByRole('checkbox', {
-      name: /hand off/i,
-    })) as HTMLInputElement
-    await waitFor(() => expect(toggle.checked).toBe(false))
-  })
-
-  it('turns it off and saves the choice', async () => {
-    mount()
-    const toggle = await screen.findByRole('checkbox', { name: /hand off/i })
-    fireEvent.click(toggle)
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:auto-hand-off-set', { enabled: false })
-    )
+    await screen.findByRole('button', { name: /Opus/ })
+    expect(screen.queryByRole('checkbox', { name: /hand off/i })).toBeNull()
   })
 })

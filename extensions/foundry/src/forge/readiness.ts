@@ -45,7 +45,6 @@ export interface ReadinessInput {
   readonly agreed: AgreedFacts | null
   /** When the last intake line was written, for "The last turn ended at …". */
   readonly turnEndedAt: string | null
-  readonly autoHandOff: boolean
   /** The shape hand-off will run, and whether it is the operator's pick. */
   readonly shape: { readonly name: string | null; readonly yours: boolean }
   /** Which optional steps the Forge offers on this order. */
@@ -68,7 +67,6 @@ export type StripAction =
   | 'tell-architect'
   | 'start-over'
   | 'open-run'
-  | 'auto-off'
   | 'draft'
 
 export interface Strip {
@@ -173,13 +171,6 @@ const SEQUENCE: readonly StepId[] = ['intent', 'plan', 'redTeam', 'shape', 'trac
 
 const PATH_RE = /\S+\.(spec|test)\.[cm]?[jt]sx?/
 
-function ordinalWord(n: number): string {
-  if (n === 1) return 'first'
-  if (n === 2) return 'second'
-  if (n === 3) return 'third'
-  return `round ${n}`
-}
-
 function pluralS(n: number): string {
   return n === 1 ? '' : 's'
 }
@@ -217,9 +208,8 @@ interface HolderStrip {
 }
 
 function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
-  const { order, compile, intake, loop, agreed, autoHandOff, shape, clock } = input
+  const { order, compile, intake, loop, agreed, shape, clock } = input
   const Shape = capitalise(shape.name ?? 'the proposed')
-  const yourChoiceSuffix = shape.yours ? ', your choice' : ''
   const openBlocking = openBlockingFindings(order)
   const machineActing = intake.kind === 'running' && loop.heldAt === null
   const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
@@ -228,24 +218,17 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
   // 1. Not draft.
   if (order.status !== 'draft') {
     const n = order.plan.units.length
+    // Only an order an earlier build handed off on its own reads this way;
+    // nothing hands off automatically any more.
     if (agreed?.by === 'automatic') {
-      const t = clock(agreed.at)
-      const last = loop.rounds.length > 0 ? loop.rounds[loop.rounds.length - 1].round : null
-      const answered = last !== null && order.redTeam.some((f) => f.round === last && isBlocking(f))
-      const clause =
-        last === null
-          ? `Automatic hand-off is on.`
-          : answered
-            ? `The architect answered every blocking finding from the red team's ${ordinalWord(last)} round, and automatic hand-off is on.`
-            : `The red team's ${ordinalWord(last)} round found nothing blocking, and automatic hand-off is on.`
       return {
         holder: 'nobody',
         strip: {
           tone: 'ready',
           icon: 'play',
-          headline: `Handed off automatically at ${t}`,
-          detail: `${clause} Running with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
-          actions: ['open-run', 'auto-off'],
+          headline: `Handed off automatically at ${clock(agreed.at)}`,
+          detail: `Running with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
+          actions: ['open-run'],
         },
       }
     }
@@ -292,9 +275,7 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
       }
     }
     if (intake.actor === 'red team') {
-      const base = autoHandOff
-        ? `Started ${t}. If it finds nothing blocking, this order hands off on its own with the ${Shape} shape${yourChoiceSuffix}.`
-        : `Started ${t}. When it finishes clean, you can hand off.`
+      const base = `Started ${t}. When it finishes clean, you can hand off.`
       const previous = lastFinishedRound(loop)
       const detail =
         previous === null
@@ -435,9 +416,8 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
       tone: 'ready',
       icon: 'check',
       headline: 'Ready to hand off',
-      detail: autoHandOff
-        ? 'All six rows pass and nobody is changing the plan. Press Hand off to start the work.'
-        : 'All six rows pass and nobody is changing the plan. Automatic hand-off is off, so this waits for you.',
+      detail:
+        'All six rows pass and nobody is changing the plan. Press Hand off to start the work.',
       actions: [],
     },
   }
@@ -847,7 +827,7 @@ function buildFindings(input: ReadinessInput): readonly FindingView[] {
 // ── Locks ────────────────────────────────────────────────────────────────
 
 function buildHandOffLock(input: ReadinessInput): string | null {
-  const { order, compile, intake, loop, agreed, autoHandOff, clock } = input
+  const { order, compile, intake, loop, agreed, clock } = input
   const openBlocking = openBlockingFindings(order)
   const machineActing = intake.kind === 'running' && loop.heldAt === null
   const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
@@ -862,9 +842,7 @@ function buildHandOffLock(input: ReadinessInput): string | null {
   if (intake.kind === 'running') {
     const t = clock(intake.at)
     if (intake.actor === 'red team') {
-      let text = `The red team is reviewing the plan (round ${intake.round} of 3, started ${t}). Hand-off opens when it finishes.`
-      if (autoHandOff) text += ' If it finds nothing blocking, the order hands off on its own.'
-      return text
+      return `The red team is reviewing the plan (round ${intake.round} of 3, started ${t}). Hand-off opens when it finishes.`
     }
     if (intake.actor === 'architect' && intake.trigger === 'automatic' && intake.round !== null) {
       return `The architect is fixing ${openBlocking.length} red-team findings (round ${intake.round} of 3, started ${t}). Hand-off opens when it finishes.`

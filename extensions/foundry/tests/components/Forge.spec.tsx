@@ -1946,6 +1946,16 @@ describe('a red-team round running', () => {
   })
 })
 
+describe('the Hand off step', () => {
+  it('offers no switch to hand off on its own: pressing Hand off is the only start', async () => {
+    mountForStart()
+    await waitFor(() => expect(screen.getByText('Ready to hand off')).toBeTruthy())
+    await openStep('Hand off')
+    expect(handOffButton()).toBeTruthy()
+    expect(screen.queryByRole('switch')).toBeNull()
+  })
+})
+
 describe('choosing a shape while a turn is running', () => {
   function mountShapeDuringTurn() {
     const running = {
