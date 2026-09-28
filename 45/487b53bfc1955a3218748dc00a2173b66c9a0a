@@ -1,0 +1,29 @@
+tests/unit/integrations/providers/linear.provider.spec.ts
+  s_e5aeafd888128f::t_a25b5474cb220d 44-47,52-72,124,127-137,144-147
+  s_e5aeafd888128f::t_e8a9fe3730acc5 138-143
+src/main/integrations/providers/linear.provider.ts
+  s_e5aeafd888128f::t_e8a9fe3730acc5 40,60-62,69,72-76,297-300,302,313-316
+docs/EXTENSION-DEVELOPMENT.md
+  s_e5aeafd888128f::t_f5418948b62cc5 651-653
+docs/user-guide/USER-GUIDE.md
+  s_e5aeafd888128f::t_f5418948b62cc5 293-296,662-664
+  s_e5aeafd888128f::t_98b125d4d4b13c 665
+CHANGELOG.md
+  s_e5aeafd888128f::t_f5418948b62cc5 68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "45487b53bfc1955a3218748dc00a2173b66c9a0a",
+  "prompts": {},
+  "sessions": {
+    "s_e5aeafd888128f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5dab759-7b68-4b27-ac75-2e4100866956",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
