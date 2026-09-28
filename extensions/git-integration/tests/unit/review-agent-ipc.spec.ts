@@ -190,6 +190,33 @@ describe('review-agent IPC', () => {
     expect(runReview.mock.calls[2][0].model).toBe('sonnet')
   })
 
+  it('passes no effort for the Default choice or an unset one, else the chosen level', async () => {
+    const runReview = vi.fn(() => ({
+      runId: 'x',
+      done: Promise.resolve(makeDoneRun()),
+      cancel: vi.fn(),
+    }))
+    const ensureWorktree = vi.fn(async () => '/wt')
+    const { handlers, settings } = captureHandlers({ ensureWorktree, runReview })
+    const start = (prNumber: number) =>
+      handlers['review-agent:start']({
+        repoRoot: '/repo',
+        prNumber,
+        headSHA: `sha${prNumber}`,
+        baseRefName: 'main',
+        scope,
+        request: 'review',
+      })
+
+    for (const [i, value] of (['default', '', 'high'] as const).entries()) {
+      settings['terminator.git-integration.review.agentEffort'] = value
+      await start(i + 1)
+      await new Promise((r) => setTimeout(r, 5))
+    }
+
+    expect(runReview.mock.calls.map((c) => c[0].effort)).toEqual([undefined, undefined, 'high'])
+  })
+
   it('review-agent:settings returns the configured default model', async () => {
     const { handlers, settings } = captureHandlers({})
     expect(await handlers['review-agent:settings']({})).toEqual({ model: 'sonnet' })
