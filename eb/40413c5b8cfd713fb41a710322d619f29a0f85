@@ -1,0 +1,48 @@
+extensions/foundry/src/components/Forge.tsx
+  s_49daec26653783::t_9b1e880ccba6da 845
+extensions/foundry/src/index.ts
+  s_49daec26653783::t_de6c249662a194 2708-2709,2714-2715
+  s_49daec26653783::t_386e7672120e12 2554,2665,2711,2743
+  s_49daec26653783::t_be1392c4345bb4 2546,2659
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_49daec26653783::t_0ca0e1f162cd21 118,128-133,188,213,218,425-426
+extensions/foundry/src/forge/readiness.ts
+  s_49daec26653783::t_8c5d4d2c65be0d 419-420
+  s_49daec26653783::t_7116e31280231f 211,221-222,229-231,278,830,845
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_49daec26653783::t_270fbdec2babd0 1638-1639,1646,1650-1651
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_49daec26653783::t_bcbf6cbcc6be27 1949-1951,1953,1955-1958
+  s_49daec26653783::t_123083ae269a9c 1954
+  s_49daec26653783::t_dff2c35ea8ab3d 1952
+extensions/foundry/src/ipc/forge-channels.ts
+  s_49daec26653783::t_345e23ce1d686f 658,680,683
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_49daec26653783::t_52be9dcf799cec 599
+docs/adr/078-hand-off-is-always-the-operators.md
+  s_49daec26653783::t_9fac3bfee8f0e0 1-41
+docs/ARCHITECTURE.md
+  s_49daec26653783::t_52be9dcf799cec 1044,1047-1050,1059-1060
+extensions/foundry/tests/components/SettingsView.spec.tsx
+  s_49daec26653783::t_270fbdec2babd0 172-175,177-178
+docs/user-guide/USER-GUIDE.md
+  s_49daec26653783::t_38afc3ff00ad73 670-671
+extensions/foundry/tests/hand-off.spec.ts
+  s_49daec26653783::t_bfa78c60860f73 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eb40413c5b8cfd713fb41a710322d619f29a0f85",
+  "prompts": {},
+  "sessions": {
+    "s_49daec26653783": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d0ca5eb-a794-4e44-9cb5-25283d8706ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
