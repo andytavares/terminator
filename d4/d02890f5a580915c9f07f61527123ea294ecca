@@ -1,0 +1,31 @@
+docs/adr/079-a-station-shows-its-own-work.md
+  s_758accd35244c9::t_b13f2c1ae6790a 1-57
+README.md
+  s_758accd35244c9::t_710e61dfcef121 22
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_758accd35244c9::t_8fe9706378177a 13,31-32,336,366,523-537
+extensions/foundry/src/components/factory/HallScene.tsx
+  s_758accd35244c9::t_db24d21f852f56 4,7,50-85,161,211-234
+extensions/foundry/src/components/foundry.css
+  s_758accd35244c9::t_21a99b07cd940a 3390
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_758accd35244c9::t_357bc8263ef7b5 244,247-248,250
+extensions/foundry/tests/components/factory/HallScene.spec.tsx
+  s_758accd35244c9::t_d9923e4b821ca8 4,6,43,121-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d4d02890f5a580915c9f07f61527123ea294ecca",
+  "prompts": {},
+  "sessions": {
+    "s_758accd35244c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "677bbf2b-2f6f-42d0-88f3-37be127e815d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
