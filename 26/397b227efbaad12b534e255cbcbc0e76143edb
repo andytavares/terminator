@@ -1,0 +1,49 @@
+extensions/foundry/src/forge/review-loop.ts
+  s_802dfa88127b4f::t_0f85e23707e852 9,14-15,17,94-106
+  s_802dfa88127b4f::t_c9445152bb393f 107-108
+extensions/foundry/tests/forge/intake-outcome.spec.ts
+  s_802dfa88127b4f::t_caa93a3f302999 9,387-419
+  s_802dfa88127b4f::t_42af6631c8667d 420
+docs/user-guide/USER-GUIDE.md
+  s_802dfa88127b4f::t_4bb76056605461 723-727
+docs/ARCHITECTURE.md
+  s_802dfa88127b4f::t_4bb76056605461 1044-1045
+docs/adr/069-the-red-team-argues-before-agreement.md
+  s_802dfa88127b4f::t_4bb76056605461 3
+docs/adr/075-one-red-team-pass-unless-asked.md
+  s_802dfa88127b4f::t_4bb76056605461 1-47
+extensions/foundry/src/forge/intake-outcome.ts
+  s_802dfa88127b4f::t_0f85e23707e852 47,252-257
+  s_802dfa88127b4f::t_de9a951d9ad0c2 258-260
+extensions/foundry/src/index.ts
+  s_802dfa88127b4f::t_5b654b67da2c70 52-57,86,2182-2183,2272,2531-2541,2610,2631-2641
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_802dfa88127b4f::t_37885e58f28444 142-160
+extensions/foundry/src/forge/readiness.ts
+  s_802dfa88127b4f::t_e92a937540d6a0 234
+  s_802dfa88127b4f::t_3c9c668c2085eb 236-240
+extensions/foundry/tests/forge/review-loop.spec.ts
+  s_802dfa88127b4f::t_caa93a3f302999 10,159-170,172
+  s_802dfa88127b4f::t_e92a937540d6a0 171
+  s_802dfa88127b4f::t_0a8ecaca89a24b 173-174
+extensions/foundry/src/line/rung-output.ts
+  s_802dfa88127b4f::t_0f85e23707e852 93,158,201-204,271,306-307,371,477,506,516
+extensions/foundry/tests/line/rung-output.spec.ts
+  s_802dfa88127b4f::t_caa93a3f302999 523-556
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "26397b227efbaad12b534e255cbcbc0e76143edb",
+  "prompts": {},
+  "sessions": {
+    "s_802dfa88127b4f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5145f198-b891-4bb6-b8e6-02de60b65ef8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
