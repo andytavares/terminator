@@ -13,6 +13,24 @@ import type { World, Crew, Crate, OpenCall } from './sim.js'
 const TOOL_OPEN_MS = 1500
 const TOOL_BURST_COUNT = 3
 
+/**
+ * How long an open call is remembered without ever seeing its close before
+ * the director gives up on it and walks the crew member home anyway.
+ *
+ * A close can go missing two ways: the activity feed only carries a node's
+ * last 20 raw events (`ipc/run-channels.ts`'s `activity()`), so a burst of
+ * later calls can evict a still-open one's eventual close before a poll ever
+ * observes it; or the run itself ends mid-call. Either way, with no bound a
+ * worker stands at the shelf or the rack forever.
+ *
+ * Set to half `DEFAULT_THRESHOLDS.silenceMs` (8 minutes, `evaluate-stall.ts`)
+ * — the shortest "this run looks stuck" signal already in this codebase — so
+ * the hall recovers well before the stall watcher would even consider the
+ * run silent, while staying far longer than any single Read or shell call
+ * realistically runs.
+ */
+const OPEN_CALL_STALE_MS = 4 * 60_000
+
 function withCrew(world: World, nodeId: string, update: (crew: Crew) => Crew): World {
   let changed = false
   const crew = world.crew.map((c) => {
@@ -78,15 +96,34 @@ function openCallKey(nodeId: string, prop: string): string {
 
 /** Send every crew member whose remembered open calls now justify a walk. */
 function applyOpenCallWalks(world: World, nowMs: number): World {
+  // A call this stale has almost certainly lost its close somewhere — the
+  // 20-event activity feed evicted it, or the run ended mid-call. Drop it
+  // and send its crew member home rather than leaving them stranded forever.
+  const stale = world.openCalls.filter((c) => nowMs - c.at >= OPEN_CALL_STALE_MS)
+  let next =
+    stale.length === 0
+      ? world
+      : {
+          ...world,
+          openCalls: world.openCalls.filter((c) => nowMs - c.at < OPEN_CALL_STALE_MS),
+        }
+  for (const call of stale) {
+    const stillOpen = next.openCalls.some((c) => c.nodeId === call.nodeId)
+    if (stillOpen) continue
+    next = withCrew(next, call.nodeId, (crew) => {
+      const seat = seatOf(world.map, call.nodeId)
+      return seat === null ? crew : sendTo(crew, seat, 'idle')
+    })
+  }
+
   const groups = new Map<string, OpenCall[]>()
-  for (const call of world.openCalls) {
+  for (const call of next.openCalls) {
     const key = openCallKey(call.nodeId, call.prop)
     const group = groups.get(key)
     if (group === undefined) groups.set(key, [call])
     else group.push(call)
   }
 
-  let next = world
   for (const calls of groups.values()) {
     if (!toolBurstWalks(calls, nowMs)) continue
     const { nodeId, prop } = calls[0]
@@ -106,8 +143,22 @@ function consumeQueued(world: World, nodeId: string): World {
   }
 }
 
+/**
+ * A node changing state closes out whatever tool calls the director was
+ * still tracking for it — its step is done, or restarting fresh, either way
+ * nothing open belongs to the step that is now current. Without this, a step
+ * that finishes mid-call (its close never arrives, or arrives after this
+ * event) would leave a phantom `openCalls` entry that keeps re-walking a
+ * crew member already seated or resting for the *next* transition.
+ */
+function clearOpenCalls(world: World, nodeId: string): World {
+  if (!world.openCalls.some((c) => c.nodeId === nodeId)) return world
+  return { ...world, openCalls: world.openCalls.filter((c) => c.nodeId !== nodeId) }
+}
+
 function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node-state' }>): World {
-  const fed = hasStarted(event.to) ? consumeQueued(world, event.nodeId) : world
+  const cleared = clearOpenCalls(world, event.nodeId)
+  const fed = hasStarted(event.to) ? consumeQueued(cleared, event.nodeId) : cleared
   switch (event.to) {
     case 'ready':
     case 'running':
@@ -148,13 +199,23 @@ function applyStranded(world: World, event: Extract<FactoryEvent, { kind: 'stran
   })
 }
 
-/** Record or clear a call in `openCalls`. Walking itself happens in `applyOpenCallWalks`. */
+/**
+ * Record or clear a call in `openCalls`. Walking itself happens in
+ * `applyOpenCallWalks`.
+ *
+ * A close is matched by `nodeId` + `callId` alone, never by `prop`: the crew
+ * member was sent to whichever prop the call *opened* as, and nothing
+ * requires the close to agree — a mis-derived or defaulted prop on the close
+ * must not orphan the open call forever. `desk` opens are the one thing never
+ * worth recording (nobody walks for them), but a `desk` close is still
+ * processed like any other, so it can retire whatever prop the matching open
+ * actually recorded.
+ */
 function applyTool(world: World, event: Extract<FactoryEvent, { kind: 'tool' }>): World {
-  if (event.prop === 'desk') return world
-
   if (event.open) {
+    if (event.prop === 'desk') return world
     const already = world.openCalls.some(
-      (c) => c.nodeId === event.nodeId && c.prop === event.prop && c.callId === event.callId
+      (c) => c.nodeId === event.nodeId && c.callId === event.callId
     )
     if (already) return world
     const call: OpenCall = {
@@ -167,9 +228,9 @@ function applyTool(world: World, event: Extract<FactoryEvent, { kind: 'tool' }>)
   }
 
   const openCalls = world.openCalls.filter(
-    (c) => !(c.nodeId === event.nodeId && c.prop === event.prop && c.callId === event.callId)
+    (c) => !(c.nodeId === event.nodeId && c.callId === event.callId)
   )
-  const stillOpen = openCalls.some((c) => c.nodeId === event.nodeId && c.prop === event.prop)
+  const stillOpen = openCalls.some((c) => c.nodeId === event.nodeId)
   let next: World = { ...world, openCalls }
   if (!stillOpen) {
     next = withCrew(next, event.nodeId, (crew) => {
