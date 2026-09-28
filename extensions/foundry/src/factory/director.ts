@@ -1,7 +1,7 @@
 import { hasStarted } from './events.js'
 import type { FactoryEvent } from './events.js'
-import { seatOf, nearestRestSeat, tileOf } from './sim.js'
-import type { World, Crew, Crate, OpenCall } from './sim.js'
+import { seatOf, nearestRestSeat, tileOf, workAnimFor } from './sim.js'
+import type { World, Crew, Crate, OpenCall, Verdict } from './sim.js'
 
 // Turns events into motion.
 //
@@ -30,6 +30,18 @@ const TOOL_BURST_COUNT = 3
  * realistically runs.
  */
 const OPEN_CALL_STALE_MS = 4 * 60_000
+
+/**
+ * Send a crew member back to their seat, working. A tool call or a stranded
+ * agent only exists while the step runs, so the seat is a working one — but
+ * a close can land in a later poll than the node's own passed/failed state,
+ * and must not walk a resting or slumped crew member back to work.
+ */
+function returnToWork(world: World, nodeId: string, crew: Crew): Crew {
+  if (crew.restSeat !== null || crew.then === 'couch' || crew.then === 'slump') return crew
+  const seat = seatOf(world.map, nodeId)
+  return seat === null ? crew : sendTo(crew, seat, workAnimFor(world.map, nodeId))
+}
 
 function withCrew(world: World, nodeId: string, update: (crew: Crew) => Crew): World {
   let changed = false
@@ -110,10 +122,7 @@ function applyOpenCallWalks(world: World, nowMs: number): World {
   for (const call of stale) {
     const stillOpen = next.openCalls.some((c) => c.nodeId === call.nodeId)
     if (stillOpen) continue
-    next = withCrew(next, call.nodeId, (crew) => {
-      const seat = seatOf(world.map, call.nodeId)
-      return seat === null ? crew : sendTo(crew, seat, 'idle')
-    })
+    next = withCrew(next, call.nodeId, (crew) => returnToWork(world, call.nodeId, crew))
   }
 
   const groups = new Map<string, OpenCall[]>()
@@ -127,6 +136,7 @@ function applyOpenCallWalks(world: World, nowMs: number): World {
   for (const calls of groups.values()) {
     if (!toolBurstWalks(calls, nowMs)) continue
     const { nodeId, prop } = calls[0]
+    if (prop === 'desk') continue
     const anchor = prop === 'archive' ? world.map.anchors.archive : world.map.anchors.rack
     next = withCrew(next, nodeId, (crew) => sendTo(crew, anchor, 'reach'))
   }
@@ -156,18 +166,26 @@ function clearOpenCalls(world: World, nodeId: string): World {
   return { ...world, openCalls: world.openCalls.filter((c) => c.nodeId !== nodeId) }
 }
 
+/** A step finishing flashes its verdict on its station, replacing any earlier flash for that node. */
+function withVerdict(world: World, event: Extract<FactoryEvent, { kind: 'node-state' }>): World {
+  if ((event.to !== 'passed' && event.to !== 'failed') || event.from === event.to) return world
+  const verdict: Verdict = { nodeId: event.nodeId, pass: event.to === 'passed', at: world.clockMs }
+  return {
+    ...world,
+    verdicts: [...world.verdicts.filter((v) => v.nodeId !== event.nodeId), verdict],
+  }
+}
+
 function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node-state' }>): World {
-  const cleared = clearOpenCalls(world, event.nodeId)
+  const cleared = withVerdict(clearOpenCalls(world, event.nodeId), event)
   const fed = hasStarted(event.to) ? consumeQueued(cleared, event.nodeId) : cleared
   switch (event.to) {
     case 'ready':
     case 'running':
     case 'verifying':
       return withCrew(fed, event.nodeId, (crew) => {
-        const kind = world.map.props.find((p) => p.nodeId === event.nodeId)?.kind ?? 'desk'
-        const anim = kind === 'rig' || kind === 'bench' ? 'scan' : 'type'
         const seat = seatOf(world.map, event.nodeId)
-        return seat === null ? crew : sendTo(crew, seat, anim)
+        return seat === null ? crew : sendTo(crew, seat, workAnimFor(world.map, event.nodeId))
       })
     case 'failed':
       return withCrew(fed, event.nodeId, (crew) => {
@@ -194,8 +212,7 @@ function applyOrphaned(world: World, event: Extract<FactoryEvent, { kind: 'orpha
 function applyStranded(world: World, event: Extract<FactoryEvent, { kind: 'stranded' }>): World {
   return withCrew(world, event.nodeId, (crew) => {
     if (event.on) return sendTo(crew, world.map.anchors.wait, 'wave')
-    const seat = seatOf(world.map, event.nodeId)
-    return seat === null ? crew : sendTo(crew, seat, 'idle')
+    return returnToWork(world, event.nodeId, crew)
   })
 }
 
@@ -206,14 +223,12 @@ function applyStranded(world: World, event: Extract<FactoryEvent, { kind: 'stran
  * A close is matched by `nodeId` + `callId` alone, never by `prop`: the crew
  * member was sent to whichever prop the call *opened* as, and nothing
  * requires the close to agree — a mis-derived or defaulted prop on the close
- * must not orphan the open call forever. `desk` opens are the one thing never
- * worth recording (nobody walks for them), but a `desk` close is still
- * processed like any other, so it can retire whatever prop the matching open
- * actually recorded.
+ * must not orphan the open call forever. `desk` opens are recorded too — the
+ * art reads `openCalls` to know what a desk is doing — but nobody ever walks
+ * for them (`applyOpenCallWalks` skips the group).
  */
 function applyTool(world: World, event: Extract<FactoryEvent, { kind: 'tool' }>): World {
   if (event.open) {
-    if (event.prop === 'desk') return world
     const already = world.openCalls.some(
       (c) => c.nodeId === event.nodeId && c.callId === event.callId
     )
@@ -233,10 +248,7 @@ function applyTool(world: World, event: Extract<FactoryEvent, { kind: 'tool' }>)
   const stillOpen = openCalls.some((c) => c.nodeId === event.nodeId)
   let next: World = { ...world, openCalls }
   if (!stillOpen) {
-    next = withCrew(next, event.nodeId, (crew) => {
-      const seat = seatOf(world.map, event.nodeId)
-      return seat === null ? crew : sendTo(crew, seat, 'idle')
-    })
+    next = withCrew(next, event.nodeId, (crew) => returnToWork(world, event.nodeId, crew))
   }
   return next
 }
