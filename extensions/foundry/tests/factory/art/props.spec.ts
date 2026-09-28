@@ -107,6 +107,7 @@ function prop(kind: PropKind, overrides: Partial<HallProp> = {}): HallProp {
     solid: true,
     nodeId: DECOR_KINDS.has(kind) ? null : 'n1',
     seat: { x: 4, y: 5 },
+    sign: null,
     ...PROP_DEFAULTS[kind],
     ...overrides,
   }
@@ -431,6 +432,43 @@ describe('factory/art/props bakeHall', () => {
     )
     expect(rugOutside).toBe(false)
   })
+
+  describe('station name stencils', () => {
+    const STENCIL = 'rgba(224,161,58,.55)'
+    const stencilRects = (calls: readonly PaintCall[]): PaintCall[] =>
+      calls.filter((c) => c.op === 'fillRect' && c.style === STENCIL)
+
+    it('paints a desk name centred in the row above it, from the one glyph table', () => {
+      const paint = createRecordingPaint()
+      bakeHall(baseMap({ props: [prop('desk', { x: 4, y: 6, w: 3, sign: 'A' })] }), paint)
+      // 'A' is 010 / 101 / 111 / 101 / 101: three wide, centred in 48px.
+      const sx = 4 * TILE_PX + Math.floor((3 * TILE_PX - 3) / 2)
+      const sy = 6 * TILE_PX - 15
+      expect(hasRect(paint.calls, sx + 1, sy, 1, 1, STENCIL)).toBe(true)
+      expect(hasRect(paint.calls, sx, sy, 1, 1, STENCIL)).toBe(false)
+      expect(hasRect(paint.calls, sx, sy + 1, 1, 1, STENCIL)).toBe(true)
+      expect(stencilRects(paint.calls)).toHaveLength(10)
+    })
+
+    it.each(['press', 'gate'] as const)('paints a %s name below its footprint', (kind) => {
+      const paint = createRecordingPaint()
+      const p = prop(kind, { x: 4, y: 6, sign: '-' })
+      bakeHall(baseMap({ props: [p] }), paint)
+      const sx = p.x * TILE_PX + Math.floor((p.w * TILE_PX - 3) / 2)
+      const sy = (p.y + p.h) * TILE_PX + 9
+      expect(hasRect(paint.calls, sx, sy + 2, 1, 1, STENCIL)).toBe(true)
+      expect(stencilRects(paint.calls)).toHaveLength(3)
+    })
+
+    it('paints nothing for props without a sign', () => {
+      const paint = createRecordingPaint()
+      bakeHall(
+        baseMap({ props: [prop('desk', { sign: null }), prop('shelves', { sign: null })] }),
+        paint
+      )
+      expect(stencilRects(paint.calls)).toHaveLength(0)
+    })
+  })
 })
 
 describe('factory/art/props drawBelts', () => {
@@ -590,5 +628,285 @@ describe('factory/art/props drawQueuePlate', () => {
     const paint = createRecordingPaint()
     expect(() => drawQueuePlate(paint, exit, context({ queue: { position: 12 } }), 0)).not.toThrow()
     expect(paint.calls.length).toBeGreaterThan(0)
+  })
+})
+
+describe('factory/art/props station work', () => {
+  const STAGES = [0, 300, 714, 1500, 5000]
+  const draw = (kind: PropKind, ctx: SceneContext, tMs: number, over: Partial<HallProp> = {}) => {
+    const paint = createRecordingPaint()
+    drawProp(paint, prop(kind, over), ctx, tMs)
+    return paint.calls
+  }
+
+  describe('desk screens', () => {
+    const SHELL = '#040907'
+    const PAGE = '#161e2a'
+    const EDIT = '#1f5566'
+    const tools = (t: 'rack' | 'archive' | 'desk') => context({ tools: { n1: t } })
+
+    it.each([
+      ['rack', SHELL],
+      ['archive', PAGE],
+      ['desk', EDIT],
+    ] as const)('shows the %s tool only while that tool is open', (tool, color) => {
+      for (const t of STAGES) {
+        expect(containsColor(draw('desk', tools(tool), t), color)).toBe(true)
+        expect(containsColor(draw('desk', context(), t), color)).toBe(false)
+      }
+    })
+
+    it('shows one tool screen at a time', () => {
+      const calls = draw('desk', tools('rack'), 0)
+      expect(containsColor(calls, PAGE)).toBe(false)
+      expect(containsColor(calls, EDIT)).toBe(false)
+    })
+
+    it('reads the tool of its own node only', () => {
+      expect(containsColor(draw('desk', context({ tools: { other: 'rack' } }), 0), SHELL)).toBe(
+        false
+      )
+    })
+
+    it('lights the screens for an open tool call with nobody typing', () => {
+      expect(containsColor(draw('desk', tools('desk'), 0), HALL.screenOn)).toBe(true)
+      expect(containsColor(draw('desk', context(), 0), HALL.screenOn)).toBe(false)
+    })
+
+    it('keeps the plain code lines for a typist with no tool call open', () => {
+      const typing = context({ crew: [crew({ anim: 'type' })] })
+      const calls = draw('desk', typing, 300)
+      expect(containsColor(calls, HALL.screenOn)).toBe(true)
+      for (const c of [SHELL, PAGE, EDIT]) expect(containsColor(calls, c)).toBe(false)
+    })
+
+    it('presses a key under the typist only while somebody types', () => {
+      const KEY = '#d8e6f5'
+      for (const t of STAGES) {
+        expect(
+          containsColor(draw('desk', context({ crew: [crew({ anim: 'type' })] }), t), KEY)
+        ).toBe(true)
+        expect(containsColor(draw('desk', tools('desk'), t), KEY)).toBe(false)
+        expect(containsColor(draw('desk', context(), t), KEY)).toBe(false)
+      }
+    })
+  })
+
+  describe('rig', () => {
+    const FAN = '#11141a'
+    const PULSE = '#fff4c2'
+    const scanning = context({ crew: [crew({ anim: 'scan' })] })
+
+    it('runs its ticker, cable pulses and fan only while a crew member scans', () => {
+      for (const t of STAGES) {
+        for (const color of [FAN, PULSE]) {
+          expect(containsColor(draw('rig', scanning, t), color)).toBe(true)
+          expect(containsColor(draw('rig', context(), t), color)).toBe(false)
+          expect(containsColor(draw('rig', context({ states: { n1: 'running' } }), t), color)).toBe(
+            false
+          )
+        }
+      }
+      // Six ticks in: the sixth reading is amber.
+      expect(
+        hasRect(draw('rig', scanning, 840), 4 * TILE_PX + 14, 4 * TILE_PX + 4, 1, 1, HALL.amber)
+      ).toBe(true)
+      expect(
+        hasRect(draw('rig', context(), 840), 4 * TILE_PX + 14, 4 * TILE_PX + 4, 1, 1, HALL.amber)
+      ).toBe(false)
+    })
+
+    it('flashes a tick or a cross only inside the verdict window', () => {
+      const PASS_BG = '#0d2412'
+      const FAIL_BG = '#2a0f0b'
+      const verdicts = (pass: boolean) => context({ verdicts: [{ nodeId: 'n1', pass, at: 1000 }] })
+      for (const [t, shown] of [
+        [999, false],
+        [1000, true],
+        [2599, true],
+        [2600, false],
+        [9000, false],
+      ] as const) {
+        expect(containsColor(draw('rig', verdicts(true), t), PASS_BG)).toBe(shown)
+        expect(containsColor(draw('rig', verdicts(false), t), FAIL_BG)).toBe(shown)
+      }
+      expect(containsColor(draw('rig', verdicts(true), 1500), FAIL_BG)).toBe(false)
+      expect(containsColor(draw('rig', verdicts(false), 1500), PASS_BG)).toBe(false)
+    })
+
+    it('ignores a verdict on another step', () => {
+      const other = context({ verdicts: [{ nodeId: 'zz', pass: true, at: 1000 }] })
+      expect(containsColor(draw('rig', other, 1500), '#0d2412')).toBe(false)
+    })
+
+    it('shows the newest of two verdicts on one step', () => {
+      const both = context({
+        verdicts: [
+          { nodeId: 'n1', pass: false, at: 1000 },
+          { nodeId: 'n1', pass: true, at: 1200 },
+        ],
+      })
+      const calls = draw('rig', both, 1300)
+      expect(containsColor(calls, '#0d2412')).toBe(true)
+      expect(containsColor(calls, '#2a0f0b')).toBe(false)
+    })
+  })
+
+  describe('bench', () => {
+    const SHEET = '#d9dde2'
+    const STRIP = '#e9ecef'
+    const scanning = context({ crew: [crew({ anim: 'scan' })] })
+
+    it('lays out the sheet, scan line and report strip only while scanning', () => {
+      for (const t of STAGES) {
+        for (const color of [SHEET, STRIP, 'rgba(114,216,242,.9)']) {
+          expect(containsColor(draw('bench', scanning, t), color)).toBe(true)
+          expect(containsColor(draw('bench', context(), t), color)).toBe(false)
+        }
+      }
+    })
+
+    it('stamps the sheet inside the verdict window, without a report strip', () => {
+      const verdicts = (pass: boolean) => context({ verdicts: [{ nodeId: 'n1', pass, at: 500 }] })
+      for (const [t, shown] of [
+        [499, false],
+        [500, true],
+        [2099, true],
+        [2100, false],
+      ] as const) {
+        expect(containsColor(draw('bench', verdicts(true), t), '#3a8a4a')).toBe(shown)
+        expect(containsColor(draw('bench', verdicts(false), t), '#b04a3c')).toBe(shown)
+      }
+      const stamped = draw('bench', verdicts(true), 600)
+      expect(containsColor(stamped, SHEET)).toBe(true)
+      expect(containsColor(stamped, STRIP)).toBe(false)
+      expect(containsColor(stamped, 'rgba(114,216,242,.9)')).toBe(false)
+    })
+  })
+
+  describe('press', () => {
+    const BEACON = '#20242c'
+    const SPARK = '#ffd27a'
+    const HEAD = '#6b7482'
+    const headY = (calls: readonly PaintCall[]): number[] =>
+      calls
+        .filter((c) => c.op === 'fillRect' && c.style === HEAD)
+        .map((c) => (c as { y: number }).y)
+
+    it.each(['running', 'verifying'] as const)(
+      'works while its step is %s, with no crew at all',
+      (state) => {
+        const ctx = context({ states: { n1: state } })
+        for (const t of STAGES) expect(containsColor(draw('press', ctx, t), BEACON)).toBe(true)
+        expect(containsColor(draw('press', ctx, 714), SPARK)).toBe(true)
+        expect(containsColor(draw('press', ctx, 0), SPARK)).toBe(false)
+        expect(headY(draw('press', ctx, 0))).not.toEqual(headY(draw('press', ctx, 714)))
+      }
+    )
+
+    it.each(['waiting', 'ready', 'passed', 'failed', 'blocked'] as const)(
+      'stands still while its step is %s, even with a crew member typing',
+      (state) => {
+        const ctx = context({ states: { n1: state }, crew: [crew({ anim: 'type' })] })
+        for (const t of STAGES) {
+          const calls = draw('press', ctx, t)
+          expect(containsColor(calls, BEACON)).toBe(false)
+          expect(containsColor(calls, SPARK)).toBe(false)
+          expect(headY(calls)).toEqual(headY(draw('press', ctx, 0)))
+        }
+      }
+    )
+
+    it('crawls the guard-rail stripes only while working', () => {
+      const work = context({ states: { n1: 'running' } })
+      const stripe = (ctx: SceneContext, t: number) =>
+        hasRect(draw('press', ctx, t), 4 * TILE_PX + 2, 3 * TILE_PX + 4 + 6, 4, 3, HALL.amber)
+      // Stripe row 1 is amber once the crawl has moved it by six.
+      expect(stripe(work, 0)).toBe(false)
+      expect(stripe(work, 720)).toBe(true)
+      expect(stripe(context(), 720)).toBe(false)
+    })
+  })
+
+  describe('gate arm', () => {
+    const at = 1000
+    const swing = (pass: boolean) => context({ verdicts: [{ nodeId: 'n1', pass, at }] })
+    const x = 4 * TILE_PX
+    const y = 4 * TILE_PX
+    const lowered = (calls: readonly PaintCall[]) =>
+      hasRect(calls, x + 1, y - 4, TILE_PX - 2, 3, '#e9ecef')
+    const raised = (calls: readonly PaintCall[]) => hasRect(calls, x, y - 20, 2, 16, '#e9ecef')
+    const segments = (calls: readonly PaintCall[]) =>
+      calls.filter((c) => c.op === 'fillRect' && c.w === 2 && c.h === 2 && c.style === '#e9ecef')
+
+    it('swings mid-way for 400ms after a pass — neither lowered nor raised', () => {
+      for (const t of [1000, 1150, 1399]) {
+        const calls = draw('gate', swing(true), t)
+        expect(lowered(calls)).toBe(false)
+        expect(raised(calls)).toBe(false)
+        expect(segments(calls).length).toBeGreaterThan(0)
+      }
+    })
+
+    it('steps the arm up through different angles', () => {
+      const a = segments(draw('gate', swing(true), 1000))
+      const b = segments(draw('gate', swing(true), 1399))
+      expect(a).not.toEqual(b)
+    })
+
+    it('snaps back to raised (passed) or lowered (not passed) once the swing is over', () => {
+      expect(
+        raised(
+          draw(
+            'gate',
+            context({ states: { n1: 'passed' }, verdicts: [{ nodeId: 'n1', pass: true, at }] }),
+            1400
+          )
+        )
+      ).toBe(true)
+      expect(lowered(draw('gate', swing(true), 1400))).toBe(true)
+      expect(segments(draw('gate', swing(true), 1400))).toHaveLength(0)
+    })
+
+    it('does not swing before the pass or for a failure', () => {
+      expect(lowered(draw('gate', swing(true), 999))).toBe(true)
+      expect(lowered(draw('gate', swing(false), 1100))).toBe(true)
+      expect(segments(draw('gate', swing(false), 1100))).toHaveLength(0)
+    })
+  })
+
+  describe('racks and shelves', () => {
+    const SLID = '#3c4351'
+    const PULLED = '#e8c56a'
+    const at = (reaching: readonly ('archive' | 'rack')[]) => context({ reaching })
+
+    it('slides a rack unit out and works its lights only while someone reaches for the rack', () => {
+      for (const t of STAGES) {
+        expect(containsColor(draw('racks', at(['rack']), t), SLID)).toBe(true)
+        expect(containsColor(draw('racks', at(['archive']), t), SLID)).toBe(false)
+        expect(containsColor(draw('racks', context(), t), SLID)).toBe(false)
+        expect(containsColor(draw('racks', at(['rack']), t), HALL.cyan)).toBe(true)
+        expect(containsColor(draw('racks', context(), t), HALL.cyan)).toBe(false)
+      }
+    })
+
+    it('leaves the idle rack blink exactly as it was when nobody reaches', () => {
+      for (const t of STAGES)
+        expect(draw('racks', at(['archive']), t)).toEqual(draw('racks', context(), t))
+    })
+
+    it('pulls a book only while someone reaches for the archive', () => {
+      for (const t of STAGES) {
+        expect(containsColor(draw('shelves', at(['archive']), t), PULLED)).toBe(true)
+        expect(containsColor(draw('shelves', at(['rack']), t), PULLED)).toBe(false)
+        expect(containsColor(draw('shelves', context(), t), PULLED)).toBe(false)
+      }
+    })
+
+    it('draws the dust speck on a beat of the clock', () => {
+      const dust = (t: number) => containsColor(draw('shelves', at(['archive']), t), '#ffffff')
+      expect(dust(0)).toBe(true)
+      expect(dust(150)).toBe(true)
+    })
   })
 })

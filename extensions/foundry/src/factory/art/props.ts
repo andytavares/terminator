@@ -3,17 +3,25 @@ import { TILE_PX } from '../layout.js'
 import type { Crew } from '../sim.js'
 import type { NodeState } from '../../line/run-graph.js'
 import type { Check } from '../../line/ci.js'
+import type { ToolProp } from '../events.js'
 import type { Paint } from './kit.js'
 import { rect, bevel, rivets, wear, mulberry32 } from './kit.js'
 import { HALL, CODE_LINE_COLORS } from './palette.js'
+import { drawDigit, drawText, textWidth } from './glyphs.js'
 
 // One draw function per `PropKind`, plus the floor/wall bake and the belts and
 // crate that move over it.
 //
 // The honesty rule lives in what each function reads out of `SceneContext`:
-// a desk's screens, a rig's waveform and a gate's beacon each ask "is a
-// present crew member actually doing the thing that would light this up"
-// rather than animating on a clock. Ambient decor (a plant's sway, a rack's
+// nothing on a station moves unless the run reported the cause. A desk's
+// screens ask whether its crew member is typing or its step has a tool call
+// open (and which kind); a rig's and a bench's scan work asks whether a crew
+// member is scanning, and their tick, cross or stamp whether the step just
+// passed or failed; a press asks whether its step is running; a gate's arm
+// swings only for a pass it was just told of; the racks and the shelves work
+// only while somebody stands at them, using them. The cause is always in the
+// context, never a clock — the clock only sets the pace of what the cause
+// started. Ambient decor (a plant's sway, a rack's
 // idle blink) is the one exception — nothing about a run makes those true or
 // false, so a clock is the only honest input they have. Breakroom furniture
 // (a bench, a sofa, a table, a fridge, a coffeebar, a vending machine, a
@@ -43,7 +51,24 @@ export interface SceneContext {
   readonly needsYou?: readonly string[]
   /** Stations whose step says it is running with no agent left to run it. */
   readonly orphaned?: readonly string[]
+  /** The newest open tool call per station: which fixture its agent is using. */
+  readonly tools?: Readonly<Record<string, ToolProp>>
+  /** Steps that just passed or failed; `at` is on the same clock as `tMs`. */
+  readonly verdicts?: readonly {
+    readonly nodeId: string
+    readonly pass: boolean
+    readonly at: number
+  }[]
+  /** Fixtures a present crew member is standing at, using them. */
+  readonly reaching?: readonly ('archive' | 'rack')[]
 }
+
+/** How long a verdict shows — matches `VERDICT_MS` in sim.ts. */
+const VERDICT_MS = 1600
+/** How long a gate's arm takes to swing up after a pass. */
+const GATE_SWING_MS = 400
+/** The station name stencilled on the floor: amber paint, worn. */
+const STENCIL_COLOR = 'rgba(224,161,58,.55)'
 
 /** Rows 0–2 are the top wall on every `HallMap` — see `layout.ts`'s contract. */
 const TOP_WALL_ROWS = 3
@@ -55,6 +80,30 @@ function typingAt(context: SceneContext, nodeId: string): boolean {
 
 function scanningAt(context: SceneContext, nodeId: string): boolean {
   return context.crew.some((c) => c.present && c.nodeId === nodeId && c.anim === 'scan')
+}
+
+function toolAt(context: SceneContext, nodeId: string | null): ToolProp | null {
+  return nodeId === null ? null : (context.tools?.[nodeId] ?? null)
+}
+
+function isWorking(context: SceneContext, nodeId: string | null): boolean {
+  const state = nodeId === null ? undefined : context.states[nodeId]
+  return state === 'running' || state === 'verifying'
+}
+
+/** The newest verdict on a step that is still inside its window, with its age. */
+function verdictAt(
+  context: SceneContext,
+  nodeId: string | null,
+  tMs: number
+): { readonly pass: boolean; readonly age: number } | null {
+  let found: { pass: boolean; age: number } | null = null
+  for (const v of context.verdicts ?? []) {
+    const age = tMs - v.at
+    if (v.nodeId !== nodeId || age < 0 || age >= VERDICT_MS) continue
+    if (found === null || age < found.age) found = { pass: v.pass, age }
+  }
+  return found
 }
 
 function hasPassed(context: SceneContext, nodeId: string | null): boolean {
@@ -97,29 +146,6 @@ function gateIsWaiting(context: SceneContext, nodeId: string | null): boolean {
 
 function chairOwnerNodeId(prop: HallProp): string | null {
   return prop.id.startsWith('chair-') ? prop.id.slice('chair-'.length) : null
-}
-
-const DIGIT_GLYPHS: Readonly<Record<string, readonly string[]>> = {
-  '0': ['111', '101', '101', '101', '111'],
-  '1': ['010', '110', '010', '010', '111'],
-  '2': ['111', '001', '111', '100', '111'],
-  '3': ['111', '001', '111', '001', '111'],
-  '4': ['101', '101', '111', '001', '001'],
-  '5': ['111', '100', '111', '001', '111'],
-  '6': ['111', '100', '111', '101', '111'],
-  '7': ['111', '001', '010', '010', '010'],
-  '8': ['111', '101', '111', '101', '111'],
-  '9': ['111', '101', '111', '001', '111'],
-}
-
-function drawDigit(paint: Paint, x: number, y: number, digit: string, color: string): void {
-  const rows = DIGIT_GLYPHS[digit]
-  if (rows === undefined) return
-  rows.forEach((row, j) => {
-    for (let i = 0; i < 3; i++) {
-      if (row[i] === '1') rect(paint, x + i * 2, y + j * 2, 2, 2, color)
-    }
-  })
 }
 
 /** A diagonal amber/dark hazard stripe, the floor decal before a press or a gate. */
@@ -192,6 +218,17 @@ export function bakeHall(map: HallMap, paint: Paint): void {
   for (const prop of map.props) {
     if (prop.kind !== 'press' && prop.kind !== 'gate') continue
     hazardHatch(paint, (prop.x - 1) * TILE_PX, prop.y * TILE_PX, TILE_PX, prop.h * TILE_PX)
+  }
+
+  // Each station's name, stencilled on the floor — a bake, so belts and crew
+  // walk over it. Desks, rigs and benches wear it in the row above; the press
+  // and the gate, which the hazard hatch fronts, wear it below.
+  for (const prop of map.props) {
+    if (prop.sign === null) continue
+    const below = prop.kind === 'press' || prop.kind === 'gate'
+    const sy = below ? (prop.y + prop.h) * TILE_PX + 9 : prop.y * TILE_PX - 15
+    const sx = prop.x * TILE_PX + Math.floor((prop.w * TILE_PX - textWidth(prop.sign)) / 2)
+    drawText(paint, sx, sy, prop.sign, STENCIL_COLOR)
   }
 
   // A lane number stencil at the left edge of every lane's belt row.
@@ -496,11 +533,133 @@ function drawScreen(
   }
 }
 
+/** A tick or a cross, two pixels thick, centred on (cx, cy). */
+function drawMark(paint: Paint, cx: number, cy: number, pass: boolean): void {
+  const pts: readonly (readonly [number, number])[] = pass
+    ? [
+        [-3, 0],
+        [-2, 1],
+        [-1, 2],
+        [0, 1],
+        [1, 0],
+        [2, -1],
+        [3, -2],
+      ]
+    : [
+        [-2, -2],
+        [-1, -1],
+        [0, 0],
+        [1, 1],
+        [2, 2],
+        [2, -2],
+        [1, -1],
+        [-1, 1],
+        [-2, 2],
+      ]
+  for (const [dx, dy] of pts) rect(paint, cx + dx, cy + dy, 2, 2, pass ? HALL.green : HALL.red)
+}
+
+const PASS_BG = '#0d2412'
+const FAIL_BG = '#2a0f0b'
+
+/**
+ * What one desk screen shows while a tool call is open: a shell for the rack,
+ * a page being read for the archive, an edit (tree, typed code with a caret,
+ * a diff) for the desk itself.
+ */
+function drawToolScreen(
+  paint: Paint,
+  sx: number,
+  sy: number,
+  sw: number,
+  index: number,
+  count: number,
+  tool: ToolProp,
+  t: number
+): void {
+  rect(
+    paint,
+    sx,
+    sy,
+    sw,
+    9,
+    tool === 'rack' ? '#040907' : tool === 'archive' ? '#161e2a' : HALL.screenOn
+  )
+  if (tool === 'desk') {
+    if (index === 0) {
+      const hl = Math.floor(t / 900) % 4
+      for (let r = 0; r < 4; r++) {
+        if (r === hl) rect(paint, sx, sy + 1 + r * 2, sw, 1, '#1f5566')
+        rect(
+          paint,
+          sx + 1 + (r % 2) * 2,
+          sy + 1 + r * 2,
+          3 + ((r * 5) % 6),
+          1,
+          r === hl ? '#e9ecef' : '#6f8296'
+        )
+      }
+    } else if (index === 1) {
+      const off = Math.floor(t / 700)
+      for (let r = 0; r < 3; r++) {
+        const len = 3 + (((r + off) * 7) % (sw - 5))
+        rect(
+          paint,
+          sx + 1 + ((r + off) % 3),
+          sy + 1 + r * 2,
+          len,
+          1,
+          CODE_LINE_COLORS[(r + off) % 5]
+        )
+      }
+      const typed = Math.floor(t / 110) % (sw - 3)
+      rect(paint, sx + 1, sy + 7, typed, 1, HALL.green)
+      if (Math.floor(t / 260) % 2 === 0) rect(paint, sx + 2 + typed, sy + 6, 1, 2, '#ffffff')
+    } else {
+      const off = Math.floor(t / 1300)
+      for (let r = 0; r < 4; r++) {
+        const del = (r + off) % 3 === 0
+        rect(paint, sx + 1, sy + 1 + r * 2, 1, 1, del ? HALL.red : HALL.green)
+        rect(
+          paint,
+          sx + 3,
+          sy + 1 + r * 2,
+          2 + (((r + off) * 3) % (sw - 5)),
+          1,
+          del ? '#7a3328' : '#3f7a3a'
+        )
+      }
+    }
+  } else if (tool === 'archive') {
+    const scroll = Math.floor(t / 400)
+    const hl = Math.floor(t / 180) % (4 * count)
+    for (let r = 0; r < 4; r++) {
+      const len = 3 + (((r + scroll) * 7 + index * 3) % (sw - 4))
+      const lit = hl === index * 4 + r
+      if (lit) rect(paint, sx, sy + 1 + r * 2, sw, 1, 'rgba(232,197,106,.35)')
+      rect(paint, sx + 1, sy + 1 + r * 2, len, 1, lit ? '#e8c56a' : '#8391a3')
+    }
+  } else {
+    const lines = Math.floor(t / 240) + index * 5
+    for (let r = 0; r < 4; r++) {
+      const idx = lines - 3 + r
+      const prompt = idx % 3 === 0
+      if (prompt) rect(paint, sx + 1, sy + 1 + r * 2, 1, 1, HALL.amber)
+      const len = r === 3 ? Math.floor(t / 60) % (sw - 4) : 2 + ((idx * 5) % (sw - 4))
+      rect(paint, sx + (prompt ? 3 : 1), sy + 1 + r * 2, len, 1, prompt ? HALL.green : '#3f7a4a')
+      if (r === 3 && Math.floor(t / 250) % 2 === 0)
+        rect(paint, sx + 4 + len, sy + 7, 1, 1, HALL.green)
+    }
+  }
+}
+
 function drawDesk(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
   const x = prop.x * TILE_PX
   const y = prop.y * TILE_PX
   const w = prop.w * TILE_PX
-  const lit = prop.nodeId !== null && typingAt(context, prop.nodeId)
+  const typing = prop.nodeId !== null && typingAt(context, prop.nodeId)
+  const tool = toolAt(context, prop.nodeId)
+  const lit = typing || tool !== null
 
   rect(paint, x + 1, y + 3, w - 2, 9, HALL.deskTop)
   bevel(paint, x + 1, y + 3, w - 2, 9, HALL.deskEdge, HALL.deskFace)
@@ -512,13 +671,24 @@ function drawDesk(paint: Paint, prop: HallProp, context: SceneContext, tMs: numb
   const screenW = Math.floor((w - 6) / screenCount)
   for (let i = 0; i < screenCount; i++) {
     const sx = x + 3 + i * (screenW + 1)
-    drawScreen(paint, sx, y - 8, screenW, 9, lit, tMs, i + prop.x)
+    if (tool === null) {
+      drawScreen(paint, sx, y - 8, screenW, 9, lit, tMs, i + prop.x)
+    } else {
+      drawScreen(paint, sx, y - 8, screenW, 9, false, tMs, i + prop.x)
+      drawToolScreen(paint, sx, y - 8, screenW, i, screenCount, tool, tMs)
+    }
     rect(paint, sx + Math.floor(screenW / 2) - 1, y + 1, 2, 3, '#2a2f37')
   }
 
   // Keyboard, a stack of papers and a mug — desk clutter that never moves.
   rect(paint, x + Math.floor(w / 2) - 6, y + 8, 12, 3, '#262b33')
   for (let k = 0; k < 5; k++) rect(paint, x + Math.floor(w / 2) - 5 + k * 2, y + 9, 1, 1, '#434a55')
+  // The key under the typist's hand — the one clutter that moves, and only
+  // while somebody is typing.
+  if (typing) {
+    const k = (Math.floor(tMs / 70) * 7) % 5
+    rect(paint, x + Math.floor(w / 2) - 5 + k * 2, y + 9, 1, 1, '#d8e6f5')
+  }
   rect(paint, x + 4, y + 7, 3, 4, '#d9dde2')
   rect(paint, x + 5, y + 8, 2, 1, '#9aa2ac')
   rect(paint, x + w - 7, y + 6, 3, 3, '#4a6f9a')
@@ -548,10 +718,33 @@ function drawRig(paint: Paint, prop: HallProp, context: SceneContext, tMs: numbe
     rect(paint, x + 4, y + 1, w - 6, 1, '#1f3325')
   }
 
+  const verdict = verdictAt(context, prop.nodeId, tMs)
+  if (verdict !== null) {
+    rect(paint, x + 3, y - 4, w - 5, 10, verdict.pass ? PASS_BG : FAIL_BG)
+    drawMark(paint, x + 3 + Math.floor((w - 5) / 2), y + 1, verdict.pass)
+  } else if (scanning) {
+    // The ticker: a row of readings filling in, an amber one every sixth.
+    const ticks = Math.floor(tMs / 140) % 13
+    for (let i = 0; i < ticks; i++) {
+      rect(paint, x + 4 + i * 2, y + 4, 1, 1, i % 6 === 5 ? HALL.amber : HALL.green)
+    }
+  }
+
   // Probe ports along the base — a rig is a bench with cables, not a screen alone.
   rect(paint, x + 2, y + 8, w - 4, 3, '#20252c')
   for (let p = 0; p < 3; p++) {
     rect(paint, x + 3 + p * 3, y + 12, 1, 6, ['#b04a3c', '#e0a13a', '#3a6ea1'][p])
+  }
+  if (scanning) {
+    // Pulses running down the cables, and the cooling fan spinning up.
+    for (let p = 0; p < 3; p++) {
+      const dy = (Math.floor(tMs / 90) + p * 2) % 6
+      rect(paint, x + 3 + p * 3, y + 12 + dy, 1, 1, '#fff4c2')
+    }
+    const f = Math.floor(tMs / 70) % 2
+    rect(paint, x + 13, y + 8, 5, 3, '#11141a')
+    rect(paint, x + 14 + f * 2, y + 9, 1, 1, '#7c8696')
+    rect(paint, x + 16 - f * 2, y + 9, 1, 1, '#4d5563')
   }
 
   if (prop.nodeId !== null)
@@ -574,12 +767,37 @@ function drawBench(paint: Paint, prop: HallProp, context: SceneContext, tMs: num
     rect(paint, x + 3 + sweep, y - 7, 2, 6, HALL.cyan)
   }
 
+  const verdict = verdictAt(context, prop.nodeId, tMs)
+  if (scanning || verdict !== null) {
+    // The work under inspection: a sheet on the bench, read by a scan line —
+    // or, once the step has a verdict, stamped.
+    rect(paint, x + 4, y + 1, 9, 9, '#d9dde2')
+    for (let r = 0; r < 4; r++) rect(paint, x + 5, y + 2 + r * 2, 3 + ((r * 3) % 5), 1, '#8a929c')
+    if (verdict !== null) {
+      const ink = verdict.pass ? '#3a8a4a' : '#b04a3c'
+      rect(paint, x + 6, y + 3, 5, 5, ink)
+      rect(paint, x + 7, y + 4, 3, 3, '#d9dde2')
+      rect(paint, x + 8, y + 5, 1, 1, ink)
+    } else {
+      rect(paint, x + 3, y + 1 + (Math.floor(tMs / 120) % 9), 11, 1, 'rgba(114,216,242,.9)')
+    }
+  }
+  if (scanning) {
+    // A report strip feeding out of the side.
+    const feed = Math.floor(tMs / 300) % 8
+    rect(paint, x + w - 11, y + 3, 5, 1 + feed, '#e9ecef')
+    for (let r = 0; r < feed; r += 2) rect(paint, x + w - 10, y + 4 + r, 3, 1, '#9aa2ac')
+  }
+
   if (prop.nodeId !== null)
     drawLamp(paint, x + w - 6, y + 2, stationLamp(context, prop.nodeId, tMs))
 }
 
-/** The press is the biggest machine on the floor — the lanes converge here. */
-
+/**
+ * The press is the biggest machine on the floor — the lanes converge here.
+ * A join step never has a crew member, so its cause is its own state: it
+ * strokes while the step is running or verifying, and stands still otherwise.
+ */
 function drawPress(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
   const x = prop.x * TILE_PX
   const y = prop.y * TILE_PX
@@ -588,23 +806,59 @@ function drawPress(paint: Paint, prop: HallProp, context: SceneContext, tMs: num
   // without reaching into the wall face behind it.
   const top = y - TILE_PX
   const PRESS_VISUAL_H = (prop.h + 1) * TILE_PX - 14
-  const active = prop.nodeId !== null && typingAt(context, prop.nodeId)
+  const active = isWorking(context, prop.nodeId)
 
   rect(paint, x, top, w, PRESS_VISUAL_H + 10, HALL.steel)
   bevel(paint, x, top, w, PRESS_VISUAL_H + 10, HALL.steelLight, HALL.steelDark)
   rect(paint, x + 2, top + 4, 4, PRESS_VISUAL_H, '#2a3039')
   rect(paint, x + w - 6, top + 4, 4, PRESS_VISUAL_H, '#2a3039')
-  // hazard stripes down both guard rails
+  // hazard stripes down both guard rails, crawling while the press works
+  const crawl = active ? Math.floor(tMs / 120) % 12 : 0
   for (let i = 0; i < PRESS_VISUAL_H; i += 6) {
-    rect(paint, x + 2, top + 4 + i, 4, 3, i % 12 === 0 ? HALL.amber : '#1b1f26')
-    rect(paint, x + w - 6, top + 4 + i, 4, 3, i % 12 === 0 ? HALL.amber : '#1b1f26')
+    const on = (i + crawl) % 12 < 6
+    rect(paint, x + 2, top + 4 + i, 4, 3, on ? HALL.amber : '#1b1f26')
+    rect(paint, x + w - 6, top + 4 + i, 4, 3, on ? HALL.amber : '#1b1f26')
   }
 
-  const cycle = active ? Math.abs(Math.sin((tMs / 1000) * 3)) : 0
-  const headY = top + 24 + Math.round(cycle * (PRESS_VISUAL_H - 40))
-  rect(paint, x + 8, top + 8, w - 16, headY - top, '#262b33')
-  rect(paint, x + 7, headY, w - 14, 10, '#6b7482')
+  const cycle = active ? Math.abs(Math.sin((tMs / 1000) * 2.2)) : 0
+  const headY = top + 12 + Math.round(cycle * (PRESS_VISUAL_H - 26))
+  rect(paint, x + 8, top + 8, w - 16, headY - top - 8, '#262b33')
+  rect(paint, x + 10, top + 8, 2, headY - top - 8, '#98a2b2')
+  rect(paint, x + w - 12, top + 8, 2, headY - top - 8, '#98a2b2')
+  rect(paint, x + 7, headY, w - 14, 8, '#6b7482')
   rect(paint, x + 7, headY, w - 14, 2, '#98a2b2')
+
+  if (active) {
+    if (cycle > 0.93) {
+      for (let k = 0; k < 4; k++) rect(paint, x + 9 + k * 7, headY + 8, 3, 1, '#ffd27a')
+    }
+    // Beacon on the crown, and steam that leaves the vents on every stroke.
+    const flip = Math.floor(tMs / 300) % 2
+    rect(paint, x + w / 2 - 4, top - 4, 8, 4, '#20242c')
+    rect(paint, x + w / 2 - 3 + flip * 3, top - 3, 3, 2, HALL.amber)
+    for (let k = 0; k < 4; k++) {
+      const age = ((tMs / 30 + k * 11) % 44) / 44
+      const alpha = (0.45 * (1 - age)).toFixed(2)
+      const py = top - 2 - Math.round(age * 14)
+      const size = 2 + Math.round(age * 2)
+      rect(
+        paint,
+        x + 3 + (k % 2) * 2 - Math.round(age * 3),
+        py,
+        size,
+        2,
+        `rgba(220,226,235,${alpha})`
+      )
+      rect(
+        paint,
+        x + w - 6 - (k % 2) * 2 + Math.round(age * 3),
+        py,
+        size,
+        2,
+        `rgba(220,226,235,${alpha})`
+      )
+    }
+  }
 
   if (prop.nodeId !== null)
     drawLamp(paint, x + w / 2 - 2, top + PRESS_VISUAL_H + 4, stationLamp(context, prop.nodeId, tMs))
@@ -615,6 +869,8 @@ function drawGate(paint: Paint, prop: HallProp, context: SceneContext, tMs: numb
   const y = prop.y * TILE_PX
   const waiting = gateIsWaiting(context, prop.nodeId)
   const open = hasPassed(context, prop.nodeId)
+  const verdict = verdictAt(context, prop.nodeId, tMs)
+  const swinging = verdict !== null && verdict.pass && verdict.age < GATE_SWING_MS
 
   // Two posts, so the arm has something to swing between.
   rect(paint, x, y - 24, 4, 40, HALL.steel)
@@ -626,7 +882,21 @@ function drawGate(paint: Paint, prop: HallProp, context: SceneContext, tMs: numb
   const beacon = waiting ? (flashOn ? HALL.amber : HALL.amberDim) : open ? HALL.green : '#3a414b'
   rect(paint, x + 1, y - 30, TILE_PX - 2, 5, beacon)
 
-  if (open) {
+  if (swinging) {
+    // Arm mid-swing, hinged on the left post: three steps up the quarter turn.
+    const angle = ((Math.floor((verdict.age / GATE_SWING_MS) * 3) + 1) / 4) * (Math.PI / 2)
+    for (let s = 0; s < 7; s++) {
+      const reach = 2 + s * 2
+      rect(
+        paint,
+        x + 2 + Math.round(Math.cos(angle) * reach),
+        y - 3 - Math.round(Math.sin(angle) * reach),
+        2,
+        2,
+        s % 2 === 0 ? '#e9ecef' : HALL.red
+      )
+    }
+  } else if (open) {
     // Arm raised, resting against the left post.
     rect(paint, x, y - 20, 2, 16, '#e9ecef')
     for (let s = 0; s < 3; s++) rect(paint, x, y - 18 + s * 5, 2, 2, HALL.red)
@@ -647,7 +917,7 @@ const SHELF_BOOK_COLORS = [
   '#2f4f6f',
 ]
 
-function drawShelves(paint: Paint, prop: HallProp): void {
+function drawShelves(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
   const x = prop.x * TILE_PX
   const y = prop.y * TILE_PX
   const w = prop.w * TILE_PX
@@ -674,12 +944,39 @@ function drawShelves(paint: Paint, prop: HallProp): void {
       bx += bw + (rnd() < 0.15 ? 2 : 0)
     }
   }
+
+  if (context.reaching?.includes('archive') === true) {
+    // Somebody is at the archive: a book pulled out a little, a new one each
+    // time round, and the dust it stirs.
+    const bx = x + 3 + (Math.floor(tMs / 1600) % 3) * 3
+    rect(paint, bx, y - 10, 3, 8, '#e8c56a')
+    rect(paint, bx, y - 10, 3, 1, '#fff1bf')
+    if (Math.floor(tMs / 150) % 3 === 0) rect(paint, bx + 1, y - 13, 1, 1, '#ffffff')
+    rect(paint, x + w - 5, y - 4, 1, 1, '#ffffff')
+  }
 }
 
-function drawRacks(paint: Paint, prop: HallProp, tMs: number): void {
+/** A rack in use: every unit's lights busy, and the first slid out on its rail. */
+function drawRackWork(paint: Paint, rx: number, y: number, index: number, tMs: number): void {
+  for (let u = 0; u < 7; u++) {
+    const uy = y - 16 + u * 4
+    const b = (Math.floor(tMs / 45) * (u + 3) + index * 5) % 3
+    rect(paint, rx + 3, uy + 1, 1, 1, b ? HALL.green : '#1e4a2a')
+    rect(paint, rx + 5, uy + 1, 1, 1, b === 1 ? HALL.amber : '#4a3515')
+    rect(paint, rx + 7, uy + 1, 3, 1, b === 2 ? HALL.cyan : '#17323a')
+  }
+  if (index === 0) {
+    const out = Math.floor(tMs / 400) % 2
+    rect(paint, rx + 1, y - 4, 12, 3, '#3c4351')
+    rect(paint, rx + 2, y - 3, 2 + out * 6, 1, HALL.green)
+  }
+}
+
+function drawRacks(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
   const x = prop.x * TILE_PX
   const y = prop.y * TILE_PX
   const t = tMs / 1000
+  const busy = context.reaching?.includes('rack') === true
 
   for (let i = 0; i < prop.w; i++) {
     const rx = x + i * TILE_PX + 1
@@ -692,6 +989,7 @@ function drawRacks(paint: Paint, prop: HallProp, tMs: number): void {
       rect(paint, rx + 3, uy + 1, 1, 1, blink ? HALL.green : '#1e4a2a')
       rect(paint, rx + 5, uy + 1, 1, 1, (blink + u) % 3 ? HALL.amber : '#4a3515')
     }
+    if (busy) drawRackWork(paint, rx, y, i, tMs)
   }
 }
 
@@ -970,9 +1268,9 @@ export function drawProp(paint: Paint, prop: HallProp, context: SceneContext, tM
     case 'gate':
       return drawGate(paint, prop, context, tMs)
     case 'shelves':
-      return drawShelves(paint, prop)
+      return drawShelves(paint, prop, context, tMs)
     case 'racks':
-      return drawRacks(paint, prop, tMs)
+      return drawRacks(paint, prop, context, tMs)
     case 'statuswall':
       return drawStatuswall(paint, prop, context)
     case 'lockers':

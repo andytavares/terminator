@@ -241,13 +241,13 @@ describe('FactoryHall', () => {
     )
   })
 
-  it('gives each station a nameplate that spends its whole width on the name', async () => {
+  it('leaves the station name to the floor: no plate over it, the full label on the button', async () => {
     mount()
     const station = await screen.findByRole('button', { name: /Build the thing/ })
-    const plate = document.querySelector('.fdry-hall-overlay .fdry-plate') as HTMLElement
-    expect(plate.textContent).toBe('Build the thing')
-    // Where it stands is the station's lamp, and its accessible name.
+    expect(document.querySelector('.fdry-plate')).toBeNull()
+    expect(station.getAttribute('aria-label')).toContain('Build the thing')
     expect(station.getAttribute('aria-label')).toContain('Working')
+    expect(station.getAttribute('title')).toContain('Build the thing')
   })
 
   it('keeps the order bar above the hall rather than over its top row', async () => {

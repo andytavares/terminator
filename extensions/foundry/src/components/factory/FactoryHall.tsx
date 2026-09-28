@@ -10,7 +10,7 @@ import { diffObservation, describeEvent } from '../../factory/events.js'
 import type { FactoryEvent, Observation } from '../../factory/events.js'
 import { direct } from '../../factory/director.js'
 import { calloutLevels, calloutsFor, interruptionsFor, stateWord } from '../../factory/callouts.js'
-import type { Callout, CalloutBox, Interruption, Obstacle } from '../../factory/callouts.js'
+import type { Callout, CalloutBox, Interruption } from '../../factory/callouts.js'
 import { momentsOf, observationAt, replayClock } from '../../factory/replay.js'
 import type { ReplayClock, Timeline } from '../../factory/replay.js'
 import type { Gate } from '../../gates/rules.js'
@@ -28,8 +28,8 @@ import { MarkdownInline } from '../Markdown.js'
 // because a station looked animatable — which is what keeps the hall honest
 // about a run it is not itself running.
 //
-// Everything the hall has to say is said inside it: a nameplate on every
-// station, a callout rising from the station where something happened, and a
+// Everything the hall has to say is said inside it: the station names are
+// stencilled on its floor, a callout rising from the station where something happened, and a
 // card pinned over the station that is waiting on you, answerable in place.
 
 export interface FactoryHallProps {
@@ -74,10 +74,6 @@ function clockText(ms: number): string {
 const CALLOUT_BASE_PX = 30
 /** Pixels each level of a callout stack lifts it: a callout's height, plus air. */
 const CALLOUT_PITCH_PX = 26
-/** Pixels between a station's top edge and its nameplate. */
-const PLATE_GAP_PX = 10
-/** Tiles a nameplate may span: a column pitch, less a gap. */
-const PLATE_COLUMNS = 4.6
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
@@ -337,7 +333,7 @@ export function FactoryHall({
   }, [replayPlaying, moveReplay])
 
   // Callouts are sized by their text, so only the laid-out page knows which
-  // ones would cover each other or a nameplate. Measured before paint, so a
+  // ones would cover each other. Measured before paint, so a
   // callout is never seen at the level it is about to leave.
   const liveMap = replay?.map ?? map
   useLayoutEffect(() => {
@@ -349,14 +345,6 @@ export function FactoryHall({
       const at = anchorOf(liveMap, nodeId)
       return { x: (at.left / 100) * width, y: (at.top / 100) * height }
     }
-    const plates: Obstacle[] = [...overlay.querySelectorAll<HTMLElement>('[data-plate-for]')].map(
-      (el) => {
-        const { x, y } = ground(el.dataset.plateFor ?? null)
-        const bottom = y - PLATE_GAP_PX
-        const w = el.offsetWidth
-        return { left: x - w / 2, top: bottom - el.offsetHeight, right: x + w / 2, bottom }
-      }
-    )
     const raised = new Map(
       [...overlay.querySelectorAll<HTMLElement>('[data-callout-id]')].map((el) => [
         el.dataset.calloutId,
@@ -375,7 +363,7 @@ export function FactoryHall({
       }
     })
     setCalloutLift((kept) => {
-      const next = calloutLevels(boxes, plates, kept, CALLOUT_PITCH_PX)
+      const next = calloutLevels(boxes, [], kept, CALLOUT_PITCH_PX)
       const same =
         Object.keys(next).length === Object.keys(kept).length &&
         Object.entries(next).every(([id, level]) => kept[id] === level)
@@ -532,37 +520,21 @@ export function FactoryHall({
               const gone = orphaned.has(node.id)
               const standing = gone ? 'no agent' : stateWord(node.state)
               return (
-                <React.Fragment key={prop.id}>
-                  <button
-                    type="button"
-                    className="fdry-hall-station"
-                    title={`${label} · ${standing}${node.attempts > 1 ? ` · try ${node.attempts}` : ''}`}
-                    style={stationStyle(shownMap, prop)}
-                    aria-label={`${label}, ${node.role ?? 'unassigned'}, ${standing}, attempt ${node.attempts}`}
-                    onClick={() => void openStation(node.id)}
-                  >
-                    {flaggedNodes.has(node.id) ? (
-                      <span className="fdry-hall-flag" aria-hidden="true">
-                        <ShieldQuestion />
-                      </span>
-                    ) : null}
-                  </button>
-                  <div
-                    className="fdry-plate"
-                    data-plate-for={node.id}
-                    aria-hidden="true"
-                    style={{
-                      left: `${anchorOf(shownMap, node.id).left}%`,
-                      top: `${anchorOf(shownMap, node.id).top}%`,
-                      transform: `translate(-50%, calc(-100% - ${PLATE_GAP_PX}px))`,
-                      // Neighbouring stations are one column pitch apart; a
-                      // plate wider than that runs into the next one's.
-                      maxWidth: `${(PLATE_COLUMNS / shownMap.width) * 100}%`,
-                    }}
-                  >
-                    {label}
-                  </div>
-                </React.Fragment>
+                <button
+                  key={prop.id}
+                  type="button"
+                  className="fdry-hall-station"
+                  title={`${label} · ${standing}${node.attempts > 1 ? ` · try ${node.attempts}` : ''}`}
+                  style={stationStyle(shownMap, prop)}
+                  aria-label={`${label}, ${node.role ?? 'unassigned'}, ${standing}, attempt ${node.attempts}`}
+                  onClick={() => void openStation(node.id)}
+                >
+                  {flaggedNodes.has(node.id) ? (
+                    <span className="fdry-hall-flag" aria-hidden="true">
+                      <ShieldQuestion />
+                    </span>
+                  ) : null}
+                </button>
               )
             })}
 

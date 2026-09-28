@@ -9,6 +9,8 @@ import {
   nearestRestSeat,
   tileCenter,
   stationOf,
+  workAnimFor,
+  VERDICT_MS,
 } from '../../src/factory/sim.js'
 import type { World } from '../../src/factory/sim.js'
 import { direct } from '../../src/factory/director.js'
@@ -138,6 +140,40 @@ function graphFor(recipeFile: string, lanes: number[], dir = SHIPPED_RECIPES): R
   const order = orderFor(recipe.id, lanes)
   return buildRunGraph(order, recipe)
 }
+
+describe('workAnimFor', () => {
+  it('scans at a rig or bench and types everywhere else', () => {
+    const map = layoutHall(graph())
+    for (const prop of map.props) {
+      const expected = prop.kind === 'rig' || prop.kind === 'bench' ? 'scan' : 'type'
+      expect(workAnimFor(map, prop.nodeId)).toBe(expected)
+    }
+    expect(map.props.some((p) => p.kind === 'rig')).toBe(true)
+    expect(map.props.some((p) => p.kind === 'desk')).toBe(true)
+  })
+
+  it('types for a node with no station', () => {
+    expect(workAnimFor(layoutHall(graph()), 'nowhere')).toBe('type')
+  })
+})
+
+describe('verdicts', () => {
+  const verdict = { nodeId: 'a', pass: true, at: 0 }
+
+  it('a new world has none', () => {
+    const g = graph()
+    expect(createWorld(layoutHall(g), obs(g)).verdicts).toEqual([])
+  })
+
+  it('tick keeps a verdict until VERDICT_MS and then drops it', () => {
+    const g = graph()
+    const world: World = { ...createWorld(layoutHall(g), obs(g)), verdicts: [verdict] }
+    const before = tick(world, VERDICT_MS - 1)
+    expect(before.verdicts).toEqual([verdict])
+    expect(before.verdicts).toBe(world.verdicts)
+    expect(tick(world, VERDICT_MS).verdicts).toEqual([])
+  })
+})
 
 describe('createWorld: CI', () => {
   it('starts with no CI when the observation carries none', () => {

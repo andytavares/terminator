@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react'
 import type { HallMap, PropKind } from '../../factory/layout.js'
 import { TILE_PX } from '../../factory/layout.js'
-import { cratePosition, tick } from '../../factory/sim.js'
+import { cratePosition, tick, tileOf } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import type { NodeState } from '../../line/run-graph.js'
+import type { ToolProp } from '../../factory/events.js'
 import type { Paint, PaintGradient } from '../../factory/art/kit.js'
 import { glow } from '../../factory/art/kit.js'
 import {
@@ -45,6 +46,42 @@ const MAX_FRAME_MS = 50
 // stands there — sorted behind them, since its low silhouette (not its tall
 // backrest) is what should tie-break against a seat one row down.
 const SEAT_FURNITURE: ReadonlySet<PropKind> = new Set(['restbench', 'sofa', 'plant'])
+
+/**
+ * What the world is doing at the fixtures, in the terms the art draws it:
+ * each station's newest open tool, the fresh verdicts, and which shared
+ * fixtures somebody is standing at and using. Pure, so it needs no canvas.
+ */
+export function sceneActivity(
+  world: World
+): Required<Pick<SceneContext, 'tools' | 'verdicts' | 'reaching'>> {
+  const newest = new Map<string, { at: number; prop: ToolProp }>()
+  for (const call of world.openCalls) {
+    const held = newest.get(call.nodeId)
+    if (held === undefined || call.at >= held.at) {
+      newest.set(call.nodeId, { at: call.at, prop: call.prop as ToolProp })
+    }
+  }
+  const { archive, rack } = world.map.anchors
+  const reaching: ('archive' | 'rack')[] = []
+  for (const crew of world.crew) {
+    if (!crew.present || crew.anim !== 'reach' || crew.goal !== null) continue
+    const at = tileOf(crew.x, crew.y)
+    if (at.x === archive.x && at.y === archive.y) reaching.push('archive')
+    else if (at.x === rack.x && at.y === rack.y) reaching.push('rack')
+  }
+  return {
+    tools: Object.fromEntries([...newest].map(([nodeId, { prop }]) => [nodeId, prop])),
+    verdicts: world.verdicts,
+    reaching,
+  }
+}
+
+const SCREEN_TINT: Readonly<Record<ToolProp, string>> = {
+  rack: '140,230,120',
+  archive: '232,197,106',
+  desk: '90,200,235',
+}
 
 function toPaint(ctx: CanvasRenderingContext2D): Paint {
   return {
@@ -121,6 +158,7 @@ function draw(
     metrics,
     queue: world.queue,
     ...lamps,
+    ...sceneActivity(world),
   }
 
   const moving = new Set(world.crates.map((c) => c.beltId))
@@ -169,6 +207,30 @@ function draw(
       'rgba(230,160,60,.5)',
       'rgba(230,160,60,0)'
     )
+  }
+  for (const prop of map.props) {
+    if (prop.nodeId === null) continue
+    const cx = (prop.x + prop.w / 2) * TILE_PX
+    if (prop.kind === 'desk') {
+      const typing = world.crew.some(
+        (c) => c.present && c.nodeId === prop.nodeId && c.anim === 'type'
+      )
+      const tool = context.tools[prop.nodeId]
+      if (!typing && tool === undefined) continue
+      const tint = SCREEN_TINT[tool ?? 'desk']
+      glow(paint, cx, prop.y * TILE_PX - 2, 30, `rgba(${tint},.16)`, `rgba(${tint},0)`)
+    } else if (prop.kind === 'press') {
+      const step = states[prop.nodeId]
+      if (step !== 'running' && step !== 'verifying') continue
+      glow(
+        paint,
+        cx,
+        prop.y * TILE_PX - TILE_PX - 4,
+        18,
+        'rgba(230,160,60,.35)',
+        'rgba(230,160,60,0)'
+      )
+    }
   }
   paint.globalCompositeOperation = 'source-over'
 }

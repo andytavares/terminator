@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
-import { HallScene } from '../../../src/components/factory/HallScene.js'
+import { HallScene, sceneActivity } from '../../../src/components/factory/HallScene.js'
 import type { HallMap } from '../../../src/factory/layout.js'
-import type { World } from '../../../src/factory/sim.js'
+import type { Crew, World } from '../../../src/factory/sim.js'
 
 // jsdom has no canvas at all, so every 2D context here is a fake this spec
 // records calls on. The point of these tests is the render loop's lifecycle
@@ -40,7 +40,7 @@ function fakeMap(): HallMap {
 }
 
 function fakeWorld(map: HallMap): World {
-  return { map, crew: [], crates: [], gatesWaiting: [], openCalls: [], clockMs: 0 }
+  return { map, crew: [], crates: [], gatesWaiting: [], openCalls: [], verdicts: [], clockMs: 0 }
 }
 
 function fakeContext2D(fillRectSpy: ReturnType<typeof vi.fn>) {
@@ -117,5 +117,55 @@ describe('components/factory/HallScene', () => {
     expect(canvas?.getAttribute('aria-hidden')).toBe('true')
     expect(canvas?.width).toBe(map.width * 16)
     expect(canvas?.height).toBe(map.height * 16)
+  })
+
+  describe('sceneActivity', () => {
+    const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew => ({
+      nodeId: 'N-1',
+      role: null,
+      x: tile.x * 16 + 8,
+      y: tile.y * 16 + 12,
+      facing: 'down',
+      anim: 'reach',
+      path: [],
+      goal: null,
+      then: 'idle',
+      present: true,
+      restSeat: null,
+      settle: null,
+      ...over,
+    })
+
+    it('keeps the newest open tool per station and passes the verdicts through', () => {
+      const map = fakeMap()
+      const verdicts = [{ nodeId: 'N-2', pass: false, at: 40 }]
+      const world: World = {
+        ...fakeWorld(map),
+        verdicts,
+        openCalls: [
+          { nodeId: 'N-1', prop: 'archive', callId: 'a', at: 10 },
+          { nodeId: 'N-1', prop: 'rack', callId: 'b', at: 30 },
+          { nodeId: 'N-1', prop: 'desk', callId: 'c', at: 20 },
+          { nodeId: 'N-2', prop: 'archive', callId: 'd', at: 5 },
+        ],
+      }
+      const activity = sceneActivity(world)
+      expect(activity.tools).toEqual({ 'N-1': 'rack', 'N-2': 'archive' })
+      expect(activity.verdicts).toBe(verdicts)
+    })
+
+    it('reports a fixture only for a present crew member reaching at it', () => {
+      const map = fakeMap()
+      const { archive, rack } = map.anchors
+      const crew = [
+        standAt(archive),
+        standAt(rack, { present: false }),
+        standAt(rack, { goal: { x: 2, y: 2 } }),
+        standAt({ x: 4, y: 4 }),
+        standAt(rack, { anim: 'type' }),
+      ]
+      expect(sceneActivity({ ...fakeWorld(map), crew }).reaching).toEqual(['archive'])
+      expect(sceneActivity({ ...fakeWorld(map), crew: [standAt(rack)] }).reaching).toEqual(['rack'])
+    })
   })
 })

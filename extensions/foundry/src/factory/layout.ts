@@ -53,6 +53,8 @@ export interface HallProp {
   readonly solid: boolean
   readonly nodeId: string | null
   readonly seat: Tile | null
+  /** The name stencilled on the floor by a station — null for everything that is not one. */
+  readonly sign: string | null
 }
 
 export interface HallBelt {
@@ -165,6 +167,38 @@ export function stationKind(kind: StepKind): StationKind {
     case 'gate':
       return 'gate'
   }
+}
+
+/**
+ * How many characters of a name fit on the floor in front of a station: its
+ * width in pixels (`stationWidth` tiles) at four pixels a glyph.
+ */
+export const SIGN_CHARS: Readonly<Record<StationKind, number>> = {
+  desk: 12,
+  press: 12,
+  rig: 8,
+  bench: 8,
+  gate: 4,
+}
+
+function foldSign(text: string): string {
+  return text.toUpperCase().replace(/[^A-Z0-9 -]/g, '-')
+}
+
+/**
+ * The name a station wears, from the node itself: who does the work (its role,
+ * else its step) and — for a node with exactly one unit — which unit. The
+ * longest of "who unit", "unit", "who" that fits wins; a name that fits none
+ * is cut and ends in a full stop. Every character the pixel font lacks
+ * becomes a hyphen.
+ */
+export function signText(node: RunNode, maxChars: number): string {
+  const named = (node.role ?? node.stepId).trim()
+  const who = foldSign(named === '' ? node.id : named)
+  const unit = node.unitIds.length === 1 ? foldSign(node.unitIds[0]) : null
+  const candidates = unit === null ? [who] : [`${who} ${unit}`, unit, who]
+  for (const candidate of candidates) if (candidate.length <= maxChars) return candidate
+  return who.slice(0, maxChars - 1) + '.'
 }
 
 function stationWidth(kind: StationKind): number {
@@ -325,6 +359,7 @@ export function layoutHall(
           solid: false,
           nodeId: DISPATCH_NODE_ID,
           seat: null,
+          sign: null,
         },
       ]
     : []
@@ -373,6 +408,7 @@ export function layoutHall(
       solid: true,
       nodeId: node.id,
       seat,
+      sign: signText(node, SIGN_CHARS[kind]),
     })
     fillRect(solid, x, y, w, h, true)
     solid[seat.y][seat.x] = false
@@ -389,6 +425,7 @@ export function layoutHall(
         solid: false,
         nodeId: null,
         seat: null,
+        sign: null,
       })
     }
   }
@@ -410,6 +447,7 @@ export function layoutHall(
       solid: true,
       nodeId: null,
       seat: null,
+      sign: null,
     })
   }
   const fixtureCol = (kind: FixtureKind): number => {
@@ -467,10 +505,11 @@ export function layoutHall(
     solid: true,
     nodeId: null,
     seat: null,
+    sign: null,
   })
 
   const put = (id: string, kind: PropKind, x: number, y: number, w = 1, h = 1): void => {
-    props.push({ id, kind, x, y, w, h, solid: true, nodeId: null, seat: null })
+    props.push({ id, kind, x, y, w, h, solid: true, nodeId: null, seat: null, sign: null })
     fillRect(solid, x, y, w, h, true)
   }
   put('room-fridge', 'fridge', roomX + 1, roomRow + 2)

@@ -57,6 +57,13 @@ export interface OpenCall {
   readonly at: number
 }
 
+/** A step that just passed or failed, for the verdict flash on its station; `at` is world `clockMs`. */
+export interface Verdict {
+  readonly nodeId: string
+  readonly pass: boolean
+  readonly at: number
+}
+
 /** What the dispatch tower shows: a round, and each check's own lamp. */
 export interface WorldCi {
   readonly round: number
@@ -70,6 +77,8 @@ export interface World {
   readonly crates: readonly Crate[]
   readonly gatesWaiting: readonly string[]
   readonly openCalls: readonly OpenCall[]
+  /** A step that just passed or failed, for the verdict flash on its station; `at` is world `clockMs`. */
+  readonly verdicts: readonly Verdict[]
   readonly clockMs: number
   /** Null until the order has shipped a pull and CI has something to say. */
   readonly ci: WorldCi | null
@@ -79,6 +88,9 @@ export interface World {
 
 const WALK_PX_PER_S = 46
 const CRATE_PX_PER_S = 34
+
+/** How long a verdict flash stays on its station. */
+export const VERDICT_MS = 1600
 
 /** A node counts as crewed when someone works it: a role, or a working kind. */
 const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run', 'judge']
@@ -96,6 +108,12 @@ function key(tile: Tile): string {
 
 export function workAnim(kind: StepKind): CrewAnim {
   return kind === 'run' || kind === 'judge' ? 'scan' : 'type'
+}
+
+/** What a crew member does at their station while their step runs: scan at a rig or bench, else type. */
+export function workAnimFor(map: HallMap, nodeId: string): CrewAnim {
+  const kind = stationOf(map, nodeId)?.kind
+  return kind === 'rig' || kind === 'bench' ? 'scan' : 'type'
 }
 
 export function tileCenter(tile: Tile): { readonly x: number; readonly y: number } {
@@ -264,6 +282,7 @@ export function createWorld(map: HallMap, observation: Observation): World {
     crates,
     gatesWaiting: [...gatesWaiting],
     openCalls: [],
+    verdicts: [],
     clockMs: 0,
     ci,
     queue,
@@ -356,5 +375,8 @@ export function tick(world: World, dtMs: number): World {
   const crates = world.crates
     .map((crate) => tickCrate(world, crate, dtSec))
     .filter((crate): crate is Crate => crate !== null)
-  return { ...world, crew, crates, clockMs: world.clockMs + dtMs }
+  const clockMs = world.clockMs + dtMs
+  const live = world.verdicts.filter((v) => clockMs - v.at < VERDICT_MS)
+  const verdicts = live.length === world.verdicts.length ? world.verdicts : live
+  return { ...world, crew, crates, verdicts, clockMs }
 }

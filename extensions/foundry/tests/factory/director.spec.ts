@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { direct } from '../../src/factory/director.js'
-import { createWorld, seatOf, tick } from '../../src/factory/sim.js'
+import { createWorld, seatOf, tick, VERDICT_MS } from '../../src/factory/sim.js'
 import type { World, Crew } from '../../src/factory/sim.js'
 import { layoutHall } from '../../src/factory/layout.js'
 import { buildRunGraph, withNode } from '../../src/line/run-graph.js'
@@ -78,6 +78,11 @@ function obs(g: RunGraph, over: Partial<Observation> = {}): Observation {
 function worldFor(g: RunGraph): World {
   const map = layoutHall(g)
   return createWorld(map, obs(g))
+}
+
+/** The graph with `a` (a builder at a desk) and `r` (a run step at a rig) mid-step. */
+function runningGraph(): RunGraph {
+  return withNode(withNode(graph(), 'a', { state: 'running' }), 'r', { state: 'running' })
 }
 
 /** A crew member for a node the map has no station for — the staleness case. */
@@ -249,13 +254,22 @@ describe('direct: orphaned / stranded', () => {
     expect(crew.then).toBe('wave')
   })
 
-  it('sends a node back to its seat once it is no longer stranded', () => {
-    const g = graph()
-    const world = worldFor(g)
-    const next = direct(world, [{ kind: 'stranded', nodeId: 'a', on: false }], 0)
-    const crew = next.crew.find((c) => c.nodeId === 'a')!
+  it('sends a node back to its seat, working, once it is no longer stranded', () => {
+    const world = worldFor(runningGraph())
+    const off: FactoryEvent = { kind: 'stranded', nodeId: 'a', on: false }
+    const crew = direct(world, [off], 0).crew.find((c) => c.nodeId === 'a')!
     expect(crew.goal).toEqual(seatOf(world.map, 'a'))
-    expect(crew.then).toBe('idle')
+    expect(crew.then).toBe('type')
+    const rig = direct(world, [{ ...off, nodeId: 'r' }], 0).crew.find((c) => c.nodeId === 'r')!
+    expect(rig.then).toBe('scan')
+  })
+
+  it('leaves a resting crew member resting when a strand clears late', () => {
+    const world = worldFor(graph())
+    const before = world.crew.find((c) => c.nodeId === 'a')!
+    expect(before.restSeat).not.toBeNull()
+    const next = direct(world, [{ kind: 'stranded', nodeId: 'a', on: false }], 0)
+    expect(next.crew.find((c) => c.nodeId === 'a')).toEqual(before)
   })
 
   it('leaves a crew member with no station untouched when its strand clears', () => {
@@ -312,7 +326,7 @@ describe('direct: tool coalescing', () => {
   })
 
   it('a call that closes at 1000ms never causes a walk', () => {
-    const g = graph()
+    const g = runningGraph()
     let world = worldFor(g)
     world = direct(
       world,
@@ -326,7 +340,7 @@ describe('direct: tool coalescing', () => {
     )
     const crew = world.crew.find((c) => c.nodeId === 'a')!
     expect(crew.goal).toEqual(seatOf(world.map, 'a'))
-    expect(crew.then).toBe('idle')
+    expect(crew.then).toBe('type')
     expect(world.openCalls).toEqual([])
 
     // and it stays put with nothing left open, however much later we check
@@ -358,26 +372,78 @@ describe('direct: tool coalescing', () => {
     expect(next.crew.find((c) => c.nodeId === 'a')!.goal).toBe(null)
   })
 
-  it('a desk-prop tool call never moves anyone, and is never remembered', () => {
-    const g = graph()
-    const world = worldFor(g)
-    const events: FactoryEvent[] = [
-      { kind: 'tool', nodeId: 'a', prop: 'desk', callId: 'c1', open: true, at: 0 },
-    ]
-    const next = direct(world, events, 100_000)
-    expect(next).toEqual(world)
+  it('a desk-prop tool call is remembered but never moves anyone, and its close retires it', () => {
+    const world = worldFor(runningGraph())
+    const open: FactoryEvent = {
+      kind: 'tool',
+      nodeId: 'a',
+      prop: 'desk',
+      callId: 'c1',
+      open: true,
+      at: 0,
+    }
+    const opened = direct(world, [open, open], 100_000)
+    expect(opened.openCalls).toEqual([{ nodeId: 'a', prop: 'desk', callId: 'c1', at: 0 }])
+    expect(opened.crew).toEqual(world.crew)
+
+    const closed = direct(opened, [{ ...open, open: false }], 100_001)
+    expect(closed.openCalls).toEqual([])
   })
 
-  it('returns to the seat on close when no other call of that prop is open', () => {
-    const g = graph()
-    const world = worldFor(g)
-    const events: FactoryEvent[] = [
-      { kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: false, at: 100 },
-    ]
-    const next = direct(world, events, 100)
+  it('returns to the seat, working, on close when no other call is open', () => {
+    const world = worldFor(runningGraph())
+    const close = (nodeId: string): FactoryEvent => ({
+      kind: 'tool',
+      nodeId,
+      prop: 'archive',
+      callId: 'c1',
+      open: false,
+      at: 100,
+    })
+    const builder = direct(world, [close('a')], 100).crew.find((c) => c.nodeId === 'a')!
+    expect(builder.goal).toEqual(seatOf(world.map, 'a'))
+    expect(builder.then).toBe('type')
+    const rig = direct(world, [close('r')], 100).crew.find((c) => c.nodeId === 'r')!
+    expect(rig.goal).toEqual(seatOf(world.map, 'r'))
+    expect(rig.then).toBe('scan')
+  })
+
+  it('leaves a resting crew member resting when a call closes late', () => {
+    const world = worldFor(graph())
+    const before = world.crew.find((c) => c.nodeId === 'a')!
+    expect(before.then).toBe('couch')
+    const next = direct(
+      world,
+      [{ kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: false, at: 100 }],
+      100
+    )
+    expect(next.crew.find((c) => c.nodeId === 'a')).toEqual(before)
+  })
+
+  it('leaves a slumped crew member slumped when a call closes late', () => {
+    const world = worldFor(withNode(graph(), 'a', { state: 'failed' }))
+    const before = world.crew.find((c) => c.nodeId === 'a')!
+    expect(before.then).toBe('slump')
+    const next = direct(
+      world,
+      [{ kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: false, at: 100 }],
+      100
+    )
+    expect(next.crew.find((c) => c.nodeId === 'a')).toEqual(before)
+  })
+
+  it('a stale dropped call returns its crew member to work', () => {
+    let world = worldFor(runningGraph())
+    world = direct(
+      world,
+      [{ kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: true, at: 0 }],
+      0
+    )
+    const next = direct(world, [], 4 * 60_000)
+    expect(next.openCalls).toEqual([])
     const crew = next.crew.find((c) => c.nodeId === 'a')!
     expect(crew.goal).toEqual(seatOf(world.map, 'a'))
-    expect(crew.then).toBe('idle')
+    expect(crew.then).toBe('type')
   })
 
   it('stays put on close while another call of that prop is still open', () => {
@@ -423,6 +489,56 @@ describe('direct: tool coalescing', () => {
     ]
     const next = direct(world, events, 0)
     expect(next.crew.find((c) => c.nodeId === 'ghost')).toEqual(ghostCrew('ghost'))
+  })
+})
+
+describe('direct: verdicts', () => {
+  const finish = (
+    to: 'passed' | 'failed',
+    from: 'running' | 'passed' = 'running'
+  ): FactoryEvent => ({
+    kind: 'node-state',
+    nodeId: 'a',
+    from,
+    to,
+  })
+
+  it('records a pass at the world clock when a step passes', () => {
+    const world = { ...worldFor(runningGraph()), clockMs: 4200 }
+    expect(direct(world, [finish('passed')], 0).verdicts).toEqual([
+      { nodeId: 'a', pass: true, at: 4200 },
+    ])
+  })
+
+  it('records a fail at the world clock when a step fails', () => {
+    const world = { ...worldFor(runningGraph()), clockMs: 900 }
+    expect(direct(world, [finish('failed')], 0).verdicts).toEqual([
+      { nodeId: 'a', pass: false, at: 900 },
+    ])
+  })
+
+  it('replaces an earlier verdict for the same node', () => {
+    const world = { ...worldFor(runningGraph()), clockMs: 100 }
+    const failed = direct(world, [finish('failed')], 0)
+    const passed = direct({ ...failed, clockMs: 500 }, [finish('passed')], 0)
+    expect(passed.verdicts).toEqual([{ nodeId: 'a', pass: true, at: 500 }])
+  })
+
+  it('records nothing for a same-state event', () => {
+    const world = worldFor(runningGraph())
+    expect(direct(world, [finish('passed', 'passed')], 0).verdicts).toEqual([])
+  })
+
+  it('records nothing for a step that merely starts', () => {
+    const world = worldFor(graph())
+    const start: FactoryEvent = { kind: 'node-state', nodeId: 'a', from: 'waiting', to: 'running' }
+    expect(direct(world, [start], 0).verdicts).toEqual([])
+  })
+
+  it('expires at VERDICT_MS and not before', () => {
+    const world = direct(worldFor(runningGraph()), [finish('passed')], 0)
+    expect(tick(world, VERDICT_MS - 1).verdicts).toHaveLength(1)
+    expect(tick(world, VERDICT_MS).verdicts).toEqual([])
   })
 })
 
@@ -647,7 +763,7 @@ describe('direct: the real pipeline never strands a worker at the shelf or the r
   function runCall(toolName: string): Crew {
     writeFileSync(transcript, toolUseLine('c1', toolName, '2026-09-27T10:00:00.000Z') + '\n')
 
-    const g = graph()
+    const g = runningGraph()
     const map = layoutHall(g)
     const emptyObs = obs(g, { activity: {} })
     let world = createWorld(map, emptyObs)
@@ -669,13 +785,13 @@ describe('direct: the real pipeline never strands a worker at the shelf or the r
     const seat = seatOf(layoutHall(graph()), 'a')
     expect(seat).not.toBeNull()
     expect(crew.goal).toEqual(seat)
-    expect(crew.then).toBe('idle')
+    expect(crew.then).toBe('type')
   })
 
   it('walks a Bash call to the rack and back to the seat when it closes', () => {
     const crew = runCall('Bash')
     expect(crew.goal).toEqual(seatOf(layoutHall(graph()), 'a'))
-    expect(crew.then).toBe('idle')
+    expect(crew.then).toBe('type')
   })
 
   it('the world after the close no longer remembers the call as open', () => {
