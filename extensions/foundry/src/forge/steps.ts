@@ -39,11 +39,13 @@ export function forgeSteps(
 /**
  * The step an order opens on: where the next thing to do is.
  *
- * A draft nobody has planned yet opens where the plan is drafted; a planned one
+ * A draft with a question waiting opens on the plan, where it is answered; a
+ * draft nobody has planned yet opens where the plan is drafted; a planned one
  * on the first step still blocking; anything else on hand-off.
  */
 export function openingStep(order: WorkOrder, steps: readonly ForgeStep[]): StepId {
   if (order.status !== 'draft') return 'handOff'
+  if (order.openQuestions.some((question) => question.answer === null)) return 'plan'
   if (order.acceptance.length === 0) return 'intent'
   return steps.find((step) => step.blocking.length > 0)?.id ?? 'handOff'
 }

@@ -139,143 +139,6 @@
   overflow: hidden;
 }
 
-.fdry-wizard-head {
-  flex: none;
-  padding: 14px 20px 0;
-  border-bottom: 1px solid var(--tm-border);
-}
-
-.fdry-order-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.fdry-order-head h1 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.fdry-order-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-  align-self: center;
-}
-
-.fdry-wizard-head .fdry-order-sub {
-  margin: 4px 0 8px;
-}
-
-/* A sequence, so numbered, and joined by a rule. A step holding hand-off up
-   trades its number for a cross: the six checks, read as a map. */
-.fdry-steps {
-  display: flex;
-  align-items: center;
-  margin: 0 -8px;
-  padding: 0;
-  list-style: none;
-  overflow-x: auto;
-}
-
-.fdry-steps li {
-  display: flex;
-  align-items: center;
-  flex: none;
-}
-
-.fdry-steps li + li::before {
-  content: '';
-  width: 18px;
-  height: 1px;
-  background: var(--tm-border-strong);
-}
-
-.fdry-step-link {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 8px 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  color: var(--tm-text-secondary);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.fdry-step-link:hover {
-  color: var(--tm-text-primary);
-}
-
-.fdry-step-link[aria-current='step'] {
-  color: var(--tm-text-primary);
-  font-weight: 600;
-  border-bottom-color: var(--tm-accent);
-}
-
-.fdry-step-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  border: 1px solid var(--tm-border-strong);
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.fdry-step-link[aria-current='step'] .fdry-step-mark {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-}
-
-.fdry-step-link.is-blocking .fdry-step-mark {
-  border-color: var(--tm-danger);
-  color: var(--tm-danger);
-}
-
-.fdry-step-link[aria-current='step'].is-blocking .fdry-step-mark {
-  background: var(--tm-danger);
-  border-color: var(--tm-danger);
-  color: var(--tm-on-accent);
-}
-
-.fdry-step-mark svg {
-  width: 11px;
-  height: 11px;
-}
-
-/* The last turn redrew something on this step, which may not be the step the
-   operator is looking at (FR-007). */
-.fdry-step-link.is-redrawn::after {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--tm-accent);
-}
-
-.fdry-step {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.fdry-step-body {
-  max-width: 760px;
-  padding: 22px 24px 28px;
-}
-
 .fdry-step-h {
   scroll-margin-top: 22px;
   margin: 0 0 6px;
@@ -304,30 +167,6 @@
 }
 
 /* What on this step is holding hand-off up, before the things that clear it. */
-.fdry-blockers {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 18px;
-  padding: 12px 14px;
-  border: 1px solid var(--tm-danger);
-  border-left-width: 3px;
-  border-radius: var(--tm-radius-md);
-}
-
-.fdry-checks {
-  display: grid;
-}
-
-.fdry-checks .fdry-check {
-  padding: 10px 0;
-  margin: 0;
-  border-bottom: 1px solid var(--tm-border);
-}
-
-.fdry-checks .fdry-check:last-child {
-  border-bottom: 0;
-}
-
 .fdry-field-h {
   scroll-margin-top: 22px;
   margin: 0 0 8px;
@@ -355,83 +194,10 @@
 }
 
 /* The order's own words are what the step is about, not a caption. */
-.fdry-step .fdry-md {
+.fdry-main .fdry-md {
   font-size: 13.5px;
   line-height: 1.55;
   color: var(--tm-text-primary);
-}
-
-.fdry-wizard-foot {
-  flex: none;
-  padding: 12px 20px;
-  border-top: 1px solid var(--tm-border);
-}
-
-.fdry-wizard-foot .fdry-problem {
-  margin: 0 0 10px;
-}
-
-/* What agreeing this order is about to queue behind (R4) — a note beside the
-   hand-off button, not styled as a check or a failure. */
-.fdry-advisory {
-  margin: 10px 0 0;
-}
-
-.fdry-wizard-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.fdry-wizard-forward {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.fdry-nav-back,
-.fdry-nav-next {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--tm-radius-sm);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.fdry-nav-back {
-  border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-}
-
-.fdry-nav-next {
-  border: 1px solid var(--tm-accent);
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
-.fdry-nav-back:hover {
-  background: var(--tm-bg-card-hover);
-}
-
-/* A hand-off that cannot happen yet still says why, in the place it will be. */
-.fdry-nav-next:disabled {
-  border: 1px dashed var(--tm-border-strong);
-  background: transparent;
-  color: var(--tm-text-secondary);
-  cursor: not-allowed;
-}
-
-.fdry-nav-next svg {
-  width: 13px;
-  height: 13px;
 }
 
 .fdry-panel {
@@ -450,75 +216,23 @@
   margin: 0 0 10px;
 }
 
-.fdry-check {
-  display: grid;
-  grid-template-columns: 16px 1fr;
-  gap: 8px;
-  align-items: start;
-  font-size: 13px;
-  color: var(--tm-text-secondary);
+@keyframes fdry-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.fdry-check b {
-  color: var(--tm-text-primary);
-  font-weight: 500;
+.fdry-spin {
+  animation: fdry-spin 1s linear infinite;
 }
 
-.fdry-check small {
-  display: block;
-  margin-top: 2px;
-  color: var(--tm-text-secondary);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-
-/* How to clear a failing check.
-
-   The five checks that were not the red team said what was wrong and stopped —
-   including `verifiable`, whose own failure text names an escape that no
-   control on this screen could reach. A red mark with no move attached is a
-   dead end the operator stares at. */
-.fdry-remedy {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.fdry-remedy button,
-.fdry-finding-actions button,
-.fdry-accept button {
-  appearance: none;
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 11px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--tm-text-primary);
-  cursor: pointer;
-}
-
-.fdry-remedy button:hover:not(:disabled),
-.fdry-finding-actions button:hover:not(:disabled),
-.fdry-accept button:hover:not(:disabled) {
-  background: var(--tm-bg-card-hover);
-}
-
-.fdry-remedy button:disabled,
-.fdry-finding-actions button:disabled,
-.fdry-accept button:disabled {
-  opacity: 0.5;
-  cursor: default;
+@media (prefers-reduced-motion: reduce) {
+  .fdry-spin {
+    animation: none;
+  }
 }
 
 /* An ask the architect is working on, in place of the button that sent it. */
-.fdry-finding .fdry-asked {
-  display: flex;
-  width: fit-content;
-  margin-top: 6px;
-}
-
 .fdry-asked {
   display: inline-flex;
   align-items: center;
@@ -535,32 +249,608 @@
   width: 13px;
   height: 13px;
   flex: none;
-  animation: fdry-spin 1s linear infinite;
 }
 
-@keyframes fdry-spin {
-  to {
-    transform: rotate(360deg);
-  }
+/* ─── The Forge box: header, status strip, rail | main, foot ────────────
+   Ported from docs/research/forge-shaping-redesign/renderings.html. One
+   derivation (readiness.ts) feeds every one of these surfaces, so they never
+   disagree about who holds the order or what happens next. */
+
+.fdry-wiz-head {
+  flex: none;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--tm-border);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .fdry-asked svg {
-    animation: none;
-  }
+.fdry-wiz-title {
+  flex: 1;
+  min-width: 0;
 }
 
-.fdry-check-mark svg {
+.fdry-wiz-title b {
+  font-size: 15px;
+  font-weight: 600;
+  display: block;
+}
+
+.fdry-wiz-sub {
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  align-items: center;
+}
+
+.fdry-chip {
+  font-size: 11.5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--tm-border-strong);
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+}
+
+.fdry-wiz-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.fdry-btn {
+  appearance: none;
+  font: inherit;
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fdry-btn:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-btn svg {
   width: 13px;
   height: 13px;
 }
 
-.fdry-check.is-pass .fdry-check-mark {
+.fdry-btn--quiet {
+  background: transparent;
+}
+
+.fdry-btn--primary {
+  border-color: var(--tm-accent);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-weight: 500;
+}
+
+.fdry-btn--sel {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent-text);
+  box-shadow: inset 0 0 0 1px var(--tm-accent);
+}
+
+/* The status strip: who holds the order, and what happens next. */
+.fdry-strip {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-strip-who {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+
+.fdry-strip-icon {
+  margin-top: 2px;
+  display: inline-flex;
+  flex: none;
+}
+
+.fdry-strip-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.fdry-strip-who b {
+  font-weight: 600;
+  display: block;
+}
+
+.fdry-strip-who small {
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  display: block;
+  margin-top: 2px;
+}
+
+.fdry-strip--working {
+  background: var(--tm-accent-dim);
+}
+.fdry-strip--working .fdry-strip-who {
+  color: var(--tm-accent-text);
+}
+.fdry-strip--you {
+  background: color-mix(in srgb, var(--tm-warning) 8%, transparent);
+}
+.fdry-strip--you .fdry-strip-who {
+  color: var(--tm-warning);
+}
+.fdry-strip--ready {
+  background: color-mix(in srgb, var(--tm-success) 8%, transparent);
+}
+.fdry-strip--ready .fdry-strip-who {
+  color: var(--tm-success);
+}
+.fdry-strip--bad {
+  background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
+}
+.fdry-strip--bad .fdry-strip-who {
+  color: var(--tm-danger);
+}
+.fdry-strip--neutral .fdry-strip-who {
+  color: var(--tm-text-primary);
+}
+.fdry-strip-who b,
+.fdry-strip-who small {
+  color: inherit;
+}
+.fdry-strip-who small {
+  color: var(--tm-text-secondary);
+}
+
+.fdry-strip-acts {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.fdry-body {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
+.fdry-rail {
+  border-right: 1px solid var(--tm-border);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--tm-bg-surface);
+  overflow-y: auto;
+}
+
+.fdry-rail-step {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--tm-radius-sm);
+  align-items: start;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--tm-text-primary);
+}
+
+.fdry-rail-step.is-on {
+  background: var(--tm-bg-card);
+  box-shadow: inset 2px 0 0 var(--tm-accent);
+}
+
+.fdry-mk {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--tm-border-strong);
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-mk svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-rail-step b {
+  font-weight: 500;
+  display: block;
+  font-size: 13px;
+}
+
+.fdry-rail-step small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+  line-height: 1.35;
+}
+
+.fdry-rail-step--done small {
+  color: var(--tm-success);
+}
+.fdry-rail-step--work small {
+  color: var(--tm-accent-text);
+}
+.fdry-rail-step--you small {
+  color: var(--tm-warning);
+}
+.fdry-rail-step--bad small {
+  color: var(--tm-danger);
+}
+
+.fdry-main {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+  overflow-y: auto;
+  max-width: 760px;
+}
+
+.fdry-checks {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+
+.fdry-chk {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--tm-border);
+  align-items: start;
+}
+
+.fdry-chk:last-child {
+  border-bottom: 0;
+}
+
+.fdry-chk b {
+  font-weight: 500;
+}
+
+.fdry-chk small {
+  display: block;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+}
+
+.fdry-chk-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-chk--work {
+  background: var(--tm-accent-dim);
+}
+
+.fdry-chk-moves {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.fdry-chk-moves button {
+  appearance: none;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 11px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  cursor: pointer;
+}
+
+.fdry-chk-moves button:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-pill {
+  font-size: 11.5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+}
+.fdry-pill--pass {
+  color: var(--tm-success);
+}
+.fdry-pill--work {
+  color: var(--tm-accent-text);
+}
+.fdry-pill--you {
+  color: var(--tm-warning);
+}
+.fdry-pill--bad {
+  color: var(--tm-danger);
+}
+.fdry-pill--note {
+  color: var(--tm-text-muted);
+}
+
+.fdry-group {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+}
+
+.fdry-group-h {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: default;
+}
+
+.fdry-group-h svg {
+  width: 14px;
+  height: 14px;
+}
+
+.fdry-cnt {
+  font-weight: 400;
+  color: var(--tm-text-muted);
+}
+
+.fdry-group-h--work {
+  color: var(--tm-accent-text);
+}
+.fdry-group-h--you {
+  color: var(--tm-warning);
+}
+.fdry-group-h--note {
+  color: var(--tm-text-secondary);
+}
+.fdry-group-h--done {
   color: var(--tm-success);
 }
 
-.fdry-check.is-fail .fdry-check-mark {
-  color: var(--tm-danger);
+.fdry-fnd {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--tm-border);
+  display: grid;
+  gap: 4px;
+}
+
+.fdry-fnd:last-child {
+  border-bottom: 0;
+}
+
+.fdry-fnd-meta {
+  display: block;
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-fnd-acts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.fdry-fnd-acts button {
+  appearance: none;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  cursor: pointer;
+}
+
+.fdry-fnd-acts button:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-fnd input,
+.fdry-fnd textarea {
+  font: inherit;
+  font-size: 13px;
+  background: var(--tm-bg-input);
+  color: var(--tm-text-primary);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 6px 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.fdry-group--resolved > summary {
+  list-style: none;
+}
+.fdry-group--resolved > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fdry-shapes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.fdry-shape {
+  appearance: none;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 10px 12px;
+  background: var(--tm-bg-elevated);
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  font: inherit;
+  color: var(--tm-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fdry-shape.is-on {
+  border-color: var(--tm-accent);
+  box-shadow: inset 0 0 0 1px var(--tm-accent);
+}
+
+.fdry-shape--off {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.fdry-shape-nm {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fdry-shape-nm b {
+  font-weight: 600;
+}
+
+.fdry-shape-nm svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-shape small {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.fdry-mark {
+  font-size: 10.5px;
+  padding: 0 6px;
+  border: 1px solid var(--tm-accent);
+  border-radius: 999px;
+  color: var(--tm-accent-text);
+}
+
+.fdry-mark--you {
+  border-color: var(--tm-text-primary);
+  color: var(--tm-text-primary);
+}
+
+.fdry-saved {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-saved svg {
+  width: 14px;
+  height: 14px;
+  color: var(--tm-success);
+}
+
+.fdry-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--tm-border);
+  background: var(--tm-bg-surface);
+  flex-wrap: wrap;
+}
+
+.fdry-foot .fdry-problem {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.fdry-why {
+  flex: 1;
+  min-width: 120px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.fdry-why svg {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  flex: none;
+}
+
+.fdry-toggle {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-sw {
+  appearance: none;
+  width: 30px;
+  height: 17px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tm-accent);
+  position: relative;
+  flex: none;
+  cursor: pointer;
+}
+.fdry-sw::after {
+  content: '';
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--tm-on-accent);
+  top: 2px;
+  left: 15px;
+}
+.fdry-sw--off {
+  background: var(--tm-border-strong);
+}
+.fdry-sw--off::after {
+  left: 2px;
+}
+
+.fdry-advisory {
+  flex-basis: 100%;
+  margin: 6px 0 0;
 }
 
 /* ─── What is waiting on a person ─────────────────────────────────
@@ -587,68 +877,6 @@
   margin-bottom: 12px;
 }
 
-/* A turn that ended with nothing to show for it.
-
-   The needs-you band's shape, in the danger colour rather than the warning
-   one: an unanswered question is work still in front of you, and this is work
-   that was thrown away. Above the questions in the source order, so it is
-   above them on the screen. */
-.fdry-refused {
-  background: var(--tm-bg-card);
-  border: 1px solid var(--tm-danger);
-  border-left-width: 3px;
-  border-radius: var(--tm-radius-md);
-  padding: 12px 14px;
-}
-
-.fdry-refused-h {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--tm-danger);
-}
-
-.fdry-refused-h svg {
-  width: 14px;
-  height: 14px;
-}
-
-.fdry-refused p {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--tm-text-secondary);
-}
-
-/* Verbatim, and monospaced because it is: the validator's own words, naming
-   the field and the values it would have accepted. Paraphrasing it would drop
-   the one thing that makes the next turn succeed. */
-.fdry-refused-why {
-  font-family: var(--tm-font-mono);
-  font-size: 12px;
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-surface);
-  border-radius: var(--tm-radius-sm);
-  padding: 8px 10px;
-  overflow-wrap: anywhere;
-}
-
-.fdry-refused .fdry-options button {
-  font-size: 12px;
-  padding: 5px 12px;
-}
-
-.fdry-refused .fdry-options button.is-recommended {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
 .fdry-needs-you-h {
   display: flex;
   align-items: center;
@@ -671,128 +899,18 @@
   gap: 14px;
 }
 
-/* Three questions at the top of a wide screen are three columns, not 300px of
-   banner pushing the document off the fold. The Floor's asks stay stacked —
-   they carry a command and its arguments, which do not survive a narrow
-   column. */
+/* Three asks at the top of a wide screen are columns, not 300px of banner
+   pushing the run off the fold. */
 @media (min-width: 900px) {
   .fdry-forge .fdry-needs-you-list {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
 }
 
-/* In the rail a rule separated the questions from the panel above. In the band
-   the gap does that, and a rule over the first one reads as a stray divider
-   under the heading. */
-.fdry-needs-you .fdry-question {
-  border-top: 0;
-  padding: 0;
-  font-size: 13px;
-}
-
-/* The buttons are the point of the band, so they are sized as controls rather
-   than as the footnote-sized pills they were in the rail. */
-.fdry-needs-you .fdry-options button {
-  font-size: 12px;
-  padding: 5px 12px;
-}
-
-.fdry-needs-you .fdry-options button.is-recommended {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
-/* The option the operator picked, before Send — a local choice, not yet a
-   turn, so it reads as selected rather than as sent. */
-.fdry-needs-you .fdry-options button.is-selected {
-  border-color: var(--tm-accent);
-  color: var(--tm-accent);
-}
-
-/* The move the operator picked for a blocking finding, before Send. */
-.fdry-finding-actions button[aria-pressed='true'] {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-}
-
-/* The one button that turns every decision in the band into a turn. */
-.fdry-settle-send {
-  appearance: none;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  margin-top: 12px;
-  padding: 6px 16px;
-  border: 1px solid var(--tm-accent);
-  border-radius: var(--tm-radius-sm);
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-  cursor: pointer;
-}
-
-.fdry-settle-send:disabled {
-  opacity: 0.5;
-  cursor: default;
-  background: transparent;
-  color: var(--tm-text-secondary);
-}
-
-/* A settle made while the architect was already working — waiting rather
-   than lost, and said so rather than left to look like nothing happened. */
-.fdry-queued {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: var(--tm-text-secondary);
-}
-
 /* The last ask in the band has no row under it to be divided from. */
 .fdry-needs-you .fdry-ask:last-child {
   border-bottom: 0;
   padding-bottom: 0;
-}
-
-.fdry-question {
-  border-top: 1px solid var(--tm-border);
-  padding: 9px 0;
-  font-size: 12.5px;
-}
-
-.fdry-question b {
-  display: block;
-  color: var(--tm-text-primary);
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.fdry-question p {
-  margin: 0 0 6px;
-  color: var(--tm-text-secondary);
-  font-size: 11.5px;
-}
-
-.fdry-options {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-
-.fdry-options button {
-  appearance: none;
-  border: 1px solid var(--tm-border-strong);
-  background: transparent;
-  color: var(--tm-text-secondary);
-  border-radius: var(--tm-radius-xs);
-  padding: 3px 9px;
-  font-size: 11.5px;
-  cursor: pointer;
-}
-
-.fdry-options button.is-recommended {
-  border-color: var(--tm-accent);
-  color: var(--tm-accent);
 }
 
 .fdry-note {
@@ -930,19 +1048,6 @@
   border-radius: var(--tm-radius-sm);
 }
 
-/* A finding, and the two ways to clear it. Showing them without a way to
-   clear them is what blocked the compile gate for ever. */
-.fdry-finding-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.fdry-finding-actions button {
-  white-space: nowrap;
-}
-
 .fdry-accept {
   display: flex;
   gap: 6px;
@@ -980,96 +1085,6 @@
 .fdry-field.is-redrawn {
   border-left: 2px solid var(--tm-accent);
   padding-left: 10px;
-}
-
-/* Drafting or redrafting the plan, in the order's header on every step. */
-.fdry-converge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--tm-on-accent);
-  background: var(--tm-accent);
-  border: 1px solid var(--tm-accent);
-  border-radius: var(--tm-radius-sm);
-  cursor: pointer;
-}
-
-.fdry-converge:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.fdry-converge svg {
-  width: 13px;
-  height: 13px;
-}
-
-/* The shapes of work, each with its whole description: the step has the room
-   the rail never did. An unavailable one is shown, not hidden, with the
-   requirement it does not meet. */
-.fdry-recipes {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
-}
-
-.fdry-recipe {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 12px 14px;
-  text-align: left;
-  font: inherit;
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  cursor: pointer;
-}
-
-.fdry-recipe:hover:not(:disabled) {
-  border-color: var(--tm-border-strong);
-}
-
-.fdry-recipe:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.fdry-recipe.is-on {
-  border-color: var(--tm-accent);
-  box-shadow: inset 0 0 0 1px var(--tm-accent);
-}
-
-.fdry-recipe-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.fdry-recipe b {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.fdry-recipe small {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--tm-text-secondary);
-}
-
-.fdry-recipe-mark {
-  padding: 0 7px;
-  border: 1px solid var(--tm-accent);
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 17px;
-  color: var(--tm-accent-text);
 }
 
 /* Finished work nobody has looked at. Worst risk first, so the queue's order
@@ -1708,32 +1723,6 @@
   opacity: 0.6;
 }
 
-.fdry-finding {
-  display: flex;
-  align-items: start;
-  gap: 10px;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--tm-text-primary);
-  padding: 10px 0;
-  border-bottom: 1px solid var(--tm-border);
-}
-
-.fdry-finding > svg {
-  width: 12px;
-  height: 12px;
-  flex: none;
-  margin-top: 3px;
-  color: var(--tm-warning);
-}
-
-/* The finding gets the full width; its moves sit under it. Beside it, three
-   buttons squeezed a reviewer's paragraph into a narrow column. */
-.fdry-finding-body {
-  flex: 1;
-  min-width: 0;
-}
-
 .fdry-finding-headline {
   display: block;
   font-weight: 500;
@@ -1752,63 +1741,6 @@
 
 .fdry-finding-detail[open] > summary {
   margin-bottom: 4px;
-}
-
-.fdry-cleared {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.fdry-finding.is-cleared {
-  font-size: 12.5px;
-  color: var(--tm-text-secondary);
-}
-
-.fdry-finding.is-cleared > svg {
-  color: inherit;
-  opacity: 0.7;
-}
-
-.fdry-finding.is-cleared .fdry-finding-headline {
-  font-weight: 400;
-}
-
-.fdry-finding-reason {
-  display: block;
-  margin-top: 2px;
-  font-style: italic;
-}
-
-/* A blocking finding, on the Red team step: read-only here, it only points
-   back to the band that actually decides it. */
-.fdry-findings-pointer {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-}
-
-/* A note the red team raised that does not block hand-off — real, but
-   nothing here for the operator to act on. */
-.fdry-notes {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.fdry-finding.is-note {
-  font-size: 12.5px;
-  color: var(--tm-text-secondary);
-}
-
-.fdry-finding-category {
-  display: inline-block;
-  margin-top: 4px;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--tm-text-secondary);
 }
 
 .fdry-input {

@@ -305,7 +305,7 @@ test('an open order is a frame, and the controls that end it never scroll away',
     const step = await inFoundry<{ height: number; viewport: number } | null>(
       handle,
       `(function () {
-      var el = document.querySelector('.fdry-step')
+      var el = document.querySelector('.fdry-main')
       if (!el) return null
       return { height: Math.round(el.getBoundingClientRect().height), viewport: window.innerHeight }
     })()`

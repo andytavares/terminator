@@ -46,9 +46,10 @@ describe('the Forge is one box of steps', () => {
 
     const wizard = container.querySelector('.fdry-wizard')
     expect(Array.from(wizard?.children ?? []).map((el) => el.className)).toEqual([
-      'fdry-wizard-head',
-      'fdry-step',
-      'fdry-wizard-foot',
+      'fdry-wiz-head',
+      'fdry-strip fdry-strip--neutral',
+      'fdry-body',
+      'fdry-foot',
     ])
   })
 })

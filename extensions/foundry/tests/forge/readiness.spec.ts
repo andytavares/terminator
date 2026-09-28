@@ -1051,13 +1051,40 @@ describe('readiness — locks and canHandOff', () => {
 describe('readiness — summary', () => {
   it('renders grade, unit count, shape and status', () => {
     const result = readiness(baseInput({ shape: { name: 'quick', yours: true } }))
-    expect(result.summary).toBe(
-      'Low risk · 1 unit · Shape: Quick (your choice) · Still being shaped'
-    )
+    expect(result.summary).toBe('Low risk · 1 unit · Shape: Quick (your choice) · Draft')
   })
 
   it('shape not chosen', () => {
     const result = readiness(baseInput({ shape: { name: null, yours: false } }))
-    expect(result.summary).toBe('Low risk · 1 unit · Shape: not chosen · Still being shaped')
+    expect(result.summary).toBe('Low risk · 1 unit · Shape: not chosen · Draft')
+  })
+})
+
+describe('readiness — finding text in plain words', () => {
+  // The red team writes criterion and unit ids; the operator reads what they are.
+  it('names criteria and units by position instead of by id', () => {
+    const order = wo0928Order({
+      redTeam: [
+        blockingFinding({
+          id: 'RT-a',
+          text: 'AC-1 passes on a filter applied after the page is fetched.',
+        }),
+        blockingFinding({ id: 'RT-b', text: 'Only U-1 builds AC-2, and AC-9 does not exist.' }),
+      ],
+    })
+    const texts = readiness(baseInput({ order })).findings.map((f) => f.text)
+    expect(texts).toEqual([
+      'The first criterion passes on a filter applied after the page is fetched.',
+      'Only the unit builds the second criterion, and AC-9 does not exist.',
+    ])
+  })
+
+  it('leaves a finding that names no id exactly as written', () => {
+    const order = wo0928Order({
+      redTeam: [blockingFinding({ id: 'RT-a', text: 'the change would leave the outcome false' })],
+    })
+    expect(readiness(baseInput({ order })).findings[0].text).toBe(
+      'the change would leave the outcome false'
+    )
   })
 })

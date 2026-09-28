@@ -790,9 +790,26 @@ const NOTE_META: Record<string, string> = {
   infra: 'Setup',
 }
 
-function findingText(text: string): string {
+const ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth']
+
+/**
+ * A finding's first paragraph, with criterion and unit ids named by what they are.
+ *
+ * An id that names nothing on the order is left alone rather than guessed at.
+ */
+function findingText(text: string, order: WorkOrder): string {
   const idx = text.search(/\n\s*\n/)
-  return (idx === -1 ? text : text.slice(0, idx)).trim()
+  const first = (idx === -1 ? text : text.slice(0, idx)).trim()
+  const named = first.replace(/\b(AC|U)-\d+\b/g, (id, kind: string, offset: number) => {
+    const list: readonly { readonly id: string }[] =
+      kind === 'AC' ? order.acceptance : order.plan.units
+    const at = list.findIndex((item) => item.id === id)
+    if (at === -1 || at >= ORDINALS.length) return id
+    const noun = kind === 'AC' ? 'criterion' : 'unit'
+    const phrase = list.length === 1 ? `the ${noun}` : `the ${ORDINALS[at]} ${noun}`
+    return offset === 0 ? capitalise(phrase) : phrase
+  })
+  return named
 }
 
 function buildFindings(input: ReadinessInput): readonly FindingView[] {
@@ -802,7 +819,7 @@ function buildFindings(input: ReadinessInput): readonly FindingView[] {
     ((intake.actor === 'architect' && intake.round !== null) || intake.actor === 'red team')
 
   return order.redTeam.map((finding) => {
-    const text = findingText(finding.text)
+    const text = findingText(finding.text, order)
     if (finding.status !== 'open') {
       return { id: finding.id, text, group: 'resolved', meta: finding.reason || 'Resolved' }
     }
@@ -923,7 +940,7 @@ function buildSummary(order: WorkOrder, shape: ReadinessInput['shape']): string 
     shape.name === null
       ? 'not chosen'
       : `${capitalise(shape.name)} (${shape.yours ? 'your choice' : 'proposed'})`
-  return `${capitalise(gradeInWords(order.risk.grade))} · ${n} unit${pluralS(n)} · Shape: ${shapePart} · ${capitalise(statusInWords(order.status))}`
+  return `${capitalise(gradeInWords(order.risk.grade))} · ${n} unit${pluralS(n)} · Shape: ${shapePart} · ${order.status === 'draft' ? 'Draft' : capitalise(statusInWords(order.status))}`
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────

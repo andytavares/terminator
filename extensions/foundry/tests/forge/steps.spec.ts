@@ -81,6 +81,26 @@ describe('where an order opens', () => {
     expect(openingStep(shown, forgeSteps(failing('coverage', 'redTeam'), ALL))).toBe('intent')
   })
 
+  // The questions live on the Plan step now, not in a band above every step,
+  // so an order waiting on an answer has to open where the answer is given.
+  it('opens an order with an unanswered question on the plan, even before criteria exist', () => {
+    const asked = order({
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'which?',
+          why: '',
+          options: ['a', 'b'],
+          recommended: 0,
+          answer: null,
+          rank: 1,
+          confidence: 0.6,
+        },
+      ],
+    })
+    expect(openingStep(asked, forgeSteps(failing('questions', 'coverage'), ALL))).toBe('plan')
+  })
+
   it('opens a drafted order on the first step that is blocking', () => {
     const shown = order({ acceptance: [CRITERION] })
     expect(openingStep(shown, forgeSteps(failing('redTeam', 'coverage'), ALL))).toBe('plan')
