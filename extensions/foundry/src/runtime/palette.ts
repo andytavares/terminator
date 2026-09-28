@@ -1,6 +1,7 @@
 import * as path from 'node:path'
 import type { Run } from './run-registry.js'
 import type { ReviewItem } from './review/review-queue.js'
+import { gradeInWords } from './review/risk-grader.js'
 
 // The palette over runs and cards.
 //
@@ -68,7 +69,7 @@ export function paletteEntries(
   const reviewEntries = review.map<PaletteEntry>((item) => ({
     id: `review.${item.sessionId}`,
     label: `Review ${path.basename(item.repoPath)}`,
-    description: `${item.grade} · ${item.gradeTrigger} · ${item.diffSummary.files} file${item.diffSummary.files === 1 ? '' : 's'}`,
+    description: `${gradeInWords(item.grade)} · ${item.gradeTrigger} · ${item.diffSummary.files} file${item.diffSummary.files === 1 ? '' : 's'}`,
     category: CATEGORY,
     sessionId: item.sessionId,
     kind: 'review',

@@ -1,3 +1,5 @@
+import { defaultInWords } from '../gates/rules.js'
+import { GateEvidence } from './GateEvidence.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Terminal,
@@ -25,6 +27,8 @@ import {
   type FloorView,
   type PendingAsk,
 } from '../renderer/use-run-observation.js'
+import { gradeInWords } from '../runtime/review/risk-grader.js'
+import type { RiskGrade } from '../runtime/review/risk-grader.js'
 
 // Where you watch, not where you act.
 //
@@ -604,7 +608,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                   return (
                     <li key={node.id} className="fdry-live-agent">
                       <div className="fdry-live-head">
-                        <b>{view.labels?.[node.id] ?? node.id}</b>
+                        <b>{view.labels?.[node.id] ?? node.role ?? 'this step'}</b>
                         {last === undefined ? null : (
                           <time dateTime={new Date(last.at).toISOString()}>
                             {ago(last.at, Date.now())}
@@ -721,6 +725,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             <div key={gate.id} className="fdry-standing-gate">
               <p className="fdry-standing-gate-h">{gate.summary}</p>
               <p className="fdry-note">{gate.why}</p>
+              <GateEvidence evidence={gate.evidence ?? []} />
               {raising === gate.id && gate.breach ? (
                 <RaiseBudgetForm
                   breach={gate.breach}
@@ -759,8 +764,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                   is a token from a rules file, not a sentence. */}
               <p className="fdry-note">
                 Nothing happens until you answer. Left alone, Foundry takes &ldquo;
-                {gate.options.find((o) => o.id === gate.defaultIfIgnored)?.label ??
-                  gate.defaultIfIgnored}
+                {defaultInWords(gate)}
                 &rdquo;.
               </p>
             </div>
@@ -931,7 +935,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                       // watching the run needs to read.
                       title={node.id}
                     >
-                      {view.labels?.[node.id] ?? node.id}
+                      {view.labels?.[node.id] ?? node.role ?? 'this step'}
                       <u>{gone ? 'stopped' : STATE_LABEL[node.state]}</u>
                       {reworks > 0 ? (
                         <span className="fdry-unit-rework">{`Sent back ${reworks}×`}</span>
@@ -941,7 +945,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                           <button
                             type="button"
                             className="fdry-unit-attach"
-                            aria-label={`Watch ${view.labels?.[node.id] ?? node.id}`}
+                            aria-label={`Watch ${view.labels?.[node.id] ?? node.role ?? 'this step'}`}
                             onClick={() => setWatching(node.sessionId)}
                           >
                             <ShieldQuestion aria-hidden="true" />
@@ -949,7 +953,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                           <button
                             type="button"
                             className="fdry-unit-attach"
-                            aria-label={`Attach to ${view.labels?.[node.id] ?? node.id}`}
+                            aria-label={`Attach to ${view.labels?.[node.id] ?? node.role ?? 'this step'}`}
                             onClick={() => void attach(node.id)}
                           >
                             <Terminal aria-hidden="true" />
@@ -1042,7 +1046,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           <h3 className="fdry-panel-h">To review — {review.length}</h3>
           {review.map((item) => (
             <div key={item.sessionId} className="fdry-review-row">
-              <span className={`fdry-grade is-${item.grade.toLowerCase()}`}>{item.grade}</span>
+              <span className={`fdry-grade is-${item.grade.toLowerCase()}`}>
+                {gradeInWords(item.grade as RiskGrade)}
+              </span>
               <div className="fdry-review-main">
                 <b>{item.branch}</b>
                 <small>
@@ -1173,7 +1179,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               </span>
               <button
                 type="button"
-                aria-label={`Dismiss ${entry.id}`}
+                aria-label={`Dismiss: ${entry.summary}`}
                 onClick={() => void dismiss(entry, false)}
               >
                 <X aria-hidden="true" />
@@ -1218,7 +1224,11 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             return (
               <div key={`${session}-${entry.firing.firedAt}`} className="fdry-ask">
                 <div className="fdry-ask-main">
-                  <b>{node === undefined ? session : (view.labels?.[node.id] ?? node.id)}</b>
+                  <b>
+                    {node === undefined
+                      ? session
+                      : (view.labels?.[node.id] ?? node.role ?? 'this step')}
+                  </b>
                   <small>
                     {stallInWords(entry.firing)}
                     {entry.shadow ? ' · shadow' : ''}

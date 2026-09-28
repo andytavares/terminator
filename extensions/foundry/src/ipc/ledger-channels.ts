@@ -153,11 +153,16 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     }).find((candidate) => candidate.id === proposalId)
 
     if (found === undefined) {
-      return { error: `The ledger no longer supports ${proposalId}. Ask again for proposals.` }
+      return { error: 'The ledger no longer supports that suggestion. Ask again for suggestions.' }
     }
 
     if (!accept) {
-      await declineProposal(deps.dataRoot(), proposalId, reason ?? 'declined by the operator')
+      await declineProposal(
+        deps.dataRoot(),
+        proposalId,
+        reason ?? 'declined by the operator',
+        found.asserts
+      )
       return { ok: true, accepted: false }
     }
 
@@ -192,12 +197,12 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     const accepted = deps.acceptedRules().find((rule) => rule.id === ruleId)
     if (accepted === undefined) {
       return {
-        error: `${ruleId} is not one of the checks you accepted, so it is not yours to remove.`,
+        error: 'That check is not one you accepted, so it is not yours to remove.',
       }
     }
 
     const reason = parsed.data.reason ?? 'removed by the operator'
-    const removed = await removeRule(deps.dataRoot(), ruleId, reason)
+    const removed = await removeRule(deps.dataRoot(), ruleId, reason, accepted.asserts)
     return { ok: true, removed, reason, at: deps.now() }
   }
 

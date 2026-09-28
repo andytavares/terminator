@@ -378,7 +378,7 @@ describe('stopping a run whose agents are still alive', () => {
     await call('foundry:inbox.decide', { gateId: 'WO-1-budget', option: 'stop' })
     expect(runner.stop).toHaveBeenCalledWith(
       'session-from-a-dead-process',
-      expect.stringContaining('budget.exceeded')
+      expect.stringContaining('a run going past its time, files or agent budget')
     )
     expect((await store.load('WO-1'))?.status).toBe('cancelled')
   })

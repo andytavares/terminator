@@ -250,3 +250,8 @@ Changed spec files also run with `--repeat-each=3` in the same job (a burn-in). 
 - Keep `retries: 1` + `failOnFlakyTests`: same verdict as `retries: 0`, but slower.
 - `fullyParallel: true`: breaks every shared-`beforeAll` file and relaunches the app per slice.
 - Ubuntu runners for E2E: the product and its PTY/codesign behaviour are macOS.
+
+## Follow-up, 2026-09-28: two more causes
+
+- **Unit suite, `ENOTEMPTY` in a spec's cleanup.** `git commit` and `git fetch` start `git maintenance run --auto --quiet --detach` (seen with `GIT_TRACE=1`, git 2.55). The detached process was still writing into the spec's temporary repository when `afterEach` deleted it. This happened only when the machine was busy: 1 in 5 full runs, and 0 in 40 runs of the spec alone. `tests/setup.ts` now turns automatic maintenance off through a test-only XDG git config that includes the operator's own. It can't be a `GIT_*` variable: the local ones are forbidden by `inherited-git-env.spec.ts`, and specs scrub the rest. Guarded by `tests/unit/git-test-env.spec.ts`. After the fix: 9 of 9 full runs passed.
+- **E2E, launch timeouts in the first wave.** One local run had all eight first-wave `beforeAll` launches exceed 30 s. It didn't reproduce in 11 further full runs, including 16 workers and the unit suite running alongside. Locally at most 4 workers now run at once (`playwright.config.ts`); 5 of 5 full runs passed, about 62 s each. `launchApp` now fails at 25 s with the app's own startup output, so the next occurrence names its cause instead of a bare hook timeout.

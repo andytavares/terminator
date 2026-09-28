@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { getFoundryAPI, type ModelChoiceView } from '../types/electron.js'
+import { rungInWords } from '../recipe/rung.js'
+import type { Rung } from '../recipe/rung.js'
 
 // What is left for a bespoke settings surface.
 //
@@ -262,7 +264,7 @@ export function SettingsView(): JSX.Element {
           <li key={row.def.id} className="fdry-sensor">
             <div className="fdry-sensor-head">
               <b>{row.def.description}</b>
-              <span className="fdry-sensor-rung">{row.rung}</span>
+              <span className="fdry-sensor-rung">{rungInWords(row.rung as Rung)}</span>
               <label className="fdry-sensor-toggle">
                 <input
                   type="checkbox"

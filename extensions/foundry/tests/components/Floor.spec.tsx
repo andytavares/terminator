@@ -307,7 +307,7 @@ describe('the units', () => {
     mount(reply({ lanes: TWO_LANES }))
     await waitFor(() => screen.getByText('Merge order'))
     const buttons = screen.getAllByRole('button', { name: /^Attach to/ })
-    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Attach to N-1'])
+    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Attach to builder'])
 
     fireEvent.click(buttons[0])
     await waitFor(() =>
@@ -353,7 +353,7 @@ describe('a rework', () => {
 
   it('does not show the chip for a node with no reworks', async () => {
     mount(reply())
-    await waitFor(() => screen.getByText('N-1'))
+    await waitFor(() => expect(document.querySelector('[title="N-1"]')).toBeTruthy())
     expect(screen.queryByText(/Sent back/)).toBeNull()
   })
 
@@ -368,7 +368,7 @@ describe('a rework', () => {
 
   it('has no disclosure for a node with no feedback', async () => {
     mount(reply())
-    await waitFor(() => screen.getByText('N-1'))
+    await waitFor(() => expect(document.querySelector('[title="N-1"]')).toBeTruthy())
     expect(screen.queryByText('Why it was sent back')).toBeNull()
   })
 })
@@ -376,14 +376,14 @@ describe('a rework', () => {
 describe('a node with skills', () => {
   it('shows which skills that node gets', async () => {
     mount(reply({ skills: { 'N-1': ['ci-fix'] } }))
-    await waitFor(() => screen.getByText('N-1'))
+    await waitFor(() => expect(document.querySelector('[title="N-1"]')).toBeTruthy())
     expect(screen.getByText(/Skills: ci-fix/)).toBeTruthy()
   })
 
   it('omits the line for a node with no skills', async () => {
     mount(reply({ skills: { 'N-1': ['ci-fix'] } }))
-    await waitFor(() => screen.getByText('N-2'))
-    const n2 = screen.getByText('N-2').closest('span')
+    await waitFor(() => expect(document.querySelector('[title="N-2"]')).toBeTruthy())
+    const n2 = document.querySelector('[title="N-2"]')?.closest('span')
     expect(n2?.textContent).not.toContain('Skills:')
   })
 })
@@ -486,7 +486,7 @@ describe('watching a run', () => {
   it('shows what the agent has been saying', async () => {
     mount(reply(), { lines: [said('reading src/auth/session.ts')] })
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
     const panel = await screen.findByRole('region', { name: 's-1' })
     await waitFor(() => expect(within(panel).getByText(/reading src\/auth/)).toBeTruthy())
     expect(panel.textContent).not.toContain('[object Object]')
@@ -495,14 +495,14 @@ describe('watching a run', () => {
   it('says so when there is nothing yet, rather than showing an empty box', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
     await waitFor(() => expect(screen.getByText('Nothing yet.')).toBeTruthy())
   })
 
   it('redirects it', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
     await waitFor(() => screen.getByLabelText('Tell it what to do instead'))
 
     fireEvent.change(screen.getByLabelText('Tell it what to do instead'), {
@@ -520,7 +520,7 @@ describe('watching a run', () => {
   it('interrupts it', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
     await waitFor(() => screen.getByRole('button', { name: 'Interrupt' }))
     fireEvent.click(screen.getByRole('button', { name: 'Interrupt' }))
     await waitFor(() =>
@@ -531,7 +531,7 @@ describe('watching a run', () => {
   it('stops it, saying why', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
     await waitFor(() => screen.getByRole('button', { name: 'Stop' }))
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
     await waitFor(() =>
@@ -545,7 +545,7 @@ describe('watching a run', () => {
   it('says so when the run is already over', async () => {
     mount(reply(), { control: { ok: false } })
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch N-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
     await waitFor(() => screen.getByRole('button', { name: 'Interrupt' }))
     fireEvent.click(screen.getByRole('button', { name: 'Interrupt' }))
     await waitFor(() => expect(screen.getByText('that run is no longer live')).toBeTruthy())
@@ -582,7 +582,7 @@ describe('finished work nobody has looked at', () => {
   it('lists it worst risk first, with the reason for the grade', async () => {
     mount(reply(), { review: [REVIEW] })
     await waitFor(() => expect(screen.getByText('To review — 1')).toBeTruthy())
-    expect(screen.getByText('P0')).toBeTruthy()
+    expect(screen.getByText('highest risk')).toBeTruthy()
     expect(screen.getByText(/touches authentication/)).toBeTruthy()
     expect(screen.getByText(/2 files/)).toBeTruthy()
   })
@@ -755,7 +755,7 @@ describe('what happened while you were away', () => {
   it('clears one line without hiding the rest', async () => {
     mount(reply(), { feed: [ENTRY] })
     await waitFor(() => screen.getByText('Activity'))
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss f-1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: edited session.ts' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:feed-dismiss', { id: 'f-1', sessionId: 's-1' })
     )
@@ -1016,9 +1016,9 @@ describe('what a node is called on the Floor', () => {
     )
   })
 
-  it('falls back to the id when nothing supplied a label', async () => {
+  it('falls back to the role when nothing supplied a label', async () => {
     mount(reply())
-    await waitFor(() => expect(screen.getByText('N-1')).toBeTruthy())
+    await waitFor(() => expect(screen.getAllByText('builder').length).toBeGreaterThan(0))
   })
 
   it('names a blocked node the same way the chips do', async () => {
@@ -1327,7 +1327,7 @@ describe('the standing band', () => {
     const band = await screen.findByRole('region', { name: 'Building' })
     await waitFor(() => expect(within(band).getByText('Bash: npm test')).toBeTruthy())
     expect(within(band).getByText('Read: src/forge/intake.ts')).toBeTruthy()
-    expect(within(band).getByText('N-1')).toBeTruthy()
+    expect(within(band).getByText('builder')).toBeTruthy()
     expect(within(band).getByText(/\d+s ago/)).toBeTruthy()
     expect(invoke).toHaveBeenCalledWith(
       'foundry:run-transcript',

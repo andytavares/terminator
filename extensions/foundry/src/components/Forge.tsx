@@ -12,8 +12,11 @@ import type { CapabilityReport } from '../trackers/write-back.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
 import { PROPOSAL_FILE } from '../order/proposal.js'
 import { forgeSteps, openingStep, type StepId } from '../forge/steps.js'
-import { budgetsInWords } from '../order/render.js'
+import { budgetsInWords, statusInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
+import { rungInWords } from '../recipe/rung.js'
+import type { Rung } from '../recipe/rung.js'
+import { gradeInWords } from '../runtime/review/risk-grader.js'
 
 // The Forge.
 //
@@ -842,7 +845,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                     {choice?.mode === 'fix' ? (
                       <div className="fdry-accept is-fix">
                         <textarea
-                          aria-label={`How should ${finding.id} be fixed?`}
+                          aria-label={`How should "${finding.text}" be fixed?`}
                           placeholder="How should it be fixed?"
                           rows={3}
                           value={choice.text}
@@ -859,7 +862,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                     {choice?.mode === 'accept' ? (
                       <div className="fdry-accept">
                         <input
-                          aria-label={`Why ${finding.id} is accepted`}
+                          aria-label={`Why "${finding.text}" is accepted`}
                           placeholder="Why it stands…"
                           value={choice.text}
                           disabled={busy}
@@ -951,8 +954,8 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
             </span>
           </div>
           <p className="fdry-order-sub">
-            recipe <b>{order.recipe ?? 'not chosen'}</b> · risk {order.risk.grade} ·{' '}
-            {order.plan.units.length} units · {order.status}
+            recipe <b>{order.recipe ?? 'not chosen'}</b> · {gradeInWords(order.risk.grade)} risk ·{' '}
+            {order.plan.units.length} units · {statusInWords(order.status)}
           </p>
           <nav aria-label="Steps">
             <ol className="fdry-steps">
@@ -1276,7 +1279,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         type="button"
                         className={`fdry-recipe ${isChosen ? 'is-on' : ''}`}
                         aria-pressed={isChosen}
-                        disabled={!option.available || locked}
+                        disabled={!option.available}
                         onClick={() => setChosen(option.name)}
                       >
                         <span className="fdry-recipe-name">
@@ -1287,7 +1290,8 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                         </span>
                         <small>
                           {option.available
-                            ? (option.description ?? `from ${option.rung ?? 'built-in'}`)
+                            ? (option.description ??
+                              `from ${rungInWords((option.rung ?? 'built-in') as Rung)}`)
                             : option.unmet.join('; ')}
                         </small>
                       </button>
@@ -1449,7 +1453,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 >
                   <Play aria-hidden="true" />
                   {!isDraft
-                    ? `Handed off — ${order.status}`
+                    ? `Handed off — ${statusInWords(order.status)}`
                     : compile.ok
                       ? 'Compile & hand off'
                       : `Blocked by ${compile.failures.length} ${compile.failures.length === 1 ? 'check' : 'checks'}`}

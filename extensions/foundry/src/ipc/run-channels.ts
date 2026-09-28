@@ -17,6 +17,7 @@ import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
 import { runFailure } from '../line/run-outcome.js'
 import { skillsFor } from '../line/executor.js'
+import { gradeInWords } from '../runtime/review/risk-grader.js'
 import { createRoleRegistry } from '../line/roles.js'
 import { readCiState } from '../line/ci-state.js'
 import { queue } from '../line/refinery.js'
@@ -277,7 +278,7 @@ export function recipeLadder(order: WorkOrder): ProposedRecipe[] {
       ? { name: 'standard', why: `${lanes} lanes of work` }
       : {
           name: 'standard',
-          why: `graded ${order.risk.grade}, which is above the direct shape's ceiling`,
+          why: `graded ${gradeInWords(order.risk.grade)}, which is above the direct shape's ceiling`,
         }
   if (lanes > 1) return [heaviest]
 
@@ -286,8 +287,8 @@ export function recipeLadder(order: WorkOrder): ProposedRecipe[] {
     name: 'direct',
     why:
       triggers.length === 0
-        ? `one lane, graded ${grade}`
-        : `one lane graded ${grade}, and ${triggers.join(', ')} fired`,
+        ? `one lane, graded ${gradeInWords(grade)}`
+        : `one lane graded ${gradeInWords(grade)}, and ${triggers.join(', ')} fired`,
   }
 
   if (grade === 'P3' && triggers.length === 0) {
@@ -295,7 +296,10 @@ export function recipeLadder(order: WorkOrder): ProposedRecipe[] {
     // not decoration: in a repository with no suite, `quick`'s only check does
     // not exist, and proposing a shape that cannot run here would refuse the
     // run rather than choose a shape that can.
-    return [{ name: 'quick', why: 'one lane, graded P3, nothing flagged' }, direct]
+    return [
+      { name: 'quick', why: `one lane, graded ${gradeInWords('P3')}, nothing flagged` },
+      direct,
+    ]
   }
   if (grade === 'P2' || grade === 'P3') return [direct]
   return [heaviest]

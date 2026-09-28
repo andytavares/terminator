@@ -241,6 +241,9 @@ function mountForStart(over: Record<string, unknown> = {}) {
       return {
         order: shown,
         compile: compileOrder(shown),
+        ...(over.intake === undefined
+          ? {}
+          : { intake: typeof over.intake === 'function' ? over.intake() : over.intake }),
         ...(commit ? { advisory: (over.advisory as string | null | undefined) ?? null } : {}),
       }
     }
@@ -389,6 +392,41 @@ describe('choosing the shape of work', () => {
     mountForStart({ recipes: { recipes: [], proposed: '' } })
     await waitFor(() => screen.getByRole('button', { name: /Compile/ }))
     expect(within(stepList()).queryByRole('button', { name: /^Shape/ })).toBeNull()
+  })
+
+  // A turn that never finishes must not lock every shape but the proposal:
+  // the operator can always override it, whether or not the architect is
+  // still working (see forge/intake-outcome.ts — a running turn never races
+  // the hand-off, because the shape is only local state until Send).
+  it('lets an available shape be chosen while an intake turn is running, and hand-off carries it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const running = { kind: 'running' as const, at: '2026-09-06T10:00:00.000Z', sessionId: 'S-1' }
+    const ended = { kind: 'redrafted' as const, at: '2026-09-06T10:01:00.000Z', note: 'redrafted' }
+    let polls = 0
+    mountForStart({
+      intake: () => {
+        polls += 1
+        return polls > 1 ? ended : running
+      },
+    })
+    await openStep('Shape')
+    const direct = screen.getByText('direct').closest('button') as HTMLElement
+    expect(direct.hasAttribute('disabled')).toBe(false)
+    expect(direct.getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.click(direct)
+    expect(direct.getAttribute('aria-pressed')).toBe('true')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await openStep('Hand off')
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: /Compile/ }).hasAttribute('disabled')).toBe(false)
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Compile/ }))
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1', recipe: 'direct' })
+    )
+    vi.useRealTimers()
   })
 })
 
@@ -607,7 +645,7 @@ describe('deciding a blocking finding, in the band', () => {
     withFinding()
     await waitFor(() => screen.getByText('the outcome restates the problem'))
     fireEvent.click(screen.getByRole('button', { name: 'Fix it…' }))
-    const how = screen.getByLabelText(/How should RT-1 be fixed/)
+    const how = screen.getByLabelText(/How should "the outcome restates the problem" be fixed/)
     fireEvent.change(how, { target: { value: 'state what will be observably different' } })
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
 
@@ -687,7 +725,7 @@ describe('deciding a blocking finding, in the band', () => {
     withFinding()
     await waitFor(() => screen.getByText('the outcome restates the problem'))
     fireEvent.click(screen.getByRole('button', { name: 'Accept' }))
-    const box = await screen.findByLabelText(/Why RT-1 is accepted/)
+    const box = await screen.findByLabelText(/Why "the outcome restates the problem" is accepted/)
 
     // Nothing is sent until there is one — a shrug is not a decision.
     const send = () => screen.getByRole('button', { name: 'Send decisions' }) as HTMLButtonElement
@@ -780,13 +818,13 @@ describe('settling everything the operator decided in one submit', () => {
 
     const findingOne = screen.getByText('finding one').closest('.fdry-finding') as HTMLElement
     fireEvent.click(within(findingOne).getByRole('button', { name: 'Fix it…' }))
-    fireEvent.change(within(findingOne).getByLabelText(/How should RT-1 be fixed/), {
+    fireEvent.change(within(findingOne).getByLabelText(/How should "finding one" be fixed/), {
       target: { value: 'do it this way' },
     })
 
     const findingTwo = screen.getByText('finding two').closest('.fdry-finding') as HTMLElement
     fireEvent.click(within(findingTwo).getByRole('button', { name: 'Accept' }))
-    fireEvent.change(within(findingTwo).getByLabelText(/Why RT-2 is accepted/), {
+    fireEvent.change(within(findingTwo).getByLabelText(/Why "finding two" is accepted/), {
       target: { value: 'priced in' },
     })
 

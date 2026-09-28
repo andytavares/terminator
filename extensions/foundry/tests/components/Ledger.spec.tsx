@@ -316,6 +316,26 @@ describe('removing an accepted check (FR-081)', () => {
     expect(screen.getByText(/it fired on everything/)).toBeTruthy()
   })
 
+  it('names a declined check by what it would have checked, never by its id', async () => {
+    mount({
+      inForce: {
+        rules: [],
+        declined: [
+          {
+            id: 'curator-hardcodes-the-timeout',
+            reason: 'it fired on everything',
+            asserts: 'The sync timeout is read from settings.',
+          },
+          { id: 'curator-skips-the-lint-step', reason: 'noise', asserts: null },
+        ],
+      },
+    })
+    await waitFor(() => expect(screen.getByText('Checks you accepted')).toBeTruthy())
+    expect(screen.getByText(/The sync timeout is read from settings\./)).toBeTruthy()
+    expect(screen.getByText(/Skips the lint step/)).toBeTruthy()
+    expect(document.body.textContent).not.toContain('curator-')
+  })
+
   it('shows the panel not at all when there is nothing in force and nothing declined', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -328,7 +348,7 @@ describe('the skills in force', () => {
     mount({ inForce: { rules: [], declined: [], skills: [{ id: 'ci-fix', rung: 'built-in' }] } })
     await waitFor(() => expect(screen.getByText('Skills in force')).toBeTruthy())
     expect(screen.getByText(/ci-fix/)).toBeTruthy()
-    expect(screen.getByText(/built-in/)).toBeTruthy()
+    expect(screen.getByText(/built into Foundry/)).toBeTruthy()
   })
 
   it('shows the panel not at all when nothing is available', async () => {

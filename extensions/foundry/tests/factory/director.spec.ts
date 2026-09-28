@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { direct } from '../../src/factory/director.js'
 import { createWorld, seatOf, tick } from '../../src/factory/sim.js'
 import type { World, Crew } from '../../src/factory/sim.js'
@@ -8,7 +11,9 @@ import { parseRecipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
+import { diffObservation } from '../../src/factory/events.js'
 import type { Observation, FactoryEvent } from '../../src/factory/events.js'
+import { readTranscript } from '../../src/runtime/transcript-tailer.js'
 
 // direct() turns a batch of FactoryEvents into a new World: it never moves
 // anyone for a reason that is not one of those events, and coalescing is
@@ -600,6 +605,96 @@ describe('direct: CI', () => {
     const one = direct(world, [{ kind: 'ci-check', name: 'test', bucket: 'pending' }], 0)
     const two = direct(one, [{ kind: 'ci-check', name: 'test', bucket: 'pass' }], 0)
     expect(two.ci?.checks.test).toBe('pass')
+  })
+})
+
+// The real bug: a worker walked to the bookshelf or the server rack and never
+// walked back. It was never in `direct`'s own unit tests — those fed it
+// close events shaped the way production ought to produce them, which is not
+// how `readTranscript` actually shaped them (an empty `toolName`, always
+// `toolProp('', false) === 'desk'`, which `applyTool`'s old prop-matched
+// lookup could never pair with the matching open). These drive the real
+// tailer -> diffObservation -> direct pipeline end to end, on both an
+// archive tool (Read) and a rack tool (Bash), and fail on the old code.
+describe('direct: the real pipeline never strands a worker at the shelf or the rack', () => {
+  let dir: string
+  let transcript: string
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'director-pipeline-'))
+    transcript = join(dir, 's1.jsonl')
+  })
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+
+  function toolUseLine(id: string, name: string, at: string): string {
+    return JSON.stringify({
+      type: 'assistant',
+      timestamp: at,
+      message: { content: [{ type: 'tool_use', id, name }] },
+    })
+  }
+
+  function toolResultLine(id: string, at: string): string {
+    return JSON.stringify({
+      type: 'user',
+      timestamp: at,
+      message: { content: [{ type: 'tool_result', tool_use_id: id }] },
+    })
+  }
+
+  /** Runs one call from open through close over the real pipeline, and returns the crew member. */
+  function runCall(toolName: string): Crew {
+    writeFileSync(transcript, toolUseLine('c1', toolName, '2026-09-27T10:00:00.000Z') + '\n')
+
+    const g = graph()
+    const map = layoutHall(g)
+    const emptyObs = obs(g, { activity: {} })
+    let world = createWorld(map, emptyObs)
+
+    const started = readTranscript(transcript)
+    const afterStart = obs(g, { activity: { a: started } })
+    world = direct(world, diffObservation(emptyObs, afterStart), 0)
+
+    appendFileSync(transcript, toolResultLine('c1', '2026-09-27T10:00:05.000Z') + '\n')
+    const finished = readTranscript(transcript)
+    const afterFinish = obs(g, { activity: { a: finished } })
+    world = direct(world, diffObservation(afterStart, afterFinish), 5000)
+
+    return world.crew.find((c) => c.nodeId === 'a')!
+  }
+
+  it('walks a Read call to the bookshelf and back to the seat when it closes', () => {
+    const crew = runCall('Read')
+    const seat = seatOf(layoutHall(graph()), 'a')
+    expect(seat).not.toBeNull()
+    expect(crew.goal).toEqual(seat)
+    expect(crew.then).toBe('idle')
+  })
+
+  it('walks a Bash call to the rack and back to the seat when it closes', () => {
+    const crew = runCall('Bash')
+    expect(crew.goal).toEqual(seatOf(layoutHall(graph()), 'a'))
+    expect(crew.then).toBe('idle')
+  })
+
+  it('the world after the close no longer remembers the call as open', () => {
+    writeFileSync(transcript, toolUseLine('c1', 'Read', '2026-09-27T10:00:00.000Z') + '\n')
+    const g = graph()
+    const map = layoutHall(g)
+    const emptyObs = obs(g, { activity: {} })
+    let world = createWorld(map, emptyObs)
+
+    const started = readTranscript(transcript)
+    const afterStart = obs(g, { activity: { a: started } })
+    world = direct(world, diffObservation(emptyObs, afterStart), 0)
+    expect(world.openCalls).toHaveLength(1)
+
+    appendFileSync(transcript, toolResultLine('c1', '2026-09-27T10:00:05.000Z') + '\n')
+    const finished = readTranscript(transcript)
+    const afterFinish = obs(g, { activity: { a: finished } })
+    world = direct(world, diffObservation(afterStart, afterFinish), 5000)
+    expect(world.openCalls).toEqual([])
   })
 })
 

@@ -8,6 +8,7 @@ import {
   clickByName,
   clickContaining,
   hasStation,
+  inFoundry,
   makeFixtureRepo,
   openFoundry,
   openForge,
@@ -354,6 +355,19 @@ test.describe('a real hall', () => {
     await expect
       .poll(() => pressedByLabel(handle, 'Factory view'), { timeout: 10_000 })
       .toBe('true')
+
+    // The hall's card carries a still picture of its floor, drawn from the run graph.
+    await expect
+      .poll(
+        () =>
+          inFoundry<boolean>(
+            handle,
+            `!!document.querySelector('[role="img"][aria-label="Factory floor for Add retry backoff to the sync job"] canvas')`
+          ),
+        { timeout: 20_000 }
+      )
+      .toBe(true)
+    await captureFoundry(handle, 'foundry-factory-site-cards.png')
 
     await expect
       .poll(() => clickContaining(handle, 'button', 'Add retry backoff to the sync job'), {

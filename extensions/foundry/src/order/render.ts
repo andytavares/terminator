@@ -1,7 +1,7 @@
 import { coverageMatrix } from './coverage-matrix.js'
 import { compileOrder } from './compile.js'
 import { isBlocking } from './schema.js'
-import type { Budgets, WorkOrder } from './schema.js'
+import type { Budgets, OrderStatus, WorkOrder } from './schema.js'
 
 // The order, rendered for a person.
 //
@@ -52,6 +52,19 @@ export function budgetsInWords(budgets: Budgets): string {
   const limit = (value: number | null, unit: string): string =>
     value === null ? `${unit} unlimited` : `${value} ${unit}`
   return [limit(budgets.agents, 'agents'), limit(budgets.wallClockMinutes, 'minutes')].join(' · ')
+}
+
+const STATUS_IN_WORDS: Record<OrderStatus, string> = {
+  draft: 'still being shaped',
+  agreed: 'agreed, not yet started',
+  running: 'running',
+  shipped: 'shipped',
+  cancelled: 'cancelled',
+}
+
+/** An order's status in words, typed so a new status fails to compile here. */
+export function statusInWords(status: OrderStatus): string {
+  return STATUS_IN_WORDS[status]
 }
 
 function coverageTable(order: WorkOrder): string[] {

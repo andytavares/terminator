@@ -73,7 +73,7 @@ describe('the sensors panel', () => {
   it('shows one row per sensor, with its description and rung', async () => {
     mount()
     await waitFor(() => expect(screen.getByText('CI flake watch')).toBeTruthy())
-    expect(screen.getByText('data-root')).toBeTruthy()
+    expect(screen.getByText('your Foundry data folder')).toBeTruthy()
   })
 
   it('refuses to enable a sensor with no repository, and shows why', async () => {

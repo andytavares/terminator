@@ -26,6 +26,7 @@ import type { ResolveSources } from '../recipe/resolve.js'
 import type { EffortLevel, Recipe, Rule, Step } from '../recipe/parse.js'
 import type { Budgets, RiskAssessment, WorkOrder } from '../order/schema.js'
 import { verdictFromExit, summarise } from '../verify/verdict.js'
+import type { Evidence } from '../verify/verdict.js'
 import type { Verdict } from '../verify/verdict.js'
 import { inspectionFor, regrade } from '../verify/inspection-triggers.js'
 import { ladderFor, climb } from '../verify/ladder.js'
@@ -35,6 +36,7 @@ import type { Gate, GateRuleId } from '../gates/rules.js'
 import { isLive } from '../gates/autonomy.js'
 import { GATE_RULES } from '../gates/rules.js'
 import type { Autonomy } from '../gates/autonomy.js'
+import { gradeInWords } from '../runtime/review/risk-grader.js'
 
 // The thing that joins the pieces.
 //
@@ -189,7 +191,7 @@ export interface ExecutorDeps {
    * never as a pass. Absent entirely means the whole climb is not measured —
    * honest, and visible, rather than a silent green.
    */
-  readonly runStep?: (step: LadderStep) => Promise<number | null>
+  readonly runStep?: (step: LadderStep, logPath: string) => Promise<number | null>
 
   /** Minutes elapsed, for the wall-clock budget. */
   readonly observe?: () => { elapsedMinutes: number } | Promise<{ elapsedMinutes: number }>
@@ -503,6 +505,7 @@ export async function execute(
        */
       deadlineMinutes?: number
       breach?: BudgetBreach
+      evidence?: readonly Evidence[]
     }
   ): Promise<boolean> {
     if (!isLive(rule, autonomy)) return false
@@ -522,6 +525,7 @@ export async function execute(
           ? null
           : new Date(Date.parse(deps.now()) + input.deadlineMinutes * 60_000).toISOString(),
       breach: input.breach ?? null,
+      evidence: input.evidence,
     })
     gates.push(gate)
     deps.onEvent?.({ type: 'gate', gate })
@@ -1070,14 +1074,25 @@ export async function execute(
   // work to climb over: a run that halted at a gate has not earned a verdict
   // on the whole change, and reporting one would be inventing it.
   let ladder: LadderOutcome | null = null
+  const ladderLogs = new Map<string, string>()
   if (!halted && !stalled && isComplete(current)) {
+    const climbedAt = Date.parse(deps.now())
     ladder = await climb(
       ladderFor({
         toolchain: order.context.toolchain,
         risk,
         touchesUi: touched.some((path) => /\.(tsx|css|html|svelte|vue)$/.test(path)),
       }),
-      deps.runStep ?? (() => Promise.resolve(null))
+      async (step) => {
+        if (deps.runStep === undefined) return null
+        const logPath = path.join(
+          orderDir(deps.sources.dataRoot, order.id),
+          'runs',
+          `final-${safeFilename(step.name.toLowerCase())}.${climbedAt}.log`
+        )
+        ladderLogs.set(step.name, logPath)
+        return deps.runStep(step, logPath)
+      }
     )
     deps.onEvent?.({ type: 'ladder', outcome: ladder })
   }
@@ -1088,19 +1103,40 @@ export async function execute(
   if (!halted && ladder !== null) {
     if (inspection.required) {
       halted = await raise('risk.p0', {
-        summary: `${order.title} graded ${risk.grade} once it was done${
-          risk.grade === order.risk.grade ? '' : ` — it was planned as ${order.risk.grade}`
+        summary: `${order.title} graded ${gradeInWords(risk.grade)} once it was done${
+          risk.grade === order.risk.grade
+            ? ''
+            : ` — it was planned as ${gradeInWords(order.risk.grade)}`
         }`,
         why: `${inspection.reason} Triggered by ${inspection.triggers.join(', ')}.`,
       })
     }
     if (!halted && !ladder.ok) {
+      const failedStep = ladder.steps.find((s) => s.result === 'fail') ?? null
+      const failedLog = failedStep === null ? undefined : ladderLogs.get(failedStep.name)
+      const excerpt =
+        failedLog !== undefined && fs.existsSync(failedLog)
+          ? lastLines(fs.readFileSync(failedLog, 'utf8').trimEnd(), 60)
+          : ''
       halted = await raise('verify.repeat-fail', {
+        evidence:
+          failedStep === null
+            ? []
+            : [
+                {
+                  kind: 'stdout',
+                  exitCode: failedStep.exitCode ?? undefined,
+                  path: failedLog,
+                  excerpt,
+                },
+              ],
         summary: `${order.title} did not pass verification`,
         why:
-          ladder.stoppedAt === null
+          ladder.stoppedAt === null || failedStep === null
             ? `Nothing failed, but ${ladder.unmeasured.join(', ')} could not be measured here.`
-            : `The climb stopped at ${ladder.stoppedAt}: ${ladder.steps.find((s) => s.result === 'fail')?.reason ?? 'a step failed'}.`,
+            : failedStep.command === null
+              ? `${failedStep.name} failed with exit code ${failedStep.exitCode ?? 'unknown'}.`
+              : `${failedStep.name} failed with exit code ${failedStep.exitCode ?? 'unknown'}: \`${failedStep.command}\`.`,
       })
     }
   }

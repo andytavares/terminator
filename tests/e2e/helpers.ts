@@ -74,7 +74,13 @@ export function e2eEnv(): NodeJS.ProcessEnv {
  * something survives a restart; `closeApp` never deletes it, so relaunching
  * after a close just works.
  */
+// Inside the 30s hook timeout, so a launch that hangs fails with the app's own
+// output instead of a bare "hook timeout exceeded" that says nothing about why.
+const LAUNCH_DEADLINE_MS = 25_000
+
 export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<AppHandle> {
+  const deadline = Date.now() + LAUNCH_DEADLINE_MS
+  const remaining = () => Math.max(1, deadline - Date.now())
   const app = await electron.launch({
     // closeApp SIGKILLs an app that will not close, and macOS then shows a
     // modal "reopen windows?" alert on the next launch of the same bundle,
@@ -82,11 +88,27 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
     // turns that restore off for this process only.
     args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
     env: e2eEnv(),
+    timeout: remaining(),
   })
-  const page = await app.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  await page.waitForSelector('.unified-sidebar', { timeout: 15000 })
-  return { app, page, userDataDir }
+  const output: string[] = []
+  const keep = (chunk: Buffer): void => {
+    output.push(chunk.toString())
+    if (output.length > 400) output.shift()
+  }
+  app.process().stdout?.on('data', keep)
+  app.process().stderr?.on('data', keep)
+  try {
+    const page = await app.firstWindow({ timeout: remaining() })
+    await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
+    await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
+    return { app, page, userDataDir }
+  } catch (error) {
+    await closeApp({ app, page: undefined as unknown as Page, userDataDir })
+    throw new Error(
+      `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
+        `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`
+    )
+  }
 }
 
 // How long to wait for a graceful Electron shutdown before force-killing. A

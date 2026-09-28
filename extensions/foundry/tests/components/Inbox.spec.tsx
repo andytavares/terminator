@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Inbox, SIGNAL_POLL_MS } from '../../src/components/Inbox.js'
-import { raiseGate, GATE_RULES } from '../../src/gates/rules.js'
+import { raiseGate, GATE_RULES, ruleInWords } from '../../src/gates/rules.js'
 import type { Signal } from '../../src/sensors/types.js'
 
 // The one surface the operator is required to visit. Every row names the rule
@@ -103,27 +103,27 @@ beforeEach(() => {
 describe('a row the operator can act on', () => {
   it('names the rule, the reason and what happens if it is ignored', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => expect(screen.getByText('risk.p0')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(ruleInWords('risk.p0'))).toBeTruthy())
     expect(screen.getByText(/session\.ts/)).toBeTruthy()
-    expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
   })
 
   it('says how much work the decision unblocks', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByText('risk.p0'))
+    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
     expect(screen.getByText('3 units waiting')).toBeTruthy()
   })
 
   it('offers each option with its consequence on the control itself', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByText('risk.p0'))
+    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
     const approve = screen.getByRole('button', { name: 'Approve' })
     expect(approve.getAttribute('title')).toContain('proceeds')
   })
 
   it('sends the decision, and asks again afterwards', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByText('risk.p0'))
+    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
@@ -136,8 +136,8 @@ describe('a row the operator can act on', () => {
 
   it('says a gate with no deadline waits, rather than implying a timer', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByText('risk.p0'))
-    expect(screen.getByText(/\(waits\)/)).toBeTruthy()
+    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
+    expect(screen.getByText(/\(it waits for you\)/)).toBeTruthy()
   })
 })
 
@@ -152,7 +152,7 @@ describe('raising a budget from the inbox', () => {
 
   it('asks for the new limit, then sends it with the decision', async () => {
     mount({ gates: [budgetGate()] })
-    await waitFor(() => screen.getByText('budget.exceeded'))
+    await waitFor(() => screen.getByText(ruleInWords('budget.exceeded')))
     fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
     expect(screen.getByText('At least 46.')).toBeTruthy()
@@ -171,7 +171,7 @@ describe('raising a budget from the inbox', () => {
 
   it('decides straight away for a gate that never recorded its budget', async () => {
     mount({ gates: [gate({ rule: 'budget.exceeded' })] })
-    await waitFor(() => screen.getByText('budget.exceeded'))
+    await waitFor(() => screen.getByText(ruleInWords('budget.exceeded')))
     fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
@@ -330,7 +330,7 @@ describe('every gate rule can be rendered', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    await waitFor(() => expect(screen.getByText(rule)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(ruleInWords(rule))).toBeTruthy())
     // The stripe as well as the icon: a missing tone is a silent `undefined`
     // in the class list rather than a throw, so it needs its own assertion.
     expect(document.querySelector('.fdry-gate')?.className).toMatch(/\bis-(p0|warn|info|ok)\b/)
@@ -352,10 +352,10 @@ describe('ci.red', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    await waitFor(() => expect(screen.getByText('ci.red')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(ruleInWords('ci.red'))).toBeTruthy())
     expect(screen.getByText(/PR #200 has been red/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Another round' })).toBeTruthy()
-    expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
   })
 })
 
@@ -374,10 +374,10 @@ describe('refinery.conflict', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    await waitFor(() => expect(screen.getByText('refinery.conflict')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(ruleInWords('refinery.conflict'))).toBeTruthy())
     expect(screen.getByText(/no longer rebases onto main/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Take it over' })).toBeTruthy()
-    expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
   })
 })
 

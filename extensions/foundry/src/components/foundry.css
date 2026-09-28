@@ -3346,6 +3346,41 @@
   background: var(--tm-bg-card-hover);
 }
 
+/* The picture at the top of the card: a fixed aspect ratio so cards line up
+   whatever shape the order's own hall turns out to be. */
+.fdry-hall-card-pic {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--tm-radius-xs);
+  background: var(--tm-bg-card);
+}
+
+.fdry-hall-card-pic-frame {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.fdry-hall-card-pic-frame canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.fdry-hall-card-pic-empty {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
 .fdry-hall-card-beacon {
   position: absolute;
   top: 10px;
@@ -4093,4 +4128,23 @@
     grid-column: 1;
     grid-row: auto;
   }
+}
+
+.fdry-gate-evidence summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-gate-evidence-pre {
+  margin: 6px 0 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-input);
+  font: 12px/1.45 var(--tm-font-mono);
+  color: var(--tm-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }

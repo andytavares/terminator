@@ -17,6 +17,7 @@ import {
   type RunCommand,
 } from './diff-metrics.js'
 import type { CheckState } from './review/risk-grader.js'
+import { gradeInWords } from './review/risk-grader.js'
 import { parseHunks } from './review/parse-hunks.js'
 import { createDecisionSet, type DecisionSet, type HunkDecision } from './review/hunk-decisions.js'
 import { reviewIntent, type IntentReview } from './review/intent-diff.js'
@@ -271,7 +272,7 @@ export function createSupervision(options: SupervisionOptions): Supervision {
         summary:
           queued === null
             ? `finished a turn in ${path.basename(run.featureDir)}`
-            : `${path.basename(run.featureDir)} is ready to review — ${queued.grade}, ${changed.files} file${changed.files === 1 ? '' : 's'} +${changed.added} −${changed.removed}`,
+            : `${path.basename(run.featureDir)} is ready to review — ${gradeInWords(queued.grade)}, ${changed.files} file${changed.files === 1 ? '' : 's'} +${changed.added} −${changed.removed}`,
       })
     },
 

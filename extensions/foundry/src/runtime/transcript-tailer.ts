@@ -57,7 +57,27 @@ function epochOf(entry: Record<string, unknown>): number | null {
   return Number.isNaN(parsed) ? null : parsed
 }
 
-function eventsFromEntry(entry: Record<string, unknown>): ToolActivity[] {
+/** What a `tool_use` block said about itself, kept around to label its `tool_result`. */
+interface CallInfo {
+  readonly toolName: string
+  readonly isShell: boolean
+}
+
+/**
+ * Turns one transcript entry into events, given what earlier entries in this
+ * same read said about the calls still open.
+ *
+ * A `tool_result` block only ever carries the call's id — the name and
+ * whether it was a shell call live on the matching `tool_use`, seen earlier
+ * in the same read. `callInfo` is that memory; without it, `toolProp` had
+ * nothing to go on for a close and defaulted every one of them to 'desk',
+ * which the director's honesty rule then had no station to walk back from
+ * (its early return for 'desk' never sees the close at all).
+ */
+function eventsFromEntry(
+  entry: Record<string, unknown>,
+  callInfo: Map<string, CallInfo>
+): ToolActivity[] {
   const at = epochOf(entry)
   if (at === null) return []
 
@@ -69,6 +89,8 @@ function eventsFromEntry(entry: Record<string, unknown>): ToolActivity[] {
       // long-command exemption could not close it. Better to skip it.
       if (callId === null) continue
       const toolName = typeof block.name === 'string' ? block.name : 'unknown'
+      const isShell = SHELL_TOOLS.has(toolName)
+      callInfo.set(callId, { toolName, isShell })
       const input = block.input
       const named =
         typeof input === 'object' && input !== null
@@ -79,14 +101,22 @@ function eventsFromEntry(entry: Record<string, unknown>): ToolActivity[] {
         kind: 'tool_started',
         toolName,
         callId,
-        isShell: SHELL_TOOLS.has(toolName),
+        isShell,
         path: typeof named === 'string' ? named : null,
         at,
       })
     } else if (block.type === 'tool_result') {
       const callId = typeof block.tool_use_id === 'string' ? block.tool_use_id : null
       if (callId === null) continue
-      events.push({ kind: 'tool_finished', toolName: '', callId, isShell: false, path: null, at })
+      const info = callInfo.get(callId)
+      events.push({
+        kind: 'tool_finished',
+        toolName: info?.toolName ?? '',
+        callId,
+        isShell: info?.isShell ?? false,
+        path: null,
+        at,
+      })
     }
   }
   return events
@@ -156,6 +186,7 @@ export function readTranscript(transcriptPath: string): ToolActivity[] {
   if (lines === null) return []
 
   const events: ToolActivity[] = []
+  const callInfo = new Map<string, CallInfo>()
   for (const line of lines) {
     const trimmed = line.trim()
     if (trimmed === '') continue
@@ -167,7 +198,7 @@ export function readTranscript(transcriptPath: string): ToolActivity[] {
       continue
     }
     if (typeof entry !== 'object' || entry === null) continue
-    events.push(...eventsFromEntry(entry as Record<string, unknown>))
+    events.push(...eventsFromEntry(entry as Record<string, unknown>, callInfo))
   }
   return events
 }
