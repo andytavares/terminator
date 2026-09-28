@@ -312,6 +312,7 @@ export const WorkOrderSchema = z.object({
 })
 
 export type WorkOrder = z.infer<typeof WorkOrderSchema>
+export type OrderStatus = WorkOrder['status']
 export type AcceptanceCriterion = z.infer<typeof AcceptanceSchema>
 export type PlanUnit = z.infer<typeof UnitSchema>
 export type Lane = z.infer<typeof LaneSchema>

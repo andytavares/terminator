@@ -23,6 +23,18 @@ export interface GradedChange {
   readonly trigger: string
 }
 
+const GRADE_IN_WORDS: Record<RiskGrade, string> = {
+  P0: 'highest risk',
+  P1: 'elevated risk',
+  P2: 'ordinary risk',
+  P3: 'low risk',
+}
+
+/** A risk grade in words a person can read, never the bare code on its own. */
+export function gradeInWords(grade: RiskGrade): string {
+  return GRADE_IN_WORDS[grade]
+}
+
 const P0_PATTERNS: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: 'authentication', pattern: /(^|\/)(auth|authn|authz|login|session-auth)(\/|\.)/i },
   { label: 'payments', pattern: /(^|\/)(payment|payments|billing|charge)(\/|\.)/i },

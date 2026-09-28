@@ -35,6 +35,7 @@ import type { Gate, GateRuleId } from '../gates/rules.js'
 import { isLive } from '../gates/autonomy.js'
 import { GATE_RULES } from '../gates/rules.js'
 import type { Autonomy } from '../gates/autonomy.js'
+import { gradeInWords } from '../runtime/review/risk-grader.js'
 
 // The thing that joins the pieces.
 //
@@ -1088,19 +1089,24 @@ export async function execute(
   if (!halted && ladder !== null) {
     if (inspection.required) {
       halted = await raise('risk.p0', {
-        summary: `${order.title} graded ${risk.grade} once it was done${
-          risk.grade === order.risk.grade ? '' : ` — it was planned as ${order.risk.grade}`
+        summary: `${order.title} graded ${gradeInWords(risk.grade)} once it was done${
+          risk.grade === order.risk.grade
+            ? ''
+            : ` — it was planned as ${gradeInWords(order.risk.grade)}`
         }`,
         why: `${inspection.reason} Triggered by ${inspection.triggers.join(', ')}.`,
       })
     }
     if (!halted && !ladder.ok) {
+      const failedStep = ladder.steps.find((s) => s.result === 'fail') ?? null
       halted = await raise('verify.repeat-fail', {
         summary: `${order.title} did not pass verification`,
         why:
-          ladder.stoppedAt === null
+          ladder.stoppedAt === null || failedStep === null
             ? `Nothing failed, but ${ladder.unmeasured.join(', ')} could not be measured here.`
-            : `The climb stopped at ${ladder.stoppedAt}: ${ladder.steps.find((s) => s.result === 'fail')?.reason ?? 'a step failed'}.`,
+            : failedStep.command === null
+              ? `${failedStep.name} failed with exit code ${failedStep.exitCode ?? 'unknown'}.`
+              : `${failedStep.name} failed with exit code ${failedStep.exitCode ?? 'unknown'}: \`${failedStep.command}\`.`,
       })
     }
   }

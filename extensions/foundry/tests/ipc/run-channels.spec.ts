@@ -350,7 +350,7 @@ describe('proposeRecipe', () => {
   it('proposes the quick shape for one lane at the lowest risk', () => {
     const proposal = proposeRecipe(graded('P3'))
     expect(proposal.name).toBe('quick')
-    expect(proposal.why).toBe('one lane, graded P3, nothing flagged')
+    expect(proposal.why).toBe('one lane, graded low risk, nothing flagged')
   })
 
   it('still proposes it when that lane holds several units', () => {
@@ -362,7 +362,7 @@ describe('proposeRecipe', () => {
   it('steps up to direct once the order grades itself notable', () => {
     const proposal = proposeRecipe(graded('P2'))
     expect(proposal.name).toBe('direct')
-    expect(proposal.why).toContain('P2')
+    expect(proposal.why).toContain('ordinary risk')
   })
 
   it('steps up to direct when a trigger fired, however low the grade', () => {
@@ -400,7 +400,7 @@ describe('the reason a shape was chosen (FR-014)', () => {
     await channels().start({ id: 'WO-1' })
     const text = ledgerText()
     expect(text).toContain('role:architect')
-    expect(text).toContain('one lane, graded P3')
+    expect(text).toContain('one lane, graded low risk')
     expect(text).toContain('resolved from built-in')
   })
 
@@ -417,7 +417,7 @@ describe('the reason a shape was chosen (FR-014)', () => {
       proposedWhy: string
     }
     expect(view.proposed).toBe('direct')
-    expect(view.proposedWhy).toBe('one lane, graded P3')
+    expect(view.proposedWhy).toBe('one lane, graded low risk')
   })
 
   // The shape's requirements are about the repository and the proposal is

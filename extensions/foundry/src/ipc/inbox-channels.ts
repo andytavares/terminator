@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { decide, applyDefault, isOverdue } from '../gates/rules.js'
+import { decide, applyDefault, isOverdue, ruleInWords } from '../gates/rules.js'
 import { raisedLimitProblem, withLimit } from '../line/scheduler.js'
 import { rankInbox, summariseInbox } from '../gates/rank.js'
 import { isLive, silencedRules } from '../gates/autonomy.js'
@@ -71,7 +71,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
           gate.orderId,
           'gate.default',
           gate.id,
-          `${gate.rule}: no answer by the deadline`
+          `${ruleInWords(gate.rule)}: no answer by the deadline`
         )
         // Acted on, not only recorded. A default that changes the row and
         // leaves the run halted is not a default — the line waits for ever on
@@ -88,8 +88,12 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
     }
 
     const orders = await deps.orders.list()
+    const titleFor = new Map(orders.map((order) => [order.id, order.title]))
     return {
-      gates: rankInbox(settled),
+      gates: rankInbox(settled).map((gate) => ({
+        ...gate,
+        orderTitle: titleFor.get(gate.orderId) ?? null,
+      })),
       // What this setting is *not* asking about. "Nothing needs you" means
       // something different at each rung of the dial, and an operator who
       // cannot see which rules are silenced cannot tell a quiet factory from
@@ -139,7 +143,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
       gate.orderId,
       'gate.decided',
       gate.id,
-      `${gate.rule} -> ${parsed.data.option}${parsed.data.note === undefined ? '' : `: ${parsed.data.note}`}`
+      `${ruleInWords(gate.rule)} -> ${parsed.data.option}${parsed.data.note === undefined ? '' : `: ${parsed.data.note}`}`
     )
     await deps.gates.save(decided)
 

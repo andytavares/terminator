@@ -19,6 +19,21 @@ export type Rung = (typeof RUNGS)[number]
 
 export type RungStatus = 'runnable' | 'unavailable' | 'not_triggered' | 'elsewhere'
 
+const RUNG_LEVEL_IN_WORDS: Record<Rung, string> = {
+  L0: 'formatting and lint',
+  L1: "the unit's own tests",
+  L2: 'repository-wide coverage',
+  L3: 'independent verification',
+  L4: 'security inspection',
+  L5: 'integration',
+  L6: 'human decision',
+}
+
+/** What a rung of the verification ladder is, in words, never the bare code. */
+export function rungLevelInWords(rung: Rung): string {
+  return RUNG_LEVEL_IN_WORDS[rung]
+}
+
 export interface LadderStep {
   readonly rung: Rung
   readonly name: string
@@ -125,6 +140,8 @@ export interface StepOutcome {
   readonly result: 'pass' | 'fail' | 'not_measured' | 'not_triggered' | 'elsewhere'
   readonly reason: string
   readonly exitCode: number | null
+  /** The command this step ran, so a failure can be reported by name, not by rung code. */
+  readonly command: string | null
 }
 
 export interface LadderOutcome {
@@ -160,6 +177,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
         result: 'not_triggered',
         reason: step.reason,
         exitCode: null,
+        command: step.command,
       })
       continue
     }
@@ -173,6 +191,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
         result: 'elsewhere',
         reason: step.reason,
         exitCode: null,
+        command: step.command,
       })
       continue
     }
@@ -187,6 +206,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
         result: 'not_measured',
         reason: step.reason,
         exitCode: null,
+        command: step.command,
       })
       continue
     }
@@ -199,6 +219,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
         result: 'not_measured',
         reason: 'the step did not run',
         exitCode: null,
+        command: step.command,
       })
       continue
     }
@@ -210,6 +231,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
       result: passed ? 'pass' : 'fail',
       reason: passed ? '' : `exited ${exitCode}`,
       exitCode,
+      command: step.command,
     })
     if (!passed) stoppedAt = step.rung
   }

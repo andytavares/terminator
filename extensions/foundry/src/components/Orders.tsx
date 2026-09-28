@@ -4,6 +4,10 @@ import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import type { Standing } from '../order/standing.js'
+import { statusInWords } from '../order/render.js'
+import type { OrderStatus } from '../order/schema.js'
+import { gradeInWords } from '../runtime/review/risk-grader.js'
+import type { RiskGrade } from '../runtime/review/risk-grader.js'
 
 // The way into the Forge: what orders exist, and a way to seed another.
 //
@@ -483,7 +487,8 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
                 <span className="fdry-order-main">
                   <b>{row.title}</b>
                   <small>
-                    {row.id} · {row.status} · risk {row.risk}
+                    {row.id} · {statusInWords(row.status as OrderStatus)} ·{' '}
+                    {gradeInWords(row.risk as RiskGrade)} risk
                     {row.source.key !== null ? ` · ${row.source.tracker} ${row.source.key}` : ''}
                   </small>
                 </span>

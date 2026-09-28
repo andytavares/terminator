@@ -18,10 +18,10 @@ import { dueSensors, runSensor } from './sensors/schedule.js'
 import type { CollectDeps } from './sensors/collect.js'
 import { rulesFor, rulesAtRung } from './verify/rules.js'
 import { availableNames, availableSensors, resolveRule } from './recipe/resolve.js'
-import { RUNGS } from './verify/ladder.js'
+import { RUNGS, rungLevelInWords } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { createLiveGateStore, createGateStore } from './gates/store.js'
-import { raiseGate } from './gates/rules.js'
+import { raiseGate, ruleInWords } from './gates/rules.js'
 import { orphanedNodes } from './line/reclaim.js'
 import type { StandingSources } from './order/standing.js'
 import { countAttention } from './gates/attention.js'
@@ -358,13 +358,14 @@ function whyNotShipped(recipe: Recipe, outcome: RunOutcome): string {
   }
   if (!outcome.complete) return 'not every node finished'
   if (outcome.gates.length > 0) {
-    return `held by ${outcome.gates.map((gate) => gate.rule).join(', ')}`
+    return `held by ${outcome.gates.map((gate) => ruleInWords(gate.rule)).join(', ')}`
   }
-  if (outcome.ladder === null) return 'the climb never ran, so nothing has been verified'
+  if (outcome.ladder === null) return 'verification never ran, so nothing has been checked'
   if (!outcome.ladder.ok) {
-    return outcome.ladder.stoppedAt === null
-      ? `the climb could not measure ${outcome.ladder.unmeasured.join(', ')}`
-      : `the climb stopped at ${outcome.ladder.stoppedAt}`
+    const failedStep = outcome.ladder.steps.find((step) => step.result === 'fail') ?? null
+    return outcome.ladder.stoppedAt === null || failedStep === null
+      ? `verification could not measure ${outcome.ladder.unmeasured.join(', ')}`
+      : `verification stopped at ${failedStep.name}`
   }
   return 'it was not shippable, and this build cannot say which check said so'
 }
@@ -1890,7 +1891,7 @@ async function executeRun(
       // Grouped by rung, so the record says what was in force where rather
       // than listing every rule as though they all applied at once.
       rulesInForce: RUNGS.flatMap((rung) =>
-        rulesAtRung(houseRules, rung).map((rule) => `${rule.id} (${rung})`)
+        rulesAtRung(houseRules, rung).map((rule) => `${rule.id} (${rungLevelInWords(rung)})`)
       ),
     },
     {
@@ -3097,7 +3098,11 @@ export function activate(api: ExtensionAPI): void {
       // cancelled and nothing did it — the run stayed `running` for ever, and
       // `order.cancel` refuses a running order and points back at this gate.
       if (option === 'stop') {
-        await stopOrder(dataRoot(), gate.orderId, `stopped at the ${gate.rule} gate`)
+        await stopOrder(
+          dataRoot(),
+          gate.orderId,
+          `stopped at the decision about ${ruleInWords(gate.rule)}`
+        )
         return
       }
 

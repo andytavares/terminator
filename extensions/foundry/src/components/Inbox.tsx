@@ -1,4 +1,5 @@
 import { ruleInWords } from '../gates/rules.js'
+import { gradeInWords } from '../runtime/review/risk-grader.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
@@ -24,7 +25,7 @@ import type { Signal } from '../sensors/types.js'
 // attribute is one they learn to click through without reading.
 
 interface InboxView {
-  gates: Gate[]
+  gates: (Gate & { orderTitle: string | null })[]
   autonomy?: 'escorted' | 'standard' | 'lights-out'
   /** Rules this setting is not asking about. Shown, so quiet is explicable. */
   silenced?: GateRuleId[]
@@ -253,14 +254,14 @@ export function Inbox(): JSX.Element {
                     <span className="fdry-gate-icon" aria-hidden="true">
                       <Icon />
                     </span>
-                    <code className="fdry-gate-rule">{gate.rule}</code>
+                    <code className="fdry-gate-rule">{ruleInWords(gate.rule)}</code>
                     <b>{gate.summary}</b>
                   </div>
                   <p className="fdry-gate-why">{gate.why}</p>
                   <div className="fdry-gate-meta">
-                    <span>{gate.orderId}</span>
+                    <span>{gate.orderTitle ?? `work order ${gate.orderId}`}</span>
                     {gate.blockedUnits > 0 ? <span>{gate.blockedUnits} units waiting</span> : null}
-                    <span>risk {gate.riskGrade}</span>
+                    <span>{gradeInWords(gate.riskGrade)} risk</span>
                     {gate.evidence.map((piece, index) => (
                       <span key={`${piece.kind}-${index}`}>
                         {piece.kind}

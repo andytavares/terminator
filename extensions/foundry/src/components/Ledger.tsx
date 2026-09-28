@@ -6,6 +6,10 @@ import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
 import { MarkdownInline } from './Markdown.js'
 import { MetricsTiles, WindowToggle } from './MetricsTiles.js'
+import { rungLevelInWords } from '../verify/ladder.js'
+import type { Rung } from '../verify/ladder.js'
+import { rungInWords } from '../recipe/rung.js'
+import type { Rung as ResolveRung } from '../recipe/rung.js'
 
 // The record: every decision, by whom or by what rule, and why.
 //
@@ -129,8 +133,8 @@ export function Ledger(): JSX.Element {
       }
       setNote(
         accept
-          ? `${proposal.id} is in force from the next run.`
-          : `${proposal.id} will not be offered again.`
+          ? `"${proposal.asserts}" is in force from the next run.`
+          : `"${proposal.asserts}" will not be offered again.`
       )
       setProposals((current) => current?.filter((p) => p.id !== proposal.id) ?? null)
       void refreshRules()
@@ -154,7 +158,7 @@ export function Ledger(): JSX.Element {
         setNote(result.error)
         return
       }
-      setNote(`${rule.id} is no longer in force, and will not be proposed again.`)
+      setNote(`"${rule.asserts}" is no longer in force, and will not be proposed again.`)
       await refreshRules()
     },
     [refreshRules]
@@ -231,7 +235,8 @@ export function Ledger(): JSX.Element {
                   <article key={proposal.id} className="fdry-proposal">
                     <b>{proposal.asserts}</b>
                     <p className="fdry-note">
-                      {proposal.occurrences} rejections · rung {proposal.rung}
+                      {proposal.occurrences} rejections · checked at{' '}
+                      {rungLevelInWords(proposal.rung as Rung)}
                     </p>
                     <ul className="fdry-citations">
                       {proposal.citations.map((citation) => (
@@ -269,7 +274,7 @@ export function Ledger(): JSX.Element {
                   <article key={rule.id} className="fdry-proposal">
                     <b>{rule.asserts}</b>
                     <p className="fdry-note">
-                      {rule.id} · rung {rule.rung} · from {rule.origin}
+                      from {rungInWords(rule.rung as ResolveRung)} · origin {rule.origin}
                     </p>
                     <div className="fdry-proposal-actions">
                       <button type="button" onClick={() => void remove(rule)}>
@@ -297,7 +302,7 @@ export function Ledger(): JSX.Element {
               <ul className="fdry-citations">
                 {rules?.skills?.map((skill) => (
                   <li key={skill.id}>
-                    <code>{skill.id}</code> ({skill.rung})
+                    <code>{skill.id}</code> ({rungInWords(skill.rung as ResolveRung)})
                   </li>
                 ))}
               </ul>

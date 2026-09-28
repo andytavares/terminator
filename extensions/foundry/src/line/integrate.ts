@@ -9,6 +9,7 @@ import type { WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
 import type { LadderOutcome } from '../verify/ladder.js'
 import type { CiOutcome } from './ship-tail.js'
+import { gradeInWords } from '../runtime/review/risk-grader.js'
 
 // The end of the line: a draft pull request, opened without being asked for.
 //
@@ -254,13 +255,13 @@ export function prBody(
 
   const ladder = shipment.ladder ?? null
   if (ladder !== null) {
-    lines.push('', '### Verification', '', '| Rung | Step | Result |', '| --- | --- | --- |')
+    lines.push('', '### Verification', '', '| Step | Rung | Result |', '| --- | --- | --- |')
     for (const step of ladder.steps) {
       const result =
         step.result === 'not_measured' || step.result === 'elsewhere'
           ? `${step.result === 'elsewhere' ? 'decided' : 'not measured'} — ${step.reason}`
           : step.result
-      lines.push(`| ${step.rung} | ${step.name} | ${result} |`)
+      lines.push(`| ${step.name} | ${step.rung} | ${result} |`)
     }
     if (ladder.unmeasured.length > 0) {
       lines.push(
@@ -483,14 +484,14 @@ export async function shipOrder(
       // that actually fired is carried here, because at P1 the id alone would
       // read as wrong.
       summary: `Push and open a draft pull request for ${order.title}?`,
-      why: `This order is graded ${order.risk.grade}, so the decision is taken before anything reaches the remote${order.risk.triggers.length === 0 ? '' : ` (${order.risk.triggers.join(', ')})`}.`,
+      why: `This order is graded ${gradeInWords(order.risk.grade)}, so the decision is taken before anything reaches the remote${order.risk.triggers.length === 0 ? '' : ` (${order.risk.triggers.join(', ')})`}.`,
       riskGrade: order.risk.grade,
       blockedUnits: order.plan.units.length,
       at: deps.now(),
     })
     const chosen = await deps.decide(gate)
     if (chosen !== 'approve') {
-      const reason = `The ${order.risk.grade} shipping decision was answered "${chosen}", so nothing was pushed.`
+      const reason = `The ${gradeInWords(order.risk.grade)} shipping decision was answered "${chosen}", so nothing was pushed.`
       await deps.record('ship.held', order.id, reason)
       return { pulls: [], bodyPaths, held: true, reason }
     }

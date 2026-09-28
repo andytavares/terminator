@@ -108,7 +108,7 @@ describe('the order', () => {
 describe('a review entry', () => {
   it('says the grade and why, not just the letter', () => {
     const entry = paletteEntries([], [item()])[0]
-    expect(entry.description).toContain('P0')
+    expect(entry.description).toContain('highest risk')
     expect(entry.description).toContain('touches auth')
   })
 

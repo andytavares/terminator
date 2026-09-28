@@ -207,7 +207,7 @@ describe('foundry:inbox.decide', () => {
       'WO-1',
       'gate.decided',
       'G-1',
-      expect.stringContaining('risk.p0 -> approve')
+      expect.stringContaining('changes that turn out to be riskier than planned -> approve')
     )
   })
 

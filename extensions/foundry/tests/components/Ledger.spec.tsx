@@ -328,7 +328,7 @@ describe('the skills in force', () => {
     mount({ inForce: { rules: [], declined: [], skills: [{ id: 'ci-fix', rung: 'built-in' }] } })
     await waitFor(() => expect(screen.getByText('Skills in force')).toBeTruthy())
     expect(screen.getByText(/ci-fix/)).toBeTruthy()
-    expect(screen.getByText(/built-in/)).toBeTruthy()
+    expect(screen.getByText(/built into Foundry/)).toBeTruthy()
   })
 
   it('shows the panel not at all when nothing is available', async () => {

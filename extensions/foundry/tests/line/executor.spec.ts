@@ -801,6 +801,21 @@ describe('the ladder', () => {
     expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
   })
 
+  it('names the step and its command in plain words, never a rung code', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'standard',
+      runStep: async () => 1,
+    })
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toMatch(/exit code/)
+    expect(gate?.why).not.toMatch(/\bL\d\b/)
+    const firstStep = outcome.ladder?.steps.find((s) => s.result === 'fail')
+    expect(firstStep).toBeDefined()
+    expect(gate?.why).toContain(firstStep?.name)
+  })
+
   it('does not interrupt a lights-out run over it, and still refuses to ship', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
@@ -1083,7 +1098,9 @@ describe('the grade the change turned out to deserve', () => {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    expect(outcome.gates.find((g) => g.rule === 'risk.p0')?.summary).toContain('planned as P3')
+    expect(outcome.gates.find((g) => g.rule === 'risk.p0')?.summary).toContain(
+      'planned as low risk'
+    )
   })
 
   it('leaves an ordinary change where the plan put it', async () => {
