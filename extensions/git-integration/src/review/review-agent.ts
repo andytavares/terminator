@@ -55,6 +55,39 @@ function defaultSpawn(
   return spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env }) as unknown as SpawnedProcess
 }
 
+/** The last absolute path in a shell's `command -v` output; rc files may print before it. */
+export function claudeFromShellOutput(stdout: string): string | null {
+  const paths = stdout
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('/'))
+  return paths.at(-1) ?? null
+}
+
+let resolvedClaude: string | undefined
+
+/**
+ * An app launched from the Dock inherits PATH=/usr/bin:/bin, so a bare `claude`
+ * is not found. Ask the person's interactive login shell, the one their
+ * terminal runs, where it is. Only a hit is cached, so installing claude later
+ * needs no restart.
+ */
+async function defaultResolveClaude(): Promise<string> {
+  if (resolvedClaude) return resolvedClaude
+  try {
+    const { stdout } = await execFileAsync(
+      process.env.SHELL || '/bin/zsh',
+      ['-ilc', 'command -v claude'],
+      { timeout: 10_000 }
+    )
+    const found = claudeFromShellOutput(stdout)
+    if (found) resolvedClaude = found
+    return found ?? 'claude'
+  } catch {
+    return 'claude'
+  }
+}
+
 // ─── Prompt ────────────────────────────────────────────────────────────────
 
 export interface BuildAgentPromptInput {
@@ -291,6 +324,7 @@ export interface RunAgentReviewInput {
 export interface RunAgentReviewDeps {
   spawn?: SpawnFn
   exec?: ExecFn
+  resolveClaude?: () => Promise<string>
 }
 
 export interface RunAgentReviewResult {
@@ -449,12 +483,14 @@ export function runAgentReview(
       schemaJson,
     })
     const env = scrubbedEnv()
+    const claudePath = await (deps.resolveClaude ?? defaultResolveClaude)()
+    if (cancelled) return cancelledRun(input, runId, startedAt, activity)
 
     return await new Promise<AgentRun>((resolve) => {
       let stdout = ''
       let stderr = ''
       const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS
-      const child = spawnFn('claude', args, { cwd: input.worktreePath, env })
+      const child = spawnFn(claudePath, args, { cwd: input.worktreePath, env })
       proc = child
 
       const timer = setTimeout(() => {

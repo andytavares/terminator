@@ -310,4 +310,47 @@ describe('ReviewQueue', () => {
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.queryByText('Needs your review')).toBeNull()
   })
+
+  describe('row format matches the all-repositories dashboard', () => {
+    function renderOne(overrides: Partial<ReviewQueuePR> = {}) {
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...defaultStoreState,
+        prQueue: [
+          makePr({
+            number: 212,
+            title: 'ci: split shards',
+            additions: 1234,
+            deletions: 3,
+            fileCount: 1,
+            ...overrides,
+          }),
+        ],
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      return render(<ReviewQueue {...defaultProps} />)
+    }
+
+    it('lays a PR out as a dashboard row: title with a subline, size, risk, estimate, action', () => {
+      const { container } = renderOne()
+      const row = container.querySelector('.rd-row')!
+      expect(row.querySelector('.rd-ti')!.textContent).toContain('#212')
+      expect(row.querySelector('.rd-ti small')!.textContent).toContain('alice')
+      expect(row.querySelector('.rd-size')!.textContent).toBe('+1,234 −3 · 1 file')
+      expect(row.querySelector('.rd-chip.rd-lo')!.textContent).toBe('Low risk')
+      expect(row.querySelector('.rd-btn')!.textContent).toBe('Review')
+      expect(container.querySelector('.rd-grp')!.textContent).toBe('Larger reviews')
+    })
+
+    it('colours additions green and removals red', () => {
+      renderOne()
+      expect(screen.getByText('+1,234').className).toBe('rd-add')
+      expect(screen.getByText('−3').className).toBe('rd-del')
+    })
+
+    it('names conflicts in the subline as text, with no icon', () => {
+      const { container } = renderOne({ mergeStateStatus: 'dirty' })
+      const conflicts = screen.getByText('Conflicts')
+      expect(conflicts.closest('small')).toBeTruthy()
+      expect(container.querySelector('.rd-row svg')).toBeNull()
+    })
+  })
 })

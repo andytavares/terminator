@@ -168,6 +168,36 @@ describe('PrReviewTab', () => {
     expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
 
+  describe('window title', () => {
+    afterEach(() => {
+      window.history.replaceState(null, '', '/')
+      document.title = ''
+    })
+
+    it('names the pop-out window after the PR it shows, so the Window menu can list it', () => {
+      window.history.replaceState(null, '', '/?view=pr-review')
+      const { rerender } = render(<PrReviewTab repoRoot="/repo" />)
+      expect(document.title).toBe('Code Reviews')
+
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...defaultStoreState,
+        activePr: { number: 214, title: 'Code review revamp' } as unknown as PrReviewDetail,
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      rerender(<PrReviewTab repoRoot="/repo" />)
+      expect(document.title).toBe('#214 Code review revamp — Review')
+    })
+
+    it('leaves the title alone when embedded in the main window', () => {
+      document.title = 'Git Integration'
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...defaultStoreState,
+        activePr: { number: 214, title: 'Code review revamp' } as unknown as PrReviewDetail,
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      render(<PrReviewTab repoRoot="/repo" />)
+      expect(document.title).toBe('Git Integration')
+    })
+  })
+
   it('shows pop out button', () => {
     render(<PrReviewTab repoRoot="/repo" />)
     expect(screen.getByTitle('Open in new window')).toBeTruthy()

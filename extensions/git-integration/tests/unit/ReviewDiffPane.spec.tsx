@@ -366,6 +366,87 @@ describe('ReviewDiffPane', () => {
     expect(screen.queryByTestId('composer')).toBeNull()
   })
 
+  it('a gutter drag across rows keeps the multi-line selection after the trailing click', async () => {
+    const actual = await vi.importActual<typeof import('../../src/stores/review-ui.store')>(
+      '../../src/stores/review-ui.store'
+    )
+    actual.useReviewUiStore.setState({ selection: null })
+    vi.mocked(useReviewUiStore).mockImplementation(actual.useReviewUiStore)
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,3 +1,3 @@',
+          lines: [1, 2, 3].map((n) => ({
+            type: 'context' as const,
+            content: `line ${n}`,
+            oldLineNumber: n,
+            newLineNumber: n,
+          })),
+        },
+      ],
+    }
+    mockPrFileDiff.mockResolvedValue({ diff })
+    const { container } = await renderPane()
+    await waitFor(() => expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy())
+
+    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
+    fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
+    fireEvent.mouseEnter(rows[1])
+    fireEvent.mouseEnter(rows[2])
+    fireEvent.mouseUp(rows[2].querySelector('.diff-line__content')!)
+    // A press and release on different elements clicks their common ancestor.
+    fireEvent.click(rows[0].parentElement!)
+
+    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(3))
+    expect(screen.getByText('Comment')).toBeTruthy()
+    expect(actual.useReviewUiStore.getState().selection).toEqual({
+      path: 'src/foo.ts',
+      side: 'RIGHT',
+      startLine: 1,
+      endLine: 3,
+    })
+  })
+
+  it('a background click after the drag has settled still clears the selection', async () => {
+    const actual = await vi.importActual<typeof import('../../src/stores/review-ui.store')>(
+      '../../src/stores/review-ui.store'
+    )
+    actual.useReviewUiStore.setState({ selection: null })
+    vi.mocked(useReviewUiStore).mockImplementation(actual.useReviewUiStore)
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,2 +1,2 @@',
+          lines: [1, 2].map((n) => ({
+            type: 'context' as const,
+            content: `line ${n}`,
+            oldLineNumber: n,
+            newLineNumber: n,
+          })),
+        },
+      ],
+    }
+    mockPrFileDiff.mockResolvedValue({ diff })
+    const { container } = await renderPane()
+    await waitFor(() => expect(screen.getByText('@@ -1,2 +1,2 @@')).toBeTruthy())
+
+    const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
+    fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
+    fireEvent.mouseEnter(rows[1])
+    fireEvent.mouseUp(rows[1])
+    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(2))
+    await new Promise((r) => setTimeout(r, 0))
+
+    fireEvent.click(rows[0].querySelector('.diff-line__content')!)
+
+    await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(0))
+    expect(actual.useReviewUiStore.getState().selection).toBeNull()
+  })
+
   it('shows the float bar under a selection, with Comment opening the composer', async () => {
     vi.mocked(useReviewUiStore).mockReturnValue({
       ...baseReviewUiStoreState(),

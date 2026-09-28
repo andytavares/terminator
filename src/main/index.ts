@@ -30,6 +30,7 @@ import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { routeExtensionExitRequest } from './extensions/extension-exit.js'
 import { logger } from './logger.js'
 import { sendToWindow } from './safe-send.js'
+import { buildWindowMenu } from './window-menu.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
@@ -210,27 +211,7 @@ function setupMenu(): void {
       label: 'View',
       submenu: buildViewSubmenu(),
     },
-    {
-      label: 'Window',
-      submenu: [
-        {
-          label: 'Home',
-          accelerator: 'CmdOrCtrl+`',
-          click: () => mainWindow?.webContents.send('menu:open-home'),
-        },
-        {
-          label: 'Home',
-          accelerator: 'CmdOrCtrl+Shift+`',
-          visible: false,
-          click: () => mainWindow?.webContents.send('menu:open-home'),
-        },
-        {
-          label: 'Close Tab',
-          accelerator: 'CmdOrCtrl+W',
-          click: () => mainWindow?.webContents.send('menu:close-tab'),
-        },
-      ],
-    },
+    buildWindowMenu((channel) => mainWindow?.webContents.send(channel)),
     {
       label: 'Help',
       submenu: [

@@ -152,7 +152,10 @@ describe('ReviewDashboard', () => {
       'REQUESTED OF YOU',
       'REQUESTED OF YOUR TEAM',
     ])
-    expect(screen.getByText('+4,043 −2,103 · 56 files')).toBeTruthy()
+    const size = screen.getByText('+4,043').closest('.rd-size')!
+    expect(size.textContent).toBe('+4,043 −2,103 · 56 files')
+    expect(screen.getByText('+4,043').className).toBe('rd-add')
+    expect(screen.getByText('−2,103').className).toBe('rd-del')
     expect(screen.getAllByText('High risk').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Re-review' })).toBeTruthy()
   })
@@ -171,7 +174,9 @@ describe('ReviewDashboard', () => {
     await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
     fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
     await screen.findByText('YOUR OPEN PRS')
-    expect(screen.getByText('+1,385 −246 · 109 files')).toBeTruthy()
+    expect(screen.getByText('+1,385').closest('.rd-size')!.textContent).toBe(
+      '+1,385 −246 · 109 files'
+    )
     expect(screen.getByText('Changes asked')).toBeTruthy()
   })
 

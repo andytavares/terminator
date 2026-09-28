@@ -80,7 +80,11 @@ function meta(e: ShortcutEvent): boolean {
  * direct shortcut cannot exist without an action showing it (AC 4).
  */
 export const CORE_SHORTCUTS: ShortcutSpec[] = [
-  { actionId: 'core.open-home', display: '⌘`', match: (e) => meta(e) && e.key === '`' },
+  {
+    actionId: 'core.open-home',
+    display: '⌘⇧H',
+    match: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'h',
+  },
   {
     actionId: 'core.open-settings',
     display: '⌘,',
@@ -388,7 +392,7 @@ export function buildCoreActions(deps: CoreActionDeps): QuickAction[] {
       label: 'Home',
       group: 'top',
       mnemonic: 'h',
-      shortcut: '⌘`',
+      shortcut: '⌘⇧H',
       run: deps.onHome,
     },
     {

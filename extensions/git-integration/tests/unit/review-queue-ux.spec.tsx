@@ -90,9 +90,9 @@ describe('review queue rows never lead with approval', () => {
       withQueue([makePr({ number: 7, title: 'Some change', riskLevel })])
       render(<ReviewQueue {...props} />)
 
-      const row = screen.getByRole('button', { name: /Some change/ })
+      const row = screen.getByText('Some change').closest<HTMLElement>('.rd-row')!
       expect(within(row).queryByText(/approve/i)).toBeNull()
-      expect(within(row).getByText('Review')).toBeTruthy()
+      expect(within(row).getByRole('button', { name: 'Review' })).toBeTruthy()
     })
   }
 

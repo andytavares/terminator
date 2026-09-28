@@ -108,7 +108,9 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
       input.model ||
       deps.getSetting<string>('terminator.git-integration.review.agentModel') ||
       'sonnet'
-    const effort = deps.getSetting<string>('terminator.git-integration.review.agentEffort') || ''
+    const effortSetting = deps.getSetting<string>('terminator.git-integration.review.agentEffort')
+    // 'default' (or a value saved before it existed, '') leaves --effort off so claude's own config wins.
+    const effort = effortSetting === 'default' ? '' : effortSetting || ''
     const timeoutMinutes =
       deps.getSetting<number>('terminator.git-integration.review.agentTimeoutMinutes') ?? 5
 

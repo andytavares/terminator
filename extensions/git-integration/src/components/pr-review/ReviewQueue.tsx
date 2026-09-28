@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Check, RefreshCw, TriangleAlert, X } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
+import { DiffSize } from './DiffSize'
+import './review-dashboard.css'
 
 type Filter = 'all' | 'stale'
 
@@ -142,24 +144,17 @@ export function ReviewQueue({
           is wrong — and two of the labels carried instructions inside them
           ("High risk — read these first"). A label names a metric; telling you
           what to do with it belongs in the grouping below, which already does. */}
-      <div className="pr-summary-row">
-        <p className="pr-summary">
-          <b className="pr-summary__count">{totalPrCount ?? prQueue.length}</b> waiting on you
-          {highRiskCount > 0 && (
-            <>
-              {' · '}
-              <span className="pr-summary__risk">{highRiskCount} high risk</span>
-            </>
-          )}
-          {inProgressCount > 0 && (
-            <>
-              {' · '}
-              {inProgressCount} already started
-            </>
-          )}
-          {minutesArePartial ? ' · at least ' : ' · about '}
+      <div className="rd-band">
+        <span>
+          <b>{totalPrCount ?? prQueue.length}</b> waiting on you
+        </span>
+        {highRiskCount > 0 && <span className="rd-warn">{highRiskCount} high risk</span>}
+        {inProgressCount > 0 && <span>{inProgressCount} already started</span>}
+        <span>
+          {minutesArePartial ? 'At least ' : 'About '}
           <b>{totalMinutes} min</b> of reading
-        </p>
+        </span>
+        <span className="rd-sp" />
         <button
           className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
           onClick={handleRefresh}
@@ -220,24 +215,19 @@ export function ReviewQueue({
             {searchQuery ? 'No matching pull requests.' : 'No open pull requests.'}
           </div>
         ) : (
-          <>
+          // One grid for every section, so their columns line up.
+          <div className="rd-rows rd-rows--single-repo">
             <PrSection
               title="In progress"
               prs={inProgress}
-              accent="blue"
               onOpen={onOpenPr}
               onDismiss={onDismissPr}
             />
-            <PrSection
-              title="Needs your review"
-              prs={needsMyReview}
-              accent="yellow"
-              onOpen={onOpenPr}
-            />
-            <PrSection title="Read these first" prs={readFirst} accent="red" onOpen={onOpenPr} />
-            <PrSection title="Quick wins" prs={quickWins} accent="green" onOpen={onOpenPr} />
-            <PrSection title="Larger reviews" prs={larger} accent="none" onOpen={onOpenPr} />
-          </>
+            <PrSection title="Needs your review" prs={needsMyReview} onOpen={onOpenPr} />
+            <PrSection title="Read these first" prs={readFirst} onOpen={onOpenPr} />
+            <PrSection title="Quick wins" prs={quickWins} onOpen={onOpenPr} />
+            <PrSection title="Larger reviews" prs={larger} onOpen={onOpenPr} />
+          </div>
         )}
       </div>
 
@@ -250,31 +240,29 @@ export function ReviewQueue({
 function PrSection({
   title,
   prs,
-  accent,
   onOpen,
   onDismiss,
 }: {
   title: string
   prs: ReviewQueuePR[]
-  accent: 'red' | 'green' | 'blue' | 'yellow' | 'none'
   onOpen: (pr: ReviewQueuePR) => void
   onDismiss?: (prNumber: number) => Promise<void>
 }) {
   if (prs.length === 0) return null
   return (
-    <div className={`pr-section pr-section--${accent}`}>
-      <h3 className="pr-section-title">{title}</h3>
+    <>
+      <h3 className="rd-grp">{title}</h3>
       {prs.map((pr) => (
         <PrRow key={pr.number} pr={pr} onOpen={onOpen} onDismiss={onDismiss} />
       ))}
-    </div>
+    </>
   )
 }
 
-const RISK_LABEL: Record<string, string> = {
-  high: 'High risk',
-  medium: 'Medium risk',
-  low: 'Low risk',
+const RISK_CHIP: Record<ReviewQueuePR['riskLevel'], { text: string; cls: string }> = {
+  high: { text: 'High risk', cls: 'rd-hi' },
+  medium: { text: 'Medium risk', cls: 'rd-md' },
+  low: { text: 'Low risk', cls: 'rd-lo' },
 }
 
 function PrRow({
@@ -287,73 +275,87 @@ function PrRow({
   onDismiss?: (prNumber: number) => Promise<void>
 }) {
   const isSession = pr.sessionStatus === 'paused' || pr.sessionStatus === 'in-progress'
-  // The row is one button and its onClick is onOpen — so this label named an
-  // outcome the click does not produce. On a low-risk PR it read "Approve" and
-  // opened the diff. A control says what happens when it is used.
+  // A control says what happens when it is used: every one of these opens the diff.
   const actionLabel =
     pr.sessionStatus === 'paused'
       ? 'Resume'
       : pr.sessionStatus === 'in-progress'
         ? 'Continue'
         : 'Review'
-  const actionModifier = isSession ? 'session' : pr.riskLevel
-
-  const age = formatAge(pr.openedAt)
-
+  const chip = RISK_CHIP[pr.riskLevel]
   const fileProgress =
     pr.sessionStatus !== 'not-started' && pr.fileCount > 0
       ? Math.round((pr.viewedFileCount / pr.fileCount) * 100)
       : null
+  const open = () => onOpen(pr)
 
   return (
-    <div className="pr-row-wrap">
-      <button className={`pr-row pr-row--${pr.riskLevel}`} onClick={() => onOpen(pr)}>
-        <div className="pr-row-left">
-          <div className="pr-row-header">
-            <span className="pr-row-number">#{pr.number}</span>
-            {pr.isDraft && <span className="pr-row-draft">Draft</span>}
-            {pr.mergeStateStatus === 'dirty' && (
-              <span className="pr-row-conflicts" title="This PR has merge conflicts">
-                <TriangleAlert aria-hidden="true" /> Conflicts
+    <div
+      className="rd-row rd-row--clickable"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') open()
+      }}
+    >
+      <span className="rd-ti">
+        <span>#{pr.number}</span> <span>{pr.title}</span>
+        <small>
+          {pr.isDraft && (
+            <>
+              <span>Draft</span>
+              {' · '}
+            </>
+          )}
+          {pr.mergeStateStatus === 'dirty' && (
+            <>
+              <span className="rd-warn" title="This PR has merge conflicts">
+                Conflicts
               </span>
-            )}
-          </div>
-          <span className="pr-row-title">{pr.title}</span>
-          <span className="pr-row-meta">
-            {pr.author} · {age} · {pr.fileCount} files · +{pr.additions}/−{pr.deletions}
-          </span>
+              {' · '}
+            </>
+          )}
+          {pr.author} · opened {formatAge(pr.openedAt)}
           {pr.approvalCount > 0 && (
-            <span className="pr-row-approved" title={`Approved by: ${pr.approvedBy.join(', ')}`}>
-              <Check aria-hidden="true" /> {pr.approvalCount} approved
-            </span>
+            <>
+              {' · '}
+              <span title={`Approved by: ${pr.approvedBy.join(', ')}`}>
+                {pr.approvalCount} approved
+              </span>
+            </>
           )}
-          {fileProgress !== null && (
-            <div className="pr-row-progress" aria-label={`${fileProgress}% of files reviewed`}>
-              <div className="pr-row-progress-bar" style={{ width: `${fileProgress}%` }} />
-            </div>
-          )}
-        </div>
-
-        <div className="pr-row-right">
-          {/* "MED" needs a key; "Medium risk" does not. The estimate carries a
-              unit rather than floating as a bare "4m". */}
-          <span className={`pr-risk-chip pr-risk-chip--${pr.riskLevel}`}>
-            {RISK_LABEL[pr.riskLevel] ?? 'Unrated'}
-          </span>
-          <span className="pr-row-time">~{pr.estimatedMinutes} min</span>
-          <span className={`pr-row-action pr-row-action--${actionModifier}`}>{actionLabel}</span>
-        </div>
-      </button>
-      {onDismiss && pr.sessionStatus !== 'not-started' && (
+          {fileProgress !== null && ` · ${fileProgress}% reviewed`}
+        </small>
+      </span>
+      <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
+      <span>{chip && <span className={`rd-chip ${chip.cls}`}>{chip.text}</span>}</span>
+      <span className="rd-num">~{pr.estimatedMinutes} min</span>
+      <span className="rd-actions">
         <button
-          className="pr-row-dismiss-btn"
-          onClick={() => void onDismiss(pr.number)}
-          title="Dismiss from in-progress"
-          aria-label={`Dismiss PR #${pr.number} from in-progress`}
+          type="button"
+          className={isSession ? 'rd-btn rd-pri' : 'rd-btn'}
+          onClick={(e) => {
+            e.stopPropagation()
+            open()
+          }}
         >
-          <X aria-hidden="true" />
+          {actionLabel}
         </button>
-      )}
+        {onDismiss && pr.sessionStatus !== 'not-started' && (
+          <button
+            type="button"
+            className="rd-btn rd-dismiss"
+            onClick={(e) => {
+              e.stopPropagation()
+              void onDismiss(pr.number)
+            }}
+            title="Dismiss from in-progress"
+            aria-label={`Dismiss PR #${pr.number} from in-progress`}
+          >
+            <X aria-hidden="true" />
+          </button>
+        )}
+      </span>
     </div>
   )
 }

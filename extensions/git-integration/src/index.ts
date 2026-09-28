@@ -193,8 +193,8 @@ export function activate(api: ExtensionAPI): void {
         'terminator.git-integration.review.agentEffort': {
           type: 'enum',
           label: 'Review agent effort',
-          options: ['', 'low', 'medium', 'high'],
-          default: '',
+          options: ['default', 'low', 'medium', 'high'],
+          default: 'default',
         },
         'terminator.git-integration.review.cloneFolder': {
           type: 'folder',
