@@ -139,7 +139,12 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
   },
   'verify.repeat-fail': {
     options: [
-      { id: 'send_back', label: 'Send back', consequence: 'A third attempt begins.' },
+      {
+        id: 'send_back',
+        label: 'Send back',
+        consequence:
+          'It goes back to the builder with the failure output, and the checks run again.',
+      },
       { id: 'take_over', label: 'Take over', consequence: 'You are dropped into the session.' },
       {
         id: 'accept_debt',
@@ -332,4 +337,13 @@ export function applyDefault(gate: Gate, at: string): Gate {
 
 export function isOverdue(gate: Gate, now: string): boolean {
   return gate.decision === null && gate.deadline !== null && gate.deadline <= now
+}
+
+/** What a gate does when nobody answers, as the operator would say it. */
+export function defaultInWords(gate: Pick<Gate, 'options' | 'defaultIfIgnored'>): string {
+  const option = gate.options.find((o) => o.id === gate.defaultIfIgnored)
+  if (option !== undefined) return option.label
+  // Every rule defaults to holding; a rule that ever defaults to something
+  // else lists it as an option, and is named by that option's label above.
+  return 'Hold, so nothing proceeds'
 }

@@ -122,6 +122,11 @@ export function ladderFor(input: LadderInput): LadderStep[] {
       check: null,
     },
     inspection,
+    // End-to-end tests run against the built application; a checkout that was
+    // never built fails every one of them whatever the change was.
+    ...(toolchain.e2e !== null && toolchain.build !== null
+      ? [step('L5', 'Build the application', toolchain.build, 'build')]
+      : []),
     integration,
     {
       rung: 'L6',

@@ -259,6 +259,32 @@ export function rework(
   return next
 }
 
+/**
+ * Hand a failure found after the run back to the nodes that wrote the work,
+ * and reopen everything downstream of them so their checks run again on the
+ * new commit.
+ */
+export function sendBack(
+  graph: RunGraph,
+  targetIds: readonly string[],
+  feedback: Feedback
+): RunGraph {
+  let next = graph
+  const reopen = new Set<string>()
+  for (const id of targetIds) {
+    const target = nodeById(next, id)
+    if (target === undefined) continue
+    next = withNode(next, id, {
+      state: 'waiting',
+      endedAt: null,
+      feedback: [...target.feedback, feedback],
+    })
+    for (const d of descendantsOf(next, id)) reopen.add(d)
+  }
+  for (const id of reopen) next = withNode(next, id, { state: 'waiting', endedAt: null })
+  return next
+}
+
 export function isComplete(graph: RunGraph): boolean {
   return graph.nodes.every((n) => n.state === 'passed' || n.state === 'skipped')
 }

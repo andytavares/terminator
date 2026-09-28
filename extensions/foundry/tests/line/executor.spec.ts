@@ -791,6 +791,32 @@ describe('the ladder', () => {
     expect(outcome.shippable).toBe(false)
   })
 
+  it("keeps each step's output and shows the failed step's last lines on the gate", async () => {
+    const o = order([unit('U-1')])
+    const logs: string[] = []
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'standard',
+      runStep: async (step, logPath) => {
+        logs.push(logPath)
+        fs.mkdirSync(path.dirname(logPath), { recursive: true })
+        fs.writeFileSync(logPath, `running ${step.command}\nError: Process failed to launch!\n`)
+        return step.name === 'Lint' ? 1 : 0
+      },
+    })
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(new Set(logs).size).toBe(logs.length)
+    expect(logs.every((p) => p.startsWith(dataRoot))).toBe(true)
+    expect(gate?.why).toContain('Lint failed with exit code 1')
+    expect(gate?.evidence).toEqual([
+      expect.objectContaining({
+        kind: 'stdout',
+        exitCode: 1,
+        excerpt: expect.stringContaining('Process failed to launch!'),
+      }),
+    ])
+  })
+
   it('asks about a failed climb where the setting is asking at all', async () => {
     const o = order([unit('U-1')])
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {

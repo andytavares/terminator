@@ -6,6 +6,7 @@ import {
   markFailed,
   retry,
   rework,
+  sendBack,
   isComplete,
   hasStalled,
   blockedNodes,
@@ -459,5 +460,55 @@ describe('rework', () => {
     const after = rework(graph, 'lint', 'build', fb())
     expect(nodeById(after, 'build')?.attempts).toBe(1)
     expect(nodeById(after, 'lint')?.attempts).toBe(2)
+  })
+})
+
+describe('sendBack after the final check failed', () => {
+  const mk = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
+    kind: 'agent',
+    state: 'passed',
+    unitIds: [],
+    lane: 1,
+    role: null,
+    dependsOn: [],
+    attempts: 1,
+    reworks: 0,
+    feedback: [],
+    sessionId: 's',
+    worktreePath: null,
+    startedAt: 'started',
+    endedAt: 'ended',
+    ...over,
+  })
+  const failure: Feedback = {
+    from: 'final check',
+    attempt: 1,
+    source: 'check',
+    command: 'npm run test:e2e',
+    exitCode: 1,
+    excerpt: 'Error: Process failed to launch!',
+    logPath: '/data/runs/final-integration.1.log',
+  }
+
+  it('reopens the builder with the failure, and everything after it', () => {
+    const g: RunGraph = {
+      orderId: 'WO-1',
+      recipe: 'quick',
+      nodes: [
+        mk({ id: 'build:lane-1', stepId: 'build', role: 'builder' }),
+        mk({ id: 'lint', stepId: 'lint', kind: 'run', dependsOn: ['build:lane-1'] }),
+        mk({ id: 'check', stepId: 'check', kind: 'run', dependsOn: ['lint'] }),
+        mk({ id: 'unrelated', stepId: 'docs' }),
+      ],
+    }
+    const next = sendBack(g, ['build:lane-1'], failure)
+    const byId = (id: string) => next.nodes.find((n) => n.id === id)!
+    expect(byId('build:lane-1').state).toBe('waiting')
+    expect(byId('build:lane-1').feedback).toEqual([failure])
+    expect(byId('build:lane-1').endedAt).toBeNull()
+    expect(byId('lint').state).toBe('waiting')
+    expect(byId('check').state).toBe('waiting')
+    expect(byId('unrelated').state).toBe('passed')
+    expect(isComplete(next)).toBe(false)
   })
 })

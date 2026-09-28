@@ -61,6 +61,34 @@ describe('ladderFor', () => {
     expect(coverage?.reason).toContain('no coverage command')
   })
 
+  it('builds the application right before the end-to-end tests when it can', () => {
+    const steps = ladderFor({
+      toolchain: toolchain({
+        ...full,
+        build: { command: 'npm run build', source: 'package.json' },
+      }),
+      risk: noRisk,
+      touchesUi: false,
+    })
+    const names = steps.map((s) => s.name)
+    const build = names.indexOf('Build the application')
+    expect(build).toBeGreaterThan(-1)
+    expect(names[build + 1]).toBe('Integration')
+    expect(steps[build].command).toBe('npm run build')
+  })
+
+  it('does not build when there are no end-to-end tests to run against the build', () => {
+    const steps = ladderFor({
+      toolchain: toolchain({
+        test: { command: 'npm test', source: 'package.json' },
+        build: { command: 'npm run build', source: 'package.json' },
+      }),
+      risk: noRisk,
+      touchesUi: false,
+    })
+    expect(steps.some((s) => s.name === 'Build the application')).toBe(false)
+  })
+
   it('does not trigger the inspection when nothing warrants one, and says so', () => {
     const inspection = ladderFor({ toolchain: full, risk: noRisk, touchesUi: false }).find(
       (s) => s.rung === 'L4'

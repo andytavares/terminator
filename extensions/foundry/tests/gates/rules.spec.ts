@@ -8,6 +8,7 @@ import {
   UnattributedGateError,
   AlreadyDecidedError,
   ruleInWords,
+  defaultInWords,
 } from '../../src/gates/rules.js'
 import type { Gate, GateRuleId } from '../../src/gates/rules.js'
 import {
@@ -366,5 +367,25 @@ describe('refinery.conflict', () => {
 
   it('says what it is in words somebody who did not write it can read', () => {
     expect(ruleInWords('refinery.conflict')).toMatch(/rebase/)
+  })
+})
+
+describe('defaultInWords', () => {
+  it('names the default by its option label when the gate offers it', () => {
+    expect(
+      defaultInWords({
+        options: [{ id: 'hold', label: 'Hold', consequence: 'x' }],
+        defaultIfIgnored: 'hold',
+      })
+    ).toBe('Hold')
+  })
+
+  it('says what holding means when the gate does not list it as an option', () => {
+    expect(
+      defaultInWords({
+        options: [{ id: 'approve', label: 'Approve', consequence: 'x' }],
+        defaultIfIgnored: 'hold',
+      })
+    ).toBe('Hold, so nothing proceeds')
   })
 })

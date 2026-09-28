@@ -1,3 +1,4 @@
+import { createPassCache } from './verify/pass-cache.js'
 import { z } from 'zod'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { app } from 'electron'
@@ -34,7 +35,7 @@ import type { Check, CiVerdict } from './line/ci.js'
 import { ciRounds, ciReworkTarget, shipNodeId } from './line/ship-tail.js'
 import { writeCiState } from './line/ci-state.js'
 import type { CiState } from './line/ci-state.js'
-import { rework } from './line/scheduler.js'
+import { rework, sendBack } from './line/scheduler.js'
 import { resolveRecipe } from './recipe/resolve.js'
 import { ensureCheckout, ensureCheckouts, branchFor, checkoutPath } from './line/worktree.js'
 import type { Checkout } from './line/worktree.js'
@@ -1374,6 +1375,10 @@ async function buildExecutorDeps(
   // Every checkout before any agent starts: a run that provisions lane 2 half
   // way through and fails has already spent lane 1's agent budget.
   const checkouts = await ensureCheckouts(order, { exec, root })
+  const passes = createPassCache(async (args, cwd) => {
+    const result = await exec({ command: 'git', args, cwd })
+    return { exitCode: result.exitCode, stdout: result.stdout }
+  })
 
   /** What the working copies have actually changed, against their base. */
   const readObservedChange = async (): Promise<{
@@ -1730,21 +1735,32 @@ async function buildExecutorDeps(
       // of its own in the lane's checkout — visible, like everything else here —
       // with no agent in between to spend a turn on it or a transcript to read
       // the answer back out of.
-      runStep: async (step) => {
+      runStep: async (step, logPath) => {
         if (step.command === null) return null
         const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
         const checkout = checkouts.get(lane)
         const runner = supervisedRunner
         // Nothing ran, so nothing was measured — never a pass.
         if (checkout === undefined || runner === null) return null
-        return runner.runCommand({
+        if (await passes.passed(checkout.path, step.command)) {
+          await fs.promises.mkdir(path.dirname(logPath), { recursive: true })
+          await fs.promises.writeFile(
+            logPath,
+            `${step.command} already passed on this exact commit earlier in this run; not run again.\n`
+          )
+          return 0
+        }
+        const exitCode = await runner.runCommand({
           worktreePath: checkout.path,
           workspaceId: workspaceOf(checkout),
           branch: checkout.branch,
           issue: issueOf(order),
           title: step.name,
           command: step.command,
+          logPath,
         })
+        await passes.record(checkout.path, step.command, exitCode)
+        return exitCode
       },
       // A recipe `run` step whose command is not a slash instruction runs as a
       // command in the lane's checkout, the same way `runStep` runs a gate's
@@ -1756,7 +1772,7 @@ async function buildExecutorDeps(
         const runner = supervisedRunner
         // Nothing ran, so nothing was measured — never a pass.
         if (checkout === undefined || runner === null) return null
-        return runner.runCommand({
+        const exitCode = await runner.runCommand({
           worktreePath: checkout.path,
           workspaceId: workspaceOf(checkout),
           branch: checkout.branch,
@@ -1765,6 +1781,8 @@ async function buildExecutorDeps(
           command: input.command,
           logPath: input.logPath,
         })
+        await passes.record(checkout.path, input.command, exitCode)
+        return exitCode
       },
       // The previous process of this conversation may still be sitting at its
       // prompt when a node resumes it. Two processes must not share one
@@ -3127,6 +3145,34 @@ export function activate(api: ExtensionAPI): void {
         if (decision.kind === 'converge' && order !== null) {
           await convergeWithFollowUps(order, decision.message, 0, 1)
           return
+        }
+      }
+
+      // The final check fails after every node has passed, so there is no node
+      // to retry: "Send back" gives the failure to the nodes that wrote the
+      // work and reruns everything after them. Retrying nothing only re-ran the
+      // same failing check.
+      if (gate.rule === 'verify.repeat-fail' && gate.nodeId === null && option === 'send_back') {
+        const root = dataRoot()
+        const graph = await readRunGraph(root, gate.orderId)
+        if (graph !== null) {
+          const roles = createRoleRegistry(resolveSources(api, root))
+          const writers = graph.nodes
+            .filter((n) => n.role !== null && roles.mayWrite(n.role))
+            .map((n) => n.id)
+          const output = gate.evidence.find((e) => e.kind === 'stdout')
+          await writeRunGraph(
+            root,
+            sendBack(graph, writers, {
+              from: 'final check',
+              attempt: 1,
+              source: 'check',
+              command: null,
+              exitCode: output?.exitCode ?? null,
+              excerpt: [gate.why, output?.excerpt ?? ''].filter(Boolean).join('\n\n'),
+              logPath: output?.path ?? null,
+            })
+          )
         }
       }
 

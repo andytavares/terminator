@@ -105,7 +105,7 @@ describe('a row the operator can act on', () => {
     mount({ gates: [gate()] })
     await waitFor(() => expect(screen.getByText(ruleInWords('risk.p0'))).toBeTruthy())
     expect(screen.getByText(/session\.ts/)).toBeTruthy()
-    expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
   })
 
   it('says how much work the decision unblocks', async () => {
@@ -137,7 +137,7 @@ describe('a row the operator can act on', () => {
   it('says a gate with no deadline waits, rather than implying a timer', async () => {
     mount({ gates: [gate()] })
     await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
-    expect(screen.getByText(/\(waits\)/)).toBeTruthy()
+    expect(screen.getByText(/\(it waits for you\)/)).toBeTruthy()
   })
 })
 
@@ -355,7 +355,7 @@ describe('ci.red', () => {
     await waitFor(() => expect(screen.getByText(ruleInWords('ci.red'))).toBeTruthy())
     expect(screen.getByText(/PR #200 has been red/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Another round' })).toBeTruthy()
-    expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
   })
 })
 
@@ -377,7 +377,7 @@ describe('refinery.conflict', () => {
     await waitFor(() => expect(screen.getByText(ruleInWords('refinery.conflict'))).toBeTruthy())
     expect(screen.getByText(/no longer rebases onto main/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Take it over' })).toBeTruthy()
-    expect(screen.getByText(/if ignored: hold/)).toBeTruthy()
+    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
   })
 })
 

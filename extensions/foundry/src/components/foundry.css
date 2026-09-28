@@ -4129,3 +4129,22 @@
     grid-row: auto;
   }
 }
+
+.fdry-gate-evidence summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-gate-evidence-pre {
+  margin: 6px 0 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-input);
+  font: 12px/1.45 var(--tm-font-mono);
+  color: var(--tm-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

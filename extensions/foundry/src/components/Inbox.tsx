@@ -1,4 +1,5 @@
-import { ruleInWords } from '../gates/rules.js'
+import { GateEvidence } from './GateEvidence.js'
+import { ruleInWords, defaultInWords } from '../gates/rules.js'
 import { gradeInWords } from '../runtime/review/risk-grader.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
@@ -262,17 +263,12 @@ export function Inbox(): JSX.Element {
                     <span>{gate.orderTitle ?? `work order ${gate.orderId}`}</span>
                     {gate.blockedUnits > 0 ? <span>{gate.blockedUnits} units waiting</span> : null}
                     <span>{gradeInWords(gate.riskGrade)} risk</span>
-                    {gate.evidence.map((piece, index) => (
-                      <span key={`${piece.kind}-${index}`}>
-                        {piece.kind}
-                        {piece.exitCode === undefined ? '' : ` ${piece.exitCode}`}
-                      </span>
-                    ))}
                     <span className="fdry-gate-default">
-                      if ignored: {gate.defaultIfIgnored}
-                      {gate.deadline === null ? ' (waits)' : ''}
+                      If nobody answers: {defaultInWords(gate)}
+                      {gate.deadline === null ? ' (it waits for you)' : ''}
                     </span>
                   </div>
+                  <GateEvidence evidence={gate.evidence} />
                   {raising === gate.id && gate.breach ? (
                     <RaiseBudgetForm
                       breach={gate.breach}

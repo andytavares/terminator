@@ -1,3 +1,5 @@
+import { defaultInWords } from '../gates/rules.js'
+import { GateEvidence } from './GateEvidence.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Terminal,
@@ -723,6 +725,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             <div key={gate.id} className="fdry-standing-gate">
               <p className="fdry-standing-gate-h">{gate.summary}</p>
               <p className="fdry-note">{gate.why}</p>
+              <GateEvidence evidence={gate.evidence ?? []} />
               {raising === gate.id && gate.breach ? (
                 <RaiseBudgetForm
                   breach={gate.breach}
@@ -761,8 +764,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                   is a token from a rules file, not a sentence. */}
               <p className="fdry-note">
                 Nothing happens until you answer. Left alone, Foundry takes &ldquo;
-                {gate.options.find((o) => o.id === gate.defaultIfIgnored)?.label ??
-                  gate.defaultIfIgnored}
+                {defaultInWords(gate)}
                 &rdquo;.
               </p>
             </div>
