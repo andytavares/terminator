@@ -214,7 +214,17 @@ beforeAll(async () => {
   }
 })
 
+/**
+ * Resuming hands the graph to an executor it does not wait for, which starts
+ * the reclaimed node again. Read the graph after that, not while it races.
+ */
+async function restarted(): Promise<RunGraph> {
+  await vi.waitFor(() => expect(runner.start).toHaveBeenCalledTimes(1))
+  return graphOnDisk()
+}
+
 beforeEach(() => {
+  runner.start.mockClear()
   runner.terminalFor.mockReturnValue(null)
   runner.stop.mockReturnValue(true)
 })
@@ -291,14 +301,14 @@ describe('answering the gate', () => {
     })) as { ok: boolean }
 
     expect(r.ok).toBe(true)
-    expect(graphOnDisk().nodes[0].state).toBe('waiting')
+    expect((await restarted()).nodes[0].state).toBe('running')
   })
 
   it('gives the attempt back, because the application closing is not a failed try', async () => {
     await seedInterruptedRun()
     await call('foundry:attention')
     await call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'resume' })
-    expect(graphOnDisk().nodes[0].attempts).toBe(0)
+    expect((await restarted()).nodes[0].attempts).toBe(1)
   })
 
   it('keeps the session on the node, so the agent resumes its own conversation', async () => {
