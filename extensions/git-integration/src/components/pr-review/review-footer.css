@@ -1,0 +1,72 @@
+/**
+ * ReviewFooter: the single 48px bar under the diff, replacing the old
+ * review-diff-nav-bar + SubmitBar pair. Tokens map onto the app's --tm-* set.
+ */
+
+.rf-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 12px;
+  background: var(--tm-bg-elevated);
+  border-top: 1px solid var(--tm-border);
+  font: 13px/1.45 var(--tm-font-ui);
+  color: var(--tm-text-primary);
+}
+
+.rf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  color: var(--tm-text-primary);
+  font: 13px/1 var(--tm-font-ui);
+  cursor: pointer;
+}
+
+.rf-btn svg {
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
+.rf-btn.rf-pri {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: var(--tm-bg-elevated);
+}
+
+.rf-btn.rf-icon {
+  padding: 0 8px;
+}
+
+.rf-drafts {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent-text);
+  background: var(--tm-accent-dim);
+}
+
+.rf-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tm-text-muted);
+}
+
+.rf-kbd {
+  font: 500 11px/1 var(--tm-font-mono);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: var(--tm-text-secondary);
+  background: var(--tm-bg-elevated);
+}
+
+.rf-sp {
+  flex: 1;
+}
