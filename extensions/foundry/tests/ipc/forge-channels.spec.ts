@@ -859,6 +859,10 @@ describe('foundry:order.converge — the half that was missing', () => {
       at: NOW,
       sessionId: 'sess-arch',
       asked: 'close the gap',
+      actor: 'architect',
+      trigger: 'you',
+      round: null,
+      autoTurn: null,
     })
 
     const polled = (await c.compile({ id: seed.order.id, commit: false })) as {
@@ -1542,5 +1546,175 @@ describe('an order seeded from a ticket that states its criteria', () => {
       repoPaths: [repo],
     })) as OrderView
     expect(r.order.acceptance).toEqual([])
+  })
+})
+
+async function drafted() {
+  return channels().create({
+    source: { kind: 'typed', text: 'expired tokens are accepted' },
+    repoPaths: [repo],
+  }) as Promise<OrderView>
+}
+
+async function completeOrder(): Promise<WorkOrder> {
+  const r = (await channels().create({
+    source: { kind: 'typed', text: 'x' },
+    repoPaths: [repo],
+  })) as OrderView
+  const done: WorkOrder = {
+    ...r.order,
+    intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
+    risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    acceptance: [
+      {
+        id: 'AC-1',
+        statement: 'a full-width row renders its final glyph',
+        priority: 'P1',
+        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+        unverifiable: null,
+      },
+    ],
+    plan: {
+      ...r.order.plan,
+      units: [
+        {
+          id: 'U-1',
+          title: 'widen',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: ['src/a.ts'],
+          verify: [],
+        },
+      ],
+    },
+    redTeam: r.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
+  }
+  await store.save(done)
+  return done
+}
+
+describe('the backend facts every Forge response carries', () => {
+  it('carries loop, agreed and turnEndedAt on compile, alongside intake', async () => {
+    const seed = await drafted()
+    const r = (await channels().compile({ id: seed.order.id, commit: false })) as OrderView & {
+      loop: { rounds: unknown[]; heldAt: null; exhausted: boolean }
+      agreed: unknown
+      turnEndedAt: string | null
+    }
+    expect(r.loop).toEqual({ rounds: [], heldAt: null, exhausted: false })
+    expect(r.agreed).toBeNull()
+    expect(r.turnEndedAt).toBeNull()
+  })
+
+  it('carries them on a running converge answer too', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels({
+      store,
+      now: () => NOW,
+      converge: async () => ({ ok: true as const, sessionId: 'sess-arch' }),
+    })
+    const r = (await c.converge({ id: seed.order.id, message: 'go' })) as OrderView & {
+      loop: unknown
+      agreed: unknown
+      turnEndedAt: unknown
+    }
+    expect(r.loop).toBeDefined()
+    expect(r.agreed).toBeNull()
+    expect(r.turnEndedAt).toBeNull()
+  })
+
+  it('says who agreed the order once it is agreed', async () => {
+    const order = await completeOrder()
+    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView & {
+      agreed: { at: string; by: string } | null
+    }
+    expect(r.compile.ok).toBe(true)
+    expect(r.agreed).toEqual({ at: NOW, by: 'you' })
+  })
+})
+
+describe('foundry:order.compile — the automatic actor', () => {
+  it('records the rule as the actor, with its own reason, when the actor is rule:forge', async () => {
+    const order = await completeOrder()
+    const r = (await channels().compile({
+      id: order.id,
+      commit: true,
+      actor: 'rule:forge',
+    })) as OrderView & { agreed: { by: string } | null }
+    expect(r.agreed).toEqual({ at: NOW, by: 'automatic' })
+
+    const entries = await store.entries(order.id)
+    const agreedEntry = entries.find((e) => e.action === 'order.agreed')
+    expect(agreedEntry?.actor).toBe('rule:forge')
+    expect(agreedEntry?.reason).toBe('all checks pass, handed off automatically')
+  })
+
+  it('defaults to the operator, with the plain reason', async () => {
+    const order = await completeOrder()
+    await channels().compile({ id: order.id, commit: true })
+
+    const entries = await store.entries(order.id)
+    const agreedEntry = entries.find((e) => e.action === 'order.agreed')
+    expect(agreedEntry?.actor).toBe('operator')
+    expect(agreedEntry?.reason).toBe('all checks pass')
+  })
+})
+
+describe('foundry:order.recipe', () => {
+  it('sets the recipe and records who chose it', async () => {
+    const seed = await drafted()
+    const c = channels()
+    const r = (await c.recipe({ id: seed.order.id, recipe: 'quick' })) as OrderView
+    expect(r.order.recipe).toBe('quick')
+
+    const entries = await store.entries(seed.order.id)
+    const last = entries[entries.length - 1]
+    expect(last.action).toBe('recipe.chosen')
+    expect(last.reason).toBe('quick')
+  })
+
+  it('records "the proposal" when the choice is cleared', async () => {
+    const seed = await drafted()
+    const c = channels()
+    await c.recipe({ id: seed.order.id, recipe: 'quick' })
+    await c.recipe({ id: seed.order.id, recipe: null })
+
+    const entries = await store.entries(seed.order.id)
+    const last = entries[entries.length - 1]
+    expect(last.reason).toBe('the proposal')
+  })
+
+  it('refuses on anything but a draft', async () => {
+    const seed = await drafted()
+    const c = channels()
+    await store.save({ ...seed.order, status: 'agreed' })
+    const r = (await c.recipe({ id: seed.order.id, recipe: 'quick' })) as { error?: string }
+    expect(r.error).toBe('Only a draft can have its shape chosen; this order is agreed.')
+  })
+})
+
+describe('foundry:order.hold', () => {
+  it('records a hold and releases it, calling onReleased only on release', async () => {
+    const seed = await drafted()
+    const onReleased = vi.fn()
+    const c = createForgeChannels({ store, now: () => NOW, onReleased })
+
+    await c.hold({ id: seed.order.id, held: true })
+    expect(onReleased).not.toHaveBeenCalled()
+    let entries = await store.entries(seed.order.id)
+    expect(entries[entries.length - 1].action).toBe('review.held')
+
+    await c.hold({ id: seed.order.id, held: false })
+    expect(onReleased).toHaveBeenCalledTimes(1)
+    entries = await store.entries(seed.order.id)
+    expect(entries[entries.length - 1].action).toBe('review.released')
+  })
+
+  it('errors on an unknown order', async () => {
+    const c = channels()
+    const r = (await c.hold({ id: 'WO-nope', held: true })) as { error?: string }
+    expect(r.error).toBe('No order WO-nope.')
   })
 })

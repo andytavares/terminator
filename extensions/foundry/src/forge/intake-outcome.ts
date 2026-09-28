@@ -1,4 +1,5 @@
 import type { LedgerEntry } from '../ledger/append.js'
+import type { LoopFacts, AgreedFacts } from './readiness.js'
 
 // How the last intake turn ended.
 //
@@ -54,6 +55,14 @@ export type IntakeOutcome =
       readonly sessionId: string
       /** What the operator asked for, so the surface can say which ask this is. */
       readonly asked: string
+      /** Who is working. A red-team round and the scout are turns too. */
+      readonly actor: 'architect' | 'red team' | 'scout'
+      /** Whether the operator asked for this turn or the Forge started it on its own. */
+      readonly trigger: 'you' | 'automatic'
+      /** The red-team loop round this turn belongs to, when it is one. */
+      readonly round: number | null
+      /** Which automatic follow-up this is (1 or 2), when it is one. */
+      readonly autoTurn: number | null
     }
   /** It finished and the order moved. */
   | { readonly kind: 'redrafted'; readonly at: string; readonly note: string }
@@ -72,22 +81,74 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
     const entry = entries[i]
     if (entry.action === REFUSED) return { kind: 'refused', at: entry.at, reason: entry.reason }
     if (entry.action === REDRAFTED) return { kind: 'redrafted', at: entry.at, note: entry.reason }
-    if (entry.action === STARTED || entry.action === FOLLOWED_UP) {
-      return { kind: 'running', at: entry.at, sessionId: entry.subject, asked: entry.reason }
+    if (entry.action === STARTED) {
+      // A fix turn the review loop started names its own round in the
+      // reason it records: `red team round 2 fix`. Every other start is the
+      // operator's, whether typed just now or the very first draft.
+      const match = /^red team round (\d+)/.exec(entry.reason)
+      return {
+        kind: 'running',
+        at: entry.at,
+        sessionId: entry.subject,
+        asked: entry.reason,
+        actor: 'architect',
+        trigger: match === null ? 'you' : 'automatic',
+        round: match === null ? null : Number(match[1]),
+        autoTurn: null,
+      }
     }
-    if (entry.action === REVIEW_REFUSED || entry.action === REVIEW_EXHAUSTED) {
+    if (entry.action === FOLLOWED_UP) {
+      // Which automatic follow-up this is: every `converge.followed_up`
+      // since the most recent `converge.started`, this one included.
+      let autoTurn = 0
+      for (let j = i; j >= 0; j -= 1) {
+        if (entries[j].action === FOLLOWED_UP) autoTurn += 1
+        else if (entries[j].action === STARTED) break
+      }
+      return {
+        kind: 'running',
+        at: entry.at,
+        sessionId: entry.subject,
+        asked: entry.reason,
+        actor: 'architect',
+        trigger: 'automatic',
+        round: null,
+        autoTurn,
+      }
+    }
+    if (entry.action === REVIEW_REFUSED) {
       return { kind: 'refused', at: entry.at, reason: entry.reason }
     }
+    // The loop giving up is "needs you", not a refusal — nothing about the
+    // proposal was rejected, and the findings it stopped on are surfaced
+    // through `loopFacts(entries).exhausted` instead.
+    if (entry.action === REVIEW_EXHAUSTED) {
+      return { kind: 'redrafted', at: entry.at, note: entry.reason }
+    }
     if (entry.action === REVIEW_STARTED) {
+      const match = /^round (\d+)/.exec(entry.reason)
       return {
         kind: 'running',
         at: entry.at,
         sessionId: entry.subject,
         asked: `red team, ${entry.reason}`,
+        actor: 'red team',
+        trigger: 'automatic',
+        round: match === null ? null : Number(match[1]),
+        autoTurn: null,
       }
     }
     if (entry.action === SCOUT_STARTED) {
-      return { kind: 'running', at: entry.at, sessionId: entry.subject, asked: 'scout' }
+      return {
+        kind: 'running',
+        at: entry.at,
+        sessionId: entry.subject,
+        asked: 'scout',
+        actor: 'scout',
+        trigger: 'automatic',
+        round: null,
+        autoTurn: null,
+      }
     }
     // A round that finished is not a turn running — either a fix turn or the
     // next round follows it, or nothing does because the order was handed
@@ -107,4 +168,83 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
 export function intakeRefusal(entries: readonly LedgerEntry[]): string | null {
   const last = lastIntake(entries)
   return last.kind === 'refused' ? last.reason : null
+}
+
+const REVIEW_HELD = 'review.held'
+const REVIEW_RELEASED = 'review.released'
+const ORDER_AGREED = 'order.agreed'
+
+/**
+ * Every red-team round on this order, and whether the operator has it held.
+ *
+ * Read straight off the ledger rather than paired with `lastIntake`: a round
+ * is a span of time with its own start and end, and the Forge needs the whole
+ * history to draw "round 2 of 3" while round 3 is still running.
+ */
+export function loopFacts(entries: readonly LedgerEntry[]): LoopFacts {
+  const rounds: { round: number; startedAt: string; finishedAt: string | null }[] = []
+  let heldAt: string | null = null
+  let releasedAt: string | null = null
+  let lastOfStartedOrExhausted: 'started' | 'exhausted' | null = null
+
+  for (const entry of entries) {
+    if (entry.action === REVIEW_STARTED) {
+      const match = /^round (\d+)/.exec(entry.reason)
+      rounds.push({
+        round: match === null ? 0 : Number(match[1]),
+        startedAt: entry.at,
+        finishedAt: null,
+      })
+      lastOfStartedOrExhausted = 'started'
+    } else if (
+      entry.action === REVIEW_ROUND ||
+      entry.action === REVIEW_REFUSED ||
+      entry.action === REVIEW_EXHAUSTED
+    ) {
+      const open = [...rounds].reverse().find((round) => round.finishedAt === null)
+      if (open !== undefined) open.finishedAt = entry.at
+      if (entry.action === REVIEW_EXHAUSTED) lastOfStartedOrExhausted = 'exhausted'
+    } else if (entry.action === REVIEW_HELD) {
+      heldAt = entry.at
+    } else if (entry.action === REVIEW_RELEASED) {
+      releasedAt = entry.at
+    }
+  }
+
+  return {
+    rounds,
+    heldAt: heldAt !== null && (releasedAt === null || heldAt > releasedAt) ? heldAt : null,
+    exhausted: lastOfStartedOrExhausted === 'exhausted',
+  }
+}
+
+/** How the order was agreed, from the last `order.agreed` line. */
+export function agreedFacts(entries: readonly LedgerEntry[]): AgreedFacts | null {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const entry = entries[i]
+    if (entry.action === ORDER_AGREED) {
+      return { at: entry.at, by: entry.actor === 'rule:forge' ? 'automatic' : 'you' }
+    }
+  }
+  return null
+}
+
+/**
+ * When the last intake line was written, for "the last turn ended at …".
+ *
+ * Null while a turn is running, or when intake has never run — neither has an
+ * end to report yet.
+ */
+export function turnEndedAt(entries: readonly LedgerEntry[]): string | null {
+  const outcome = lastIntake(entries)
+  return outcome.kind === 'running' || outcome.kind === 'none' ? null : outcome.at
+}
+
+/** Whether a red-team round finished after the plan last changed. */
+export function reviewedCurrentPlan(entries: readonly LedgerEntry[]): boolean {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i].action === REVIEW_ROUND) return true
+    if (entries[i].action === REDRAFTED) return false
+  }
+  return false
 }

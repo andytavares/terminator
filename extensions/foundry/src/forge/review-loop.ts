@@ -3,6 +3,8 @@ import { compileOrder } from '../order/compile.js'
 import { isBlocking } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Role, Rule } from '../recipe/parse.js'
+import { followUpFor } from './autonomy.js'
+import type { LoopFacts } from './readiness.js'
 
 // The Forge's own red team, argued to a fixed point before the operator sees it.
 //
@@ -99,4 +101,45 @@ export function reviewNext(input: {
  */
 export function shouldReview(order: WorkOrder): boolean {
   return compileOrder(order).failures.every((failure) => failure.check === 'redTeam')
+}
+
+/** The round after the last one recorded, or 1 when none has run. */
+export function nextRound(loop: LoopFacts): number {
+  return loop.rounds.length === 0 ? 1 : loop.rounds[loop.rounds.length - 1].round + 1
+}
+
+export type ReleaseNext =
+  | { readonly kind: 'review'; readonly round: number }
+  | { readonly kind: 'fix'; readonly message: string; readonly round: number }
+  | { readonly kind: 'follow-up'; readonly message: string }
+  | { readonly kind: 'hand-off' }
+  | { readonly kind: 'nothing' }
+
+/**
+ * Where the loop goes when the operator lets a held order continue.
+ *
+ * The same move the loop would have made had it not been held: a plan the
+ * red team has not seen is reviewed, open blocking findings go back to the
+ * architect, any other failing check gets a follow-up, and a plan that passed
+ * its review is handed off. A loop that already gave up stays the operator's.
+ */
+export function afterRelease(
+  order: WorkOrder,
+  facts: { readonly loop: LoopFacts; readonly reviewedCurrentPlan: boolean }
+): ReleaseNext {
+  const failures = compileOrder(order).failures
+  if (failures.some((failure) => failure.check === 'questions')) return { kind: 'nothing' }
+
+  const followUp = followUpFor(
+    failures.filter((failure) => failure.check !== 'redTeam'),
+    0
+  )
+  if (followUp !== null) return { kind: 'follow-up', message: followUp }
+
+  if (!facts.reviewedCurrentPlan) return { kind: 'review', round: nextRound(facts.loop) }
+
+  const fix = fixMessage(order)
+  if (fix === null) return { kind: 'hand-off' }
+  if (facts.loop.exhausted) return { kind: 'nothing' }
+  return { kind: 'fix', message: fix, round: nextRound(facts.loop) - 1 }
 }

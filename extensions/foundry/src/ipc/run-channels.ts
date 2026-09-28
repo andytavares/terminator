@@ -717,10 +717,29 @@ export function createRunChannels(deps: RunDeps): RunChannels {
     })
 
     // The same walk `start` does, so the shape the surface shows is the shape
-    // that would run.
-    const fitted = fitRecipe(recipeLadder(order), order, deps.sources())
-    const proposal = 'error' in fitted ? proposeRecipe(order) : fitted.proposal
-    return { recipes: offered, proposed: proposal.name, proposedWhy: proposal.why }
+    // that would run — but over the order's own statement of itself, with the
+    // operator's pick set aside: `proposed` is "what the ladder would choose",
+    // not "what is already chosen", or overriding one recipe with another
+    // would say it was the ladder's idea.
+    const forProposal: WorkOrder = { ...order, recipe: null }
+    const fitted = fitRecipe(recipeLadder(forProposal), forProposal, deps.sources())
+    const proposal = 'error' in fitted ? proposeRecipe(forProposal) : fitted.proposal
+
+    // When the operator actually chose one, and when — `null` for both while
+    // they have not, or while their only "choice" was clearing it back to the
+    // proposal (`recipe.chosen` records that too, with reason "the proposal").
+    const entries = await deps.store.entries(order.id)
+    const chosenEntry = [...entries]
+      .reverse()
+      .find((entry) => entry.action === 'recipe.chosen' && entry.reason !== 'the proposal')
+
+    return {
+      recipes: offered,
+      proposed: proposal.name,
+      proposedWhy: proposal.why,
+      chosen: order.recipe,
+      chosenAt: chosenEntry?.at ?? null,
+    }
   }
 
   /**

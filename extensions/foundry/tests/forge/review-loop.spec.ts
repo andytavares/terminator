@@ -5,6 +5,8 @@ import {
   fixMessage,
   reviewNext,
   shouldReview,
+  nextRound,
+  afterRelease,
 } from '../../src/forge/review-loop.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder, RedTeamFinding } from '../../src/order/schema.js'
@@ -215,5 +217,121 @@ describe('shouldReview', () => {
       ],
     })
     expect(shouldReview(draft)).toBe(false)
+  })
+})
+
+describe('nextRound', () => {
+  it('is 1 before any round has run', () => {
+    expect(nextRound({ rounds: [], heldAt: null, exhausted: false })).toBe(1)
+  })
+
+  // An operator's turn used to restart the loop at round 1, so the cap of
+  // three rounds started over every time somebody asked for something.
+  it('continues after the last recorded round', () => {
+    const rounds = [
+      { round: 1, startedAt: 'a', finishedAt: 'b' },
+      { round: 2, startedAt: 'c', finishedAt: 'd' },
+    ]
+    expect(nextRound({ rounds, heldAt: null, exhausted: false })).toBe(3)
+  })
+})
+
+describe('afterRelease', () => {
+  const clean = { rounds: [], heldAt: null, exhausted: false }
+  const reviewed = {
+    rounds: [{ round: 1, startedAt: 'a', finishedAt: 'b' }],
+    heldAt: null,
+    exhausted: false,
+  }
+
+  function ready(over: Partial<WorkOrder> = {}): WorkOrder {
+    return order({
+      intent: { problem: 'p', outcome: 'o', nonGoals: [] },
+      risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'it works',
+          priority: 'P0',
+          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+          unverifiable: null,
+        },
+      ],
+      plan: {
+        ...order().plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'do it',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: ['src/a.ts'],
+            verify: [],
+          },
+        ],
+        lanes: [{ ord: 1, repo: '/repos/a', branch: '', role: null, blocks: [], blockedBy: [] }],
+        sharedFiles: [],
+      },
+      ...over,
+    })
+  }
+
+  it('reviews a plan the red team has not seen', () => {
+    expect(afterRelease(ready(), { loop: clean, reviewedCurrentPlan: false })).toEqual({
+      kind: 'review',
+      round: 1,
+    })
+  })
+
+  it('hands off a plan the red team has already passed', () => {
+    expect(afterRelease(ready(), { loop: reviewed, reviewedCurrentPlan: true })).toEqual({
+      kind: 'hand-off',
+    })
+  })
+
+  it('sends open blocking findings back to the architect for the last round', () => {
+    const next = afterRelease(ready({ redTeam: [finding()] }), {
+      loop: reviewed,
+      reviewedCurrentPlan: true,
+    })
+    expect(next.kind).toBe('fix')
+    expect(next.kind === 'fix' ? next.round : null).toBe(1)
+  })
+
+  it('leaves findings to the operator once the loop has given up', () => {
+    expect(
+      afterRelease(ready({ redTeam: [finding()] }), {
+        loop: { ...reviewed, exhausted: true },
+        reviewedCurrentPlan: true,
+      })
+    ).toEqual({ kind: 'nothing' })
+  })
+
+  it('asks the architect to close any other failing check', () => {
+    expect(afterRelease(order(), { loop: clean, reviewedCurrentPlan: false }).kind).toBe(
+      'follow-up'
+    )
+  })
+
+  it('does nothing while a question waits on the operator', () => {
+    const asked = ready({
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'which?',
+          why: '',
+          options: ['a', 'b'],
+          recommended: null,
+          confidence: null,
+          answer: null,
+          rank: 0,
+        },
+      ],
+    })
+    expect(afterRelease(asked, { loop: clean, reviewedCurrentPlan: false })).toEqual({
+      kind: 'nothing',
+    })
   })
 })

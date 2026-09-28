@@ -49,6 +49,7 @@ import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
 import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
 import { followUpFor } from './forge/autonomy.js'
+import { loopFacts, lastIntake, reviewedCurrentPlan } from './forge/intake-outcome.js'
 import { endAndWait } from './runtime/end-session.js'
 import { compileOrder } from './order/compile.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
@@ -79,6 +80,8 @@ import {
   reviewNext,
   shouldReview,
   fixMessage,
+  nextRound,
+  afterRelease,
 } from './forge/review-loop.js'
 import { forgeDefectAnswer } from './gates/act-decision.js'
 import { brief } from './line/brief.js'
@@ -2447,6 +2450,9 @@ export function activate(api: ExtensionAPI): void {
       executingOrders.has(orderId) ? [] : orphanedNodes(graph, isLiveSession).map((n) => n.id),
   }
 
+  const nextReviewRound = async (orderId: string): Promise<number> =>
+    nextRound(loopFacts(await createOrderStore(dataRoot()).entries(orderId)))
+
   /**
    * One architect turn, and the ones the Forge starts on its own after it.
    *
@@ -2506,13 +2512,22 @@ export function activate(api: ExtensionAPI): void {
           evidence: [],
         })
 
+        // The operator's "Hold for me" stops every automatic continuation,
+        // this one included — a redraft that just landed still saves, but
+        // nothing starts on its own from here until the operator releases it.
+        if (loopFacts(await store.entries(order.id)).heldAt !== null) return
+
         const next = followUpFor(compileOrder(outcome.order).failures, autoTurns)
         if (next === null) {
           // Nothing left the architect can close on its own by compiling again.
           // If the order is otherwise ready, the red team gets a round before
           // the operator ever sees it — the whole point of the loop.
           if (shouldReview(outcome.order)) {
-            await startReview(outcome.order, loopRound ?? 1, outcome.note)
+            await startReview(
+              outcome.order,
+              loopRound ?? (await nextReviewRound(order.id)),
+              outcome.note
+            )
           }
           return
         }
@@ -2582,7 +2597,10 @@ export function activate(api: ExtensionAPI): void {
         if (updated === null) return
 
         const store = createOrderStore(root)
-        const fresh = updated.redTeam.filter((f) => f.round === round)
+        // Only what is still open: a finding the architect already fixed or
+        // the operator already accepted this same round is not what the
+        // operator needs counted as still standing.
+        const fresh = updated.redTeam.filter((f) => f.round === round && f.status === 'open')
         const blocking = fresh.filter(isBlocking).length
         const notes = fresh.length - blocking
         await store.record({
@@ -2594,6 +2612,11 @@ export function activate(api: ExtensionAPI): void {
           reason: `round ${round}: ${blocking} blocking, ${notes} note${notes === 1 ? '' : 's'}`,
           evidence: [],
         })
+
+        // The operator's hold stops every automatic continuation this round
+        // could lead to — the next round, hand-off, or a fix turn — the same
+        // as it stops a redraft's own follow-up.
+        if (loopFacts(await store.entries(order.id)).heldAt !== null) return
 
         const next = reviewNext({ order: updated, round })
         if (next.kind === 'clean') {
@@ -2620,7 +2643,21 @@ export function activate(api: ExtensionAPI): void {
           )
           return
         }
-        await convergeWithFollowUps(updated, next.message, 0, round + 1)
+        // Recorded here, and not left to `convergeWithFollowUps`'s own
+        // finish-time bookkeeping: the loop's fix turn is `converge.started`,
+        // not `review.started`, and nothing recorded it starting at all —
+        // the Forge read the ledger and saw no turn running while an
+        // architect was in fact fixing the findings.
+        const started = await convergeWithFollowUps(updated, next.message, 0, round + 1)
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'role:architect',
+          action: started.ok ? 'converge.started' : 'converge.refused',
+          subject: started.ok ? started.sessionId : order.id,
+          reason: started.ok ? `red team round ${round} fix` : started.reason,
+          evidence: [],
+        })
       },
     })
   }
@@ -2641,7 +2678,11 @@ export function activate(api: ExtensionAPI): void {
       )
       return
     }
-    const agreed = (await forge.compile({ id: order.id, commit: true })) as {
+    const agreed = (await forge.compile({
+      id: order.id,
+      commit: true,
+      actor: 'rule:forge',
+    })) as {
       error?: string
       order?: { status: string }
     }
@@ -2673,6 +2714,59 @@ export function activate(api: ExtensionAPI): void {
       `${order.title} handed off.`,
       `foundry.review.handoff.${order.id}`
     )
+  }
+
+  /**
+   * Releasing a hold picks the loop back up from wherever it would have gone
+   * on its own — the same three moves `onFinished` above already makes, just
+   * entered from "the operator let go" rather than "a turn just finished".
+   *
+   * A draft only, and only once nothing is already running: a hold recorded
+   * while nothing was in flight has nothing to resume, and one recorded over
+   * a running turn is released the moment that turn's own `onFinished` reads
+   * the ledger — starting a second thing here would race it.
+   */
+  const onReleased = (order: WorkOrder): void => {
+    void (async () => {
+      if (order.status !== 'draft') return
+      const store = createOrderStore(dataRoot())
+      const entries = await store.entries(order.id)
+      if (lastIntake(entries).kind === 'running') return
+
+      const next = afterRelease(order, {
+        loop: loopFacts(entries),
+        reviewedCurrentPlan: reviewedCurrentPlan(entries),
+      })
+      if (next.kind === 'review') {
+        await startReview(order, next.round, '')
+      } else if (next.kind === 'hand-off') {
+        await handOff(order)
+      } else if (next.kind === 'fix' || next.kind === 'follow-up') {
+        const started = await convergeWithFollowUps(
+          order,
+          next.message,
+          next.kind === 'fix' ? 0 : 1,
+          next.kind === 'fix' ? next.round + 1 : undefined
+        )
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'role:architect',
+          action: !started.ok
+            ? 'converge.refused'
+            : next.kind === 'fix'
+              ? 'converge.started'
+              : 'converge.followed_up',
+          subject: started.ok ? started.sessionId : order.id,
+          reason: !started.ok
+            ? started.reason
+            : next.kind === 'fix'
+              ? `red team round ${next.round} fix`
+              : 'closing the failing checks on its own',
+          evidence: [],
+        })
+      }
+    })()
   }
 
   /**
@@ -2813,6 +2907,7 @@ export function activate(api: ExtensionAPI): void {
       }
     },
     queueEntries: () => computeQueueEntries(api, dataRoot()),
+    onReleased,
   })
   // Your tickets, so a ticket can be picked rather than typed from memory.
   //
@@ -2875,6 +2970,8 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:order.writeBack', (payload) => forge.setWriteBack(payload))
   reg(api, 'foundry:order.budgets', (payload) => forge.setBudgets(payload))
   reg(api, 'foundry:order.cancel', (payload) => forge.cancel(payload))
+  reg(api, 'foundry:order.recipe', (payload) => forge.recipe(payload))
+  reg(api, 'foundry:order.hold', (payload) => forge.hold(payload))
 
   // Gone, rather than hidden.
   //

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { lastIntake, intakeRefusal } from '../../src/forge/intake-outcome.js'
+import {
+  lastIntake,
+  intakeRefusal,
+  loopFacts,
+  agreedFacts,
+  turnEndedAt,
+  reviewedCurrentPlan,
+} from '../../src/forge/intake-outcome.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
 // How the last intake turn ended, read back out of the ledger.
@@ -35,6 +42,30 @@ describe('lastIntake', () => {
       at: '2026-09-09T19:30:00Z',
       sessionId: 'sess-1',
       asked: 'close the gap',
+      actor: 'architect',
+      trigger: 'you',
+      round: null,
+      autoTurn: null,
+    })
+  })
+
+  it('is running, as the loop’s own fix turn, when the operator did not start it', () => {
+    const out = lastIntake([
+      entry({
+        action: 'converge.started',
+        subject: 'sess-9',
+        reason: 'red team round 2 fix',
+      }),
+    ])
+    expect(out).toEqual({
+      kind: 'running',
+      at: '2026-09-09T19:30:00Z',
+      sessionId: 'sess-9',
+      asked: 'red team round 2 fix',
+      actor: 'architect',
+      trigger: 'automatic',
+      round: 2,
+      autoTurn: null,
     })
   })
 
@@ -53,7 +84,28 @@ describe('lastIntake', () => {
       at: '2026-09-09T19:30:00Z',
       sessionId: 'sess-2',
       asked: 'closing the failing checks on its own',
+      actor: 'architect',
+      trigger: 'automatic',
+      round: null,
+      autoTurn: 1,
     })
+  })
+
+  it('counts which automatic follow-up this is, since the most recent start', () => {
+    const out = lastIntake([
+      entry({ action: 'converge.started', at: '2026-09-09T19:30:00Z', subject: 'sess-2' }),
+      entry({
+        action: 'converge.followed_up',
+        at: '2026-09-09T19:31:00Z',
+        subject: 'sess-2a',
+      }),
+      entry({
+        action: 'converge.followed_up',
+        at: '2026-09-09T19:32:00Z',
+        subject: 'sess-2b',
+      }),
+    ])
+    expect(out).toMatchObject({ kind: 'running', autoTurn: 2 })
   })
 
   it('is redrafted once the architect has saved one', () => {
@@ -112,6 +164,10 @@ describe('lastIntake', () => {
       at: '2026-09-09T19:40:00Z',
       sessionId: 'sess-2',
       asked: '',
+      actor: 'architect',
+      trigger: 'you',
+      round: null,
+      autoTurn: null,
     })
   })
 })
@@ -128,6 +184,10 @@ describe('lastIntake, for the review loop', () => {
       at: '2026-09-09T19:30:00Z',
       sessionId: 'sess-3',
       asked: 'red team, round 2',
+      actor: 'red team',
+      trigger: 'automatic',
+      round: 2,
+      autoTurn: null,
     })
   })
 
@@ -138,6 +198,10 @@ describe('lastIntake, for the review loop', () => {
       at: '2026-09-09T19:30:00Z',
       sessionId: 'sess-4',
       asked: 'scout',
+      actor: 'scout',
+      trigger: 'automatic',
+      round: null,
+      autoTurn: null,
     })
   })
 
@@ -157,7 +221,9 @@ describe('lastIntake, for the review loop', () => {
     })
   })
 
-  it('is refused when the loop could not converge', () => {
+  // The loop giving up is "needs you", not a refusal: nothing about the
+  // proposal was rejected. `loopFacts(entries).exhausted` is what surfaces it.
+  it('is redrafted, not refused, when the loop could not converge', () => {
     const out = lastIntake([
       entry({
         action: 'review.exhausted',
@@ -166,9 +232,9 @@ describe('lastIntake, for the review loop', () => {
       }),
     ])
     expect(out).toEqual({
-      kind: 'refused',
+      kind: 'redrafted',
       at: '2026-09-09T19:40:00Z',
-      reason: 'still has 1 blocking finding after 3 rounds',
+      note: 'still has 1 blocking finding after 3 rounds',
     })
   })
 
@@ -195,5 +261,125 @@ describe('intakeRefusal', () => {
     expect(intakeRefusal([])).toBeNull()
     expect(intakeRefusal([entry({ action: 'converge.started' })])).toBeNull()
     expect(intakeRefusal([entry({ action: 'order.redrafted' })])).toBeNull()
+  })
+})
+
+describe('loopFacts', () => {
+  it('is empty, unheld, not exhausted with no review lines', () => {
+    expect(loopFacts([])).toEqual({ rounds: [], heldAt: null, exhausted: false })
+  })
+
+  it('pairs a started round with the round summary that finishes it', () => {
+    const out = loopFacts([
+      entry({ action: 'review.started', at: '2026-09-09T19:30:00Z', reason: 'round 1' }),
+      entry({
+        action: 'review.round',
+        at: '2026-09-09T19:35:00Z',
+        reason: 'round 1: 1 blocking, 0 notes',
+      }),
+    ])
+    expect(out.rounds).toEqual([
+      { round: 1, startedAt: '2026-09-09T19:30:00Z', finishedAt: '2026-09-09T19:35:00Z' },
+    ])
+  })
+
+  it('leaves the current round unfinished while it is still going', () => {
+    const out = loopFacts([
+      entry({ action: 'review.started', at: '2026-09-09T19:30:00Z', reason: 'round 1' }),
+      entry({ action: 'review.round', at: '2026-09-09T19:35:00Z', reason: 'round 1: 0, 0' }),
+      entry({ action: 'review.started', at: '2026-09-09T19:40:00Z', reason: 'round 2' }),
+    ])
+    expect(out.rounds).toEqual([
+      { round: 1, startedAt: '2026-09-09T19:30:00Z', finishedAt: '2026-09-09T19:35:00Z' },
+      { round: 2, startedAt: '2026-09-09T19:40:00Z', finishedAt: null },
+    ])
+  })
+
+  it('is held when the last hold is after the last release', () => {
+    const out = loopFacts([
+      entry({ action: 'review.held', at: '2026-09-09T19:30:00Z' }),
+      entry({ action: 'review.released', at: '2026-09-09T19:31:00Z' }),
+      entry({ action: 'review.held', at: '2026-09-09T19:32:00Z' }),
+    ])
+    expect(out.heldAt).toBe('2026-09-09T19:32:00Z')
+  })
+
+  it('is not held when the last release is after the last hold', () => {
+    const out = loopFacts([
+      entry({ action: 'review.held', at: '2026-09-09T19:30:00Z' }),
+      entry({ action: 'review.released', at: '2026-09-09T19:31:00Z' }),
+    ])
+    expect(out.heldAt).toBeNull()
+  })
+
+  it('is exhausted when the loop gave up last', () => {
+    const out = loopFacts([
+      entry({ action: 'review.started', reason: 'round 1' }),
+      entry({ action: 'review.exhausted', reason: 'still has 1 blocking finding' }),
+    ])
+    expect(out.exhausted).toBe(true)
+  })
+
+  it('is not exhausted once a fresh round has started since', () => {
+    const out = loopFacts([
+      entry({ action: 'review.exhausted', reason: 'gave up' }),
+      entry({ action: 'review.started', reason: 'round 1' }),
+    ])
+    expect(out.exhausted).toBe(false)
+  })
+})
+
+describe('agreedFacts', () => {
+  it('is null before the order is agreed', () => {
+    expect(agreedFacts([])).toBeNull()
+  })
+
+  it('is by you when the operator agreed it', () => {
+    const out = agreedFacts([
+      entry({ action: 'order.agreed', at: '2026-09-09T19:45:00Z', actor: 'operator' }),
+    ])
+    expect(out).toEqual({ at: '2026-09-09T19:45:00Z', by: 'you' })
+  })
+
+  it('is automatic when the rule agreed it', () => {
+    const out = agreedFacts([
+      entry({ action: 'order.agreed', at: '2026-09-09T19:45:00Z', actor: 'rule:forge' }),
+    ])
+    expect(out).toEqual({ at: '2026-09-09T19:45:00Z', by: 'automatic' })
+  })
+})
+
+describe('turnEndedAt', () => {
+  it('is null while a turn is running', () => {
+    expect(turnEndedAt([entry({ action: 'converge.started' })])).toBeNull()
+  })
+
+  it('is null when intake has never run', () => {
+    expect(turnEndedAt([])).toBeNull()
+  })
+
+  it('is the time of the last intake line once it finished', () => {
+    const at = turnEndedAt([
+      entry({ action: 'order.redrafted', at: '2026-09-09T19:33:00Z', reason: 'added criteria' }),
+    ])
+    expect(at).toBe('2026-09-09T19:33:00Z')
+  })
+})
+
+describe('reviewedCurrentPlan', () => {
+  it('is false before any review', () => {
+    expect(reviewedCurrentPlan([entry({ action: 'order.redrafted' })])).toBe(false)
+  })
+
+  it('is true when a round finished after the last redraft', () => {
+    expect(
+      reviewedCurrentPlan([entry({ action: 'order.redrafted' }), entry({ action: 'review.round' })])
+    ).toBe(true)
+  })
+
+  it('is false once the plan was redrafted after the round', () => {
+    expect(
+      reviewedCurrentPlan([entry({ action: 'review.round' }), entry({ action: 'order.redrafted' })])
+    ).toBe(false)
   })
 })
