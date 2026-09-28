@@ -139,4 +139,65 @@ describe('HealthChips', () => {
     const items = screen.getAllByRole('listitem')
     expect(items.length).toBe(8)
   })
+
+  describe('variant="list"', () => {
+    it('renders unchanged chip output by default (variant omitted)', () => {
+      const { container } = render(<HealthChips riskScore={makeRiskScore()} />)
+      expect(container.querySelector('.health-chips')).toBeTruthy()
+      expect(container.querySelector('dl')).toBeNull()
+    })
+
+    it('renders a titled dl list instead of chips', () => {
+      const { container } = render(<HealthChips riskScore={makeRiskScore()} variant="list" />)
+      expect(screen.getByText('Health')).toBeTruthy()
+      expect(container.querySelector('dl')).toBeTruthy()
+      expect(container.querySelector('.health-chips')).toBeNull()
+    })
+
+    it('orders rows fail, then warn, then pass, then unknown', () => {
+      const { container } = render(
+        <HealthChips
+          riskScore={makeRiskScore({ testFilePresent: false, complexityDelta: 3, churn90d: null })}
+          variant="list"
+          ciStatus="passing"
+        />
+      )
+      const labels = Array.from(container.querySelectorAll('dt')).map((el) => el.textContent)
+      const statuses = Array.from(container.querySelectorAll('dd')).map((el) =>
+        el.getAttribute('data-status')
+      )
+      // fail (Tests) must come before warn (Complexity), which comes before
+      // pass (Coverage, CI), which comes before unknown (Churn, Blast, Duplication, Lint)
+      const failIdx = statuses.indexOf('fail')
+      const warnIdx = statuses.indexOf('warn')
+      const passIdx = statuses.indexOf('pass')
+      const unknownIdx = statuses.indexOf('unknown')
+      expect(failIdx).toBeLessThan(warnIdx)
+      expect(warnIdx).toBeLessThan(passIdx)
+      expect(passIdx).toBeLessThan(unknownIdx)
+      expect(labels).toContain('Tests')
+    })
+
+    it('shows "unknown" as the value text for unknown status rows', () => {
+      render(<HealthChips riskScore={makeRiskScore({ churn90d: null })} variant="list" />)
+      const unknownValues = screen.getAllByText('unknown')
+      expect(unknownValues.length).toBeGreaterThan(0)
+    })
+
+    it('keeps the tooltip as a title attribute on each row', () => {
+      const { container } = render(<HealthChips riskScore={makeRiskScore()} variant="list" />)
+      const row = Array.from(container.querySelectorAll('div[title]')).find((el) =>
+        el.textContent?.includes('Tests')
+      )
+      expect(row?.getAttribute('title')).toContain('test file')
+    })
+
+    it('colours the value text by status', () => {
+      const { container } = render(
+        <HealthChips riskScore={makeRiskScore({ testFilePresent: false })} variant="list" />
+      )
+      const failValue = container.querySelector('dd[data-status="fail"]')
+      expect(failValue).toBeTruthy()
+    })
+  })
 })

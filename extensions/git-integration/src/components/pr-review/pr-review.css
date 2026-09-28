@@ -1137,6 +1137,51 @@
   opacity: 0.85;
 }
 
+.health-list {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--tm-border);
+}
+.health-list-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.health-list dl {
+  margin: 0;
+}
+.health-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+}
+.health-list-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--tm-text);
+}
+.health-list-value {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.health-list-value--pass {
+  color: var(--tm-success);
+}
+.health-list-value--warn {
+  color: var(--tm-warning);
+}
+.health-list-value--fail {
+  color: var(--tm-danger);
+}
+.health-list-value--unknown {
+  color: var(--tm-text-muted);
+}
+
 /* ─── InlineCommentThread ─────────────────────────────────────────────────── */
 
 .inline-comment-thread {
