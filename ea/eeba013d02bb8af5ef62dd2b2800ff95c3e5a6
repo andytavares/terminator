@@ -1,0 +1,37 @@
+extensions/foundry/src/index.ts
+  s_588031f3a66ad7::t_db6ee91e15fb63 806,813
+extensions/foundry/src/sensors/collect.ts
+  s_588031f3a66ad7::t_db6ee91e15fb63 12,16-19,159-161
+src/main/integrations/providers/linear.provider.ts
+  s_588031f3a66ad7::t_ef9d767980baef 40,60-62,69,72-76,297-300,302,313-316
+docs/user-guide/USER-GUIDE.md
+  s_588031f3a66ad7::t_ae2bd3452d7c6c 293-295
+CHANGELOG.md
+  s_588031f3a66ad7::t_ae2bd3452d7c6c 68
+extensions/foundry/tests/sensors/collect.spec.ts
+  s_588031f3a66ad7::t_ae2bd3452d7c6c 253-258
+  s_588031f3a66ad7::t_ce262771983431 231-237,249-252,259-265
+  s_588031f3a66ad7::t_034c65fa5adad8 266-267
+docs/EXTENSION-DEVELOPMENT.md
+  s_588031f3a66ad7::t_ae2bd3452d7c6c 637-638
+tests/unit/integrations/providers/linear.provider.spec.ts
+  s_588031f3a66ad7::t_ef9d767980baef 44-47
+  s_588031f3a66ad7::t_f7b2e716c4e669 1,103,106-181,189-195
+  s_588031f3a66ad7::t_3619f1d80c681e 182-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eaeeba013d02bb8af5ef62dd2b2800ff95c3e5a6",
+  "prompts": {},
+  "sessions": {
+    "s_588031f3a66ad7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d030a629-7af7-42de-b7e3-a9965c519822",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
