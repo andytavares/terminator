@@ -85,3 +85,17 @@ export function createGateStore(root: string): GateStore {
     },
   }
 }
+
+/**
+ * A decision taken before the work it gates, asked once per order.
+ *
+ * A resume runs the tail again, so a gate with a fixed id comes round again
+ * after its own Approve. Saving it unconditionally replaced the approval with a
+ * fresh question, and the operator answered it for ever.
+ */
+export async function askOnce(store: GateStore, gate: Gate): Promise<'approve' | 'hold'> {
+  const prior = await store.get(gate.id)
+  if (prior?.decision?.option === 'approve') return 'approve'
+  await store.save(gate)
+  return 'hold'
+}

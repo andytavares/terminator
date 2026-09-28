@@ -1041,12 +1041,28 @@ closes only when the proposal lists it in `resolveFindings` with how (ADR 068).
 others (`scope`, `process`, `pre-existing`, `infra`) are notes the builder sees.
 Once a redraft passes every other check, `src/forge/review-loop.ts` runs a
 red-team round in the Forge. The architect gets every blocking finding in one
-turn, and the next round attacks only what changed. The red team reads what
+turn. The fix is ready for hand-off unless the red team set `anotherPass` or a blocking
+finding is still open (ADR 075); then the next round attacks only what changed. The red team reads what
 earlier rounds settled and may reopen a finding only with new evidence. After
-three rounds the order goes to the operator. A clean round hands off on its own
-unless `terminator.foundry.autoHandOff` is off, and a failed hand-off is
-recorded as `handoff.failed`. Before the first draft, the scout reads the
-repository.
+three rounds the order goes to the operator. A clean round says the order is
+ready and stops: hand-off is always the operator's, and nothing agrees an order
+or starts the Line on its own (ADR 078). Before the first draft, the scout reads
+the repository.
+
+**The Forge reads one readiness (ADR 074).** `src/forge/readiness.ts` is a pure
+function over the order, its compile result, the last intake turn and the loop
+facts read from the ledger (`loopFacts`, `agreedFacts`, `turnEndedAt` in
+`src/forge/intake-outcome.ts`). It returns who holds the order, the status
+strip, the six hand-off rows, each step's state word, the red-team findings
+grouped by who acts, and the reason each lockable control is locked. The Forge
+draws it and decides nothing. Every turn writes a start line: the loop's fix
+turn records `converge.started` with reason `red team round N fix`. An
+`order.agreed` by `rule:forge` exists only in ledgers from before ADR 078. `foundry:order.hold` records
+`review.held` / `review.released`; every automatic continuation checks it, and
+a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
+`foundry:order.recipe` saves the operator's shape to `order.recipe`, which
+`recipeLadder` reads first. Unavailable controls are `ReasonButton`s:
+`aria-disabled` plus `aria-describedby`, never the native `disabled`.
 
 ### The Line (`src/line/`, `src/recipe/`, `src/verify/`, `src/gates/`)
 
@@ -1227,6 +1243,12 @@ repository.
   which are quoting; it is still not a shell parser. The OS temp roots are
   scratch, with the hole that names — a data root configured inside temp — in
   the ADR.
+- **Auto mode answers what the policy abstains on (ADR 077).** With
+  `terminator.foundry.letAutoModeDecide` on (the default), `decideTool` returns
+  `mode` instead of `null` for a call it has no opinion on, a destructive one
+  included. The one exception is the `escorted` setting. The bridge answers `defer`,
+  and the hook script prints nothing, so Claude Code's `--permission-mode auto`
+  decides. Returning `ask` would force a confirmation prompt, even in auto mode.
 - **A stall is measured from the state the session is in now.**
   `evaluate-stall.ts` takes the later of the last tool call and `stateSince`,
   and the runner moves a session's `startedAt` whenever it is given a new turn.
@@ -1373,6 +1395,12 @@ App
   in a terminal tab of its own in the lane's checkout
   (`SupervisedRunner.runCommand`): its output is visible, and its verdict is
   the tab's exit status, with no agent in between (ADR 059).
+- **It closes the tabs it opens (ADR 076).** A tab is titled for its agent
+  ("Architect", "Red team", "Builder") or its check ("Lint"). An agent is
+  stopped once its turn's output is collected, and `SupervisedRunner` closes a
+  tab through `pty.closeTerminalTab` when its run or command ends cleanly. A
+  failed one stays open, exited, so its output can be read. A later node in the
+  lane resumes the conversation in a fresh tab.
 - All `foundry:*` IPC channels are extension-owned. The core app has no
   knowledge of them: delete `extensions/foundry/` and core still builds.
 

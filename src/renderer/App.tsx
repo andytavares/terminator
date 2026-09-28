@@ -925,6 +925,13 @@ export function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
+    return window.electronAPI.extensionBridge.on('terminal:close-tab', (data) => {
+      const { sessionId } = data as { sessionId: string }
+      void useSessionStore.getState().closeSession(sessionId)
+    })
+  }, [])
+
+  useEffect(() => {
     return window.electronAPI.extensionBridge.on('terminal:navigate-to-session', (data) => {
       const { sessionId } = data as { sessionId: string }
       revealSession(sessionId)

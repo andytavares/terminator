@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { Forge } from '../../src/components/Forge.js'
 import { Floor } from '../../src/components/Floor.js'
@@ -76,52 +76,52 @@ function mountForge(questions: OpenQuestion[]) {
   return render(<Forge orderId="WO-1" />)
 }
 
+// jsdom doesn't implement scrollIntoView, and openStep focuses the target.
+window.HTMLElement.prototype.scrollIntoView = vi.fn()
+
 beforeEach(() => vi.clearAllMocks())
 
-describe('the Forge puts its open questions above everything else', () => {
-  it('renders them, with how many of them are decided in the heading', async () => {
-    const { container } = mountForge(QUESTIONS)
-    await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
-    expect(screen.getByText(/Needs you — 0 of 2 decided/)).toBeTruthy()
+async function openPlan(): Promise<void> {
+  await waitFor(() => screen.getByRole('button', { name: /^Plan/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Plan/ }))
+}
+
+describe('the Forge puts its open questions on the Plan step', () => {
+  it('renders them, with how many of them are decided in the group heading', async () => {
+    mountForge(QUESTIONS)
+    await openPlan()
+    await waitFor(() => screen.getByText('Needs your answer'))
+    expect(screen.getByText(/0 of 2 decided/)).toBeTruthy()
     expect(screen.getByText(QUESTIONS[0].text)).toBeTruthy()
   })
 
-  it('is not inside any step, so it shows whichever step is open', async () => {
+  it('is inside the Plan step, not a band above every step', async () => {
     const { container } = mountForge(QUESTIONS)
-    await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
-    const band = container.querySelector('.fdry-needs-you')
-    expect(band?.closest('.fdry-wizard'), 'the band is back inside the steps').toBeNull()
-  })
-
-  it('comes before the steps, not after them', async () => {
-    const { container } = mountForge(QUESTIONS)
-    await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
-    const band = container.querySelector('.fdry-needs-you')
-    const wizard = container.querySelector('.fdry-wizard')
-    // DOCUMENT_POSITION_FOLLOWING: the argument comes after the node.
-    expect(band?.compareDocumentPosition(wizard as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    )
-  })
-
-  it('is the first thing in the Forge, so nothing can be scrolled past to reach it', async () => {
-    const { container } = mountForge(QUESTIONS)
-    await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
-    const forge = container.querySelector('.fdry-forge')
-    expect(forge?.firstElementChild?.className).toContain('fdry-needs-you')
+    await openPlan()
+    await waitFor(() => screen.getByText('Needs your answer'))
+    const group = screen.getByText('Needs your answer').closest('.fdry-group')
+    expect(group?.closest('.fdry-wizard'), 'the group is inside the steps').not.toBeNull()
+    expect(container.querySelector('.fdry-needs-you')).toBeNull()
   })
 
   it('takes no room at all when nothing is being asked', async () => {
-    const { container } = mountForge([])
-    await waitFor(() => expect(container.querySelector('.fdry-wizard')).not.toBeNull())
-    expect(container.querySelector('.fdry-needs-you')).toBeNull()
+    mountForge([])
+    await openPlan()
+    await waitFor(() => screen.getByRole('heading', { name: 'The plan and how it is proven' }))
+    expect(screen.queryByText('Needs your answer')).toBeNull()
   })
 })
 
-// The band now also holds every open blocking red-team finding — the other
-// half of what a run of TAV-15 could not settle in one submit. A finding that
-// does not make the change wrong (`process`, `pre-existing`, `infra`, `scope`)
-// is a note the builder sees, never a reason to interrupt the operator.
+// The Red team step now also holds every open blocking red-team finding — the
+// other half of what a run of TAV-15 could not settle in one submit. A
+// finding that does not make the change wrong (`process`, `pre-existing`,
+// `infra`, `scope`) is a note the builder sees, never a reason to interrupt
+// the operator.
+
+async function openRedTeam(): Promise<void> {
+  await waitFor(() => screen.getByRole('button', { name: /^Red team/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Red team/ }))
+}
 
 function mountForgeWithOrder(over: Partial<WorkOrder>) {
   const current = order(over)
@@ -143,9 +143,9 @@ function mountForgeWithOrder(over: Partial<WorkOrder>) {
   return render(<Forge orderId="WO-1" />)
 }
 
-describe('the band also holds open findings, but only the ones that block', () => {
-  it('puts a blocking finding in the band, with a way to decide it', async () => {
-    const { container } = mountForgeWithOrder({
+describe('the Red team step holds open findings, but only the ones that block need a decision', () => {
+  it('puts a blocking finding in the "Needs your decision" group, with a way to decide it', async () => {
+    mountForgeWithOrder({
       redTeam: [
         {
           id: 'RT-1',
@@ -158,14 +158,15 @@ describe('the band also holds open findings, but only the ones that block', () =
         },
       ],
     })
-    await waitFor(() => expect(container.querySelector('.fdry-needs-you')).not.toBeNull())
-    const band = container.querySelector('.fdry-needs-you') as HTMLElement
-    expect(within(band).getByText('the change would leave the outcome false')).toBeTruthy()
-    expect(within(band).getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
+    await openRedTeam()
+    await waitFor(() => screen.getByText('Needs your decision'))
+    const group = screen.getByText('Needs your decision').closest('.fdry-group') as HTMLElement
+    expect(within(group).getByText('the change would leave the outcome false')).toBeTruthy()
+    expect(within(group).getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
   })
 
-  it('leaves a non-blocking finding out of the band entirely', async () => {
-    const { container } = mountForgeWithOrder({
+  it('puts a non-blocking finding in the neutral "Notes" group instead', async () => {
+    mountForgeWithOrder({
       redTeam: [
         {
           id: 'RT-1',
@@ -178,8 +179,9 @@ describe('the band also holds open findings, but only the ones that block', () =
         },
       ],
     })
-    await waitFor(() => expect(container.querySelector('.fdry-wizard')).not.toBeNull())
-    expect(container.querySelector('.fdry-needs-you')).toBeNull()
+    await openRedTeam()
+    await waitFor(() => screen.getByText('Notes, nothing to do'))
+    expect(screen.queryByText('Needs your decision')).toBeNull()
   })
 })
 

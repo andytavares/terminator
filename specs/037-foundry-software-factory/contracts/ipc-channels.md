@@ -4,7 +4,7 @@
 
 All channels use the `foundry:` namespace, registered by the extension's main-process handler via `api.ipc.registerHandler`. Payloads are validated with zod before processing. Nothing in `src/` names any of these channels (Constitution II).
 
-**Forty-three channels**, of which the thirteen below carry the Forge, the Line and the record and are documented in full; the remaining thirty drive the supervision surface and are listed, with their payloads and responses, in [Supervision and settings channels](#supervision-and-settings-channels) at the end. Every one is renderer → main (invoke) unless stated.
+**Forty-five channels**, of which the fifteen below carry the Forge, the Line and the record and are documented in full; the remaining thirty drive the supervision surface and are listed, with their payloads and responses, in [Supervision and settings channels](#supervision-and-settings-channels) at the end. Every one is renderer → main (invoke) unless stated.
 
 The count is worth stating plainly: an earlier draft of this contract said ten, which was the design's ambition rather than what shipped. Supervising a live agent — its permissions, its transcript, its review queue, its stalls — is where the other thirty went.
 
@@ -34,6 +34,51 @@ A **running** order is refused, with the reason. Its agents are in their
 terminals with work in their worktrees, and throwing that away silently is the
 opposite of what every budget and gate here exists to do — stop it at its gate
 first.
+
+---
+
+## `foundry:order.recipe`
+
+Choose which shape hand-off will run, overriding the proposal (FR-014).
+
+**Payload**:
+
+```typescript
+{
+  id: string
+  recipe: string | null
+}
+```
+
+`null` clears the choice back to the proposal.
+
+**Reply**: the order view, or `{ error }` — a draft only; a running order's
+recipe is fixed by `run.start`.
+
+**Ledger**: `recipe.chosen`, actor `operator`, subject the order id, reason
+the recipe name or `'the proposal'` when cleared.
+
+---
+
+## `foundry:order.hold`
+
+Hold the review loop for the operator, or release it.
+
+**Payload**:
+
+```typescript
+{
+  id: string
+  held: boolean
+}
+```
+
+**Reply**: the order view, or `{ error }`.
+
+**Ledger**: `review.held` when `held` is true, `review.released` when false —
+both actor `operator`, subject the order id. Releasing resumes whatever the
+loop was about to do on its own next: the next review round, a follow-up
+turn, or hand-off.
 
 ---
 
@@ -551,12 +596,7 @@ An architect turn that amends a drafted plan (an ask, an answer, or a follow-up 
 | `foundry:ask-model`     | `{}`                            | `{ selected: 'sonnet' \| 'opus' }` |
 | `foundry:ask-model-set` | `{ model: 'sonnet' \| 'opus' }` | `{ ok, selected }` or `{ error }`  |
 
-Before agreement, the architect and the red team argue to a fixed point on their own (`src/forge/review-loop.ts`; see `docs/research/foundry-red-team-loop.md`). A clean round hands the order off automatically unless this is turned off, in which case the order shows ready and waits for the operator.
-
-| Channel                     | Payload                | Response                         |
-| --------------------------- | ---------------------- | -------------------------------- |
-| `foundry:auto-hand-off`     | `{}`                   | `{ enabled: boolean }`           |
-| `foundry:auto-hand-off-set` | `{ enabled: boolean }` | `{ ok, enabled }` or `{ error }` |
+Before agreement, the architect and the red team argue to a fixed point on their own (`src/forge/review-loop.ts`; see `docs/research/foundry-red-team-loop.md`). A clean round shows the order ready and waits for the operator: only `foundry:run.start`, from the Forge's Hand off button, starts the Line (ADR 078). `foundry:auto-hand-off` and `foundry:auto-hand-off-set` were removed.
 
 ### Quick actions (057)
 

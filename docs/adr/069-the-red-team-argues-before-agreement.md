@@ -1,6 +1,6 @@
 # ADR 069: The red team argues before agreement
 
-**Status**: Accepted
+**Status**: Accepted, amended by ADR 075 (one pass unless the red team asks for another)
 
 **Date**: 2026-09-26
 

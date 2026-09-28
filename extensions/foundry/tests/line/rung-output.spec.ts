@@ -520,6 +520,40 @@ describe('applyRungOutput', () => {
   })
 })
 
+describe('anotherPass', () => {
+  it('asks the red team whether its fixes need attacking again', () => {
+    const text = rungOutputContract('/x.json', ['findings'])
+    expect(text).toContain('"anotherPass"')
+    expect(rungOutputContract('/x.json', ['context'])).not.toContain('"anotherPass"')
+  })
+
+  it('takes a recommendation for another pass from a role that finds things', () => {
+    const output = parseRungOutput({ redTeam: [], anotherPass: true }, ['findings'])
+    const applied = applyRungOutput(order(), {
+      role: 'red-team',
+      output,
+      writes: ['findings'],
+      at: AT,
+    })
+    expect(applied.anotherPass).toBe(true)
+  })
+
+  it('is one pass when the red team says nothing about it', () => {
+    const output = parseRungOutput({ redTeam: [] }, ['findings'])
+    const applied = applyRungOutput(order(), {
+      role: 'red-team',
+      output,
+      writes: ['findings'],
+      at: AT,
+    })
+    expect(applied.anotherPass).toBe(false)
+  })
+
+  it('refuses it from a role that raises no findings', () => {
+    expect(() => parseRungOutput({ anotherPass: true }, ['context'])).toThrow(RungOutputRejected)
+  })
+})
+
 describe('readRungOutput', () => {
   let dir: string
   let file: string

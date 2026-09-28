@@ -312,6 +312,44 @@ describe('foundry:run.recipes', () => {
     const r = (await channels().recipes({ id: 'WO-1' })) as { recipes: { rung: string }[] }
     expect(r.recipes.every((x) => x.rung === 'built-in')).toBe(true)
   })
+
+  it('is unchosen, with no chosenAt, before the operator picks one', async () => {
+    await store.save(order())
+    const r = (await channels().recipes({ id: 'WO-1' })) as {
+      chosen: string | null
+      chosenAt: string | null
+    }
+    expect(r.chosen).toBeNull()
+    expect(r.chosenAt).toBeNull()
+  })
+
+  it('reports what the operator chose and when', async () => {
+    await store.save(order())
+    await store.record({
+      at: '2026-09-06T10:05:00.000Z',
+      orderId: 'WO-1',
+      actor: 'operator',
+      action: 'recipe.chosen',
+      subject: 'WO-1',
+      reason: 'standard',
+      evidence: [],
+    })
+    await store.save({ ...order(), recipe: 'standard' })
+    const r = (await channels().recipes({ id: 'WO-1' })) as {
+      chosen: string | null
+      chosenAt: string | null
+    }
+    expect(r.chosen).toBe('standard')
+    expect(r.chosenAt).toBe('2026-09-06T10:05:00.000Z')
+  })
+
+  // The ladder's own proposal ignores the operator's pick — overriding one
+  // recipe with another must not read back as "the ladder proposed this".
+  it('proposes what the ladder would choose, ignoring the operator’s own pick', async () => {
+    await store.save({ ...order(), recipe: 'standard' })
+    const r = (await channels().recipes({ id: 'WO-1' })) as { proposed: string }
+    expect(r.proposed).toBe('direct')
+  })
 })
 
 // Choosing the shape.

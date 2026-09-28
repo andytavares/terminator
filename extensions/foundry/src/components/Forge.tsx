@@ -1,6 +1,19 @@
 import { Markdown, MarkdownInline } from './Markdown.js'
 import React, { useCallback, useEffect, useState } from 'react'
-import { Check, X, CircleDot, Terminal, Play, Wand, AlertCircle, LoaderCircle } from 'lucide-react'
+import {
+  Check,
+  X,
+  Terminal,
+  Play,
+  Wand,
+  AlertCircle,
+  LoaderCircle,
+  User,
+  Pause,
+  Lock,
+  Info,
+  List,
+} from 'lucide-react'
 import { isBlocking } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
@@ -11,21 +24,33 @@ import type { StateMapping, TransitionIntent, WriteBack } from '../order/schema.
 import type { CapabilityReport } from '../trackers/write-back.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
 import { PROPOSAL_FILE } from '../order/proposal.js'
-import { forgeSteps, openingStep, type StepId } from '../forge/steps.js'
-import { budgetsInWords, statusInWords } from '../order/render.js'
+import { openingStep, forgeSteps, type StepId } from '../forge/steps.js'
+import { budgetsInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
-import { rungInWords } from '../recipe/rung.js'
-import type { Rung } from '../recipe/rung.js'
-import { gradeInWords } from '../runtime/review/risk-grader.js'
+import { ReasonButton } from './ReasonButton.js'
+import {
+  readiness,
+  capitalise,
+  shapeUnavailable,
+  LOCAL_REASONS,
+  type LoopFacts,
+  type AgreedFacts,
+  type Row,
+  type StepView,
+  type FindingView,
+  type FindingGroup,
+  type StripAction,
+  type StripIcon,
+  type StepMark,
+} from '../forge/readiness.js'
 
 // The Forge.
 //
-// Walked as steps, one full-width screen each: what is asked, the plan, the red
-// team, the shape of work, the tracker, hand-off. It was a document with a
-// 260px rail of checks, recipe cards and tracker settings beside it, and an
-// operator reported the rail's cards as too condensed to read. The six checks
-// are still the gate; each failing one now sits on the step that clears it,
-// and the step list marks which steps are holding hand-off up.
+// One box, one derivation. `readiness()` (ADR 074) is the one answer every
+// piece of this screen reads: who holds the order, the status strip, the
+// step rail, the six hand-off rows, the red-team findings by who acts on
+// them, and why every control that can be unavailable is unavailable. This
+// component draws what it returns and decides nothing about state itself.
 
 export interface OrderView {
   order: WorkOrder
@@ -34,15 +59,10 @@ export interface OrderView {
   unavailableChecks?: string[]
   /** The session the architect is drafting in, while it is drafting. */
   converging?: string
-  /** How the last intake turn ended. Absent only on a channel that predates it. */
   intake?: IntakeOutcome
-  /**
-   * What agreeing this order is about to queue behind, if anything (R4).
-   *
-   * Set only by the compile call that agrees the order; null when nothing
-   * overlaps, or the host has not wired the refinery. Absent on every other
-   * response, including a redraft that never reached hand-off.
-   */
+  loop?: LoopFacts
+  agreed?: AgreedFacts | null
+  turnEndedAt?: string | null
   advisory?: string | null
 }
 
@@ -69,6 +89,9 @@ interface RecipesView {
   proposed?: string
   /** Why that shape was proposed (FR-014) — the grounds, not just the answer. */
   proposedWhy?: string
+  /** The operator's saved pick (`order.recipe`), and when it was made. */
+  chosen?: string | null
+  chosenAt?: string | null
   error?: string
 }
 
@@ -88,16 +111,6 @@ const INTENT_LABELS: Record<TransitionIntent, string> = {
   done: 'When it merges',
 }
 
-const CHECK_LABELS: Record<CheckId, string> = {
-  questions: 'No open questions',
-  verifiable: 'Criteria falsifiable',
-  coverage: 'Coverage both ways',
-  risk: 'Risk graded',
-  redTeam: 'Red team resolved',
-}
-
-const CHECK_ORDER: CheckId[] = ['questions', 'verifiable', 'coverage', 'risk', 'redTeam']
-
 const STEP_LABELS: Record<StepId, string> = {
   intent: 'Intent',
   plan: 'Plan',
@@ -113,17 +126,7 @@ const STEP_TITLES: Record<StepId, string> = {
   redTeam: 'Red team findings',
   shape: 'Shape of work',
   tracker: 'Tracker write-back',
-  handOff: 'Checks before hand-off',
-}
-
-/** Which of a turn's redrawn fields each step shows. */
-const STEP_FIELDS: Record<StepId, readonly string[]> = {
-  intent: ['intent'],
-  plan: ['acceptance', 'assumptions'],
-  redTeam: ['redTeam'],
-  shape: [],
-  tracker: [],
-  handOff: [],
+  handOff: 'Ready to hand off?',
 }
 
 const STEP_HEADING = 'fdry-step-h'
@@ -151,7 +154,7 @@ type Remedy =
   | { readonly kind: 'ask'; readonly label: string; readonly message: string }
 
 const CHECK_REMEDIES: Record<CheckId, readonly Remedy[]> = {
-  questions: [{ kind: 'goto', label: 'Answer them', step: null, target: 'fdry-needs-you-h' }],
+  questions: [{ kind: 'goto', label: 'Answer them', step: 'plan', target: 'fdry-questions-h' }],
   verifiable: [
     {
       kind: 'ask',
@@ -231,48 +234,8 @@ function buildSettle(
   return { answers, accepts, fixes, asks }
 }
 
-/**
- * A finding's claim, and the argument behind it.
- *
- * A reviewer writes a paragraph; read at a glance, only its first sentence is
- * the finding. A finding written as a headline line and detail splits there.
- */
-function findingParts(text: string): { headline: string; detail: string } {
-  const trimmed = text.trim()
-  const newline = trimmed.indexOf('\n')
-  if (newline !== -1) {
-    return { headline: trimmed.slice(0, newline).trim(), detail: trimmed.slice(newline).trim() }
-  }
-  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
-  return sentence === null
-    ? { headline: trimmed, detail: '' }
-    : { headline: sentence[1], detail: trimmed.slice(sentence[0].length) }
-}
+const TURN_REMEDY_LABEL = 'Tell the architect what was wrong'
 
-function FindingText({ text }: { readonly text: string }): JSX.Element {
-  const { headline, detail } = findingParts(text)
-  return (
-    <>
-      <span className="fdry-finding-headline">
-        <MarkdownInline text={headline} />
-      </span>
-      {detail === '' ? null : (
-        <details className="fdry-finding-detail">
-          <summary>Why</summary>
-          <Markdown text={detail} />
-        </details>
-      )}
-    </>
-  )
-}
-
-/**
- * Where the operator asked, in place of the button they pressed.
- *
- * The button used to go faintly disabled and keep its label, and the only word
- * that anything had started was in the header, out of view. So the ask becomes
- * the answer on the spot, and while it runs nothing offers a second one.
- */
 function Asked(): JSX.Element {
   return (
     <span role="status" aria-label="Asked" className="fdry-asked">
@@ -282,12 +245,6 @@ function Asked(): JSX.Element {
   )
 }
 
-/**
- * Take the operator to a control or a step's heading.
- *
- * Focused as well as scrolled: a page that silently changed under a keyboard
- * user would leave their focus on a button that is no longer there.
- */
 function goTo(target: string): void {
   const element = document.getElementById(target)
   if (element === null) return
@@ -299,21 +256,67 @@ function invoke(channel: string, payload: unknown): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
+function clockOf(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
 export interface ForgeProps {
   readonly orderId: string
-  /** The run has begun; the caller swaps this surface for the Floor. */
   readonly onStarted?: (orderId: string) => void
 }
 
-/**
- * Take me to the terminal the architect is in.
- *
- * The backstop the whole design rests on: the agent runs in a real terminal
- * and you can go and type at it.
- */
-async function attachToArchitect(sessionId: string): Promise<string | null> {
+async function attachToSession(sessionId: string): Promise<string | null> {
   const r = (await invoke('foundry:run-terminal', { sessionId })) as { ok?: boolean }
   return r.ok === true ? null : 'that conversation no longer has a terminal'
+}
+
+/** One row's icon, from its state. */
+function RowIcon({ state }: { readonly state: Row['state'] }): JSX.Element {
+  if (state === 'passed') return <Check aria-hidden="true" />
+  if (state === 'in-progress') return <LoaderCircle aria-hidden="true" className="fdry-spin" />
+  if (state === 'needs-you') return <AlertCircle aria-hidden="true" />
+  return <X aria-hidden="true" />
+}
+
+const ROW_PILL: Record<Row['state'], { readonly label: string; readonly cls: string }> = {
+  passed: { label: 'Passed', cls: 'pass' },
+  'in-progress': { label: 'In progress', cls: 'work' },
+  'needs-you': { label: 'Needs you', cls: 'you' },
+  failing: { label: 'Failing', cls: 'bad' },
+}
+
+function StripIconGlyph({ icon }: { readonly icon: StripIcon }): JSX.Element {
+  if (icon === 'load') return <LoaderCircle aria-hidden="true" className="fdry-spin" />
+  if (icon === 'user') return <User aria-hidden="true" />
+  if (icon === 'check') return <Check aria-hidden="true" />
+  if (icon === 'play') return <Play aria-hidden="true" />
+  if (icon === 'pause') return <Pause aria-hidden="true" />
+  return <AlertCircle aria-hidden="true" />
+}
+
+function RailMark({ mark }: { readonly mark: StepMark; readonly position: number }): JSX.Element {
+  if (mark === 'check') return <Check aria-hidden="true" />
+  if (mark === 'spin') return <LoaderCircle aria-hidden="true" className="fdry-spin" />
+  if (mark === 'alert') return <AlertCircle aria-hidden="true" />
+  if (mark === 'x') return <X aria-hidden="true" />
+  return <></>
+}
+
+const STEP_STATE_CLASS: Record<StepView['state'], string> = {
+  done: 'done',
+  work: 'work',
+  you: 'you',
+  bad: 'bad',
+  'not-yet': 'not-yet',
+}
+
+const GROUP_META: Record<FindingGroup, { readonly heading: string; readonly cls: string }> = {
+  fixing: { heading: 'The architect is fixing', cls: 'work' },
+  'needs-you': { heading: 'Needs your decision', cls: 'you' },
+  notes: { heading: 'Notes, nothing to do', cls: 'note' },
+  resolved: { heading: 'Resolved', cls: 'done' },
 }
 
 export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
@@ -321,27 +324,16 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
-  /** Set when a start was refused for backpressure, which the operator may override. */
   const [heldBack, setHeldBack] = useState<{ unreviewed: number; limit: number } | null>(null)
   const [states, setStates] = useState<StatesView | null>(null)
-  /** What the last turn moved, so the operator can see the redraw (FR-007). */
   const [moved, setMoved] = useState<string[]>([])
-  /** Which option the operator picked for each open question, before Send. */
   const [questionChoices, setQuestionChoices] = useState<Record<string, number>>({})
-  /** What the operator has decided about each blocking finding, before Send. */
   const [findingChoice, setFindingChoice] = useState<Record<string, FindingChoice>>({})
-  /** A settle made while the architect was working, sent once it stops. */
   const [queuedSettle, setQueuedSettle] = useState<Settle | null>(null)
-  /** The criterion being accepted as unverifiable, and why. Kept apart from
-      the red team's own reason so two open forms never share a box. */
   const [unproven, setUnproven] = useState<string | null>(null)
   const [unprovenReason, setUnprovenReason] = useState('')
   const [recipes, setRecipes] = useState<RecipesView | null>(null)
-  const [chosen, setChosen] = useState<string | null>(null)
-  /** The step the operator went to. Until they pick one, the order opens where
-      the next thing to do is, and follows it as the architect's turns land. */
   const [picked, setPicked] = useState<StepId | null>(null)
-  /** Focused once the step it is on has rendered. */
   const [focusTarget, setFocusTarget] = useState<string | null>(null)
 
   useEffect(() => {
@@ -362,9 +354,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     void refresh()
   }, [refresh])
 
-  // Read once, not on every redraw: this is a request to the tracker, and
-  // polling it would spend the operator's rate limit on a panel that does not
-  // change.
   useEffect(() => {
     let live = true
     void (async () => {
@@ -376,18 +365,14 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     }
   }, [orderId])
 
-  // Read once, alongside the document. What shapes of work this repository can
-  // actually support is a fact about the repository, not about the draft.
-  useEffect(() => {
-    let live = true
-    void (async () => {
-      const next = (await invoke('foundry:run.recipes', { id: orderId })) as RecipesView
-      if (live) setRecipes(next)
-    })()
-    return () => {
-      live = false
-    }
+  const refreshRecipes = useCallback(async () => {
+    const next = (await invoke('foundry:run.recipes', { id: orderId })) as RecipesView
+    setRecipes(next)
   }, [orderId])
+
+  useEffect(() => {
+    void refreshRecipes()
+  }, [refreshRecipes])
 
   const setWriteBack = useCallback(
     async (writeBack: WriteBack[]) => {
@@ -436,8 +421,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
         const next = (await invoke('foundry:order.turn', { id: orderId, ...payload })) as
           | (OrderView & { error?: string })
           | { error: string }
-        // A turn can both move the document and report a problem — intake that
-        // refused a proposal returns the order as it stands *and* why.
         if ('order' in next) {
           setView(next)
           setMoved(next.changed ?? [])
@@ -450,7 +433,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     [orderId]
   )
 
-  /** Ask the architect for a draft, or a redraft. */
   const converge = useCallback(
     async (message?: string) => {
       setBusy(true)
@@ -469,39 +451,39 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     [orderId]
   )
 
-  /**
-   * Whether an architect is working on this order, from the record.
-   *
-   * Its own `useState` before, set when the converge call returned and cleared
-   * when `provenance.decisions` grew. Both halves were wrong. A refusal grows
-   * nothing — the proposal failed validation, so there is no redraft to save
-   * and the document is untouched — so the flag was never cleared and the
-   * button read "The architect is working…" for ever, over a turn that had
-   * ended minutes earlier. And a flag set by a click cannot survive leaving
-   * the screen, so coming back mid-turn showed a draft that looked idle.
-   *
-   * The ledger knows both. `intake` is the last of this order's three intake
-   * lines, and a turn is running exactly while the last one is its start.
-   */
+  const holdOrder = useCallback(
+    async (held: boolean) => {
+      setBusy(true)
+      try {
+        await invoke('foundry:order.hold', { id: orderId, held })
+        await refresh()
+      } finally {
+        setBusy(false)
+      }
+    },
+    [orderId, refresh]
+  )
+
+  const pickRecipe = useCallback(
+    async (recipe: string | null) => {
+      await invoke('foundry:order.recipe', { id: orderId, recipe })
+      await Promise.all([refresh(), refreshRecipes()])
+    },
+    [orderId, refresh, refreshRecipes]
+  )
+
   const intake: IntakeOutcome = view?.intake ?? { kind: 'none' }
   const drafting = intake.kind === 'running'
-  /** The instruction the running turn was started with, to find the ask it answers. */
   const asked = intake.kind === 'running' ? intake.asked : null
-  // The architect's proposal is merged over the order as it stood when its
-  // turn started, so an edit made while it works is one it never saw.
   const locked = busy || drafting
 
-  // The architect answers in minutes, not in the call that started it, so the
-  // document is refetched while it works and the outcome — a redraft, or the
-  // reason it was refused — appears when it lands.
+  const orderStatus = view === null ? null : view.order.status
   useEffect(() => {
-    if (!drafting) return
+    if (orderStatus !== 'draft') return
     const timer = setInterval(() => void refresh(), REDRAFT_POLL_MS)
     return () => clearInterval(timer)
-  }, [drafting, refresh])
+  }, [orderStatus, refresh])
 
-  /** Send a settle turn: every answer and accept apply at once, and a fix or
-   *  an ask goes to the architect in the one turn this starts. */
   const applySettle = useCallback(
     async (settle: Settle) => {
       setBusy(true)
@@ -519,25 +501,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     [orderId]
   )
 
-  /**
-   * Collect every decision in the band and send it as one turn.
-   *
-   * The architect's proposal is merged over the order as it stood when its
-   * turn started, so a settle made mid-turn is one it never saw — it waits,
-   * rather than racing the turn already running, and goes the moment that one
-   * ends (below).
-   */
-  const sendSettle = useCallback(() => {
-    const settle = buildSettle(questionChoices, findingChoice)
-    setQuestionChoices({})
-    setFindingChoice({})
-    if (drafting) {
-      setQueuedSettle(settle)
-      return
-    }
-    void applySettle(settle)
-  }, [drafting, questionChoices, findingChoice, applySettle])
-
   useEffect(() => {
     if (drafting || queuedSettle === null) return
     const toSend = queuedSettle
@@ -545,17 +508,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     void applySettle(toSend)
   }, [drafting, queuedSettle, applySettle])
 
-  /**
-   * Compile, agree, and start the Line.
-   *
-   * One action, because "handed off" that leaves the order sitting agreed with
-   * nothing running is the failure this button exists to avoid — the operator
-   * pressed hand off, and work has to start.
-   *
-   * The run is started separately from the agreement rather than inside it:
-   * agreeing is a decision and is recorded; starting can fail on a recipe this
-   * repository cannot support, and that must not un-agree what was agreed.
-   */
   const handOff = useCallback(
     async (force = false) => {
       setBusy(true)
@@ -573,9 +525,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
 
         const started = (await invoke('foundry:run.start', {
           id: orderId,
-          // Only when the operator picked one. Absent means the proposal
-          // stands, and the ledger records which of the two it was.
-          ...(chosen === null ? {} : { recipe: chosen }),
+          ...(recipes?.chosen != null ? { recipe: recipes.chosen } : {}),
           ...(force ? { force: true } : {}),
         })) as {
           error?: string
@@ -584,8 +534,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
         }
         if (started.error !== undefined) {
           setProblem(`The order is agreed, but the run did not start: ${started.error}`)
-          // A refusal for backpressure is the one the operator can answer: it is
-          // about their own review queue, not about the order.
           setHeldBack(started.backpressure ?? null)
           return
         }
@@ -595,7 +543,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
         setBusy(false)
       }
     },
-    [orderId, onStarted, chosen]
+    [orderId, onStarted, recipes?.chosen]
   )
 
   if (view === null) {
@@ -607,29 +555,38 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
   const matrix = coverageMatrix(order)
   const questions = surfacedQuestions(order.openQuestions)
   const assumptions = liveAssumptions(order)
-  // Only a blocking finding is a decision the operator has to make; the rest
-  // are notes the builder sees and never held up hand-off.
   const blockingFindings = order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
-  const nonBlockingOpenFindings = order.redTeam.filter((f) => f.status === 'open' && !isBlocking(f))
-  const clearedFindings = order.redTeam.filter((f) => f.status !== 'open')
-  const decided =
-    questions.filter((q) => questionChoices[q.id] !== undefined).length +
-    blockingFindings.filter((f) => findingDecided(findingChoice[f.id])).length
-  const needsYouTotal = questions.length + blockingFindings.length
 
-  const steps = forgeSteps(compile, {
-    shape: (recipes?.recipes?.length ?? 0) > 0 && isDraft,
+  const offers = {
+    shape: (recipes?.recipes?.length ?? 0) > 0,
     tracker: states?.capability !== undefined && states.capability.transitions !== 'no_issue',
+  }
+
+  const shapeName = recipes?.chosen ?? recipes?.proposed ?? order.recipe ?? null
+  const shapeYours =
+    recipes?.chosen !== null && recipes?.chosen !== undefined && recipes.chosen !== recipes.proposed
+
+  const r = readiness({
+    order,
+    compile,
+    intake,
+    loop: view.loop ?? { rounds: [], heldAt: null, exhausted: false },
+    agreed: view.agreed ?? null,
+    turnEndedAt: view.turnEndedAt ?? null,
+    shape: { name: shapeName, yours: shapeYours },
+    offers,
+    clock: clockOf,
   })
-  // A picked step can stop being offered — the shape of work, once handed off.
-  const pickedIndex = steps.findIndex((each) => each.id === picked)
+
+  const forgeStepList = forgeSteps(compile, offers)
+  const pickedIndex = r.steps.findIndex((each) => each.id === picked)
   const index =
     pickedIndex !== -1
       ? pickedIndex
-      : steps.findIndex((each) => each.id === openingStep(order, steps))
-  const step = steps[index]
-  const previous = steps[index - 1]
-  const next = steps[index + 1]
+      : r.steps.findIndex((each) => each.id === openingStep(order, forgeStepList))
+  const stepView = r.steps[Math.max(index, 0)]
+  const previous = r.steps[index - 1]
+  const next = r.steps[index + 1]
 
   const openStep = (id: StepId): void => {
     setPicked(id)
@@ -641,365 +598,301 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
       ? `Nothing under an acceptance heading in ${order.source.key ?? 'the ticket'}. Press “Draft the plan” and the architect will write the criteria from what it does say.`
       : 'No criteria yet. Nothing writes them but the architect — press “Draft the plan”.'
 
-  /** One of the checks: what is wrong, and the move that clears it. */
-  const renderCheck = (id: CheckId): JSX.Element => {
-    const failure = compile.failures.find((f) => f.check === id)
-    const bad = failure !== undefined
+  const askReason = locked ? (r.locks.redraft ?? LOCAL_REASONS.saving) : null
+
+  /**
+   * What the operator can do about a row.
+   *
+   * A row the machine is closing offers nothing but the "Asked" marker for the
+   * ask it is answering; a failing or needs-you row offers its moves.
+   */
+  const renderMoves = (row: Row): JSX.Element | null => {
+    if (row.state === 'passed') return null
+    if (row.id === 'turn') {
+      if (row.state !== 'failing' || intake.kind !== 'refused') return null
+      const reason = intake.reason
+      return (
+        <div className="fdry-chk-moves">
+          <ReasonButton
+            reason={askReason}
+            onClick={() =>
+              void converge(
+                `Your last proposal was refused and nothing was changed. The reason: ${reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
+              )
+            }
+          >
+            {TURN_REMEDY_LABEL}
+          </ReasonButton>
+        </div>
+      )
+    }
+    const remedies = CHECK_REMEDIES[row.id]
+    if (row.state === 'in-progress') {
+      const answering = remedies.find((remedy) => remedy.kind === 'ask' && asked === remedy.message)
+      return answering === undefined ? null : (
+        <div className="fdry-chk-moves">
+          <Asked />
+        </div>
+      )
+    }
     return (
-      <div key={id} className={`fdry-check ${bad ? 'is-fail' : 'is-pass'}`}>
-        <span className="fdry-check-mark" aria-hidden="true">
-          {bad ? <X /> : <Check />}
-        </span>
-        <span>
-          <b>{CHECK_LABELS[id]}</b>
-          {bad ? <small>{failure.detail}</small> : null}
-          {/* Saying what is wrong is half of it. A check that names no move is
-              one the operator stares at. */}
-          {bad && isDraft ? (
-            <span className="fdry-remedy">
-              {CHECK_REMEDIES[id].map((remedy) => {
-                if (remedy.kind === 'ask' && drafting) {
-                  return asked === remedy.message ? <Asked key={remedy.label} /> : null
-                }
-                return (
-                  <button
-                    key={remedy.label}
-                    type="button"
-                    disabled={locked}
-                    onClick={() => {
-                      if (remedy.kind === 'ask') {
-                        void converge(remedy.message)
-                        return
-                      }
-                      if (remedy.step !== null) setPicked(remedy.step)
-                      setFocusTarget(remedy.target)
-                    }}
-                  >
-                    {remedy.label}
-                  </button>
-                )
-              })}
-            </span>
-          ) : null}
-        </span>
+      <div className="fdry-chk-moves">
+        {remedies.map((remedy) => {
+          if (remedy.kind === 'ask' && drafting) {
+            return asked === remedy.message ? <Asked key={remedy.label} /> : null
+          }
+          if (remedy.kind === 'goto') {
+            return (
+              <button
+                key={remedy.label}
+                type="button"
+                className="fdry-btn"
+                onClick={() => {
+                  if (remedy.step !== null) setPicked(remedy.step)
+                  setFocusTarget(remedy.target)
+                }}
+              >
+                {remedy.label}
+              </button>
+            )
+          }
+          return (
+            <ReasonButton
+              key={remedy.label}
+              reason={askReason}
+              onClick={() => void converge(remedy.message)}
+            >
+              {remedy.label}
+            </ReasonButton>
+          )
+        })}
       </div>
     )
   }
 
+  const renderRow = (row: Row): JSX.Element => (
+    <div key={row.id} className={`fdry-chk${row.state === 'in-progress' ? ' fdry-chk--work' : ''}`}>
+      <span className="fdry-chk-icon" aria-hidden="true">
+        <RowIcon state={row.state} />
+      </span>
+      <div>
+        <b>{row.label}</b>
+        <small>{row.detail}</small>
+        {renderMoves(row)}
+      </div>
+      <span className={`fdry-pill fdry-pill--${ROW_PILL[row.state].cls}`}>
+        {ROW_PILL[row.state].label}
+      </span>
+    </div>
+  )
+
+  /** A failing or in-progress plan check, on the step that clears it. */
+  const renderCheckRow = (id: CheckId): JSX.Element | null => {
+    const row = r.rows.find((each) => each.id === id)
+    return row === undefined || row.state === 'passed' ? null : renderRow(row)
+  }
+
+  /** The six hand-off rows, one per `readiness.rows` entry. */
+  const renderHandOffRow = renderRow
+
+  // Findings grouped by who acts on them, in the fixed order the rendering
+  // shows: fixing, needs-you, notes, resolved. An empty group is not shown.
+  const findingsByGroup: Record<FindingGroup, FindingView[]> = {
+    fixing: [],
+    'needs-you': [],
+    notes: [],
+    resolved: [],
+  }
+  for (const finding of r.findings) findingsByGroup[finding.group].push(finding)
+  const needsYouFindings = findingsByGroup['needs-you']
+  const findingsDecided = needsYouFindings.filter((f) => findingDecided(findingChoice[f.id])).length
+
+  const openQuestions = questions
+  const questionsDecided = openQuestions.filter((q) => questionChoices[q.id] !== undefined).length
+
+  const stepNeedsYou =
+    stepView.id === 'redTeam'
+      ? { total: needsYouFindings.length, decided: findingsDecided }
+      : stepView.id === 'plan'
+        ? { total: openQuestions.length, decided: questionsDecided }
+        : { total: 0, decided: 0 }
+
+  const sendReason =
+    stepNeedsYou.total === 0
+      ? null
+      : queuedSettle !== null
+        ? LOCAL_REASONS.queued
+        : stepNeedsYou.decided === 0
+          ? LOCAL_REASONS.nothingDecided
+          : null
+
+  const sendDecisionsOnThisStep = (): void => {
+    if (stepView.id === 'redTeam') {
+      const settle = buildSettle({}, findingChoice)
+      setFindingChoice({})
+      if (drafting) {
+        setQueuedSettle(settle)
+        return
+      }
+      void applySettle(settle)
+      return
+    }
+    if (stepView.id === 'plan') {
+      const settle = buildSettle(questionChoices, {})
+      setQuestionChoices({})
+      if (drafting) {
+        setQueuedSettle(settle)
+        return
+      }
+      void applySettle(settle)
+    }
+  }
+
+  const handleAttach = (sessionId: string): void => {
+    void attachToSession(sessionId).then(setProblem)
+  }
+
+  const runStripAction = (action: StripAction): void => {
+    if (action === 'hold') void holdOrder(true)
+    else if (action === 'release') void holdOrder(false)
+    else if (action === 'watch') {
+      if (intake.kind === 'running') handleAttach(intake.sessionId)
+    } else if (action === 'tell-architect') {
+      if (intake.kind === 'refused') {
+        void converge(
+          `Your last proposal was refused and nothing was changed. The reason: ${intake.reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
+        )
+      }
+    } else if (action === 'start-over') void converge()
+    else if (action === 'open-run') onStarted?.(orderId)
+    else if (action === 'draft') void converge()
+  }
+
+  const STRIP_ACTION_LABEL: Record<StripAction, string> = {
+    hold: 'Hold for me',
+    release: 'Let it continue',
+    watch: intake.kind === 'running' ? `Watch the ${intake.actor}` : 'Watch',
+    'tell-architect': 'Tell the architect what was wrong',
+    'start-over': 'Start the turn over',
+    'open-run': 'Open the run',
+    draft: 'Draft the plan',
+  }
+
   return (
     <div className="fdry-forge">
-      {/* The turn that ended with nothing to show for it.
-
-          Above the questions and above every step, because until this is
-          answered nothing else on the screen will move: the checks are the
-          checks the refused plan would have cleared, and answering a question
-          the architect asked before it was refused changes a document no
-          architect is currently reading.
-
-          It was recorded in the ledger and rendered nowhere. The operator's
-          report was two sentences — "no way to recover from this" and "there's
-          also zero indication anything has even gone wrong" — and both were
-          exactly right: the screen said the architect was working, and it had
-          stopped forty minutes earlier. */}
-      {intake.kind === 'refused' && isDraft ? (
-        <section className="fdry-refused" aria-labelledby="fdry-refused-h">
-          <h2 className="fdry-refused-h" id="fdry-refused-h" tabIndex={-1}>
-            <AlertCircle aria-hidden="true" />
-            The architect&rsquo;s plan was refused
-          </h2>
-          <p>
-            Nothing on this order was changed. The proposal did not fit the shape an order has to
-            be, so none of it was taken.
-          </p>
-          <p className="fdry-refused-why">{intake.reason}</p>
-          <div className="fdry-options">
-            {/* The move, not just the news. The reason goes back with it: the
-                architect cannot read its own refusal — it ended before the
-                validation ran — and on the run this was found on it also
-                could not parse the JSON it had just written, because `node
-                -e`, `python3 -c` and redirects are all off intake's read-only
-                allowlist. Told what was wrong, it fixes it in one turn. */}
-            <button
-              type="button"
-              className="is-recommended"
-              disabled={locked}
-              onClick={() =>
-                void converge(
-                  `Your last proposal was refused and nothing was changed. The reason: ${intake.reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
-                )
-              }
-            >
-              Tell the architect what was wrong
-            </button>
-            <button type="button" disabled={locked} onClick={() => void converge()}>
-              Start the turn over
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {/* The one thing on this screen that is waiting on a person, and so the
-          first thing on it, above whichever step is open — and the only place
-          left that decides an open question or a blocking finding: seven
-          findings used to cost seven serial turns, one clicked at a time,
-          because the controls that cleared them went away the moment a turn
-          was running. Nothing here sends until Send does, in one turn, and
-          nothing here is ever hidden while that turn runs — a decision made
-          mid-turn waits and goes the moment it ends. */}
-      {needsYouTotal > 0 ? (
-        <section className="fdry-needs-you" aria-labelledby="fdry-needs-you-h">
-          <h2 className="fdry-needs-you-h" id="fdry-needs-you-h" tabIndex={-1}>
-            <AlertCircle aria-hidden="true" />
-            Needs you — {decided} of {needsYouTotal} decided
-          </h2>
-          <div className="fdry-needs-you-list">
-            {questions.map((question) => (
-              <div key={question.id} className="fdry-question">
-                <b>
-                  <MarkdownInline text={question.text} />
-                </b>
-                {question.why !== '' ? <Markdown text={question.why} /> : null}
-                <div className="fdry-options">
-                  {question.options.map((option, optionIndex) => (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={questionChoices[question.id] === optionIndex}
-                      className={
-                        `${optionIndex === question.recommended ? 'is-recommended ' : ''}` +
-                        (questionChoices[question.id] === optionIndex ? 'is-selected' : '')
-                      }
-                      disabled={busy}
-                      onClick={() =>
-                        setQuestionChoices((current) => ({
-                          ...current,
-                          [question.id]: optionIndex,
-                        }))
-                      }
-                    >
-                      <MarkdownInline text={option} />
-                      {optionIndex === question.recommended ? ' (recommended)' : ''}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {blockingFindings.map((finding) => {
-              const choice = findingChoice[finding.id]
-              return (
-                <div key={finding.id} className="fdry-finding">
-                  <CircleDot aria-hidden="true" />
-                  <div className="fdry-finding-body">
-                    <FindingText text={finding.text} />
-                    <span className="fdry-finding-actions">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        aria-pressed={choice?.mode === 'ask'}
-                        title="Have the architect change the order so this no longer holds"
-                        onClick={() =>
-                          setFindingChoice((current) => ({
-                            ...current,
-                            [finding.id]: { mode: 'ask', text: '' },
-                          }))
-                        }
-                      >
-                        Ask the architect
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        aria-pressed={choice?.mode === 'fix'}
-                        title="Say how, and the architect changes the order that way"
-                        onClick={() =>
-                          setFindingChoice((current) => ({
-                            ...current,
-                            [finding.id]: {
-                              mode: 'fix',
-                              text: choice?.mode === 'fix' ? choice.text : '',
-                            },
-                          }))
-                        }
-                      >
-                        Fix it…
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        aria-pressed={choice?.mode === 'accept'}
-                        title="It stands, and here is why"
-                        onClick={() =>
-                          setFindingChoice((current) => ({
-                            ...current,
-                            [finding.id]: {
-                              mode: 'accept',
-                              text: choice?.mode === 'accept' ? choice.text : '',
-                            },
-                          }))
-                        }
-                      >
-                        Accept
-                      </button>
-                    </span>
-                    {choice?.mode === 'fix' ? (
-                      <div className="fdry-accept is-fix">
-                        <textarea
-                          aria-label={`How should "${finding.text}" be fixed?`}
-                          placeholder="How should it be fixed?"
-                          rows={3}
-                          value={choice.text}
-                          disabled={busy}
-                          onChange={(event) =>
-                            setFindingChoice((current) => ({
-                              ...current,
-                              [finding.id]: { mode: 'fix', text: event.target.value },
-                            }))
-                          }
-                        />
-                      </div>
-                    ) : null}
-                    {choice?.mode === 'accept' ? (
-                      <div className="fdry-accept">
-                        <input
-                          aria-label={`Why "${finding.text}" is accepted`}
-                          placeholder="Why it stands…"
-                          value={choice.text}
-                          disabled={busy}
-                          onChange={(event) =>
-                            setFindingChoice((current) => ({
-                              ...current,
-                              [finding.id]: { mode: 'accept', text: event.target.value },
-                            }))
-                          }
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {queuedSettle !== null ? (
-            <p role="status" aria-label="Queued" className="fdry-queued">
-              Queued — this will be sent once the architect finishes.
-            </p>
-          ) : null}
-
-          <button
-            type="button"
-            className="fdry-settle-send"
-            disabled={decided === 0 || busy || queuedSettle !== null}
-            onClick={sendSettle}
-          >
-            {drafting ? 'Send when the architect finishes' : 'Send decisions'}
-          </button>
-        </section>
-      ) : null}
-
-      {/* The steps, in one box: the list at the top, the open step scrolling
-          itself, and the way forward pinned under it. Its own box so the bands
-          above keep the full width. */}
       <div className="fdry-wizard">
-        <header className="fdry-wizard-head">
-          <div className="fdry-order-head">
-            <h1>{order.title}</h1>
-            {order.source.kind === 'signal' ? (
-              <span className="fdry-src">
-                From a sensor signal
-                {order.source.url !== null ? (
-                  <a href={order.source.url} target="_blank" rel="noreferrer">
-                    evidence
-                  </a>
-                ) : null}
-              </span>
-            ) : order.source.key !== null ? (
-              <span className="fdry-src">
-                {order.source.tracker} {order.source.key}
-              </span>
-            ) : null}
-            <span className="fdry-id">{order.id}</span>
-            <span className="fdry-order-actions">
-              {/* The conversation that wrote this plan, from the order's own
-                  record rather than a prop nobody passed. */}
-              {order.provenance.forgeSession !== null ? (
-                <button
-                  type="button"
-                  className="fdry-attach"
-                  onClick={() =>
-                    void attachToArchitect(order.provenance.forgeSession ?? '').then(setProblem)
-                  }
-                >
-                  <Terminal aria-hidden="true" /> Attach
-                </button>
+        <header className="fdry-wiz-head">
+          <div className="fdry-wiz-title">
+            <b>{order.title}</b>
+            <div className="fdry-wiz-sub">
+              {order.source.kind === 'signal' ? (
+                <span className="fdry-chip">From a sensor signal</span>
+              ) : order.source.key !== null ? (
+                <span className="fdry-chip">
+                  {capitalise(order.source.tracker ?? '')} {order.source.key}
+                </span>
               ) : null}
-              {/* The plan does not write itself, and a redraft can be wanted from
-                  any step — so this is in the header of all of them. */}
-              {isDraft ? (
-                <button
-                  type="button"
-                  className="fdry-converge"
-                  disabled={locked}
-                  onClick={() => void converge()}
-                >
-                  <Wand aria-hidden="true" />
-                  {drafting
-                    ? 'The architect is working…'
-                    : order.acceptance.length === 0
-                      ? 'Draft the plan'
-                      : 'Redraft'}
-                </button>
-              ) : null}
-            </span>
+              <span>{r.summary}</span>
+            </div>
           </div>
-          <p className="fdry-order-sub">
-            recipe <b>{order.recipe ?? 'not chosen'}</b> · {gradeInWords(order.risk.grade)} risk ·{' '}
-            {order.plan.units.length} units · {statusInWords(order.status)}
-          </p>
-          <nav aria-label="Steps">
-            <ol className="fdry-steps">
-              {steps.map((each, position) => {
-                const blocking = each.blocking.length > 0
-                const redrawn = STEP_FIELDS[each.id].some((field) => moved.includes(field))
-                return (
-                  <li key={each.id}>
-                    <button
-                      type="button"
-                      className={`fdry-step-link${blocking ? ' is-blocking' : ''}${redrawn ? ' is-redrawn' : ''}`}
-                      aria-current={each === step ? 'step' : undefined}
-                      aria-label={
-                        blocking ? `${STEP_LABELS[each.id]}, blocking hand-off` : undefined
-                      }
-                      onClick={() => openStep(each.id)}
-                    >
-                      <span className="fdry-step-mark" aria-hidden="true">
-                        {blocking ? <X /> : position + 1}
-                      </span>
-                      {STEP_LABELS[each.id]}
-                    </button>
-                  </li>
-                )
-              })}
-            </ol>
-          </nav>
+          <div className="fdry-wiz-actions">
+            {intake.kind === 'running' ? (
+              <button
+                type="button"
+                className="fdry-btn fdry-btn--quiet"
+                onClick={() => handleAttach(intake.sessionId)}
+              >
+                <Terminal aria-hidden="true" /> {STRIP_ACTION_LABEL.watch}
+              </button>
+            ) : order.provenance.forgeSession !== null ? (
+              <button
+                type="button"
+                className="fdry-btn fdry-btn--quiet"
+                onClick={() => handleAttach(order.provenance.forgeSession ?? '')}
+              >
+                <Terminal aria-hidden="true" /> Attach
+              </button>
+            ) : null}
+            {isDraft && !r.strip.actions.includes('draft') ? (
+              <ReasonButton
+                reason={r.locks.redraft}
+                className="fdry-btn"
+                onClick={() => void converge()}
+              >
+                <Wand aria-hidden="true" />
+                {order.plan.units.length === 0 ? 'Draft the plan' : 'Redraft'}
+              </ReasonButton>
+            ) : null}
+          </div>
         </header>
 
-        <section className="fdry-step" aria-labelledby={STEP_HEADING}>
-          <div className="fdry-step-body">
+        <div className={`fdry-strip fdry-strip--${r.strip.tone}`}>
+          <div className="fdry-strip-who">
+            <span className="fdry-strip-icon" aria-hidden="true">
+              <StripIconGlyph icon={r.strip.icon} />
+            </span>
+            <div>
+              <b>{r.strip.headline}</b>
+              <small>{r.strip.detail}</small>
+            </div>
+          </div>
+          {r.strip.actions.length > 0 ? (
+            <div className="fdry-strip-acts">
+              {r.strip.actions.map((action) => (
+                <button
+                  key={action}
+                  type="button"
+                  className={`fdry-btn${action === 'tell-architect' ? ' fdry-btn--primary' : ''}`}
+                  onClick={() => runStripAction(action)}
+                >
+                  {action === 'hold' ? <Pause aria-hidden="true" /> : null}
+                  {action === 'watch' ? <Terminal aria-hidden="true" /> : null}
+                  {STRIP_ACTION_LABEL[action]}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="fdry-body">
+          <nav aria-label="Steps" className="fdry-rail">
+            {r.steps.map((each, position) => (
+              <button
+                key={each.id}
+                type="button"
+                className={`fdry-rail-step fdry-rail-step--${STEP_STATE_CLASS[each.state]}${each === stepView ? ' is-on' : ''}`}
+                aria-current={each === stepView ? 'step' : undefined}
+                onClick={() => openStep(each.id)}
+              >
+                <span className="fdry-mk" aria-hidden="true">
+                  {each.mark === 'number' ? (
+                    position + 1
+                  ) : (
+                    <RailMark mark={each.mark} position={position} />
+                  )}
+                </span>
+                <span>
+                  <b>{STEP_LABELS[each.id]}</b>
+                  <small>{each.word}</small>
+                </span>
+              </button>
+            ))}
+          </nav>
+
+          <section className="fdry-main" aria-labelledby={STEP_HEADING}>
             <h2 className="fdry-step-h" id={STEP_HEADING} tabIndex={-1}>
-              {STEP_TITLES[step.id]}
+              {stepView.id === 'handOff' && !isDraft
+                ? `Agreed at ${clockOf(view.agreed?.at ?? order.agreedAt ?? '')} by ${view.agreed?.by === 'automatic' ? 'automatic hand-off' : 'you'}`
+                : STEP_TITLES[stepView.id]}
             </h2>
 
-            {step.id === 'intent' ? (
+            {stepView.id === 'intent' ? (
               <>
                 <p className="fdry-step-intro">
                   The problem and the outcome this order is for. The architect plans everything else
                   from them.
                 </p>
                 <section className={`fdry-field ${moved.includes('intent') ? 'is-redrawn' : ''}`}>
-                  {/* A tracker's description is markdown; a `<p>` would collapse
-                      every newline in it into one unbroken line. */}
                   <h3 className="fdry-field-h">Problem</h3>
                   {order.intent.problem === '' ? (
                     <p className="fdry-note">Not stated yet.</p>
@@ -1019,14 +912,66 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
               </>
             ) : null}
 
-            {step.id === 'plan' ? (
+            {stepView.id === 'plan' ? (
               <>
                 <p className="fdry-step-intro">
                   What has to be true when the work is done, how each part is proven, and what the
                   architect assumed.
                 </p>
-                {step.blocking.length > 0 ? (
-                  <div className="fdry-blockers">{step.blocking.map(renderCheck)}</div>
+
+                {(['verifiable', 'coverage', 'risk'] as const).some(
+                  (id) => r.rows.find((row) => row.id === id)?.state !== 'passed'
+                ) ? (
+                  <div className="fdry-checks">
+                    {renderCheckRow('verifiable')}
+                    {renderCheckRow('coverage')}
+                    {renderCheckRow('risk')}
+                  </div>
+                ) : null}
+
+                {openQuestions.length > 0 ? (
+                  <div className="fdry-group">
+                    <div
+                      className="fdry-group-h fdry-group-h--you"
+                      id="fdry-questions-h"
+                      tabIndex={-1}
+                    >
+                      <AlertCircle aria-hidden="true" />
+                      Needs your answer{' '}
+                      <span className="fdry-cnt">
+                        {questionsDecided} of {openQuestions.length} decided
+                      </span>
+                    </div>
+                    {openQuestions.map((question) => (
+                      <div key={question.id} className="fdry-fnd">
+                        <b>
+                          <MarkdownInline text={question.text} />
+                        </b>
+                        {question.why !== '' ? <Markdown text={question.why} /> : null}
+                        <div className="fdry-fnd-acts">
+                          {question.options.map((option, optionIndex) => (
+                            <button
+                              key={option}
+                              type="button"
+                              aria-pressed={questionChoices[question.id] === optionIndex}
+                              className={
+                                questionChoices[question.id] === optionIndex ? 'fdry-btn--sel' : ''
+                              }
+                              onClick={() =>
+                                setQuestionChoices((current) => ({
+                                  ...current,
+                                  [question.id]: optionIndex,
+                                }))
+                              }
+                            >
+                              <MarkdownInline text={option} />
+                              {optionIndex === question.recommended ? ' (recommended)' : ''}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : null}
 
                 <section
@@ -1050,23 +995,18 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                               proven by {criterion.verify.kind}
                               {uncovered ? ' · no unit satisfies this' : ''}
                             </span>
-                            {/* The escape the falsifiable check has always named:
-                                a criterion nothing here can prove may be
-                                accepted anyway, in writing, and the reason
-                                travels with the order. */}
                             {excused ? (
                               <p className="fdry-ac-excused">
                                 accepted as unverifiable — {criterion.unverifiable?.reason}
                               </p>
                             ) : isDraft && unproven !== criterion.id ? (
-                              <button
-                                type="button"
+                              <ReasonButton
                                 className="fdry-ac-excuse"
-                                disabled={locked}
+                                reason={askReason}
                                 onClick={() => setUnproven(criterion.id)}
                               >
                                 Nothing here can prove this
-                              </button>
+                              </ReasonButton>
                             ) : null}
                             {unproven === criterion.id && !excused ? (
                               <form
@@ -1090,12 +1030,16 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                                   value={unprovenReason}
                                   onChange={(event) => setUnprovenReason(event.target.value)}
                                 />
-                                <button
+                                <ReasonButton
                                   type="submit"
-                                  disabled={locked || unprovenReason.trim() === ''}
+                                  reason={
+                                    unprovenReason.trim() === ''
+                                      ? LOCAL_REASONS.acceptEmpty
+                                      : askReason
+                                  }
                                 >
                                   Accept it
-                                </button>
+                                </ReasonButton>
                               </form>
                             ) : null}
                           </div>
@@ -1154,14 +1098,13 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                     </p>
                     <div className="fdry-assume">
                       {assumptions.map((assumption) => (
-                        <button
+                        <ReasonButton
                           key={assumption.id}
-                          type="button"
-                          disabled={locked}
+                          reason={askReason}
                           onClick={() => void turn({ strike: assumption.id })}
                         >
                           <MarkdownInline text={assumption.text} /> <X aria-hidden="true" />
-                        </button>
+                        </ReasonButton>
                       ))}
                     </div>
                   </section>
@@ -1197,103 +1140,243 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
               </>
             ) : null}
 
-            {step.id === 'redTeam' ? (
+            {stepView.id === 'redTeam' ? (
               <>
-                <p className="fdry-step-intro">
-                  {blockingFindings.length === 0
-                    ? 'Nothing here blocks hand-off. An adversarial pass read the plan and left nothing that would make the change wrong.'
-                    : `${blockingFindings.length} open and blocking hand-off. Decide each one in the band above — nothing hands off while one is open.`}
-                </p>
-                <section className={`fdry-field ${moved.includes('redTeam') ? 'is-redrawn' : ''}`}>
-                  {blockingFindings.length === 0 ? null : (
-                    <ul className="fdry-findings-pointer" aria-label="Blocking findings">
-                      {blockingFindings.map((finding) => (
-                        <li key={finding.id} className="fdry-finding">
-                          <CircleDot aria-hidden="true" />
-                          <div className="fdry-finding-body">
-                            <FindingText text={finding.text} />
-                            <button type="button" onClick={() => goTo('fdry-needs-you-h')}>
-                              Decide it above
+                {findingsByGroup.fixing.length > 0 ? (
+                  <div className="fdry-group">
+                    <div className={`fdry-group-h fdry-group-h--${GROUP_META.fixing.cls}`}>
+                      <LoaderCircle aria-hidden="true" className="fdry-spin" />
+                      {GROUP_META.fixing.heading}{' '}
+                      <span className="fdry-cnt">{findingsByGroup.fixing.length}</span>
+                    </div>
+                    {findingsByGroup.fixing.map((finding) => (
+                      <div key={finding.id} className="fdry-fnd">
+                        <span className="fdry-fnd-text">
+                          <MarkdownInline text={finding.text} />
+                        </span>
+                        <span className="fdry-fnd-meta">{finding.meta}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {needsYouFindings.length > 0 ? (
+                  <div className="fdry-group">
+                    <div className={`fdry-group-h fdry-group-h--${GROUP_META['needs-you'].cls}`}>
+                      <AlertCircle aria-hidden="true" />
+                      {GROUP_META['needs-you'].heading}{' '}
+                      <span className="fdry-cnt">
+                        {findingsDecided} of {needsYouFindings.length} decided
+                      </span>
+                    </div>
+                    {needsYouFindings.map((finding) => {
+                      const choice = findingChoice[finding.id]
+                      return (
+                        <div key={finding.id} className="fdry-fnd">
+                          <span className="fdry-fnd-text">
+                            <MarkdownInline text={finding.text} />
+                          </span>
+                          <span className="fdry-fnd-meta">{finding.meta}</span>
+                          <div className="fdry-fnd-acts">
+                            <button
+                              type="button"
+                              aria-pressed={choice?.mode === 'ask'}
+                              className={choice?.mode === 'ask' ? 'fdry-btn--sel' : ''}
+                              title="Have the architect change the order so this no longer holds"
+                              onClick={() =>
+                                setFindingChoice((current) => ({
+                                  ...current,
+                                  [finding.id]: { mode: 'ask', text: '' },
+                                }))
+                              }
+                            >
+                              Ask the architect
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={choice?.mode === 'fix'}
+                              className={choice?.mode === 'fix' ? 'fdry-btn--sel' : ''}
+                              title="Say how, and the architect changes the order that way"
+                              onClick={() =>
+                                setFindingChoice((current) => ({
+                                  ...current,
+                                  [finding.id]: {
+                                    mode: 'fix',
+                                    text: choice?.mode === 'fix' ? choice.text : '',
+                                  },
+                                }))
+                              }
+                            >
+                              Fix it…
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={choice?.mode === 'accept'}
+                              className={choice?.mode === 'accept' ? 'fdry-btn--sel' : ''}
+                              title="It stands, and here is why"
+                              onClick={() =>
+                                setFindingChoice((current) => ({
+                                  ...current,
+                                  [finding.id]: {
+                                    mode: 'accept',
+                                    text: choice?.mode === 'accept' ? choice.text : '',
+                                  },
+                                }))
+                              }
+                            >
+                              Accept it
                             </button>
                           </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {nonBlockingOpenFindings.length === 0 ? null : (
-                    <>
-                      <h3 className="fdry-field-h">Notes (don&rsquo;t block hand-off)</h3>
-                      <ul className="fdry-notes" aria-label="Non-blocking findings">
-                        {nonBlockingOpenFindings.map((finding) => (
-                          <li key={finding.id} className="fdry-finding is-note">
-                            <div className="fdry-finding-body">
-                              <FindingText text={finding.text} />
-                              <span className="fdry-finding-category">{finding.category}</span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                  {clearedFindings.length === 0 ? null : (
-                    <>
-                      <h3 className="fdry-field-h">Cleared</h3>
-                      <ul className="fdry-cleared" aria-label="Cleared findings">
-                        {clearedFindings.map((finding) => (
-                          <li key={finding.id} className="fdry-finding is-cleared">
-                            <Check aria-hidden="true" />
-                            <div className="fdry-finding-body">
-                              <span className="fdry-finding-headline">
-                                <MarkdownInline text={findingParts(finding.text).headline} />
-                              </span>
-                              <span className="fdry-finding-reason">{finding.reason}</span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                </section>
+                          {choice?.mode === 'fix' ? (
+                            <textarea
+                              aria-label={`How should "${finding.text}" be fixed?`}
+                              placeholder="How should it be fixed?"
+                              rows={3}
+                              value={choice.text}
+                              onChange={(event) =>
+                                setFindingChoice((current) => ({
+                                  ...current,
+                                  [finding.id]: { mode: 'fix', text: event.target.value },
+                                }))
+                              }
+                            />
+                          ) : null}
+                          {choice?.mode === 'accept' ? (
+                            <input
+                              aria-label={`Why "${finding.text}" is accepted`}
+                              placeholder="Why it stands…"
+                              value={choice.text}
+                              onChange={(event) =>
+                                setFindingChoice((current) => ({
+                                  ...current,
+                                  [finding.id]: { mode: 'accept', text: event.target.value },
+                                }))
+                              }
+                            />
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : null}
+
+                {findingsByGroup.notes.length > 0 ? (
+                  <div className="fdry-group">
+                    <div className={`fdry-group-h fdry-group-h--${GROUP_META.notes.cls}`}>
+                      <List aria-hidden="true" />
+                      {GROUP_META.notes.heading}{' '}
+                      <span className="fdry-cnt">{findingsByGroup.notes.length}</span>
+                    </div>
+                    {findingsByGroup.notes.map((finding) => (
+                      <div key={finding.id} className="fdry-fnd">
+                        <span className="fdry-fnd-text">
+                          <MarkdownInline text={finding.text} />
+                        </span>
+                        <span className="fdry-fnd-meta">{finding.meta}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {findingsByGroup.resolved.length > 0 ? (
+                  <details className="fdry-group fdry-group--resolved">
+                    <summary className={`fdry-group-h fdry-group-h--${GROUP_META.resolved.cls}`}>
+                      <Check aria-hidden="true" />
+                      {GROUP_META.resolved.heading}{' '}
+                      <span className="fdry-cnt">{findingsByGroup.resolved.length}</span>
+                    </summary>
+                    {findingsByGroup.resolved.map((finding) => (
+                      <div key={finding.id} className="fdry-fnd">
+                        <span className="fdry-fnd-text">
+                          <MarkdownInline text={finding.text} />
+                        </span>
+                        <span className="fdry-fnd-meta">{finding.meta}</span>
+                      </div>
+                    ))}
+                  </details>
+                ) : null}
+
+                {blockingFindings.length === 0 &&
+                findingsByGroup.notes.length === 0 &&
+                findingsByGroup.resolved.length === 0 ? (
+                  <p className="fdry-step-intro">
+                    Nothing here blocks hand-off. An adversarial pass read the plan and left nothing
+                    that would make the change wrong.
+                  </p>
+                ) : null}
               </>
             ) : null}
 
-            {/* Proposed rather than chosen — a proposal nobody can predict is
-                worse than a plain one — and overridden in one click, with the
-                override recorded. One that cannot run here is shown with the
-                requirement it does not meet rather than hidden. */}
-            {step.id === 'shape' ? (
+            {stepView.id === 'shape' ? (
               <>
                 <p className="fdry-step-intro">
-                  How the work runs.{' '}
-                  {recipes?.proposedWhy !== undefined && recipes.proposedWhy !== ''
-                    ? `${recipes.proposed} proposed — ${recipes.proposedWhy}.`
-                    : null}{' '}
-                  Pick another if it fits better; the override is recorded.
+                  {recipes?.proposed !== undefined
+                    ? `${capitalise(recipes.proposed)} is proposed: ${recipes.proposedWhy ?? ''}. Pick any shape. Your choice is saved and used at hand-off.`
+                    : 'Pick any shape. Your choice is saved and used at hand-off.'}
                 </p>
-                <div className="fdry-recipes">
+                {recipes?.chosen !== null &&
+                recipes?.chosen !== undefined &&
+                recipes.chosen !== recipes.proposed ? (
+                  <div className="fdry-saved">
+                    <Check aria-hidden="true" />
+                    Saved{' '}
+                    {recipes.chosenAt !== null && recipes.chosenAt !== undefined
+                      ? clockOf(recipes.chosenAt)
+                      : ''}
+                    : {capitalise(recipes.chosen)}.
+                    <button
+                      type="button"
+                      className="fdry-btn fdry-btn--quiet"
+                      onClick={() => void pickRecipe(null)}
+                    >
+                      Use the proposal
+                    </button>
+                  </div>
+                ) : null}
+                <div className="fdry-shapes">
                   {recipes?.recipes?.map((option) => {
-                    const isChosen = (chosen ?? recipes.proposed) === option.name
+                    const isSelected = (recipes.chosen ?? recipes.proposed) === option.name
+                    if (!option.available || (!isDraft && r.locks.handOff !== null)) {
+                      const reason = !option.available
+                        ? shapeUnavailable(option.name, option.unmet)
+                        : r.locks.handOff
+                      return (
+                        <ReasonButton
+                          key={option.name}
+                          tip="fit"
+                          reason={reason}
+                          className={`fdry-shape${isSelected ? ' is-on' : ''} fdry-shape--off`}
+                        >
+                          <span className="fdry-shape-nm">
+                            <b>{capitalise(option.name)}</b>
+                            <Lock aria-hidden="true" />
+                          </span>
+                          <small>
+                            {option.available
+                              ? (option.description ?? '')
+                              : `Unavailable: ${option.unmet.join('; ')}`}
+                          </small>
+                        </ReasonButton>
+                      )
+                    }
                     return (
                       <button
                         key={option.name}
                         type="button"
-                        className={`fdry-recipe ${isChosen ? 'is-on' : ''}`}
-                        aria-pressed={isChosen}
-                        disabled={!option.available}
-                        onClick={() => setChosen(option.name)}
+                        className={`fdry-shape${isSelected ? ' is-on' : ''}`}
+                        aria-pressed={isSelected}
+                        onClick={() => void pickRecipe(option.name)}
                       >
-                        <span className="fdry-recipe-name">
-                          <b>{option.name}</b>
+                        <span className="fdry-shape-nm">
+                          <b>{capitalise(option.name)}</b>
                           {option.name === recipes.proposed ? (
-                            <span className="fdry-recipe-mark">Proposed</span>
+                            <span className="fdry-mark">Proposed</span>
+                          ) : null}
+                          {option.name === recipes.chosen && option.name !== recipes.proposed ? (
+                            <span className="fdry-mark fdry-mark--you">Your choice</span>
                           ) : null}
                         </span>
-                        <small>
-                          {option.available
-                            ? (option.description ??
-                              `from ${rungInWords((option.rung ?? 'built-in') as Rung)}`)
-                            : option.unmet.join('; ')}
-                        </small>
+                        <small>{option.description ?? ''}</small>
                       </button>
                     )
                   })}
@@ -1301,7 +1384,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
               </>
             ) : null}
 
-            {step.id === 'tracker' ? (
+            {stepView.id === 'tracker' ? (
               <>
                 <p className="fdry-step-intro">
                   What this order tells {order.source.tracker} {order.source.key} as it moves.
@@ -1348,9 +1431,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                   </section>
                 )}
 
-                {/* Per order, defaulting from configuration (FR-062). A run
-                    against somebody else's repository is a reason to turn one
-                    off without changing the setting for every order after it. */}
                 <section className="fdry-field">
                   <h3 className="fdry-field-h">What goes back to the issue</h3>
                   <div className="fdry-writebacks">
@@ -1376,12 +1456,52 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
               </>
             ) : null}
 
-            {step.id === 'handOff' ? (
+            {stepView.id === 'handOff' ? (
               <>
-                <p className="fdry-step-intro">
-                  All of them must pass. Handing off agrees the order and starts the work.
-                </p>
-                <div className="fdry-checks">{CHECK_ORDER.map(renderCheck)}</div>
+                {isDraft ? (
+                  <p className="fdry-step-intro">
+                    {view.intake?.kind === 'refused'
+                      ? 'These rows describe the order as it stood before the refused turn.'
+                      : 'Hand-off agrees the order and starts the work. Every row must pass.'}
+                  </p>
+                ) : null}
+                {isDraft ? (
+                  <div className="fdry-checks">{r.rows.map(renderHandOffRow)}</div>
+                ) : (
+                  <>
+                    <p className="fdry-step-intro">
+                      All six rows passed at agreement. The order is now read-only. Changes go
+                      through the run.
+                    </p>
+                    <div className="fdry-checks">
+                      <div className="fdry-chk">
+                        <span className="fdry-chk-icon" aria-hidden="true">
+                          <Check aria-hidden="true" />
+                        </span>
+                        <div>
+                          <b>Six of six rows passed</b>
+                          <small>
+                            Questions, proof, coverage, risk, red team, nobody changing the plan.
+                          </small>
+                        </div>
+                        <span className="fdry-pill fdry-pill--pass">Agreed</span>
+                      </div>
+                      <div className="fdry-chk">
+                        <span className="fdry-chk-icon" aria-hidden="true">
+                          <Play aria-hidden="true" />
+                        </span>
+                        <div>
+                          <b>Run started with {capitalise(shapeName ?? 'the proposed')}</b>
+                          <small>
+                            {recipes?.recipes?.find((r2) => r2.name === shapeName)?.description ??
+                              ''}
+                          </small>
+                        </div>
+                        <span className="fdry-pill fdry-pill--work">Running</span>
+                      </div>
+                    </div>
+                  </>
+                )}
                 {view.unavailableChecks !== undefined && view.unavailableChecks.length > 0 ? (
                   <section className="fdry-field">
                     <h3 className="fdry-field-h">Not measurable here</h3>
@@ -1400,8 +1520,6 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 onSubmit={(event) => {
                   event.preventDefault()
                   if (draft.trim() === '') return
-                  // Straight to the architect. `turn` routes free text there
-                  // too; going directly says what the button does.
                   void converge(draft)
                   setDraft('')
                 }}
@@ -1410,68 +1528,93 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                   aria-label="Tell the architect what is wrong, or what you want instead"
                   placeholder="Tell the architect what's wrong, or what you want instead…"
                   value={draft}
-                  disabled={locked}
                   onChange={(event) => setDraft(event.target.value)}
                 />
-                <button type="submit" disabled={locked || draft.trim() === ''}>
+                <ReasonButton
+                  type="submit"
+                  reason={
+                    r.locks.message ?? (draft.trim() === '' ? LOCAL_REASONS.emptyMessage : null)
+                  }
+                >
                   Send
-                </button>
+                </ReasonButton>
               </form>
             ) : null}
-          </div>
-        </section>
+          </section>
+        </div>
 
-        <footer className="fdry-wizard-foot">
-          {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
-          <div className="fdry-wizard-nav">
+        {isDraft || problem !== null || heldBack !== null || view.advisory != null ? (
+          <footer className="fdry-foot">
+            {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
             {previous !== undefined ? (
-              <button type="button" className="fdry-nav-back" onClick={() => openStep(previous.id)}>
+              <button type="button" className="fdry-btn" onClick={() => openStep(previous.id)}>
                 Back
               </button>
             ) : null}
-            <span className="fdry-wizard-forward">
-              {/* The one refusal the operator can answer: it is about their own
-                  review queue, not about the order. Overriding is one click,
-                  and the depth they ignored goes in the record (FR-054). */}
-              {step.id === 'handOff' && heldBack !== null ? (
-                <button
-                  type="button"
-                  className="fdry-nav-next"
-                  disabled={locked}
-                  onClick={() => void handOff(true)}
-                >
-                  <Play aria-hidden="true" /> Start anyway — {heldBack.unreviewed} waiting for
-                  review
-                </button>
-              ) : null}
-              {step.id === 'handOff' ? (
-                <button
-                  type="button"
-                  className="fdry-nav-next"
-                  disabled={!compile.ok || locked || !isDraft}
-                  onClick={() => void handOff()}
-                >
-                  <Play aria-hidden="true" />
-                  {!isDraft
-                    ? `Handed off — ${statusInWords(order.status)}`
-                    : compile.ok
-                      ? 'Compile & hand off'
-                      : `Blocked by ${compile.failures.length} ${compile.failures.length === 1 ? 'check' : 'checks'}`}
-                </button>
-              ) : next !== undefined ? (
-                <button type="button" className="fdry-nav-next" onClick={() => openStep(next.id)}>
-                  Next: {STEP_LABELS[next.id]}
-                </button>
-              ) : null}
-            </span>
-          </div>
-          {/* What agreeing this order queued it behind (R4) — a note, not a
-              check or a failure: the run still starts, it just waits its
-              turn on a file another order already has. */}
-          {step.id === 'handOff' && view.advisory != null ? (
-            <p className="fdry-note fdry-advisory">{view.advisory}</p>
-          ) : null}
-        </footer>
+            {r.handOffWhy !== null && stepView.id === 'handOff' ? (
+              <span className="fdry-why">
+                <Info aria-hidden="true" />
+                {r.handOffWhy}
+              </span>
+            ) : stepNeedsYou.decided > 0 && stepNeedsYou.total !== stepNeedsYou.decided ? (
+              <span className="fdry-why">
+                <Info aria-hidden="true" />
+                Send now or decide the {stepNeedsYou.total === 2 ? 'second' : 'next'} finding first.
+                Undecided findings stay open.
+              </span>
+            ) : (
+              <span className="fdry-why" />
+            )}
+
+            {stepView.id === 'handOff' ? (
+              <>
+                {heldBack !== null ? (
+                  <button
+                    type="button"
+                    className="fdry-btn fdry-btn--primary"
+                    onClick={() => void handOff(true)}
+                  >
+                    <Play aria-hidden="true" /> Start anyway — {heldBack.unreviewed} waiting for
+                    review
+                  </button>
+                ) : view.agreed !== undefined && !isDraft ? null : (
+                  <ReasonButton
+                    className="fdry-btn fdry-btn--primary"
+                    reason={r.locks.handOff}
+                    onClick={() => void handOff()}
+                  >
+                    {r.canHandOff ? <Play aria-hidden="true" /> : <Lock aria-hidden="true" />}
+                    {r.canHandOff
+                      ? `Hand off with ${capitalise(shapeName ?? 'the proposed')}`
+                      : 'Hand off'}
+                  </ReasonButton>
+                )}
+              </>
+            ) : stepNeedsYou.total > 0 ? (
+              <ReasonButton
+                className="fdry-btn fdry-btn--primary"
+                reason={sendReason}
+                onClick={sendDecisionsOnThisStep}
+              >
+                {stepNeedsYou.decided === 0
+                  ? 'Send decisions'
+                  : `Send ${stepNeedsYou.decided} decision${stepNeedsYou.decided === 1 ? '' : 's'}`}
+              </ReasonButton>
+            ) : next !== undefined ? (
+              <button
+                type="button"
+                className="fdry-btn fdry-btn--primary"
+                onClick={() => openStep(next.id)}
+              >
+                Next: {STEP_LABELS[next.id]}
+              </button>
+            ) : null}
+
+            {stepView.id === 'handOff' && view.advisory != null ? (
+              <p className="fdry-note fdry-advisory">{view.advisory}</p>
+            ) : null}
+          </footer>
+        ) : null}
       </div>
     </div>
   )

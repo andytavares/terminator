@@ -185,6 +185,11 @@ export interface PtyManagerAPI {
    * in.
    */
   openTerminalTab(input: OpenTerminalTabInput): string | null
+  /**
+   * Closes a tab `openTerminalTab` opened, ending its process if it still runs
+   * (v2.6.0). `kill` alone leaves the tab on screen marked "[exited]".
+   */
+  closeTerminalTab(sessionId: string): void
   /** v1.4.0 — multi-subscriber output fan-out. Returns a disposer, or null if unknown. */
   onData(sessionId: string, listener: (data: string) => void): (() => void) | null
   /** v1.4.0 — multi-subscriber exit fan-out. Listeners fire after the session is removed. */
@@ -1181,6 +1186,15 @@ export function createExtensionAPI(
           scrollbackLimit: input.scrollbackLimit ?? getGlobalSettings().terminal.scrollbackLimit,
         })
         return sessionId
+      },
+      closeTerminalTab(sessionId): void {
+        // The renderer owns the tab list; its close also ends the process
+        // and marks the session record closed.
+        if (deps?.broadcastToWindows) {
+          deps.broadcastToWindows('terminal:close-tab', { sessionId })
+          return
+        }
+        deps?.ptyManager?.kill(sessionId)
       },
       onData(sessionId, listener) {
         return deps?.ptyManager?.onData(sessionId, listener) ?? null

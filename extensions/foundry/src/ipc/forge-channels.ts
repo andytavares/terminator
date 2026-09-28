@@ -7,7 +7,15 @@ import { applyFindings, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
 import { readStanding } from '../order/standing.js'
-import { intakeRefusal, lastIntake } from '../forge/intake-outcome.js'
+import {
+  intakeRefusal,
+  lastIntake,
+  loopFacts,
+  agreedFacts,
+  turnEndedAt as turnEndedAtOf,
+} from '../forge/intake-outcome.js'
+import type { IntakeOutcome } from '../forge/intake-outcome.js'
+import type { LoopFacts, AgreedFacts } from '../forge/readiness.js'
 import { runFailure } from '../line/run-outcome.js'
 import { readCiState } from '../line/ci-state.js'
 import { queue, advisory as advisoryFor } from '../line/refinery.js'
@@ -107,7 +115,13 @@ const TurnPayload = z.object({
   settle: SettlePayload.optional(),
 })
 
-const CompilePayload = z.object({ id: z.string(), commit: z.boolean().default(false) })
+const CompilePayload = z.object({
+  id: z.string(),
+  commit: z.boolean().default(false),
+})
+
+const RecipePayload = z.object({ id: z.string(), recipe: z.string().nullable() })
+const HoldPayload = z.object({ id: z.string(), held: z.boolean() })
 
 const WriteBackPayload = z.object({
   id: z.string(),
@@ -207,6 +221,15 @@ export interface ForgeDeps {
    * has never wired the refinery has nothing to say either way.
    */
   readonly queueEntries?: () => Promise<readonly QueueEntry[]>
+  /**
+   * The side effect of releasing a hold: pick the loop back up.
+   *
+   * Kept out of this file on purpose — `hold` only records the ledger line
+   * and hands back the view, the same as every other channel here. What
+   * "release" actually resumes (start the next review round, send a
+   * follow-up, hand off) is the loop's own business, in `src/index.ts`.
+   */
+  readonly onReleased?: (order: WorkOrder) => void
 }
 
 export interface ForgeChannels {
@@ -226,11 +249,41 @@ export interface ForgeChannels {
   setBudgets(payload: unknown): Promise<unknown>
   /** Discard an order that should not have been made. */
   cancel(payload: unknown): Promise<unknown>
+  /** Choose which shape hand-off will run (FR-014's override). */
+  recipe(payload: unknown): Promise<unknown>
+  /** Hold the loop for the operator, or release it. */
+  hold(payload: unknown): Promise<unknown>
 }
 
 /** The order plus its checks — what every Forge channel hands back. */
 function view(order: WorkOrder, changed: string[] = []) {
   return { order, compile: compileOrder(order), changed }
+}
+
+/**
+ * The backend facts the redesigned Forge reads, from one read of the ledger.
+ *
+ * Every response that used to carry `intake` alone now carries these four
+ * together — one function so no call site can add a fifth response that
+ * forgets one of them, the way `intake` alone was added in three places and
+ * a fourth was missed.
+ */
+async function readFacts(
+  store: OrderStore,
+  orderId: string
+): Promise<{
+  intake: IntakeOutcome
+  loop: LoopFacts
+  agreed: AgreedFacts | null
+  turnEndedAt: string | null
+}> {
+  const entries = await store.entries(orderId)
+  return {
+    intake: lastIntake(entries),
+    loop: loopFacts(entries),
+    agreed: agreedFacts(entries),
+    turnEndedAt: turnEndedAtOf(entries),
+  }
 }
 
 /**
@@ -456,7 +509,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       return {
         ...view(order),
         error: started.reason,
-        intake: lastIntake(await deps.store.entries(order.id)),
+        ...(await readFacts(deps.store, order.id)),
       }
     }
 
@@ -479,7 +532,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     return {
       ...view(order),
       converging: started.sessionId,
-      intake: lastIntake(await deps.store.entries(order.id)),
+      ...(await readFacts(deps.store, order.id)),
     }
   }
 
@@ -614,11 +667,11 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     // only reads the document cannot tell "the architect is working" from "the
     // architect finished an hour ago and nothing was accepted". The Forge
     // could not, and spun on the first while it was the second.
-    const intake = lastIntake(await deps.store.entries(id))
-    if (!commit || !result.ok) return { compile: result, order, intake }
+    const facts = await readFacts(deps.store, id)
+    if (!commit || !result.ok) return { compile: result, order, ...facts }
 
     const agreed = agreeOrder(order, deps.now())
-    if (!agreed.ok) return { compile: agreed.result, order, intake }
+    if (!agreed.ok) return { compile: agreed.result, order, ...facts }
 
     await deps.store.save(agreed.order)
     await deps.store.record({
@@ -656,7 +709,9 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     return {
       compile: compileOrder(agreed.order),
       order: agreed.order,
-      intake,
+      // Recomputed rather than reused: the ledger line just written is the
+      // agreement this response is about, and the read above predates it.
+      ...(await readFacts(deps.store, id)),
       capability,
       advisory,
     }
@@ -865,6 +920,66 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     return view(next)
   }
 
+  /**
+   * Choose the shape hand-off will run, overriding the proposal (FR-014).
+   *
+   * A draft only — a running order's recipe is fixed by `run.start`, and
+   * changing it here would say one thing while the graph already cut ran
+   * another.
+   */
+  async function recipe(raw: unknown): Promise<unknown> {
+    const parsed = RecipePayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const order = await deps.store.load(parsed.data.id)
+    if (order === null) return { error: `No order ${parsed.data.id}.` }
+    if (order.status !== 'draft') {
+      return { error: `Only a draft can have its shape chosen; this order is ${order.status}.` }
+    }
+
+    const next: WorkOrder = { ...order, recipe: parsed.data.recipe }
+    await deps.store.save(next)
+    await deps.store.record({
+      at: deps.now(),
+      orderId: order.id,
+      actor: 'operator',
+      action: 'recipe.chosen',
+      subject: order.id,
+      reason: parsed.data.recipe ?? 'the proposal',
+      evidence: [],
+    })
+    return view(next)
+  }
+
+  /**
+   * Hold the loop for the operator, or release it.
+   *
+   * Recording the decision is all this channel does. What "release" actually
+   * resumes — the next review round, a follow-up, hand-off — is
+   * `deps.onReleased`'s job, over in the loop that knows what those are.
+   */
+  async function hold(raw: unknown): Promise<unknown> {
+    const parsed = HoldPayload.safeParse(raw)
+    if (!parsed.success) return { error: 'Malformed request.' }
+
+    const order = await deps.store.load(parsed.data.id)
+    if (order === null) return { error: `No order ${parsed.data.id}.` }
+
+    await deps.store.record({
+      at: deps.now(),
+      orderId: order.id,
+      actor: 'operator',
+      action: parsed.data.held ? 'review.held' : 'review.released',
+      subject: order.id,
+      reason: parsed.data.held ? 'held by the operator' : 'released by the operator',
+      evidence: [],
+    })
+
+    if (!parsed.data.held) deps.onReleased?.(order)
+
+    return view(order)
+  }
+
   return {
     create,
     turn,
@@ -876,5 +991,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     setWriteBack,
     setBudgets,
     cancel,
+    recipe,
+    hold,
   }
 }

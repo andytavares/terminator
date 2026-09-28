@@ -25,6 +25,7 @@ function request(over: Partial<ToolRequest> = {}): ToolRequest {
     worktreePath: '/work/checkout',
     outputPath: null,
     skillsMount: null,
+    letModeDecide: false,
     ...over,
   }
 }
@@ -453,5 +454,55 @@ describe('a skill mounted for this node', () => {
         })
       )?.allow
     ).toBe(true)
+  })
+})
+
+// Claude Code's auto mode answers what Foundry's own policy has no opinion on,
+// instead of the call waiting five minutes for a person and then prompting in
+// a terminal nobody is watching.
+describe('letting auto mode decide', () => {
+  const auto = (over: Partial<ToolRequest> = {}) =>
+    decideTool(request({ letModeDecide: true, ...over }))
+
+  it('hands a call the policy has no opinion on to auto mode', () => {
+    expect(auto({ tool: 'Edit', input: { file_path: '/etc/hosts' } })).toBe('mode')
+    expect(auto({ input: { command: 'npm test > /work/other/out.log' } })).toBe('mode')
+  })
+
+  it('does so at lights-out too, where the call was refused', () => {
+    expect(auto({ tool: 'Edit', input: { file_path: '/etc/hosts' }, autonomy: 'lights-out' })).toBe(
+      'mode'
+    )
+  })
+
+  // The five calls TAV-15's builder waited on were all of this kind.
+  it('hands a destructive action to auto mode as well', () => {
+    for (const command of [
+      'git add a.ts && node scripts/check-patch-coverage.cjs; echo gate=$?; git reset -q',
+      'rm -rf node_modules/electron/dist node_modules/electron/path.txt',
+    ]) {
+      expect(auto({ input: { command } })).toBe('mode')
+      expect(auto({ input: { command }, autonomy: 'lights-out' })).toBe('mode')
+    }
+  })
+
+  it('still holds a destructive action when auto mode may not decide', () => {
+    expect(decideTool(request({ input: { command: 'git reset --hard' } }))).toBeNull()
+  })
+
+  it('still asks about everything at escorted, which is what the setting means', () => {
+    expect(
+      auto({ tool: 'Edit', input: { file_path: '/work/checkout/a.ts' }, autonomy: 'escorted' })
+    ).toBeNull()
+  })
+
+  it('leaves the decisions the policy does take alone', () => {
+    expect(auto({ tool: 'Edit', input: { file_path: '/work/checkout/a.ts' } })).toEqual({
+      allow: true,
+      reason: expect.any(String),
+    })
+    expect(
+      auto({ readOnly: true, role: 'verifier', input: { command: 'rm -rf x' } })
+    ).toMatchObject({ allow: false })
   })
 })

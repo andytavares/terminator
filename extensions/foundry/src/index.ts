@@ -21,7 +21,7 @@ import { rulesFor, rulesAtRung } from './verify/rules.js'
 import { availableNames, availableSensors, resolveRule } from './recipe/resolve.js'
 import { RUNGS, rungLevelInWords } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
-import { createLiveGateStore, createGateStore } from './gates/store.js'
+import { askOnce, createLiveGateStore, createGateStore } from './gates/store.js'
 import { raiseGate, ruleInWords } from './gates/rules.js'
 import { orphanedNodes } from './line/reclaim.js'
 import type { StandingSources } from './order/standing.js'
@@ -49,6 +49,12 @@ import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
 import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
 import { followUpFor } from './forge/autonomy.js'
+import {
+  anotherPassWanted,
+  loopFacts,
+  lastIntake,
+  reviewedCurrentPlan,
+} from './forge/intake-outcome.js'
 import { endAndWait } from './runtime/end-session.js'
 import { compileOrder } from './order/compile.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
@@ -72,13 +78,17 @@ import type { EffortLevel, Recipe, Role } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
 import { collectableWrites, readRungOutput, rungOutputPath } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
+import { agentTitle } from './runtime/agent-title.js'
 import { resolveRole } from './recipe/resolve.js'
 import {
   MAX_REVIEW_ROUNDS,
   reviewPrompt,
   reviewNext,
+  afterFix,
   shouldReview,
   fixMessage,
+  nextRound,
+  afterRelease,
 } from './forge/review-loop.js'
 import { forgeDefectAnswer } from './gates/act-decision.js'
 import { brief } from './line/brief.js'
@@ -256,12 +266,6 @@ function resolveFoundryDataRoot(api: ExtensionAPI): string {
 
 const MODEL_SETTING_KEY = 'terminator.foundry.defaultModel'
 const ASK_MODEL_SETTING_KEY = 'terminator.foundry.askModel'
-const AUTO_HAND_OFF_SETTING_KEY = 'terminator.foundry.autoHandOff'
-
-/** Whether a clean review loop hands off on its own. On unless turned off. */
-function autoHandOff(api: ExtensionAPI): boolean {
-  return api.settings.get<boolean>(AUTO_HAND_OFF_SETTING_KEY) ?? true
-}
 
 /**
  * The model every phase launches with.
@@ -1496,6 +1500,7 @@ async function buildExecutorDeps(
           workspaceId: workspaceOf(checkout),
           branch: checkout.branch,
           issue: issueOf(order),
+          title: agentTitle(input.role ?? input.node.stepId),
           prompt: input.prompt,
           phase: (input.role ?? input.node.id) as never,
           resumeSessionId: input.resumeSessionId,
@@ -1524,6 +1529,8 @@ async function buildExecutorDeps(
               isProbed: (name, given) => isProbedCommand(order, name, given),
               readOnlyTools: readOnlyTools(api),
               autonomy: autonomyFor(api),
+              letModeDecide:
+                api.settings?.get<boolean>('terminator.foundry.letAutoModeDecide') ?? true,
               worktreePath: checkout.path,
               outputPath: input.outputPath ?? null,
               skillsMount: input.skillsMount,
@@ -1610,6 +1617,10 @@ async function buildExecutorDeps(
             // whether it was is the verifier's to say and the ladder's to
             // measure, never the producing agent's (FR-033).
             finish(0)
+            // Nothing types into it again: a later node in the lane resumes
+            // the conversation in a fresh tab. Left at its prompt, every
+            // finished node kept a terminal and a process open.
+            supervisedRunner?.stop(sessionId)
           },
         })
         .then((run) => {
@@ -1718,6 +1729,7 @@ async function buildExecutorDeps(
         await store.save(result.order)
         return { order: result.order, note: result.note, defect: result.defect }
       },
+      priorGates: await gates.list(),
       raise: async (gate) => {
         await gates.save(gate)
         await store.record({
@@ -1777,7 +1789,7 @@ async function buildExecutorDeps(
           workspaceId: workspaceOf(checkout),
           branch: checkout.branch,
           issue: issueOf(order),
-          title: input.title,
+          title: agentTitle(input.title),
           command: input.command,
           logPath: input.logPath,
         })
@@ -1918,10 +1930,7 @@ async function executeRun(
       ...integrateDepsFor(api, root, order.id),
       // The shipping decision, where the grade calls for one, is the operator's
       // and reaches them through the inbox like every other.
-      decide: async (gate) => {
-        await gates.save(gate)
-        return 'hold'
-      },
+      decide: (gate) => askOnce(gates, gate),
       raiseGate: async (gate) => {
         await gates.save(gate)
       },
@@ -2071,6 +2080,7 @@ async function convergeOnce(
       resolve(started)
     }
     let done = false
+    let architectSession: string | null = null
     /**
      * Take the proposal, if there is one to take.
      *
@@ -2085,6 +2095,9 @@ async function convergeOnce(
       if (done || deletedOrders.has(order.id)) return
       if (!deadline && !fs.existsSync(plan.proposalPath)) return
       done = true
+      // The proposal is in, so the turn's terminal has nothing left to do. A
+      // follow-up resumes the conversation in a fresh one.
+      if (!deadline && architectSession !== null) runner.stop(architectSession)
       // The session is over either way, so it must not be resumed: `--resume`
       // on one the runtime has forgotten silently starts a fresh agent that
       // believes it is continuing.
@@ -2106,6 +2119,7 @@ async function convergeOnce(
         workspaceId: workspaceFor(api.workspace?.list() ?? [], checkout.origin),
         branch: checkout.branch,
         issue: issueOf(order),
+        title: 'Architect',
         prompt: plan.prompt,
         phase: 'architect' as never,
         resumeSessionId: plan.role.allowResume ? resumableIn(checkout.path, resuming) : undefined,
@@ -2130,6 +2144,7 @@ async function convergeOnce(
             summary: `refused ${tool}: ${reason}`,
           }),
         onRegistered: (run) => {
+          architectSession = run.sessionId
           rememberSession(run.sessionId)
           answer({ ok: true, sessionId: run.sessionId })
         },
@@ -2172,7 +2187,8 @@ async function readOnlyRound(input: {
   readonly prompt: (role: Role) => string
   readonly startedAction: string
   readonly startedReason: string
-  readonly onFinished: (order: WorkOrder | null) => Promise<void>
+  /** `anotherPass` is the red team asking to attack the fix for its findings. */
+  readonly onFinished: (order: WorkOrder | null, anotherPass?: boolean) => Promise<void>
   /** Stamped onto every fresh finding — only meaningful for the red team. */
   readonly round?: number
   /**
@@ -2230,6 +2246,7 @@ async function readOnlyRound(input: {
 
   let done = false
   let announced = false
+  let roundSession: string | null = null
   const announce = (subject: string): void => {
     if (announced) return
     announced = true
@@ -2241,6 +2258,8 @@ async function readOnlyRound(input: {
     if (done || deletedOrders.has(order.id)) return
     if (!deadline && !fs.existsSync(outputPath)) return
     done = true
+    // Read-only and one turn: once its file is in, the round is over.
+    if (!deadline && roundSession !== null) runner.stop(roundSession)
     const current = (await store.load(order.id)) ?? order
     const result = readRungOutput({
       order: current,
@@ -2261,7 +2280,7 @@ async function readOnlyRound(input: {
       return
     }
     await store.save(result.order)
-    await onFinished(result.order)
+    await onFinished(result.order, result.anotherPass)
   }
 
   void runner
@@ -2271,6 +2290,7 @@ async function readOnlyRound(input: {
       workspaceId: workspaceFor(api.workspace?.list() ?? [], checkout.origin),
       branch: checkout.branch,
       issue: issueOf(order),
+      title: agentTitle(roleId),
       prompt: input.prompt(role),
       phase: roleId,
       model: modelForTier(api, role.modelTier),
@@ -2286,7 +2306,10 @@ async function readOnlyRound(input: {
           author: 'console',
           summary: `refused ${tool}: ${reason}`,
         }),
-      onRegistered: (run) => announce(run.sessionId),
+      onRegistered: (run) => {
+        roundSession = run.sessionId
+        announce(run.sessionId)
+      },
       onTurnEnd: () => void collect(false),
       onEnd: () => void collect(true),
     })
@@ -2447,6 +2470,9 @@ export function activate(api: ExtensionAPI): void {
       executingOrders.has(orderId) ? [] : orphanedNodes(graph, isLiveSession).map((n) => n.id),
   }
 
+  const nextReviewRound = async (orderId: string): Promise<number> =>
+    nextRound(loopFacts(await createOrderStore(dataRoot()).entries(orderId)))
+
   /**
    * One architect turn, and the ones the Forge starts on its own after it.
    *
@@ -2506,13 +2532,33 @@ export function activate(api: ExtensionAPI): void {
           evidence: [],
         })
 
+        // The operator's "Hold for me" stops every automatic continuation,
+        // this one included — a redraft that just landed still saves, but
+        // nothing starts on its own from here until the operator releases it.
+        if (loopFacts(await store.entries(order.id)).heldAt !== null) return
+
         const next = followUpFor(compileOrder(outcome.order).failures, autoTurns)
         if (next === null) {
           // Nothing left the architect can close on its own by compiling again.
           // If the order is otherwise ready, the red team gets a round before
           // the operator ever sees it — the whole point of the loop.
           if (shouldReview(outcome.order)) {
-            await startReview(outcome.order, loopRound ?? 1, outcome.note)
+            // A fix turn is ready for hand-off unless the red team asked to see the fix.
+            if (
+              loopRound !== undefined &&
+              afterFix({
+                order: outcome.order,
+                anotherPass: anotherPassWanted(await store.entries(order.id)),
+              }) === 'hand-off'
+            ) {
+              sayReady(outcome.order)
+              return
+            }
+            await startReview(
+              outcome.order,
+              loopRound ?? (await nextReviewRound(order.id)),
+              outcome.note
+            )
           }
           return
         }
@@ -2576,13 +2622,16 @@ export function activate(api: ExtensionAPI): void {
       },
       startedAction: 'review.started',
       startedReason: `round ${round}`,
-      onFinished: async (updated) => {
+      onFinished: async (updated, anotherPass) => {
         // A refusal was already recorded by readOnlyRound — nothing more to
         // decide, and nowhere left for this round to go on its own.
         if (updated === null) return
 
         const store = createOrderStore(root)
-        const fresh = updated.redTeam.filter((f) => f.round === round)
+        // Only what is still open: a finding the architect already fixed or
+        // the operator already accepted this same round is not what the
+        // operator needs counted as still standing.
+        const fresh = updated.redTeam.filter((f) => f.round === round && f.status === 'open')
         const blocking = fresh.filter(isBlocking).length
         const notes = fresh.length - blocking
         await store.record({
@@ -2594,10 +2643,26 @@ export function activate(api: ExtensionAPI): void {
           reason: `round ${round}: ${blocking} blocking, ${notes} note${notes === 1 ? '' : 's'}`,
           evidence: [],
         })
+        if (anotherPass === true) {
+          await store.record({
+            at: new Date().toISOString(),
+            orderId: order.id,
+            actor: 'role:red-team',
+            action: 'review.another_pass',
+            subject: order.id,
+            reason: `round ${round} asked to review the fix`,
+            evidence: [],
+          })
+        }
+
+        // The operator's hold stops every automatic continuation this round
+        // could lead to — the next round, "ready", or a fix turn — the same
+        // as it stops a redraft's own follow-up.
+        if (loopFacts(await store.entries(order.id)).heldAt !== null) return
 
         const next = reviewNext({ order: updated, round })
         if (next.kind === 'clean') {
-          await handOff(updated)
+          sayReady(updated)
           return
         }
         if (next.kind === 'operator') {
@@ -2620,59 +2685,88 @@ export function activate(api: ExtensionAPI): void {
           )
           return
         }
-        await convergeWithFollowUps(updated, next.message, 0, round + 1)
+        // Recorded here, and not left to `convergeWithFollowUps`'s own
+        // finish-time bookkeeping: the loop's fix turn is `converge.started`,
+        // not `review.started`, and nothing recorded it starting at all —
+        // the Forge read the ledger and saw no turn running while an
+        // architect was in fact fixing the findings.
+        const started = await convergeWithFollowUps(updated, next.message, 0, round + 1)
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'role:architect',
+          action: started.ok ? 'converge.started' : 'converge.refused',
+          subject: started.ok ? started.sessionId : order.id,
+          reason: started.ok ? `red team round ${round} fix` : started.reason,
+          evidence: [],
+        })
       },
     })
   }
 
   /**
-   * A clean review round: hand off on its own, or say it is ready to.
-   *
-   * Opt-out, not opt-in (`terminator.foundry.autoHandOff` defaults on) — the
-   * whole point of arguing the order to a fixed point before the operator
-   * sees it is that they should not then have to click to move it along too.
+   * A clean review round says the order is ready and stops there. Hand-off is
+   * the operator's: nothing agrees an order or starts the Line on its own.
    */
-  const handOff = async (order: WorkOrder): Promise<void> => {
-    if (!autoHandOff(api)) {
-      api.notifications.showToast(
-        'info',
-        `${order.title} is ready to hand off.`,
-        `foundry.review.ready.${order.id}`
-      )
-      return
-    }
-    const agreed = (await forge.compile({ id: order.id, commit: true })) as {
-      error?: string
-      order?: { status: string }
-    }
-    const started =
-      agreed.order?.status === 'agreed'
-        ? ((await runs.start({ id: order.id })) as { error?: string; started?: boolean })
-        : null
-    if (started === null || started.error !== undefined || started.started === false) {
-      const reason =
-        agreed.error ?? started?.error ?? 'the order did not pass its checks when handed off'
-      await createOrderStore(dataRoot()).record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: 'rule:forge',
-        action: 'handoff.failed',
-        subject: order.id,
-        reason,
-        evidence: [],
-      })
-      api.notifications.showToast(
-        'warning',
-        `${order.title} was not handed off: ${reason}`,
-        `foundry.review.handoff.${order.id}`
-      )
-      return
-    }
+  const sayReady = (order: WorkOrder): void => {
     api.notifications.showToast(
       'info',
-      `${order.title} handed off.`,
-      `foundry.review.handoff.${order.id}`
+      `${order.title} is ready to hand off.`,
+      `foundry.review.ready.${order.id}`
     )
+  }
+
+  /**
+   * Releasing a hold picks the loop back up from wherever it would have gone
+   * on its own — the same three moves `onFinished` above already makes, just
+   * entered from "the operator let go" rather than "a turn just finished".
+   *
+   * A draft only, and only once nothing is already running: a hold recorded
+   * while nothing was in flight has nothing to resume, and one recorded over
+   * a running turn is released the moment that turn's own `onFinished` reads
+   * the ledger — starting a second thing here would race it.
+   */
+  const onReleased = (order: WorkOrder): void => {
+    void (async () => {
+      if (order.status !== 'draft') return
+      const store = createOrderStore(dataRoot())
+      const entries = await store.entries(order.id)
+      if (lastIntake(entries).kind === 'running') return
+
+      const next = afterRelease(order, {
+        loop: loopFacts(entries),
+        reviewedCurrentPlan: reviewedCurrentPlan(entries),
+      })
+      if (next.kind === 'review') {
+        await startReview(order, next.round, '')
+      } else if (next.kind === 'hand-off') {
+        sayReady(order)
+      } else if (next.kind === 'fix' || next.kind === 'follow-up') {
+        const started = await convergeWithFollowUps(
+          order,
+          next.message,
+          next.kind === 'fix' ? 0 : 1,
+          next.kind === 'fix' ? next.round + 1 : undefined
+        )
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: order.id,
+          actor: 'role:architect',
+          action: !started.ok
+            ? 'converge.refused'
+            : next.kind === 'fix'
+              ? 'converge.started'
+              : 'converge.followed_up',
+          subject: started.ok ? started.sessionId : order.id,
+          reason: !started.ok
+            ? started.reason
+            : next.kind === 'fix'
+              ? `red team round ${next.round} fix`
+              : 'closing the failing checks on its own',
+          evidence: [],
+        })
+      }
+    })()
   }
 
   /**
@@ -2813,6 +2907,7 @@ export function activate(api: ExtensionAPI): void {
       }
     },
     queueEntries: () => computeQueueEntries(api, dataRoot()),
+    onReleased,
   })
   // Your tickets, so a ticket can be picked rather than typed from memory.
   //
@@ -2875,6 +2970,8 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:order.writeBack', (payload) => forge.setWriteBack(payload))
   reg(api, 'foundry:order.budgets', (payload) => forge.setBudgets(payload))
   reg(api, 'foundry:order.cancel', (payload) => forge.cancel(payload))
+  reg(api, 'foundry:order.recipe', (payload) => forge.recipe(payload))
+  reg(api, 'foundry:order.hold', (payload) => forge.hold(payload))
 
   // Gone, rather than hidden.
   //
@@ -3313,16 +3410,6 @@ export function activate(api: ExtensionAPI): void {
     return { ok: true, selected: chosen }
   })
 
-  // Whether a clean review loop hands off on its own (spec: the red-team loop).
-  reg(api, 'foundry:auto-hand-off', () => ({ enabled: autoHandOff(api) }))
-
-  reg(api, 'foundry:auto-hand-off-set', (payload: unknown) => {
-    const { enabled } = payload as { enabled?: unknown }
-    if (typeof enabled !== 'boolean') return { error: 'enabled must be a boolean' }
-    api.settings.set(AUTO_HAND_OFF_SETTING_KEY, enabled)
-    return { ok: true, enabled }
-  })
-
   // The firings, and whether they were recorded or surfaced. Precision is
   // measured against these by hand before shadow mode is turned off.
   reg(api, 'foundry:stalls-list', () => ({
@@ -3642,6 +3729,13 @@ export function activate(api: ExtensionAPI): void {
             'Which rules are allowed to stop for you. Risk, budget, destructive actions and the merge decision are live at every setting — at lights-out they refuse rather than wait, because nobody is there to answer.',
           options: ['escorted', 'standard', 'lights-out'],
           default: 'standard',
+        },
+        'terminator.foundry.letAutoModeDecide': {
+          type: 'boolean',
+          label: 'Let auto mode decide',
+          description:
+            "On: a tool call Foundry's own rules have no opinion on is decided by Claude Code's auto mode, destructive actions included. Off: it waits for you. The escorted setting always asks you.",
+          default: true,
         },
         'terminator.foundry.budgets.agents': {
           type: 'number',

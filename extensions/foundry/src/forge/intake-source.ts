@@ -176,15 +176,18 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
     }
   }
 
+  // What the ticket already said done looks like. Not the architect's job
+  // done for it — coverage still runs both ways, so a criterion no unit
+  // satisfies fails the compile exactly as before. What this stops is an
+  // order seeded from a ticket with a heading called "Acceptance Criteria"
+  // opening with "No criteria yet", and its outcome with "Not stated yet".
+  const acceptance = acceptanceFromTicket(problem)
+  const outcome = acceptance.map((criterion) => `- ${criterion.statement}`).join('\n')
+
   const seeded: WorkOrder = {
     ...order,
-    intent: { ...order.intent, problem },
-    // What the ticket already said done looks like. Not the architect's job
-    // done for it — coverage still runs both ways, so a criterion no unit
-    // satisfies fails the compile exactly as before. What this stops is an
-    // order seeded from a ticket with a heading called "Acceptance Criteria"
-    // opening with "No criteria yet".
-    acceptance: acceptanceFromTicket(problem),
+    intent: { ...order.intent, problem, outcome },
+    acceptance,
     context: { ...order.context, toolchain, houseDocs, priorArt },
     plan: {
       ...order.plan,

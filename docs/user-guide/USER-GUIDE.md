@@ -663,51 +663,80 @@ the foot. **Discard** marks an order cancelled and keeps its records; **Delete**
 removes the order and everything it made — its ledger, its run graph, its
 checkout and its branch — and asks you to confirm that in as many words first.
 
-Inside the frame the order is **walked in steps**, one full-width screen each,
-with **Back** and **Next** at the bottom:
+Inside the frame the order is **walked in steps**. The box has four parts:
+
+- **The status strip** at the top says who holds the order right now and what
+  happens when they finish, for example **The red team is reviewing the plan ·
+  round 2 of 3 — When it finishes clean, you can hand off.** Foundry never
+  starts the work on its own: nothing builds until you press **Hand off**. Blue means Foundry is working and you don't need to do
+  anything. Orange means only you can decide something. Red means something
+  failed and needs a fix. Green means you can hand off, or the order has been
+  handed off.
+- **The step list** on the left. Every step has a word under it that says its
+  state: **Done**, **Reviewing, round 2 of 3**, **Needs you: 2 decisions**,
+  **Needs a fix**. Steps after one that is waiting on something stay numbered
+  until it clears.
+- **The open step** on the right.
+- **The bottom bar**: **Back**, a line saying why you can't move on yet, and
+  the way forward.
+
+The steps:
 
 1. **Intent** — the problem and the outcome the order is for.
 2. **Plan** — the acceptance criteria and how each is proven, the coverage
-   matrix, and the assumptions the architect made.
+   matrix, the assumptions the architect made, any question it needs you to
+   answer, and the budgets.
 3. **Red team** — what an adversarial pass found in the plan.
-4. **Shape** — the shape of work. Shown while the order is a draft.
+4. **Shape** — the shape of work.
 5. **Tracker** — what goes back to the issue. Shown only for an order seeded
    from a tracker issue.
-6. **Hand off** — the five checks, and **Compile & hand off**.
+6. **Hand off** — six rows that must all pass, and **Hand off**.
 
-Any step can be opened from the step list at any time. A step that is holding
-hand-off up shows a **cross** in place of its number, and a dot appears beside a
-step the architect's last turn redrew. An order opens where the next thing to
-do is: **Intent** if nothing is planned yet, otherwise the first step with a
-failing check, otherwise **Hand off**.
+Any step can be opened from the step list at any time. An order opens where the
+next thing to do is.
 
-**Needs you** is the band above the steps — **at most three questions**, ever,
-above everything else on the surface, because a question you have to go looking
-for is a question that does not get answered. The recommended answer is the
-filled button. Everything else Foundry decided is a **strikeable assumption** on
-the Plan step rather than a question — click it to strike it, and the parts of
+**Every button that can't be used says why.** Hover it, or move to it with Tab,
+and a tooltip gives the reason, for example "The red team is reviewing the plan
+(round 2 of 3, started 13:06:19). Hand-off opens when it finishes." Clicking it
+shows the same reason under the button.
+
+**Questions** the architect was less than 90% sure about appear on the Plan step
+under **Needs your answer**, and the status strip turns orange. The recommended
+answer is marked. Everything else Foundry decided is a **strikeable assumption**
+on the Plan step rather than a question. Click it to strike it, and the parts of
 the order that depended on it are redrawn.
 
 **Draft the plan** is the first thing to press, and it sits in the order's
 header on every step (it reads **Redraft** once there is a plan). Foundry seeds
 a draft with your problem statement and what it read in the repository; the
 architect turns that into criteria, units and a risk grade. It runs in
-a terminal you can watch, and it can only _propose_ — it cannot mark its own
+a terminal you can watch, and it can only _propose_. It cannot mark its own
 work agreed. Type into the box at the bottom of any step to tell it what is
-wrong, and it redrafts. **Attach**, beside it, takes you into the terminal the
-architect is working in — the same conversation, whether it is still running
-or you came back to it after a restart.
+wrong, and it redrafts. While someone is working, the header offers **Watch the
+architect** (or the red team, or the scout), which takes you into that
+terminal.
 
-**Five checks**, and it will not hand off until all five pass — no open
-questions, every acceptance criterion falsifiable, coverage complete in both
-directions, risk graded against _this_ plan, adversarial findings resolved.
-A failing check is shown at the top of the step that clears it, and all five
-are listed on **Hand off**. Each failure names the specific
-criterion, unit or question responsible, **and what to do about it**: either a
-button that takes you to the control that clears it — on its own step — or one
-that redrafts with the instruction the architect needs. Once you press one of
-those, the button becomes **Asked — the architect is working on it** until the
-redraft lands, and no other ask is offered in the meantime.
+**Foundry does most of the shaping on its own.** When a check fails that the
+architect can close, it gets up to two automatic turns to close it. While it
+works, the step shows **Being revised** in blue rather than a red cross, because
+nothing is wrong yet. Once the plan passes, the red team reviews it. Blocking
+findings go straight back to the architect. The order then hands off unless the
+red team asked to review the fix, or the architect left a blocking finding
+open, in which case the red team takes another look, up to three rounds. You
+only see orange when that loop stops: after three rounds without agreement, or
+when you press **Hold for me**.
+
+**Hold for me**, in the status strip while Foundry is working, stops it from
+starting anything else on its own. The turn already running finishes. **Let it
+continue** picks up where it would have gone.
+
+**Six rows** on the Hand off step, and it will not hand off until all six pass:
+no open questions, every criterion can be proven, plan and criteria cover each
+other, risk graded against _this_ plan, no blocking red-team findings, and
+nobody is changing the plan. A passing row says why it passed. A failing check
+also shows on the step that clears it, with what to do about it: either a
+button that takes you to the control that clears it, or one that redrafts with
+the instruction the architect needs.
 
 The one that catches people is **criteria falsifiable** on a change somebody
 can see: a plan that touches a `.tsx`, `.css` or `.html` file and has no
@@ -730,18 +759,26 @@ has already used, and won't accept less than what the run has already used.
 The new limit is saved to the order and the run resumes. You can tick **No
 limit** there as well.
 
-**Red team** findings are each cleared one of three ways. **Ask the architect**
-has it change the order so the finding no longer holds; a finding the checks can
-re-run, like an order that excludes nothing, closes itself when the redraft
-lands. **Fixed** marks it done yourself, and **Accept** keeps it at the cost of a
-written reason. Nothing hands off while one is open.
+**Red team** findings are grouped by who acts on them:
 
-**Shape** offers the shapes this repository can actually support, each with its
-whole description — one that cannot run here says which requirement it does not
-meet rather than quietly disappearing. Foundry proposes one and says why it
-chose it ("2 units of work", "graded P1, which is above the direct shape's
-ceiling"). Pick a different one in a click; the override is recorded alongside
-the proposal it replaced.
+- **The architect is fixing** — blocking findings a fix turn is handling now.
+  Nothing to do.
+- **Needs your decision** — blocking findings the loop left to you. Choose
+  **Ask the architect** (it changes the order so the finding no longer holds),
+  **Fix it…** (say how) or **Accept it** (keep it, with a written reason), then
+  **Send** at the bottom. Everything you decided goes in one turn.
+- **Notes, nothing to do** — findings that don't block hand-off: scope,
+  process, setup, or something already true before this change. The builder
+  sees them.
+- **Resolved** — collapsed.
+
+**Shape** offers every shape this repository can support, each with its whole
+description. A shape that can't run here is locked, and its tooltip names the
+requirement it doesn't meet. Foundry proposes one and says why. **You can pick
+a different shape at any time before hand-off, even while Foundry is working.**
+Your choice is saved to the order straight away, recorded in the ledger, and
+used by both your hand-off and the automatic one. The card shows **Your
+choice**, and **Use the proposal** goes back.
 
 Each shape also says how hard its agents think. `quick`, `spike`, `research`
 and `poc` run at `medium` effort; `direct`, `standard`, `bugfix`, `refactor`,
@@ -771,9 +808,14 @@ own decision) say where they were decided instead of counting as gaps.
 
 ![A work order in the Forge, open on its first step with the step list above it](screenshots/08b-foundry-forge.png)
 
-**Compile & hand off**, at the foot of the Hand off step, agrees the order and
-starts the work. If the run is held back because too much finished work is
-waiting for your review, **Start anyway** appears beside it.
+**Hand off**, at the foot of the Hand off step, agrees the order and starts the
+work with the shape it names (**Hand off with Direct**). Beside it, **Hand off on
+its own when clean** is the same setting as Settings → Foundry. When it is on,
+an order whose red-team round finds nothing blocking hands itself off, and the
+status strip says so in advance. Afterwards it says **Handed off automatically
+at 13:07:53**, and the ledger records that Foundry agreed it, not you. If the
+run is held back because too much finished work is waiting for your review,
+**Start anyway** appears beside it.
 
 In the list of orders, a row that is waiting on an answer says **"N waiting on
 you"** where the others say what is blocking them — so the count on the Forge
@@ -824,13 +866,21 @@ The debt is visible afterwards rather than only felt.
 Three settings, differing in which rules stop the line. Four things ask at
 every one of them, including the most permissive: before anything is merged,
 before a destructive action, when a budget is exceeded, and when the change
-turns out to carry real risk.
+turns out to carry real risk. With **Let auto mode decide** on, an agent's
+destructive tool call is the exception: auto mode decides it (below).
 
 Everything else depends on where the dial is. At **escorted** every action an
 agent takes waits for you. At **standard** and **lights-out** ordinary work
 inside the unit's own worktree is taken automatically and recorded — editing
 the files the unit was given, running the project's tests — and what reaches
 you is what the rules actually wanted a person for.
+
+**Let auto mode decide** (Settings → Foundry, on by default) answers the rest.
+At standard and lights-out, a tool call Foundry's own rules have no opinion
+on, such as a write outside the worktree, is decided by Claude Code's auto
+mode, and so is a destructive action: auto mode behaves exactly as it does in
+any other Claude Code session. Without it, the call waits five minutes for
+you. Escorted still asks about everything.
 
 "Destructive" is read generously: `rm`, a hard reset, `git clean`, a force
 push, deleting a branch, and anything the check cannot parse. A command it

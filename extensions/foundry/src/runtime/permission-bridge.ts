@@ -62,8 +62,11 @@ export interface PermissionBridgeOptions {
   /** Cleared when it has been answered, by the operator or the ladder. */
   onResolved: (requestId: string, decision: PermissionOutcome) => void
   now: () => number
-  /** The autonomy ladder. Returns null to abstain and let the operator decide. */
-  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
+  /**
+   * The autonomy ladder. Null abstains and asks the operator; `mode` leaves
+   * the call to Claude Code's own permission mode.
+   */
+  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | 'mode' | null
   /**
    * The ladder refused something, without asking anybody.
    *
@@ -279,6 +282,7 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
   return {
     canUseTool(toolName: string, input: unknown): Promise<HookDecision> {
       const auto = autoDecide?.(toolName, input) ?? null
+      if (auto === 'mode') return Promise.resolve({ permissionDecision: 'defer' })
       if (auto !== null) {
         // Resolved by the autonomy ladder — the operator is never interrupted,
         // and no prompt is raised for a surface to display.

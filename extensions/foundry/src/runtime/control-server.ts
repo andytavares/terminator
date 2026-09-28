@@ -37,7 +37,8 @@ import { randomBytes } from 'crypto'
  * `permissionDecisionReason`, not `systemMessage`.
  */
 export interface HookDecision {
-  permissionDecision: 'allow' | 'deny' | 'ask'
+  /** `defer` is no opinion: the hook answers nothing and the permission mode decides. */
+  permissionDecision: 'allow' | 'deny' | 'ask' | 'defer'
   /** Returned on allow; the agent proceeds with this rather than the original. */
   updatedInput?: unknown
   /** The only channel that carries words back to the agent. */

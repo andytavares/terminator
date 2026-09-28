@@ -935,7 +935,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                       // watching the run needs to read.
                       title={node.id}
                     >
-                      {view.labels?.[node.id] ?? node.role ?? 'this step'}
+                      <span className="fdry-unit-label">
+                        {view.labels?.[node.id] ?? node.role ?? 'this step'}
+                      </span>
                       <u>{gone ? 'stopped' : STATE_LABEL[node.state]}</u>
                       {reworks > 0 ? (
                         <span className="fdry-unit-rework">{`Sent back ${reworks}×`}</span>

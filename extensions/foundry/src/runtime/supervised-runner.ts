@@ -60,8 +60,10 @@ export interface StartSupervisedRunOptions {
   featureDir: string
   worktreePath: string
   workspaceId: string
-  /** The branch the worktree is on — names the project and the tab. */
+  /** The branch the worktree is on — names the project. */
   branch: string
+  /** What the tab is called: the agent, as a person names it ("Red team"). */
+  title: string
   /** The order's ticket, linked to the project (ADR-061). */
   issue?: { tracker: 'linear' | 'jira'; key: string }
   /** What to tell the agent: a `/speckit-*` command, or a reply to it. */
@@ -79,7 +81,7 @@ export interface StartSupervisedRunOptions {
    */
   addDirs?: string[]
   /** Decides without asking when the autonomy ladder allows it. */
-  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
+  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | 'mode' | null
   /** The ladder refused something without asking. Only refusals are reported. */
   onAutoDenied?: (toolName: string, reason: string) => void
   onPending: (pending: PendingPermission) => void
@@ -355,7 +357,11 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     return file
   }
 
-  function end(sessionId: string): void {
+  /**
+   * `clean` closes the tab: a finished agent's terminal is a shell nobody
+   * needs. A failed one stays open so the operator can read why.
+   */
+  function end(sessionId: string, clean: boolean): void {
     const run = running.get(sessionId)
     if (run === undefined) return
     running.delete(sessionId)
@@ -364,6 +370,9 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     // unresolved promise holds the agent's tool call open forever.
     run.bridge.rejectAll('This run has ended')
     run.release()
+    // Last and optional: an installed host older than `closeTerminalTab`
+    // threw here and skipped everything after it.
+    if (clean) api.pty.closeTerminalTab?.(run.terminalSessionId)
   }
 
   return {
@@ -432,7 +441,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
             return
           }
           phase.current.onEnd?.(0)
-          end(sessionId)
+          end(sessionId, true)
         },
       })
 
@@ -453,7 +462,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       const terminalSessionId = api.pty.openTerminalTab({
         projectId: project.id,
         cwd: start.worktreePath,
-        tabTitle: start.branch,
+        tabTitle: start.title,
         type: 'agent',
       })
       if (terminalSessionId === null) {
@@ -470,7 +479,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       const detachExit =
         api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
           phase.current.onEnd?.(exitCode)
-          end(sessionId)
+          end(sessionId, exitCode === 0)
         }) ?? null
 
       running.set(sessionId, {
@@ -562,8 +571,14 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
 
       return new Promise((resolve) => {
         // The shell exits with the command's status, so the tab's own exit is
-        // the verdict. It stays open, exited, as the record of what ran.
-        api.pty.onExit?.(terminalSessionId, (exitCode: number) => resolve(exitCode))
+        // the verdict. A failure stays open, exited, as the record of what
+        // ran; a pass closes, and its output is in the log. The verdict goes
+        // first and the close is optional: an installed host older than
+        // `closeTerminalTab` threw here, and the pass never reached the run.
+        api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
+          resolve(exitCode)
+          if (exitCode === 0) api.pty.closeTerminalTab?.(terminalSessionId)
+        })
         const script = writeCommandScript(randomUUID(), options.command, options.logPath)
         api.pty.write(
           terminalSessionId,
@@ -663,7 +678,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     },
 
     dispose(): void {
-      for (const sessionId of [...running.keys()]) end(sessionId)
+      for (const sessionId of [...running.keys()]) end(sessionId, false)
     },
   }
 }
