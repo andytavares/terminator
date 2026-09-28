@@ -1389,6 +1389,12 @@ App
   in a terminal tab of its own in the lane's checkout
   (`SupervisedRunner.runCommand`): its output is visible, and its verdict is
   the tab's exit status, with no agent in between (ADR 059).
+- **It closes the tabs it opens (ADR 076).** A tab is titled for its agent
+  ("Architect", "Red team", "Builder") or its check ("Lint"). An agent is
+  stopped once its turn's output is collected, and `SupervisedRunner` closes a
+  tab through `pty.closeTerminalTab` when its run or command ends cleanly. A
+  failed one stays open, exited, so its output can be read. A later node in the
+  lane resumes the conversation in a fresh tab.
 - All `foundry:*` IPC channels are extension-owned. The core app has no
   knowledge of them: delete `extensions/foundry/` and core still builds.
 

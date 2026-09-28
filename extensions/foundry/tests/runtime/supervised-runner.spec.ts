@@ -23,6 +23,7 @@ let terminalId: string | null
 let projectId: string | null
 let exitListener: ((exitCode: number) => void) | null
 let exitDetached: boolean
+let closed: string[]
 
 function api() {
   return {
@@ -38,6 +39,7 @@ function api() {
         return terminalId
       },
       write: (terminal: string, data: string) => written.push({ terminal, data }),
+      closeTerminalTab: (terminal: string) => closed.push(terminal),
       onExit: (_sessionId: string, listener: (exitCode: number) => void) => {
         exitListener = listener
         return () => {
@@ -77,6 +79,7 @@ const start = {
   worktreePath: '/wt/feat-thing',
   workspaceId: 'ws-1',
   branch: 'feat/thing',
+  title: 'Builder',
   prompt: '/speckit-implement',
   phase: 'implement' as never,
   onPending: () => {},
@@ -93,6 +96,7 @@ beforeEach(async () => {
   projectId = 'project-1'
   exitListener = null
   exitDetached = false
+  closed = []
 })
 
 afterEach(async () => {
@@ -121,7 +125,7 @@ describe('starting a supervised run', () => {
     expect(opened[0]).toMatchObject({
       projectId: 'project-1',
       cwd: '/wt/feat-thing',
-      tabTitle: 'feat/thing',
+      tabTitle: 'Builder',
       type: 'agent',
     })
   })
@@ -338,6 +342,13 @@ describe('taking a run over, or ending it', () => {
     expect(r.terminalFor(run?.sessionId ?? '')).toBeNull()
   })
 
+  it('closes the tab once the conversation has ended, rather than leaving a shell behind', async () => {
+    const r = runner()
+    const run = await r.start(start)
+    await report(run?.sessionId ?? '', 'session_end')
+    expect(closed).toEqual(['terminal-1'])
+  })
+
   it('stops answering the agent once disposed, rather than holding a call open', async () => {
     const r = runner()
     const run = await r.start(start)
@@ -383,6 +394,18 @@ describe('when the terminal itself goes', () => {
     const run = await r.start(start)
     exitListener?.(0)
     expect(r.watchable().map((w) => w.sessionId)).not.toContain(run?.sessionId)
+  })
+
+  it('closes the tab of a run that ended cleanly, so finished agents do not pile up', async () => {
+    await runner().start(start)
+    exitListener?.(0)
+    expect(closed).toEqual(['terminal-1'])
+  })
+
+  it('keeps the tab of a run that failed, so the operator can read why', async () => {
+    await runner().start(start)
+    exitListener?.(137)
+    expect(closed).toEqual([])
   })
 
   it('stops listening once the run is over', async () => {
@@ -765,6 +788,22 @@ describe('running one command in a terminal, with no agent', () => {
     expect(launchScriptBody()).toContain('npm run lint')
     expect(written.map((w) => w.data).join('')).toMatch(/; exit \$\?\r$/)
     expect(launchScriptBody()).not.toContain('claude')
+  })
+
+  it('closes the tab of a command that passed', async () => {
+    const pending = runner().runCommand(command)
+    await Promise.resolve()
+    exitListener!(0)
+    await pending
+    expect(closed).toEqual(['terminal-1'])
+  })
+
+  it('keeps the tab of a command that failed, with its output on screen', async () => {
+    const pending = runner().runCommand(command)
+    await Promise.resolve()
+    exitListener!(1)
+    await pending
+    expect(closed).toEqual([])
   })
 
   it("resolves with the terminal's exit status, a failure as much as a pass", async () => {

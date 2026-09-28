@@ -78,6 +78,7 @@ import type { EffortLevel, Recipe, Role } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
 import { collectableWrites, readRungOutput, rungOutputPath } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
+import { agentTitle } from './runtime/agent-title.js'
 import { resolveRole } from './recipe/resolve.js'
 import {
   MAX_REVIEW_ROUNDS,
@@ -1505,6 +1506,7 @@ async function buildExecutorDeps(
           workspaceId: workspaceOf(checkout),
           branch: checkout.branch,
           issue: issueOf(order),
+          title: agentTitle(input.role ?? input.node.stepId),
           prompt: input.prompt,
           phase: (input.role ?? input.node.id) as never,
           resumeSessionId: input.resumeSessionId,
@@ -1619,6 +1621,10 @@ async function buildExecutorDeps(
             // whether it was is the verifier's to say and the ladder's to
             // measure, never the producing agent's (FR-033).
             finish(0)
+            // Nothing types into it again: a later node in the lane resumes
+            // the conversation in a fresh tab. Left at its prompt, every
+            // finished node kept a terminal and a process open.
+            supervisedRunner?.stop(sessionId)
           },
         })
         .then((run) => {
@@ -1787,7 +1793,7 @@ async function buildExecutorDeps(
           workspaceId: workspaceOf(checkout),
           branch: checkout.branch,
           issue: issueOf(order),
-          title: input.title,
+          title: agentTitle(input.title),
           command: input.command,
           logPath: input.logPath,
         })
@@ -2078,6 +2084,7 @@ async function convergeOnce(
       resolve(started)
     }
     let done = false
+    let architectSession: string | null = null
     /**
      * Take the proposal, if there is one to take.
      *
@@ -2092,6 +2099,9 @@ async function convergeOnce(
       if (done || deletedOrders.has(order.id)) return
       if (!deadline && !fs.existsSync(plan.proposalPath)) return
       done = true
+      // The proposal is in, so the turn's terminal has nothing left to do. A
+      // follow-up resumes the conversation in a fresh one.
+      if (!deadline && architectSession !== null) runner.stop(architectSession)
       // The session is over either way, so it must not be resumed: `--resume`
       // on one the runtime has forgotten silently starts a fresh agent that
       // believes it is continuing.
@@ -2113,6 +2123,7 @@ async function convergeOnce(
         workspaceId: workspaceFor(api.workspace?.list() ?? [], checkout.origin),
         branch: checkout.branch,
         issue: issueOf(order),
+        title: 'Architect',
         prompt: plan.prompt,
         phase: 'architect' as never,
         resumeSessionId: plan.role.allowResume ? resumableIn(checkout.path, resuming) : undefined,
@@ -2137,6 +2148,7 @@ async function convergeOnce(
             summary: `refused ${tool}: ${reason}`,
           }),
         onRegistered: (run) => {
+          architectSession = run.sessionId
           rememberSession(run.sessionId)
           answer({ ok: true, sessionId: run.sessionId })
         },
@@ -2238,6 +2250,7 @@ async function readOnlyRound(input: {
 
   let done = false
   let announced = false
+  let roundSession: string | null = null
   const announce = (subject: string): void => {
     if (announced) return
     announced = true
@@ -2249,6 +2262,8 @@ async function readOnlyRound(input: {
     if (done || deletedOrders.has(order.id)) return
     if (!deadline && !fs.existsSync(outputPath)) return
     done = true
+    // Read-only and one turn: once its file is in, the round is over.
+    if (!deadline && roundSession !== null) runner.stop(roundSession)
     const current = (await store.load(order.id)) ?? order
     const result = readRungOutput({
       order: current,
@@ -2279,6 +2294,7 @@ async function readOnlyRound(input: {
       workspaceId: workspaceFor(api.workspace?.list() ?? [], checkout.origin),
       branch: checkout.branch,
       issue: issueOf(order),
+      title: agentTitle(roleId),
       prompt: input.prompt(role),
       phase: roleId,
       model: modelForTier(api, role.modelTier),
@@ -2294,7 +2310,10 @@ async function readOnlyRound(input: {
           author: 'console',
           summary: `refused ${tool}: ${reason}`,
         }),
-      onRegistered: (run) => announce(run.sessionId),
+      onRegistered: (run) => {
+        roundSession = run.sessionId
+        announce(run.sessionId)
+      },
       onTurnEnd: () => void collect(false),
       onEnd: () => void collect(true),
     })
