@@ -44,6 +44,19 @@ describe('raiseGate', () => {
     expect(g.defaultIfIgnored).toBe('hold')
   })
 
+  it('offers to fix a check that already fails on the base branch', () => {
+    const g = gate({ rule: 'verify.base-fail' })
+    expect(g.options.map((o) => o.id)).toEqual(['fix_first', 'accept_debt', 'hold'])
+    expect(g.defaultIfIgnored).toBe('hold')
+    expect(ruleInWords('verify.base-fail')).toBe('a check that already fails on the base branch')
+  })
+
+  it('drops an omitted option, and refuses to drop the default', () => {
+    const g = gate({ rule: 'verify.repeat-fail', omitOptions: ['send_back'] })
+    expect(g.options.map((o) => o.id)).toEqual(['take_over', 'accept_debt', 'hold'])
+    expect(() => gate({ rule: 'verify.repeat-fail', omitOptions: ['hold'] })).toThrow(/hold/)
+  })
+
   it('refuses a gate that cannot say why it exists', () => {
     expect(() => gate({ why: '   ' })).toThrow(UnattributedGateError)
   })
@@ -149,6 +162,7 @@ describe('autonomy', () => {
   it('asks about a repeat failure and a new dependency at standard, and not at lights-out', () => {
     for (const rule of [
       'verify.repeat-fail',
+      'verify.base-fail',
       'new-dependency',
       'critical-path',
       'forge-defect',
