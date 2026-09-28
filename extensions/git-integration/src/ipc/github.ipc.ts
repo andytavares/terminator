@@ -43,6 +43,7 @@ import {
 import { analysePr } from '../review/analyse.js'
 import { applyReadingOrder } from '../review/apply-reading-order.js'
 import { findTestReferencesInRepo } from '../review/test-references.js'
+import { findTestLocations, symbolsForBlock } from '../review/test-locations.js'
 
 type RegisterFn = (
   channel: string,
@@ -1040,6 +1041,22 @@ export function registerGithubHandlers(
       }
       return catchError(e)
     }
+  })
+
+  register('github:tests-for-block', async (payload) => {
+    const schema = z.object({
+      repoRoot: z.string().min(1),
+      headSHA: z.string().min(1),
+      path: z.string().min(1),
+      code: z.string(),
+      hunkHeader: z.string().optional(),
+    })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, headSHA, path, code, hunkHeader } = parsed.data
+    const symbols = await symbolsForBlock(path, code, hunkHeader)
+    const locations = await findTestLocations(repoRoot, headSHA, symbols, runGit)
+    return { symbols, locations }
   })
 
   // ─── Clone for diff-only review (uncloned PRs) ─────────────────────────────

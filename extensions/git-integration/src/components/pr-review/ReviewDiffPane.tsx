@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { ViewMenu } from './ViewMenu'
 import { UsesPopover } from './UsesPopover'
+import { TestsPopover, type TestBlock } from './TestsPopover'
 import { InlineCommentThread } from './InlineCommentThread'
 import { RichContent } from './RichContent'
 import { CommentComposer } from './CommentComposer'
@@ -68,6 +69,8 @@ export function ReviewDiffPane({
     null
   )
   const [expandedMoved, setExpandedMoved] = useState<Set<string>>(new Set())
+  const [testsFor, setTestsFor] = useState<{ anchor: string; block: TestBlock } | null>(null)
+  const [pendingJump, setPendingJump] = useState<{ path: string; line: number } | null>(null)
   const lineDragRef = useRef<{
     active: boolean
     side: 'LEFT' | 'RIGHT' | null
@@ -600,6 +603,70 @@ export function ReviewDiffPane({
     [pr.chapters, setCurrentChapter, setCurrentFile]
   )
 
+  const prPaths = useMemo(
+    () => new Set(pr.chapters.flatMap((c) => c.files.map((f) => f.path))),
+    [pr.chapters]
+  )
+
+  const openTests = (anchor: string, code: string, hunkHeader?: string) =>
+    setTestsFor({
+      anchor,
+      block: { repoRoot, headSHA: pr.headSHA, path: file.path, code, hunkHeader },
+    })
+
+  const openTestInReview = (path: string, line: number) => {
+    setPendingJump({ path, line })
+    goToPath(path)
+  }
+
+  useEffect(() => {
+    if (!pendingJump || !diff || pendingJump.path !== file.path) return
+    scrollRef.current
+      ?.querySelector<HTMLElement>(`[data-new-line="${pendingJump.line}"]`)
+      ?.scrollIntoView({ block: 'center' })
+    setPendingJump(null)
+  }, [pendingJump, diff, file.path])
+
+  const hunkCode = (lines: Array<{ type: string; content: string }>) =>
+    lines
+      .filter((l) => l.type !== 'remove')
+      .map((l) => l.content)
+      .join('\n')
+
+  const selectionCode = (sel: { side: 'LEFT' | 'RIGHT'; startLine: number; endLine: number }) =>
+    (diff?.hunks ?? [])
+      .flatMap((h) => h.lines)
+      .filter((l) => {
+        const n = sel.side === 'LEFT' ? l.oldLineNumber : l.newLineNumber
+        return n != null && n >= sel.startLine && n <= sel.endLine
+      })
+      .map((l) => l.content)
+      .join('\n')
+
+  const testsButton = (anchor: string, code: string, hunkHeader?: string) => (
+    <>
+      <button
+        type="button"
+        className="rs-hunk-tests"
+        onClick={(e) => {
+          e.stopPropagation()
+          openTests(anchor, code, hunkHeader)
+        }}
+        aria-label="Jump to the tests for this block"
+      >
+        Tests
+      </button>
+      {testsFor?.anchor === anchor && (
+        <TestsPopover
+          block={testsFor.block}
+          prPaths={prPaths}
+          onOpenInReview={openTestInReview}
+          onClose={() => setTestsFor(null)}
+        />
+      )}
+    </>
+  )
+
   const closeComposer = () => setComposerAnchor(null)
 
   const saveNote = () => {
@@ -624,8 +691,9 @@ export function ReviewDiffPane({
         selection.endLine === lineNum &&
         !lineDragRef.current.active && (
           <tr>
-            <td colSpan={5}>
+            <td colSpan={5} className="rs-hunk-anchor">
               <SelectionBar
+                onTests={() => openTests('selection', selectionCode(selection))}
                 onAskAgent={() =>
                   openAgentPanel(
                     {
@@ -665,6 +733,14 @@ export function ReviewDiffPane({
                   })
                 }
               />
+              {testsFor?.anchor === 'selection' && (
+                <TestsPopover
+                  block={testsFor.block}
+                  prPaths={prPaths}
+                  onOpenInReview={openTestInReview}
+                  onClose={() => setTestsFor(null)}
+                />
+              )}
             </td>
           </tr>
         )}
@@ -930,8 +1006,9 @@ export function ReviewDiffPane({
                   <table className="diff-table diff-table--review">
                     <tbody>
                       <tr>
-                        <td colSpan={5} className="diff-hunk-header">
+                        <td colSpan={5} className="diff-hunk-header rs-hunk-anchor">
                           {hunk.header}
+                          {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
                         </td>
                       </tr>
                       {hunk.lines.map((line, li) => {
@@ -1038,7 +1115,10 @@ export function ReviewDiffPane({
                   </table>
                 ) : (
                   <div className="diff-split-hunk">
-                    <div className="diff-split-header">{hunk.header}</div>
+                    <div className="diff-split-header rs-hunk-anchor">
+                      {hunk.header}
+                      {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
+                    </div>
                     {buildSplitRows(hunk.lines).map((row, ri) => {
                       const leftLine = row.kind === 'context' ? row.line : row.oldLine
                       const rightLine = row.kind === 'context' ? row.line : row.newLine

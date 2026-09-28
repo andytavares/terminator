@@ -1094,6 +1094,72 @@ describe('ReviewDiffPane', () => {
     })
   })
 
+  describe('jump to the tests for a block', () => {
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,2 +1,2 @@ export function foo(',
+          lines: [
+            { type: 'remove' as const, content: 'old()', oldLineNumber: 1, newLineNumber: null },
+            { type: 'add' as const, content: 'next()', oldLineNumber: null, newLineNumber: 1 },
+            { type: 'context' as const, content: 'done()', oldLineNumber: 2, newLineNumber: 2 },
+          ],
+        },
+      ],
+    }
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn()
+    })
+
+    it('searches the tests with the hunk as it reads after the change', async () => {
+      mockPrFileDiff.mockResolvedValue({ diff })
+      mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+        if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
+        if (channel === 'github:tests-for-block')
+          return Promise.resolve({ symbols: ['foo'], locations: [] })
+        return Promise.resolve({})
+      })
+      await renderPane()
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Jump to the tests for this block' })
+      )
+      await waitFor(() =>
+        expect(mockInvoke).toHaveBeenCalledWith('github:tests-for-block', {
+          repoRoot: '/repo',
+          headSHA: mockPr.headSHA,
+          path: 'src/foo.ts',
+          code: 'next()\ndone()',
+          hunkHeader: '@@ -1,2 +1,2 @@ export function foo(',
+        })
+      )
+      expect(await screen.findByText('No test mentions foo.')).toBeTruthy()
+    })
+
+    it('opens a test in the PR at its line', async () => {
+      mockPrFileDiff.mockResolvedValue({ diff })
+      mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+        if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
+        if (channel === 'github:tests-for-block')
+          return Promise.resolve({
+            symbols: ['foo'],
+            locations: [{ path: 'src/foo.ts', line: 2, symbol: 'foo', text: 'done()' }],
+          })
+        return Promise.resolve({})
+      })
+      await renderPane()
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Jump to the tests for this block' })
+      )
+      fireEvent.click(await screen.findByRole('button', { name: /src\/foo\.ts:2/ }))
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('src/foo.ts')
+      const row = document.querySelector('[data-new-line="2"]') as HTMLElement
+      await waitFor(() => expect(row.scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+    })
+  })
+
   describe('keyboard events (REVIEW_KEY_EVENTS)', () => {
     const twoHunkDiff = {
       path: 'src/foo.ts',
