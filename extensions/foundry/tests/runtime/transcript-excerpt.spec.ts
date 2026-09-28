@@ -39,8 +39,8 @@ describe('the tail of a conversation', () => {
       })
     )
     expect(readTranscriptTail(file)).toEqual([
-      { role: 'user', text: 'do the thing', at: Date.parse('2026-07-27T10:00:00Z') },
-      { role: 'assistant', text: 'on it', at: Date.parse('2026-07-27T10:00:05Z') },
+      { role: 'user', kind: 'text', text: 'do the thing', at: Date.parse('2026-07-27T10:00:00Z') },
+      { role: 'assistant', kind: 'text', text: 'on it', at: Date.parse('2026-07-27T10:00:05Z') },
     ])
   })
 
@@ -59,8 +59,71 @@ describe('the tail of a conversation', () => {
       })
     )
     expect(readTranscriptTail(file).map((l) => l.text)).toEqual([
-      'Tests pass; checking the lint next.\nBash: npm run lint',
+      'Tests pass; checking the lint next.',
+      'Bash: npm run lint',
     ])
+  })
+
+  it('gives a message with text and two tool calls three lines, a call being its own kind', () => {
+    write(
+      line({
+        type: 'assistant',
+        timestamp: '2026-07-27T10:00:05Z',
+        message: {
+          content: [
+            { type: 'text', text: 'looking' },
+            { type: 'tool_use', name: 'Read', input: { file_path: '/repo/a.ts' } },
+            { type: 'tool_use', name: 'Bash', input: { command: 'npm test' } },
+          ],
+        },
+      })
+    )
+    const at = Date.parse('2026-07-27T10:00:05Z')
+    expect(readTranscriptTail(file)).toEqual([
+      { role: 'assistant', kind: 'text', text: 'looking', at },
+      { role: 'assistant', kind: 'tool', text: 'Read: /repo/a.ts', at },
+      { role: 'assistant', kind: 'tool', text: 'Bash: npm test', at },
+    ])
+  })
+
+  it('reads string content as one text line', () => {
+    write(line({ type: 'user', timestamp: '2026-07-27T10:00:00Z', message: { content: 'hi' } }))
+    expect(readTranscriptTail(file).map((l) => [l.kind, l.text])).toEqual([['text', 'hi']])
+  })
+
+  it('skips blocks with nothing to show, and a message made only of them', () => {
+    write(
+      line({
+        type: 'assistant',
+        timestamp: '2026-07-27T10:00:05Z',
+        message: {
+          content: [
+            { type: 'text', text: '' },
+            { type: 'text', text: '  ' },
+            { type: 'image' },
+            { type: 'tool_use', input: {} },
+          ],
+        },
+      })
+    )
+    expect(readTranscriptTail(file)).toEqual([])
+  })
+
+  it('counts the limit in lines, so a message with many blocks can be cut part way', () => {
+    write(
+      line({
+        type: 'assistant',
+        timestamp: '2026-07-27T10:00:05Z',
+        message: {
+          content: [
+            { type: 'text', text: 'one' },
+            { type: 'text', text: 'two' },
+            { type: 'text', text: 'three' },
+          ],
+        },
+      })
+    )
+    expect(readTranscriptTail(file, 2).map((l) => l.text)).toEqual(['two', 'three'])
   })
 
   it('summarises a tool call rather than printing all of its arguments', () => {
@@ -81,8 +144,9 @@ describe('the tail of a conversation', () => {
         },
       })
     )
-    const text = readTranscriptTail(file)[0].text
-    expect(text.startsWith('checking\nBash: xxx')).toBe(true)
+    const [, call] = readTranscriptTail(file)
+    const text = call.text
+    expect(text.startsWith('Bash: xxx')).toBe(true)
     expect(text.length).toBeLessThan(200)
     expect(text.endsWith('\u2026')).toBe(true)
   })
