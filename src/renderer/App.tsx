@@ -36,6 +36,7 @@ import { useSettingsStore } from './stores/settings.store'
 import { useIntegrationsStore } from './stores/integrations.store'
 import { useSessionRecordsStore } from './stores/session-records.store'
 import { useSessionStore } from './stores/session.store'
+import { useTerminalOpenErrorStore } from './stores/terminal-open-error.store'
 import { useSessionFacts, useIssue } from './components/session/useSessionFacts'
 import { SessionLinkDialog } from './components/session/SessionLinkDialog'
 import { useTerminalSession } from './hooks/useTerminalSession'
@@ -729,6 +730,10 @@ export function App(): JSX.Element {
     if (activeProjectId) setScratchActive(false)
   }, [activeProjectId])
 
+  const openRetry = useTerminalOpenErrorStore((s) =>
+    activeProjectId ? (s.retries[activeProjectId] ?? 0) : 0
+  )
+
   // Auto-open a terminal whenever the Terminal tab is active and has no sessions.
   // Covers: first project selection, switching back from an extension tab, all sessions closed.
   useEffect(() => {
@@ -736,11 +741,17 @@ export function App(): JSX.Element {
     if (getSessionsForProject(activeProjectId).length > 0) return
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
-    void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit).catch(
-      () => {}
+    const projectId = activeProjectId
+    createSession(projectId, 'human', '', cwd, settings.terminal.scrollbackLimit).then(
+      () => useTerminalOpenErrorStore.getState().clearError(projectId),
+      (err: unknown) =>
+        useTerminalOpenErrorStore
+          .getState()
+          .setError(projectId, err instanceof Error ? err.message : String(err))
     )
   }, [
     activeProjectId,
+    openRetry,
     activeProjectTabId,
     activeWorkspaceId,
     resolveActiveCwd,

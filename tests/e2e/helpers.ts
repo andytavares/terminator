@@ -209,7 +209,8 @@ export async function addAndSelectProject(
   // Clicking the row selects the branch; the app's auto-open effect gives it
   // its first terminal, which now shows in the tab bar rather than the sidebar.
   await row.click()
-  await page.waitForSelector('.tab-bar__tab--session', { timeout: 15000 })
+  // Session tabs carry no role; the mounted terminal's input is the accessible sign a session opened.
+  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor({ timeout: 15000 })
 }
 
 /** Re-select an existing branch. */
