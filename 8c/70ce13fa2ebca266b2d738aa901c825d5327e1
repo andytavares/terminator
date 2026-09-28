@@ -1,0 +1,31 @@
+src/renderer/App.tsx
+  s_758accd35244c9::t_907ccc9a6d56f3 39,733-736,744-750,754
+src/renderer/components/terminal/TerminalPane.css
+  s_758accd35244c9::t_56556767a404b3 92-100
+src/renderer/components/terminal/TerminalPane.tsx
+  s_758accd35244c9::t_b4acc0efec45bf 4,30-33,36,39-42,129-142
+src/renderer/stores/terminal-open-error.store.ts
+  s_758accd35244c9::t_bd8b524b260402 1-28
+tests/e2e/helpers.ts
+  s_758accd35244c9::t_3dee7b3c1f229f 212-213
+tests/unit/renderer/App.spec.tsx
+  s_758accd35244c9::t_6e20997af73c9b 9,1468-1498
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_758accd35244c9::t_2226d57026741f 5,104,114-138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8c70ce13fa2ebca266b2d738aa901c825d5327e1",
+  "prompts": {},
+  "sessions": {
+    "s_758accd35244c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "677bbf2b-2f6f-42d0-88f3-37be127e815d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
