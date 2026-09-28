@@ -1,0 +1,30 @@
+tests/unit/extensions/api-supervised-runs.spec.ts
+  s_802dfa88127b4f::t_e8ef30f249a406 272-276
+  s_802dfa88127b4f::t_56c2e3b5a6e2c3 68,75,77,268-271,277-284
+  s_802dfa88127b4f::t_f0f829f9787947 285
+src/renderer/App.tsx
+  s_802dfa88127b4f::t_d2358943531cbc 928-933
+  s_802dfa88127b4f::t_1ffbb47d1af18a 927
+src/main/extensions/api.ts
+  s_802dfa88127b4f::t_d2358943531cbc 188-192,1190-1197
+  s_802dfa88127b4f::t_62d8e8ff8cc7c8 1198
+docs/EXTENSION-DEVELOPMENT.md
+  s_802dfa88127b4f::t_c027fbc8f1590c 5,630-642
+  s_802dfa88127b4f::t_dd6e279c666203 643
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "06f9dd0bf641274818f3922c97e998dcae6f75f5",
+  "prompts": {},
+  "sessions": {
+    "s_802dfa88127b4f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5145f198-b891-4bb6-b8e6-02de60b65ef8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
