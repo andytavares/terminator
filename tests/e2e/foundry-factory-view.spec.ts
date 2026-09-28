@@ -401,6 +401,44 @@ test.describe('a real hall', () => {
 
     await captureFoundry(handle, 'foundry-factory-hall.png')
 
+    // A station opens as a monitor: its heading and its transcript are there
+    // by role. `build:lane1` is orphaned, so its tube says the line is dead.
+    expect(await clickByName(handle, 'button', 'builder, builder, no agent')).toBe(true)
+    await expect
+      .poll(
+        () =>
+          inFoundry<boolean>(
+            handle,
+            `(function () {
+    var monitor = document.querySelector('section[aria-labelledby]')
+    if (!monitor || !monitor.querySelector('button[aria-label="Close monitor"]')) return false
+    var heading = document.getElementById(monitor.getAttribute('aria-labelledby'))
+    var log = monitor.querySelector('[role="log"][aria-label="Transcript"]')
+    return !!heading && heading.tagName === 'H3' && heading.textContent === 'BUILDER' && !!log && log.textContent.indexOf('NO CARRIER') !== -1
+  })()`
+          ),
+        { timeout: 15_000 }
+      )
+      .toBe(true)
+    // The power-on takes 0.42s: wait for the tube to finish opening before the picture.
+    await expect
+      .poll(
+        () =>
+          inFoundry<boolean>(
+            handle,
+            `document.querySelector('section[aria-labelledby] > div').getAnimations().length === 0`
+          ),
+        { timeout: 10_000 }
+      )
+      .toBe(true)
+    await captureFoundry(handle, 'foundry-station-monitor.png')
+    expect(await clickByName(handle, 'button', 'Close monitor')).toBe(true)
+    await expect
+      .poll(() => inFoundry<boolean>(handle, `!document.querySelector('[role="log"]')`), {
+        timeout: 10_000,
+      })
+      .toBe(true)
+
     // The recording plays back in the same hall.
     expect(await clickByName(handle, 'button', 'Replay')).toBe(true)
     await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain('Back to live')

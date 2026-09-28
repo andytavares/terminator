@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowLeft, History, Pause, Play, Radio, ShieldQuestion, Terminal, X } from 'lucide-react'
+import { ArrowLeft, History, Pause, Play, Radio, ShieldQuestion, Terminal } from 'lucide-react'
 import { useRunObservation } from '../../renderer/use-run-observation.js'
 import type { FloorView, PendingAsk } from '../../renderer/use-run-observation.js'
 import { layoutHall } from '../../factory/layout.js'
@@ -16,6 +16,8 @@ import type { ReplayClock, Timeline } from '../../factory/replay.js'
 import type { Gate } from '../../gates/rules.js'
 import type { OrderMetrics } from '../../factory/metrics.js'
 import { HallScene } from './HallScene.js'
+import { StationMonitor } from './StationMonitor.js'
+import type { MonitorStatus } from './StationMonitor.js'
 import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
@@ -42,6 +44,9 @@ export interface FactoryHallProps {
 
 /** Same cadence as the run observation, so a tool call lands within one beat of it. */
 const ACTIVITY_POLL_MS = 2000
+
+/** How much of an open station's transcript its monitor keeps on screen. */
+const MONITOR_LINES = 40
 /** How long a callout stays up before it has risen and faded. */
 const CALLOUT_MS = 5000
 /** Rows from the top of the hall under which a pinned card opens downward instead. */
@@ -371,23 +376,34 @@ export function FactoryHall({
     })
   }, [callouts, liveMap])
 
-  const openStation = useCallback(
-    async (nodeId: string) => {
-      setSelected(nodeId)
-      setAttachProblem(null)
-      const node = view?.graph.nodes.find((n) => n.id === nodeId)
-      if (node?.sessionId == null) {
-        setTranscript([])
-        return
-      }
+  const selectedSessionId =
+    selected === null ? null : (view?.graph.nodes.find((n) => n.id === selected)?.sessionId ?? null)
+
+  // An open station's transcript is live: read at once, then on the activity
+  // beat, and only for as long as this station stays open.
+  useEffect(() => {
+    setTranscript([])
+    if (selectedSessionId === null) return
+    let live = true
+    const read = async (): Promise<void> => {
       const r = (await invoke('foundry:run-transcript', {
-        sessionId: node.sessionId,
-        limit: 12,
+        sessionId: selectedSessionId,
+        limit: MONITOR_LINES,
       })) as { lines?: TranscriptLine[] }
-      setTranscript(r.lines ?? [])
-    },
-    [view]
-  )
+      if (live) setTranscript(r.lines ?? [])
+    }
+    void read()
+    const timer = setInterval(() => void read(), ACTIVITY_POLL_MS)
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
+  }, [selectedSessionId])
+
+  const openStation = useCallback((nodeId: string) => {
+    setSelected(nodeId)
+    setAttachProblem(null)
+  }, [])
 
   const attach = useCallback(
     async (nodeId: string) => {
@@ -471,6 +487,29 @@ export function FactoryHall({
   for (const n of shownGraph.nodes) states[n.id] = n.state
   const selectedNode =
     selected === null ? null : (view.graph.nodes.find((n) => n.id === selected) ?? null)
+  const monitorStatus: MonitorStatus =
+    selectedNode === null
+      ? 'idle'
+      : flaggedNodes.has(selectedNode.id)
+        ? 'waiting'
+        : orphaned.has(selectedNode.id)
+          ? 'gone'
+          : selectedNode.state === 'failed' || selectedNode.state === 'blocked'
+            ? 'failed'
+            : selectedNode.state === 'running' || selectedNode.state === 'verifying'
+              ? 'running'
+              : 'idle'
+  const monitorAlert =
+    monitorStatus === 'waiting'
+      ? `WAITING FOR YOU: ${interruptions.find((i) => i.nodeId === selectedNode?.id)?.title ?? ''}`
+          .trim()
+          .toUpperCase()
+      : monitorStatus === 'failed'
+        ? (view.standing === undefined
+            ? 'FAILED'
+            : `FAILED: ${view.standing.headline}`
+          ).toUpperCase()
+        : null
 
   return (
     <div
@@ -527,7 +566,7 @@ export function FactoryHall({
                   title={`${label} · ${standing}${node.attempts > 1 ? ` · try ${node.attempts}` : ''}`}
                   style={stationStyle(shownMap, prop)}
                   aria-label={`${label}, ${node.role ?? 'unassigned'}, ${standing}, attempt ${node.attempts}`}
-                  onClick={() => void openStation(node.id)}
+                  onClick={() => openStation(node.id)}
                 >
                   {flaggedNodes.has(node.id) ? (
                     <span className="fdry-hall-flag" aria-hidden="true">
@@ -637,29 +676,18 @@ export function FactoryHall({
         )}
 
         {selectedNode === null ? null : (
-          <section className="fdry-hall-inspector" aria-labelledby="fdry-hall-inspector-h">
-            <div className="fdry-hall-inspector__head">
-              <h3 id="fdry-hall-inspector-h">{labels[selectedNode.id] ?? selectedNode.id}</h3>
-              <button type="button" aria-label="Close" onClick={() => setSelected(null)}>
-                <X aria-hidden="true" />
-              </button>
-            </div>
-            <p className="fdry-hall-inspector__meta">
-              {stateWord(selectedNode.state)} {'·'} attempt {selectedNode.attempts}
-              {selectedNode.role !== null ? ` · ${selectedNode.role}` : ''}
-            </p>
-            <pre className="fdry-hall-inspector__log">
-              {transcript.length === 0 ? 'Nothing yet.' : transcript.map((l) => l.text).join('\n')}
-            </pre>
-            {attachProblem !== null ? <p className="fdry-problem">{attachProblem}</p> : null}
-            <button
-              type="button"
-              className="fdry-hall-btn is-primary"
-              onClick={() => void attach(selectedNode.id)}
-            >
-              <Terminal aria-hidden="true" /> Attach
-            </button>
-          </section>
+          <StationMonitor
+            node={selectedNode}
+            label={labels[selectedNode.id] ?? selectedNode.id}
+            sign={shownMap.props.find((p) => p.nodeId === selectedNode.id)?.sign ?? null}
+            orderId={orderId}
+            lines={transcript}
+            status={monitorStatus}
+            alert={monitorAlert}
+            attachProblem={attachProblem}
+            onAttach={() => void attach(selectedNode.id)}
+            onClose={() => setSelected(null)}
+          />
         )}
       </div>
 

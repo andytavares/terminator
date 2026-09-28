@@ -2,6 +2,12 @@
    Every colour comes from a --tm-* token; the only literals are the two
    brand colours, which identify a product and must not shift with the theme. */
 
+@font-face {
+  font-family: 'VT323';
+  src: url('../../assets/VT323-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+
 /* ── Action buttons ──────────────────────────────────────────── */
 
 .sk-btn {
@@ -3802,74 +3808,341 @@
   color: #72d8f2;
 }
 
-/* A station's detail, over the hall's right edge. */
-.fdry-hall-inspector {
+/* A station's monitor, over the hall's right edge. The case is a canvas drawn
+   behind the screen; every measurement below is in --px, the size of one art
+   pixel, so the screen sits exactly in the case's tube. */
+.fdry-crt {
+  --px: 3px;
+  --fdry-crt-phosphor: #33ff66;
+  --fdry-crt-phosphor-dim: #1c9c45;
+  --fdry-crt-phosphor-hi: #c4ffd4;
+  --fdry-crt-screen: #031509;
+  --fdry-crt-amber: #ffb000;
+  --fdry-crt-red: #ff5a3c;
+  --fdry-crt-font: 'VT323', var(--tm-font-mono);
+
   position: absolute;
   z-index: var(--tm-layer-modal);
-  top: 46px;
-  right: 8px;
-  bottom: 8px;
+  top: 30px;
+  right: 10px;
+  bottom: 10px;
+  width: min(400px, 46%);
+}
+
+.fdry-crt__case {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.fdry-crt__screen {
+  position: absolute;
+  top: calc(var(--px) * 9);
+  left: calc(var(--px) * 9);
+  right: calc(var(--px) * 9);
+  bottom: calc(var(--px) * 21);
+  border-radius: 14px / 18px;
+  overflow: hidden;
+  background: var(--fdry-crt-screen);
+  box-shadow:
+    inset 0 0 24px rgba(0, 0, 0, 0.85),
+    inset 0 0 3px rgba(0, 0, 0, 0.9);
+  font-family: var(--fdry-crt-font);
+  color: var(--fdry-crt-phosphor);
+  font-size: 19px;
+  line-height: 1.02;
+  text-shadow:
+    0 0 5px rgba(51, 255, 102, 0.55),
+    0 0 1px rgba(51, 255, 102, 0.9);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: min(320px, 42%);
-  padding: 10px 12px;
-  border: 1px solid #2c3340;
-  border-radius: 3px;
-  background: rgba(10, 12, 18, 0.95);
-  font-size: 11.5px;
+  transform-origin: center;
 }
 
-.fdry-hall-inspector__head {
+/* Scanlines, then the glass over them: a vignette and a soft reflection. One
+ * layer after the body in document order paints above it, so the screen needs
+ * no stacking value of its own. */
+.fdry-crt__screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 30% 12%, rgba(196, 255, 212, 0.07), transparent 45%),
+    radial-gradient(140% 120% at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.55) 100%),
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.28) 0 1px, transparent 1px 3px);
+}
+
+.fdry-crt__body {
+  position: relative;
+  flex: 1;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  padding: 10px 14px 8px;
+  min-height: 0;
+  animation: fdry-crt-flicker 6s steps(60) infinite;
+}
+
+.fdry-crt__title {
+  display: flex;
   justify-content: space-between;
   gap: 8px;
+  background: var(--fdry-crt-phosphor);
+  color: var(--fdry-crt-screen);
+  text-shadow: none;
+  padding: 0 6px;
+  margin: 0 -4px;
+  box-shadow: 0 0 8px rgba(51, 255, 102, 0.5);
 }
 
-.fdry-hall-inspector__head h3 {
-  margin: 0;
-  font-size: 13px;
+.fdry-crt__meta {
+  color: var(--fdry-crt-phosphor-dim);
+  margin-top: 6px;
 }
 
-.fdry-hall-inspector__head button {
-  appearance: none;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid #3a4250;
-  border-radius: 2px;
-  background: transparent;
-  color: #98a2b1;
-  cursor: pointer;
+.fdry-crt__heading {
+  margin: 6px 0 0;
+  font: inherit;
+  color: var(--fdry-crt-phosphor);
 }
 
-.fdry-hall-inspector__head button svg {
-  width: 12px;
-  height: 12px;
+.fdry-crt__rule {
+  color: var(--fdry-crt-phosphor-dim);
+  overflow: hidden;
+  white-space: nowrap;
 }
 
-.fdry-hall-inspector__meta {
-  margin: 0;
-  color: #98a2b1;
-}
-
-.fdry-hall-inspector__log {
+.fdry-crt__log {
   flex: 1;
   margin: 0;
-  overflow: auto;
-  padding: 8px;
-  border-radius: 2px;
-  background: #0b0e13;
-  color: #9fb0c4;
-  font-size: 10.5px;
+  overflow: hidden auto;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  scrollbar-width: none;
 }
 
-.fdry-hall-inspector .fdry-hall-btn {
-  align-self: flex-start;
+.fdry-crt__log .tool {
+  color: var(--fdry-crt-phosphor-dim);
+}
+
+.fdry-crt__log .tool::before {
+  content: '> ';
+}
+
+.fdry-crt__log .say {
+  color: var(--fdry-crt-phosphor-hi);
+}
+
+.fdry-crt__log .you {
+  color: var(--fdry-crt-phosphor);
+}
+
+.fdry-crt__log .you::before {
+  content: '$ ';
+}
+
+.fdry-crt__cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.9em;
+  background: var(--fdry-crt-phosphor);
+  vertical-align: -0.1em;
+  box-shadow: 0 0 6px rgba(51, 255, 102, 0.8);
+  animation: fdry-crt-blink 1.06s steps(1) infinite;
+}
+
+.fdry-crt__alert {
+  color: var(--fdry-crt-screen);
+  background: var(--fdry-crt-amber);
+  text-shadow: none;
+  padding: 0 6px;
+  margin: 4px -4px 0;
+  box-shadow: 0 0 8px rgba(255, 176, 0, 0.6);
+}
+
+.fdry-crt__alert.fdry-problem {
+  font-size: inherit;
+}
+
+.fdry-crt[data-state='failed'] .fdry-crt__alert {
+  background: var(--fdry-crt-red);
+  box-shadow: 0 0 8px rgba(255, 90, 60, 0.6);
+}
+
+.fdry-crt[data-state='gone'] .fdry-crt__log {
+  color: var(--fdry-crt-phosphor-dim);
+}
+
+.fdry-crt__chin {
+  position: absolute;
+  left: calc(var(--px) * 9);
+  right: calc(var(--px) * 9);
+  bottom: calc(var(--px) * 5);
+  height: calc(var(--px) * 12);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fdry-crt__badge {
+  font-family: var(--fdry-crt-font);
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  color: #4a4336;
+  text-shadow: 0 1px 0 #e9e2cc;
+  padding: 0 8px;
+  background: #b9b097;
+  border: 1px solid #8f866f;
+  border-top-color: #6f6755;
+  border-left-color: #6f6755;
+  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.fdry-crt__spacer {
+  flex: 1;
+}
+
+.fdry-crt__led {
+  width: 9px;
+  height: 6px;
+  border-radius: 1px;
+  background: #3a3a30;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.fdry-crt[data-state='running'] .fdry-crt__led {
+  background: #3dff6e;
+  box-shadow: 0 0 6px #3dff6e;
+}
+
+.fdry-crt[data-state='waiting'] .fdry-crt__led {
+  background: var(--fdry-crt-amber);
+  box-shadow: 0 0 6px var(--fdry-crt-amber);
+  animation: fdry-crt-blink 0.9s steps(1) infinite;
+}
+
+.fdry-crt[data-state='failed'] .fdry-crt__led {
+  background: var(--fdry-crt-red);
+  box-shadow: 0 0 6px var(--fdry-crt-red);
+}
+
+.fdry-crt__key,
+.fdry-crt__power {
+  appearance: none;
+  font-family: var(--fdry-crt-font);
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  color: #3b362c;
+  cursor: pointer;
+  background: #d6ceb6;
+  border: 0;
+  padding: 1px 10px 2px;
+  border-radius: 2px;
+  box-shadow:
+    inset -2px -2px 0 #8f866f,
+    inset 2px 2px 0 #f1ead4,
+    0 2px 0 #4a4336;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fdry-crt__key:active,
+.fdry-crt__power:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 2px 2px 0 #8f866f,
+    inset -2px -2px 0 #f1ead4,
+    0 0 0 #4a4336;
+}
+
+.fdry-crt__key:focus-visible,
+.fdry-crt__power:focus-visible {
+  outline: 2px solid #33ff66;
+  outline-offset: 2px;
+}
+
+.fdry-crt__power {
+  padding: 3px 5px;
+}
+
+.fdry-crt__key svg,
+.fdry-crt__power svg {
+  width: 14px;
+  height: 14px;
+}
+
+.fdry-crt.is-on .fdry-crt__screen {
+  animation: fdry-crt-on 0.42s ease-out;
+}
+
+.fdry-crt.is-off .fdry-crt__screen {
+  animation: fdry-crt-off 0.3s ease-in forwards;
+}
+
+@keyframes fdry-crt-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes fdry-crt-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.985;
+  }
+  51% {
+    opacity: 1;
+  }
+}
+
+@keyframes fdry-crt-on {
+  0% {
+    transform: scale(1, 0.006);
+    filter: brightness(4);
+  }
+  45% {
+    transform: scale(1, 0.02);
+    filter: brightness(3);
+  }
+  100% {
+    transform: scale(1, 1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes fdry-crt-off {
+  0% {
+    transform: scale(1, 1);
+    filter: brightness(1);
+  }
+  60% {
+    transform: scale(1, 0.01);
+    filter: brightness(3);
+  }
+  100% {
+    transform: scale(0, 0.01);
+    filter: brightness(5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fdry-crt__body,
+  .fdry-crt__cursor,
+  .fdry-crt__led,
+  .fdry-crt.is-on .fdry-crt__screen,
+  .fdry-crt.is-off .fdry-crt__screen {
+    animation: none !important;
+  }
 }
 
 .fdry-sr-only {
