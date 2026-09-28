@@ -402,6 +402,27 @@ describe('when the terminal itself goes', () => {
     expect(closed).toEqual(['terminal-1'])
   })
 
+  it('still stops answering the agent on a host that cannot close the tab', async () => {
+    const host = api() as { pty: { closeTerminalTab?: unknown } }
+    delete host.pty.closeTerminalTab
+    const r = createSupervisedRunner({
+      api: host as never,
+      control,
+      stateDir: join(dir, 'state'),
+      now: () => 1_000,
+    })
+    const run = await r.start(start)
+    const pending = fetch(control.url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: run?.sessionId, toolName: 'Bash', input: {} }),
+    }).then((res) => res.json())
+    pending.catch(() => {})
+    await new Promise((res) => setTimeout(res, 30))
+    expect(() => exitListener?.(0)).not.toThrow()
+    expect(await pending).toMatchObject({ permissionDecision: 'deny' })
+  })
+
   it('keeps the tab of a run that failed, so the operator can read why', async () => {
     await runner().start(start)
     exitListener?.(137)
@@ -796,6 +817,23 @@ describe('running one command in a terminal, with no agent', () => {
     exitListener!(0)
     await pending
     expect(closed).toEqual(['terminal-1'])
+  })
+
+  // The extension loads from the checkout; the host is whatever app is
+  // installed. A host built before `closeTerminalTab` existed threw from the
+  // exit listener, the pass never resolved, and the run sat at lint for ever.
+  it('still resolves a pass on a host that cannot close the tab', async () => {
+    const host = api() as { pty: { closeTerminalTab?: unknown } }
+    delete host.pty.closeTerminalTab
+    const pending = createSupervisedRunner({
+      api: host as never,
+      control,
+      stateDir: join(dir, 'state'),
+      now: () => 1_000,
+    }).runCommand(command)
+    await Promise.resolve()
+    expect(() => exitListener!(0)).not.toThrow()
+    await expect(pending).resolves.toBe(0)
   })
 
   it('keeps the tab of a command that failed, with its output on screen', async () => {

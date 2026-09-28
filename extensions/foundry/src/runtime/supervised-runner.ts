@@ -366,11 +366,13 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     if (run === undefined) return
     running.delete(sessionId)
     run.detachExit?.()
-    if (clean) api.pty.closeTerminalTab(run.terminalSessionId)
     // Anything still waiting can no longer be answered from here, and an
     // unresolved promise holds the agent's tool call open forever.
     run.bridge.rejectAll('This run has ended')
     run.release()
+    // Last and optional: an installed host older than `closeTerminalTab`
+    // threw here and skipped everything after it.
+    if (clean) api.pty.closeTerminalTab?.(run.terminalSessionId)
   }
 
   return {
@@ -570,10 +572,12 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       return new Promise((resolve) => {
         // The shell exits with the command's status, so the tab's own exit is
         // the verdict. A failure stays open, exited, as the record of what
-        // ran; a pass closes, and its output is in the log.
+        // ran; a pass closes, and its output is in the log. The verdict goes
+        // first and the close is optional: an installed host older than
+        // `closeTerminalTab` threw here, and the pass never reached the run.
         api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
-          if (exitCode === 0) api.pty.closeTerminalTab(terminalSessionId)
           resolve(exitCode)
+          if (exitCode === 0) api.pty.closeTerminalTab?.(terminalSessionId)
         })
         const script = writeCommandScript(randomUUID(), options.command, options.logPath)
         api.pty.write(
