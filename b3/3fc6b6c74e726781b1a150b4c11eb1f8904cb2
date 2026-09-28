@@ -1,0 +1,30 @@
+extensions/foundry/tests/components/ReasonButton.spec.tsx
+  s_c2925d3c93b84c::t_1a2579d9926f87 65-67
+  s_c2925d3c93b84c::t_257d0bf391bcc7 106
+  s_c2925d3c93b84c::t_7122e1d14f2592 62
+  s_c2925d3c93b84c::t_485ff5bcc948d4 15-17
+  s_c2925d3c93b84c::t_c28fe6ce89a0f1 1-14,18-28,32-34,37-61,63-64,68-105,107-108
+  s_c2925d3c93b84c::t_df10e088765f47 29-31,35-36
+extensions/foundry/src/components/foundry.css
+  s_c2925d3c93b84c::t_22b2d8dfc78b70 4185
+  s_c2925d3c93b84c::t_844a01685c6f67 4151-4184,4186-4241
+extensions/foundry/src/components/ReasonButton.tsx
+  s_c2925d3c93b84c::t_1a2579d9926f87 18-24,41-45
+  s_c2925d3c93b84c::t_a66b8adf2d73ab 1-17,25-40,46-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b33fc6b6c74e726781b1a150b4c11eb1f8904cb2",
+  "prompts": {},
+  "sessions": {
+    "s_c2925d3c93b84c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db9b284f-3346-4749-bd47-5e725126a82a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
