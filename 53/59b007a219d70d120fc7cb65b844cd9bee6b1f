@@ -1,0 +1,33 @@
+docs/ARCHITECTURE.md
+  s_802dfa88127b4f::t_45b62b12ab7cfe 1392-1397
+docs/adr/076-foundry-closes-the-tabs-it-opens.md
+  s_802dfa88127b4f::t_45b62b12ab7cfe 1-42
+extensions/foundry/src/runtime/agent-title.ts
+  s_802dfa88127b4f::t_4319dc46f51b1f 1-5
+extensions/foundry/src/index.ts
+  s_802dfa88127b4f::t_638f97b50c89ff 81,1509,1624-1627,1796,2087,2102-2104,2126,2151,2253,2265-2266,2297,2313-2316
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_802dfa88127b4f::t_e01dd4e6afd066 63,65-66,360-364,369,442,463,480,572-577,677
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_802dfa88127b4f::t_935ffcc855c6ec 26,42,82,99,128,399-410,793-807
+  s_802dfa88127b4f::t_4e8235888dbb89 345-351
+  s_802dfa88127b4f::t_af7fe092a4c4a1 808
+extensions/foundry/tests/runtime/agent-title.spec.ts
+  s_802dfa88127b4f::t_4319dc46f51b1f 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5359b007a219d70d120fc7cb65b844cd9bee6b1f",
+  "prompts": {},
+  "sessions": {
+    "s_802dfa88127b4f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5145f198-b891-4bb6-b8e6-02de60b65ef8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
