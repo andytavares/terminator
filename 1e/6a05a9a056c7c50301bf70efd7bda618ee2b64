@@ -1,0 +1,26 @@
+docs/adr/074-the-forge-reads-one-readiness.md
+  s_c2925d3c93b84c::t_4dff7be3b0a6a1 1-63
+docs/ARCHITECTURE.md
+  s_c2925d3c93b84c::t_41ea775935a949 1051-1065
+docs/user-guide/USER-GUIDE.md
+  s_c2925d3c93b84c::t_202f9f23d6729b 666-683,687-688,690,693-706,713,715-737,760-779,809-816
+docs/research/forge-shaping-redesign/renderings.html
+  s_c2925d3c93b84c::t_474f850cf7ae05 1-954,958,963-964,974-975
+  s_c2925d3c93b84c::t_4d26ca9d16c8e6 955-957,959-962,965-973,976-2898
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1e6a05a9a056c7c50301bf70efd7bda618ee2b64",
+  "prompts": {},
+  "sessions": {
+    "s_c2925d3c93b84c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db9b284f-3346-4749-bd47-5e725126a82a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
