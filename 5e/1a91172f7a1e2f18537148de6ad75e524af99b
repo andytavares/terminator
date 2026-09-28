@@ -1,0 +1,19 @@
+tests/e2e/foundry-factory-view.spec.ts
+  s_6f2763bc197e91::t_16d36045a71dd6 11,359-371
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5e1a91172f7a1e2f18537148de6ad75e524af99b",
+  "prompts": {},
+  "sessions": {
+    "s_6f2763bc197e91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20a95b64-c37e-4c82-914f-a10b3237caab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
