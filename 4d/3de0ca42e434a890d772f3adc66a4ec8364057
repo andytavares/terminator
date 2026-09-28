@@ -1,0 +1,19 @@
+docs/adr/076-foundry-closes-the-tabs-it-opens.md
+  s_49daec26653783::t_9fac3bfee8f0e0 43-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4d3de0ca42e434a890d772f3adc66a4ec8364057",
+  "prompts": {},
+  "sessions": {
+    "s_49daec26653783": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d0ca5eb-a794-4e44-9cb5-25283d8706ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
