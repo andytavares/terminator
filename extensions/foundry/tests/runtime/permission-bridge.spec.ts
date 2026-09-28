@@ -154,6 +154,23 @@ describe('auto-decision by the autonomy ladder', () => {
   })
 })
 
+describe('a call the ladder leaves to auto mode', () => {
+  it('answers with no decision, and never raises a request', async () => {
+    const events: PendingPermission[] = []
+    const bridge = createPermissionBridge({
+      sessionId: 's1',
+      now: () => 1_000,
+      onPending: (p) => events.push(p),
+      onResolved: () => {},
+      autoDecide: () => 'mode',
+    })
+    await expect(bridge.canUseTool('Edit', { file_path: '/etc/hosts' })).resolves.toEqual({
+      permissionDecision: 'defer',
+    })
+    expect(events).toHaveLength(0)
+  })
+})
+
 describe('shutdown', () => {
   it('denies every outstanding request when the session is torn down', async () => {
     const { bridge } = harness()

@@ -59,6 +59,12 @@ export interface ToolRequest {
    * never change them.
    */
   readonly skillsMount: string | null
+  /**
+   * Leave what this policy has no opinion on to Claude Code's auto mode,
+   * rather than holding it five minutes for a person. Never a destructive
+   * action, and never at `escorted`, whose meaning is "ask me".
+   */
+  readonly letModeDecide: boolean
 }
 
 /**
@@ -107,7 +113,7 @@ function isInsideMount(target: string | null, mount: string | null): boolean {
   )
 }
 
-export function decideTool(request: ToolRequest): PolicyDecision | null {
+export function decideTool(request: ToolRequest): PolicyDecision | 'mode' | null {
   // A node's skills, mounted read-only outside the repository and handed to
   // the agent with `--add-dir`. Anything `decideTool` does not decide is held
   // for five minutes, so a read of the mount that fell through to "ask" would
@@ -180,6 +186,14 @@ export function decideTool(request: ToolRequest): PolicyDecision | null {
     worktreePath: request.worktreePath,
   })
   if (taken !== null) return { allow: taken.allow, reason: taken.reason }
+
+  if (
+    request.letModeDecide &&
+    request.autonomy !== 'escorted' &&
+    !isDestructive(request.tool, request.input)
+  ) {
+    return 'mode'
+  }
 
   // At `lights-out` a question has nobody to answer it, so it is a refusal
   // rather than a wait.

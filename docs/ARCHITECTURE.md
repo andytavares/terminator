@@ -1243,6 +1243,12 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   which are quoting; it is still not a shell parser. The OS temp roots are
   scratch, with the hole that names — a data root configured inside temp — in
   the ADR.
+- **Auto mode answers what the policy abstains on (ADR 077).** With
+  `terminator.foundry.letAutoModeDecide` on (the default), `decideTool` returns
+  `mode` instead of `null` for a call it has no opinion on. The exceptions are
+  destructive actions and the `escorted` setting. The bridge answers `defer`,
+  and the hook script prints nothing, so Claude Code's `--permission-mode auto`
+  decides. Returning `ask` would force a confirmation prompt, even in auto mode.
 - **A stall is measured from the state the session is in now.**
   `evaluate-stall.ts` takes the later of the last tool call and `stateSince`,
   and the runner moves a session's `startedAt` whenever it is given a new turn.

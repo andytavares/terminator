@@ -1535,6 +1535,8 @@ async function buildExecutorDeps(
               isProbed: (name, given) => isProbedCommand(order, name, given),
               readOnlyTools: readOnlyTools(api),
               autonomy: autonomyFor(api),
+              letModeDecide:
+                api.settings?.get<boolean>('terminator.foundry.letAutoModeDecide') ?? true,
               worktreePath: checkout.path,
               outputPath: input.outputPath ?? null,
               skillsMount: input.skillsMount,
@@ -3785,6 +3787,13 @@ export function activate(api: ExtensionAPI): void {
             'Which rules are allowed to stop for you. Risk, budget, destructive actions and the merge decision are live at every setting — at lights-out they refuse rather than wait, because nobody is there to answer.',
           options: ['escorted', 'standard', 'lights-out'],
           default: 'standard',
+        },
+        'terminator.foundry.letAutoModeDecide': {
+          type: 'boolean',
+          label: 'Let auto mode decide',
+          description:
+            "On: a tool call Foundry's own rules have no opinion on is decided by Claude Code's auto mode. Off: it waits for you. Destructive actions and the escorted setting always ask you.",
+          default: true,
         },
         'terminator.foundry.budgets.agents': {
           type: 'number',

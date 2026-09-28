@@ -81,7 +81,7 @@ export interface StartSupervisedRunOptions {
    */
   addDirs?: string[]
   /** Decides without asking when the autonomy ladder allows it. */
-  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
+  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | 'mode' | null
   /** The ladder refused something without asking. Only refusals are reported. */
   onAutoDenied?: (toolName: string, reason: string) => void
   onPending: (pending: PendingPermission) => void

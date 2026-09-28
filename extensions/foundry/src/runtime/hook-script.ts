@@ -101,6 +101,7 @@ process.stdin.on('end', () => {
     .then((response) => response.json())
     .then((decision) => {
       const permissionDecision = decision && decision.permissionDecision
+      if (permissionDecision === 'defer') answer('')
       if (permissionDecision !== 'allow' && permissionDecision !== 'deny') answer(ASK)
 
       const hookSpecificOutput = { hookEventName: 'PreToolUse', permissionDecision }

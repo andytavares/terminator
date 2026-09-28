@@ -874,6 +874,12 @@ inside the unit's own worktree is taken automatically and recorded — editing
 the files the unit was given, running the project's tests — and what reaches
 you is what the rules actually wanted a person for.
 
+**Let auto mode decide** (Settings → Foundry, on by default) answers the rest.
+At standard and lights-out, a tool call Foundry's own rules have no opinion
+on, such as a write outside the worktree, is decided by Claude Code's auto
+mode. Without it, the call waits five minutes for you. Destructive actions
+still come to you, and escorted still asks about everything.
+
 "Destructive" is read generously: `rm`, a hard reset, `git clean`, a force
 push, deleting a branch, and anything the check cannot parse. A command it
 cannot read is treated as destructive rather than assumed safe.

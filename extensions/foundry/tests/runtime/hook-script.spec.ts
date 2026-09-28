@@ -85,6 +85,19 @@ describe('the hook script, run the way Claude Code runs it', () => {
     })
   })
 
+  it('answers nothing for a deferred call, so the permission mode decides', async () => {
+    // Verified against claude 2.1.284 under --permission-mode auto: an empty
+    // answer ran the command; "ask" stopped it for a confirmation.
+    server = await createControlServer()
+    server.register('s1', { decide: async () => ({ permissionDecision: 'defer' }) })
+    const stdout = await run(
+      installHookScript(directory),
+      [server.url, server.token, 's1'],
+      HOOK_INPUT
+    )
+    expect(stdout).toBe('')
+  })
+
   it('passes the tool and its input through to the console', async () => {
     server = await createControlServer()
     let seen: unknown = null
