@@ -178,6 +178,13 @@ export interface ExecutorDeps {
    */
   readonly raise?: (gate: Gate) => Promise<void>
 
+  /**
+   * This order's gates from earlier attempts. A resume re-runs everything
+   * after the last passed node, so a rule that fires on the finished work
+   * fires again; without these, Approve resumed straight into the same gate.
+   */
+  readonly priorGates?: readonly Gate[]
+
   /** Which rules are live. Without one, everything is asked — the safe end. */
   readonly autonomy?: Autonomy
 
@@ -419,7 +426,9 @@ export async function execute(
   const gates: Gate[] = []
 
   let current = graph
-  let gateSeq = 0
+  const priorGates = (deps.priorGates ?? []).filter((g) => g.orderId === order.id)
+  // Past what is already on file, so a new gate never overwrites a decided one.
+  let gateSeq = priorGates.length
 
   /**
    * The order as later briefs see it, which is not the order the run is judged
@@ -509,12 +518,17 @@ export async function execute(
     }
   ): Promise<boolean> {
     if (!isLive(rule, autonomy)) return false
+    const nodeId = input.nodeId ?? null
+    const approved = priorGates.some(
+      (g) => g.rule === rule && g.nodeId === nodeId && g.decision?.option === 'approve'
+    )
+    if (approved) return false
     gateSeq += 1
     const gate = raiseGate({
       id: `${order.id}-${rule}-${gateSeq}`,
       rule,
       orderId: order.id,
-      nodeId: input.nodeId ?? null,
+      nodeId,
       summary: input.summary,
       why: input.why,
       riskGrade: order.risk.grade,

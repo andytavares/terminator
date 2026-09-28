@@ -13,6 +13,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { ResumeForbiddenError, createRoleRegistry } from '../../src/line/roles.js'
 import { makeVerdict, SelfVerificationError } from '../../src/verify/verdict.js'
+import { decide } from '../../src/gates/rules.js'
 
 // The executor is where the scheduler, the roles and a session finally meet.
 // Each of those was testable alone and none of them did anything on its own,
@@ -1127,6 +1128,50 @@ describe('the grade the change turned out to deserve', () => {
     expect(outcome.gates.find((g) => g.rule === 'risk.p0')?.summary).toContain(
       'planned as low risk'
     )
+  })
+
+  it('does not ask again about a regrade the operator already approved', async () => {
+    const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
+      risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    })
+    const first = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+    })
+    const asked = first.gates.find((g) => g.rule === 'risk.p0')
+    if (asked === undefined) throw new Error('expected the regrade to be asked about')
+    const approved = decide(asked, 'approve', '', '2026-09-28T19:12:26.193Z')
+
+    const resumed = await execute(o, recipe(), first.graph, {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+      priorGates: [approved],
+    })
+    expect(resumed.gates.filter((g) => g.rule === 'risk.p0')).toEqual([])
+    expect(resumed.shippable).toBe(true)
+  })
+
+  it('asks again about a regrade the operator held', async () => {
+    const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
+      risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    })
+    const first = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+    })
+    const asked = first.gates.find((g) => g.rule === 'risk.p0')
+    if (asked === undefined) throw new Error('expected the regrade to be asked about')
+    const held = decide(asked, 'hold', '', '2026-09-28T19:12:26.193Z')
+
+    const resumed = await execute(o, recipe(), first.graph, {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+      priorGates: [held],
+    })
+    const again = resumed.gates.find((g) => g.rule === 'risk.p0')
+    expect(again).toBeDefined()
+    // A fresh id, or saving it overwrites the decision already on file.
+    expect(again?.id).not.toBe(asked.id)
   })
 
   it('leaves an ordinary change where the plan put it', async () => {

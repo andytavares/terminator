@@ -21,7 +21,7 @@ import { rulesFor, rulesAtRung } from './verify/rules.js'
 import { availableNames, availableSensors, resolveRule } from './recipe/resolve.js'
 import { RUNGS, rungLevelInWords } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
-import { createLiveGateStore, createGateStore } from './gates/store.js'
+import { askOnce, createLiveGateStore, createGateStore } from './gates/store.js'
 import { raiseGate, ruleInWords } from './gates/rules.js'
 import { orphanedNodes } from './line/reclaim.js'
 import type { StandingSources } from './order/standing.js'
@@ -1721,6 +1721,7 @@ async function buildExecutorDeps(
         await store.save(result.order)
         return { order: result.order, note: result.note, defect: result.defect }
       },
+      priorGates: await gates.list(),
       raise: async (gate) => {
         await gates.save(gate)
         await store.record({
@@ -1921,10 +1922,7 @@ async function executeRun(
       ...integrateDepsFor(api, root, order.id),
       // The shipping decision, where the grade calls for one, is the operator's
       // and reaches them through the inbox like every other.
-      decide: async (gate) => {
-        await gates.save(gate)
-        return 'hold'
-      },
+      decide: (gate) => askOnce(gates, gate),
       raiseGate: async (gate) => {
         await gates.save(gate)
       },
