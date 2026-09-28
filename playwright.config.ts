@@ -21,7 +21,10 @@ export default defineConfig({
   // 36344425737 each shard's wall time matched its summed test time with two
   // workers, and the session specs ran 50% slower than when paired with light
   // tests. Parallelism comes from the shards (ADR 071).
-  workers: process.env.CI ? 1 : undefined,
+  // Locally, at most four copies of the app at once: the default (half the
+  // cores) starts eight or more Electron apps in the same second on a machine
+  // that is also running the app, its agents and their checks.
+  workers: process.env.CI ? 1 : 4,
   globalSetup: './tests/e2e/global-setup.ts',
   globalTeardown: './tests/e2e/global-teardown.ts',
   use: {
