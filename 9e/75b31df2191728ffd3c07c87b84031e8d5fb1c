@@ -1,0 +1,51 @@
+extensions/foundry/src/components/Floor.tsx
+  s_6f2763bc197e91::t_e335de90e98717 1-2,728,767
+extensions/foundry/src/components/GateEvidence.tsx
+  s_6f2763bc197e91::t_1e6513c194937d 1-39
+extensions/foundry/src/components/Inbox.tsx
+  s_6f2763bc197e91::t_5796ad44c55f20 1-2,267-268,271
+extensions/foundry/src/components/foundry.css
+  s_6f2763bc197e91::t_dfb96c05c2909d 4132-4150
+extensions/foundry/src/gates/rules.ts
+  s_6f2763bc197e91::t_a3d92b9935fd46 142-147,341-349
+extensions/foundry/src/index.ts
+  s_6f2763bc197e91::t_516b4ebf5ce88d 1,38,1378-1381,1738,1745-1753,1760,1762-1763,1775,1784-1785,3151-3178
+extensions/foundry/src/line/executor.ts
+  s_6f2763bc197e91::t_96dad3f990a206 29,194,508,528,1077,1079,1086-1095,1116-1120,1122-1132
+extensions/foundry/src/line/scheduler.ts
+  s_6f2763bc197e91::t_62cb2bc6905f3e 262-287
+extensions/foundry/src/verify/ladder.ts
+  s_6f2763bc197e91::t_e5bdf04a422579 125-129
+extensions/foundry/src/verify/pass-cache.ts
+  s_6f2763bc197e91::t_1d6c51184f8f29 1-37
+extensions/foundry/tests/components/GateEvidence.spec.tsx
+  s_6f2763bc197e91::t_1850e9cca02da6 1-39
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_6f2763bc197e91::t_f46bb8db8d85fd 108,140,358,380
+extensions/foundry/tests/gates/rules.spec.ts
+  s_6f2763bc197e91::t_5fd8ad69d17069 11,372-391
+extensions/foundry/tests/line/executor.spec.ts
+  s_6f2763bc197e91::t_432aa3c215f2b6 794-819
+extensions/foundry/tests/line/scheduler.spec.ts
+  s_6f2763bc197e91::t_41f79f492848b5 9,465-514
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_6f2763bc197e91::t_50208f01eae6d7 64-91
+extensions/foundry/tests/verify/pass-cache.spec.ts
+  s_6f2763bc197e91::t_64d288c7d353da 1-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9e75b31df2191728ffd3c07c87b84031e8d5fb1c",
+  "prompts": {},
+  "sessions": {
+    "s_6f2763bc197e91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20a95b64-c37e-4c82-914f-a10b3237caab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
