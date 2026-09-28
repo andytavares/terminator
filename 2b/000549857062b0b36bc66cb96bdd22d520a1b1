@@ -1,0 +1,23 @@
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_1d40c41b0585ca::t_a8566d22261484 90,287-292,590
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_1d40c41b0585ca::t_7b0396289876e2 402,441,446
+  s_1d40c41b0585ca::t_de0105e682966e 412-440,442-445,447-449
+  s_1d40c41b0585ca::t_69fc5ce1b7eab8 369-401,403-411
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2b000549857062b0b36bc66cb96bdd22d520a1b1",
+  "prompts": {},
+  "sessions": {
+    "s_1d40c41b0585ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5012b074-3fcf-4c7c-9cc7-96d3b79bdc03",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
