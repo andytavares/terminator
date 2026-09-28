@@ -30,7 +30,7 @@ import type { Evidence } from '../verify/verdict.js'
 import type { Verdict } from '../verify/verdict.js'
 import { inspectionFor, regrade } from '../verify/inspection-triggers.js'
 import { ladderFor, climb } from '../verify/ladder.js'
-import type { LadderOutcome, LadderStep } from '../verify/ladder.js'
+import type { LadderOutcome, LadderStep, StepOutcome } from '../verify/ladder.js'
 import { raiseGate } from '../gates/rules.js'
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { isLive } from '../gates/autonomy.js'
@@ -48,6 +48,9 @@ import { gradeInWords } from '../runtime/review/risk-grader.js'
 // prompt: a role that may not resume is refused a session to resume, a role
 // that may not write gets a read-only decision on every tool call, and a
 // verdict that came from the working session is rejected outright.
+
+/** Sending the finished change back to the builder this many times is enough; the third is a person's call. */
+const MAX_FINAL_SEND_BACKS = 2
 
 export interface StartedRun {
   readonly sessionId: string
@@ -199,6 +202,21 @@ export interface ExecutorDeps {
    * honest, and visible, rather than a silent green.
    */
   readonly runStep?: (step: LadderStep, logPath: string) => Promise<number | null>
+
+  /**
+   * Run one rung in a checkout of the order's base branch, without this change.
+   *
+   * It is how a failure the change caused is told from one that was already
+   * there. Null means it could not run there, which is "not known", never
+   * "passes on the base". Absent means the base is never consulted.
+   */
+  readonly runStepOnBase?: (step: LadderStep, logPath: string) => Promise<number | null>
+
+  /**
+   * Let go of the base checkout `runStepOnBase` used. Called once, in a
+   * `finally`, after any base run, so a throwing rung cannot leave it behind.
+   */
+  readonly releaseBase?: () => Promise<void>
 
   /** Minutes elapsed, for the wall-clock budget. */
   readonly observe?: () => { elapsedMinutes: number } | Promise<{ elapsedMinutes: number }>
@@ -515,6 +533,7 @@ export async function execute(
       deadlineMinutes?: number
       breach?: BudgetBreach
       evidence?: readonly Evidence[]
+      omitOptions?: readonly string[]
     }
   ): Promise<boolean> {
     if (!isLive(rule, autonomy)) return false
@@ -540,6 +559,7 @@ export async function execute(
           : new Date(Date.parse(deps.now()) + input.deadlineMinutes * 60_000).toISOString(),
       breach: input.breach ?? null,
       evidence: input.evidence,
+      omitOptions: input.omitOptions,
     })
     gates.push(gate)
     deps.onEvent?.({ type: 'gate', gate })
@@ -1088,27 +1108,64 @@ export async function execute(
   // work to climb over: a run that halted at a gate has not earned a verdict
   // on the whole change, and reporting one would be inventing it.
   let ladder: LadderOutcome | null = null
-  const ladderLogs = new Map<string, string>()
+  let ladderLogs = new Map<string, string>()
+  const climbedAt = Date.parse(deps.now())
+  const ladderSteps = ladderFor({
+    toolchain: order.context.toolchain,
+    risk,
+    touchesUi: touched.some((path) => /\.(tsx|css|html|svelte|vue)$/.test(path)),
+  })
+
+  /** One climb, with each step's log kept so a gate can show what it saw. */
+  async function climbWith(
+    steps: readonly LadderStep[],
+    runner: NonNullable<typeof deps.runStep> | undefined,
+    suffix: string
+  ): Promise<{ outcome: LadderOutcome; logs: Map<string, string> }> {
+    const logs = new Map<string, string>()
+    const outcome = await climb(steps, async (step) => {
+      if (runner === undefined) return null
+      const logPath = path.join(
+        orderDir(deps.sources.dataRoot, order.id),
+        'runs',
+        `final-${safeFilename(step.name.toLowerCase())}.${climbedAt}${suffix}.log`
+      )
+      logs.set(step.name, logPath)
+      return runner(step, logPath)
+    })
+    return { outcome, logs }
+  }
+
+  /** The last lines of a step's log, or nothing when it never wrote one. */
+  function excerptOf(logPath: string | undefined): string {
+    return logPath !== undefined && fs.existsSync(logPath)
+      ? lastLines(fs.readFileSync(logPath, 'utf8').trimEnd(), 60)
+      : ''
+  }
+
   if (!halted && !stalled && isComplete(current)) {
-    const climbedAt = Date.parse(deps.now())
-    ladder = await climb(
-      ladderFor({
-        toolchain: order.context.toolchain,
-        risk,
-        touchesUi: touched.some((path) => /\.(tsx|css|html|svelte|vue)$/.test(path)),
-      }),
-      async (step) => {
-        if (deps.runStep === undefined) return null
-        const logPath = path.join(
-          orderDir(deps.sources.dataRoot, order.id),
-          'runs',
-          `final-${safeFilename(step.name.toLowerCase())}.${climbedAt}.log`
-        )
-        ladderLogs.set(step.name, logPath)
-        return deps.runStep(step, logPath)
-      }
-    )
+    const first = await climbWith(ladderSteps, deps.runStep, '')
+    ladder = first.outcome
+    ladderLogs = first.logs
     deps.onEvent?.({ type: 'ladder', outcome: ladder })
+
+    // A check that fails once and passes on the same commit is not the change's
+    // doing. Passes on this commit are cached by the caller, so only the failed
+    // step and those after it run again.
+    const firstFailed = ladder.ok ? undefined : ladder.steps.find((s) => s.result === 'fail')
+    if (firstFailed !== undefined) {
+      const retry = await climbWith(ladderSteps, deps.runStep, '.retry')
+      ladder = retry.outcome
+      ladderLogs = retry.logs
+      deps.onEvent?.({ type: 'ladder', outcome: ladder })
+      if (ladder.ok) {
+        await deps.record?.(
+          'verify.flaky',
+          firstFailed.name,
+          `${firstFailed.name} failed once and passed on a re-run: ${first.logs.get(firstFailed.name) ?? 'no log'} then ${retry.logs.get(firstFailed.name) ?? 'no log'}`
+        )
+      }
+    }
   }
 
   // The three rules that fire on what the change turned out to be, rather than
@@ -1128,30 +1185,81 @@ export async function execute(
     if (!halted && !ladder.ok) {
       const failedStep = ladder.steps.find((s) => s.result === 'fail') ?? null
       const failedLog = failedStep === null ? undefined : ladderLogs.get(failedStep.name)
-      const excerpt =
-        failedLog !== undefined && fs.existsSync(failedLog)
-          ? lastLines(fs.readFileSync(failedLog, 'utf8').trimEnd(), 60)
-          : ''
-      halted = await raise('verify.repeat-fail', {
-        evidence:
+      const changeEvidence: Evidence[] =
+        failedStep === null
+          ? []
+          : [
+              {
+                kind: 'stdout',
+                exitCode: failedStep.exitCode ?? undefined,
+                path: failedLog,
+                excerpt: excerptOf(failedLog),
+              },
+            ]
+      const failedWhy =
+        failedStep === null
+          ? `Nothing failed, but ${ladder.unmeasured.join(', ')} could not be measured here.`
+          : failedStep.command === null
+            ? `${failedStep.name} failed with exit code ${failedStep.exitCode ?? 'unknown'}.`
+            : `${failedStep.name} failed with exit code ${failedStep.exitCode ?? 'unknown'}: \`${failedStep.command}\`.`
+
+      // Run the same rungs on the base branch, so a failure that was already
+      // there is not sent back to a builder who did not cause it.
+      let onBase: 'fails' | 'passes' | 'unknown' = 'unknown'
+      let baseFailed: StepOutcome | null = null
+      let baseLogs = new Map<string, string>()
+      const baseBranch = order.context.repos[0]?.baseBranch ?? 'the base branch'
+      if (failedStep !== null && deps.runStepOnBase !== undefined) {
+        const upTo = ladderSteps.findIndex((s) => s.name === failedStep.name)
+        try {
+          const base = await climbWith(ladderSteps.slice(0, upTo + 1), deps.runStepOnBase, '.base')
+          baseLogs = base.logs
+          baseFailed = base.outcome.steps.find((s) => s.result === 'fail') ?? null
+          const atStep = base.outcome.steps.find((s) => s.name === failedStep.name)
+          onBase = baseFailed !== null ? 'fails' : atStep?.result === 'pass' ? 'passes' : 'unknown'
+        } finally {
+          await deps.releaseBase?.()
+        }
+      }
+
+      if (onBase === 'fails' && baseFailed !== null) {
+        const baseCommand = baseFailed.command === null ? '' : `: \`${baseFailed.command}\``
+        halted = await raise('verify.base-fail', {
+          evidence: [
+            ...changeEvidence,
+            {
+              kind: 'stdout',
+              exitCode: baseFailed.exitCode ?? undefined,
+              step: baseFailed.name,
+              command: baseFailed.command ?? undefined,
+              path: baseLogs.get(baseFailed.name),
+              excerpt: excerptOf(baseLogs.get(baseFailed.name)),
+            },
+          ],
+          summary: `${order.title} is blocked by a check that already fails on ${baseBranch}`,
+          why: `${baseFailed.name} fails on ${baseBranch} with exit code ${baseFailed.exitCode ?? 'unknown'}${baseCommand}. It also fails without this change.`,
+        })
+      } else {
+        const sentBack = priorGates.filter(
+          (g) =>
+            g.rule === 'verify.repeat-fail' &&
+            g.nodeId === null &&
+            g.decision?.option === 'send_back'
+        ).length
+        const capped = sentBack >= MAX_FINAL_SEND_BACKS
+        const baseNote =
           failedStep === null
-            ? []
-            : [
-                {
-                  kind: 'stdout',
-                  exitCode: failedStep.exitCode ?? undefined,
-                  path: failedLog,
-                  excerpt,
-                },
-              ],
-        summary: `${order.title} did not pass verification`,
-        why:
-          ladder.stoppedAt === null || failedStep === null
-            ? `Nothing failed, but ${ladder.unmeasured.join(', ')} could not be measured here.`
-            : failedStep.command === null
-              ? `${failedStep.name} failed with exit code ${failedStep.exitCode ?? 'unknown'}.`
-              : `${failedStep.name} failed with exit code ${failedStep.exitCode ?? 'unknown'}: \`${failedStep.command}\`.`,
-      })
+            ? ''
+            : onBase === 'passes'
+              ? ` It passes on ${baseBranch} without this change.`
+              : ` ${baseBranch} could not be checked to see whether it fails there too.`
+        halted = await raise('verify.repeat-fail', {
+          evidence: changeEvidence,
+          summary: `${order.title} did not pass verification`,
+          why: `${failedWhy}${baseNote}${capped ? ' It has been sent back twice; take over, accept the debt, or hold.' : ''}`,
+          omitOptions: capped ? ['send_back'] : undefined,
+        })
+      }
     }
   }
 

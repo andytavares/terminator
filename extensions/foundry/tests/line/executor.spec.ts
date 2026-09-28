@@ -13,7 +13,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { ResumeForbiddenError, createRoleRegistry } from '../../src/line/roles.js'
 import { makeVerdict, SelfVerificationError } from '../../src/verify/verdict.js'
-import { decide } from '../../src/gates/rules.js'
+import { decide, raiseGate } from '../../src/gates/rules.js'
 
 // The executor is where the scheduler, the roles and a session finally meet.
 // Each of those was testable alone and none of them did anything on its own,
@@ -854,6 +854,191 @@ describe('the ladder', () => {
     // without you either, which is the rule that stays live at every setting.
     expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
     expect(outcome.shippable).toBe(false)
+  })
+})
+
+describe('a failed final climb', () => {
+  /** Fails Lint (and writes a log for it) until `passAfter` runs of it have happened. */
+  function lintRunner(exit: (n: number) => number) {
+    let n = 0
+    return async (step: { name: string }, logPath: string) => {
+      fs.mkdirSync(path.dirname(logPath), { recursive: true })
+      const code = step.name === 'Lint' ? exit((n += 1)) : 0
+      fs.writeFileSync(logPath, `${step.name} exited ${code} at ${path.basename(logPath)}\n`)
+      return code
+    }
+  }
+
+  const base = (over: Record<string, unknown> = {}) => ({
+    ...deps(vi.fn(ok)),
+    autonomy: 'standard' as const,
+    ...over,
+  })
+
+  function sentBack(o: WorkOrder, n: number) {
+    return Array.from({ length: n }, (_, i) => ({
+      ...raiseGate({
+        id: `WO-1-verify.repeat-fail-${i + 1}`,
+        rule: 'verify.repeat-fail',
+        orderId: o.id,
+        summary: 's',
+        why: 'w',
+        at: '2026-09-06T10:00:00.000Z',
+      }),
+      decision: {
+        option: 'send_back',
+        by: 'operator' as const,
+        note: '',
+        at: '2026-09-06T10:05:00.000Z',
+      },
+    }))
+  }
+
+  it('records a flaky check that passes on a re-run, and ships', async () => {
+    const o = order([unit('U-1')])
+    const record = vi.fn(async () => undefined)
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({ runStep: lintRunner((n) => (n === 1 ? 1 : 0)), record })
+    )
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
+    expect(outcome.ladder?.ok).toBe(true)
+    expect(outcome.shippable).toBe(true)
+    expect(record).toHaveBeenCalledWith(
+      'verify.flaky',
+      'Lint',
+      expect.stringMatching(
+        /^Lint failed once and passed on a re-run: .*\.log then .*\.retry\.log$/
+      )
+    )
+  })
+
+  it('blocks on the base branch when the same check fails there too', async () => {
+    const o = order([unit('U-1')])
+    const releaseBase = vi.fn(async () => undefined)
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({
+        runStep: lintRunner(() => 1),
+        runStepOnBase: lintRunner(() => 2),
+        releaseBase,
+      })
+    )
+    const gate = outcome.gates.find((g) => g.rule === 'verify.base-fail')
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
+    expect(gate?.summary).toBe('x is blocked by a check that already fails on main')
+    expect(gate?.why).toContain('Lint fails on main with exit code 2')
+    expect(gate?.why).toContain('also fails without this change')
+    expect(gate?.options.map((o) => o.id)).toEqual(['fix_first', 'accept_debt', 'hold'])
+    expect(gate?.evidence).toHaveLength(2)
+    expect(gate?.evidence[0]).toMatchObject({ exitCode: 1 })
+    expect(gate?.evidence[0].excerpt).toContain('.retry.log')
+    expect(gate?.evidence[1]).toMatchObject({ exitCode: 2, step: 'Lint' })
+    expect(gate?.evidence[1].command).toBeTruthy()
+    expect(gate?.evidence[1].excerpt).toContain('.base.log')
+    expect(releaseBase).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends the change back when the base passes the same check', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({ runStep: lintRunner(() => 1), runStepOnBase: lintRunner(() => 0) })
+    )
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toMatch(/It passes on main without this change\.$/)
+    expect(gate?.options.map((o) => o.id)).toContain('send_back')
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.base-fail')
+  })
+
+  it('stops offering send back after two of them', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({
+        runStep: lintRunner(() => 1),
+        runStepOnBase: lintRunner(() => 0),
+        priorGates: sentBack(o, 2),
+      })
+    )
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.options.map((o) => o.id)).toEqual(['take_over', 'accept_debt', 'hold'])
+    expect(gate?.why).toContain('It has been sent back twice; take over, accept the debt, or hold.')
+  })
+
+  it('still offers send back after one', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({ runStep: lintRunner(() => 1), priorGates: sentBack(o, 1) })
+    )
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.options.map((o) => o.id)).toContain('send_back')
+  })
+
+  it('says so when the base branch could not be checked, and never counts it as a pass', async () => {
+    const o = order([unit('U-1')])
+    const unmeasured = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({ runStep: lintRunner(() => 1), runStepOnBase: async () => null })
+    )
+    const absent = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({ runStep: lintRunner(() => 1) })
+    )
+    for (const outcome of [unmeasured, absent]) {
+      const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+      expect(gate?.why).toContain('main could not be checked')
+      expect(gate?.options.map((o) => o.id)).toContain('send_back')
+    }
+  })
+
+  it('releases the base checkout once, even when a base step throws', async () => {
+    const o = order([unit('U-1')])
+    const releaseBase = vi.fn(async () => undefined)
+    await expect(
+      execute(
+        o,
+        recipe(),
+        buildRunGraph(o, recipe()),
+        base({
+          runStep: lintRunner(() => 1),
+          runStepOnBase: async () => {
+            throw new Error('checkout gone')
+          },
+          releaseBase,
+        })
+      )
+    ).rejects.toThrow('checkout gone')
+    expect(releaseBase).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not touch the base when the ladder passes', async () => {
+    const o = order([unit('U-1')])
+    const runStepOnBase = vi.fn(async () => 0)
+    const releaseBase = vi.fn(async () => undefined)
+    await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({ runStep: async () => 0, runStepOnBase, releaseBase })
+    )
+    expect(runStepOnBase).not.toHaveBeenCalled()
+    expect(releaseBase).not.toHaveBeenCalled()
   })
 })
 

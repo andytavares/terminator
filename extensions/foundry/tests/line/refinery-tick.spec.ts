@@ -26,15 +26,18 @@ function baseDeps(over: Partial<RefineryTickDeps> = {}): RefineryTickDeps & {
   records: { orderId: string; action: string; subject: string; reason: string }[]
   conflicts: { orderId: string; why: string; files: readonly string[] }[]
   watched: string[]
+  resumed: string[]
 } {
   const states = new Map<string, RefineryState>()
   const records: { orderId: string; action: string; subject: string; reason: string }[] = []
   const conflicts: { orderId: string; why: string; files: readonly string[] }[] = []
   const watched: string[] = []
+  const resumed: string[] = []
 
   const deps: RefineryTickDeps = {
     candidates: async () => [],
-    readState: async (orderId) => states.get(orderId) ?? { mergedAt: null, restackedFor: [] },
+    readState: async (orderId) =>
+      states.get(orderId) ?? { mergedAt: null, restackedFor: [], waitingOn: null },
     writeState: async (orderId, state) => {
       states.set(orderId, state)
     },
@@ -52,11 +55,15 @@ function baseDeps(over: Partial<RefineryTickDeps> = {}): RefineryTickDeps & {
       records.push({ orderId, action, subject, reason })
     },
     titleOf: async (orderId) => orderId,
+    waitingOn: async () => [],
+    resume: async (orderId) => {
+      resumed.push(orderId)
+    },
     now: () => '2026-09-06T12:00:00.000Z',
     ...over,
   }
 
-  return Object.assign(deps, { states, records, conflicts, watched })
+  return Object.assign(deps, { states, records, conflicts, watched, resumed })
 }
 
 describe('refineryTick', () => {
@@ -91,6 +98,7 @@ describe('refineryTick', () => {
     expect(deps.states.get('WO-1')).toEqual({
       mergedAt: '2026-09-06T12:00:00.000Z',
       restackedFor: [],
+      waitingOn: null,
     })
     expect(deps.states.get('WO-2')?.restackedFor).toEqual(['WO-1'])
     expect(deps.watched).toEqual(['WO-2'])
@@ -106,7 +114,11 @@ describe('refineryTick', () => {
       viewPr,
       entries: async () => [],
     })
-    deps.states.set('WO-1', { mergedAt: '2026-09-06T10:00:00.000Z', restackedFor: [] })
+    deps.states.set('WO-1', {
+      mergedAt: '2026-09-06T10:00:00.000Z',
+      restackedFor: [],
+      waitingOn: null,
+    })
 
     await refineryTick(deps)
 
@@ -126,7 +138,7 @@ describe('refineryTick', () => {
       ],
       restack,
     })
-    deps.states.set('WO-2', { mergedAt: null, restackedFor: ['WO-1'] })
+    deps.states.set('WO-2', { mergedAt: null, restackedFor: ['WO-1'], waitingOn: null })
 
     await refineryTick(deps)
 
@@ -184,5 +196,80 @@ describe('refineryTick', () => {
     await refineryTick(deps)
     expect(deps.states.get('WO-2')?.restackedFor).toEqual(['WO-1'])
     expect(deps.watched).toEqual(['WO-2'])
+  })
+
+  describe('an order waiting on a fix for the base branch', () => {
+    function waitingDeps(over: Partial<RefineryTickDeps> = {}) {
+      const deps = baseDeps({
+        candidates: async () => [
+          { order: { id: 'WO-FIX', title: 'Fix lint on main' }, pulls: [{ url: 'u1' }] },
+        ],
+        viewPr: async () => ({ merged: true }),
+        waitingOn: async (id) => (id === 'WO-FIX' ? ['WO-2'] : []),
+        titleOf: async (id) => (id === 'WO-FIX' ? 'Fix lint on main' : 'Blocked order'),
+        ...over,
+      })
+      deps.states.set('WO-2', { mergedAt: null, restackedFor: [], waitingOn: 'WO-FIX' })
+      return deps
+    }
+
+    it('restacks it, stops it waiting, records that it is checking again, and resumes it', async () => {
+      const restack = vi.fn(async () => ({ kind: 'rebased' as const, pushed: true }))
+      const deps = waitingDeps({ restack })
+
+      await refineryTick(deps)
+
+      expect(restack).toHaveBeenCalledTimes(1)
+      expect(deps.states.get('WO-2')?.waitingOn).toBeNull()
+      expect(deps.records.filter((r) => r.orderId === 'WO-2')).toEqual([
+        {
+          orderId: 'WO-2',
+          action: 'refinery.resumed',
+          subject: 'WO-2',
+          reason: 'Fix lint on main merged; checking again.',
+        },
+      ])
+      expect(deps.resumed).toEqual(['WO-2'])
+    })
+
+    it('raises a conflict instead of resuming when it no longer rebases', async () => {
+      const deps = waitingDeps({ restack: async () => ({ kind: 'conflict', files: ['a.ts'] }) })
+
+      await refineryTick(deps)
+
+      expect(deps.conflicts).toEqual([
+        {
+          orderId: 'WO-2',
+          why: 'Blocked order no longer rebases onto its base after Fix lint on main merged',
+          files: ['a.ts'],
+        },
+      ])
+      expect(deps.records.map((r) => r.action)).toContain('refinery.conflict')
+      expect(deps.resumed).toEqual([])
+    })
+
+    it('keeps waiting on a failed restack, and resumes on the next tick', async () => {
+      const restack = vi.fn(async () => ({ kind: 'failed' as const, reason: 'network blip' }))
+      const deps = waitingDeps({ restack })
+
+      await refineryTick(deps)
+      expect(deps.states.get('WO-2')?.waitingOn).toBe('WO-FIX')
+      expect(deps.records.map((r) => r.action)).toContain('refinery.failed')
+      expect(deps.resumed).toEqual([])
+
+      restack.mockResolvedValueOnce({ kind: 'rebased', pushed: true } as never)
+      await refineryTick(deps)
+      expect(deps.states.get('WO-2')?.waitingOn).toBeNull()
+      expect(deps.resumed).toEqual(['WO-2'])
+    })
+
+    it('does nothing for it while the fix has not merged', async () => {
+      const deps = waitingDeps({ viewPr: async () => ({ merged: false }) })
+
+      await refineryTick(deps)
+
+      expect(deps.states.get('WO-2')?.waitingOn).toBe('WO-FIX')
+      expect(deps.resumed).toEqual([])
+    })
   })
 })

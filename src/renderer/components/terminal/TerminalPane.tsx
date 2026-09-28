@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
 import { useModalStore } from '../../stores/modal.store'
+import { useTerminalOpenErrorStore } from '../../stores/terminal-open-error.store'
 import type { PaneNode } from '../../../../shared/types/index'
 import { SplitContainer } from './SplitContainer'
 import { LeafPane } from './LeafPane'
@@ -26,10 +27,19 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   } = useSessionStore()
   const modalOpen = useModalStore((s) => s.depth > 0)
 
+  const openError = useTerminalOpenErrorStore((s) => s.errors[projectId])
+  const retryOpen = useTerminalOpenErrorStore((s) => s.retry)
+  const clearOpenError = useTerminalOpenErrorStore((s) => s.clearError)
+
   const activeSessionId = getActiveSessionForProject(projectId)
   const sessions = getSessionsForProject(projectId)
+  const hasSessions = sessions.length > 0
   const layout = getPaneLayout(projectId)
   // All hooks must run unconditionally before any early return.
+  useEffect(() => {
+    if (hasSessions) clearOpenError(projectId)
+  }, [hasSessions, projectId, clearOpenError])
+
   useEffect(() => {
     if (activeSessionId) clearBellCount(activeSessionId)
   }, [activeSessionId, clearBellCount])
@@ -116,7 +126,20 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   if (sessions.length === 0) {
     return (
       <div className="terminal-pane terminal-pane--empty">
-        <span>Open a terminal tab to get started</span>
+        {openError ? (
+          <div className="terminal-pane__open-error" role="alert">
+            <span>Couldn&apos;t open a terminal: {openError}</span>
+            <button
+              type="button"
+              className="dialog__btn-secondary"
+              onClick={() => retryOpen(projectId)}
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <span>Open a terminal tab to get started</span>
+        )}
       </div>
     )
   }
