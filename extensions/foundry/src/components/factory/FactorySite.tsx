@@ -3,6 +3,8 @@ import type { Standing } from '../../order/standing.js'
 import type { FactoryMetrics } from '../../factory/metrics.js'
 import { MetricsTiles, WindowToggle } from '../MetricsTiles.js'
 import type { Signal } from '../../sensors/types.js'
+import type { CiState } from '../../line/ci-state.js'
+import { HallThumbnail } from './HallThumbnail.js'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
@@ -33,7 +35,11 @@ export interface FactoryOrderRow {
    * Null when nothing has shipped a pull yet, and absent (like `standing`)
    * when the host answering the list has never heard of CI.
    */
-  readonly ci?: { readonly status: string; readonly round: number; readonly max: number } | null
+  readonly ci?: {
+    readonly status: CiState['status']
+    readonly round: number
+    readonly max: number
+  } | null
   /**
    * Where this order stands in the refinery's file-overlap queue.
    *
@@ -129,6 +135,21 @@ export interface FactorySiteProps {
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
+}
+
+/** Plain words for a CI status, keyed so a new status the store starts
+ *  emitting fails to compile here rather than showing the operator a raw
+ *  code. */
+const CI_STATUS_WORDS: Record<CiState['status'], string> = {
+  watching: 'still running',
+  green: 'passed',
+  red: 'failing',
+  not_measured: 'not measured yet',
+  reworking: 'sent back for rework',
+}
+
+function ciLine(ci: NonNullable<FactoryOrderRow['ci']>): string {
+  return `CI check round ${ci.round} of ${ci.max}: ${CI_STATUS_WORDS[ci.status]}`
 }
 
 /** How often the grid is refetched. Slower than a live run's own poll: this
@@ -289,13 +310,16 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
               {row.standing?.turn === 'you' ? (
                 <span className="fdry-hall-card-beacon" aria-hidden="true" />
               ) : null}
+              <HallThumbnail
+                orderId={row.id}
+                title={row.title}
+                refreshKey={`${row.status}:${row.standing?.kind ?? ''}:${row.ci?.status ?? ''}:${row.ci?.round ?? ''}`}
+              />
               <b>{row.title}</b>
               {row.standing === undefined ? null : (
                 <span className="fdry-hall-card-state">{row.standing.label}</span>
               )}
-              {row.ci ? (
-                <span className="fdry-hall-card-ci">{`CI ${row.ci.round}/${row.ci.max} · ${row.ci.status}`}</span>
-              ) : null}
+              {row.ci ? <span className="fdry-hall-card-ci">{ciLine(row.ci)}</span> : null}
             </button>
           ))}
         </div>

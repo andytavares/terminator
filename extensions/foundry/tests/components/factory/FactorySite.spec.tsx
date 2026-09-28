@@ -112,12 +112,12 @@ describe('FactorySite', () => {
     ).not.toBeNull()
   })
 
-  it('shows the CI round and status when the order carries one', async () => {
+  it('shows the CI round and status in plain words, never a raw code', async () => {
     mount([
       { id: 'WO-1', title: 'Shipping', status: 'running', ci: { status: 'red', round: 2, max: 3 } },
     ])
     await waitFor(() => screen.getByText('Shipping'))
-    expect(screen.getByText('CI 2/3 · red')).toBeTruthy()
+    expect(screen.getByText('CI check round 2 of 3: failing')).toBeTruthy()
   })
 
   it('says nothing about CI for an order that has not shipped one', async () => {
