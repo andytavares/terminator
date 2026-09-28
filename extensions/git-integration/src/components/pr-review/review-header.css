@@ -1,0 +1,236 @@
+/*
+ * ReviewHeader: the single 44px row that replaces the old top bar, the
+ * StatusChecksBar band, the progress track and the large-PR banner.
+ * Class prefix `rh-`. Tokens only from EXTENSION_BASE_CSS's --tm-* set.
+ */
+
+.rh-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--tm-border);
+  flex-shrink: 0;
+}
+
+.rh-num {
+  font-size: 12px;
+  color: var(--tm-text-muted);
+  flex-shrink: 0;
+}
+
+.rh-draft-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--tm-text-muted);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.rh-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tm-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.rh-pill-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.rh-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font: inherit;
+  color: var(--tm-text-muted);
+  cursor: pointer;
+  line-height: 16px;
+}
+
+.rh-pill:hover {
+  background: var(--tm-overlay-subtle);
+}
+
+.rh-pill--fail {
+  color: var(--tm-danger);
+  border-color: color-mix(in srgb, var(--tm-danger) 40%, transparent);
+}
+
+.rh-pill--pending,
+.rh-pill--warning {
+  color: var(--tm-warning);
+  border-color: color-mix(in srgb, var(--tm-warning) 40%, transparent);
+}
+
+.rh-pill--focus[aria-pressed='true'] {
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+  border-color: var(--tm-accent);
+}
+
+.rh-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.rh-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.rh-progress-meter {
+  width: 60px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tm-overlay);
+  overflow: hidden;
+}
+
+.rh-progress-fill {
+  height: 100%;
+  background: var(--tm-accent);
+  transition: width 0.3s ease;
+}
+
+.rh-progress-text {
+  font-size: 11px;
+  color: var(--tm-text-muted);
+  white-space: nowrap;
+}
+
+.rh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font: inherit;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rh-btn:hover {
+  background: var(--tm-overlay-subtle);
+}
+
+.rh-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 4px;
+  color: var(--tm-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rh-icon-btn:hover {
+  background: var(--tm-overlay-subtle);
+}
+
+.rh-icon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.rh-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 220px;
+  max-width: 340px;
+  background: var(--tm-surface);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 8px;
+  box-shadow: var(--tm-shadow-elevated, 0 4px 16px rgba(0, 0, 0, 0.2));
+  padding: 6px;
+}
+
+.rh-large-pr-text {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  line-height: 1.4;
+  margin: 4px 6px 8px;
+}
+
+.rh-popover-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font: inherit;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.rh-popover-btn:hover {
+  background: var(--tm-overlay-subtle);
+}
+
+.rh-menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.rh-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font: inherit;
+  color: var(--tm-text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.rh-menu-item:hover {
+  background: var(--tm-overlay-subtle);
+}
+
+.rh-menu-item:disabled {
+  color: var(--tm-text-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.rh-menu-item:disabled:hover {
+  background: none;
+}
+
+.rh-menu-hint {
+  font-size: 10px;
+  color: var(--tm-text-muted);
+}
