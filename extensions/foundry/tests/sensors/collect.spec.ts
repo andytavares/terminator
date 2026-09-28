@@ -228,7 +228,13 @@ describe('collect: tracker', () => {
   it('searches when a query is set', async () => {
     const built = trackerDeps()
     search.mockResolvedValue([
-      { key: 'PROJ-1', title: 'Login flakes', url: 'https://tracker/PROJ-1', updatedAt: 't1' },
+      {
+        key: 'PROJ-1',
+        title: 'Login flakes',
+        url: 'https://tracker/PROJ-1',
+        stateType: 'started',
+        updatedAt: 't1',
+      },
     ])
     const source: SensorSource = { kind: 'tracker', query: 'flake', limit: 15 }
 
@@ -238,6 +244,25 @@ describe('collect: tracker', () => {
     expect(listMine).not.toHaveBeenCalled()
     expect(result.problem).toBeNull()
     expect(result.items[0].key).toMatch(/^tracker:/)
+  })
+
+  it('senses only open tickets from a saved query', async () => {
+    const built = trackerDeps()
+    search.mockResolvedValue([
+      { key: 'PROJ-1', title: 'Login flakes', url: 'https://tracker/PROJ-1', stateType: 'started' },
+      {
+        key: 'PROJ-2',
+        title: 'Retry flakes',
+        url: 'https://tracker/PROJ-2',
+        stateType: 'completed',
+      },
+      { key: 'PROJ-3', title: 'Old flakes', url: 'https://tracker/PROJ-3', stateType: 'canceled' },
+    ])
+    const source: SensorSource = { kind: 'tracker', query: 'flake', limit: 15 }
+
+    const result = await collect(source, built)
+
+    expect(result.items.map((item) => item.evidence.url)).toEqual(['https://tracker/PROJ-1'])
   })
 
   it('lists mine when the query is null', async () => {

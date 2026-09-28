@@ -634,7 +634,8 @@ Settings → Integrations. An extension never holds a tracker credential and nev
 tracker itself — it asks here, the same way it asks for a shell or a PTY.
 
 ```typescript
-// "My issues" across every connected tracker.
+// "My issues" across every connected tracker. Linear leaves out closed tickets
+// here; `search` does not, so a closed one can still be found by name.
 const { issues, failures } = await api.issues.listMine({ limit: 25 })
 
 // A tracker that failed does not fail the call. Say what is missing rather

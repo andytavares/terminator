@@ -290,8 +290,9 @@ Connect a tracker first: [Settings → Integrations](#9-settings).
 A branch can carry **one** issue at a time — a branch is a unit of work, and so is a ticket.
 
 **To attach one**: right-click the branch in the sidebar → **Link issue…**. The picker opens on
-the issues assigned to you across every connected tracker, so the common case needs no typing.
-Type to search, or type an issue key exactly (`TAV-42`) to jump straight to it. Each row shows
+the issues assigned to you across every connected tracker, so the common case needs no typing;
+closed Linear tickets (done, canceled, duplicate) are left out. Type to search — search finds a
+ticket in any state — or type an issue key exactly (`TAV-42`) to jump straight to it. Each row shows
 which tracker it came from, because two trackers can both have a `TAV-42` and they are different
 issues.
 

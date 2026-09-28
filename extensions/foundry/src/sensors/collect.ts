@@ -9,8 +9,13 @@ interface TrackerIssue {
   readonly key: string
   readonly title: string
   readonly url: string
+  readonly stateType: string
   readonly updatedAt?: string
 }
+
+// Tracker search is unfiltered so a person can find a closed ticket by name;
+// a saved sensor query is a standing filter for new work, so it drops them.
+const CLOSED_STATE_TYPES: ReadonlySet<string> = new Set(['completed', 'canceled'])
 
 export interface CollectDeps {
   readonly exec: ShellExec
@@ -151,7 +156,9 @@ async function collectTracker(
 
   const found =
     source.query !== null
-      ? await deps.issues.search(source.query, { limit: source.limit })
+      ? (await deps.issues.search(source.query, { limit: source.limit })).filter(
+          (issue) => !CLOSED_STATE_TYPES.has(issue.stateType)
+        )
       : await deps.issues.listMine({ limit: source.limit })
 
   const items: SensedItem[] = found.map((issue) => ({

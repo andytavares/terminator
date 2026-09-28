@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { createLinearProvider } from '../../../../src/main/integrations/providers/linear.provider'
 import { TrackerError } from '../../../../src/main/integrations/tracker-error'
 import {
@@ -41,7 +41,10 @@ describe('linear provider — listMine', () => {
     const result = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 25)
 
     expect(issues).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: { assignee: { email: { eq: 'a@b.c' } } }, first: 25 })
+      expect.objectContaining({
+        filter: expect.objectContaining({ assignee: { email: { eq: 'a@b.c' } } }),
+        first: 25,
+      })
     )
     expect(result[0]).toMatchObject({ tracker: 'linear', key: 'TAV-42' })
   })
@@ -97,10 +100,98 @@ describe('linear provider — search', () => {
     const provider = providerWith({ searchIssues })
     const result = await provider.search(CRED, 'sidebar', 15)
 
-    expect(searchIssues).toHaveBeenCalledWith(
-      expect.objectContaining({ term: 'sidebar', first: 15 })
-    )
+    expect(searchIssues).toHaveBeenCalledWith('sidebar', { first: 15, includeArchived: true })
     expect(result[0].key).toBe('TAV-42')
+  })
+
+  it('returns closed tickets too, reading a duplicate as canceled', async () => {
+    const duplicate = makeIssue({
+      identifier: 'TAV-7',
+      state: Promise.resolve({ name: 'Duplicate', type: 'duplicate' }),
+    })
+    const provider = providerWith({
+      searchIssues: vi.fn().mockResolvedValue({ nodes: [DONE_ISSUE, duplicate] }),
+    })
+    const result = await provider.search(CRED, 'themed', 15)
+
+    expect(result.map((issue) => [issue.key, issue.state])).toEqual([
+      ['TAV-38', { name: 'Done', type: 'completed' }],
+      ['TAV-7', { name: 'Duplicate', type: 'canceled' }],
+    ])
+  })
+})
+
+// The fakes above accept whatever arguments they are handed, which is how a
+// search that passed its variables as the term shipped. These build the real
+// SDK client and read the GraphQL request it actually sends.
+describe('linear provider — the request the SDK sends', () => {
+  const OPEN_ONLY = { type: { nin: ['completed', 'canceled', 'duplicate'] } }
+  const EMPTY = { nodes: [], pageInfo: { hasNextPage: false, hasPreviousPage: false } }
+
+  interface SentRequest {
+    query: string
+    variables: Record<string, unknown>
+  }
+
+  function stubLinear(respond: (sent: SentRequest) => unknown): SentRequest[] {
+    const sent: SentRequest[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: { body: string }) => {
+        const body = JSON.parse(init.body) as SentRequest
+        sent.push(body)
+        return new Response(JSON.stringify({ data: respond(body) }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      })
+    )
+    return sent
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('asks for open issues only when listing by assignee email', async () => {
+    const sent = stubLinear(() => ({ issues: EMPTY }))
+
+    await createLinearProvider().listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 25)
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0].variables.filter).toEqual({
+      assignee: { email: { eq: 'a@b.c' } },
+      state: OPEN_ONLY,
+    })
+  })
+
+  it("asks for open issues only when listing the viewer's own", async () => {
+    const sent = stubLinear((request) =>
+      request.query.includes('assignedIssues')
+        ? { user: { assignedIssues: EMPTY } }
+        : { viewer: { id: 'user-1', ...VIEWER } }
+    )
+
+    await createLinearProvider().listMine(CRED, { kind: 'assignee', email: null }, 10)
+
+    const listing = sent.find((request) => request.query.includes('assignedIssues'))
+    expect(listing?.variables).toMatchObject({ first: 10, filter: { state: OPEN_ONLY } })
+  })
+
+  it('searches every state, archived included, with the term as a string', async () => {
+    const sent = stubLinear(() => ({
+      searchIssues: {
+        ...EMPTY,
+        totalCount: 0,
+        archivePayload: { archive: '', totalCount: 0, databaseVersion: 0 },
+      },
+    }))
+
+    await createLinearProvider().search(CRED, 'sidebar', 15)
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0].variables).toMatchObject({ term: 'sidebar', first: 15, includeArchived: true })
+    expect(sent[0].variables).not.toHaveProperty('filter')
   })
 })
 

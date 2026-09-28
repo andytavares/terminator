@@ -803,12 +803,14 @@ function sensorIssuesFor(api: ExtensionAPI): CollectDeps['issues'] {
         key: issue.key,
         title: issue.title,
         url: issue.url,
+        stateType: issue.state.type,
       })),
     listMine: async (opts) =>
       (await issues.listMine(opts)).issues.map((issue) => ({
         key: issue.key,
         title: issue.title,
         url: issue.url,
+        stateType: issue.state.type,
       })),
   }
 }

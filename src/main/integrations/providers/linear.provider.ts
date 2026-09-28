@@ -37,7 +37,7 @@ interface LinearLike {
     teams?: (vars?: unknown) => unknown
   }>
   issues(vars?: unknown): unknown
-  searchIssues(vars?: unknown): unknown
+  searchIssues(term: string, vars?: unknown): unknown
   issue(id: string): unknown
   createComment(input: { issueId: string; body: string }): unknown
   updateIssue(id: string, input: { stateId: string }): unknown
@@ -57,15 +57,22 @@ function assertLinear(
   }
 }
 
-// Linear's own state categories map one-to-one onto ours; anything it adds
-// later reads as backlog rather than crashing the mapping.
+// Linear's own state categories map onto ours; a duplicate is closed without
+// being done, which is what canceled already means. Anything Linear adds later
+// reads as backlog rather than crashing the mapping.
 const STATE_TYPES: ReadonlyMap<string, IssueStateType> = new Map([
   ['backlog', 'backlog'],
   ['unstarted', 'unstarted'],
   ['started', 'started'],
   ['completed', 'completed'],
   ['canceled', 'canceled'],
+  ['duplicate', 'canceled'],
 ])
+
+// A list of "mine" is a list of work to pick up; a closed ticket never
+// reopens, so it is left out at the query. Search deliberately does not use
+// this: a person looking for a ticket by name may be looking for a closed one.
+const OPEN_STATES = { type: { nin: ['completed', 'canceled', 'duplicate'] } }
 
 function toState(raw: { name?: unknown; type?: unknown } | null | undefined): IssueState {
   const name = typeof raw?.name === 'string' ? raw.name : 'Unknown'
@@ -287,9 +294,12 @@ export function createLinearProvider(
         const connection = (await (email === null
           ? // No email configured: the key's own viewer is the answer, and it
             // is one fewer round trip than looking the user up first.
-            ((await client.viewer).assignedIssues?.({ first: limit }) ?? { nodes: [] })
+            ((await client.viewer).assignedIssues?.({
+              filter: { state: OPEN_STATES },
+              first: limit,
+            }) ?? { nodes: [] })
           : client.issues({
-              filter: { assignee: { email: { eq: email } } },
+              filter: { assignee: { email: { eq: email } }, state: OPEN_STATES },
               first: limit,
               orderBy: 'updatedAt',
             }))) as { nodes?: RawIssue[] } | null
@@ -300,7 +310,10 @@ export function createLinearProvider(
     async search(cred, term, limit): Promise<IssueSummary[]> {
       const client = clientFor(cred)
       return run(async () => {
-        const connection = (await client.searchIssues({ term, first: limit })) as {
+        const connection = (await client.searchIssues(term, {
+          first: limit,
+          includeArchived: true,
+        })) as {
           nodes?: RawIssue[]
         } | null
         return Promise.all((connection?.nodes ?? []).map(toSummary))
