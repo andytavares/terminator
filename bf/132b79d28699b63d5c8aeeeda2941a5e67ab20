@@ -1,0 +1,27 @@
+docs/EXTENSION-DEVELOPMENT.md
+  s_baf89fbe48640a::t_e90e383465c638 637-638
+specs/031-linear-project-integration/contracts/extension-api.md
+  s_baf89fbe48640a::t_e90e383465c638 19-20,23
+tests/unit/integrations/providers/linear.provider.spec.ts
+  s_baf89fbe48640a::t_503d479453ea9c 44-47,52-69,126-134
+src/main/integrations/providers/linear.provider.ts
+  s_baf89fbe48640a::t_48f13d284a4b03 287-289,293-295,297
+specs/031-linear-project-integration/contracts/tracker-provider.md
+  s_baf89fbe48640a::t_e90e383465c638 16,19,55-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bf132b79d28699b63d5c8aeeeda2941a5e67ab20",
+  "prompts": {},
+  "sessions": {
+    "s_baf89fbe48640a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "52ffbc4c-0d9e-43b3-9736-7636a9e37045",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
