@@ -5,6 +5,7 @@ export type AgentRequest = 'review' | 'explain' | 'ask'
 
 export type CommentVisibility = 'all' | 'unresolved' | 'hidden'
 export type DiffRange = 'since' | 'whole'
+export type DiffViewMode = 'unified' | 'split'
 
 /** A line range the reviewer has selected in the diff, for the float bar and the agent. */
 export interface LineSelection {
@@ -43,6 +44,8 @@ interface Prefs {
   agentNotesOn: boolean
   diffRange: DiffRange
   fileListHidden: boolean
+  diffViewMode: DiffViewMode
+  hideFormattingHunks: boolean
 }
 
 const DEFAULT_PREFS: Prefs = {
@@ -50,6 +53,8 @@ const DEFAULT_PREFS: Prefs = {
   agentNotesOn: true,
   diffRange: 'since',
   fileListHidden: false,
+  diffViewMode: 'unified',
+  hideFormattingHunks: true,
 }
 
 function loadPrefs(): Prefs {
@@ -87,6 +92,8 @@ interface ReviewUiStore extends Prefs {
   setAgentNotesOn(on: boolean): void
   setDiffRange(r: DiffRange): void
   toggleFileList(): void
+  setDiffViewMode(mode: DiffViewMode): void
+  setHideFormattingHunks(on: boolean): void
   setSelection(s: LineSelection | null): void
   requestComposer(r: ComposerRequest | null): void
   setAgentRuns(runs: AgentRun[]): void
@@ -108,6 +115,8 @@ export const useReviewUiStore = create<ReviewUiStore>((set, get) => {
       agentNotesOn: s.agentNotesOn,
       diffRange: s.diffRange,
       fileListHidden: s.fileListHidden,
+      diffViewMode: s.diffViewMode,
+      hideFormattingHunks: s.hideFormattingHunks,
     })
   }
   return {
@@ -129,6 +138,8 @@ export const useReviewUiStore = create<ReviewUiStore>((set, get) => {
     setAgentNotesOn: (on) => persist({ agentNotesOn: on }),
     setDiffRange: (r) => persist({ diffRange: r }),
     toggleFileList: () => persist({ fileListHidden: !get().fileListHidden }),
+    setDiffViewMode: (mode) => persist({ diffViewMode: mode }),
+    setHideFormattingHunks: (on) => persist({ hideFormattingHunks: on }),
     setSelection: (s) => set({ selection: s }),
     requestComposer: (r) => set({ composerRequest: r }),
     setAgentRuns: (runs) => set({ agentRuns: runs }),
