@@ -423,17 +423,6 @@
   gap: 8px;
   min-height: 36px;
 }
-.pr-review-progress-track {
-  height: 3px;
-  background: var(--tm-overlay);
-  flex-shrink: 0;
-}
-.pr-review-progress-fill {
-  height: 100%;
-  background: var(--tm-accent);
-  transition: width 0.3s ease;
-  min-width: 0;
-}
 
 .pr-review-topbar-title {
   font-size: 12px;
@@ -518,23 +507,6 @@
   opacity: 0.7;
 }
 
-.pr-review-panel-close {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  color: var(--tm-text-muted);
-  line-height: 1;
-  padding: 0 4px;
-  z-index: var(--tm-layer-panel);
-}
-.pr-review-panel-close:hover {
-  color: var(--tm-text-primary);
-}
-
 .pr-review-panel-header {
   display: flex;
   justify-content: space-between;
@@ -566,74 +538,54 @@
   font-size: 13px;
 }
 
-/* ─── Large-PR cognitive load banner ─────────────────────────────────────── */
+/* ─── Rail: Files | Chapters ─────────────────────────────────────────────── */
 
-.pr-large-pr-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: color-mix(in srgb, var(--tm-warning) 10%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--tm-warning) 25%, transparent);
-  flex-shrink: 0;
-  min-height: 32px;
+.pr-rail-switch {
+  display: inline-flex;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  overflow: hidden;
 }
 
-.pr-large-pr-banner__icon {
-  font-size: 11px;
-  color: var(--tm-warning);
-  flex-shrink: 0;
-  opacity: 0.9;
-}
-
-.pr-large-pr-banner__text {
-  font-size: 11px;
-  color: color-mix(in srgb, var(--tm-warning) 90%, transparent);
-  flex: 1;
-  line-height: 1.4;
-}
-
-.pr-large-pr-banner__focus {
-  background: color-mix(in srgb, var(--tm-warning) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tm-warning) 30%, transparent);
-  border-radius: 4px;
-  color: color-mix(in srgb, var(--tm-warning) 85%, transparent);
-  font-size: 11px;
-  font-weight: 500;
+.pr-rail-switch button {
+  background: transparent;
+  border: 0;
+  padding: 3px 10px;
+  font: 500 12px/1.4 var(--tm-font-ui);
+  color: var(--tm-text-secondary);
   cursor: pointer;
-  padding: 2px 8px;
-  flex-shrink: 0;
-  transition:
-    background 0.15s,
-    border-color 0.15s;
-  line-height: 18px;
 }
 
-.pr-large-pr-banner__focus:hover {
-  background: color-mix(in srgb, var(--tm-warning) 25%, transparent);
-  border-color: color-mix(in srgb, var(--tm-warning) 50%, transparent);
+.pr-rail-switch button + button {
+  border-left: 1px solid var(--tm-border-strong);
 }
 
-.pr-large-pr-banner__focus--active {
-  background: color-mix(in srgb, var(--tm-warning) 28%, transparent);
-  border-color: color-mix(in srgb, var(--tm-warning) 60%, transparent);
-  color: var(--tm-warning);
+.pr-rail-switch button[aria-pressed='true'] {
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
 }
 
-.pr-large-pr-banner__dismiss {
-  background: none;
-  border: none;
-  color: color-mix(in srgb, var(--tm-warning) 50%, transparent);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 2px;
-  flex-shrink: 0;
-  transition: color 0.15s;
+.pr-rail-chapters .chapter-nav {
+  flex-direction: column;
+  overflow-x: visible;
 }
 
-.pr-large-pr-banner__dismiss:hover {
-  color: color-mix(in srgb, var(--tm-warning) 85%, transparent);
+.pr-rail-chapters .chapter-nav-tab {
+  width: 100%;
+  padding: 7px 10px;
+  border-bottom: 0;
+  border-left: 2px solid transparent;
+  white-space: normal;
+  text-align: left;
+}
+
+.pr-rail-chapters .chapter-nav-tab--active {
+  border-left-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
+}
+
+.pr-rail-chapters .chapter-nav-meta {
+  margin-left: auto;
 }
 
 /* ─── ChapterNav ──────────────────────────────────────────────────────────── */
@@ -806,7 +758,8 @@
 .review-diff-pane {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1035,107 +988,8 @@
 }
 
 /* Nav bar */
-.review-diff-nav-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 14px;
-  border-top: 1px solid var(--tm-border);
-  flex-shrink: 0;
-}
-
-.review-diff-nav-left,
-.review-diff-nav-right {
-  display: flex;
-  gap: 8px;
-}
-
-.review-diff-nav-center {
-  flex: 1;
-  text-align: center;
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  padding: 0 12px;
-}
-
-.review-diff-nav-btn {
-  padding: 5px 12px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 5px;
-  background: none;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--tm-text-primary);
-  transition:
-    background 0.1s,
-    border-color 0.1s;
-}
-.review-diff-nav-btn:hover {
-  background: var(--tm-overlay-soft);
-  border-color: var(--tm-border-strong);
-}
-
-.review-diff-nav-btn--primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 600;
-}
-.review-diff-nav-btn--primary:hover {
-  background: var(--tm-accent-hover, var(--tm-accent));
-}
-
-.review-diff-progress {
-  font-size: 11px;
-}
 
 /* ─── HealthChips ─────────────────────────────────────────────────────────── */
-
-.health-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 7px 14px;
-  border-bottom: 1px solid var(--tm-border);
-  flex-shrink: 0;
-}
-
-.health-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 10px;
-  font-size: 11px;
-  border: 1px solid transparent;
-}
-.health-chip--pass {
-  background: color-mix(in srgb, var(--tm-success) 12%, transparent);
-  border-color: color-mix(in srgb, var(--tm-success) 30%, transparent);
-  color: var(--tm-success);
-}
-.health-chip--warn {
-  background: color-mix(in srgb, var(--tm-warning) 12%, transparent);
-  border-color: color-mix(in srgb, var(--tm-warning) 30%, transparent);
-  color: var(--tm-warning);
-}
-.health-chip--fail {
-  background: color-mix(in srgb, var(--tm-danger) 12%, transparent);
-  border-color: color-mix(in srgb, var(--tm-danger) 30%, transparent);
-  color: var(--tm-danger);
-}
-.health-chip--unknown {
-  background: color-mix(in srgb, var(--tm-text-muted) 10%, transparent);
-  border-color: color-mix(in srgb, var(--tm-text-muted) 20%, transparent);
-  color: var(--tm-text-muted);
-}
-
-.health-chip-label {
-  font-weight: 600;
-}
-.health-chip-value {
-  opacity: 0.85;
-}
 
 .health-list {
   padding: 10px 14px;
@@ -1162,7 +1016,7 @@
 .health-list-label {
   margin: 0;
   font-size: 12px;
-  color: var(--tm-text);
+  color: var(--tm-text-primary);
 }
 .health-list-value {
   margin: 0;
@@ -1736,53 +1590,11 @@
   margin-bottom: 3px;
 }
 
-/* ─── View-mode toggle button ─────────────────────────────────────────────── */
-
-.pr-review-panel-header-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pr-view-mode-btn {
-  padding: 5px 10px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  background: none;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--tm-text-muted);
-  white-space: nowrap;
-  line-height: 1;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.pr-view-mode-btn:hover {
-  border-color: var(--tm-border-strong);
-  color: var(--tm-text-primary);
-}
-.pr-view-mode-btn--active {
-  border-color: var(--tm-accent);
-  color: var(--tm-accent-text);
-}
-
 /* ─── FullFileList ────────────────────────────────────────────────────────── */
 
 .full-file-list {
   overflow-y: auto;
   flex: 1;
-}
-
-.full-file-list-summary {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 10px;
-  font-size: 10px;
-  color: var(--tm-text-muted);
-  border-bottom: 1px solid var(--tm-border);
-  flex-shrink: 0;
 }
 
 /* Chapter group */
@@ -1960,48 +1772,6 @@
 }
 .full-file-row-del {
   color: var(--tm-danger);
-}
-
-/* ─── Overview button in review topbar ────────────────────────────────────── */
-
-.pr-focus-mode-btn {
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  color: var(--tm-text-muted);
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    border-color 0.15s,
-    background 0.15s;
-}
-.pr-focus-mode-btn:hover {
-  color: var(--tm-accent-text);
-  border-color: var(--tm-accent);
-}
-.pr-focus-mode-btn--active {
-  background: color-mix(in srgb, var(--tm-accent) 15%, transparent);
-  color: var(--tm-accent-text);
-  border-color: var(--tm-accent);
-}
-
-.pr-review-overview-btn {
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  color: var(--tm-text-muted);
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-}
-.pr-review-overview-btn:hover {
-  color: var(--tm-accent-text);
-  border-color: var(--tm-accent);
 }
 
 /* ─── PrOverviewPanel ─────────────────────────────────────────────────────── */

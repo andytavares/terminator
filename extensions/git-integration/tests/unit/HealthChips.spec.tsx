@@ -21,6 +21,13 @@ function makeRiskScore(overrides: Partial<RiskScore['metrics']> = {}): RiskScore
   }
 }
 
+function statusOf(container: HTMLElement, label: string): string | null {
+  const row = [...container.querySelectorAll('.health-list-row')].find(
+    (r) => r.querySelector('dt')?.textContent === label
+  )
+  return row?.querySelector('dd')?.getAttribute('data-status') ?? null
+}
+
 describe('HealthChips', () => {
   it('renders all chip labels', () => {
     render(<HealthChips riskScore={makeRiskScore()} />)
@@ -37,29 +44,27 @@ describe('HealthChips', () => {
     const { container } = render(
       <HealthChips riskScore={makeRiskScore({ testFilePresent: true })} />
     )
-    const testChip = container.querySelector('.health-chip:first-child')
-    expect(testChip?.className).toContain('health-chip--pass')
+    expect(statusOf(container, 'Tests')).toBe('pass')
   })
 
   it('shows fail for test file missing', () => {
     const { container } = render(
       <HealthChips riskScore={makeRiskScore({ testFilePresent: false })} />
     )
-    expect(container.querySelector('.health-chip--fail')).toBeTruthy()
+    expect(statusOf(container, 'Tests')).toBe('fail')
   })
 
   it('shows unknown for null testFilePresent', () => {
     const { container } = render(
       <HealthChips riskScore={makeRiskScore({ testFilePresent: null })} />
     )
-    expect(container.querySelector('.health-chip--unknown')).toBeTruthy()
+    expect(statusOf(container, 'Tests')).toBe('unknown')
   })
 
   it('shows CI passing chip with pass status', () => {
     const { container } = render(<HealthChips riskScore={makeRiskScore()} ciStatus="passing" />)
     expect(screen.getByText('passing')).toBeTruthy()
-    const chips = container.querySelectorAll('.health-chip--pass')
-    expect(chips.length).toBeGreaterThan(0)
+    expect(statusOf(container, 'CI')).toBe('pass')
   })
 
   it('shows CI failing chip with fail status', () => {
@@ -79,7 +84,7 @@ describe('HealthChips', () => {
 
   it('shows coverage warn when between 50 and 79', () => {
     const { container } = render(<HealthChips riskScore={makeRiskScore({ patchCoverage: 60 })} />)
-    expect(container.querySelector('.health-chip--warn')).toBeTruthy()
+    expect(statusOf(container, 'Coverage')).toBe('warn')
   })
 
   it('shows coverage fail when below 50', () => {
@@ -112,10 +117,9 @@ describe('HealthChips', () => {
     expect(screen.getByText('5 importers')).toBeTruthy()
   })
 
-  it('shows ? for null churn value', () => {
-    render(<HealthChips riskScore={makeRiskScore({ churn90d: null })} />)
-    const questionMarks = screen.getAllByText('?')
-    expect(questionMarks.length).toBeGreaterThan(0)
+  it('shows unknown for null churn value', () => {
+    const { container } = render(<HealthChips riskScore={makeRiskScore({ churn90d: null })} />)
+    expect(statusOf(container, 'Churn')).toBe('unknown')
   })
 
   it('shows lint clean for pass status', () => {
@@ -133,32 +137,23 @@ describe('HealthChips', () => {
     expect(screen.getByText('warnings')).toBeTruthy()
   })
 
-  it('renders as accessible list', () => {
-    render(<HealthChips riskScore={makeRiskScore()} />)
-    expect(screen.getByRole('list')).toBeTruthy()
-    const items = screen.getAllByRole('listitem')
-    expect(items.length).toBe(8)
+  it('labels the list and renders one row per signal', () => {
+    const { container } = render(<HealthChips riskScore={makeRiskScore()} />)
+    expect(screen.getByLabelText('File health signals')).toBeTruthy()
+    expect(container.querySelectorAll('dt')).toHaveLength(8)
   })
 
-  describe('variant="list"', () => {
-    it('renders unchanged chip output by default (variant omitted)', () => {
+  describe('list', () => {
+    it('renders a titled dl list', () => {
       const { container } = render(<HealthChips riskScore={makeRiskScore()} />)
-      expect(container.querySelector('.health-chips')).toBeTruthy()
-      expect(container.querySelector('dl')).toBeNull()
-    })
-
-    it('renders a titled dl list instead of chips', () => {
-      const { container } = render(<HealthChips riskScore={makeRiskScore()} variant="list" />)
       expect(screen.getByText('Health')).toBeTruthy()
       expect(container.querySelector('dl')).toBeTruthy()
-      expect(container.querySelector('.health-chips')).toBeNull()
     })
 
     it('orders rows fail, then warn, then pass, then unknown', () => {
       const { container } = render(
         <HealthChips
           riskScore={makeRiskScore({ testFilePresent: false, complexityDelta: 3, churn90d: null })}
-          variant="list"
           ciStatus="passing"
         />
       )
@@ -179,13 +174,13 @@ describe('HealthChips', () => {
     })
 
     it('shows "unknown" as the value text for unknown status rows', () => {
-      render(<HealthChips riskScore={makeRiskScore({ churn90d: null })} variant="list" />)
+      render(<HealthChips riskScore={makeRiskScore({ churn90d: null })} />)
       const unknownValues = screen.getAllByText('unknown')
       expect(unknownValues.length).toBeGreaterThan(0)
     })
 
     it('keeps the tooltip as a title attribute on each row', () => {
-      const { container } = render(<HealthChips riskScore={makeRiskScore()} variant="list" />)
+      const { container } = render(<HealthChips riskScore={makeRiskScore()} />)
       const row = Array.from(container.querySelectorAll('div[title]')).find((el) =>
         el.textContent?.includes('Tests')
       )
@@ -194,7 +189,7 @@ describe('HealthChips', () => {
 
     it('colours the value text by status', () => {
       const { container } = render(
-        <HealthChips riskScore={makeRiskScore({ testFilePresent: false })} variant="list" />
+        <HealthChips riskScore={makeRiskScore({ testFilePresent: false })} />
       )
       const failValue = container.querySelector('dd[data-status="fail"]')
       expect(failValue).toBeTruthy()

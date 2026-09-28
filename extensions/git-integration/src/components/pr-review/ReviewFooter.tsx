@@ -14,7 +14,6 @@ export interface ReviewFooterProps {
   onOpenSubmit: () => void
 }
 
-/** S: single 48px bar replacing the review-diff nav bar and SubmitBar. */
 export function ReviewFooter({
   drafts,
   isLastFile,

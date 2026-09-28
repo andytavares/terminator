@@ -80,7 +80,6 @@ export function ReviewInspector({
               repoRoot={file.repoRoot}
             />
             <HealthChips
-              variant="list"
               riskScore={file.riskScore}
               ciStatus={file.ciStatus}
               lintStatus={file.lintStatus}

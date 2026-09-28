@@ -164,10 +164,10 @@
   right: 0;
   min-width: 220px;
   max-width: 340px;
-  background: var(--tm-surface);
+  background: var(--tm-bg-elevated);
   border: 1px solid var(--tm-border-strong);
   border-radius: 8px;
-  box-shadow: var(--tm-shadow-elevated, 0 4px 16px rgba(0, 0, 0, 0.2));
+  box-shadow: 0 8px 24px var(--tm-scrim);
   padding: 6px;
 }
 

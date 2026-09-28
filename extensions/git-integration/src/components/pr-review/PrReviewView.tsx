@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, TriangleAlert, Sparkles } from 'lucide-react'
 import { Dialog } from '@terminator/extension-ui'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useReviewUiStore } from '../../stores/review-ui.store'
@@ -7,19 +6,19 @@ import { ChapterNav } from './ChapterNav'
 import { ChapterFileList } from './ChapterFileList'
 import { FullFileList } from './FullFileList'
 import { ReviewDiffPane } from './ReviewDiffPane'
-import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { ReviewSubmitPanel } from './ReviewSubmitPanel'
 import { AgentPanel } from './AgentPanel'
 import { SinceBanner } from './SinceBanner'
 import { ResumeCard } from './ResumeCard'
 import { KeyboardHelp } from './KeyboardHelp'
-import { SubmitBar } from './SubmitBar'
+import { ReviewHeader } from './ReviewHeader'
+import { ReviewFooter } from './ReviewFooter'
+import { ReviewInspector, type InspectorTab } from './ReviewInspector'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import { useAgentRuns } from '../../hooks/useAgentRuns'
 import { useReviewKeys } from '../../hooks/useReviewKeys'
 import { QUEUE_RISK_HIGH_LINES } from '../../github/pr-review-service'
 import { useResizePanel } from '../../hooks/useResizePanel'
-import { StatusChecksBar } from './StatusChecksBar'
 import type { PrReviewDetail, PrChangedFile } from '../../schemas/pr-review.schema'
 import './review-chrome.css'
 
@@ -71,6 +70,9 @@ export function PrReviewView({
   const setKeyboardHelpOpen = useReviewUiStore((s) => s.setKeyboardHelpOpen)
   const agentRuns = useReviewUiStore((s) => s.agentRuns)
   const agentPanelScope = useReviewUiStore((s) => s.agentPanelScope)
+  const openAgentPanel = useReviewUiStore((s) => s.openAgentPanel)
+  const fileListHidden = useReviewUiStore((s) => s.fileListHidden)
+  const toggleFileList = useReviewUiStore((s) => s.toggleFileList)
 
   useAgentRuns(repoRoot, pr)
 
@@ -104,6 +106,11 @@ export function PrReviewView({
   const [refreshing, setRefreshing] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [largePrDismissed, setLargePrDismissed] = useState(false)
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('agent')
+
+  useEffect(() => {
+    if (agentPanelScope) setInspectorTab('agent')
+  }, [agentPanelScope])
 
   // When focus mode is active, filter each chapter to only medium/high risk files.
   // Chapters where every file is low-risk are dropped entirely; if all chapters
@@ -123,7 +130,7 @@ export function PrReviewView({
     .reduce((s, f) => s + f.additions + f.deletions, 0)
   const estimatedReviewMinutes = Math.round((totalLoc / 100) * 25)
   const isLargePr = totalLoc >= QUEUE_RISK_HIGH_LINES
-  const showLargePrBanner = isLargePr && !largePrDismissed
+  const showLargePrPill = isLargePr && !largePrDismissed
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -254,9 +261,6 @@ export function PrReviewView({
     [displayPr]
   )
   const reviewedCount = [...viewedFiles].filter((p) => displayedPaths.has(p)).length
-  const reviewPct =
-    totalFiles > 0 ? Math.min(100, Math.round((reviewedCount / totalFiles) * 100)) : 0
-
   useReviewKeys({
     nextFile: handleNextFile,
     prevFile: handlePrevFile,
@@ -266,67 +270,41 @@ export function PrReviewView({
     openSubmit: () => setShowSubmit(true),
   })
 
-  const leftPanel =
-    viewMode === 'full' ? (
-      <aside className="pr-review-panel pr-review-panel--left" style={{ width: leftWidth }}>
-        <div className="pr-review-panel-header">
-          <span className="pr-review-chapter-name">All files</span>
-          <div className="pr-review-panel-header-right">
+  const viewedInActiveChapter = orderedFiles.filter((f) => viewedFiles.has(f.path)).length
+
+  const leftPanel = fileListHidden ? null : (
+    <aside className="pr-review-panel pr-review-panel--left" style={{ width: leftWidth }}>
+      <div className="pr-review-panel-header">
+        {showMultipleChapters ? (
+          <div className="pr-rail-switch" role="group" aria-label="File list mode">
             <button
-              className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
-              onClick={handleRefresh}
-              disabled={refreshing}
-              title="Refresh PR"
-              aria-label="Refresh pull request"
+              type="button"
+              aria-pressed={viewMode === 'full'}
+              onClick={() => setViewMode('full')}
             >
-              <RefreshCw aria-hidden="true" />
+              Files
             </button>
-            {showMultipleChapters && (
-              <button
-                className="pr-view-mode-btn"
-                onClick={() => setViewMode('guided')}
-                title="Switch to guided chapter view"
-              >
-                Guided ↩
-              </button>
-            )}
+            <button
+              type="button"
+              aria-pressed={viewMode === 'guided'}
+              onClick={() => setViewMode('guided')}
+            >
+              Chapters
+            </button>
           </div>
-        </div>
-        <FullFileList
-          pr={displayPr}
-          repoRoot={repoRoot}
-          headSHA={pr.headSHA}
-          currentFilePath={currentFilePath}
-          onSelectFile={handleSelectFileFromFull}
-          showChapterHeaders={showMultipleChapters}
-        />
-      </aside>
-    ) : (
-      activeChapter && (
-        <aside className="pr-review-panel pr-review-panel--left" style={{ width: leftWidth }}>
-          <div className="pr-review-panel-header">
-            <span className="pr-review-chapter-name">{activeChapter.name}</span>
-            <div className="pr-review-panel-header-right">
-              <span className="pr-review-chapter-count">
-                {orderedFiles.filter((f) => viewedFiles.has(f.path)).length}/{orderedFiles.length}
-              </span>
-              <button
-                className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
-                onClick={handleRefresh}
-                disabled={refreshing}
-                title="Refresh PR"
-                aria-label="Refresh pull request"
-              >
-                <RefreshCw aria-hidden="true" />
-              </button>
-              <button
-                className="pr-view-mode-btn"
-                onClick={() => setViewMode('full')}
-                title="Switch to full file view"
-              >
-                All ↗
-              </button>
-            </div>
+        ) : (
+          <span className="pr-review-chapter-name">Files</span>
+        )}
+        {viewMode === 'guided' && activeChapter && (
+          <span className="pr-review-chapter-count">
+            {viewedInActiveChapter}/{orderedFiles.length}
+          </span>
+        )}
+      </div>
+      {viewMode === 'guided' && activeChapter ? (
+        <>
+          <div className="pr-rail-chapters">
+            <ChapterNav chapters={displayPr.chapters} onSelectChapter={handleSelectChapter} />
           </div>
           <ChapterFileList
             repoRoot={repoRoot}
@@ -336,71 +314,77 @@ export function PrReviewView({
             currentFilePath={activeFile?.path ?? null}
             onSelectFile={handleSelectFile}
           />
-        </aside>
+        </>
+      ) : (
+        <FullFileList
+          pr={displayPr}
+          repoRoot={repoRoot}
+          headSHA={pr.headSHA}
+          currentFilePath={currentFilePath}
+          onSelectFile={handleSelectFileFromFull}
+          showChapterHeaders={showMultipleChapters}
+        />
+      )}
+    </aside>
+  )
+
+  const riskOpenForActiveFile = !!activeFile && showRiskFor === activeFile.path
+  const inspectorOpen = !!agentPanelScope || riskOpenForActiveFile
+  const currentAgentRun = agentPanelScope
+    ? agentRuns.find(
+        (r) =>
+          r.prNumber === pr.number &&
+          r.status === 'done' &&
+          JSON.stringify(r.scope) === JSON.stringify(agentPanelScope)
       )
-    )
+    : undefined
+  const agentFindingCount = currentAgentRun
+    ? currentAgentRun.findings.filter((f) => !f.dismissed).length
+    : 0
+  const dryViolationCount =
+    activeFile && pr.dryViolations?.length
+      ? pr.dryViolations.filter((v) => v.files.includes(activeFile.path)).length
+      : undefined
+
+  const handleShowRisk = () => {
+    if (!activeFile) return
+    setShowRiskFor(activeFile.path)
+    setInspectorTab('file')
+  }
+
+  const handleCloseInspector = () => {
+    openAgentPanel(null)
+    setShowRiskFor(null)
+  }
 
   return (
     <div className="pr-review-view">
-      {/* Top bar: PR title + pop-out */}
-      <div className="pr-review-topbar">
-        <span className="pr-review-topbar-title">
-          #{pr.number}
-          {pr.isDraft && <span className="pr-draft-badge">Draft</span>} {pr.title}
-        </span>
-        <div className="pr-review-topbar-actions">
-          <button
-            className={`pr-focus-mode-btn${focusMode ? ' pr-focus-mode-btn--active' : ''}`}
-            onClick={() => setFocusMode((v) => !v)}
-            title="Focus mode — show only medium/high risk files"
-          >
-            {focusMode ? 'All files' : 'Focus mode'}
-          </button>
-          <button
-            className="pr-review-ask-agent-btn"
-            onClick={() =>
-              useReviewUiStore.getState().openAgentPanel(
-                {
-                  kind: 'pr',
-                  path: null,
-                  startLine: null,
-                  endLine: null,
-                  side: null,
-                  chapter: null,
-                },
-                'review'
-              )
-            }
-            title="Ask agent about this PR"
-          >
-            <Sparkles aria-hidden="true" /> Ask agent about this PR
-          </button>
-          {onShowOverview && (
-            <button
-              className="pr-review-overview-btn"
-              onClick={onShowOverview}
-              title="Back to PR overview"
-            >
-              Overview
-            </button>
-          )}
-          {onPopOut && (
-            <button
-              className="pr-review-popout-btn"
-              onClick={onPopOut}
-              title="Open in focused window"
-            >
-              ⬡ Pop out
-            </button>
-          )}
-          <button className="pr-review-close-btn" onClick={onClose} aria-label="Close review">
-            ×
-          </button>
-        </div>
-      </div>
-
-      {/* Status checks */}
-      <StatusChecksBar checks={pr.statusChecks ?? []} />
+      <ReviewHeader
+        prNumber={pr.number}
+        title={pr.title}
+        isDraft={!!pr.isDraft}
+        checks={pr.statusChecks ?? []}
+        viewedCount={reviewedCount}
+        totalFiles={totalFiles}
+        estimatedMinutes={displayPr.chapters.reduce((n, c) => n + c.estimatedMinutes, 0)}
+        largePr={showLargePrPill ? { loc: totalLoc, minutes: estimatedReviewMinutes } : null}
+        onDismissLargePr={() => setLargePrDismissed(true)}
+        focusMode={focusMode}
+        onToggleFocusMode={() => setFocusMode((v) => !v)}
+        onAskAgent={() =>
+          openAgentPanel(
+            { kind: 'pr', path: null, startLine: null, endLine: null, side: null, chapter: null },
+            'review'
+          )
+        }
+        onShowOverview={onShowOverview}
+        onPopOut={onPopOut}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+        onToggleFileList={toggleFileList}
+        onOpenKeyboardHelp={() => setKeyboardHelpOpen(true)}
+        onClose={onClose}
+      />
 
       {/* S1: commits since the stored session was last opened */}
       {sinceInfo && (
@@ -413,58 +397,21 @@ export function PrReviewView({
         />
       )}
 
-      {/* Review progress bar */}
-      <div
-        className="pr-review-progress-track"
-        aria-label={`${reviewedCount} of ${totalFiles} files reviewed`}
-      >
-        <div className="pr-review-progress-fill" style={{ width: `${reviewPct}%` }} />
-      </div>
-
-      {/* Large-PR cognitive load warning */}
-      {showLargePrBanner && (
-        <div className="pr-large-pr-banner" role="alert">
-          <TriangleAlert aria-hidden="true" className="pr-large-pr-banner__icon" />
-          <span className="pr-large-pr-banner__text">
-            Large PR — {totalLoc.toLocaleString()} LOC, estimated {estimatedReviewMinutes} min to
-            review. Consider requesting it be split.
-          </span>
-          <button
-            className="pr-large-pr-banner__dismiss"
-            onClick={() => setLargePrDismissed(true)}
-            aria-label="Dismiss large PR warning"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* Chapter nav: guided mode only, hidden when ≤1 chapter */}
-      {viewMode === 'guided' && showMultipleChapters && (
-        <ChapterNav chapters={displayPr.chapters} onSelectChapter={handleSelectChapter} />
-      )}
-
       <div className="pr-review-panels">
         {leftPanel}
 
         {leftPanel && <div className="pr-resize-handle" onMouseDown={handleLeftDividerMouseDown} />}
 
-        {/* Centre panel: diff */}
         <main className="pr-review-panel pr-review-panel--centre">
           {activeFile && activeChapter ? (
             <ReviewDiffPane
               repoRoot={repoRoot}
               pr={pr}
               file={activeFile}
-              chapterProgress={{ index: resolvedIndex, total: orderedFiles.length }}
               onMarkViewed={handleMarkViewed}
               onPrevFile={handlePrevFile}
               onNextFile={handleNextFile}
-              onFinishChapter={handleFinishChapter}
-              isLastChapter={isLastChapter}
-              onPause={handlePause}
-              onOpenSubmit={() => setShowSubmit(true)}
-              onShowRisk={() => setShowRiskFor(activeFile.path)}
+              onShowRisk={handleShowRisk}
             />
           ) : (
             <div className="pr-review-empty-state">Select a file to review.</div>
@@ -487,52 +434,48 @@ export function PrReviewView({
               onContinue={handleContinueResume}
             />
           )}
+
+          <ReviewFooter
+            drafts={drafts}
+            isLastFile={resolvedIndex === orderedFiles.length - 1}
+            isLastChapter={isLastChapter}
+            onPause={handlePause}
+            onPrevFile={handlePrevFile}
+            onMarkViewed={handleMarkViewed}
+            onFinishChapter={handleFinishChapter}
+            onOpenSubmit={() => setShowSubmit(true)}
+          />
         </main>
 
-        {/* Right panel: the agent panel wins when both it and the risk panel are open */}
-        {agentPanelScope ? (
+        {inspectorOpen && (
           <>
             <div className="pr-resize-handle" onMouseDown={handleRightDividerMouseDown} />
             <aside className="pr-review-panel pr-review-panel--right" style={{ width: rightWidth }}>
-              <AgentPanel repoRoot={repoRoot} pr={pr} />
+              <ReviewInspector
+                tab={inspectorTab}
+                onTabChange={setInspectorTab}
+                onClose={handleCloseInspector}
+                agentAvailable={!!agentPanelScope}
+                agentFindingCount={agentFindingCount}
+                agent={<AgentPanel repoRoot={repoRoot} pr={pr} />}
+                file={
+                  activeFile
+                    ? {
+                        path: activeFile.path,
+                        riskScore: activeFile.riskScore,
+                        repoRoot,
+                        ciStatus: pr.ciStatus,
+                        lintStatus: pr.lintStatus,
+                        coverageStatus: pr.coverageStatus,
+                        dryViolationCount,
+                      }
+                    : null
+                }
+              />
             </aside>
           </>
-        ) : (
-          showRiskFor &&
-          activeFile &&
-          activeFile.path === showRiskFor && (
-            <>
-              <div className="pr-resize-handle" onMouseDown={handleRightDividerMouseDown} />
-              <aside
-                className="pr-review-panel pr-review-panel--right"
-                style={{ width: rightWidth }}
-              >
-                <button
-                  className="pr-review-panel-close"
-                  onClick={() => setShowRiskFor(null)}
-                  aria-label="Close risk panel"
-                >
-                  ×
-                </button>
-                <RiskBreakdownPanel
-                  filePath={activeFile.path}
-                  riskScore={activeFile.riskScore}
-                  repoRoot={repoRoot}
-                />
-              </aside>
-            </>
-          )
         )}
       </div>
-
-      {/* S5: draft comments pinned to the bottom until submitted */}
-      <SubmitBar
-        repoRoot={repoRoot}
-        prNumber={pr.number}
-        headSHA={pr.headSHA}
-        drafts={drafts}
-        onReviewDrafts={() => setShowSubmit(true)}
-      />
 
       {/* Submit review overlay */}
       {showSubmit && (

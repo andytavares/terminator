@@ -32,8 +32,8 @@
 }
 
 .ri-tab--active {
-  color: var(--tm-text);
-  border-bottom-color: var(--tm-accent, var(--tm-text));
+  color: var(--tm-text-primary);
+  border-bottom-color: var(--tm-accent);
 }
 
 .ri-tab-badge {
@@ -66,11 +66,16 @@
 
 .ri-close:hover {
   background: color-mix(in srgb, var(--tm-text-muted) 12%, transparent);
-  color: var(--tm-text);
+  color: var(--tm-text-primary);
 }
 
 .ri-panel {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* The inspector's tab strip already names the Agent tab and closes it. */
+.ri-panel .ap-header {
+  display: none;
 }

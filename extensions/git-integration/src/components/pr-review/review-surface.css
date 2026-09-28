@@ -8,14 +8,84 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 8px 14px;
+  height: 40px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--tm-border);
   background: var(--tm-bg-elevated);
-  flex-wrap: wrap;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  container-type: inline-size;
 }
 
-.rs-fh--row2 {
-  border-top: 1px solid var(--tm-border);
+.rs-fh .rs-p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rs-p-dir {
+  color: var(--tm-text-muted);
+}
+
+.rs-risk {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: 500 11.5px/1.4 var(--tm-font-ui);
+  cursor: pointer;
+  border-bottom: 1px dotted currentColor;
+}
+
+.rs-risk--low {
+  color: var(--tm-success);
+}
+
+.rs-risk--medium {
+  color: var(--tm-warning);
+}
+
+.rs-risk--high {
+  color: var(--tm-danger);
+}
+
+.rs-note--changed {
+  color: var(--tm-warning);
+}
+
+.rs-short {
+  display: none;
+}
+
+.rs-fh-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--tm-border-strong);
+  flex-shrink: 0;
+}
+
+.rs-viewed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+/* The file header never wraps; below this width the long labels give way. */
+@container (max-width: 700px) {
+  .rs-long {
+    display: none;
+  }
+
+  .rs-short {
+    display: inline;
+  }
+
+  .rs-p-dir {
+    display: none;
+  }
 }
 
 .rs-fh .rs-p {
@@ -43,52 +113,6 @@
   color: var(--tm-text-secondary);
   white-space: nowrap;
   background: transparent;
-}
-
-.rs-chip--hi {
-  color: var(--tm-danger);
-  border-color: currentColor;
-}
-
-.rs-chip--md {
-  color: var(--tm-warning);
-  border-color: currentColor;
-}
-
-.rs-chip--lo {
-  color: var(--tm-success);
-  border-color: currentColor;
-}
-
-.rs-chip--ag {
-  color: var(--tm-agent);
-  border-color: currentColor;
-}
-
-.rs-seg {
-  display: inline-flex;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 7px;
-  overflow: hidden;
-}
-
-.rs-seg button {
-  background: transparent;
-  border: 0;
-  padding: 4px 10px;
-  color: var(--tm-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.rs-seg button + button {
-  border-left: 1px solid var(--tm-border-strong);
-}
-
-.rs-seg button[aria-pressed='true'] {
-  background: var(--tm-accent-dim);
-  color: var(--tm-accent-text);
-  font-weight: 600;
 }
 
 .rs-kbd {
@@ -306,16 +330,6 @@
 .rs-note-composer-actions {
   display: flex;
   gap: 6px;
-}
-
-.rs-chip-link {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  font-size: inherit;
-  color: inherit;
-  text-decoration: underline;
-  cursor: pointer;
 }
 
 .rs-band {
