@@ -6,6 +6,7 @@ import {
   buildClaudeArgs,
   buildDiffText,
   runAgentReview,
+  claudeFromShellOutput,
   type SpawnedProcess,
 } from '../../src/review/review-agent.js'
 import { FINDING_SEVERITIES } from '../../src/schemas/review-agent.schema.js'
@@ -221,6 +222,7 @@ function makeFakeProcess(): SpawnedProcess & {
 }
 
 describe('runAgentReview', () => {
+  const resolveClaude = async () => '/Users/me/.local/bin/claude'
   const baseInput = {
     repoRoot: '/repo',
     worktreePath: '/wt',
@@ -247,7 +249,7 @@ describe('runAgentReview', () => {
     const fake = makeFakeProcess()
     const spawn = vi.fn(() => fake)
 
-    const { done } = runAgentReview(baseInput, { exec, spawn })
+    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
 
     // let the diff/prompt build settle before the process "runs"
     await new Promise((r) => setTimeout(r, 10))
@@ -263,7 +265,7 @@ describe('runAgentReview', () => {
 
     expect(spawn).toHaveBeenCalledTimes(1)
     const [cmd, args, opts] = spawn.mock.calls[0]
-    expect(cmd).toBe('claude')
+    expect(cmd).toBe('/Users/me/.local/bin/claude')
     expect(args).toContain('--tools')
     expect(args[args.indexOf('--tools') + 1]).toBe('Read,Grep,Glob')
     expect(args).not.toContain('Bash')
@@ -275,7 +277,7 @@ describe('runAgentReview', () => {
     const fake = makeFakeProcess()
     const spawn = vi.fn(() => fake)
 
-    const { done } = runAgentReview(baseInput, { exec, spawn })
+    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
     await new Promise((r) => setTimeout(r, 10))
     fake.stdoutEmitter.emit(
       'data',
@@ -302,7 +304,7 @@ describe('runAgentReview', () => {
     const fake = makeFakeProcess()
     const spawn = vi.fn(() => fake)
 
-    const { done } = runAgentReview(baseInput, { exec, spawn })
+    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
     await new Promise((r) => setTimeout(r, 10))
     fake.stdoutEmitter.emit(
       'data',
@@ -320,7 +322,7 @@ describe('runAgentReview', () => {
     const fake = makeFakeProcess()
     const spawn = vi.fn(() => fake)
 
-    const { done } = runAgentReview(baseInput, { exec, spawn })
+    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
     await new Promise((r) => setTimeout(r, 10))
     fake.stdoutEmitter.emit('data', JSON.stringify({ structured_output: { summary: 'x' } }))
     fake.emitExit(0)
@@ -336,7 +338,7 @@ describe('runAgentReview', () => {
     const fake = makeFakeProcess()
     const spawn = vi.fn(() => fake)
 
-    const { done } = runAgentReview(baseInput, { exec, spawn })
+    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
     await new Promise((r) => setTimeout(r, 10))
     fake.stderr.on
     ;(fake as any)._stdoutEmitter // no-op reference
@@ -351,7 +353,7 @@ describe('runAgentReview', () => {
     const fake = makeFakeProcess()
     const spawn = vi.fn(() => fake)
 
-    const { done } = runAgentReview({ ...baseInput, timeoutMs: 5 }, { exec, spawn })
+    const { done } = runAgentReview({ ...baseInput, timeoutMs: 5 }, { exec, spawn, resolveClaude })
     const run = await done
     expect(run.status).toBe('failed')
     expect(run.error).toMatch(/Timed out/)
@@ -363,7 +365,7 @@ describe('runAgentReview', () => {
     const fake = makeFakeProcess()
     const spawn = vi.fn(() => fake)
 
-    const { done, cancel } = runAgentReview(baseInput, { exec, spawn })
+    const { done, cancel } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
     await new Promise((r) => setTimeout(r, 10))
     cancel()
     fake.emitExit(137)
@@ -383,7 +385,7 @@ describe('runAgentReview', () => {
     process.env.CLAUDECODE = '1'
 
     try {
-      const { done } = runAgentReview(baseInput, { exec, spawn })
+      const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
       await new Promise((r) => setTimeout(r, 10))
       fake.stdoutEmitter.emit(
         'data',
@@ -401,5 +403,22 @@ describe('runAgentReview', () => {
       if (prevCode === undefined) delete process.env.CLAUDECODE
       else process.env.CLAUDECODE = prevCode
     }
+  })
+})
+
+describe('claudeFromShellOutput', () => {
+  it('takes the absolute path the shell printed, past any rc-file noise', () => {
+    expect(claudeFromShellOutput('Updating oh-my-zsh...\n/Users/me/.local/bin/claude\n')).toBe(
+      '/Users/me/.local/bin/claude'
+    )
+  })
+
+  it('is null when the shell found no claude', () => {
+    expect(claudeFromShellOutput('')).toBeNull()
+    expect(claudeFromShellOutput('claude not found\n')).toBeNull()
+  })
+
+  it('is null for an alias or function rather than a file', () => {
+    expect(claudeFromShellOutput("alias claude='claude --foo'\n")).toBeNull()
   })
 })
