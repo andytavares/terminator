@@ -1,0 +1,20 @@
+docs/research/forge-shaping-redesign.md
+  s_c2925d3c93b84c::t_de97f09eb96e7f 1-304
+  s_c2925d3c93b84c::t_4bee90027df332 305-307
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c07f3e16f901eb439cc550bfacd7dba40b45919d",
+  "prompts": {},
+  "sessions": {
+    "s_c2925d3c93b84c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db9b284f-3346-4749-bd47-5e725126a82a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
