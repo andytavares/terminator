@@ -1,0 +1,48 @@
+extensions/foundry/src/runtime/permission-bridge.ts
+  s_802dfa88127b4f::t_eebfd2dca8a2ef 66-69,285
+  s_802dfa88127b4f::t_00a88407ae772c 65
+extensions/foundry/tests/runtime/hook-script.spec.ts
+  s_802dfa88127b4f::t_f16e1db89fda69 88-100
+extensions/foundry/CLAUDE.md
+  s_802dfa88127b4f::t_e023de08f7f24b 32-35
+extensions/foundry/src/runtime/hook-script.ts
+  s_802dfa88127b4f::t_eebfd2dca8a2ef 104
+extensions/foundry/src/runtime/tool-decision.ts
+  s_802dfa88127b4f::t_eebfd2dca8a2ef 62-67,116,190-196
+  s_802dfa88127b4f::t_20075537718f7e 197
+extensions/foundry/src/index.ts
+  s_802dfa88127b4f::t_b2cc8d4ab2ad55 1538-1539,3791-3796
+  s_802dfa88127b4f::t_d60240074bf3b3 3797
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_802dfa88127b4f::t_eebfd2dca8a2ef 84
+extensions/foundry/src/runtime/control-server.ts
+  s_802dfa88127b4f::t_eebfd2dca8a2ef 40-41
+extensions/foundry/tests/runtime/tool-decision.spec.ts
+  s_802dfa88127b4f::t_a52b37347646f7 28,459-495,499
+  s_802dfa88127b4f::t_8c16dca29c871c 496-498
+  s_802dfa88127b4f::t_040b21a29d9f74 500
+docs/user-guide/USER-GUIDE.md
+  s_802dfa88127b4f::t_e023de08f7f24b 877-882
+docs/ARCHITECTURE.md
+  s_802dfa88127b4f::t_e023de08f7f24b 1246-1251
+extensions/foundry/tests/runtime/permission-bridge.spec.ts
+  s_802dfa88127b4f::t_f16e1db89fda69 157-173
+docs/adr/077-auto-mode-answers-what-foundry-abstains-on.md
+  s_802dfa88127b4f::t_e023de08f7f24b 1-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d2070e9bce08382d2adb26b7fd2db167d1bef5bf",
+  "prompts": {},
+  "sessions": {
+    "s_802dfa88127b4f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5145f198-b891-4bb6-b8e6-02de60b65ef8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
