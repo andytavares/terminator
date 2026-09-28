@@ -1,0 +1,42 @@
+tests/unit/renderer/quick-actions/shortcut-conflict-guard.spec.tsx
+  s_1d40c41b0585ca::t_20d53550bc24f5 73
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_1d40c41b0585ca::t_be4b1c0bbd9baa 105-108
+  s_1d40c41b0585ca::t_f3b5c28f404f5f 104
+tests/unit/main/window-menu.spec.ts
+  s_1d40c41b0585ca::t_b5574b5d335998 1-39
+src/main/index.ts
+  s_1d40c41b0585ca::t_d3d1032bcb2107 33,214
+src/main/window-menu.ts
+  s_1d40c41b0585ca::t_d3d1032bcb2107 1-29
+docs/ARCHITECTURE.md
+  s_1d40c41b0585ca::t_7410d21d67bbd3 241
+  s_1d40c41b0585ca::t_4209694c04db1f 242
+README.md
+  s_1d40c41b0585ca::t_35502ec2553803 45
+src/renderer/App.tsx
+  s_1d40c41b0585ca::t_20d53550bc24f5 859
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_1d40c41b0585ca::t_35386de4c6c325 171-200
+src/renderer/quick-actions/core-actions.ts
+  s_1d40c41b0585ca::t_20d53550bc24f5 84-87,395
+  s_1d40c41b0585ca::t_5185e5795a0bac 83
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_1d40c41b0585ca::t_20d53550bc24f5 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "529a89c017ff2b03eb0755bd34e247cce3d86fbf",
+  "prompts": {},
+  "sessions": {
+    "s_1d40c41b0585ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5012b074-3fcf-4c7c-9cc7-96d3b79bdc03",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
