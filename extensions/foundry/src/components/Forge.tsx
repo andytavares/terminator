@@ -840,7 +840,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                 onClick={() => void converge()}
               >
                 <Wand aria-hidden="true" />
-                {order.acceptance.length === 0 ? 'Draft the plan' : 'Redraft'}
+                {order.plan.units.length === 0 ? 'Draft the plan' : 'Redraft'}
               </ReasonButton>
             ) : null}
           </div>

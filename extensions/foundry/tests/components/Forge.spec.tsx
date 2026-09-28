@@ -541,9 +541,51 @@ describe('drafting the plan', () => {
     await waitFor(() => expect(screen.getByText('the proposal reached for a status')).toBeTruthy())
   })
 
-  it('offers a redraft once there are criteria', async () => {
+  it('offers a draft, not a redraft, when a ticket brought criteria and no units', async () => {
+    const seeded = {
+      ...order(),
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'a',
+          priority: 'P1' as const,
+          verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
+          unverifiable: null,
+        },
+      ],
+    }
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: seeded, compile: compileOrder(seeded) }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /Redraft/ })).toBeNull()
+  })
+
+  it('offers a redraft once there is a plan', async () => {
     const withCriteria = {
       ...order(),
+      plan: {
+        ...order().plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'u',
+            role: 'builder' as const,
+            lane: 1,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: [],
+            verify: [],
+          },
+        ],
+      },
       acceptance: [
         {
           id: 'AC-1',

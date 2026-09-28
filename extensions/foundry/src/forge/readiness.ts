@@ -398,8 +398,9 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
     }
   }
 
-  // 7. No acceptance criteria yet.
-  if (order.acceptance.length === 0) {
+  // 7. Nothing drafted yet. Criteria alone are not a plan: an order seeded
+  // from a ticket arrives with them, and no unit to satisfy them.
+  if (order.plan.units.length === 0) {
     return {
       holder: 'you',
       strip: {
@@ -660,7 +661,7 @@ function computeBaseStep(
     }
     // An empty plan fails coverage by construction, so it is named before the
     // failing checks or it would read "Needs a fix" before anything was drafted.
-    if (order.acceptance.length === 0) {
+    if (order.plan.units.length === 0) {
       return machineActing
         ? { state: 'work', mark: 'spin', word: 'Being drafted' }
         : { state: 'you', mark: 'number', word: 'Not drafted yet' }

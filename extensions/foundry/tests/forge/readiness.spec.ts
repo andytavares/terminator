@@ -438,6 +438,14 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.actions).toEqual(['draft'])
   })
 
+  it('7. criteria copied from the ticket but no units drafted is still no plan', () => {
+    const order = wo0928Order({ plan: { ...wo0928Order().plan, units: [] } })
+    const result = readiness(baseInput({ order }))
+    expect(result.strip.headline).toBe('No plan yet')
+    expect(result.strip.actions).toEqual(['draft'])
+    expect(result.steps.find((s) => s.id === 'plan')?.word).toBe('Not drafted yet')
+  })
+
   it('8. other compile failures, nothing running', () => {
     const order = wo0928Order({
       risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
@@ -720,7 +728,7 @@ describe('readiness — steps and the not-yet rule', () => {
   })
 
   it('names an empty plan before its failing checks, and says when it is being drafted', () => {
-    const empty = wo0928Order({ acceptance: [] })
+    const empty = wo0928Order({ plan: { ...wo0928Order().plan, units: [] } })
     const idle = readiness(baseInput({ order: empty }))
     expect(idle.steps.find((s) => s.id === 'plan')?.word).toBe('Not drafted yet')
 
