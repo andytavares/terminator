@@ -1,0 +1,2227 @@
+<title>Review Screen Declutter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+/>
+<style>
+  :root {
+    --bg: #f0f0f5;
+    --surface: #ffffff;
+    --card: #e8e8f0;
+    --text: #1b1b2a;
+    --text2: #4a4a72;
+    --muted: #6a6a92;
+    --line: rgba(20, 20, 60, 0.1);
+    --line2: rgba(20, 20, 60, 0.18);
+    --accent: #4a58b0;
+    --accent-dim: rgba(92, 107, 192, 0.12);
+    --ok: #157a3c;
+    --warn: #8a6400;
+    --bad: #b23a3a;
+    --ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+      --bg: #0c0c0f;
+      --surface: #111116;
+      --card: #18181f;
+      --text: #e2e2ee;
+      --text2: #b0b0d4;
+      --muted: #8585b8;
+      --line: rgba(255, 255, 255, 0.07);
+      --line2: rgba(255, 255, 255, 0.14);
+      --accent: #8b98e8;
+      --accent-dim: rgba(92, 107, 192, 0.18);
+      --ok: #4ade80;
+      --warn: #facc15;
+      --bad: #f07a7a;
+    }
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --bg: #0c0c0f;
+    --surface: #111116;
+    --card: #18181f;
+    --text: #e2e2ee;
+    --text2: #b0b0d4;
+    --muted: #8585b8;
+    --line: rgba(255, 255, 255, 0.07);
+    --line2: rgba(255, 255, 255, 0.14);
+    --accent: #8b98e8;
+    --accent-dim: rgba(92, 107, 192, 0.18);
+    --ok: #4ade80;
+    --warn: #facc15;
+    --bad: #f07a7a;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.6 var(--ui);
+    padding-inline: 16px;
+    padding-block: 40px 80px;
+  }
+  .doc {
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+  .prose {
+    max-width: 760px;
+  }
+  h1 {
+    font-size: 34px;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  h2 {
+    font-size: 21px;
+    margin: 56px 0 12px;
+    font-weight: 600;
+    text-wrap: balance;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+  h3 {
+    font-size: 16px;
+    margin: 28px 0 8px;
+    font-weight: 600;
+  }
+  p {
+    margin: 0 0 14px;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--mono);
+    margin-bottom: 28px;
+  }
+  code,
+  .mono {
+    font-family: var(--mono);
+    font-size: 0.86em;
+  }
+  code {
+    background: var(--card);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  ul,
+  ol {
+    margin: 0 0 14px;
+    padding-left: 22px;
+  }
+  li {
+    margin: 3px 0;
+  }
+  a {
+    color: var(--accent);
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--text2);
+  }
+  .tbl {
+    overflow-x: auto;
+    margin: 12px 0 18px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14px;
+    min-width: 640px;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  td:first-child {
+    white-space: nowrap;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  .fig {
+    margin: 22px 0 8px;
+  }
+  .fig figcaption {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 8px;
+    max-width: 900px;
+  }
+  .shot {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--line2);
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    min-width: 900px;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .pair {
+      grid-template-columns: 1fr;
+    }
+  }
+  .stat {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    margin: 16px 0 20px;
+  }
+  .stat div {
+    display: flex;
+    flex-direction: column;
+  }
+  .stat b {
+    font-size: 28px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* band diagram */
+  .bands {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 18px 0;
+  }
+  @media (max-width: 700px) {
+    .bands {
+      grid-template-columns: 1fr;
+    }
+  }
+  .bands h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 12.5px;
+    font-family: var(--mono);
+  }
+  .stack div {
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .stack .opt {
+    border-style: dashed;
+    color: var(--muted);
+  }
+  .stack .diff {
+    background: var(--accent-dim);
+    color: var(--accent);
+    justify-content: center;
+    padding: 26px 10px;
+    font-weight: 500;
+  }
+  .stack .diff.big {
+    padding: 62px 10px;
+  }
+  .stack small {
+    color: var(--muted);
+  }
+
+  /* ================= MOCKUPS: the app's own dark tokens ================= */
+  .m {
+    --b0: #0c0c0f;
+    --b1: #111116;
+    --b2: #18181f;
+    --b3: #1c1c25;
+    --bh: #22222e;
+    --t1: #e2e2ee;
+    --t2: #9090c4;
+    --t3: #8585b8;
+    --br: rgba(255, 255, 255, 0.06);
+    --br2: rgba(255, 255, 255, 0.12);
+    --ac: #5c6bc0;
+    --act: #8b98e8;
+    --acd: rgba(92, 107, 192, 0.18);
+    --dn: #e05c5c;
+    --ok: #4ade80;
+    --wn: #facc15;
+    --ag: #b39cf5;
+    --agd: rgba(179, 156, 245, 0.1);
+    --add: rgba(152, 195, 121, 0.12);
+    --rem: rgba(224, 108, 117, 0.12);
+    width: 1200px;
+    height: 740px;
+    background: var(--b0);
+    color: var(--t1);
+    font: 13px/1.45 var(--ui);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color-scheme: dark;
+    position: relative;
+  }
+  .m button {
+    font: inherit;
+    color: inherit;
+  }
+  .m .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .m .sp {
+    flex: 1;
+  }
+  .m .mut {
+    color: var(--t3);
+  }
+  .m .hdr {
+    height: 44px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--br);
+    background: var(--b1);
+    flex: none;
+  }
+  .m .ttl {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 520px;
+  }
+  .m .ttl i {
+    font-style: normal;
+    color: var(--t3);
+    font-weight: 500;
+    margin-right: 6px;
+  }
+  .m .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 12px;
+    border: 1px solid var(--br2);
+    font-size: 12px;
+    color: var(--t2);
+    background: transparent;
+    white-space: nowrap;
+  }
+  .m .pill.bad {
+    color: var(--dn);
+    border-color: rgba(224, 92, 92, 0.35);
+  }
+  .m .pill.wn {
+    color: var(--wn);
+    border-color: rgba(250, 204, 21, 0.3);
+  }
+  .m .pill.ag {
+    color: var(--ag);
+    border-color: rgba(179, 156, 245, 0.35);
+  }
+  .m .btn {
+    height: 28px;
+    padding: 0 11px;
+    border-radius: 6px;
+    border: 1px solid var(--br2);
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+  .m .btn.pri {
+    background: var(--ac);
+    border-color: var(--ac);
+    color: #fff;
+    font-weight: 500;
+  }
+  .m .btn.ghost {
+    border-color: transparent;
+    color: var(--t2);
+  }
+  .m .ib {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--t2);
+    display: inline-grid;
+    place-items: center;
+  }
+  .m svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex: none;
+  }
+  .m .prog {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--t2);
+    font-variant-numeric: tabular-nums;
+  }
+  .m .bar {
+    width: 84px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--b3);
+    overflow: hidden;
+  }
+  .m .bar b {
+    display: block;
+    height: 100%;
+    background: var(--ac);
+  }
+  .m .kbd {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 0 4px;
+    border-radius: 3px;
+    border: 1px solid var(--br2);
+    color: var(--t3);
+    line-height: 15px;
+  }
+  .m .body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  .m .rail {
+    width: 236px;
+    flex: none;
+    border-right: 1px solid var(--br);
+    background: var(--b1);
+    display: flex;
+    flex-direction: column;
+  }
+  .m .seg {
+    display: inline-flex;
+    border: 1px solid var(--br2);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .m .seg span {
+    padding: 3px 10px;
+    font-size: 12px;
+    color: var(--t2);
+  }
+  .m .seg span.on {
+    background: var(--acd);
+    color: var(--act);
+    font-weight: 500;
+  }
+  .m .railtop {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--br);
+  }
+  .m .grp {
+    padding: 10px 12px 4px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--t3);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .m .grp b {
+    color: var(--t2);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .m .fr {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    column-gap: 8px;
+    padding: 6px 12px;
+    align-items: baseline;
+  }
+  .m .fr.cur {
+    background: var(--acd);
+    box-shadow: inset 2px 0 0 var(--ac);
+  }
+  .m .fr .n {
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+  .m .fr.done .n {
+    color: var(--t3);
+  }
+  .m .fr .why {
+    grid-column: 2/4;
+    font-size: 11.5px;
+    color: var(--t3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .m .fr .d {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--t3);
+  }
+  .m .fr .st {
+    font-size: 11px;
+    color: var(--t3);
+  }
+  .m .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    background: var(--ok);
+    transform: translateY(-1px);
+  }
+  .m .dot.md {
+    background: var(--wn);
+  }
+  .m .dot.hi {
+    background: var(--dn);
+  }
+  .m .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .m .fh {
+    height: 40px;
+    padding: 0 14px;
+    overflow: hidden;
+    min-width: 0;
+    border-bottom: 1px solid var(--br);
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--b0);
+  }
+  .m .path {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+  .m .path i {
+    font-style: normal;
+    color: var(--t3);
+  }
+  .m .chip {
+    font-size: 11.5px;
+    color: var(--t3);
+    white-space: nowrap;
+  }
+  .m .chip.link {
+    color: var(--t2);
+    border-bottom: 1px dotted var(--t3);
+  }
+  .m .chip.md {
+    color: var(--wn);
+  }
+  .m .chip.lo {
+    color: var(--ok);
+  }
+  .m .sep {
+    width: 1px;
+    height: 14px;
+    background: var(--br2);
+  }
+  .m .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--t2);
+  }
+  .m .check i {
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid var(--t3);
+    border-radius: 3px;
+    display: inline-block;
+  }
+  .m .check.on i {
+    background: var(--ac);
+    border-color: var(--ac);
+  }
+  .m .band {
+    height: 36px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--br);
+    background: var(--acd);
+    flex: none;
+    font-size: 12.5px;
+  }
+  .m .diff {
+    flex: 1;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 19px;
+    background: var(--b0);
+  }
+  .m .hh {
+    color: var(--t3);
+    padding: 3px 14px;
+    background: var(--b1);
+    border-bottom: 1px solid var(--br);
+  }
+  .m .dl {
+    display: grid;
+    grid-template-columns: 44px 44px 18px 1fr;
+    white-space: pre;
+  }
+  .m .dl > span:nth-child(-n + 2) {
+    color: #56567e;
+    text-align: right;
+    padding-right: 10px;
+  }
+  .m .dl.a {
+    background: var(--add);
+  }
+  .m .dl.r {
+    background: var(--rem);
+  }
+  .m .dl.a > span:nth-child(3) {
+    color: var(--ok);
+  }
+  .m .dl.r > span:nth-child(3) {
+    color: var(--dn);
+  }
+  .m .k {
+    color: #cf9ee8;
+  }
+  .m .s {
+    color: #4ade80;
+  }
+  .m .t {
+    color: #7fb8f0;
+  }
+  .m .nu {
+    color: #e0a361;
+  }
+  .m .l {
+    color: #6cc9d9;
+  }
+  .m .at {
+    color: #e2c07e;
+  }
+  .m .note {
+    margin: 6px 14px 6px 106px;
+    border-left: 2px solid var(--ag);
+    background: var(--agd);
+    padding: 6px 10px;
+    font-family: var(--ui);
+    font-size: 12.5px;
+    white-space: normal;
+  }
+  .m .note b {
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ag);
+    margin-right: 6px;
+  }
+  .m .note.draft {
+    border-left-color: var(--act);
+    background: var(--acd);
+  }
+  .m .note.draft b {
+    color: var(--act);
+  }
+  .m .note.hot {
+    border-left-color: var(--wn);
+    background: rgba(250, 204, 21, 0.06);
+  }
+  .m .note.hot b {
+    color: var(--wn);
+  }
+  .m .ftr {
+    height: 48px;
+    padding: 0 14px;
+    border-top: 1px solid var(--br);
+    background: var(--b1);
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .m .hint {
+    font-size: 11.5px;
+    color: var(--t3);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .m .insp {
+    width: 330px;
+    flex: none;
+    border-left: 1px solid var(--br);
+    background: var(--b1);
+    display: flex;
+    flex-direction: column;
+  }
+  .m .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--br);
+    height: 40px;
+    align-items: stretch;
+  }
+  .m .tabs span {
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--t3);
+    font-size: 12.5px;
+  }
+  .m .tabs span.on {
+    color: var(--t1);
+    box-shadow: inset 0 -2px 0 var(--ac);
+  }
+  .m .tabs .ct {
+    font-size: 10.5px;
+    background: var(--b3);
+    border-radius: 8px;
+    padding: 0 6px;
+    color: var(--t2);
+  }
+  .m .ib-sm {
+    margin-left: auto;
+    align-self: center;
+  }
+  .m .ipad {
+    padding: 12px 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .m .fnd {
+    border-top: 1px solid var(--br);
+    padding-top: 10px;
+  }
+  .m .fnd:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .m .sev {
+    font-size: 10px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .m .sev.must {
+    color: var(--dn);
+  }
+  .m .sev.sug {
+    color: var(--act);
+  }
+  .m .sev.q {
+    color: var(--wn);
+  }
+  .m .fnd h5 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline;
+  }
+  .m .fnd .loc {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--t3);
+    margin: 2px 0 4px;
+  }
+  .m .fnd p {
+    margin: 0 0 6px;
+    font-size: 12.5px;
+    color: var(--t2);
+    line-height: 1.45;
+  }
+  .m .acts {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+  }
+  .m .acts span {
+    color: var(--act);
+  }
+  .m .acts span.q {
+    color: var(--t3);
+  }
+  .m .score {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .m .score b {
+    font-size: 30px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .m .kv {
+    display: grid;
+    grid-template-columns: 1fr 90px 34px;
+    gap: 6px 10px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--t2);
+  }
+  .m .kv .m-bar {
+    height: 4px;
+    background: var(--b3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .m .kv .m-bar b {
+    display: block;
+    height: 100%;
+    background: var(--ac);
+  }
+  .m .kv em {
+    font-style: normal;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--t1);
+  }
+  .m .sect {
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--t3);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .m .hl {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+    font-size: 12px;
+  }
+  .m .hl span:nth-child(odd) {
+    color: var(--t2);
+  }
+  .m .hl .bad {
+    color: var(--dn);
+  }
+  .m .hl .okk {
+    color: var(--ok);
+  }
+  .m .hl .unk {
+    color: var(--t3);
+  }
+  .m .hl .wn {
+    color: var(--wn);
+  }
+  .m .ul {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--act);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .m .pop {
+    position: absolute;
+    background: var(--b2);
+    border: 1px solid var(--br2);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    padding: 8px;
+    font-size: 12.5px;
+    z-index: 2;
+  }
+  .m .pop .ph {
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--t3);
+    padding: 6px 8px 4px;
+    font-weight: 600;
+  }
+  .m .pop .pi {
+    padding: 5px 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+  }
+  .m .pop .pi.hov {
+    background: var(--bh);
+  }
+  .m .pop hr {
+    border: 0;
+    border-top: 1px solid var(--br);
+    margin: 6px 0;
+  }
+
+  /* popover gallery */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .tile {
+    background: #0c0c0f;
+    border-radius: 10px;
+    border: 1px solid var(--line2);
+    padding: 16px;
+    min-height: 190px;
+    position: relative;
+  }
+  .tile .m {
+    width: auto;
+    height: auto;
+    background: transparent;
+    overflow: visible;
+  }
+  .tile .m .pop {
+    position: static;
+    box-shadow: none;
+  }
+  .tile figcaption {
+    font-size: 12.5px;
+    color: #9090c4;
+    margin-top: 10px;
+  }
+  .callouts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px 24px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: c;
+  }
+  .callouts li {
+    font-size: 13.5px;
+    color: var(--text2);
+    padding-left: 28px;
+    position: relative;
+    margin: 0;
+  }
+  .callouts li::before {
+    counter-increment: c;
+    content: counter(c);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 19px;
+    height: 19px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+  }
+  .m .hdr,
+  .m .rail,
+  .m .fh,
+  .m .ftr {
+    position: relative;
+  }
+  .m code {
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--t1);
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 0.92em;
+  }
+  .m .cn {
+    position: absolute;
+    width: 19px;
+    height: 19px;
+    border-radius: 50%;
+    background: #e2c07e;
+    color: #241a00;
+    font: 700 11px/19px var(--ui);
+    text-align: center;
+    z-index: 3;
+    box-shadow: 0 0 0 3px rgba(12, 12, 15, 0.9);
+  }
+</style>
+
+<div class="doc">
+  <h1>Review Screen Declutter</h1>
+  <div class="meta">Design document · extensions/git-integration · Draft · 2026-09-27</div>
+
+  <div class="prose">
+    <p class="lede">
+      The review screen stacks up to eleven horizontal bands around the diff and repeats several
+      controls. This design keeps every piece of content and moves it into two bars, one footer, a
+      right-hand inspector and three small menus.
+    </p>
+
+    <h2>Context</h2>
+    <p>
+      The screen is <code>PrReviewView</code> with <code>ReviewDiffPane</code> in the middle.
+      Features were added one band at a time, and the diff now sits under six bands from the view
+      and three from the file header, with two more below it. On a 900px-tall window the code starts
+      about a third of the way down (see the screenshots below). Some things appear more than once.
+      <b>Submit review</b> is in the nav bar and in the drafts bar. Review progress shows up in four
+      places. Risk shows up in three. Every file header also carries four view toggles, even though
+      three of them are global settings.
+    </p>
+
+    <div class="stat">
+      <div><b>11 → 3</b><span>bands around the diff</span></div>
+      <div><b>2 → 1</b><span>Submit review buttons</span></div>
+      <div><b>4 → 1</b><span>progress displays</span></div>
+      <div><b>0</b><span>content removed</span></div>
+    </div>
+    <p style="font-size: 13px; color: var(--muted)">
+      Counted from the JSX: bands in <code>PrReviewView.tsx</code> at lines 346, 403, 407, 417, 425
+      and 443; in <code>ReviewDiffPane.tsx</code> at 863, 959, 979 and 1386; and
+      <code>SubmitBar</code> at <code>PrReviewView.tsx:529</code>. The "after" count is the header,
+      the file header and the footer. The notice row appears only after a push, and one of the
+      eleven "before" bands is conditional too.
+    </p>
+  </div>
+
+  <div class="bands">
+    <div>
+      <h4>Today, top to bottom</h4>
+      <div class="stack">
+        <div>Top bar: title, Focus mode, Ask agent, Overview, Pop out, × <small>346</small></div>
+        <div>Status checks <small>403</small></div>
+        <div class="opt">Since-your-review banner <small>407</small></div>
+        <div>Progress track <small>417</small></div>
+        <div class="opt">Large-PR warning <small>425</small></div>
+        <div class="opt">Chapter tabs (guided) <small>443</small></div>
+        <div>File header: path, chips, 4 toggle groups <small>863</small></div>
+        <div class="opt">Uses + Peek definition <small>959</small></div>
+        <div>Health chips ×8 <small>979</small></div>
+        <div class="diff">diff</div>
+        <div>Nav: Pause, Submit, progress, Prev, Mark viewed <small>1386</small></div>
+        <div class="opt">Drafts: count, verdict, Submit <small>529</small></div>
+      </div>
+    </div>
+    <div>
+      <h4>Proposed</h4>
+      <div class="stack">
+        <div>Header: title, checks, progress, Ask agent, ⋯, ×</div>
+        <div class="opt">Notice row: since-your-review only</div>
+        <div>File header: path, risk, step, Uses, View ▾, Viewed</div>
+        <div class="diff big">diff</div>
+        <div>Footer: Pause, drafts, keys, Prev, Mark viewed, Submit</div>
+      </div>
+      <p style="font-size: 13px; color: var(--muted); margin-top: 10px">
+        Dashed rows are conditional. The right-hand inspector holds the Agent and File tabs.
+      </p>
+    </div>
+  </div>
+
+  <h2>Goals and non-goals</h2>
+  <div class="prose">
+    <ul>
+      <li><b>Goal:</b> at most three bands around the diff, plus one notice row after a push.</li>
+      <li>
+        <b>Goal:</b> every control and signal that exists today stays reachable, and every keyboard
+        shortcut keeps its behaviour.
+      </li>
+      <li><b>Goal:</b> one place for each thing: submit, progress, risk, and view settings.</li>
+      <li>
+        <b>Non-goal:</b> new features. That includes agent review scoped to a file or to selected
+        files, which was set aside in this session.
+      </li>
+      <li>
+        <b>Non-goal:</b> the Overview screen (<code>PrOverviewPanel</code>), the review queue and
+        the dashboard.
+      </li>
+    </ul>
+  </div>
+
+  <h2>Current state</h2>
+  <p class="prose">
+    These are screenshots of the running app, taken today for
+    <code>docs/research/code-review-guide/</code>.
+  </p>
+  <div class="pair">
+    <figure class="fig">
+      <div class="shot">
+        <img
+          src="code-review-guide/23-since-your-review.jpg"
+          alt="Current review screen after a push: top bar, checks, since banner, file header in two rows, uses row, health chips, then the diff; nav bar and drafts bar below."
+        />
+      </div>
+      <figcaption>
+        After a push. The diff starts at about y=300 of 900, and there are two footer bars that each
+        have a Submit button.
+      </figcaption>
+    </figure>
+    <figure class="fig">
+      <div class="shot">
+        <img
+          src="code-review-guide/15-agent-findings.jpg"
+          alt="Current review screen with the agent panel open; the file header wraps to two rows and the uses row to two more."
+        />
+      </div>
+      <figcaption>
+        With the agent panel open, the narrower centre wraps the file header onto two rows and the
+        Uses row onto two more.
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>Where each piece of content goes</h3>
+  <div class="tbl">
+    <table>
+      <thead>
+        <tr>
+          <th>Today</th>
+          <th>Source</th>
+          <th>Proposed home</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PR number, Draft badge, title</td>
+          <td><code>PrReviewView.tsx:346</code></td>
+          <td>Header, left</td>
+        </tr>
+        <tr>
+          <td>Status checks bar and its list</td>
+          <td><code>StatusChecksBar.tsx</code></td>
+          <td>
+            Header pill "2 of 8 checks failing". It opens a popover with the same list and links.
+          </td>
+        </tr>
+        <tr>
+          <td>Progress track, "0 / 5 files reviewed ~6m", "1 of 5 files", chapter n/m</td>
+          <td>
+            <code>PrReviewView.tsx:417</code>, <code>FullFileList.tsx:80</code>,
+            <code>ReviewDiffPane.tsx:1396</code>
+          </td>
+          <td>
+            One header meter, "2/5 viewed · ~6m". Chapter n/m stays on the rail group headers.
+          </td>
+        </tr>
+        <tr>
+          <td>Large-PR warning</td>
+          <td><code>PrReviewView.tsx:425</code></td>
+          <td>Header pill "912 LOC · ~228 min". Its popover has the full sentence and Dismiss.</td>
+        </tr>
+        <tr>
+          <td>Focus mode, Overview, Pop out, Refresh, keyboard sheet</td>
+          <td>top bar, rail header</td>
+          <td>
+            The ⋯ menu, each with its shortcut shown. The Focus mode state also shows as a pill
+            while it is on.
+          </td>
+        </tr>
+        <tr>
+          <td>Ask agent about this PR</td>
+          <td><code>PrReviewView.tsx:359</code></td>
+          <td>Header "Ask agent" button. Same behaviour.</td>
+        </tr>
+        <tr>
+          <td>Since-your-review banner, Since my review / Whole PR</td>
+          <td><code>SinceBanner.tsx</code></td>
+          <td>
+            The one notice row. Unchanged, because it is the only band that asks you to choose
+            something.
+          </td>
+        </tr>
+        <tr>
+          <td>Guided chapter tabs, All ↗ / Guided ↩</td>
+          <td><code>ChapterNav.tsx</code>, rail header</td>
+          <td>
+            A rail switch, "Files | Chapters". In Chapters mode, chapters are rail groups with risk
+            dot, n/m and minutes.
+          </td>
+        </tr>
+        <tr>
+          <td>Change type, risk + Why?, Step n of m, Changed since you viewed, +/−</td>
+          <td><code>ReviewDiffPane.tsx:864–887</code></td>
+          <td>
+            File header, in plain muted text instead of eight outlined chips. Clicking risk opens
+            the inspector's File tab (the Why panel).
+          </td>
+        </tr>
+        <tr>
+          <td>
+            Comments All/Unresolved/Hidden, Agent notes On/Off, Unified/Split, Semantic, "Showing
+            a1b2… head"
+          </td>
+          <td><code>ReviewDiffPane.tsx:889–950</code></td>
+          <td>
+            The View ▾ menu. A dot on the button means something is not at its default. The keys
+            <code>c</code> and <code>⇧C</code> still work.
+          </td>
+        </tr>
+        <tr>
+          <td>Viewed chip</td>
+          <td><code>ReviewDiffPane.tsx:951</code></td>
+          <td>
+            A Viewed checkbox at the right of the file header, as GitHub places it. Toggles with
+            <code>v</code>.
+          </td>
+        </tr>
+        <tr>
+          <td>Uses row, Peek definition</td>
+          <td><code>ReviewDiffPane.tsx:959</code></td>
+          <td>
+            A "Uses 5 · 3 unread" button in the file header. Its popover has the same list and Peek
+            definition (<code>g d</code>).
+          </td>
+        </tr>
+        <tr>
+          <td>Health chips ×8</td>
+          <td><code>HealthChips.tsx</code></td>
+          <td>
+            Inspector File tab, next to the risk breakdown, because both answer "why is this risky".
+            Each chip has a value and a tooltip in the code (<code>HealthChips.tsx:13,163</code>);
+            the tooltip becomes a line of text.
+          </td>
+        </tr>
+        <tr>
+          <td>Risk breakdown panel, importers</td>
+          <td><code>RiskBreakdownPanel.tsx</code></td>
+          <td>Inspector File tab</td>
+        </tr>
+        <tr>
+          <td>Agent panel</td>
+          <td><code>AgentPanel.tsx</code></td>
+          <td>
+            Inspector Agent tab, with a count. Finding actions become one line of text buttons.
+          </td>
+        </tr>
+        <tr>
+          <td>Pause review, Submit review, Prev, Mark viewed / Finish</td>
+          <td><code>ReviewDiffPane.tsx:1386</code></td>
+          <td>Footer, with one Submit</td>
+        </tr>
+        <tr>
+          <td>Drafts count, "from an agent finding", Review drafts, verdict, Submit</td>
+          <td><code>SubmitBar.tsx</code></td>
+          <td>
+            Footer link "3 drafts on 2 files · 1 from agent". It opens the Submit dialog. The
+            verdict is chosen in the Submit dialog, which already has Approve / Request changes /
+            Comment (<code>ReviewSubmitPanel.tsx:73</code>).
+          </td>
+        </tr>
+        <tr>
+          <td>Complexity hotspot, agent notes, drafts, notes, selection bar</td>
+          <td>inside the diff</td>
+          <td>
+            Unchanged. The hotspot keeps its border and background tint but loses the big icon row.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose" style="font-size: 14px; color: var(--text2)">
+    GitHub places things the same way: view settings are under a gear ("click ⚙ and choose the
+    unified or split view"; whitespace is in the same menu), and Viewed is "on the right of the
+    header of the file". Source:
+    <a
+      href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request"
+      >Reviewing proposed changes in a pull request</a
+    >.
+  </p>
+
+  <h2>The design</h2>
+  <div class="prose">
+    <p>
+      The approach is two thin bars, one footer, one inspector and three menus. The diff owns the
+      rest of the screen. Colour is only used for state that needs you: failing checks, risk, agent
+      findings and drafts. Values that are fine go quiet.
+    </p>
+  </div>
+
+  <h3>1 · Reading a file</h3>
+  <figure class="fig">
+    <div class="shot">
+      <div class="m" role="img" aria-label="Proposed review screen, reading utils.ts">
+        <div class="row hdr">
+          <span class="ttl"
+            ><i>#68</i>feat(test-batch): batch 050 — BatchPanel50 with filter/sort/pagination</span
+          >
+          <span class="pill bad"
+            ><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>2 of 8 checks
+            failing</span
+          >
+          <span class="sp"></span>
+          <span class="prog"
+            ><span class="bar"><b style="width: 20%"></b></span>1/5 viewed · ~6m</span
+          >
+          <button class="btn">
+            <svg viewBox="0 0 24 24">
+              <path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z" /></svg
+            >Ask agent
+          </button>
+          <button class="ib" aria-label="More">
+            <svg viewBox="0 0 24 24">
+              <circle cx="5" cy="12" r="1" />
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="19" cy="12" r="1" />
+            </svg>
+          </button>
+          <button class="ib" aria-label="Close">
+            <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+          <span class="cn" style="left: 612px; top: 2px">1</span
+          ><span class="cn" style="left: 800px; top: 2px">2</span
+          ><span class="cn" style="left: 1124px; top: 2px">3</span>
+        </div>
+        <div class="body">
+          <aside class="rail">
+            <div class="railtop row">
+              <div class="seg"><span class="on">Files</span><span>Chapters</span></div>
+            </div>
+            <div class="fr done">
+              <span class="dot md"></span><span class="n">types.ts</span><span class="st">✓</span
+              ><span class="why">Defines Priority · depends on nothing in this PR</span>
+            </div>
+            <div class="fr cur">
+              <span class="dot"></span><span class="n">utils.ts</span><span class="d">+54</span
+              ><span class="why">Uses BatchItem50 (step 1)</span>
+            </div>
+            <div class="fr">
+              <span class="dot"></span><span class="n">constants.ts</span><span class="d">+23</span
+              ><span class="why">Defines BATCH_KEY · depends on nothing in this PR</span>
+            </div>
+            <div class="fr">
+              <span class="dot md"></span><span class="n">useBatch.ts</span
+              ><span class="d">+57</span><span class="why">Calls sortByPriority (step 2)</span>
+            </div>
+            <div class="fr">
+              <span class="dot md"></span><span class="n">BatchPanel.tsx</span
+              ><span class="d">+68</span><span class="why">Calls useBatch50 (step 4)</span>
+            </div>
+            <span class="cn" style="left: 200px; top: 62px">4</span>
+          </aside>
+          <main class="main">
+            <div class="fh">
+              <span class="path"><i>src/test-batch/pr-050/</i>utils.ts</span>
+              <span class="chip">added</span>
+              <span class="chip link lo">● Low risk</span>
+              <span class="chip">Step 2 of 5</span>
+              <span class="chip">+54 −0</span>
+              <span class="sp"></span>
+              <button class="btn ghost">
+                Uses 4 · 4 unread<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              <button class="btn ghost">
+                View<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              <span class="sep"></span>
+              <span class="check"><i></i>Viewed <span class="kbd">v</span></span>
+              <span class="cn" style="left: 352px; top: 1px">5</span
+              ><span class="cn" style="left: 630px; top: 1px">6</span
+              ><span class="cn" style="left: 776px; top: 1px">7</span>
+            </div>
+            <div class="diff">
+              <div class="hh">@@ -0,0 +1,54 @@</div>
+              <div class="dl a">
+                <span></span><span>1</span><span>+</span
+                ><span
+                  ><span class="k">import type</span> { BatchItem50, BatchFilter50, BatchResult50,
+                  Priority } <span class="k">from</span> <span class="s">'./types'</span></span
+                >
+              </div>
+              <div class="dl a"><span></span><span>2</span><span>+</span><span></span></div>
+              <div class="dl a">
+                <span></span><span>3</span><span>+</span
+                ><span
+                  ><span class="k">const</span> <span class="at">PRIORITY_WEIGHT</span>:
+                  Record&lt;Priority, <span class="t">number</span>&gt; = {</span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>4</span><span>+</span
+                ><span> low: <span class="nu">1</span>,</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>5</span><span>+</span
+                ><span> medium: <span class="nu">2</span>,</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>6</span><span>+</span
+                ><span> high: <span class="nu">3</span>,</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>7</span><span>+</span
+                ><span> critical: <span class="nu">4</span>,</span>
+              </div>
+              <div class="dl a"><span></span><span>8</span><span>+</span><span>}</span></div>
+              <div class="dl a"><span></span><span>9</span><span>+</span><span></span></div>
+              <div class="dl a">
+                <span></span><span>10</span><span>+</span
+                ><span
+                  ><span class="k">export function</span>
+                  <span class="t">sortByPriority</span>(items: BatchItem50[]): BatchItem50[] {</span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>11</span><span>+</span
+                ><span> <span class="k">return</span> [...items].<span class="t">sort</span>(</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>12</span><span>+</span
+                ><span>
+                  (a, b) =&gt; <span class="at">PRIORITY_WEIGHT</span>[b.priority] -
+                  <span class="at">PRIORITY_WEIGHT</span>[a.priority]</span
+                >
+              </div>
+              <div class="dl a"><span></span><span>13</span><span>+</span><span> )</span></div>
+              <div class="dl a"><span></span><span>14</span><span>+</span><span>}</span></div>
+              <div class="dl a"><span></span><span>15</span><span>+</span><span></span></div>
+              <div class="dl a">
+                <span></span><span>16</span><span>+</span
+                ><span
+                  ><span class="k">export function</span> <span class="t">filterItems</span>(</span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>17</span><span>+</span><span> items: BatchItem50[],</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>18</span><span>+</span><span> filter: BatchFilter50</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>19</span><span>+</span><span>): BatchItem50[] {</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>20</span><span>+</span
+                ><span>
+                  <span class="k">return</span> items.<span class="t">filter</span>((item) =&gt;
+                  {</span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>21</span><span>+</span
+                ><span>
+                  <span class="k">if</span> (filter.priority &amp;&amp; item.priority !==
+                  filter.priority) <span class="k">return</span> <span class="l">false</span></span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>22</span><span>+</span
+                ><span>
+                  <span class="k">if</span> (filter.tags?.length &amp;&amp; !filter.tags.<span
+                    class="t"
+                    >some</span
+                  >((t) =&gt; item.tags.<span class="t">includes</span>(t)))
+                  <span class="k">return</span> <span class="l">false</span></span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>23</span><span>+</span
+                ><span>
+                  <span class="k">if</span> (filter.fromDate &amp;&amp; item.createdAt &lt;
+                  filter.fromDate) <span class="k">return</span> <span class="l">false</span></span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>24</span><span>+</span
+                ><span>
+                  <span class="k">if</span> (filter.toDate &amp;&amp; item.createdAt &gt;
+                  filter.toDate) <span class="k">return</span> <span class="l">false</span></span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>25</span><span>+</span
+                ><span> <span class="k">if</span> (filter.search) {</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>26</span><span>+</span
+                ><span>
+                  <span class="k">const</span> q = filter.search.<span class="t">toLowerCase</span
+                  >()</span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>27</span><span>+</span
+                ><span>
+                  <span class="k">if</span> (!item.id.<span class="t">toLowerCase</span>().<span
+                    class="t"
+                    >includes</span
+                  >(q)) <span class="k">return</span> <span class="l">false</span></span
+                >
+              </div>
+              <div class="dl a"><span></span><span>28</span><span>+</span><span> }</span></div>
+              <div class="dl a">
+                <span></span><span>29</span><span>+</span
+                ><span> <span class="k">return</span> <span class="l">true</span></span>
+              </div>
+              <div class="dl a"><span></span><span>30</span><span>+</span><span> })</span></div>
+              <div class="dl a"><span></span><span>31</span><span>+</span><span>}</span></div>
+            </div>
+            <div class="ftr">
+              <button class="btn ghost">Pause</button>
+              <span class="hint"
+                ><span class="kbd">[</span><span class="kbd">]</span> files
+                <span class="kbd">j</span><span class="kbd">k</span> hunks
+                <span class="kbd">?</span> all keys</span
+              >
+              <span class="sp"></span>
+              <button class="btn">
+                <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg>Prev
+              </button>
+              <button class="btn pri">Mark viewed, next</button>
+              <button class="btn">Submit review <span class="kbd">⌘↵</span></button>
+              <span class="cn" style="left: 262px; top: 2px">8</span
+              ><span class="cn" style="left: 812px; top: 2px">9</span>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+    <figcaption>
+      Reading <code>utils.ts</code>. The diff starts at y=84 of 740, compared with y≈290 of 900
+      today.
+    </figcaption>
+  </figure>
+  <ol class="callouts">
+    <li>
+      The status checks shrink to one pill. Its popover has the same list
+      <code>StatusChecksBar</code> renders.
+    </li>
+    <li>One progress meter replaces the track, the rail summary and the nav text.</li>
+    <li>⋯ holds Focus mode, Overview, Pop out, Refresh and Keyboard shortcuts.</li>
+    <li>Rail rows: the reason line is muted instead of green, and a ✓ marks viewed files.</li>
+    <li>Risk, step and size are plain text. Click the risk to open the File inspector.</li>
+    <li>Uses and Peek definition move into a popover.</li>
+    <li>Comments, Agent notes, Unified/Split and Semantic move into the View menu.</li>
+    <li>
+      The key hint is fixed. Today it reads "1 mark viewed", but the key is
+      <code>v</code> (<code>ReviewDiffPane.tsx:1397</code>).
+    </li>
+    <li>There is one Submit. Choosing the verdict moves into the dialog.</li>
+  </ol>
+
+  <h3>2 · After a push, with agent findings and drafts</h3>
+  <figure class="fig">
+    <div class="shot">
+      <div
+        class="m"
+        role="img"
+        aria-label="Proposed review screen after a push with the Agent inspector open"
+      >
+        <div class="row hdr">
+          <span class="ttl"
+            ><i>#68</i>feat(test-batch): batch 050 — BatchPanel50 with filter/sort/pagination</span
+          >
+          <span class="pill bad"
+            ><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>2 of 8 checks
+            failing</span
+          >
+          <span class="sp"></span>
+          <span class="prog"
+            ><span class="bar"><b style="width: 40%"></b></span>2/5 viewed · ~6m</span
+          >
+          <button class="btn">
+            <svg viewBox="0 0 24 24">
+              <path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z" /></svg
+            >Ask agent
+          </button>
+          <button class="ib" aria-label="More">
+            <svg viewBox="0 0 24 24">
+              <circle cx="5" cy="12" r="1" />
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="19" cy="12" r="1" />
+            </svg>
+          </button>
+          <button class="ib" aria-label="Close">
+            <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="band">
+          <b>3 commits since you last looked</b
+          ><span class="mut">1 d ago · 3 files changed · 2 still viewed</span>
+          <span class="sp"></span>
+          <div class="seg">
+            <span class="on">Since my review <span class="kbd">s</span></span
+            ><span>Whole PR</span>
+          </div>
+        </div>
+        <div class="body">
+          <aside class="rail">
+            <div class="railtop row">
+              <div class="seg"><span class="on">Files</span><span>Chapters</span></div>
+            </div>
+            <div class="fr done">
+              <span class="dot md"></span><span class="n">types.ts</span><span class="st">✓</span
+              ><span class="why">Defines Priority · depends on nothing in this PR</span>
+            </div>
+            <div class="fr">
+              <span class="dot"></span><span class="n">utils.ts</span
+              ><span class="st" style="color: var(--wn)">changed</span
+              ><span class="why">Uses BatchItem50 (step 1)</span>
+            </div>
+            <div class="fr">
+              <span class="dot"></span><span class="n">constants.ts</span><span class="st">new</span
+              ><span class="why">Defines BATCH_KEY · depends on nothing in this PR</span>
+            </div>
+            <div class="fr done">
+              <span class="dot md"></span><span class="n">useBatch.ts</span><span class="st">✓</span
+              ><span class="why">Calls sortByPriority (step 2)</span>
+            </div>
+            <div class="fr cur">
+              <span class="dot md"></span><span class="n">BatchPanel.tsx</span
+              ><span class="st" style="color: var(--wn)">changed</span
+              ><span class="why">Calls useBatch50 (step 4)</span>
+            </div>
+          </aside>
+          <main class="main">
+            <div class="fh">
+              <span class="path"><i>…/pr-050/</i>BatchPanel.tsx</span>
+              <span class="chip link md">● Medium risk</span>
+              <span class="chip">Step 5 of 5</span>
+              <span class="chip" style="color: var(--wn)" title="Changed since you viewed"
+                >Changed</span
+              >
+              <span class="sp"></span>
+              <button class="btn ghost">
+                Uses 5<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              <button class="btn ghost">
+                View<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              <span class="sep"></span>
+              <span class="check"><i></i>Viewed</span>
+            </div>
+            <div class="diff">
+              <div class="hh">@@ -58,8 +58,8 @@</div>
+              <div class="dl">
+                <span>58</span><span>58</span><span></span><span> &lt;/li&gt;</span>
+              </div>
+              <div class="dl"><span>59</span><span>59</span><span></span><span> ))}</span></div>
+              <div class="dl">
+                <span>60</span><span>60</span><span></span><span> &lt;/ul&gt;</span>
+              </div>
+              <div class="dl r">
+                <span>61</span><span></span><span>−</span><span> {result.hasMore ? (</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>61</span><span>+</span><span> {result.hasMore &amp;&amp; (</span>
+              </div>
+              <div class="dl">
+                <span>62</span><span>62</span><span></span
+                ><span>
+                  &lt;<span class="t">button</span> <span class="at">onClick</span>={() =&gt;
+                  <span class="t">fetch</span>(filter)}&gt;</span
+                >
+              </div>
+              <div class="note">
+                <b>Agent · must-fix</b><code>fetch(filter)</code> passes the same filter, so "Load
+                more (page 2)" reloads page 1. Pass the next page:
+                <code>fetch({ ...filter, page: result.page + 1 })</code>.
+              </div>
+              <div class="note draft">
+                <b>Pending</b><code>fetch(filter)</code> reloads the same page; pass
+                <code>page: result.page + 1</code>.
+                <span style="color: var(--t3)">· Edit · Delete</span>
+              </div>
+              <div class="dl">
+                <span>63</span><span>63</span><span></span
+                ><span> Load more (page {result.page + <span class="nu">1</span>})</span>
+              </div>
+              <div class="dl">
+                <span>64</span><span>64</span><span></span
+                ><span> &lt;/<span class="t">button</span>&gt;</span>
+              </div>
+              <div class="dl r">
+                <span>65</span><span></span><span>−</span
+                ><span> ) : <span class="l">null</span>}</span>
+              </div>
+              <div class="dl a"><span></span><span>65</span><span>+</span><span> )}</span></div>
+              <div class="dl">
+                <span>66</span><span>66</span><span></span><span> &lt;/div&gt;</span>
+              </div>
+            </div>
+            <div class="ftr">
+              <button class="btn ghost">Pause</button>
+              <button class="btn ghost" style="color: var(--act); padding: 0 4px">
+                <b style="font-weight: 600">3 drafts</b>&nbsp;on 2 files · 1 from agent
+              </button>
+              <span class="sp"></span>
+              <button class="btn" aria-label="Previous file">
+                <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg>
+              </button>
+              <button class="btn pri">Finish review ↵</button>
+              <button class="btn">Submit review <span class="kbd">⌘↵</span></button>
+            </div>
+          </main>
+          <aside class="insp">
+            <div class="tabs">
+              <span class="on">Agent <span class="ct">3</span></span
+              ><span>File</span
+              ><button class="ib ib-sm" aria-label="Close inspector">
+                <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div class="ipad">
+              <div class="mut" style="font-size: 12px">
+                lines 45–62 · 3 findings · private to you
+              </div>
+              <div class="fnd">
+                <span class="sev must">must-fix</span>
+                <h5>Load more fetches the same page</h5>
+                <div class="loc">BatchPanel.tsx:62</div>
+                <p>fetch(filter) passes the same filter, so "Load more (page 2)" reloads page 1.</p>
+                <div class="acts">
+                  <span>Post as comment</span><span>Follow up</span><span class="q">Dismiss</span>
+                </div>
+              </div>
+              <div class="fnd">
+                <span class="sev sug">suggestion</span>
+                <h5>Every item shows the "active" status</h5>
+                <div class="loc">BatchPanel.tsx:56</div>
+                <p>STATUS_MAP.active is rendered for each item regardless of its own status.</p>
+                <div class="acts">
+                  <span>Post as comment</span><span>Follow up</span><span class="q">Dismiss</span>
+                </div>
+              </div>
+              <div class="fnd">
+                <span class="sev q">question</span>
+                <h5>Colour carries the priority alone</h5>
+                <div class="loc">BatchPanel.tsx:51</div>
+                <p>The bracketed label repeats it, so this reads fine without colour. Intended?</p>
+                <div class="acts">
+                  <span>Post as comment</span><span>Follow up</span><span class="q">Dismiss</span>
+                </div>
+              </div>
+              <div class="acts" style="margin-top: 4px"><span>Ask again</span></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+    <figcaption>
+      The same state as screenshots 23 and 15. The notice row is the only extra band, and the drafts
+      bar becomes one footer link that opens the Submit dialog. With the inspector open the centre
+      is narrow, so the file header shortens its labels ("Changed", "Uses 5") instead of wrapping.
+      The full text stays in a tooltip and in the popover.
+    </figcaption>
+  </figure>
+
+  <h3>3 · Chapters, and the File inspector</h3>
+  <figure class="fig">
+    <div class="shot">
+      <div
+        class="m"
+        role="img"
+        aria-label="Proposed review screen in chapters mode with the File inspector open"
+      >
+        <div class="row hdr">
+          <span class="ttl"
+            ><i>#68</i>feat(test-batch): batch 050 — BatchPanel50 with filter/sort/pagination</span
+          >
+          <span class="pill bad"
+            ><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>2 of 8 checks
+            failing</span
+          >
+          <span class="pill wn"
+            ><svg viewBox="0 0 24 24">
+              <path
+                d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"
+              /></svg
+            >912 LOC · ~228 min</span
+          >
+          <span class="sp"></span>
+          <span class="prog"
+            ><span class="bar"><b style="width: 0%"></b></span>0/5 viewed · ~12m</span
+          >
+          <button class="btn">
+            <svg viewBox="0 0 24 24">
+              <path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z" /></svg
+            >Ask agent
+          </button>
+          <button class="ib" aria-label="More">
+            <svg viewBox="0 0 24 24">
+              <circle cx="5" cy="12" r="1" />
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="19" cy="12" r="1" />
+            </svg>
+          </button>
+          <button class="ib" aria-label="Close">
+            <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="body">
+          <aside class="rail">
+            <div class="railtop row">
+              <div class="seg"><span>Files</span><span class="on">Chapters</span></div>
+            </div>
+            <div class="grp">
+              <span class="dot md"></span><b>Types &amp; helpers</b><span class="sp"></span>0/3 · 6m
+            </div>
+            <div class="fr">
+              <span class="dot md"></span><span class="n">types.ts</span><span class="d">+104</span
+              ><span class="why">Defines Priority</span>
+            </div>
+            <div class="fr cur">
+              <span class="dot"></span><span class="n">utils.ts</span><span class="d">+216</span
+              ><span class="why">Uses BatchItem50 (step 1)</span>
+            </div>
+            <div class="fr">
+              <span class="dot"></span><span class="n">constants.ts</span><span class="d">+92</span
+              ><span class="why">Defines BATCH_KEY</span>
+            </div>
+            <div class="grp">
+              <span class="dot md"></span><b>Hook &amp; panel</b><span class="sp"></span>0/2 · 6m
+            </div>
+            <div class="fr">
+              <span class="dot md"></span><span class="n">useBatch.ts</span><span class="d"></span
+              ><span class="why">Calls sortByPriority (step 2)</span>
+            </div>
+            <div class="fr">
+              <span class="dot md"></span><span class="n">BatchPanel.tsx</span
+              ><span class="d"></span><span class="why">Calls useBatch50 (step 4)</span>
+            </div>
+          </aside>
+          <main class="main">
+            <div class="fh">
+              <span class="path"><i>…/pr-050/</i>utils.ts</span>
+              <span class="chip link lo">● Low risk</span>
+              <span class="chip">Step 2 of 5</span>
+              <span class="sp"></span>
+              <button class="btn ghost">
+                Uses 4<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              <button class="btn ghost">
+                View •<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              <span class="sep"></span>
+              <span class="check"><i></i>Viewed</span>
+            </div>
+            <div class="diff">
+              <div class="hh">@@ -0,0 +1,54 @@</div>
+              <div class="dl a">
+                <span></span><span>10</span><span>+</span
+                ><span
+                  ><span class="k">export function</span>
+                  <span class="t">sortByPriority</span>(items: BatchItem50[]): BatchItem50[] {</span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>11</span><span>+</span
+                ><span> <span class="k">return</span> [...items].<span class="t">sort</span>(</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>12</span><span>+</span
+                ><span>
+                  (a, b) =&gt; <span class="at">PRIORITY_WEIGHT</span>[b.priority] -
+                  <span class="at">PRIORITY_WEIGHT</span>[a.priority]</span
+                >
+              </div>
+              <div class="dl a"><span></span><span>13</span><span>+</span><span> )</span></div>
+              <div class="dl a"><span></span><span>14</span><span>+</span><span>}</span></div>
+              <div class="note hot">
+                <b>Complexity hotspot</b>This block adds 5 decision points (cyclomatic delta +5).
+              </div>
+              <div class="dl a"><span></span><span>15</span><span>+</span><span></span></div>
+              <div class="dl a">
+                <span></span><span>16</span><span>+</span
+                ><span
+                  ><span class="k">export function</span> <span class="t">filterItems</span>(</span
+                >
+              </div>
+              <div class="dl a">
+                <span></span><span>17</span><span>+</span><span> items: BatchItem50[],</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>18</span><span>+</span><span> filter: BatchFilter50</span>
+              </div>
+              <div class="dl a">
+                <span></span><span>19</span><span>+</span><span>): BatchItem50[] {</span>
+              </div>
+            </div>
+            <div class="ftr">
+              <button class="btn ghost">Pause</button>
+              <span class="hint"
+                ><span class="kbd">[</span><span class="kbd">]</span> files
+                <span class="kbd">j</span><span class="kbd">k</span> hunks
+                <span class="kbd">?</span> all keys</span
+              >
+              <span class="sp"></span>
+              <button class="btn">
+                <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg>Prev
+              </button>
+              <button class="btn pri">Mark viewed, next</button>
+              <button class="btn">Submit review <span class="kbd">⌘↵</span></button>
+            </div>
+          </main>
+          <aside class="insp">
+            <div class="tabs">
+              <span>Agent</span><span class="on">File</span
+              ><button class="ib ib-sm" aria-label="Close inspector">
+                <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div class="ipad">
+              <div class="score">
+                <b>29</b><span class="mut">/ 100 · Low risk · Large change, 54 lines</span>
+              </div>
+              <div class="kv">
+                <span>Change size</span><span class="m-bar"><b style="width: 14%"></b></span
+                ><em>54</em> <span>Churn 90d</span
+                ><span class="m-bar"><b style="width: 0%"></b></span><em>0</em>
+                <span>Blast radius</span><span class="m-bar"><b style="width: 12%"></b></span
+                ><em>27</em> <span>Complexity delta</span
+                ><span class="m-bar"><b style="width: 55%"></b></span><em>11</em>
+              </div>
+              <div class="sect">Health</div>
+              <div class="hl">
+                <span>CI</span><span class="bad">failing</span> <span>Complexity</span
+                ><span class="wn">+11</span> <span>Tests</span><span class="okk">present</span>
+                <span>Lint</span><span class="okk">clean</span> <span>Churn</span
+                ><span class="okk">0x / 90d</span> <span>Blast</span
+                ><span class="wn">27 importers</span> <span>Coverage</span
+                ><span class="unk">unknown</span> <span>Duplication</span
+                ><span class="unk">unknown</span>
+              </div>
+              <div class="sect">Importers (27)</div>
+              <div class="ul">
+                <span>FileDiffView.tsx</span><span>AiSuggestionPanel.tsx</span
+                ><span>ConflictPanel.tsx</span><span>KeepBothModal.tsx</span
+                ><span class="mut">+23 more</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+    <figcaption>
+      Chapters mode puts the old chapter tabs into the rail as groups. The large-PR banner becomes a
+      header pill. Clicking "Low risk" opens the File tab, which holds the eight health signals, the
+      risk breakdown and the importers. Problems are listed first. The numbers are the ones
+      screenshot 08 shows for <code>utils.ts</code>.
+    </figcaption>
+  </figure>
+
+  <h3>4 · The menus</h3>
+  <div class="tiles">
+    <figure class="tile" style="margin: 0">
+      <div class="m">
+        <div class="pop" style="width: 250px">
+          <div class="ph">Comments <span class="kbd">c</span></div>
+          <div class="pi">
+            <div class="seg">
+              <span class="on">All</span><span>Unresolved</span><span>Hidden</span>
+            </div>
+          </div>
+          <div class="ph">Agent notes <span class="kbd">⇧C</span></div>
+          <div class="pi">
+            <div class="seg"><span class="on">On</span><span>Off</span></div>
+          </div>
+          <div class="ph">Layout</div>
+          <div class="pi">
+            <div class="seg"><span class="on">Unified</span><span>Split</span></div>
+          </div>
+          <hr />
+          <div class="pi hov">
+            <span>Hide formatting-only hunks</span><span class="check on"><i></i></span>
+          </div>
+          <div class="pi mut" style="font-size: 11.5px">Showing a1b2c3d4 … head</div>
+        </div>
+      </div>
+      <figcaption>
+        View ▾: the four toggle groups from the file header, unchanged. It gets a dot when something
+        is off its default.
+      </figcaption>
+    </figure>
+
+    <figure class="tile" style="margin: 0">
+      <div class="m">
+        <div class="pop" style="width: 240px">
+          <div class="pi hov">
+            <span>Focus mode</span
+            ><span class="mut" style="font-size: 11.5px">medium/high risk only</span>
+          </div>
+          <div class="pi"><span>Overview</span><span class="kbd">i</span></div>
+          <div class="pi"><span>Hide file list</span><span class="kbd">t</span></div>
+          <hr />
+          <div class="pi"><span>Refresh PR</span></div>
+          <div class="pi"><span>Pop out</span></div>
+          <hr />
+          <div class="pi"><span>Keyboard shortcuts</span><span class="kbd">?</span></div>
+        </div>
+      </div>
+      <figcaption>
+        ⋯: the rest of today's top-bar and rail-header buttons, with their keys.
+      </figcaption>
+    </figure>
+
+    <figure class="tile" style="margin: 0">
+      <div class="m">
+        <div class="pop" style="width: 260px">
+          <div class="ph">Uses</div>
+          <div class="pi"><span>useBatch50</span><span class="mut">step 4 · read</span></div>
+          <div class="pi"><span>BatchFilter50</span><span class="mut">step 1 · read</span></div>
+          <div class="pi"><span>Priority</span><span class="mut">step 1 · read</span></div>
+          <div class="pi">
+            <span>BATCH_KEY</span><span style="color: var(--wn)">step 3 · not read</span>
+          </div>
+          <div class="pi">
+            <span>STATUS_MAP</span><span style="color: var(--wn)">step 3 · not read</span>
+          </div>
+          <hr />
+          <div class="pi hov"><span>Peek definition</span><span class="kbd">g d</span></div>
+        </div>
+      </div>
+      <figcaption>Uses: the reading-order row from screenshot 23, as a list.</figcaption>
+    </figure>
+
+    <figure class="tile" style="margin: 0">
+      <div class="m">
+        <div class="pop" style="width: 260px">
+          <div class="pi" style="color: var(--wn); align-items: flex-start">
+            <span
+              >Large PR: 912 LOC, estimated 228 min to review. Consider requesting it be
+              split.</span
+            >
+          </div>
+          <hr />
+          <div class="pi hov"><span>Dismiss</span></div>
+        </div>
+      </div>
+      <figcaption>
+        The large-PR pill: the banner's exact text and its dismiss. The checks pill opens the same
+        list <code>StatusChecksBar</code> expands today.
+      </figcaption>
+    </figure>
+  </div>
+
+  <h2>Options considered</h2>
+  <div class="tbl">
+    <table>
+      <thead>
+        <tr>
+          <th>Option</th>
+          <th>What it does</th>
+          <th>Tradeoffs</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>A · Consolidate</b></td>
+          <td>Two bars, one footer, a tabbed inspector and three menus, as drawn above.</td>
+          <td>
+            Removes 8 bands and every duplicate. It costs one extra click for view toggles and
+            health signals. The view toggles have keys, and the risk label is one click from health.
+          </td>
+        </tr>
+        <tr>
+          <td><b>B · Restyle in place</b></td>
+          <td>Keep every band but make chips smaller, drop outlines and mute colours.</td>
+          <td>
+            Least code and least risk. The bands, the duplicate Submit and the four progress
+            displays all stay, and the header still wraps when the agent panel opens.
+          </td>
+        </tr>
+        <tr>
+          <td><b>C · Zen mode</b></td>
+          <td>
+            Hide everything except the diff and reach controls through ⌘P Quick Actions and keys.
+          </td>
+          <td>
+            Cleanest look. Checks, risk and drafts disappear until you ask for them, which hides
+            state that is waiting on you.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose">
+    <b>Decision: A,</b> with B's quieter styling on what remains. It is the only option that removes
+    duplicates and bands while keeping failing checks, risk and drafts visible without a click.
+  </p>
+
+  <h2>Changes, in order</h2>
+  <div class="prose">
+    <p>
+      All paths are under <code>extensions/git-integration/src/components/pr-review/</code>. Each
+      step is one commit and leaves the screen working.
+    </p>
+    <ol>
+      <li>
+        <b>Footer.</b> Merge the nav bar (<code>ReviewDiffPane.tsx:1386</code>) and
+        <code>SubmitBar.tsx</code> into a new <code>ReviewFooter.tsx</code> rendered by
+        <code>PrReviewView</code>. Drop SubmitBar's verdict control, because
+        <code>ReviewSubmitPanel</code> already has one. Fix the key hint.
+      </li>
+      <li>
+        <b>Header.</b> Add <code>ReviewHeader.tsx</code>: title, checks pill with a
+        <code>Popover</code> from <code>@terminator/extension-ui</code> around today's
+        <code>StatusChecksBar</code> list, the progress meter, a large-PR pill, Ask agent, and a ⋯
+        menu. Remove the progress track, the large-PR banner and the rail's refresh button from
+        <code>PrReviewView</code>.
+      </li>
+      <li>
+        <b>Rail.</b> Replace the rail header buttons and <code>ChapterNav</code> with a Files |
+        Chapters switch. <code>FullFileList</code> already renders chapter groups
+        (<code>FullFileList.tsx:102</code>), so Chapters mode reuses them. Remove its summary row
+        and mute the reason text.
+      </li>
+      <li>
+        <b>File header.</b> Collapse <code>ReviewDiffPane.tsx:863–976</code> to one row. Add
+        <code>ViewMenu.tsx</code> and <code>UsesPopover.tsx</code>, and a Viewed checkbox wired to
+        <code>markFileViewed</code>. Move <code>diffViewMode</code> and
+        <code>hideFormattingHunks</code> from local state (<code>ReviewDiffPane.tsx:81–82</code>)
+        into <code>review-ui.store.ts</code> so the menu drives them like the other two.
+      </li>
+      <li>
+        <b>Inspector.</b> Add <code>ReviewInspector.tsx</code> with Agent and File tabs. File
+        renders <code>RiskBreakdownPanel</code> and <code>HealthChips</code> (restyled as a list,
+        problems first). This replaces the two-way <code>agentPanelScope</code> /
+        <code>showRiskFor</code> choice at <code>PrReviewView.tsx:490</code>.
+      </li>
+      <li>
+        <b>Docs.</b> Update the review section of the extension README and
+        <code>ARCHITECTURE.md</code> (Constitution VIII).
+      </li>
+    </ol>
+  </div>
+
+  <h2>Testing and verification</h2>
+  <div class="prose">
+    <ul>
+      <li>
+        Write the failing tests first, in <code>tests/unit/PrReviewView.spec.tsx</code>. At most
+        three bars render around the diff, and exactly one control is named "Submit review". Every
+        former control is reachable by role and name: open ⋯, then View, then the inspector tabs,
+        and assert each option. The same file covers <code>ViewMenu</code> and
+        <code>ReviewInspector</code>.
+      </li>
+      <li>
+        Keys: extend the <code>useReviewKeys</code> coverage so <code>c</code>, <code>⇧C</code>,
+        <code>s</code>, <code>v</code>, <code>t</code>, <code>i</code> and <code>⌘↵</code> still
+        work with the menus closed.
+      </li>
+      <li>
+        Checks: <code>npm run format</code>, <code>npm run lint</code>,
+        <code>npx vitest run --coverage</code>, all exit 0.
+      </li>
+      <li>
+        Render: re-shoot screenshots 06, 08, 15, 23 and 32 against the live app in both themes and
+        compare them with the renderings above.
+      </li>
+    </ul>
+  </div>
+
+  <h2>Risks</h2>
+  <div class="prose">
+    <ul>
+      <li>
+        <b>Hidden toggles get forgotten.</b> A comment filter left on "Hidden" hides threads. The
+        View button's dot and the existing keys cover this. Also show "Comments hidden" next to View
+        whenever that state is on.
+      </li>
+      <li>
+        <b>A narrow centre wraps the header again.</b> The file header never wraps. Below about
+        700px of centre width it shortens labels ("Changed since you viewed" becomes "Changed",
+        "Uses 5 · 3 unread" becomes "Uses 5") and puts the full text in a tooltip. A container query
+        on the header decides this.
+      </li>
+      <li>
+        <b>Health signals are one click away.</b> Failing CI is already in the header pill. A
+        missing test file and low patch coverage feed the risk score (<code
+          >MISSING_TEST_PENALTY</code
+        >
+        and a 0.05 weight in <code>github/pr-review-service.ts:111–128</code>), so they move the
+        risk label. Lint and duplication do not, so show a small count beside the risk label ("· 2
+        warnings") whenever any signal fails.
+      </li>
+      <li>
+        <b>e2e selectors.</b> Specs that address <code>.pr-review-ask-agent-btn</code> or other old
+        classes will break. Address controls by role and accessible name.
+      </li>
+    </ul>
+  </div>
+
+  <h2>Open questions</h2>
+  <div class="prose">
+    <ul>
+      <li>
+        Should the File inspector open by itself on high-risk files, or only when you click the risk
+        label?
+      </li>
+      <li>
+        Screenshots 06–32 have no capture script in the repo (<code
+          >rg -i playwright docs/research/code-review-guide.md</code
+        >
+        finds none). How were they taken? The answer decides whether the "Render" step can be
+        automated.
+      </li>
+      <li>
+        Should Focus mode stay a menu item, or keep a header pill while it is on so a filtered file
+        list is never a surprise? The drawing assumes a pill while it is on.
+      </li>
+    </ul>
+  </div>
+
+  <h2>Alternatives rejected</h2>
+  <div class="prose">
+    <ul>
+      <li>Collapsible bands: they keep the stack and add a toggle to each band.</li>
+      <li>Moving health chips to the rail: that repeats eight signals per row.</li>
+      <li>A second tab strip for chapters: the rail already groups by chapter.</li>
+    </ul>
+  </div>
+</div>

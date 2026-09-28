@@ -53,13 +53,6 @@ export function FullFileList({
     return map
   }, [pr.readingOrder, viewedFiles])
 
-  const totalFiles = pr.chapters.reduce((n, c) => n + c.files.length, 0)
-  const totalViewed = pr.chapters.reduce(
-    (n, c) => n + c.files.filter((f) => viewedFiles.has(f.path)).length,
-    0
-  )
-  const totalMinutes = pr.chapters.reduce((n, c) => n + c.estimatedMinutes, 0)
-
   // Chapters collapsed by default only if they are complete
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(pr.chapters.map((c) => [c.id, false]))
@@ -76,14 +69,6 @@ export function FullFileList({
 
   return (
     <div className="full-file-list">
-      {/* Summary row */}
-      <div className="full-file-list-summary">
-        <span>
-          {totalViewed} / {totalFiles} files reviewed
-        </span>
-        <span>~{totalMinutes}m</span>
-      </div>
-
       {pr.chapters.map((chapter, ci) => {
         const status = chapterStatus(chapter)
         const isOpen = !collapsed[chapter.id]

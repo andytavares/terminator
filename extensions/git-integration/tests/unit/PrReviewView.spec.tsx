@@ -16,25 +16,16 @@ vi.mock('../../src/components/pr-review/FullFileList', () => ({
 }))
 vi.mock('../../src/components/pr-review/ReviewDiffPane', () => ({
   ReviewDiffPane: ({
-    onPause,
-    onOpenSubmit,
     onMarkViewed,
-    onFinishChapter,
     onShowRisk,
     onPrevFile,
   }: {
-    onPause: () => void
-    onOpenSubmit: () => void
     onMarkViewed: () => void
-    onFinishChapter: () => void
     onShowRisk: () => void
     onPrevFile: () => void
   }) => (
     <div data-testid="review-diff-pane">
-      <button onClick={onPause}>Pause</button>
-      <button onClick={onOpenSubmit}>Submit</button>
       <button onClick={onMarkViewed}>MarkViewed</button>
-      <button onClick={onFinishChapter}>FinishChapter</button>
       <button onClick={onShowRisk}>ShowRisk</button>
       <button onClick={onPrevFile}>PrevFile</button>
     </div>
@@ -164,8 +155,7 @@ describe('PrReviewView', () => {
       { chapters: [mockChapter, ch2] },
       { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
     )
-    // Default is full mode; switch to guided
-    fireEvent.click(screen.getByTitle('Switch to guided chapter view'))
+    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
   })
 
@@ -175,8 +165,7 @@ describe('PrReviewView', () => {
       { chapters: [mockChapter, ch2] },
       { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
     )
-    // Default is full mode; chapter nav only visible in guided mode
-    fireEvent.click(screen.getByTitle('Switch to guided chapter view'))
+    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-nav')).toBeTruthy()
   })
 
@@ -191,7 +180,7 @@ describe('PrReviewView', () => {
     render(
       <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
     )
-    fireEvent.click(screen.getByText('Submit'))
+    fireEvent.click(screen.getByRole('button', { name: /^Submit review/ }))
     expect(screen.getByTestId('submit-panel')).toBeTruthy()
   })
 
@@ -201,7 +190,7 @@ describe('PrReviewView', () => {
     render(
       <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
     )
-    fireEvent.click(screen.getByText('Submit'))
+    fireEvent.click(screen.getByRole('button', { name: /^Submit review/ }))
     fireEvent.click(screen.getByText('CloseSubmit'))
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
@@ -212,9 +201,41 @@ describe('PrReviewView', () => {
     render(
       <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
     )
-    fireEvent.click(screen.getByText('Pause'))
+    fireEvent.click(screen.getByRole('button', { name: 'Pause review' }))
     expect(mockSetPaused).toHaveBeenCalled()
     expect(mockClose).toHaveBeenCalled()
+  })
+
+  it('shows review progress once, in the header, with the chapter estimate', async () => {
+    await renderView({}, { currentFilePath: 'src/foo.ts' })
+    expect(screen.getByText('0/1 viewed · ~10m')).toBeTruthy()
+    expect(screen.queryByText(/files reviewed/)).toBeNull()
+  })
+
+  it('shows exactly one Submit review control', async () => {
+    await renderView({}, { currentFilePath: 'src/foo.ts' })
+    expect(screen.getAllByRole('button', { name: /^Submit review/ })).toHaveLength(1)
+  })
+
+  it('opens the Agent tab of the inspector from Ask agent, and closes it', async () => {
+    await renderView({}, { currentFilePath: 'src/foo.ts' })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask agent about this PR' }))
+    expect(screen.getByRole('tab', { name: /Agent/, selected: true })).toBeTruthy()
+    expect(screen.getByTestId('agent-panel')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }))
+    expect(screen.queryByTestId('agent-panel')).toBeNull()
+    expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
+  })
+
+  it('hides and restores the file list from the more menu', async () => {
+    await renderView({}, { currentFilePath: 'src/foo.ts' })
+    expect(screen.getByTestId('full-file-list')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
+    expect(screen.queryByTestId('full-file-list')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
+    expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 
   it('shows risk panel when ShowRisk is clicked', async () => {
@@ -224,7 +245,9 @@ describe('PrReviewView', () => {
       <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
     )
     fireEvent.click(screen.getByText('ShowRisk'))
+    expect(screen.getByRole('tab', { name: 'File', selected: true })).toBeTruthy()
     expect(screen.getByTestId('risk-panel')).toBeTruthy()
+    expect(screen.getByText('Health')).toBeTruthy()
   })
 
   it('opens submit panel when FinishChapter is clicked on the last (only) chapter', async () => {
@@ -233,7 +256,7 @@ describe('PrReviewView', () => {
     render(
       <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
     )
-    fireEvent.click(screen.getByText('FinishChapter'))
+    fireEvent.click(screen.getByRole('button', { name: 'Finish review ↵' }))
     expect(screen.getByTestId('submit-panel')).toBeTruthy()
   })
 
@@ -249,7 +272,7 @@ describe('PrReviewView', () => {
         onRefresh={mockRefresh}
       />
     )
-    fireEvent.click(screen.getByText('FinishChapter'))
+    fireEvent.click(screen.getByRole('button', { name: 'Finish chapter ↵' }))
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
@@ -286,11 +309,9 @@ describe('PrReviewView', () => {
     )
     // Full is default
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
-    // Switch to guided
-    fireEvent.click(screen.getByTitle('Switch to guided chapter view'))
+    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-    // Switch back to full
-    fireEvent.click(screen.getByTitle('Switch to full file view'))
+    fireEvent.click(screen.getByRole('button', { name: 'Files' }))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 
@@ -306,7 +327,7 @@ describe('PrReviewView', () => {
         onRefresh={mockRefresh}
       />
     )
-    fireEvent.click(screen.getByTitle('Switch to guided chapter view'))
+    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
   })
 
@@ -316,7 +337,8 @@ describe('PrReviewView', () => {
     render(
       <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
     )
-    fireEvent.click(screen.getByTitle('Refresh PR'))
+    fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Refresh PR/ }))
     expect(mockRefresh).toHaveBeenCalled()
   })
 
@@ -334,7 +356,7 @@ describe('PrReviewView', () => {
     expect(screen.getByText('Select a file to review.')).toBeTruthy()
   })
 
-  describe('large-PR banner', () => {
+  describe('large-PR warning', () => {
     function makeLargeFile(path: string, additions: number) {
       return { ...mockFile, path, additions, deletions: 0 }
     }
@@ -352,13 +374,13 @@ describe('PrReviewView', () => {
           onRefresh={mockRefresh}
         />
       )
-      expect(screen.getByRole('alert')).toBeTruthy()
-      expect(screen.getByText(/Large PR/)).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: /500 LOC/ }))
+      expect(screen.getByText(/Large PR — 500 LOC, estimated 125 min to review/)).toBeTruthy()
     })
 
     it('does not show large-PR banner when PR is under 400 LOC', async () => {
       await renderView()
-      expect(screen.queryByRole('alert')).toBeNull()
+      expect(screen.queryByRole('button', { name: /LOC ·/ })).toBeNull()
     })
 
     it('dismisses large-PR banner when × clicked', async () => {
@@ -374,8 +396,9 @@ describe('PrReviewView', () => {
           onRefresh={mockRefresh}
         />
       )
-      fireEvent.click(screen.getByLabelText('Dismiss large PR warning'))
-      expect(screen.queryByRole('alert')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: /500 LOC/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+      expect(screen.queryByRole('button', { name: /500 LOC/ })).toBeNull()
     })
 
     it('toggles focus mode on/off', async () => {
@@ -391,10 +414,12 @@ describe('PrReviewView', () => {
           onRefresh={mockRefresh}
         />
       )
-      const focusBtn = screen.getByTitle('Focus mode — show only medium/high risk files')
-      expect(focusBtn.textContent).toBe('Focus mode')
-      fireEvent.click(focusBtn)
-      expect(focusBtn.textContent).toBe('All files')
+      expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))
+      const pill = screen.getByRole('button', { name: 'Focus mode', pressed: true })
+      fireEvent.click(pill)
+      expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
     })
 
     it('drops all-low-risk chapters in focus mode instead of showing their full file list', async () => {
@@ -427,10 +452,10 @@ describe('PrReviewView', () => {
           onRefresh={mockRefresh}
         />
       )
-      const focusBtn = screen.getByTitle('Focus mode — show only medium/high risk files')
-      fireEvent.click(focusBtn)
+      fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))
       // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
-      expect(screen.getByLabelText(/0 of 1 files reviewed/)).toBeTruthy()
+      expect(screen.getByRole('progressbar', { name: '0 of 1 files viewed' })).toBeTruthy()
       unmount()
     })
 
@@ -446,7 +471,7 @@ describe('PrReviewView', () => {
         currentFilePath: 'src/low.ts',
         viewedFiles: new Set(['src/low.ts', 'src/other.ts', 'src/another.ts']),
       })
-      const { container } = render(
+      render(
         <PrReviewView
           repoRoot="/repo"
           pr={{ ...mockPr, chapters: [chapter] }}
@@ -454,9 +479,10 @@ describe('PrReviewView', () => {
           onRefresh={mockRefresh}
         />
       )
-      const fill = container.querySelector('.pr-review-progress-fill') as HTMLElement
-      const width = parseFloat(fill?.style.width ?? '0')
-      expect(width).toBeLessThanOrEqual(100)
+      const bar = screen.getByRole('progressbar')
+      expect(Number(bar.getAttribute('aria-valuenow'))).toBeLessThanOrEqual(
+        Number(bar.getAttribute('aria-valuemax'))
+      )
     })
   })
 })

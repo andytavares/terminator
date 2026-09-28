@@ -5,10 +5,11 @@ interface Props {
   onExplain: () => void
   onAddNote: () => void
   onComment: () => void
+  onTests: () => void
 }
 
 /** The float bar shown under the last selected line (R5 step 1). */
-export function SelectionBar({ onAskAgent, onExplain, onAddNote, onComment }: Props) {
+export function SelectionBar({ onAskAgent, onExplain, onAddNote, onComment, onTests }: Props) {
   return (
     <div className="rs-float" onClick={(e) => e.stopPropagation()}>
       <button type="button" className="rs-btn rs-btn--ag" onClick={onAskAgent}>
@@ -22,6 +23,9 @@ export function SelectionBar({ onAskAgent, onExplain, onAddNote, onComment }: Pr
       </button>
       <button type="button" className="rs-btn" onClick={onComment}>
         Comment <span className="rs-kbd">r</span>
+      </button>
+      <button type="button" className="rs-btn" onClick={onTests}>
+        Tests
       </button>
     </div>
   )

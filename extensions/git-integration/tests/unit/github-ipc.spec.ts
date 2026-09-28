@@ -2185,6 +2185,44 @@ describe('github:pr-compare', () => {
   })
 })
 
+describe('github:tests-for-block', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing fields', async () => {
+    const result = (await handlers['github:tests-for-block']({ repoRoot: '/repo' })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('names the block and returns the test lines that mention it', async () => {
+    mockGitSuccess('abc:src/utils.spec.ts:7:  expect(sortByPriority([])).toEqual([])')
+    const result = (await handlers['github:tests-for-block']({
+      repoRoot: '/repo',
+      headSHA: 'abc',
+      path: 'src/utils.ts',
+      code: 'export function sortByPriority(items: number[]) {\n  return items\n}',
+    })) as { symbols: string[]; locations: unknown[] }
+    expect(result.symbols).toEqual(['sortByPriority'])
+    expect(result.locations).toEqual([
+      {
+        path: 'src/utils.spec.ts',
+        line: 7,
+        symbol: 'sortByPriority',
+        text: 'expect(sortByPriority([])).toEqual([])',
+      },
+    ])
+    const args: string[] = mockExecFile.mock.calls[0][1]
+    expect(args.slice(0, 2)).toEqual(['grep', '-n'])
+  })
+})
+
 describe('github:clone-repo', () => {
   let handlers: Record<string, Handler>
 

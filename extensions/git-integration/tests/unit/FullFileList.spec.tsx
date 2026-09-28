@@ -83,11 +83,6 @@ describe('FullFileList', () => {
     onSelectFile: vi.fn(),
   }
 
-  it('renders summary with file counts', () => {
-    render(<FullFileList {...defaultProps} />)
-    expect(screen.getByText('0 / 2 files reviewed')).toBeTruthy()
-  })
-
   it('renders chapter name', () => {
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('Core')).toBeTruthy()
@@ -138,11 +133,6 @@ describe('FullFileList', () => {
   it('shows progress per chapter', () => {
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('0/2')).toBeTruthy()
-  })
-
-  it('shows estimated minutes in summary', () => {
-    render(<FullFileList {...defaultProps} />)
-    expect(screen.getByText('~10m')).toBeTruthy()
   })
 
   it('shows done check when chapter is complete', () => {

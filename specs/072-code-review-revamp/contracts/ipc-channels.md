@@ -9,6 +9,7 @@ Registered by `extensions/git-integration` (`src/ipc/github.ipc.ts`, `src/ipc/re
 | `github:file-viewed-set`         | `{ repoRoot, prNumber, path, viewed }`                                                           | `{ ok: true }`                                             |
 | `github:pr-compare`              | `{ repoRoot, fromSha, toSha }`                                                                   | `{ rewritten, commits, files: [{ path, status, patch }] }` |
 | `github:pr-review-submit`        | adds `comments?: [{ path, line, startLine, side, body }]`                                        | unchanged                                                  |
+| `github:tests-for-block`         | `{ repoRoot, headSHA, path, code, hunkHeader? }`                                                 | `{ symbols, locations: [{ path, line, symbol, text }] }`   |
 | `github:clone-repo`              | `{ repo: 'owner/name', folder }`                                                                 | `{ repoRoot }`                                             |
 | `github:review-settings`         | `{}`                                                                                             | `{ cloneFolder }`                                          |
 | `github:pr-review-detail`        | unchanged                                                                                        | `pr` gains `readingOrder`, `movedBlocks`, `insights`       |

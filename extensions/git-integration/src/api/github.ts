@@ -71,6 +71,14 @@ export const githubAPI = {
   prCompare: (repoRoot: string, fromSha: string, toSha: string) =>
     bridge().invoke('github:pr-compare', { repoRoot, fromSha, toSha }),
 
+  testsForBlock: (input: {
+    repoRoot: string
+    headSHA: string
+    path: string
+    code: string
+    hunkHeader?: string
+  }) => bridge().invoke('github:tests-for-block', input),
+
   cloneRepo: (repo: string, folder: string) =>
     bridge().invoke('github:clone-repo', { repo, folder }),
 

@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { Check, ChevronLeft, TriangleAlert } from 'lucide-react'
-import { HealthChips } from './HealthChips'
+import { TriangleAlert } from 'lucide-react'
+import { ViewMenu } from './ViewMenu'
+import { UsesPopover } from './UsesPopover'
+import { TestsPopover, type TestBlock } from './TestsPopover'
 import { InlineCommentThread } from './InlineCommentThread'
 import { RichContent } from './RichContent'
 import { CommentComposer } from './CommentComposer'
@@ -27,14 +29,9 @@ interface Props {
   repoRoot: string
   pr: PrReviewDetail
   file: PrChangedFile
-  chapterProgress: { index: number; total: number }
   onMarkViewed: () => void
   onPrevFile: () => void
   onNextFile: () => void
-  onFinishChapter: () => void
-  isLastChapter: boolean
-  onPause: () => void
-  onOpenSubmit: () => void
   onShowRisk: () => void
 }
 
@@ -46,8 +43,6 @@ interface ComposerAnchor {
   fromFindingId: string | null
 }
 
-type DiffViewMode = 'unified' | 'split'
-
 function findChapterId(chapters: Chapter[], path: string): string | null {
   return chapters.find((c) => c.files.some((f) => f.path === path))?.id ?? null
 }
@@ -56,14 +51,9 @@ export function ReviewDiffPane({
   repoRoot,
   pr,
   file,
-  chapterProgress,
   onMarkViewed,
   onPrevFile,
   onNextFile,
-  onFinishChapter,
-  isLastChapter,
-  onPause,
-  onOpenSubmit,
   onShowRisk,
 }: Props) {
   const [diff, setDiff] = useState<FileDiff | null>(null)
@@ -78,9 +68,9 @@ export function ReviewDiffPane({
   const [replyTarget, setReplyTarget] = useState<{ threadId: string; inReplyToId: number } | null>(
     null
   )
-  const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified')
-  const [hideFormattingHunks, setHideFormattingHunks] = useState(true)
   const [expandedMoved, setExpandedMoved] = useState<Set<string>>(new Set())
+  const [testsFor, setTestsFor] = useState<{ anchor: string; block: TestBlock } | null>(null)
+  const [pendingJump, setPendingJump] = useState<{ path: string; line: number } | null>(null)
   const lineDragRef = useRef<{
     active: boolean
     side: 'LEFT' | 'RIGHT' | null
@@ -110,12 +100,16 @@ export function ReviewDiffPane({
     removeDraft,
     setCurrentChapter,
     setCurrentFile,
+    markFileViewed,
+    unmarkFileViewed,
   } = usePrReviewStore()
   const {
     commentVisibility,
     setCommentVisibility,
     agentNotesOn,
-    setAgentNotesOn,
+    diffViewMode,
+    hideFormattingHunks,
+    setHideFormattingHunks,
     diffRange,
     selection,
     setSelection,
@@ -137,8 +131,10 @@ export function ReviewDiffPane({
 
   const lang = detectLanguage(file.path)
   const isViewed = viewedFiles.has(file.path)
+  const slash = file.path.lastIndexOf('/')
+  const dirName = slash >= 0 ? file.path.slice(0, slash + 1) : ''
+  const baseName = file.path.slice(slash + 1)
   const fileThreads = useMemo(() => threads[file.path] ?? [], [threads, file.path])
-  const isLastFile = chapterProgress.index === chapterProgress.total - 1
   const isChangedSince = changedSince.has(file.path)
 
   const readingStep = useMemo(
@@ -537,11 +533,6 @@ export function ReviewDiffPane({
   const hotspots = diff ? detectComplexityHotspots(diff) : []
   const hotspotHunks = new Set(hotspots.map((h) => h.hunkIndex))
 
-  const dryViolationCount = useMemo(() => {
-    if (!pr.dryViolations?.length) return undefined
-    return pr.dryViolations.filter((v) => v.files.includes(file.path)).length
-  }, [pr.dryViolations, file.path])
-
   const visibleHunks = useMemo(() => {
     if (!diff) return []
     if (!hideFormattingHunks) return diff.hunks.map((h, i) => ({ hunk: h, index: i }))
@@ -612,6 +603,70 @@ export function ReviewDiffPane({
     [pr.chapters, setCurrentChapter, setCurrentFile]
   )
 
+  const prPaths = useMemo(
+    () => new Set(pr.chapters.flatMap((c) => c.files.map((f) => f.path))),
+    [pr.chapters]
+  )
+
+  const openTests = (anchor: string, code: string, hunkHeader?: string) =>
+    setTestsFor({
+      anchor,
+      block: { repoRoot, headSHA: pr.headSHA, path: file.path, code, hunkHeader },
+    })
+
+  const openTestInReview = (path: string, line: number) => {
+    setPendingJump({ path, line })
+    goToPath(path)
+  }
+
+  useEffect(() => {
+    if (!pendingJump || !diff || pendingJump.path !== file.path) return
+    scrollRef.current
+      ?.querySelector<HTMLElement>(`[data-new-line="${pendingJump.line}"]`)
+      ?.scrollIntoView({ block: 'center' })
+    setPendingJump(null)
+  }, [pendingJump, diff, file.path])
+
+  const hunkCode = (lines: Array<{ type: string; content: string }>) =>
+    lines
+      .filter((l) => l.type !== 'remove')
+      .map((l) => l.content)
+      .join('\n')
+
+  const selectionCode = (sel: { side: 'LEFT' | 'RIGHT'; startLine: number; endLine: number }) =>
+    (diff?.hunks ?? [])
+      .flatMap((h) => h.lines)
+      .filter((l) => {
+        const n = sel.side === 'LEFT' ? l.oldLineNumber : l.newLineNumber
+        return n != null && n >= sel.startLine && n <= sel.endLine
+      })
+      .map((l) => l.content)
+      .join('\n')
+
+  const testsButton = (anchor: string, code: string, hunkHeader?: string) => (
+    <>
+      <button
+        type="button"
+        className="rs-hunk-tests"
+        onClick={(e) => {
+          e.stopPropagation()
+          openTests(anchor, code, hunkHeader)
+        }}
+        aria-label="Jump to the tests for this block"
+      >
+        Tests
+      </button>
+      {testsFor?.anchor === anchor && (
+        <TestsPopover
+          block={testsFor.block}
+          prPaths={prPaths}
+          onOpenInReview={openTestInReview}
+          onClose={() => setTestsFor(null)}
+        />
+      )}
+    </>
+  )
+
   const closeComposer = () => setComposerAnchor(null)
 
   const saveNote = () => {
@@ -636,8 +691,9 @@ export function ReviewDiffPane({
         selection.endLine === lineNum &&
         !lineDragRef.current.active && (
           <tr>
-            <td colSpan={5}>
+            <td colSpan={5} className="rs-hunk-anchor">
               <SelectionBar
+                onTests={() => openTests('selection', selectionCode(selection))}
                 onAskAgent={() =>
                   openAgentPanel(
                     {
@@ -677,6 +733,14 @@ export function ReviewDiffPane({
                   })
                 }
               />
+              {testsFor?.anchor === 'selection' && (
+                <TestsPopover
+                  block={testsFor.block}
+                  prPaths={prPaths}
+                  onOpenInReview={openTestInReview}
+                  onClose={() => setTestsFor(null)}
+                />
+              )}
             </td>
           </tr>
         )}
@@ -859,130 +923,60 @@ export function ReviewDiffPane({
 
   return (
     <div className="review-diff-pane">
-      {/* File header row 1 */}
       <div className="rs-fh">
-        <span className="rs-p">{file.path}</span>
-        {file.changeType !== 'modified' && <span className="rs-chip">{file.changeType}</span>}
-        <span
-          className={`rs-chip rs-chip--${file.riskScore.level === 'high' ? 'hi' : file.riskScore.level === 'medium' ? 'md' : 'lo'}`}
+        <span className="rs-p" title={file.path}>
+          {dirName && <span className="rs-p-dir">{dirName}</span>}
+          {baseName}
+        </span>
+        {file.changeType !== 'modified' && <span className="rs-note">{file.changeType}</span>}
+        <button
+          type="button"
+          className={`rs-risk rs-risk--${file.riskScore.level}`}
+          onClick={onShowRisk}
+          title="Why this risk level?"
         >
           {file.riskScore.level === 'high'
             ? 'High risk'
             : file.riskScore.level === 'medium'
               ? 'Medium risk'
               : 'Low risk'}
-          <button type="button" className="rs-chip-link" onClick={onShowRisk}>
-            Why?
-          </button>
-        </span>
+        </button>
         {readingStep && (
-          <span className="rs-chip">{`Step ${readingStep.step} of ${pr.readingOrder.length}`}</span>
+          <span className="rs-note">{`Step ${readingStep.step} of ${pr.readingOrder.length}`}</span>
         )}
         {isChangedSince && diffRange === 'since' && (
-          <span className="rs-chip rs-chip--md">Changed since you viewed</span>
+          <span className="rs-note rs-note--changed" title="Changed since you viewed">
+            <span className="rs-long">Changed since you viewed</span>
+            <span className="rs-short">Changed</span>
+          </span>
         )}
         <span className="rs-note">
           +{file.additions}/−{file.deletions}
         </span>
         <span className="rs-sp" />
-        <span className="rs-note">Comments</span>
-        <div className="rs-seg" role="group" aria-label="Comment visibility">
-          <button
-            type="button"
-            aria-pressed={commentVisibility === 'all'}
-            onClick={() => setCommentVisibility('all')}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            aria-pressed={commentVisibility === 'unresolved'}
-            onClick={() => setCommentVisibility('unresolved')}
-          >
-            Unresolved
-          </button>
-          <button
-            type="button"
-            aria-pressed={commentVisibility === 'hidden'}
-            onClick={() => setCommentVisibility('hidden')}
-          >
-            Hidden
-          </button>
-        </div>
-        <span className="rs-note">Agent notes</span>
-        <div className="rs-seg" role="group" aria-label="Agent notes">
-          <button type="button" aria-pressed={agentNotesOn} onClick={() => setAgentNotesOn(true)}>
-            On
-          </button>
-          <button type="button" aria-pressed={!agentNotesOn} onClick={() => setAgentNotesOn(false)}>
-            Off
-          </button>
-        </div>
-        <div className="rs-seg" role="group" aria-label="Diff view mode">
-          <button
-            type="button"
-            aria-pressed={diffViewMode === 'unified'}
-            onClick={() => setDiffViewMode('unified')}
-            title="Unified diff view"
-          >
-            Unified
-          </button>
-          <button
-            type="button"
-            aria-pressed={diffViewMode === 'split'}
-            onClick={() => setDiffViewMode('split')}
-            title="Split diff view"
-          >
-            Split
-          </button>
-        </div>
-        <div className="rs-seg" role="group" aria-label="Semantic filter">
-          <button
-            type="button"
-            aria-pressed={hideFormattingHunks}
-            onClick={() => setHideFormattingHunks((v) => !v)}
-            title="Hide formatting-only hunks (whitespace, import reordering)"
-          >
-            Semantic
-          </button>
-        </div>
-        {sinceNote && <span className="rs-note">{sinceNote}</span>}
-        {isViewed && (
-          <span className="rs-chip rs-chip--lo">
-            <Check aria-hidden="true" className="tm-icon-sm" /> Viewed
-          </span>
-        )}
+        <UsesPopover
+          uses={usesWithDef.map((u) => ({
+            symbol: u.symbol,
+            definedInStep: u.definedInStep!,
+            read: u.definedInPath != null && viewedFiles.has(u.definedInPath),
+          }))}
+          onPeekDefinition={handlePeekDefinition}
+        />
+        <ViewMenu sinceNote={sinceNote} />
+        <span className="rs-fh-sep" />
+        <label className="rs-viewed">
+          <input
+            type="checkbox"
+            checked={isViewed}
+            onChange={() =>
+              isViewed
+                ? unmarkFileViewed(repoRoot, pr.number, pr.headSHA, file.path)
+                : markFileViewed(repoRoot, pr.number, pr.headSHA, file.path)
+            }
+          />
+          Viewed
+        </label>
       </div>
-
-      {/* File header row 2 — reading-order uses */}
-      {usesWithDef.length > 0 && (
-        <div className="rs-fh rs-fh--row2">
-          <span className="rs-sp" />
-          <span className="rs-note">Uses</span>
-          {usesWithDef.map((u) => {
-            const read = u.definedInPath != null && viewedFiles.has(u.definedInPath)
-            return (
-              <span key={u.symbol} className={`rs-chip${read ? ' rs-chip--lo' : ''}`}>
-                {read
-                  ? `${u.symbol} · read in step ${u.definedInStep}`
-                  : `${u.symbol} · step ${u.definedInStep}, not read yet`}
-              </span>
-            )
-          })}
-          <button type="button" className="rs-btn" onClick={handlePeekDefinition}>
-            Peek definition
-          </button>
-        </div>
-      )}
-
-      {/* Health chips */}
-      <HealthChips
-        riskScore={file.riskScore}
-        ciStatus={pr.ciStatus}
-        lintStatus={pr.lintStatus}
-        coverageStatus={pr.coverageStatus}
-        dryViolationCount={dryViolationCount}
-      />
 
       {/* Diff content */}
       <div className="review-diff-scroll" ref={scrollRef} onClick={clearSelectionOnBackgroundClick}>
@@ -1012,8 +1006,9 @@ export function ReviewDiffPane({
                   <table className="diff-table diff-table--review">
                     <tbody>
                       <tr>
-                        <td colSpan={5} className="diff-hunk-header">
+                        <td colSpan={5} className="diff-hunk-header rs-hunk-anchor">
                           {hunk.header}
+                          {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
                         </td>
                       </tr>
                       {hunk.lines.map((line, li) => {
@@ -1120,7 +1115,10 @@ export function ReviewDiffPane({
                   </table>
                 ) : (
                   <div className="diff-split-hunk">
-                    <div className="diff-split-header">{hunk.header}</div>
+                    <div className="diff-split-header rs-hunk-anchor">
+                      {hunk.header}
+                      {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
+                    </div>
                     {buildSplitRows(hunk.lines).map((row, ri) => {
                       const leftLine = row.kind === 'context' ? row.line : row.oldLine
                       const rightLine = row.kind === 'context' ? row.line : row.newLine
@@ -1380,43 +1378,6 @@ export function ReviewDiffPane({
             ))}
           </div>
         ) : null}
-      </div>
-
-      {/* Bottom navigation bar */}
-      <div className="review-diff-nav-bar">
-        <div className="review-diff-nav-left">
-          <button className="review-diff-nav-btn" onClick={onPause}>
-            Pause review
-          </button>
-          <button className="review-diff-nav-btn" onClick={onOpenSubmit}>
-            Submit review
-          </button>
-        </div>
-        <div className="review-diff-nav-center">
-          <span className="review-diff-progress">
-            {chapterProgress.index + 1} of {chapterProgress.total} files · [ prev · 1 mark viewed
-          </span>
-        </div>
-        <div className="review-diff-nav-right">
-          <button className="review-diff-nav-btn" onClick={onPrevFile} aria-label="Previous file">
-            <ChevronLeft aria-hidden="true" /> Prev
-          </button>
-          {isLastFile ? (
-            <button
-              className="review-diff-nav-btn review-diff-nav-btn--primary"
-              onClick={onFinishChapter}
-            >
-              {isLastChapter ? 'Finish review ↵' : 'Finish chapter ↵'}
-            </button>
-          ) : (
-            <button
-              className="review-diff-nav-btn review-diff-nav-btn--primary"
-              onClick={onMarkViewed}
-            >
-              Mark viewed, go to next
-            </button>
-          )}
-        </div>
       </div>
     </div>
   )

@@ -9,6 +9,13 @@ interface Props {
   dryViolationCount?: number
 }
 
+const STATUS_ORDER: Record<Chip['status'], number> = {
+  fail: 0,
+  warn: 1,
+  pass: 2,
+  unknown: 3,
+}
+
 interface Chip {
   label: string
   tooltip: string
@@ -153,19 +160,23 @@ export function HealthChips({
     },
   ]
 
+  const orderedChips = [...chips].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
   return (
-    <div className="health-chips" role="list" aria-label="File health signals">
-      {chips.map((chip) => (
-        <div
-          key={chip.label}
-          className={`health-chip health-chip--${chip.status}`}
-          role="listitem"
-          title={chip.tooltip}
-        >
-          <span className="health-chip-label">{chip.label}</span>
-          <span className="health-chip-value">{chip.value ?? '?'}</span>
-        </div>
-      ))}
+    <div className="health-list" aria-label="File health signals">
+      <h3 className="health-list-title">Health</h3>
+      <dl>
+        {orderedChips.map((chip) => (
+          <div key={chip.label} className="health-list-row" title={chip.tooltip}>
+            <dt className="health-list-label">{chip.label}</dt>
+            <dd
+              className={`health-list-value health-list-value--${chip.status}`}
+              data-status={chip.status}
+            >
+              {chip.status === 'unknown' ? 'unknown' : (chip.value ?? 'unknown')}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   )
 }

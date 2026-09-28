@@ -36,7 +36,14 @@ function run(id: string, status: AgentRun['status']): AgentRun {
 describe('review UI store', () => {
   beforeEach(() => {
     localStorage.clear()
-    useReviewUiStore.setState({ commentVisibility: 'all', agentNotesOn: true, diffRange: 'since' })
+    useReviewUiStore.setState({
+      commentVisibility: 'all',
+      agentNotesOn: true,
+      diffRange: 'since',
+      fileListHidden: false,
+      diffViewMode: 'unified',
+      hideFormattingHunks: true,
+    })
     useReviewUiStore.getState().resetForPr()
   })
 
@@ -67,6 +74,45 @@ describe('review UI store', () => {
     s.upsertAgentRun(run('a', 'done'))
     const runs = useReviewUiStore.getState().agentRuns
     expect(runs.map((r) => `${r.id}:${r.status}`)).toEqual(['a:done', 'b:running'])
+  })
+
+  it('defaults diffViewMode to unified and hideFormattingHunks to true', () => {
+    const s = useReviewUiStore.getState()
+    expect(s.diffViewMode).toBe('unified')
+    expect(s.hideFormattingHunks).toBe(true)
+  })
+
+  it('sets and persists diff view mode and formatting-hunk visibility', () => {
+    const s = useReviewUiStore.getState()
+    s.setDiffViewMode('split')
+    s.setHideFormattingHunks(false)
+    expect(useReviewUiStore.getState().diffViewMode).toBe('split')
+    expect(useReviewUiStore.getState().hideFormattingHunks).toBe(false)
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY)!)
+    expect(saved).toMatchObject({ diffViewMode: 'split', hideFormattingHunks: false })
+  })
+
+  it('loads persisted diffViewMode and hideFormattingHunks from localStorage on module init', async () => {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({ diffViewMode: 'split', hideFormattingHunks: false })
+    )
+    vi.resetModules()
+    const fresh = await import('../../src/stores/review-ui.store')
+    expect(fresh.useReviewUiStore.getState()).toMatchObject({
+      diffViewMode: 'split',
+      hideFormattingHunks: false,
+    })
+  })
+
+  it('falls back to defaults when persisted JSON is malformed', async () => {
+    localStorage.setItem(PREFS_KEY, '{not json')
+    vi.resetModules()
+    const fresh = await import('../../src/stores/review-ui.store')
+    expect(fresh.useReviewUiStore.getState()).toMatchObject({
+      diffViewMode: 'unified',
+      hideFormattingHunks: true,
+    })
   })
 
   it('resetForPr clears per-PR state but keeps preferences', () => {

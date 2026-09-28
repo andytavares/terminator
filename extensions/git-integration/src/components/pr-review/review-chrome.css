@@ -1,7 +1,6 @@
 /*
  * Chrome for the review surface's supporting UI: the "since you last looked"
- * banner (S1), the resume card (S2), the keyboard-help sheet (S3) and the
- * submit bar (S5). Ported 1:1 from docs/research/code-review-revamp.html —
+ * banner (S1), the resume card (S2) and the keyboard-help sheet (S3). Ported 1:1 from docs/research/code-review-revamp.html —
  * class names keep the `rc-` prefix, tokens map onto the app's --tm-* set.
  */
 
@@ -243,42 +242,7 @@
 
 /* ── S5: submit bar ────────────────────────────────────────────────────── */
 
-.rc-submit {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 14px;
-  background: var(--tm-bg-elevated);
-  border-top: 1px solid var(--tm-border);
-  font: 13px/1.45 var(--tm-font-ui);
-  color: var(--tm-text-primary);
-}
-
-.rc-submit-error {
-  color: var(--tm-danger);
-  font-size: 12px;
-}
-
 /* ── topbar: ask agent about this PR ──────────────────────────────────── */
-
-.pr-review-ask-agent-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--tm-agent);
-  color: var(--tm-agent);
-  background: var(--tm-agent-dim);
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font: inherit;
-  cursor: pointer;
-}
-
-.pr-review-ask-agent-btn svg {
-  width: 13px;
-  height: 13px;
-}
 
 /* The card sits over the top of the diff until Continue, not after it. */
 .pr-review-panel--centre {

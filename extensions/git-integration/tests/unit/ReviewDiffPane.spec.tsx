@@ -9,8 +9,28 @@ vi.mock('../../src/stores/review-ui.store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/stores/review-ui.store')>()
   return { ...actual, useReviewUiStore: vi.fn() }
 })
-vi.mock('../../src/components/pr-review/HealthChips', () => ({
-  HealthChips: () => <div data-testid="health-chips" />,
+vi.mock('../../src/components/pr-review/ViewMenu', () => ({
+  ViewMenu: ({ sinceNote }: { sinceNote?: string | null }) => (
+    <div data-testid="view-menu">{sinceNote}</div>
+  ),
+}))
+vi.mock('../../src/components/pr-review/UsesPopover', () => ({
+  UsesPopover: ({
+    uses,
+    onPeekDefinition,
+  }: {
+    uses: Array<{ symbol: string; definedInStep: number; read: boolean }>
+    onPeekDefinition: () => void
+  }) => (
+    <div data-testid="uses">
+      {uses.map((u) => (
+        <span
+          key={u.symbol}
+        >{`${u.symbol} · step ${u.definedInStep} · ${u.read ? 'read' : 'not read'}`}</span>
+      ))}
+      <button onClick={onPeekDefinition}>Peek definition</button>
+    </div>
+  ),
 }))
 vi.mock('../../src/components/pr-review/InlineCommentThread', () => ({
   InlineCommentThread: () => <div data-testid="thread" />,
@@ -39,6 +59,9 @@ const mockUpdateDraft = vi.fn()
 const mockRemoveDraft = vi.fn()
 const mockSetCurrentChapter = vi.fn()
 const mockSetCurrentFile = vi.fn()
+const mockMarkFileViewed = vi.fn()
+const mockUnmarkFileViewed = vi.fn()
+const mockSetHideFormattingHunks = vi.fn()
 const mockSetSelection = vi.fn()
 const mockSetCommentVisibility = vi.fn()
 const mockSetAgentNotesOn = vi.fn()
@@ -65,6 +88,8 @@ function basePrReviewStoreState() {
     removeDraft: mockRemoveDraft,
     setCurrentChapter: mockSetCurrentChapter,
     setCurrentFile: mockSetCurrentFile,
+    markFileViewed: mockMarkFileViewed,
+    unmarkFileViewed: mockUnmarkFileViewed,
   }
 }
 
@@ -74,6 +99,9 @@ function baseReviewUiStoreState() {
     setCommentVisibility: mockSetCommentVisibility,
     agentNotesOn: true,
     setAgentNotesOn: mockSetAgentNotesOn,
+    diffViewMode: 'unified' as const,
+    hideFormattingHunks: true,
+    setHideFormattingHunks: mockSetHideFormattingHunks,
     diffRange: 'whole' as const,
     selection: null,
     setSelection: mockSetSelection,
@@ -141,14 +169,9 @@ const defaultProps = {
   repoRoot: '/repo',
   pr: mockPr,
   file: mockFile,
-  chapterProgress: { index: 0, total: 2 },
   onMarkViewed: vi.fn(),
   onPrevFile: vi.fn(),
   onNextFile: vi.fn(),
-  onFinishChapter: vi.fn(),
-  isLastChapter: false,
-  onPause: vi.fn(),
-  onOpenSubmit: vi.fn(),
   onShowRisk: vi.fn(),
 }
 
@@ -184,12 +207,7 @@ async function renderPane(props: Partial<typeof defaultProps> = {}) {
 describe('ReviewDiffPane', () => {
   it('renders file path in header', async () => {
     await renderPane()
-    expect(screen.getByText('src/foo.ts')).toBeTruthy()
-  })
-
-  it('renders health chips', async () => {
-    await renderPane()
-    expect(screen.getByTestId('health-chips')).toBeTruthy()
+    expect(screen.getByTitle('src/foo.ts').textContent).toBe('src/foo.ts')
   })
 
   it('shows additions and deletions', async () => {
@@ -232,50 +250,37 @@ describe('ReviewDiffPane', () => {
       viewedFiles: new Set(['src/foo.ts']),
     } as unknown as ReturnType<typeof usePrReviewStore>)
     await renderPane()
-    expect(screen.getByText(/Viewed/)).toBeTruthy()
+    const box = screen.getByRole('checkbox', { name: 'Viewed' }) as HTMLInputElement
+    expect(box.checked).toBe(true)
+    fireEvent.click(box)
+    expect(mockUnmarkFileViewed).toHaveBeenCalledWith(
+      '/repo',
+      mockPr.number,
+      mockPr.headSHA,
+      'src/foo.ts'
+    )
   })
 
-  it('shows Finish chapter button when on last file of a non-final chapter', async () => {
-    await renderPane({ chapterProgress: { index: 1, total: 2 }, isLastChapter: false })
-    expect(screen.getByText('Finish chapter ↵')).toBeTruthy()
-  })
-
-  it('shows Finish review button when on last file of the final chapter', async () => {
-    await renderPane({ chapterProgress: { index: 1, total: 2 }, isLastChapter: true })
-    expect(screen.getByText('Finish review ↵')).toBeTruthy()
-  })
-
-  it('shows Mark viewed button when not on last file', async () => {
-    await renderPane({ chapterProgress: { index: 0, total: 2 } })
-    expect(screen.getByText('Mark viewed, go to next')).toBeTruthy()
-  })
-
-  it('calls onPause when Pause review is clicked', async () => {
-    const onPause = vi.fn()
-    await renderPane({ onPause })
-    fireEvent.click(screen.getByText('Pause review'))
-    expect(onPause).toHaveBeenCalled()
-  })
-
-  it('calls onOpenSubmit when Submit review is clicked', async () => {
-    const onOpenSubmit = vi.fn()
-    await renderPane({ onOpenSubmit })
-    fireEvent.click(screen.getByText('Submit review'))
-    expect(onOpenSubmit).toHaveBeenCalled()
+  it('marks the file viewed from the header checkbox without leaving it', async () => {
+    const onMarkViewed = vi.fn()
+    await renderPane({ onMarkViewed })
+    const box = screen.getByRole('checkbox', { name: 'Viewed' }) as HTMLInputElement
+    expect(box.checked).toBe(false)
+    fireEvent.click(box)
+    expect(mockMarkFileViewed).toHaveBeenCalledWith(
+      '/repo',
+      mockPr.number,
+      mockPr.headSHA,
+      'src/foo.ts'
+    )
+    expect(onMarkViewed).not.toHaveBeenCalled()
   })
 
   it('calls onShowRisk when the Why? button is clicked', async () => {
     const onShowRisk = vi.fn()
     await renderPane({ onShowRisk })
-    fireEvent.click(screen.getByText('Why?'))
+    fireEvent.click(screen.getByRole('button', { name: 'Low risk' }))
     expect(onShowRisk).toHaveBeenCalled()
-  })
-
-  it('calls onPrevFile when the Prev control is clicked', async () => {
-    const onPrevFile = vi.fn()
-    await renderPane({ onPrevFile })
-    fireEvent.click(screen.getByText(/Prev/))
-    expect(onPrevFile).toHaveBeenCalled()
   })
 
   it('renders diff hunks when diff is loaded', async () => {
@@ -323,10 +328,12 @@ describe('ReviewDiffPane', () => {
       ],
     }
     mockPrFileDiff.mockResolvedValue({ diff })
+    vi.mocked(useReviewUiStore).mockReturnValue({
+      ...baseReviewUiStoreState(),
+      diffViewMode: 'split',
+    } as unknown as ReturnType<typeof useReviewUiStore>)
     const { container } = await renderPane()
     await waitFor(() => expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy())
-
-    fireEvent.click(screen.getByTitle('Split diff view'))
 
     await waitFor(() => expect(container.querySelector('.diff-table--split')).toBeTruthy())
   })
@@ -885,9 +892,14 @@ describe('ReviewDiffPane', () => {
 
     async function renderSplit(overrides: Partial<typeof defaultProps> = {}) {
       mockPrFileDiff.mockResolvedValue({ diff: splitDiff })
+      const state =
+        vi.mocked(useReviewUiStore).getMockImplementation()?.() ?? baseReviewUiStoreState()
+      vi.mocked(useReviewUiStore).mockReturnValue({
+        ...(state as object),
+        diffViewMode: 'split',
+      } as unknown as ReturnType<typeof useReviewUiStore>)
       const view = await renderPane(overrides)
       await waitFor(() => expect(screen.getByText('@@ -85,3 +88,3 @@')).toBeTruthy())
-      fireEvent.click(screen.getByTitle('Split diff view'))
       await waitFor(() => expect(document.querySelector('.diff-table--split')).toBeTruthy())
       return view
     }
@@ -1082,6 +1094,72 @@ describe('ReviewDiffPane', () => {
     })
   })
 
+  describe('jump to the tests for a block', () => {
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,2 +1,2 @@ export function foo(',
+          lines: [
+            { type: 'remove' as const, content: 'old()', oldLineNumber: 1, newLineNumber: null },
+            { type: 'add' as const, content: 'next()', oldLineNumber: null, newLineNumber: 1 },
+            { type: 'context' as const, content: 'done()', oldLineNumber: 2, newLineNumber: 2 },
+          ],
+        },
+      ],
+    }
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn()
+    })
+
+    it('searches the tests with the hunk as it reads after the change', async () => {
+      mockPrFileDiff.mockResolvedValue({ diff })
+      mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+        if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
+        if (channel === 'github:tests-for-block')
+          return Promise.resolve({ symbols: ['foo'], locations: [] })
+        return Promise.resolve({})
+      })
+      await renderPane()
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Jump to the tests for this block' })
+      )
+      await waitFor(() =>
+        expect(mockInvoke).toHaveBeenCalledWith('github:tests-for-block', {
+          repoRoot: '/repo',
+          headSHA: mockPr.headSHA,
+          path: 'src/foo.ts',
+          code: 'next()\ndone()',
+          hunkHeader: '@@ -1,2 +1,2 @@ export function foo(',
+        })
+      )
+      expect(await screen.findByText('No test mentions foo.')).toBeTruthy()
+    })
+
+    it('opens a test in the PR at its line', async () => {
+      mockPrFileDiff.mockResolvedValue({ diff })
+      mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+        if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
+        if (channel === 'github:tests-for-block')
+          return Promise.resolve({
+            symbols: ['foo'],
+            locations: [{ path: 'src/foo.ts', line: 2, symbol: 'foo', text: 'done()' }],
+          })
+        return Promise.resolve({})
+      })
+      await renderPane()
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Jump to the tests for this block' })
+      )
+      fireEvent.click(await screen.findByRole('button', { name: /src\/foo\.ts:2/ }))
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('src/foo.ts')
+      const row = document.querySelector('[data-new-line="2"]') as HTMLElement
+      await waitFor(() => expect(row.scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+    })
+  })
+
   describe('keyboard events (REVIEW_KEY_EVENTS)', () => {
     const twoHunkDiff = {
       path: 'src/foo.ts',
@@ -1262,7 +1340,7 @@ describe('ReviewDiffPane', () => {
       } as unknown as ReturnType<typeof usePrReviewStore>)
       await renderPane({ pr: prWithOrder })
       expect(screen.getByText('Step 4 of 1')).toBeTruthy()
-      expect(screen.getByText('computeRiskScore · read in step 2')).toBeTruthy()
+      expect(screen.getByText('computeRiskScore · step 2 · read')).toBeTruthy()
     })
 
     it('calls setCurrentChapter/setCurrentFile when Peek definition is clicked', async () => {
