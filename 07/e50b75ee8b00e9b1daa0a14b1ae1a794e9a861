@@ -1,0 +1,117 @@
+extensions/foundry/src/order/render.ts
+  s_6f2763bc197e91::t_9cdf4261f28bc0 4
+  s_6f2763bc197e91::t_9298a4f6964835 57-69
+extensions/foundry/src/line/integrate.ts
+  s_6f2763bc197e91::t_fe67e594876839 12
+  s_6f2763bc197e91::t_bdddaa1009865c 258,264
+  s_6f2763bc197e91::t_8ec4be70754bb0 487,494
+extensions/foundry/src/verify/ladder.ts
+  s_6f2763bc197e91::t_dfd65c169c0fdb 143-144
+  s_6f2763bc197e91::t_32abb39cd7cb59 22-36
+  s_38a4dfd51889cf::t_40eff42f51d1af 180,194,209,222,234
+extensions/foundry/src/components/Ledger.tsx
+  s_6f2763bc197e91::t_80624843b1ac62 136-137
+  s_6f2763bc197e91::t_f8eb65eed62f63 9-12
+  s_6f2763bc197e91::t_ff1c0bc8ef1785 161
+  s_6f2763bc197e91::t_70fa8c7aa86618 238
+  s_6f2763bc197e91::t_deddfdd3f9a25e 239,277,305
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_6f2763bc197e91::t_1a7ed14dc61b5c 1021
+  s_6f2763bc197e91::t_035d0d7cbfa602 585
+  s_6f2763bc197e91::t_725f24848b3629 1019
+  s_38a4dfd51889cf::t_bbe7ec0fbe7868 310,356,371,379,385-386,489,498,505,523,534,548,1330
+extensions/foundry/src/order/schema.ts
+  s_6f2763bc197e91::t_8fa62ed297cf4f 315
+extensions/foundry/tests/runtime/palette.spec.ts
+  s_6f2763bc197e91::t_644d60f65f48e0 111
+extensions/foundry/tests/components/SettingsView.spec.tsx
+  s_6f2763bc197e91::t_705491e455d037 76
+extensions/foundry/src/recipe/rung.ts
+  s_6f2763bc197e91::t_55920437812444 1-19
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_6f2763bc197e91::t_87bfa48e352e5e 210
+extensions/foundry/src/line/executor.ts
+  s_6f2763bc197e91::t_58e55443e9fefa 1109
+  s_6f2763bc197e91::t_1a3c8c4a2dd1a0 38
+  s_6f2763bc197e91::t_28142a76a8b6dc 1101,1105,1107-1108
+  s_6f2763bc197e91::t_07d5c571ca5ed4 1092-1095
+extensions/foundry/src/index.ts
+  s_6f2763bc197e91::t_79c0f9f5f8c691 1894
+  s_6f2763bc197e91::t_933a5aa986e8a7 24
+  s_6f2763bc197e91::t_0f4fad5195dbfb 3101
+  s_6f2763bc197e91::t_689e73e38999a6 21
+  s_6f2763bc197e91::t_8b3dd89d1981b2 361,363,365-368
+  s_6f2763bc197e91::t_9aaf27fe9bc8de 3102-3105
+extensions/foundry/src/components/Inbox.tsx
+  s_6f2763bc197e91::t_49685853a5141a 28
+  s_6f2763bc197e91::t_37205bf742cc7c 257,262,264
+  s_6f2763bc197e91::t_8e96109d252f87 2
+extensions/foundry/src/recipe/resolve.ts
+  s_6f2763bc197e91::t_ebc15dd143d3fb 18-20
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_6f2763bc197e91::t_699b4fb90a1277 331
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_6f2763bc197e91::t_c80cc4497284ff 5
+  s_6f2763bc197e91::t_17d7dbaf027b41 106,113,119,126,139,155,174,333,355,377
+extensions/foundry/src/runtime/review/risk-grader.ts
+  s_6f2763bc197e91::t_63e45d69c34907 26-37
+extensions/foundry/src/ipc/inbox-channels.ts
+  s_6f2763bc197e91::t_b52512d5c96988 2
+  s_6f2763bc197e91::t_c0a317b95b5bf1 74
+  s_6f2763bc197e91::t_1561fddec6310a 91,93-96
+  s_6f2763bc197e91::t_3d9f02a5fdb1bc 146
+extensions/foundry/src/components/Orders.tsx
+  s_6f2763bc197e91::t_cf09c3a676099d 7-10
+  s_6f2763bc197e91::t_afb72fd9c9fea1 490-491
+extensions/foundry/src/runtime/palette.ts
+  s_6f2763bc197e91::t_976c99931f232b 72
+  s_6f2763bc197e91::t_5d855e72b8a2c7 4
+extensions/foundry/src/ipc/run-channels.ts
+  s_6f2763bc197e91::t_98d5f7e5461749 281,290-291,299-302
+  s_6f2763bc197e91::t_20326d3b921f20 20
+extensions/foundry/src/components/Floor.tsx
+  s_6f2763bc197e91::t_b09a869a90d8f5 936,946,954
+  s_6f2763bc197e91::t_330d7b1c1c6510 28-29
+  s_6f2763bc197e91::t_2278dbbc83faba 1225-1227
+  s_6f2763bc197e91::t_99682fe26d0c8c 609
+  s_6f2763bc197e91::t_7906d4a013e031 1047-1049
+  s_6f2763bc197e91::t_ad249fc717e45b 1228-1229
+extensions/foundry/src/runtime/supervision.ts
+  s_6f2763bc197e91::t_937738bc4b6d00 20
+  s_6f2763bc197e91::t_bea1933c238047 275
+extensions/foundry/tests/line/executor.spec.ts
+  s_6f2763bc197e91::t_4436ac8b20a9f7 804-818,1102
+  s_6f2763bc197e91::t_8d752e26d0747d 1101
+  s_6f2763bc197e91::t_787903f849de94 1103
+extensions/foundry/src/components/SettingsView.tsx
+  s_6f2763bc197e91::t_712011836d5f31 267
+  s_6f2763bc197e91::t_fd6e4ffd3d01eb 3-4
+extensions/foundry/tests/ipc/interrupted-run-ipc.spec.ts
+  s_6f2763bc197e91::t_5117ddb79c7b2c 381
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_6f2763bc197e91::t_85bdbe884e2dd1 353,365,403,420
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "07e50b75ee8b00e9b1daa0a14b1ae1a794e9a861",
+  "prompts": {},
+  "sessions": {
+    "s_38a4dfd51889cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab5982e3b20286761",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_6f2763bc197e91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20a95b64-c37e-4c82-914f-a10b3237caab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
