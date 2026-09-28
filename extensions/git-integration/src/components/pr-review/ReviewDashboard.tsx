@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { githubAPI } from '../../api/github'
 import { DashboardPRSchema, type DashboardPR } from '../../schemas/pr-review.schema'
+import { DiffSize } from './DiffSize'
 import './review-dashboard.css'
 
 type Tab = 'needs' | 'mine' | 'involved'
@@ -68,11 +69,6 @@ function formatMinutes(total: number): string {
   const h = Math.floor(total / 60)
   const m = total % 60
   return h > 0 ? `${h} h ${m} min` : `${m} min`
-}
-
-function formatSize(pr: DashboardPR): string {
-  const files = `${pr.fileCount.toLocaleString('en-US')} file${pr.fileCount === 1 ? '' : 's'}`
-  return `+${pr.additions.toLocaleString('en-US')} −${pr.deletions.toLocaleString('en-US')} · ${files}`
 }
 
 function ciLabel(pr: DashboardPR): string {
@@ -168,7 +164,7 @@ function Row({
         #{pr.number} {pr.title}
         <small>{subline}</small>
       </span>
-      <span className="rd-num">{formatSize(pr)}</span>
+      <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
       <span>{chip.text && <span className={`rd-chip ${chip.cls}`}>{chip.text}</span>}</span>
       <span className="rd-num">{estimate}</span>
       <span className="rd-actions">
@@ -178,7 +174,7 @@ function Row({
         {showClone && (
           <button
             type="button"
-            className="rd-btn rd-clone"
+            className="rd-btn"
             disabled={cloneState?.status === 'cloning'}
             onClick={() => onClone(pr)}
           >

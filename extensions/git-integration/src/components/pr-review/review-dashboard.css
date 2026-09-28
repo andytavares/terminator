@@ -148,14 +148,27 @@
   align-items: center;
 }
 
+/* Rows share one set of columns (subgrid), so a column is as wide as its
+   widest cell and a two-button action cell never wraps. */
 .rd-rows {
   display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) repeat(4, max-content);
+  column-gap: 12px;
+}
+
+.rd-rows--single-repo {
+  grid-template-columns: minmax(0, 1fr) repeat(4, max-content);
+}
+
+.rd-rows > .rd-grp {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .rd-row {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr) 150px 88px 70px 90px;
-  gap: 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   padding: 9px 14px;
   border-bottom: 1px solid var(--tm-border);
@@ -185,21 +198,27 @@
   font-size: 12px;
 }
 
+.rd-row .rd-add {
+  color: var(--tm-success);
+}
+
+.rd-row .rd-del {
+  color: var(--tm-danger);
+}
+
 .rd-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  flex-wrap: wrap;
-}
-
-.rd-btn.rd-clone {
-  font-size: 11px;
-  padding: 3px 8px;
+  white-space: nowrap;
 }
 
 .rd-clone-error {
   font-size: 11px;
   color: var(--tm-danger);
+  white-space: normal;
+  max-width: 220px;
 }
 
 .rd-empty,
@@ -215,4 +234,24 @@
 
 .rd-error {
   color: var(--tm-danger);
+}
+
+.rd-warn {
+  color: var(--tm-warning);
+}
+
+.rd-row--clickable {
+  cursor: pointer;
+}
+
+.rd-btn.rd-dismiss {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 6px;
+}
+
+.rd-btn.rd-dismiss svg {
+  width: 12px;
+  height: 12px;
 }
