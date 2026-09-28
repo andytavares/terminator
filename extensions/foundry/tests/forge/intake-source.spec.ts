@@ -153,6 +153,39 @@ describe('seedOrder from a tracker issue', () => {
     if ('error' in r) expect(r.error).toContain('TAV-99')
   })
 
+  it('states the outcome the ticket already gives under its acceptance heading', async () => {
+    const r = await seedOrder(
+      { kind: 'tracker', tracker: 'linear', key: 'TAV-15', repoPaths: [repo] },
+      deps({
+        readIssue: vi.fn(async () => ({
+          ...issue,
+          key: 'TAV-15',
+          description: [
+            '## Summary',
+            'Forge lists every ticket, including DONE ones.',
+            '',
+            '## Acceptance Criteria',
+            '- [ ] Filters only list tickets in an open state',
+            '- [ ] A text search matches tickets in any state',
+          ].join('\n'),
+        })),
+      })
+    )
+    if (!('order' in r)) throw new Error('expected an order')
+    expect(r.order.intent.outcome).toBe(
+      '- Filters only list tickets in an open state\n- A text search matches tickets in any state'
+    )
+  })
+
+  it('leaves the outcome unstated when the ticket gives no acceptance heading', async () => {
+    const r = await seedOrder(
+      { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
+      deps({ readIssue: vi.fn(async () => issue) })
+    )
+    if (!('order' in r)) throw new Error('expected an order')
+    expect(r.order.intent.outcome).toBe('')
+  })
+
   it('seeds an issue with nothing but a title', async () => {
     const r = await seedOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-7', repoPaths: [repo] },
