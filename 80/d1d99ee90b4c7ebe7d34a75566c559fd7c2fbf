@@ -1,0 +1,35 @@
+README.md
+  s_758accd35244c9::t_4b95411627a5ed 22
+docs/adr/081-a-station-opens-into-its-monitor.md
+  s_758accd35244c9::t_fbea338fae4d99 1-46
+extensions/foundry/assets/OFL.txt
+  s_758accd35244c9::t_8b4ad5404fff29 1-93
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_758accd35244c9::t_8845a760cb789f 2,19-20,47-49,379-388,390-391,393-406,490-512,569,679-690
+extensions/foundry/src/components/factory/StationMonitor.tsx
+  s_758accd35244c9::t_823dfc37ba745a 1-244
+extensions/foundry/src/components/foundry.css
+  s_758accd35244c9::t_90a209b6a73084 5-10,3811-3823,3826-3858,3861-3882,3885-3896,3900-3905,3908-3910,3913-3916,3919-3922,3925-3926,3928-3980,3983-4016,4018-4054,4056-4062,4065-4154
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_758accd35244c9::t_ad855271d7c71b 227,231-233,245-257,539-540,544-594
+extensions/foundry/tests/components/factory/StationMonitor.spec.tsx
+  s_758accd35244c9::t_140d6246f888f4 1-236
+tests/e2e/foundry-factory-view.spec.ts
+  s_758accd35244c9::t_f3e12fb198a95c 404-441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "80d1d99ee90b4c7ebe7d34a75566c559fd7c2fbf",
+  "prompts": {},
+  "sessions": {
+    "s_758accd35244c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "677bbf2b-2f6f-42d0-88f3-37be127e815d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
