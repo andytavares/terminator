@@ -61,8 +61,9 @@ export interface ToolRequest {
   readonly skillsMount: string | null
   /**
    * Leave what this policy has no opinion on to Claude Code's auto mode,
-   * rather than holding it five minutes for a person. Never a destructive
-   * action, and never at `escorted`, whose meaning is "ask me".
+   * rather than holding it five minutes for a person — a destructive action
+   * included, exactly as in any other auto-mode session. Never at `escorted`,
+   * whose meaning is "ask me".
    */
   readonly letModeDecide: boolean
 }
@@ -187,13 +188,7 @@ export function decideTool(request: ToolRequest): PolicyDecision | 'mode' | null
   })
   if (taken !== null) return { allow: taken.allow, reason: taken.reason }
 
-  if (
-    request.letModeDecide &&
-    request.autonomy !== 'escorted' &&
-    !isDestructive(request.tool, request.input)
-  ) {
-    return 'mode'
-  }
+  if (request.letModeDecide && request.autonomy !== 'escorted') return 'mode'
 
   // At `lights-out` a question has nobody to answer it, so it is a refusal
   // rather than a wait.

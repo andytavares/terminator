@@ -31,7 +31,7 @@ correctness one: a held call costs minutes where a decided one costs seconds.
 
 With `terminator.foundry.letAutoModeDecide` on (the default), an abstention at
 `standard` or `lights-out` goes to Claude Code's auto mode instead of the hold
-(ADR 077). Destructive actions and `escorted` are still held for a person.
+(ADR 077), destructive actions included. Only `escorted` still holds for a person.
 
 When you change `shell-split.ts`, `autonomy-policy.ts` or `read-only-policy.ts`,
 the question is not only "does this let the wrong thing through". It is also

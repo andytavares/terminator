@@ -475,11 +475,19 @@ describe('letting auto mode decide', () => {
     )
   })
 
-  it('still asks a person about a destructive action', () => {
-    expect(auto({ input: { command: 'git reset --hard' } })).toBeNull()
-    expect(auto({ input: { command: 'git reset --hard' }, autonomy: 'lights-out' })?.allow).toBe(
-      false
-    )
+  // The five calls TAV-15's builder waited on were all of this kind.
+  it('hands a destructive action to auto mode as well', () => {
+    for (const command of [
+      'git add a.ts && node scripts/check-patch-coverage.cjs; echo gate=$?; git reset -q',
+      'rm -rf node_modules/electron/dist node_modules/electron/path.txt',
+    ]) {
+      expect(auto({ input: { command } })).toBe('mode')
+      expect(auto({ input: { command }, autonomy: 'lights-out' })).toBe('mode')
+    }
+  })
+
+  it('still holds a destructive action when auto mode may not decide', () => {
+    expect(decideTool(request({ input: { command: 'git reset --hard' } }))).toBeNull()
   })
 
   it('still asks about everything at escorted, which is what the setting means', () => {

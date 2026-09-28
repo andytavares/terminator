@@ -3734,7 +3734,7 @@ export function activate(api: ExtensionAPI): void {
           type: 'boolean',
           label: 'Let auto mode decide',
           description:
-            "On: a tool call Foundry's own rules have no opinion on is decided by Claude Code's auto mode. Off: it waits for you. Destructive actions and the escorted setting always ask you.",
+            "On: a tool call Foundry's own rules have no opinion on is decided by Claude Code's auto mode, destructive actions included. Off: it waits for you. The escorted setting always asks you.",
           default: true,
         },
         'terminator.foundry.budgets.agents': {

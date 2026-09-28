@@ -866,7 +866,8 @@ The debt is visible afterwards rather than only felt.
 Three settings, differing in which rules stop the line. Four things ask at
 every one of them, including the most permissive: before anything is merged,
 before a destructive action, when a budget is exceeded, and when the change
-turns out to carry real risk.
+turns out to carry real risk. With **Let auto mode decide** on, an agent's
+destructive tool call is the exception: auto mode decides it (below).
 
 Everything else depends on where the dial is. At **escorted** every action an
 agent takes waits for you. At **standard** and **lights-out** ordinary work
@@ -877,8 +878,9 @@ you is what the rules actually wanted a person for.
 **Let auto mode decide** (Settings → Foundry, on by default) answers the rest.
 At standard and lights-out, a tool call Foundry's own rules have no opinion
 on, such as a write outside the worktree, is decided by Claude Code's auto
-mode. Without it, the call waits five minutes for you. Destructive actions
-still come to you, and escorted still asks about everything.
+mode, and so is a destructive action: auto mode behaves exactly as it does in
+any other Claude Code session. Without it, the call waits five minutes for
+you. Escorted still asks about everything.
 
 "Destructive" is read generously: `rm`, a hard reset, `git clean`, a force
 push, deleting a branch, and anything the check cannot parse. A command it

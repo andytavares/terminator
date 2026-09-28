@@ -1245,8 +1245,8 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   the ADR.
 - **Auto mode answers what the policy abstains on (ADR 077).** With
   `terminator.foundry.letAutoModeDecide` on (the default), `decideTool` returns
-  `mode` instead of `null` for a call it has no opinion on. The exceptions are
-  destructive actions and the `escorted` setting. The bridge answers `defer`,
+  `mode` instead of `null` for a call it has no opinion on, a destructive one
+  included. The one exception is the `escorted` setting. The bridge answers `defer`,
   and the hook script prints nothing, so Claude Code's `--permission-mode auto`
   decides. Returning `ask` would force a confirmation prompt, even in auto mode.
 - **A stall is measured from the state the session is in now.**

@@ -41,3 +41,17 @@ the agent to run `touch marker.txt`:
   and a terminal prompt, is decided by the auto mode classifier.
 - At `lights-out`, the same calls go to auto mode instead of being refused.
 - Turning the setting off restores the hold.
+
+## Addendum: destructive actions go to auto mode too
+
+The destructive exception is removed. On TAV-15 the builder waited on the
+operator five times, every one a destructive call inside its own checkout:
+`git reset -q` after a coverage check, and `rm -rf node_modules/electron/dist`
+four times while repairing an Electron install. Auto mode is meant to behave
+exactly as it does in any Claude Code session, and its classifier already
+judges destructive actions.
+
+- With `letAutoModeDecide` on, `decideTool` returns `mode` for a destructive
+  call at `standard` and `lights-out`. At `lights-out` it is no longer refused.
+- `escorted` still holds everything. Turning the setting off restores the hold
+  for destructive calls and the `lights-out` refusal.
