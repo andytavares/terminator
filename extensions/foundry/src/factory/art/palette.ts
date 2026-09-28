@@ -34,6 +34,15 @@ export const HALL = {
   pot: '#6b4a36',
   screenOff: '#0e1116',
   screenOn: '#0b2a33',
+  caseFace: '#c9c0a7',
+  caseHi: '#e8e1cc',
+  caseLo: '#9a917a',
+  caseDeep: '#6f6755',
+  caseLine: '#2f2b23',
+  caseRecess: '#7d7563',
+  caseRecessDeep: '#4f493d',
+  caseStand: '#8f866f',
+  caseTube: '#031509',
 } as const
 
 export const CODE_LINE_COLORS: readonly string[] = [
