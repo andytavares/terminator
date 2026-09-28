@@ -1,0 +1,21 @@
+extensions/foundry/src/components/Floor.tsx
+  s_49daec26653783::t_451ce2cedf35e3 938-940
+extensions/foundry/src/components/foundry.css
+  s_49daec26653783::t_451ce2cedf35e3 2459,2500-2506
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2f66e7d2d4e3ffe86e423f699586685f7926f5a8",
+  "prompts": {},
+  "sessions": {
+    "s_49daec26653783": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6d0ca5eb-a794-4e44-9cb5-25283d8706ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
