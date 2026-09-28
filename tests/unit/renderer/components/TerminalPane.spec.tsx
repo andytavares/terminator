@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { useTerminalOpenErrorStore } from '../../../../src/renderer/stores/terminal-open-error.store'
 import { TerminalPane } from '../../../../src/renderer/components/terminal/TerminalPane'
 
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
@@ -100,6 +101,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  useTerminalOpenErrorStore.setState({ errors: {}, retries: {} })
   delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
@@ -107,6 +109,31 @@ describe('TerminalPane', () => {
   it('shows empty state when no sessions', () => {
     render(<TerminalPane projectId="proj-1" />)
     expect(screen.getByText('Open a terminal tab to get started')).toBeTruthy()
+  })
+
+  it('shows why the terminal failed to open, and Try again asks the app to open it again', () => {
+    useTerminalOpenErrorStore.getState().setError('proj-1', 'spawn EBADF')
+    render(<TerminalPane projectId="proj-1" />)
+    expect(screen.getByRole('alert').textContent).toContain("Couldn't open a terminal: spawn EBADF")
+    expect(screen.queryByText('Open a terminal tab to get started')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(useTerminalOpenErrorStore.getState().retries['proj-1']).toBe(1)
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText('Open a terminal tab to get started')).toBeTruthy()
+  })
+
+  it('shows only the error of its own project', () => {
+    useTerminalOpenErrorStore.getState().setError('proj-2', 'spawn EBADF')
+    render(<TerminalPane projectId="proj-1" />)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('clears the error once a session exists', () => {
+    useTerminalOpenErrorStore.getState().setError('proj-1', 'spawn EBADF')
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'Terminal', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    render(<TerminalPane projectId="proj-1" />)
+    expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeUndefined()
   })
 
   it('renders container when sessions exist', () => {

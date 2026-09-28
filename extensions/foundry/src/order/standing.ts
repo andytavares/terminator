@@ -26,6 +26,7 @@ export type StandingKind =
   | 'stranded'
   | 'halted'
   | 'stalled'
+  | 'waiting'
   | 'adrift'
   | 'failed'
   | 'stopped'
@@ -59,6 +60,8 @@ export interface Standing {
   readonly total: number
   /** The gate holding this order, when one is. */
   readonly gateId: string | null
+  /** The order this one is waiting on to merge, when it is: where the move points. */
+  readonly waitingOn: string | null
 }
 
 export interface StandingInput {
@@ -106,6 +109,14 @@ export interface StandingInput {
    * its node still `running`, which is indistinguishable from working.
    */
   readonly stranded: number
+  /**
+   * The order whose merge this one is waiting for. Running orders only.
+   *
+   * The base branch failed a check this order did not cause, and another order
+   * is fixing it. Nothing is running here and nothing is asked of the
+   * operator, which without this reads as an order that has been abandoned.
+   */
+  readonly waitingOn?: { readonly id: string; readonly title: string } | null
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -126,7 +137,7 @@ export function standingOf(input: StandingInput): Standing {
   const done = nodes.filter((n) => n.state === 'passed' || n.state === 'skipped').length
   const running = nodes.filter((n) => n.state === 'running' || n.state === 'verifying').length
   const failed = nodes.filter((n) => n.state === 'failed').length
-  const counts = { done, total, gateId: null }
+  const counts = { done, total, gateId: null, waitingOn: null }
 
   if (input.status === 'shipped') {
     return {
@@ -189,6 +200,21 @@ export function standingOf(input: StandingInput): Standing {
       label: 'halted',
       headline: 'Halted — your move',
       detail: 'The line stopped at a gate. Nothing moves until you answer it.',
+    }
+  }
+
+  // Ahead of `adrift`: nothing is running because the run was deliberately
+  // left standing until the fix merges, not because the application closed.
+  if (input.waitingOn !== undefined && input.waitingOn !== null) {
+    const { id, title } = input.waitingOn
+    return {
+      ...counts,
+      kind: 'waiting',
+      turn: 'foundry',
+      waitingOn: id,
+      label: 'waiting for a fix',
+      headline: `Waiting for ${title} to merge`,
+      detail: `A check fails on the base branch without this order's change. ${title} fixes it, and this order checks again when that merges.`,
     }
   }
 
@@ -339,6 +365,10 @@ export interface StandingSources {
   readonly intakeRefusedFor?: (orderId: string) => Promise<string | null>
   /** Why this order's run last stopped on an error or refused to ship. */
   readonly runFailureFor?: (orderId: string) => Promise<string | null>
+  /** The order whose merge this order is waiting for, when it is. */
+  readonly waitingOnFor?: (
+    orderId: string
+  ) => Promise<{ readonly id: string; readonly title: string } | null>
 }
 
 /**
@@ -369,5 +399,7 @@ export async function readStanding(order: WorkOrder, sources: StandingSources): 
     // nothing.
     runFailure:
       order.status === 'running' ? ((await sources.runFailureFor?.(order.id)) ?? null) : null,
+    waitingOn:
+      order.status === 'running' ? ((await sources.waitingOnFor?.(order.id)) ?? null) : null,
   })
 }

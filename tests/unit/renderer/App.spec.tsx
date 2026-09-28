@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
 import { useSessionStore } from '../../../src/renderer/stores/session.store'
 import { useToastStore } from '../../../src/renderer/stores/toast.store'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
+import { useTerminalOpenErrorStore } from '../../../src/renderer/stores/terminal-open-error.store'
 import { useTerminalSession } from '../../../src/renderer/hooks/useTerminalSession'
 import { useIntegrationsStore } from '../../../src/renderer/stores/integrations.store'
 import { App } from '../../../src/renderer/App'
@@ -1461,6 +1462,37 @@ describe('App', () => {
         badge: 2,
         badgeLabel: '2 need you',
       })
+    })
+  })
+
+  describe('auto-open terminal failure', () => {
+    afterEach(() => useTerminalOpenErrorStore.setState({ errors: {}, retries: {} }))
+
+    it("keeps the reason a branch's first terminal failed to open", async () => {
+      const mockCreateSession = vi.fn().mockRejectedValue(new Error('spawn EBADF'))
+      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      render(<App />)
+      await waitFor(() =>
+        expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBe('spawn EBADF')
+      )
+      expect(mockCreateSession).toHaveBeenCalledTimes(1)
+    })
+
+    it('opens again when Try again bumps the retry, and clears the error on success', async () => {
+      const mockCreateSession = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('spawn EBADF'))
+        .mockResolvedValue('ses-1')
+      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      render(<App />)
+      await waitFor(() =>
+        expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeTruthy()
+      )
+      act(() => useTerminalOpenErrorStore.getState().retry('proj-1'))
+      await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(2))
+      expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeUndefined()
     })
   })
 

@@ -14,6 +14,7 @@ export const GATE_RULES = [
   'destructive',
   'ready-for-review',
   'verify.repeat-fail',
+  'verify.base-fail',
   'critical-path',
   'new-dependency',
   'forge-defect',
@@ -39,6 +40,7 @@ const RULE_IN_WORDS: Record<GateRuleId, string> = {
   destructive: 'anything that destroys work rather than changing it',
   'ready-for-review': 'whether a draft is ready for review',
   'verify.repeat-fail': 'work that keeps failing its checks',
+  'verify.base-fail': 'a check that already fails on the base branch',
   'critical-path': 'edits to a path you marked critical',
   'new-dependency': 'a new third-party dependency',
   'forge-defect': 'an order that contradicts itself',
@@ -155,6 +157,23 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
     ],
     defaultIfIgnored: 'hold',
   },
+  'verify.base-fail': {
+    options: [
+      {
+        id: 'fix_first',
+        label: 'Fix it first',
+        consequence:
+          'A new order to fix it on the base branch opens in the Forge. This order waits, and checks again when that one merges.',
+      },
+      {
+        id: 'accept_debt',
+        label: 'Accept the debt',
+        consequence: 'The criterion is accepted unmet, in writing.',
+      },
+      HOLD,
+    ],
+    defaultIfIgnored: 'hold',
+  },
   'critical-path': {
     options: [
       {
@@ -249,6 +268,8 @@ export interface RaiseInput {
   readonly deadline?: string | null
   readonly breach?: BudgetBreach | null
   readonly at: string
+  /** Option ids this gate must not offer, for a choice that no longer makes sense here. */
+  readonly omitOptions?: readonly string[]
 }
 
 export class UnattributedGateError extends Error {
@@ -281,6 +302,13 @@ export function raiseGate(input: RaiseInput): Gate {
     )
   }
 
+  const omitted = input.omitOptions ?? []
+  if (omitted.includes(shape.defaultIfIgnored)) {
+    throw new Error(
+      `The "${input.rule}" rule defaults to "${shape.defaultIfIgnored}", so that option cannot be omitted.`
+    )
+  }
+
   return {
     id: input.id,
     rule: input.rule,
@@ -289,7 +317,7 @@ export function raiseGate(input: RaiseInput): Gate {
     summary: input.summary,
     why: input.why,
     evidence: input.evidence ?? [],
-    options: shape.options,
+    options: shape.options.filter((option) => !omitted.includes(option.id)),
     defaultIfIgnored: shape.defaultIfIgnored,
     deadline: input.deadline ?? null,
     blockedUnits: input.blockedUnits ?? 0,

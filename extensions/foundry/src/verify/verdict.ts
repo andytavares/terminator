@@ -18,6 +18,10 @@ export interface Evidence {
   readonly path?: string
   readonly excerpt?: string
   readonly exitCode?: number
+  /** The ladder step this output came from, when it came from one. */
+  readonly step?: string
+  /** The command that step ran. */
+  readonly command?: string
 }
 
 export interface Verdict {
