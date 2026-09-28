@@ -224,12 +224,13 @@ describe('FactoryHall', () => {
     expect(onOpenInbox).not.toHaveBeenCalled()
   })
 
-  it('opens a station’s inspector and attaches to it', async () => {
+  it('opens a station’s monitor and attaches to it', async () => {
     mount()
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))
-    await waitFor(() => screen.getByRole('button', { name: /Attach/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
+    await waitFor(() => screen.getByRole('button', { name: /ATTACH/ }))
+    expect(document.querySelector('.fdry-hall-inspector')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:session.attach', {
         orderId: 'WO-1',
@@ -239,6 +240,19 @@ describe('FactoryHall', () => {
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 't-1' })
     )
+  })
+
+  it('shows the waiting station’s own card summary on its monitor', async () => {
+    mount({
+      view: view({
+        waiting: [],
+        stranded: ['s-1'],
+      }),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('heading', { name: 'BUILD THE THING' })
+    expect(screen.getByRole('img', { name: 'Needs you' })).toBeTruthy()
+    expect(screen.getByText(/^WAITING FOR YOU: WAITING AT ITS TERMINAL/i)).toBeTruthy()
   })
 
   it('leaves the station name to the floor: no plate over it, the full label on the button', async () => {
@@ -522,8 +536,59 @@ describe('FactoryHall', () => {
     render(<FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onBack={vi.fn()} />)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))
-    await waitFor(() => screen.getByRole('button', { name: /Attach/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
+    await waitFor(() => screen.getByRole('button', { name: /ATTACH/ }))
+    fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
     await waitFor(() => screen.getByText('gone'))
+  })
+})
+
+describe('an open station monitor is live', () => {
+  const line = (text: string, at: number) => ({ role: 'assistant', kind: 'text', text, at })
+
+  it('reads the transcript at once, then on the activity beat, and stops when closed', async () => {
+    const lines = [line('first', 1)]
+    mount({ lines })
+    // The bridge hands back a fresh array on every read; the fake would not.
+    const fake = invoke.getMockImplementation()!
+    invoke.mockImplementation(async (channel: string, payload?: unknown) => {
+      const r = (await fake(channel, payload)) as { lines?: unknown[] }
+      return channel === 'foundry:run-transcript' ? { lines: [...(r.lines ?? [])] } : r
+    })
+    const station = await screen.findByRole('button', { name: /Build the thing/ })
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(station)
+      await vi.advanceTimersByTimeAsync(0)
+
+      const reads = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:run-transcript')
+      expect(reads().length).toBe(1)
+      expect(reads()[0]![1]).toEqual({ sessionId: 's-1', limit: 40 })
+      expect(screen.getByRole('log', { name: 'Transcript' }).textContent).toContain('first')
+
+      lines.push(line('second', 2))
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(reads().length).toBe(2)
+      expect(screen.getByRole('log', { name: 'Transcript' }).textContent).toContain('second')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close monitor' }))
+      await vi.advanceTimersByTimeAsync(300)
+      expect(screen.queryByRole('log', { name: 'Transcript' })).toBeNull()
+      await vi.advanceTimersByTimeAsync(6000)
+      expect(reads().length).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not read a transcript for a station with no session', async () => {
+    mount({
+      view: view({
+        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ sessionId: null })] },
+      }),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('log', { name: 'Transcript' })
+    expect(invoke.mock.calls.some((c) => c[0] === 'foundry:run-transcript')).toBe(false)
+    expect(screen.getByRole('log', { name: 'Transcript' }).textContent?.trim()).toBe('NOTHING YET.')
   })
 })

@@ -10,12 +10,14 @@ import { readFileSync, statSync } from 'node:fs'
 
 export interface TranscriptLine {
   readonly role: 'user' | 'assistant'
+  /** A tool call is its own kind, so a surface can tell it from the agent's words. */
+  readonly kind: 'text' | 'tool'
   /** Flattened to text: a surface renders words, not content blocks. */
   readonly text: string
   readonly at: number
 }
 
-/** How many lines back. Enough to see the loop, short enough to read. */
+/** How many lines back (a line is one content block). Enough to see the loop, short enough to read. */
 const DEFAULT_LIMIT = 40
 
 /** Longest a tool's arguments get before they stop being a summary. */
@@ -48,30 +50,33 @@ function argumentOf(input: unknown): string {
   return ''
 }
 
-function textOf(message: Record<string, unknown>): string {
+type Block = Pick<TranscriptLine, 'kind' | 'text'>
+
+/** One entry per non-empty content block, in the order they were written. */
+function blocksOf(message: Record<string, unknown>): Block[] {
   const content = message.content
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return ''
-  return content
-    .map((block) => {
-      if (typeof block !== 'object' || block === null) return ''
-      const b = block as Record<string, unknown>
-      if (b.type === 'text' && typeof b.text === 'string') return b.text
-      // Some models write their notes between tool calls as thinking blocks;
-      // an empty one is thinking the runtime chose not to show.
-      if (b.type === 'thinking' && typeof b.thinking === 'string') return b.thinking
-      if (b.type === 'tool_use' && typeof b.name === 'string') {
-        const argument = argumentOf(b.input)
-        return argument === '' ? `${b.name}` : `${b.name}: ${argument}`
-      }
-      return ''
-    })
-    .filter((part) => part !== '')
-    .join('\n')
+  if (typeof content === 'string') return content === '' ? [] : [{ kind: 'text', text: content }]
+  if (!Array.isArray(content)) return []
+  const blocks: Block[] = []
+  for (const block of content) {
+    if (typeof block !== 'object' || block === null) continue
+    const b = block as Record<string, unknown>
+    if (b.type === 'text' && typeof b.text === 'string') blocks.push({ kind: 'text', text: b.text })
+    // Some models write their notes between tool calls as thinking blocks;
+    // an empty one is thinking the runtime chose not to show.
+    else if (b.type === 'thinking' && typeof b.thinking === 'string')
+      blocks.push({ kind: 'text', text: b.thinking })
+    else if (b.type === 'tool_use' && typeof b.name === 'string') {
+      const argument = argumentOf(b.input)
+      blocks.push({ kind: 'tool', text: argument === '' ? `${b.name}` : `${b.name}: ${argument}` })
+    }
+  }
+  return blocks.filter((block) => block.text !== '')
 }
 
 /**
- * The last few things said in a run, oldest first.
+ * The last few things said in a run, oldest first. `limit` counts lines —
+ * one per content block — so it can cut a message part way through.
  *
  * Every failure is tolerated as "nothing to show": the JSONL schema is not a
  * published contract, and a surface that throws because one line changed shape
@@ -102,10 +107,12 @@ export function readTranscriptTail(
     if (role !== 'user' && role !== 'assistant') continue
     const message = entry.message
     if (typeof message !== 'object' || message === null) continue
-    const text = textOf(message as Record<string, unknown>)
-    if (text.trim() === '') continue
-    const at = Date.parse(String(entry.timestamp ?? ''))
-    lines.push({ role, text, at: Number.isNaN(at) ? 0 : at })
+    const parsed = Date.parse(String(entry.timestamp ?? ''))
+    const at = Number.isNaN(parsed) ? 0 : parsed
+    for (const block of blocksOf(message as Record<string, unknown>)) {
+      if (block.text.trim() === '') continue
+      lines.push({ role, ...block, at })
+    }
   }
   return lines.slice(-Math.max(1, limit))
 }

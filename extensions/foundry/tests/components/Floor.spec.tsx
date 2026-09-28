@@ -471,7 +471,7 @@ describe('a held tool call', () => {
 
 /** A transcript line as `foundry:run-transcript` returns it, not as a string. */
 function said(text: string, secondsAgo = 5) {
-  return { role: 'assistant', text, at: Date.now() - secondsAgo * 1000 }
+  return { role: 'assistant', kind: 'text', text, at: Date.now() - secondsAgo * 1000 }
 }
 
 describe('watching a run', () => {
@@ -490,6 +490,27 @@ describe('watching a run', () => {
     const panel = await screen.findByRole('region', { name: 's-1' })
     await waitFor(() => expect(within(panel).getByText(/reading src\/auth/)).toBeTruthy())
     expect(panel.textContent).not.toContain('[object Object]')
+  })
+
+  // One message now arrives as a line per block; the panel still prints it as
+  // the single block of text it printed before.
+  it('prints a message with text and tool calls exactly as it did as one line', async () => {
+    const at = Date.now() - 5000
+    const block = (kind: string, text: string) => ({ role: 'assistant', kind, text, at })
+    mount(reply(), {
+      lines: [
+        block('text', 'checking'),
+        block('tool', 'Read: /repo/a.ts'),
+        block('tool', 'Bash: npm test'),
+      ],
+    })
+    await waitFor(() => screen.getByText(/WO-1/))
+    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
+    const panel = await screen.findByRole('region', { name: 's-1' })
+    await waitFor(() => expect(panel.querySelector('pre.fdry-transcript')).not.toBeNull())
+    expect(panel.querySelector('pre.fdry-transcript')?.textContent).toBe(
+      'checking\nRead: /repo/a.ts\nBash: npm test'
+    )
   })
 
   it('says so when there is nothing yet, rather than showing an empty box', async () => {
@@ -1333,6 +1354,19 @@ describe('the standing band', () => {
       'foundry:run-transcript',
       expect.objectContaining({ sessionId: 's-1' })
     )
+  })
+
+  it('shows one row per message in the live band, the first line of it', async () => {
+    const at = Date.now() - 3000
+    mount(reply({ standing: standing() }), {
+      lines: [
+        { role: 'assistant', kind: 'text', text: 'checking', at },
+        { role: 'assistant', kind: 'tool', text: 'Bash: npm test', at },
+      ],
+    })
+    const band = await screen.findByRole('region', { name: 'Building' })
+    await waitFor(() => expect(within(band).getByText('checking')).toBeTruthy())
+    expect(within(band).queryByText('Bash: npm test')).toBeNull()
   })
 
   it('says a running agent has not said anything yet, rather than nothing', async () => {

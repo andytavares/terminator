@@ -134,6 +134,20 @@ const LIVE_POLL_MS = 2000
 /** How many of a running agent's last lines the standing band shows. */
 const LIVE_LINES = 5
 
+/** A message is written as one line per block; the live rows show one per message. */
+function byMessage(lines: TranscriptLine[]): TranscriptLine[] {
+  const messages: TranscriptLine[] = []
+  for (const line of lines) {
+    const last = messages.length - 1
+    if (last >= 0 && line.at !== 0 && messages[last].at === line.at) {
+      messages[last] = { ...messages[last], text: `${messages[last].text}\n${line.text}` }
+    } else {
+      messages.push(line)
+    }
+  }
+  return messages
+}
+
 /** A node an agent is working on now. An orphan says running and is not. */
 function isLive(node: RunNode, orphaned: readonly string[]): boolean {
   return node.state === 'running' && node.sessionId !== null && !orphaned.includes(node.id)
@@ -499,7 +513,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
         })) as { lines?: TranscriptLine[] }
         // The agent's own words and calls. The user side is the brief and
         // tool results, which are either enormous or empty here.
-        next[sessionId] = (tail.lines ?? []).filter((l) => l.role === 'assistant')
+        next[sessionId] = byMessage((tail.lines ?? []).filter((l) => l.role === 'assistant'))
       }
       if (!cancelled) setLive(next)
     }
