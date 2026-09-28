@@ -40,3 +40,11 @@ renderer then marks the tab `[exited]` and keeps it.
 - One tab per lane at a time, plus any failure the operator has not closed.
 - "Watch" on a finished node finds no terminal. The session record and
   transcript remain.
+
+## Addendum: an installed host older than v2.6.0
+
+Foundry loads from the checkout, but the host is whatever app is installed. On
+an app built before `closeTerminalTab` existed, the call threw inside the exit
+listener before the check's verdict resolved. A passing check never reported,
+and the run stayed on lint indefinitely. `SupervisedRunner` now resolves the
+verdict and releases the run first, and calls `closeTerminalTab?.()` last.
