@@ -856,8 +856,7 @@ export function App(): JSX.Element {
     })
   }, [handleOpenQuickActions])
 
-  // A menu accelerator, not a renderer keydown: macOS claims Cmd+` for window
-  // cycling before the keydown is ever dispatched to the page.
+  // Home is a Window-menu accelerator (Cmd+Shift+H), not a renderer keydown.
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuOpenHome) return
     return window.electronAPI.extensionEvents.onMenuOpenHome(() => {

@@ -102,6 +102,11 @@ export function PrReviewTab({ repoRoot }: Props) {
   const [sinceInfo, setSinceInfo] = useState<SinceInfo | null>(null)
 
   useEffect(() => {
+    if (!isPopoutWindow) return
+    document.title = activePr ? `#${activePr.number} ${activePr.title} — Review` : 'Code Reviews'
+  }, [isPopoutWindow, activePr])
+
+  useEffect(() => {
     if (isPopoutWindow) return
     // Listen for auxiliary window open/close events via extensionBridge
     const unsubOpen = window.electronAPI.extensionBridge.on('window:pr-review-opened', () =>

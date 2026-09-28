@@ -238,6 +238,8 @@ Extension authors must keep main-process entry points free of React/DOM imports 
 
 The `window:open-pr-review` IPC handler, registered by the git-integration extension in `extensions/git-integration/src/index.ts` via `api.ipc.registerHandler`, calls `api.window.openAuxiliary('pr-review', params)`. The host creates a new `BrowserWindow` that loads the renderer URL with `?view=pr-review&repoRoot=<path>` (and optionally `&prNumber=<n>&showOverview=<bool>` to restore directly into an active review). The renderer's `src/renderer/index.tsx` detects the `view` query param and renders `PrReviewWindow` instead of `App` — a minimal wrapper around `PrReviewTab` with no workspace/terminal chrome. `PrReviewTab` reads the remaining URL params on mount to auto-navigate to the correct PR and session state. This pattern can be reused for other focused views.
 
+Pop-outs are top-level windows of the same app, so on macOS they are reached like any app's second window, not through Cmd+Tab (which switches apps). The Window menu (`src/main/window-menu.ts`) carries the `window` role, so macOS lists every open window in it, and it leaves Cmd+`unbound so the OS cycles through them. Each pop-out names itself through`document.title`(the note's or diagram's title, or`#<n> <PR title> — Review`) so that list is readable.
+
 ### Sandboxed Shell Execution (v1.1.0)
 
 `api.shell.exec()` allows extensions to run `git` and `gh` commands in the main process. Since extensions run in the main process (not the renderer), this is a direct call to `shell-executor.ts` — not an IPC round-trip. The `shell:exec` IPC channel exists separately for renderer-initiated shell calls.

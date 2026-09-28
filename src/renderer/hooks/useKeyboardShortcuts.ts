@@ -24,8 +24,7 @@ interface Options {
   onNewTab?: () => void
   /** Opens the inline description editor for the focused session. */
   onEditSessionNote?: () => void
-  /** A menu accelerator, not a renderer keydown on macOS: Cmd+` is claimed by
-   * the OS for window cycling before the page ever sees it. Kept here so
+  /** A menu accelerator (Cmd+Shift+H), not a renderer keydown. Kept here so
    * `core-actions.ts` shares the same callback the "Home" quick action runs. */
   onOpenHome?: () => void
   /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
