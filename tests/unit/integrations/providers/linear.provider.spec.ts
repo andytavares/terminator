@@ -41,7 +41,13 @@ describe('linear provider — listMine', () => {
     const result = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 25)
 
     expect(issues).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: { assignee: { email: { eq: 'a@b.c' } } }, first: 25 })
+      expect.objectContaining({
+        filter: {
+          assignee: { email: { eq: 'a@b.c' } },
+          state: { type: { nin: ['completed', 'canceled'] } },
+        },
+        first: 25,
+      })
     )
     expect(result[0]).toMatchObject({ tracker: 'linear', key: 'TAV-42' })
   })
@@ -51,7 +57,10 @@ describe('linear provider — listMine', () => {
     const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER, assignedIssues }) })
     const result = await provider.listMine(CRED, { kind: 'assignee', email: null }, 10)
 
-    expect(assignedIssues).toHaveBeenCalled()
+    expect(assignedIssues).toHaveBeenCalledWith({
+      filter: { state: { type: { nin: ['completed', 'canceled'] } } },
+      first: 10,
+    })
     expect(result).toHaveLength(1)
   })
 
@@ -101,6 +110,15 @@ describe('linear provider — search', () => {
       expect.objectContaining({ term: 'sidebar', first: 15 })
     )
     expect(result[0].key).toBe('TAV-42')
+  })
+
+  it('searches every ticket regardless of state, archived ones included', async () => {
+    const searchIssues = vi.fn().mockResolvedValue({ nodes: [DONE_ISSUE] })
+    const provider = providerWith({ searchIssues })
+    const [issue] = await provider.search(CRED, 'sidebar', 15)
+
+    expect(searchIssues).toHaveBeenCalledWith({ term: 'sidebar', first: 15, includeArchived: true })
+    expect(issue.state.type).toBe('completed')
   })
 })
 

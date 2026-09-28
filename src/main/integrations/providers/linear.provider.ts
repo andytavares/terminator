@@ -67,6 +67,10 @@ const STATE_TYPES: ReadonlyMap<string, IssueStateType> = new Map([
   ['canceled', 'canceled'],
 ])
 
+// A duplicate is closed as canceled, and a closed ticket never reopens, so
+// neither terminal category is work anyone can pick up.
+const OPEN_STATE = { type: { nin: ['completed', 'canceled'] } }
+
 function toState(raw: { name?: unknown; type?: unknown } | null | undefined): IssueState {
   const name = typeof raw?.name === 'string' ? raw.name : 'Unknown'
   const type = typeof raw?.type === 'string' ? (STATE_TYPES.get(raw.type) ?? 'backlog') : 'backlog'
@@ -287,9 +291,14 @@ export function createLinearProvider(
         const connection = (await (email === null
           ? // No email configured: the key's own viewer is the answer, and it
             // is one fewer round trip than looking the user up first.
-            ((await client.viewer).assignedIssues?.({ first: limit }) ?? { nodes: [] })
+            ((await client.viewer).assignedIssues?.({
+              filter: { state: OPEN_STATE },
+              first: limit,
+            }) ?? {
+              nodes: [],
+            })
           : client.issues({
-              filter: { assignee: { email: { eq: email } } },
+              filter: { assignee: { email: { eq: email } }, state: OPEN_STATE },
               first: limit,
               orderBy: 'updatedAt',
             }))) as { nodes?: RawIssue[] } | null
@@ -300,7 +309,12 @@ export function createLinearProvider(
     async search(cred, term, limit): Promise<IssueSummary[]> {
       const client = clientFor(cred)
       return run(async () => {
-        const connection = (await client.searchIssues({ term, first: limit })) as {
+        const connection = (await client.searchIssues({
+          term,
+          first: limit,
+          // Linear auto-archives closed tickets; a search still has to find them.
+          includeArchived: true,
+        })) as {
           nodes?: RawIssue[]
         } | null
         return Promise.all((connection?.nodes ?? []).map(toSummary))
