@@ -1,0 +1,37 @@
+extensions/foundry/node_modules
+  s_6f2763bc197e91::t_c8bedca876652e 1
+extensions/foundry/src/components/Floor.tsx
+  s_6f2763bc197e91::t_891fda081c4731 1180
+extensions/foundry/src/components/Ledger.tsx
+  s_6f2763bc197e91::t_6ec2cd3c2e4bdc 43,49-55,298-299
+extensions/foundry/src/index.ts
+  s_6f2763bc197e91::t_82b577f8ea3f52 1894-1896
+extensions/foundry/src/ipc/ledger-channels.ts
+  s_6f2763bc197e91::t_41642948fa5fbe 156,160-165,200,205
+extensions/foundry/src/verify/rules.ts
+  s_6f2763bc197e91::t_930ff078d87ef6 128-143,146-149,165-166,169-172,187-189,193,203-208,218
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_6f2763bc197e91::t_466907c59213ee 758
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_6f2763bc197e91::t_8b0a76df6039e0 319-338
+extensions/foundry/tests/ipc/ledger-channels.spec.ts
+  s_6f2763bc197e91::t_44b62115f7980f 342,344-350
+extensions/foundry/tests/verify/rules.spec.ts
+  s_6f2763bc197e91::t_d3f281b601efe1 9,144-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d385af3ea574b5291c01d3cfcea01414a09db435",
+  "prompts": {},
+  "sessions": {
+    "s_6f2763bc197e91": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20a95b64-c37e-4c82-914f-a10b3237caab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
