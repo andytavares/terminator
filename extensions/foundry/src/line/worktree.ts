@@ -212,3 +212,65 @@ export async function removeCheckout(checkout: Checkout, deps: CheckoutDeps): Pr
   })
   return removed.exitCode === 0
 }
+
+/**
+ * A checkout of a lane's base branch as it is, without the lane's change.
+ *
+ * It answers whether a failing check was already failing before the change.
+ * Detached, so no branch of the repository moves and the lane's own branch is
+ * untouched; it sits beside the lane's checkout, under the data root, for the
+ * same reason that one does.
+ */
+export async function ensureBaseCheckout(
+  order: WorkOrder,
+  lane: number,
+  deps: CheckoutDeps
+): Promise<Checkout> {
+  const repo = order.context.repos.find((r) => r.lane === lane)
+  if (repo === undefined)
+    throw new CheckoutFailedError(`lane ${lane}`, 'the order has no such lane')
+
+  const target = `${checkoutPath(deps.root, order, repo.name)}@base`
+  const listed = await deps.exec({
+    command: 'git',
+    args: ['worktree', 'list', '--porcelain'],
+    cwd: repo.path,
+    timeoutMs: 30_000,
+  })
+  const existing = listed.exitCode === 0 && listed.stdout.includes(`worktree ${target}`)
+
+  if (!existing) {
+    const added = await deps.exec({
+      command: 'git',
+      args: ['worktree', 'add', '--detach', target, repo.baseBranch],
+      cwd: repo.path,
+      timeoutMs: 120_000,
+    })
+    if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
+  }
+
+  const checkout = {
+    repo: repo.name,
+    origin: repo.path,
+    path: target,
+    branch: repo.baseBranch,
+    created: !existing,
+  }
+  await provisionDependencies(checkout, deps)
+  return checkout
+}
+
+/** Take a base checkout away and forget it. Best effort; never throws. */
+export async function removeBaseCheckout(checkout: Checkout, deps: CheckoutDeps): Promise<void> {
+  try {
+    await removeCheckout(checkout, deps)
+    await deps.exec({
+      command: 'git',
+      args: ['worktree', 'prune'],
+      cwd: checkout.origin,
+      timeoutMs: 30_000,
+    })
+  } catch {
+    // nothing left to do if cleanup itself fails
+  }
+}

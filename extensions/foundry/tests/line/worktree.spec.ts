@@ -5,6 +5,8 @@ import * as os from 'node:os'
 import {
   ensureCheckout,
   ensureCheckouts,
+  ensureBaseCheckout,
+  removeBaseCheckout,
   removeCheckout,
   provisionDependencies,
   branchFor,
@@ -362,5 +364,69 @@ describe('provisioning dependencies', () => {
 
     expect(checkout.created).toBe(false)
     expect(fs.lstatSync(path.join(target, 'node_modules')).isSymbolicLink()).toBe(true)
+  })
+})
+
+describe('a checkout of the base branch', () => {
+  const baseTarget = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app@base')
+
+  it('adds a detached worktree of the base beside the lane checkout', async () => {
+    const d = deps()
+    const checkout = await ensureBaseCheckout(order(), 1, d)
+
+    expect(calls(d.exec).find((c) => c.args[1] === 'add')).toMatchObject({
+      cwd: '/repos/app',
+      args: ['worktree', 'add', '--detach', baseTarget, 'main'],
+    })
+    expect(checkout).toMatchObject({ path: baseTarget, branch: 'main', created: true })
+    expect(checkout.path).not.toBe(checkoutPath(ROOT, order(), 'app'))
+  })
+
+  it('reuses the one git already has', async () => {
+    const exec = vi.fn(async (options: { args: string[] }) => ({
+      exitCode: 0,
+      stdout: options.args[1] === 'list' ? `worktree ${baseTarget}\nHEAD abc\n` : '',
+      stderr: '',
+      timedOut: false,
+    }))
+    const checkout = await ensureBaseCheckout(order(), 1, deps({ exec: exec as never }))
+
+    expect(checkout.created).toBe(false)
+    expect(calls(exec).some((c) => c.args[1] === 'add')).toBe(false)
+  })
+
+  it('says which repository failed, and why', async () => {
+    const exec = vi.fn(async (options: { args: string[] }) => ({
+      exitCode: options.args[1] === 'add' ? 128 : 0,
+      stdout: '',
+      stderr: options.args[1] === 'add' ? 'invalid reference: main' : '',
+      timedOut: false,
+    }))
+    await expect(ensureBaseCheckout(order(), 1, deps({ exec: exec as never }))).rejects.toThrow(
+      /app.*invalid reference: main/
+    )
+  })
+
+  it('refuses a lane the order does not have', async () => {
+    await expect(ensureBaseCheckout(order(), 9, deps())).rejects.toBeInstanceOf(CheckoutFailedError)
+  })
+
+  it('removes it and prunes, and never throws at a caller that is cleaning up', async () => {
+    const d = deps()
+    const checkout = await ensureBaseCheckout(order(), 1, d)
+    d.exec.mockClear()
+
+    await removeBaseCheckout(checkout, d)
+    expect(calls(d.exec).map((c) => c.args)).toEqual([
+      ['worktree', 'remove', '--force', baseTarget],
+      ['worktree', 'prune'],
+    ])
+
+    const failing = deps({
+      exec: vi.fn(async () => {
+        throw new Error('git is gone')
+      }) as never,
+    })
+    await expect(removeBaseCheckout(checkout, failing)).resolves.toBeUndefined()
   })
 })

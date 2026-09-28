@@ -45,7 +45,24 @@ export interface RefineryTickDeps {
     reason: string
   ) => Promise<void>
   readonly titleOf: (orderId: string) => Promise<string>
+  /** The orders whose refinery state waits on `mergedId` to merge. */
+  readonly waitingOn: (mergedId: string) => Promise<readonly string[]>
+  /** Carry on a run that was waiting: the same resume a gate's decision uses. */
+  readonly resume: (orderId: string) => Promise<void>
   readonly now: () => string
+}
+
+/** Restack every lane of one order; the first conflict or failure stops it. */
+async function restackLanes(
+  deps: RefineryTickDeps,
+  orderId: string
+): Promise<{ conflictFiles: readonly string[] | null; failedReason: string | null }> {
+  for (const lane of await deps.lanesFor(orderId)) {
+    const result = await deps.restack(lane)
+    if (result.kind === 'conflict') return { conflictFiles: result.files, failedReason: null }
+    if (result.kind === 'failed') return { conflictFiles: null, failedReason: result.reason }
+  }
+  return { conflictFiles: null, failedReason: null }
 }
 
 export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
@@ -80,30 +97,17 @@ export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
   const entries = await deps.entries()
 
   for (const mergedId of mergedIds) {
+    const mergedTitle = await deps.titleOf(mergedId)
+    await resumeWaiting(deps, mergedId, mergedTitle)
+
     const overlapping = laterOverlapping(entries, mergedId)
     if (overlapping.length === 0) continue
-
-    const mergedTitle = await deps.titleOf(mergedId)
 
     for (const { orderId, files } of overlapping) {
       const state = await deps.readState(orderId)
       if (state.restackedFor.includes(mergedId)) continue
 
-      const lanes = await deps.lanesFor(orderId)
-      let conflictFiles: readonly string[] | null = null
-      let failedReason: string | null = null
-
-      for (const lane of lanes) {
-        const result = await deps.restack(lane)
-        if (result.kind === 'conflict') {
-          conflictFiles = result.files
-          break
-        }
-        if (result.kind === 'failed') {
-          failedReason = result.reason
-          break
-        }
-      }
+      const { conflictFiles, failedReason } = await restackLanes(deps, orderId)
 
       if (conflictFiles !== null) {
         const title = await deps.titleOf(orderId)
@@ -130,5 +134,43 @@ export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
       )
       await deps.watchCi(orderId)
     }
+  }
+}
+
+/**
+ * Orders that stopped because the base branch was broken wait for the order
+ * fixing it. Once it has merged they are rebased onto that fix and carried on,
+ * and the resumed run climbs its final check again.
+ */
+async function resumeWaiting(
+  deps: RefineryTickDeps,
+  mergedId: string,
+  mergedTitle: string
+): Promise<void> {
+  for (const orderId of await deps.waitingOn(mergedId)) {
+    const { conflictFiles, failedReason } = await restackLanes(deps, orderId)
+
+    if (conflictFiles !== null) {
+      const title = await deps.titleOf(orderId)
+      const why = `${title} no longer rebases onto its base after ${mergedTitle} merged`
+      await deps.raiseConflict(orderId, why, conflictFiles)
+      await deps.record(orderId, 'refinery.conflict', orderId, why)
+      continue
+    }
+
+    // Left waiting, so the next tick tries the rebase again.
+    if (failedReason !== null) {
+      await deps.record(orderId, 'refinery.failed', orderId, failedReason)
+      continue
+    }
+
+    await deps.writeState(orderId, { ...(await deps.readState(orderId)), waitingOn: null })
+    await deps.record(
+      orderId,
+      'refinery.resumed',
+      orderId,
+      `${mergedTitle} merged; checking again.`
+    )
+    await deps.resume(orderId)
   }
 }
