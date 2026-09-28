@@ -65,13 +65,16 @@ let spawned: Spawned[]
 let broadcasts: Array<{ channel: string; payload: Record<string, unknown> }>
 let dataListener: ((data: string) => void) | null
 let exitListener: ((code: number) => void) | null
+let killed: string[]
 
 function build(withWindow = true) {
   spawned = []
   broadcasts = []
   dataListener = null
   exitListener = null
+  killed = []
   const ptyManager = {
+    kill: (id: string) => killed.push(id),
     spawnSession: (options: Spawned) => {
       spawned.push(options)
       return options
@@ -260,5 +263,23 @@ describe('pty.openTerminalTab', () => {
     // A terminal nobody can see is the thing this exists to prevent.
     expect(build(false).pty.openTerminalTab(input)).toBeNull()
     expect(spawned).toEqual([])
+  })
+})
+
+describe('pty.closeTerminalTab', () => {
+  it('tells the renderer to close the tab, which ends the process and its record', () => {
+    const api = build()
+    const sessionId = api.pty.openTerminalTab({
+      projectId: 'proj-1',
+      cwd: '/wt/a',
+      tabTitle: 'Architect',
+    })
+    api.pty.closeTerminalTab(sessionId as string)
+    expect(broadcasts).toContainEqual({ channel: 'terminal:close-tab', payload: { sessionId } })
+  })
+
+  it('still ends the process when there is no window to close a tab in', () => {
+    build(false).pty.closeTerminalTab('s-1')
+    expect(killed).toEqual(['s-1'])
   })
 })

@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 2.5.0 (`api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
+**Current API version**: 2.6.0 (`pty.closeTerminalTab` closes a tab `openTerminalTab` opened — see [`closeTerminalTab`](#closeterminaltab--closing-a-tab-you-opened-v260); 2.5.0: `api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
 
 ---
 
@@ -626,6 +626,20 @@ has to be told, adopt the session, render, and mount an xterm before anything is
 listening; delivered live, everything in that window goes to nobody — including
 the command you just typed into it. The hold is released automatically when the
 tab mounts.
+
+#### `closeTerminalTab` — closing a tab you opened _(v2.6.0)_
+
+`kill` ends the process but leaves the tab on screen marked `[exited]`. An
+extension that opens a tab per agent or per command fills the tab strip that
+way. `closeTerminalTab` removes the tab, ends its process if it still runs,
+and marks its session record closed:
+
+```typescript
+api.pty.onExit(sessionId, (exitCode) => {
+  // Keep a failure on screen so the operator can read it.
+  if (exitCode === 0) api.pty.closeTerminalTab(sessionId)
+})
+```
 
 ### `api.issues` — the application's tracker connection _(v2.2.0)_
 
