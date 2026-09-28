@@ -1,0 +1,23 @@
+extensions/git-integration/src/ipc/review-agent.ipc.ts
+  s_1d40c41b0585ca::t_94463d41218420 111-113
+extensions/git-integration/src/index.ts
+  s_1d40c41b0585ca::t_94463d41218420 196-197
+extensions/git-integration/tests/unit/review-agent-ipc.spec.ts
+  s_1d40c41b0585ca::t_8f956925ee1cb5 193-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2d9c5aaebd73a7c399b79479bcd6fd23dbfcf0ed",
+  "prompts": {},
+  "sessions": {
+    "s_1d40c41b0585ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5012b074-3fcf-4c7c-9cc7-96d3b79bdc03",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
