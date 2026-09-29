@@ -95,7 +95,11 @@ empty one, which FR-032 requires be distinguishable.
 Only rate limits are retried. An auth failure will not fix itself, and retrying it spends what is
 left of the operator's budget.
 
-### 5. Comments are the only write
+### 5. Open issues only in listMine; search covers all
+
+The `listMine` method returns issues whose state type is not completed or canceled, filtering out Done, Closed, and Duplicate tickets. Linear files Duplicate under canceled, so `state: { type: { nin: ['completed', 'canceled'] } }` covers all three. The `search` method carries no state filter and returns every result, so a text search still finds closed tickets — listMine's filter is a "my active work" boundary, not a "hide completed work" policy.
+
+### 6. Comments are the only write
 
 The `TrackerProvider` interface exposes `verify`, `listMine`, `search`, `get`, `comment` — and
 nothing else. No state transition, no assignment, no field edit. FR-034 and SC-014 say no field

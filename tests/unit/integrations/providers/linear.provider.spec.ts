@@ -40,10 +40,33 @@ describe('linear provider — listMine', () => {
     const provider = providerWith({ issues })
     const result = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 25)
 
-    expect(issues).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: { assignee: { email: { eq: 'a@b.c' } } }, first: 25 })
-    )
+    expect(issues).toHaveBeenCalledWith({
+      filter: {
+        assignee: { email: { eq: 'a@b.c' } },
+        state: { type: { nin: ['completed', 'canceled'] } },
+      },
+      first: 25,
+      orderBy: 'updatedAt',
+    })
     expect(result[0]).toMatchObject({ tracker: 'linear', key: 'TAV-42' })
+  })
+
+  it('sends state filter to exclude completed and canceled issues when email is configured (AC-1)', async () => {
+    const issues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
+    const provider = providerWith({ issues })
+    await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 25)
+
+    const callArgs = issues.mock.calls[0][0]
+    expect(callArgs.filter.state).toEqual({ type: { nin: ['completed', 'canceled'] } })
+  })
+
+  it('sends state filter to exclude completed and canceled issues when no email is configured (AC-1)', async () => {
+    const assignedIssues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
+    const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER, assignedIssues }) })
+    await provider.listMine(CRED, { kind: 'assignee', email: null }, 10)
+
+    const callArgs = assignedIssues.mock.calls[0][0]
+    expect(callArgs.state).toEqual({ type: { nin: ['completed', 'canceled'] } })
   })
 
   it("falls back to the viewer's own assigned issues when no email is configured", async () => {
@@ -101,6 +124,23 @@ describe('linear provider — search', () => {
       expect.objectContaining({ term: 'sidebar', first: 15 })
     )
     expect(result[0].key).toBe('TAV-42')
+  })
+
+  it('calls searchIssues with exactly term and first, no state filter (AC-2)', async () => {
+    const searchIssues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
+    const provider = providerWith({ searchIssues })
+    await provider.search(CRED, 'sidebar', 15)
+
+    expect(searchIssues).toHaveBeenCalledWith({ term: 'sidebar', first: 15 })
+  })
+
+  it('includes completed-state issues in search results (AC-2)', async () => {
+    const searchIssues = vi.fn().mockResolvedValue({ nodes: [DONE_ISSUE] })
+    const provider = providerWith({ searchIssues })
+    const result = await provider.search(CRED, 'sidebar', 15)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].state.type).toBe('completed')
   })
 })
 
