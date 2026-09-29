@@ -1,0 +1,27 @@
+src/main/integrations/providers/linear.provider.ts
+  s_3763eb01054c3a::t_0fa08a90184f96 290-293,295-298
+docs/EXTENSION-DEVELOPMENT.md
+  s_3763eb01054c3a::t_8007c6bbca9c9c 651-653
+tests/unit/integrations/providers/linear.provider.spec.ts
+  s_3763eb01054c3a::t_7ba6dbe7c5f9bc 128-144
+  s_3763eb01054c3a::t_e3e8dda5c41bf3 43-50
+  s_3763eb01054c3a::t_701d27f72321da 54-71
+docs/adr/029-core-issue-tracker-service.md
+  s_3763eb01054c3a::t_02f10526f84e54 98-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "06f4ea8756264a622dd3e4a49e92b92f1c973c6f",
+  "prompts": {},
+  "sessions": {
+    "s_3763eb01054c3a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f0d9f9ac-abb0-4b32-80aa-7a123f6a3693",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
