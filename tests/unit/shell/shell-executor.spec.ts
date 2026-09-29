@@ -146,6 +146,22 @@ describe('execShell', () => {
     expect(result.exitCode).toBe(1)
   })
 
+  // A command that never started (not on PATH) has no stderr of its own; without
+  // the spawn error a caller could only report "exit code 1".
+  it('reports the spawn error as stderr when the command could not be started', async () => {
+    const err = Object.assign(new Error('spawn gh ENOENT'), { code: 'ENOENT' })
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
+        callback(err, '', '')
+        return { on: vi.fn() } as unknown as ChildProcess
+      }
+    )
+
+    const result = await execShell({ command: 'gh', args: ['pr', 'create'], cwd: '/tmp' })
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toBe('spawn gh ENOENT')
+  })
+
   it('marks timedOut when SIGTERM close signal fires before callback', async () => {
     mockExecFile.mockImplementation(
       (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {

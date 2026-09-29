@@ -80,7 +80,9 @@ export function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
       },
       (error, stdout, stderr) => {
         const exitCode = error?.code != null ? (typeof error.code === 'number' ? error.code : 1) : 0
-        resolve({ exitCode, stdout, stderr, timedOut })
+        // A string code means the command never started (e.g. ENOENT), so it wrote nothing.
+        const spawnError = typeof error?.code === 'string' && stderr === '' ? error.message : ''
+        resolve({ exitCode, stdout, stderr: spawnError || stderr, timedOut })
       }
     )
     child.on('error', () => {

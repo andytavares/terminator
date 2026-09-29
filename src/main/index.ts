@@ -18,6 +18,7 @@ import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
+import { adoptLoginShellPath } from './shell/login-shell-path.js'
 import { registerEditorHandlers } from './ipc/editor.ipc.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { registerLogHandlers } from './ipc/log.ipc.js'
@@ -287,6 +288,7 @@ protocol.registerSchemesAsPrivileged([
 
 app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
+  if (process.platform === 'darwin') await adoptLoginShellPath()
 
   const userData = app.getPath('userData')
   await initAppDb(userData)
