@@ -1,0 +1,30 @@
+src/main/shell/shell-executor.ts
+  s_1ef3808e44791f::t_050d367ac2832f 83-85
+tests/unit/shell/login-shell-path.spec.ts
+  s_1ef3808e44791f::t_b2b6e117e22467 1-44,49-62
+  s_1ef3808e44791f::t_2d745b4e80f8e0 45-48
+docs/ARCHITECTURE.md
+  s_1ef3808e44791f::t_2d745b4e80f8e0 247-248
+tests/unit/shell/shell-executor.spec.ts
+  s_1ef3808e44791f::t_b2b6e117e22467 149-164
+src/main/shell/login-shell-path.ts
+  s_1ef3808e44791f::t_050d367ac2832f 1-35
+src/main/index.ts
+  s_1ef3808e44791f::t_9e10750a9535e8 21,291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c17b9efaeb9d5ed2e905e7576b6646fb823b6cc8",
+  "prompts": {},
+  "sessions": {
+    "s_1ef3808e44791f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df3293fb-c020-4ca2-98a1-2898f5b5fa53",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
