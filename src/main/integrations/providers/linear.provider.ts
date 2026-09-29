@@ -287,9 +287,15 @@ export function createLinearProvider(
         const connection = (await (email === null
           ? // No email configured: the key's own viewer is the answer, and it
             // is one fewer round trip than looking the user up first.
-            ((await client.viewer).assignedIssues?.({ first: limit }) ?? { nodes: [] })
+            ((await client.viewer).assignedIssues?.({
+              first: limit,
+              state: { type: { nin: ['completed', 'canceled'] } },
+            }) ?? { nodes: [] })
           : client.issues({
-              filter: { assignee: { email: { eq: email } } },
+              filter: {
+                assignee: { email: { eq: email } },
+                state: { type: { nin: ['completed', 'canceled'] } },
+              },
               first: limit,
               orderBy: 'updatedAt',
             }))) as { nodes?: RawIssue[] } | null
