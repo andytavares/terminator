@@ -244,6 +244,8 @@ Pop-outs are top-level windows of the same app, so on macOS they are reached lik
 
 `api.shell.exec()` allows extensions to run `git` and `gh` commands in the main process. Since extensions run in the main process (not the renderer), this is a direct call to `shell-executor.ts` — not an IPC round-trip. The `shell:exec` IPC channel exists separately for renderer-initiated shell calls.
 
+Commands resolve against `process.env.PATH`. On macOS an app started from the Dock or Finder gets `/usr/bin:/bin:/usr/sbin:/sbin`, which has no Homebrew `gh`, so at startup `login-shell-path.ts` puts the login shell's PATH (`$SHELL -ilc`) ahead of it. A command that cannot be started reports its spawn error (`spawn gh ENOENT`) as stderr, never a bare exit code.
+
 Security constraints: command allowlist `['git', 'gh']`, CWD pinned to project root, `shell: false`, sanitized environment. See [ADR-006](adr/006-sandboxed-shell-exec-for-extensions.md).
 
 ### File System Watch (v1.1.0)
