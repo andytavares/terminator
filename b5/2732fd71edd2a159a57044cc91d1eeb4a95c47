@@ -1,0 +1,25 @@
+extensions/remote-control/package.json
+  s_71a39504a89e7e::t_9f1c9ff29fd4a3 14
+package.json
+  s_71a39504a89e7e::t_9f1c9ff29fd4a3 62
+README.md
+  s_71a39504a89e7e::t_aefb6fe0f667d7 66
+package-lock.json
+  s_71a39504a89e7e::t_386b74c1767e0d 27,242,4996,6483-6485,7656-7658,7672-7674,7879,8000,8211-8213,8986,9042,9091,14005
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b52732fd71edd2a159a57044cc91d1eeb4a95c47",
+  "prompts": {},
+  "sessions": {
+    "s_71a39504a89e7e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec9314a5-ad73-4edf-8e6a-62a7e6985ed7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
