@@ -8,7 +8,6 @@
   },
   "dependencies": {
     "@terminator/extension-ui": "*",
-    "chokidar": "^3.6.0",
     "electron-store": "8.2.0",
     "lucide-react": "^1.16.0",
     "node-ical": "^0.26.1",

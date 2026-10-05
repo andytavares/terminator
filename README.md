@@ -63,7 +63,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | E2E tests              | Playwright 1.x                              |
 | UI font                | IBM Plex Sans (@fontsource)                 |
 
-Extension dependencies (not part of the core app): `@electric-sql/pglite`, `sql.js`, `@modelcontextprotocol/sdk`, `chokidar`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
+Extension dependencies (not part of the core app): `@electric-sql/pglite`, `sql.js`, `@modelcontextprotocol/sdk`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
 
 ## Documentation
 
