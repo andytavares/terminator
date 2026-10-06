@@ -79,6 +79,28 @@ function mockGitFailure(message: string) {
   )
 }
 
+// The dashboard sends one graphql request per section in parallel, so replies are
+// routed by the alias in each query rather than queued in call order.
+function mockDashboardExec(
+  sections: Record<string, unknown[]>,
+  remotes: Record<string, string | Error> = {}
+) {
+  mockExecFile.mockImplementation(
+    (_cmd: string, args: string[], opts: { cwd?: string }, cb: ExecCallback) => {
+      if (args[0] === 'api' && args[1] === 'user') return cb(null, { stdout: 'alice', stderr: '' })
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        const alias = /(\w+): search\(/.exec(args[3])![1]
+        const data = { [alias]: { nodes: sections[alias] ?? [] } }
+        return cb(null, { stdout: JSON.stringify({ data }), stderr: '' })
+      }
+      const remote = remotes[opts.cwd ?? '']
+      if (remote instanceof Error || remote === undefined)
+        return cb(remote ?? new Error('no remote'))
+      return cb(null, { stdout: remote, stderr: '' })
+    }
+  )
+}
+
 function mockGitFailureWithStdout(message: string, stdout: string) {
   mockExecFile.mockImplementationOnce(
     (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
@@ -2482,22 +2504,14 @@ describe('review revamp — edge branches', () => {
       commits: { nodes: [] },
       latestReviews: { nodes: [] },
     })
-    mockGitSuccess('alice')
-    mockGitSuccess(
-      JSON.stringify({
-        data: {
-          viewer: { login: 'alice' },
-          reReview: { nodes: [] },
-          requested: { nodes: [] },
-          team: { nodes: [] },
-          involved: { nodes: [] },
-          mine: { nodes: [node('acme/widgets', 1), node('acme/gadgets', 2)] },
-        },
-      })
+    mockDashboardExec(
+      { mine: [node('acme/widgets', 1), node('acme/gadgets', 2)] },
+      {
+        '/src/widgets': 'git@github.com:acme/widgets.git',
+        '/src/gadgets': 'https://gitlab.com/acme/gadgets.git',
+        '/src/broken': new Error('not a git repository'),
+      }
     )
-    mockGitSuccess('git@github.com:acme/widgets.git')
-    mockGitSuccess('https://gitlab.com/acme/gadgets.git')
-    mockGitFailure('not a git repository')
     const result = (await hs['github:dashboard-search']({})) as {
       prs: Array<{ repo: string; localRepoRoot: string | null }>
     }
@@ -2523,50 +2537,40 @@ describe('github:dashboard-search', () => {
       () => ['/Users/me/repos/widgets']
     )
 
-    mockGitSuccess('alice') // gh api user --jq .login
-    mockGitSuccess(
-      JSON.stringify({
-        data: {
-          viewer: { login: 'alice' },
-          reReview: { nodes: [] },
-          requested: { nodes: [] },
-          team: { nodes: [] },
-          involved: { nodes: [] },
-          mine: {
-            nodes: [
-              {
-                number: 1,
-                title: 'Fix bug',
-                url: 'https://github.com/acme/widgets/pull/1',
-                isDraft: false,
-                additions: 10,
-                deletions: 5,
-                changedFiles: 2,
-                createdAt: '2026-01-01T00:00:00Z',
-                repository: { nameWithOwner: 'acme/widgets' },
-                author: { login: 'alice' },
-                reviewDecision: 'REVIEW_REQUIRED',
-                reviewRequests: { totalCount: 0 },
-                reviewThreads: { nodes: [] },
-                commits: {
-                  nodes: [
-                    {
-                      commit: {
-                        oid: 'a',
-                        committedDate: '2026-01-01',
-                        statusCheckRollup: { state: 'SUCCESS' },
-                      },
-                    },
-                  ],
+    mockDashboardExec(
+      {
+        mine: [
+          {
+            number: 1,
+            title: 'Fix bug',
+            url: 'https://github.com/acme/widgets/pull/1',
+            isDraft: false,
+            additions: 10,
+            deletions: 5,
+            changedFiles: 2,
+            createdAt: '2026-01-01T00:00:00Z',
+            repository: { nameWithOwner: 'acme/widgets' },
+            author: { login: 'alice' },
+            reviewDecision: 'REVIEW_REQUIRED',
+            reviewRequests: { totalCount: 0 },
+            reviewThreads: { nodes: [] },
+            commits: {
+              nodes: [
+                {
+                  commit: {
+                    oid: 'a',
+                    committedDate: '2026-01-01',
+                    statusCheckRollup: { state: 'SUCCESS' },
+                  },
                 },
-                latestReviews: { nodes: [] },
-              },
-            ],
+              ],
+            },
+            latestReviews: { nodes: [] },
           },
-        },
-      })
-    ) // gh api graphql (dashboard query)
-    mockGitSuccess('https://github.com/acme/widgets.git') // git remote get-url origin
+        ],
+      },
+      { '/Users/me/repos/widgets': 'https://github.com/acme/widgets.git' }
+    )
 
     const result = (await handlers['github:dashboard-search']({})) as {
       prs: Array<{ localRepoRoot: string | null; repo: string }>
@@ -2579,6 +2583,18 @@ describe('github:dashboard-search', () => {
 
     const userCallOpts = mockExecFile.mock.calls[0][2] as { cwd?: string }
     expect(userCallOpts.cwd).toBe(homedir())
+  })
+
+  it('sends each section as its own graphql request', async () => {
+    const handlers = captureHandlers()
+    mockDashboardExec({})
+    await handlers['github:dashboard-search']({})
+    const queries = mockExecFile.mock.calls
+      .map((c) => c[1] as string[])
+      .filter((args) => args[1] === 'graphql')
+      .map((args) => args[3])
+    expect(queries).toHaveLength(5)
+    for (const q of queries) expect(q.match(/: search\(/g)).toHaveLength(1)
   })
 
   it('returns catchError shape when the login lookup fails', async () => {

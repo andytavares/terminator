@@ -12,7 +12,7 @@ import type {
   ReviewSession,
 } from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
-import { buildDashboardQuery, parseDashboard } from '../github/dashboard-search.js'
+import { buildSectionQueries, parseDashboard } from '../github/dashboard-search.js'
 import {
   buildChapters,
   parseReviewQueuePR,
@@ -992,9 +992,13 @@ export function registerGithubHandlers(
     try {
       const cwd = homedir()
       const login = (await gh(cwd, ['api', 'user', '--jq', '.login'])).trim()
-      const query = buildDashboardQuery(login)
-      const raw = await gh(cwd, ['api', 'graphql', '-f', `query=${query}`], 60_000)
-      const data = JSON.parse(raw)
+      const sections = await Promise.all(
+        Object.values(buildSectionQueries(login)).map(async (query) => {
+          const raw = await gh(cwd, ['api', 'graphql', '-f', `query=${query}`], 60_000)
+          return (JSON.parse(raw) as { data?: Record<string, unknown> }).data
+        })
+      )
+      const data = { data: Object.assign({}, ...sections) }
 
       const localRoots = new Map<string, string>()
       if (listProjectRoots) {

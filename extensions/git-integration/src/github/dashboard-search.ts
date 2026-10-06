@@ -26,22 +26,7 @@ const SECTION_ALIASES: Record<DashboardSection, string> = {
 // 'mine' is independent — it never competes with the others.
 const DEDUPE_ORDER: DashboardSection[] = ['re-review', 'requested', 'team', 'involved']
 
-/** One GraphQL query, aliased per section, so the dashboard costs a single request. */
-export function buildDashboardQuery(login: string): string {
-  const sections: DashboardSection[] = ['re-review', 'requested', 'team', 'mine', 'involved']
-  const searches = sections
-    .map((section) => {
-      const query = DASHBOARD_QUERIES[section].replace('LOGIN', login)
-      const alias = SECTION_ALIASES[section]
-      return `${alias}: search(query: ${JSON.stringify(query)}, type: ISSUE, first: 50) { nodes { ...prFields } }`
-    })
-    .join('\n    ')
-
-  return `query {
-    viewer { login }
-    ${searches}
-  }
-  fragment prFields on PullRequest {
+const PR_FIELDS = `fragment prFields on PullRequest {
     number
     title
     url
@@ -58,6 +43,25 @@ export function buildDashboardQuery(login: string): string {
     commits(last: 50) { nodes { commit { oid committedDate statusCheckRollup { state } } } }
     latestReviews(first: 20) { nodes { author { login } submittedAt commit { oid } } }
   }`
+
+/**
+ * One query per section. GitHub resolves aliased searches one after another
+ * within a request, so a combined query costs the sum of every section and
+ * returns HTTP 502 once that passes its ~10 s limit.
+ */
+export function buildSectionQueries(login: string): Record<DashboardSection, string> {
+  const entries = (Object.keys(DASHBOARD_QUERIES) as DashboardSection[]).map((section) => {
+    const query = DASHBOARD_QUERIES[section].replace('LOGIN', login)
+    const alias = SECTION_ALIASES[section]
+    return [
+      section,
+      `query {
+    ${alias}: search(query: ${JSON.stringify(query)}, type: ISSUE, first: 50) { nodes { ...prFields } }
+  }
+  ${PR_FIELDS}`,
+    ]
+  })
+  return Object.fromEntries(entries) as Record<DashboardSection, string>
 }
 
 // ─── Raw GraphQL node shapes ────────────────────────────────────────────────────
@@ -96,7 +100,6 @@ interface RawSearchResult {
 
 interface RawDashboardResponse {
   data?: {
-    viewer?: { login?: string }
     reReview?: RawSearchResult
     requested?: RawSearchResult
     team?: RawSearchResult
