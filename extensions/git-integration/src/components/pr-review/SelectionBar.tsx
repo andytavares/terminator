@@ -6,10 +6,19 @@ interface Props {
   onAddNote: () => void
   onComment: () => void
   onTests: () => void
+  /** False when the selection includes lines outside the diff, which GitHub cannot comment on. */
+  canComment?: boolean
 }
 
 /** The float bar shown under the last selected line (R5 step 1). */
-export function SelectionBar({ onAskAgent, onExplain, onAddNote, onComment, onTests }: Props) {
+export function SelectionBar({
+  onAskAgent,
+  onExplain,
+  onAddNote,
+  onComment,
+  onTests,
+  canComment = true,
+}: Props) {
   return (
     <div className="rs-float" onClick={(e) => e.stopPropagation()}>
       <button type="button" className="rs-btn rs-btn--ag" onClick={onAskAgent}>
@@ -21,9 +30,11 @@ export function SelectionBar({ onAskAgent, onExplain, onAddNote, onComment, onTe
       <button type="button" className="rs-btn" onClick={onAddNote}>
         Add note <span className="rs-kbd">m</span>
       </button>
-      <button type="button" className="rs-btn" onClick={onComment}>
-        Comment <span className="rs-kbd">r</span>
-      </button>
+      {canComment && (
+        <button type="button" className="rs-btn" onClick={onComment}>
+          Comment <span className="rs-kbd">r</span>
+        </button>
+      )}
       <button type="button" className="rs-btn" onClick={onTests}>
         Tests
       </button>

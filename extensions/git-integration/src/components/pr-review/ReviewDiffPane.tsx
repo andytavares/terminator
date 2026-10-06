@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { ChevronDown, ChevronUp, TriangleAlert, UnfoldVertical } from 'lucide-react'
 import { ViewMenu } from './ViewMenu'
 import { UsesPopover } from './UsesPopover'
 import { TestsPopover, type TestBlock } from './TestsPopover'
@@ -20,9 +20,10 @@ import {
 import { detectLanguage, highlight, buildSplitRows } from '../FileDiffView'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import type { PrChangedFile, PrReviewDetail, Chapter, Thread } from '../../schemas/pr-review.schema'
-import type { FileDiff } from '../../schemas/git.schema'
+import type { DiffLine, FileDiff } from '../../schemas/git.schema'
 import { FileDiffSchema } from '../../schemas/git.schema'
 import { githubAPI } from '../../api/github'
+import { EXPAND_STEP, gapsFor, reveal, splitLines, type Expansion } from '../../review/expand-gaps'
 import './review-surface.css'
 
 interface Props {
@@ -42,6 +43,13 @@ interface ComposerAnchor {
   initialBody: string
   fromFindingId: string | null
 }
+
+type FileText =
+  | { status: 'idle' | 'loading' | 'tooLarge' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; lines: string[] }
+
+type ContentResult = { content: string } | { tooLarge: true } | { error: string }
 
 function findChapterId(chapters: Chapter[], path: string): string | null {
   return chapters.find((c) => c.files.some((f) => f.path === path))?.id ?? null
@@ -119,6 +127,12 @@ export function ReviewDiffPane({
     openAgentPanel,
   } = useReviewUiStore()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [expansions, setExpansions] = useState<Map<string, Expansion>>(new Map())
+  const [fileText, setFileText] = useState<FileText>({ status: 'idle' })
+  const fileTextCache = useRef(new Map<string, string[]>())
+  const fileTextKey = `${file.path}@${pr.headSHA}`
+  const fileTextKeyRef = useRef(fileTextKey)
+  fileTextKeyRef.current = fileTextKey
 
   // Use refs so the complexity-patch effect always has current values without
   // making them deps of the diff-loading effect (which would cause an infinite
@@ -172,6 +186,8 @@ export function ReviewDiffPane({
     setDiff(null)
     setDiffError(null)
     setSinceNote(null)
+    setExpansions(new Map())
+    setFileText({ status: 'idle' })
     currentHunkIndexRef.current = 0
     if (file.isBinary) return
     setDiffLoading(true)
@@ -343,6 +359,92 @@ export function ReviewDiffPane({
     return null
   }, [diff])
 
+  const loadFileText = useCallback(() => {
+    const key = fileTextKeyRef.current
+    const cached = fileTextCache.current.get(key)
+    if (cached) {
+      setFileText({ status: 'ready', lines: cached })
+      return
+    }
+    setFileText({ status: 'loading' })
+    const isCurrent = () => fileTextKeyRef.current === key
+    githubAPI
+      .prFileContent(repoRoot, pr.number, file.path, pr.headSHA)
+      .then((raw: unknown) => {
+        if (!isCurrent()) return
+        const result = raw as ContentResult
+        if ('tooLarge' in result) {
+          setFileText({ status: 'tooLarge' })
+        } else if ('error' in result) {
+          setFileText({ status: 'error', message: result.error })
+        } else {
+          const lines = splitLines(result.content)
+          fileTextCache.current.set(key, lines)
+          setFileText({ status: 'ready', lines })
+        }
+      })
+      .catch((e: unknown) => {
+        if (isCurrent()) setFileText({ status: 'error', message: String(e) })
+      })
+  }, [repoRoot, pr.number, pr.headSHA, file.path])
+
+  const expandGap = (key: string, kind: 'above' | 'below' | 'all') => {
+    setExpansions((prev) => {
+      const next = new Map(prev)
+      const cur = next.get(key) ?? { fromTop: 0, fromBottom: 0 }
+      next.set(
+        key,
+        kind === 'above'
+          ? { ...cur, fromBottom: cur.fromBottom + EXPAND_STEP }
+          : kind === 'below'
+            ? { ...cur, fromTop: cur.fromTop + EXPAND_STEP }
+            : { fromTop: Number.MAX_SAFE_INTEGER, fromBottom: 0 }
+      )
+      return next
+    })
+    if (fileText.status === 'idle') loadFileText()
+  }
+
+  // Gaps come from every hunk, not the visible ones, so hiding formatting hunks
+  // never shifts which unchanged lines belong to which gap.
+  const gaps = useMemo(
+    () => (diff && !file.isBinary && !diff.truncated ? gapsFor(diff.hunks) : []),
+    [diff, file.isBinary]
+  )
+
+  const gapViews = useMemo(() => {
+    const views = new Map<string, { above: DiffLine[]; hidden: number | null; below: DiffLine[] }>()
+    for (const gap of gaps) {
+      const exp = expansions.get(gap.key) ?? { fromTop: 0, fromBottom: 0 }
+      if (fileText.status === 'ready') {
+        views.set(gap.key, reveal(gap, fileText.lines, exp))
+      } else if (gap.newEnd != null) {
+        const size = gap.newEnd - gap.newStart + 1
+        const top = Math.min(exp.fromTop, size)
+        const bottom = Math.min(exp.fromBottom, size - top)
+        views.set(gap.key, { above: [], hidden: size - top - bottom, below: [] })
+      } else {
+        views.set(gap.key, { above: [], hidden: null, below: [] })
+      }
+    }
+    return views
+  }, [gaps, expansions, fileText])
+
+  // GitHub accepts review comments only on lines inside the diff.
+  const selectionTouchesRevealed = useCallback(
+    (sel: { path: string; side: 'LEFT' | 'RIGHT'; startLine: number; endLine: number } | null) => {
+      if (!sel || sel.path !== file.path) return false
+      for (const view of gapViews.values()) {
+        for (const line of [...view.above, ...view.below]) {
+          const n = sel.side === 'LEFT' ? line.oldLineNumber : line.newLineNumber
+          if (n != null && n >= sel.startLine && n <= sel.endLine) return true
+        }
+      }
+      return false
+    },
+    [gapViews, file.path]
+  )
+
   // REVIEW_KEY_EVENTS: the surface-level key handler (useReviewKeys, owned
   // elsewhere) raises these; only the pane knows its hunks and selection.
   useEffect(() => {
@@ -379,7 +481,7 @@ export function ReviewDiffPane({
       if (scope) openAgentPanel(scope, 'explain', true)
     }
     const onComment = () => {
-      if (selection && selection.path === file.path) {
+      if (selection && selection.path === file.path && !selectionTouchesRevealed(selection)) {
         setComposerAnchor({
           line: selection.endLine,
           startLine: selection.startLine !== selection.endLine ? selection.startLine : null,
@@ -412,7 +514,14 @@ export function ReviewDiffPane({
       window.removeEventListener(REVIEW_KEY_EVENTS.peekDefinition, onPeekDefinition)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, file.path, hunkNearTop, scrollHunkIntoView, openAgentPanel])
+  }, [
+    selection,
+    file.path,
+    hunkNearTop,
+    scrollHunkIntoView,
+    openAgentPanel,
+    selectionTouchesRevealed,
+  ])
 
   const handleSplitDividerMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -442,9 +551,10 @@ export function ReviewDiffPane({
         if ((line.newLineNumber ?? 0) > max) max = line.newLineNumber ?? 0
       }
     }
+    if (fileText.status === 'ready') max = Math.max(max, fileText.lines.length)
     const digits = String(max || 1).length
     return 20 + digits * 8 + 8
-  }, [diff])
+  }, [diff, fileText])
 
   const commentedLines = useMemo(() => {
     const set = new Set<string>()
@@ -693,6 +803,7 @@ export function ReviewDiffPane({
           <tr>
             <td colSpan={5} className="rs-hunk-anchor">
               <SelectionBar
+                canComment={!selectionTouchesRevealed(selection)}
                 onTests={() => openTests('selection', selectionCode(selection))}
                 onAskAgent={() =>
                   openAgentPanel(
@@ -921,6 +1032,305 @@ export function ReviewDiffPane({
     )
   }
 
+  const renderUnifiedLine = (line: DiffLine, expanded: boolean) => {
+    const lineNum = line.newLineNumber ?? line.oldLineNumber ?? 0
+    const side: 'LEFT' | 'RIGHT' = line.type === 'remove' ? 'LEFT' : 'RIGHT'
+    return (
+      <>
+        <tr
+          className={`diff-line diff-line--${line.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(lineNum, side) ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(lineNum, side) ? ' diff-line--commented' : ''}`}
+          data-expanded={expanded ? 'true' : undefined}
+          data-new-line={line.newLineNumber ?? undefined}
+          data-old-line={line.oldLineNumber ?? undefined}
+          onMouseEnter={() => handleRowMouseEnter(lineNum, side)}
+        >
+          <td className="diff-line__old-num diff-line__num-gutter">
+            {line.oldLineNumber ?? ''}
+            {side === 'LEFT' && (
+              <button
+                className="diff-gutter-btn"
+                aria-label="Add comment"
+                onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
+              >
+                +
+              </button>
+            )}
+          </td>
+          <td className="diff-line__new-num diff-line__num-gutter">
+            {line.newLineNumber ?? ''}
+            {side === 'RIGHT' && (
+              <button
+                className="diff-gutter-btn"
+                aria-label="Add comment"
+                onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
+              >
+                +
+              </button>
+            )}
+          </td>
+          <td className="rs-gut" style={{ width: gutterWidth, minWidth: gutterWidth }}>
+            {side === 'RIGHT' && insightsChipForLine(lineNum) && (
+              <span
+                className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(lineNum)!.kind}`}
+              >
+                {insightsChipForLine(lineNum)!.label}
+              </span>
+            )}
+            {gutterPip(lineNum, side)}
+          </td>
+          <td className="diff-line__prefix">
+            {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+          </td>
+          <td className="diff-line__content">
+            <pre
+              dangerouslySetInnerHTML={{
+                __html: highlight(line.content, lang),
+              }}
+            />
+          </td>
+        </tr>
+        {renderSelectionExtras(lineNum, side)}
+        {renderLineAnnotations(lineNum, side)}
+      </>
+    )
+  }
+
+  const renderSplitPair = (
+    leftLine: DiffLine | null | undefined,
+    rightLine: DiffLine | null | undefined,
+    expanded: boolean
+  ) => {
+    const leftLineNum = leftLine?.oldLineNumber ?? 0
+    const rightLineNum = rightLine?.newLineNumber ?? 0
+    const leftThreads = leftLine ? visibleThreadsForLine(leftLineNum, 'LEFT') : []
+    const rightThreads = rightLine ? visibleThreadsForLine(rightLineNum, 'RIGHT') : []
+    const showComposerLeft =
+      leftLine != null && composerAnchor?.line === leftLineNum && composerAnchor.side === 'LEFT'
+    const showComposerRight =
+      rightLine != null && composerAnchor?.line === rightLineNum && composerAnchor.side === 'RIGHT'
+    const leftAnnotated = leftLine != null && hasAnnotations(leftLineNum, 'LEFT')
+    const rightAnnotated = rightLine != null && hasAnnotations(rightLineNum, 'RIGHT')
+    const hasComments =
+      leftThreads.length > 0 ||
+      rightThreads.length > 0 ||
+      showComposerLeft ||
+      showComposerRight ||
+      leftAnnotated ||
+      rightAnnotated
+    return (
+      <>
+        {/* One flex row per line pair — identical structure to diff-split-tables */}
+        <div className="diff-split-tables">
+          <table
+            className="diff-table diff-table--split diff-table--left"
+            style={{ width: `${splitLeftPct}%` }}
+          >
+            <tbody>
+              {leftLine ? (
+                <tr
+                  className={`diff-line diff-line--${leftLine.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(leftLineNum, 'LEFT') ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(leftLineNum, 'LEFT') ? ' diff-line--commented' : ''}`}
+                  data-expanded={expanded ? 'true' : undefined}
+                  data-old-line={leftLine.oldLineNumber ?? undefined}
+                  onMouseEnter={() => handleRowMouseEnter(leftLineNum, 'LEFT')}
+                >
+                  <td
+                    className="diff-line__old-num diff-line__num-gutter"
+                    style={{ width: numColWidth, minWidth: numColWidth }}
+                  >
+                    {leftLine.oldLineNumber ?? ''}
+                    <button
+                      className="diff-gutter-btn"
+                      aria-label="Add comment"
+                      onMouseDown={(e) => handleGutterMouseDown(e, leftLineNum, 'LEFT')}
+                    >
+                      +
+                    </button>
+                    {gutterPip(leftLineNum, 'LEFT')}
+                  </td>
+                  <td className="diff-line__prefix">{leftLine.type === 'remove' ? '-' : ' '}</td>
+                  <td className="diff-line__content">
+                    <pre
+                      dangerouslySetInnerHTML={{
+                        __html: highlight(leftLine.content, lang),
+                      }}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                <tr className="diff-line">
+                  <td colSpan={3} className="diff-line__empty-cell" />
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <div className="diff-split-resize-handle" onMouseDown={handleSplitDividerMouseDown} />
+          <table
+            className="diff-table diff-table--split diff-table--right"
+            style={{ width: `${splitRightPct}%` }}
+          >
+            <tbody>
+              {rightLine ? (
+                <tr
+                  className={`diff-line diff-line--${rightLine.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(rightLineNum, 'RIGHT') ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(rightLineNum, 'RIGHT') ? ' diff-line--commented' : ''}`}
+                  data-expanded={expanded ? 'true' : undefined}
+                  data-new-line={rightLine.newLineNumber ?? undefined}
+                  onMouseEnter={() => handleRowMouseEnter(rightLineNum, 'RIGHT')}
+                >
+                  <td
+                    className="diff-line__new-num diff-line__num-gutter"
+                    style={{ width: numColWidth, minWidth: numColWidth }}
+                  >
+                    {rightLine.newLineNumber ?? ''}
+                    <button
+                      className="diff-gutter-btn"
+                      aria-label="Add comment"
+                      onMouseDown={(e) => handleGutterMouseDown(e, rightLineNum, 'RIGHT')}
+                    >
+                      +
+                    </button>
+                  </td>
+                  <td className="rs-gut" style={{ width: gutterWidth, minWidth: gutterWidth }}>
+                    {insightsChipForLine(rightLineNum) && (
+                      <span
+                        className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(rightLineNum)!.kind}`}
+                      >
+                        {insightsChipForLine(rightLineNum)!.label}
+                      </span>
+                    )}
+                    {gutterPip(rightLineNum, 'RIGHT')}
+                  </td>
+                  <td className="diff-line__prefix">{rightLine.type === 'add' ? '+' : ' '}</td>
+                  <td className="diff-line__content">
+                    <pre
+                      dangerouslySetInnerHTML={{
+                        __html: highlight(rightLine.content, lang),
+                      }}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                <tr className="diff-line">
+                  <td colSpan={4} className="diff-line__empty-cell" />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {/* Comment row: uses exact same flex classes as code rows for pixel-perfect alignment */}
+        {hasComments && (
+          <div className="diff-split-tables">
+            <div className="diff-table--split" style={{ width: `${splitLeftPct}%` }}>
+              {leftLine != null && (showComposerLeft || leftAnnotated) && (
+                <div className="diff-split-comment-inner" style={{ paddingLeft: numColWidth + 18 }}>
+                  {renderAnnotationContent(leftLineNum, 'LEFT')}
+                </div>
+              )}
+            </div>
+            <div className="diff-split-resize-handle" onMouseDown={handleSplitDividerMouseDown} />
+            <div className="diff-table--split" style={{ width: `${splitRightPct}%` }}>
+              {rightLine != null && (showComposerRight || rightAnnotated) && (
+                <div className="diff-split-comment-inner" style={{ paddingLeft: numColWidth + 18 }}>
+                  {renderAnnotationContent(rightLineNum, 'RIGHT')}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
+  const renderExpanderContent = (gap: { key: string }, hidden: number | null) => {
+    if (fileText.status === 'tooLarge') {
+      return <span className="diff-gap-msg">This file is too large to expand here.</span>
+    }
+    if (fileText.status === 'error') {
+      return (
+        <>
+          <span className="diff-gap-msg">{fileText.message}</span>
+          <button type="button" className="diff-gap-btn" onClick={loadFileText}>
+            Retry
+          </button>
+        </>
+      )
+    }
+    const busy = fileText.status === 'loading'
+    const allLabel = hidden == null ? 'Show all lines' : `Show all ${hidden} lines`
+    return (
+      <>
+        {gap.key !== 'top' && (
+          <button
+            type="button"
+            className="diff-gap-btn"
+            disabled={busy}
+            aria-label={`Show ${EXPAND_STEP} lines below`}
+            title={`Show ${EXPAND_STEP} lines below`}
+            onClick={() => expandGap(gap.key, 'below')}
+          >
+            <ChevronDown aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button"
+          className="diff-gap-btn"
+          disabled={busy}
+          aria-label={allLabel}
+          title={allLabel}
+          onClick={() => expandGap(gap.key, 'all')}
+        >
+          <UnfoldVertical aria-hidden="true" />
+          <span>{hidden == null ? 'All lines' : `${hidden} lines`}</span>
+        </button>
+        {gap.key !== 'bottom' && (
+          <button
+            type="button"
+            className="diff-gap-btn"
+            disabled={busy}
+            aria-label={`Show ${EXPAND_STEP} lines above`}
+            title={`Show ${EXPAND_STEP} lines above`}
+            onClick={() => expandGap(gap.key, 'above')}
+          >
+            <ChevronUp aria-hidden="true" />
+          </button>
+        )}
+      </>
+    )
+  }
+
+  const renderGap = (key: string) => {
+    const view = gapViews.get(key)
+    if (!view) return null
+    if (view.hidden === 0 && view.above.length + view.below.length === 0) return null
+    const content = view.hidden === 0 ? null : renderExpanderContent({ key }, view.hidden)
+    const rows = (lines: DiffLine[], part: string) =>
+      lines.map((line) => (
+        <React.Fragment key={`${key}-${part}-${line.newLineNumber}`}>
+          {diffViewMode === 'unified'
+            ? renderUnifiedLine(line, true)
+            : renderSplitPair(line, line, true)}
+        </React.Fragment>
+      ))
+    return diffViewMode === 'unified' ? (
+      <table className="diff-table diff-table--review">
+        <tbody>
+          {rows(view.above, 'above')}
+          {content && (
+            <tr className="diff-gap-row">
+              <td colSpan={5}>{content}</td>
+            </tr>
+          )}
+          {rows(view.below, 'below')}
+        </tbody>
+      </table>
+    ) : (
+      <div className="diff-split-hunk">
+        {rows(view.above, 'above')}
+        {content && <div className="diff-gap-row">{content}</div>}
+        {rows(view.below, 'below')}
+      </div>
+    )
+  }
+
   return (
     <div className="review-diff-pane">
       <div className="rs-fh">
@@ -1002,6 +1412,7 @@ export function ReviewDiffPane({
             )}
             {visibleHunks.map(({ hunk, index: hi }) => (
               <React.Fragment key={hi}>
+                {hi === 0 && renderGap('top')}
                 {diffViewMode === 'unified' ? (
                   <table className="diff-table diff-table--review">
                     <tbody>
@@ -1052,62 +1463,7 @@ export function ReviewDiffPane({
                                 </td>
                               </tr>
                             )}
-                            <tr
-                              className={`diff-line diff-line--${line.type}${isLineSelected(lineNum, side) ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(lineNum, side) ? ' diff-line--commented' : ''}`}
-                              data-new-line={line.newLineNumber ?? undefined}
-                              data-old-line={line.oldLineNumber ?? undefined}
-                              onMouseEnter={() => handleRowMouseEnter(lineNum, side)}
-                            >
-                              <td className="diff-line__old-num diff-line__num-gutter">
-                                {line.oldLineNumber ?? ''}
-                                {side === 'LEFT' && (
-                                  <button
-                                    className="diff-gutter-btn"
-                                    aria-label="Add comment"
-                                    onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
-                                  >
-                                    +
-                                  </button>
-                                )}
-                              </td>
-                              <td className="diff-line__new-num diff-line__num-gutter">
-                                {line.newLineNumber ?? ''}
-                                {side === 'RIGHT' && (
-                                  <button
-                                    className="diff-gutter-btn"
-                                    aria-label="Add comment"
-                                    onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
-                                  >
-                                    +
-                                  </button>
-                                )}
-                              </td>
-                              <td
-                                className="rs-gut"
-                                style={{ width: gutterWidth, minWidth: gutterWidth }}
-                              >
-                                {side === 'RIGHT' && insightsChipForLine(lineNum) && (
-                                  <span
-                                    className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(lineNum)!.kind}`}
-                                  >
-                                    {insightsChipForLine(lineNum)!.label}
-                                  </span>
-                                )}
-                                {gutterPip(lineNum, side)}
-                              </td>
-                              <td className="diff-line__prefix">
-                                {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-                              </td>
-                              <td className="diff-line__content">
-                                <pre
-                                  dangerouslySetInnerHTML={{
-                                    __html: highlight(line.content, lang),
-                                  }}
-                                />
-                              </td>
-                            </tr>
-                            {renderSelectionExtras(lineNum, side)}
-                            {renderLineAnnotations(lineNum, side)}
+                            {renderUnifiedLine(line, false)}
                           </React.Fragment>
                         )
                       })}
@@ -1151,29 +1507,6 @@ export function ReviewDiffPane({
                       if (mbLeft && !leftIsStart && !leftExpanded) return null
                       if (mbRight && !rightIsStart && !rightExpanded) return null
 
-                      const leftThreads = leftLine ? visibleThreadsForLine(leftLineNum, 'LEFT') : []
-                      const rightThreads = rightLine
-                        ? visibleThreadsForLine(rightLineNum, 'RIGHT')
-                        : []
-                      const showComposerLeft =
-                        leftLine != null &&
-                        composerAnchor?.line === leftLineNum &&
-                        composerAnchor.side === 'LEFT'
-                      const showComposerRight =
-                        rightLine != null &&
-                        composerAnchor?.line === rightLineNum &&
-                        composerAnchor.side === 'RIGHT'
-                      const leftAnnotated = leftLine != null && hasAnnotations(leftLineNum, 'LEFT')
-                      const rightAnnotated =
-                        rightLine != null && hasAnnotations(rightLineNum, 'RIGHT')
-                      const hasComments =
-                        leftThreads.length > 0 ||
-                        rightThreads.length > 0 ||
-                        showComposerLeft ||
-                        showComposerRight ||
-                        leftAnnotated ||
-                        rightAnnotated
-
                       return (
                         <React.Fragment key={`${hi}-row-${ri}`}>
                           {mbLeft && leftIsStart && (
@@ -1214,150 +1547,7 @@ export function ReviewDiffPane({
                               onGoToOrigin={() => goToPath(mbRight.fromPath)}
                             />
                           )}
-                          {/* One flex row per line pair — identical structure to diff-split-tables */}
-                          <div className="diff-split-tables">
-                            <table
-                              className="diff-table diff-table--split diff-table--left"
-                              style={{ width: `${splitLeftPct}%` }}
-                            >
-                              <tbody>
-                                {leftLine ? (
-                                  <tr
-                                    className={`diff-line diff-line--${leftLine.type}${isLineSelected(leftLineNum, 'LEFT') ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(leftLineNum, 'LEFT') ? ' diff-line--commented' : ''}`}
-                                    data-old-line={leftLine.oldLineNumber ?? undefined}
-                                    onMouseEnter={() => handleRowMouseEnter(leftLineNum, 'LEFT')}
-                                  >
-                                    <td
-                                      className="diff-line__old-num diff-line__num-gutter"
-                                      style={{ width: numColWidth, minWidth: numColWidth }}
-                                    >
-                                      {leftLine.oldLineNumber ?? ''}
-                                      <button
-                                        className="diff-gutter-btn"
-                                        aria-label="Add comment"
-                                        onMouseDown={(e) =>
-                                          handleGutterMouseDown(e, leftLineNum, 'LEFT')
-                                        }
-                                      >
-                                        +
-                                      </button>
-                                      {gutterPip(leftLineNum, 'LEFT')}
-                                    </td>
-                                    <td className="diff-line__prefix">
-                                      {leftLine.type === 'remove' ? '-' : ' '}
-                                    </td>
-                                    <td className="diff-line__content">
-                                      <pre
-                                        dangerouslySetInnerHTML={{
-                                          __html: highlight(leftLine.content, lang),
-                                        }}
-                                      />
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  <tr className="diff-line">
-                                    <td colSpan={3} className="diff-line__empty-cell" />
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
-                            <div
-                              className="diff-split-resize-handle"
-                              onMouseDown={handleSplitDividerMouseDown}
-                            />
-                            <table
-                              className="diff-table diff-table--split diff-table--right"
-                              style={{ width: `${splitRightPct}%` }}
-                            >
-                              <tbody>
-                                {rightLine ? (
-                                  <tr
-                                    className={`diff-line diff-line--${rightLine.type}${isLineSelected(rightLineNum, 'RIGHT') ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(rightLineNum, 'RIGHT') ? ' diff-line--commented' : ''}`}
-                                    data-new-line={rightLine.newLineNumber ?? undefined}
-                                    onMouseEnter={() => handleRowMouseEnter(rightLineNum, 'RIGHT')}
-                                  >
-                                    <td
-                                      className="diff-line__new-num diff-line__num-gutter"
-                                      style={{ width: numColWidth, minWidth: numColWidth }}
-                                    >
-                                      {rightLine.newLineNumber ?? ''}
-                                      <button
-                                        className="diff-gutter-btn"
-                                        aria-label="Add comment"
-                                        onMouseDown={(e) =>
-                                          handleGutterMouseDown(e, rightLineNum, 'RIGHT')
-                                        }
-                                      >
-                                        +
-                                      </button>
-                                    </td>
-                                    <td
-                                      className="rs-gut"
-                                      style={{ width: gutterWidth, minWidth: gutterWidth }}
-                                    >
-                                      {insightsChipForLine(rightLineNum) && (
-                                        <span
-                                          className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(rightLineNum)!.kind}`}
-                                        >
-                                          {insightsChipForLine(rightLineNum)!.label}
-                                        </span>
-                                      )}
-                                      {gutterPip(rightLineNum, 'RIGHT')}
-                                    </td>
-                                    <td className="diff-line__prefix">
-                                      {rightLine.type === 'add' ? '+' : ' '}
-                                    </td>
-                                    <td className="diff-line__content">
-                                      <pre
-                                        dangerouslySetInnerHTML={{
-                                          __html: highlight(rightLine.content, lang),
-                                        }}
-                                      />
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  <tr className="diff-line">
-                                    <td colSpan={4} className="diff-line__empty-cell" />
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                          {/* Comment row: uses exact same flex classes as code rows for pixel-perfect alignment */}
-                          {hasComments && (
-                            <div className="diff-split-tables">
-                              <div
-                                className="diff-table--split"
-                                style={{ width: `${splitLeftPct}%` }}
-                              >
-                                {leftLine != null && (showComposerLeft || leftAnnotated) && (
-                                  <div
-                                    className="diff-split-comment-inner"
-                                    style={{ paddingLeft: numColWidth + 18 }}
-                                  >
-                                    {renderAnnotationContent(leftLineNum, 'LEFT')}
-                                  </div>
-                                )}
-                              </div>
-                              <div
-                                className="diff-split-resize-handle"
-                                onMouseDown={handleSplitDividerMouseDown}
-                              />
-                              <div
-                                className="diff-table--split"
-                                style={{ width: `${splitRightPct}%` }}
-                              >
-                                {rightLine != null && (showComposerRight || rightAnnotated) && (
-                                  <div
-                                    className="diff-split-comment-inner"
-                                    style={{ paddingLeft: numColWidth + 18 }}
-                                  >
-                                    {renderAnnotationContent(rightLineNum, 'RIGHT')}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                          {renderSplitPair(leftLine, rightLine, false)}
                         </React.Fragment>
                       )
                     })}
@@ -1374,6 +1564,8 @@ export function ReviewDiffPane({
                       </div>
                     )
                   })()}
+                {renderGap(`after-${hi}`)}
+                {hi === diff.hunks.length - 1 && renderGap('bottom')}
               </React.Fragment>
             ))}
           </div>

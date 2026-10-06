@@ -69,6 +69,7 @@ const mockRequestComposer = vi.fn()
 const mockOpenAgentPanel = vi.fn()
 const mockPrFileDiff = vi.fn()
 const mockPrCompare = vi.fn()
+const mockPrFileContent = vi.fn()
 const mockInvoke = vi.fn()
 
 function basePrReviewStoreState() {
@@ -182,6 +183,7 @@ beforeEach(() => {
   mockInvoke.mockImplementation((channel: string, payload: unknown) => {
     if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
     if (channel === 'github:pr-compare') return mockPrCompare(payload)
+    if (channel === 'github:pr-file-content') return mockPrFileContent(payload)
     return Promise.resolve({})
   })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
@@ -1464,5 +1466,258 @@ describe('ReviewDiffPane', () => {
       expect(gut.className).toBe('rs-gut')
       expect(gut.style.width).toBe('78px')
     })
+  })
+})
+
+describe('ReviewDiffPane expandable context', () => {
+  const FILE_LINES = 100
+  const fileText = Array.from({ length: FILE_LINES }, (_, i) => `line ${i + 1}`).join('\n') + '\n'
+  const ctx = (n: number) => ({
+    type: 'context' as const,
+    content: `line ${n}`,
+    oldLineNumber: n,
+    newLineNumber: n,
+  })
+  const hunk = (start: number) => ({
+    header: `@@ -${start},3 +${start},3 @@`,
+    lines: [
+      ctx(start),
+      { type: 'remove' as const, content: 'old', oldLineNumber: start + 1, newLineNumber: null },
+      { type: 'add' as const, content: 'new', oldLineNumber: null, newLineNumber: start + 1 },
+      ctx(start + 2),
+    ],
+  })
+  // Gaps: top 1-9, after-0 13-49, bottom 53-100.
+  const twoHunkDiff = { path: 'src/foo.ts', isBinary: false, hunks: [hunk(10), hunk(50)] }
+
+  const renderLoaded = async (
+    diff: unknown = twoHunkDiff,
+    props: Partial<typeof defaultProps> = {}
+  ) => {
+    mockPrFileDiff.mockResolvedValue({ diff })
+    const view = await renderPane(props)
+    await waitFor(() => expect(view.container.querySelector('.diff-hunk-header')).toBeTruthy())
+    return view
+  }
+  const expandedRows = (c: HTMLElement) => c.querySelectorAll('tr[data-expanded="true"]')
+
+  beforeEach(() => {
+    mockPrFileContent.mockResolvedValue({ content: fileText })
+  })
+
+  it('shows no expanded rows and fetches nothing on first render', async () => {
+    const { container } = await renderLoaded()
+    expect(expandedRows(container).length).toBe(0)
+    expect(mockPrFileContent).not.toHaveBeenCalled()
+  })
+
+  it('offers the right buttons per gap kind without touching hunk headers', async () => {
+    const { container } = await renderLoaded()
+    const rows = Array.from(container.querySelectorAll('.diff-gap-row'))
+    expect(rows.length).toBe(3)
+    const names = rows.map((r) =>
+      Array.from(r.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))
+    )
+    expect(names[0]).toEqual(['Show all 9 lines', 'Show 20 lines above'])
+    expect(names[1]).toEqual(['Show 20 lines below', 'Show all 37 lines', 'Show 20 lines above'])
+    expect(names[2]).toEqual(['Show 20 lines below', 'Show all lines'])
+    expect(container.querySelectorAll('.diff-hunk-header').length).toBe(2)
+  })
+
+  it('fetches once on the first click and renders 20 numbered rows below the hunk', async () => {
+    const { container } = await renderLoaded()
+    const between = container.querySelectorAll('.diff-gap-row')[1] as HTMLElement
+    fireEvent.click(between.querySelector('button[aria-label="Show 20 lines below"]')!)
+    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    expect(mockPrFileContent).toHaveBeenCalledTimes(1)
+    expect(mockPrFileContent).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      prNumber: 1,
+      path: 'src/foo.ts',
+      ref: 'abc',
+    })
+    const rows = Array.from(expandedRows(container))
+    expect(rows[0].getAttribute('data-old-line')).toBe('13')
+    expect(rows[0].getAttribute('data-new-line')).toBe('13')
+    expect(rows[19].getAttribute('data-new-line')).toBe('32')
+    expect(rows[0].classList.contains('diff-line--expanded')).toBe(true)
+    expect(rows[0].textContent).toContain('line 13')
+
+    fireEvent.click(
+      (container.querySelectorAll('.diff-gap-row')[1] as HTMLElement).querySelector(
+        'button[aria-label="Show 20 lines below"]'
+      )!
+    )
+    await waitFor(() => expect(expandedRows(container).length).toBe(37))
+    expect(mockPrFileContent).toHaveBeenCalledTimes(1)
+  })
+
+  it('reveals lines just above the next hunk from the above button', async () => {
+    const { container } = await renderLoaded()
+    const top = container.querySelectorAll('.diff-gap-row')[0] as HTMLElement
+    fireEvent.click(top.querySelector('button[aria-label="Show 20 lines above"]')!)
+    await waitFor(() => expect(expandedRows(container).length).toBe(9))
+    const rows = Array.from(expandedRows(container))
+    expect(rows[0].getAttribute('data-new-line')).toBe('1')
+    expect(rows[8].getAttribute('data-new-line')).toBe('9')
+  })
+
+  it('Show all removes that expander and offsets old numbers after a net line change', async () => {
+    const shifted = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -10,2 +10,3 @@',
+          lines: [
+            ctx(10),
+            { type: 'add' as const, content: 'x', oldLineNumber: null, newLineNumber: 11 },
+            { type: 'context' as const, content: 'line 11', oldLineNumber: 11, newLineNumber: 12 },
+          ],
+        },
+        {
+          header: '@@ -20,1 +21,1 @@',
+          lines: [{ ...ctx(21), oldLineNumber: 20 }],
+        },
+      ],
+    }
+    const { container } = await renderLoaded(shifted)
+    const between = container.querySelectorAll('.diff-gap-row')[1] as HTMLElement
+    fireEvent.click(between.querySelector('button[aria-label^="Show all"]')!)
+    await waitFor(() => expect(expandedRows(container).length).toBe(8))
+    const rows = Array.from(expandedRows(container))
+    expect(rows[0].getAttribute('data-new-line')).toBe('13')
+    expect(rows[0].getAttribute('data-old-line')).toBe('12')
+    expect(container.querySelectorAll('.diff-gap-row').length).toBe(2)
+  })
+
+  it('renders revealed rows in split view', async () => {
+    vi.mocked(useReviewUiStore).mockReturnValue({
+      ...baseReviewUiStoreState(),
+      diffViewMode: 'split' as const,
+    } as unknown as ReturnType<typeof useReviewUiStore>)
+    mockPrFileDiff.mockResolvedValue({ diff: twoHunkDiff })
+    const { container } = await renderPane()
+    await waitFor(() => expect(container.querySelector('.diff-split-header')).toBeTruthy())
+    const between = container.querySelectorAll('.diff-gap-row')[1] as HTMLElement
+    fireEvent.click(between.querySelector('button[aria-label="Show 20 lines below"]')!)
+    await waitFor(() =>
+      expect(container.querySelectorAll('tr[data-expanded="true"]').length).toBe(40)
+    )
+    expect(container.querySelectorAll('.diff-table--left tr[data-old-line="13"]').length).toBe(1)
+    expect(container.querySelectorAll('.diff-table--right tr[data-new-line="13"]').length).toBe(1)
+    expect(container.querySelectorAll('.diff-hunk-header').length).toBe(0)
+  })
+
+  it('hides Comment but keeps the other actions when the selection includes a revealed line', async () => {
+    const actual = await vi.importActual<typeof import('../../src/stores/review-ui.store')>(
+      '../../src/stores/review-ui.store'
+    )
+    actual.useReviewUiStore.setState({ selection: null })
+    vi.mocked(useReviewUiStore).mockImplementation(actual.useReviewUiStore)
+    const { container } = await renderLoaded()
+    const between = container.querySelectorAll('.diff-gap-row')[1] as HTMLElement
+    fireEvent.click(between.querySelector('button[aria-label="Show 20 lines below"]')!)
+    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+
+    const row = container.querySelector('tr[data-new-line="13"]')!
+    fireEvent.mouseDown(row.querySelector('.diff-gutter-btn')!)
+    fireEvent.mouseUp(window)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Ask agent/ })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /Comment/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Add note/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Explain' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Tests' })).toBeTruthy()
+    expect(screen.queryByTestId('composer')).toBeNull()
+
+    window.dispatchEvent(new Event('review:comment'))
+    expect(screen.queryByTestId('composer')).toBeNull()
+  })
+
+  it('still offers Comment for a selection inside the diff', async () => {
+    const actual = await vi.importActual<typeof import('../../src/stores/review-ui.store')>(
+      '../../src/stores/review-ui.store'
+    )
+    actual.useReviewUiStore.setState({ selection: null })
+    vi.mocked(useReviewUiStore).mockImplementation(actual.useReviewUiStore)
+    const { container } = await renderLoaded()
+    const row = container.querySelector('tr[data-new-line="11"]')!
+    fireEvent.mouseDown(row.querySelector('.diff-gutter-btn')!)
+    fireEvent.mouseUp(window)
+    await waitFor(() => expect(screen.getByRole('button', { name: /Comment/ })).toBeTruthy())
+  })
+
+  it('says the file is too large and offers no buttons', async () => {
+    mockPrFileContent.mockResolvedValue({ tooLarge: true })
+    const { container } = await renderLoaded()
+    fireEvent.click(
+      (container.querySelectorAll('.diff-gap-row')[1] as HTMLElement).querySelector(
+        'button[aria-label="Show 20 lines below"]'
+      )!
+    )
+    await waitFor(() =>
+      expect(screen.getAllByText('This file is too large to expand here.').length).toBe(3)
+    )
+    expect(container.querySelectorAll('.diff-gap-row button').length).toBe(0)
+  })
+
+  it('shows the error with Retry, and Retry fetches again', async () => {
+    mockPrFileContent.mockResolvedValueOnce({ error: 'NETWORK_DOWN' })
+    const { container } = await renderLoaded()
+    fireEvent.click(
+      (container.querySelectorAll('.diff-gap-row')[1] as HTMLElement).querySelector(
+        'button[aria-label="Show 20 lines below"]'
+      )!
+    )
+    await waitFor(() => expect(screen.getAllByText('NETWORK_DOWN').length).toBe(3))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0])
+    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+    expect(mockPrFileContent).toHaveBeenCalledTimes(2)
+  })
+
+  it('resets expansions when another file opens', async () => {
+    const { container, rerender } = await renderLoaded()
+    fireEvent.click(
+      (container.querySelectorAll('.diff-gap-row')[1] as HTMLElement).querySelector(
+        'button[aria-label="Show 20 lines below"]'
+      )!
+    )
+    await waitFor(() => expect(expandedRows(container).length).toBe(20))
+
+    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
+    const other = { ...mockFile, path: 'src/bar.ts' }
+    mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
+    rerender(<ReviewDiffPane {...defaultProps} file={other} />)
+    await waitFor(() => expect(screen.getByTitle('src/bar.ts')).toBeTruthy())
+    await waitFor(() => expect(container.querySelectorAll('.diff-gap-row').length).toBe(3))
+    expect(expandedRows(container).length).toBe(0)
+  })
+
+  it('shows no expanders for a binary file', async () => {
+    const { container } = await renderPane({ file: { ...mockFile, isBinary: true } })
+    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
+  })
+
+  it('shows no expanders for a truncated diff', async () => {
+    const { container } = await renderLoaded({ ...twoHunkDiff, truncated: true })
+    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
+  })
+
+  it('shows no expanders for an added file', async () => {
+    const added = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -0,0 +1,2 @@',
+          lines: [
+            { type: 'add' as const, content: 'a', oldLineNumber: null, newLineNumber: 1 },
+            { type: 'add' as const, content: 'b', oldLineNumber: null, newLineNumber: 2 },
+          ],
+        },
+      ],
+    }
+    const { container } = await renderLoaded(added)
+    expect(container.querySelectorAll('.diff-gap-row').length).toBe(0)
   })
 })
