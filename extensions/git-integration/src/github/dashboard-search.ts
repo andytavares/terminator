@@ -22,9 +22,10 @@ const SECTION_ALIASES: Record<DashboardSection, string> = {
   involved: 'involved',
 }
 
-// Section priority (highest first) used by parseDashboard's de-dup pass.
+// Section priority (highest first) used by parseDashboard's de-dup pass. A PR
+// that asks for my review files under 'requested' even when I reviewed it before.
 // 'mine' is independent — it never competes with the others.
-const DEDUPE_ORDER: DashboardSection[] = ['re-review', 'requested', 'team', 'involved']
+const DEDUPE_ORDER: DashboardSection[] = ['requested', 're-review', 'team', 'involved']
 
 const PR_FIELDS = `fragment prFields on PullRequest {
     number

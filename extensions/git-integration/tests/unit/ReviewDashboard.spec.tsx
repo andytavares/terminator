@@ -139,7 +139,7 @@ describe('ReviewDashboard', () => {
     expect(screen.getByRole('tab', { name: /Involved/ })).toBeTruthy()
   })
 
-  it('renders groups in order with correct headings and row content', async () => {
+  it('puts the reviews requested of you above every other group', async () => {
     mockInvoke({
       prs: [pr211, pr210, pr212],
       login: 'andytavares',
@@ -148,8 +148,8 @@ describe('ReviewDashboard', () => {
     render(<ReviewDashboard />)
     const headings = await screen.findAllByText(/RE-REVIEW|REQUESTED OF YOU|REQUESTED OF YOUR TEAM/)
     expect(headings.map((h) => h.textContent)).toEqual([
-      'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED',
       'REQUESTED OF YOU',
+      'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED',
       'REQUESTED OF YOUR TEAM',
     ])
     const size = screen.getByText('+4,043').closest('.rd-size')!

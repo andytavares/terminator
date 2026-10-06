@@ -213,25 +213,36 @@ describe('parseDashboard', () => {
     expect(pr.commitsSinceMyReview).toBe(0)
   })
 
-  it('dedupes across sections by precedence re-review > requested > team > involved', () => {
+  it('dedupes across sections by precedence requested > re-review > team > involved', () => {
     const shared = prNode({ number: 9 })
     const sharedRequested = prNode({ number: 9 })
     const raw = {
       data: {
         reReview: { nodes: [shared] },
         requested: { nodes: [sharedRequested] },
-        team: { nodes: [] },
-        involved: { nodes: [] },
+        team: { nodes: [prNode({ number: 9 })] },
+        involved: { nodes: [prNode({ number: 9 })] },
         mine: { nodes: [] },
       },
     }
-    // Make it survive the re-review filter.
     shared.latestReviews.nodes = [
       { author: { login: 'alice' }, submittedAt: '2020-01-01', commit: { oid: 'a' } },
     ]
     const result = parseDashboard(raw, 'alice', new Map())
     expect(result).toHaveLength(1)
-    expect(result[0].section).toBe('re-review')
+    expect(result[0].section).toBe('requested')
+  })
+
+  it('keeps a re-review row the reviewer was not re-requested on', () => {
+    const shared = prNode({ number: 9 })
+    shared.latestReviews.nodes = [
+      { author: { login: 'alice' }, submittedAt: '2020-01-01', commit: { oid: 'a' } },
+    ]
+    const raw = {
+      data: { reReview: { nodes: [shared] }, team: { nodes: [prNode({ number: 9 })] } },
+    }
+    const result = parseDashboard(raw, 'alice', new Map())
+    expect(result.map((r) => r.section)).toEqual(['re-review'])
   })
 
   it('keeps mine rows independent of dedup against other sections', () => {
