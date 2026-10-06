@@ -418,3 +418,27 @@ describe('anotherPassWanted', () => {
     ).toBe(false)
   })
 })
+
+describe('a skipped red team', () => {
+  it('is read off the ledger by loopFacts', () => {
+    const facts = loopFacts([
+      entry({ action: 'review.skipped', reason: 'graded P3, one lane, no risk triggers' }),
+    ])
+    expect(facts.skipped).toBe('graded P3, one lane, no risk triggers')
+    expect(facts.rounds).toEqual([])
+  })
+
+  it('is forgotten when the plan is redrafted', () => {
+    const facts = loopFacts([
+      entry({ action: 'review.skipped', reason: 'small' }),
+      entry({ action: 'order.redrafted' }),
+    ])
+    expect(facts.skipped).toBeUndefined()
+  })
+
+  it('counts as having reviewed the current plan, until a redraft', () => {
+    const skipped = entry({ action: 'review.skipped', reason: 'small' })
+    expect(reviewedCurrentPlan([skipped])).toBe(true)
+    expect(reviewedCurrentPlan([skipped, entry({ action: 'order.redrafted' })])).toBe(false)
+  })
+})

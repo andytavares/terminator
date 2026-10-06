@@ -80,7 +80,10 @@ import {
   readProposal,
 } from './forge/converge.js'
 import type { AskModel } from './forge/converge.js'
-import { convergeMaybeScouted as scoutedConverge } from './forge/scouted-converge.js'
+import {
+  convergeMaybeScouted as scoutedConverge,
+  withScoutContext,
+} from './forge/scouted-converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
 import { interruptedRuns, interruptedGate } from './line/adopt.js'
@@ -102,6 +105,8 @@ import {
   fixMessage,
   nextRound,
   afterRelease,
+  reviewSkipReason,
+  lighterRedTeamModel,
 } from './forge/review-loop.js'
 import { forgeDefectAnswer } from './gates/act-decision.js'
 import { brief } from './line/brief.js'
@@ -443,6 +448,11 @@ function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' 
     api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
     'standard'
   )
+}
+
+/** Whether the red team runs on the balanced tier. Off unless the operator asks. */
+function lighterRedTeam(api: ExtensionAPI): boolean {
+  return api.settings.get<boolean>('terminator.foundry.lighterRedTeam') ?? false
 }
 
 function askModel(api: ExtensionAPI): AskModel {
@@ -2254,6 +2264,8 @@ async function readOnlyRound(input: {
    * Absent for a round nothing else needs to answer early for.
    */
   readonly onStarted?: (sessionId: string) => void
+  /** Overrides the role's own tier, for a round the operator asked to keep light. */
+  readonly model?: string
 }): Promise<void> {
   const { api, root, order, roleId, nodeId, startedAction, startedReason, onFinished } = input
   if (deletedOrders.has(order.id)) return
@@ -2351,7 +2363,7 @@ async function readOnlyRound(input: {
       title: agentTitle(roleId),
       prompt: input.prompt(role),
       phase: roleId,
-      model: modelForTier(api, role.modelTier),
+      model: input.model ?? modelForTier(api, role.modelTier),
       // Read-only, enforced by the hook rather than by the prompt, with the
       // one exception being the rung's own output file.
       autoDecide: readOnlyAutoDecide(outputPath),
@@ -2586,7 +2598,10 @@ export function activate(api: ExtensionAPI): void {
           )
           return
         }
-        await store.save(outcome.order)
+        // The scout runs beside a first draft, so it may have stored its
+        // findings while this turn was still writing.
+        const drafted = withScoutContext(outcome.order, await store.load(order.id))
+        await store.save(drafted)
         await store.record({
           at: new Date().toISOString(),
           orderId: order.id,
@@ -2602,28 +2617,24 @@ export function activate(api: ExtensionAPI): void {
         // nothing starts on its own from here until the operator releases it.
         if (loopFacts(await store.entries(order.id)).heldAt !== null) return
 
-        const next = followUpFor(compileOrder(outcome.order).failures, autoTurns)
+        const next = followUpFor(compileOrder(drafted).failures, autoTurns)
         if (next === null) {
           // Nothing left the architect can close on its own by compiling again.
           // If the order is otherwise ready, the red team gets a round before
           // the operator ever sees it — the whole point of the loop.
-          if (shouldReview(outcome.order)) {
+          if (shouldReview(drafted)) {
             // A fix turn is ready for hand-off unless the red team asked to see the fix.
             if (
               loopRound !== undefined &&
               afterFix({
-                order: outcome.order,
+                order: drafted,
                 anotherPass: anotherPassWanted(await store.entries(order.id)),
               }) === 'hand-off'
             ) {
-              sayReady(outcome.order)
+              sayReady(drafted)
               return
             }
-            await startReview(
-              outcome.order,
-              loopRound ?? (await nextReviewRound(order.id)),
-              outcome.note
-            )
+            await startReview(drafted, loopRound ?? (await nextReviewRound(order.id)), outcome.note)
           }
           return
         }
@@ -2640,7 +2651,7 @@ export function activate(api: ExtensionAPI): void {
             'continuing in a follow-up turn'
           )
         }
-        const started = await convergeWithFollowUps(outcome.order, next, autoTurns + 1, loopRound)
+        const started = await convergeWithFollowUps(drafted, next, autoTurns + 1, loopRound)
         await store.record({
           at: new Date().toISOString(),
           orderId: order.id,
@@ -2664,6 +2675,25 @@ export function activate(api: ExtensionAPI): void {
    */
   const startReview = async (order: WorkOrder, round: number, changed: string): Promise<void> => {
     const root = dataRoot()
+    const skipReason = round === 1 ? reviewSkipReason(order) : null
+    if (skipReason !== null) {
+      // Recorded rather than silent: the Forge reads this as the red team
+      // step passed, with the reason, instead of a step still owed.
+      await createOrderStore(root).record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'rule:forge',
+        action: 'review.skipped',
+        subject: order.id,
+        reason: skipReason,
+        evidence: [],
+      })
+      sayReady(order)
+      return
+    }
+    // The scout runs beside the first draft, so what it found reaches the red
+    // team from the store rather than from the draft it is attacking.
+    const attacked = withScoutContext(order, (await createOrderStore(root).load(order.id)) ?? null)
     await readOnlyRound({
       api,
       root,
@@ -2671,10 +2701,11 @@ export function activate(api: ExtensionAPI): void {
       roleId: 'red-team',
       nodeId: `review-${round}`,
       round,
+      model: lighterRedTeam(api) ? lighterRedTeamModel(defaultModel(api)) : undefined,
       prompt: (role) => {
         const sources = resolveSources(api, root)
         return reviewPrompt({
-          order,
+          order: attacked,
           role,
           rules: rulesFor(sources, {
             repoPaths: sources.repoPaths,
@@ -2835,8 +2866,8 @@ export function activate(api: ExtensionAPI): void {
   }
 
   /**
-   * Before the very first draft, the scout reads the repository so the
-   * architect starts from code it has already seen rather than a guess.
+   * Beside the very first draft, the scout reads the repository; the
+   * architect does not wait for it (ADR 084).
    *
    * Only for a first draft: `provenance.decisions` is empty until a proposal
    * has been applied, and `context.entryPoints` is empty until something has
@@ -2850,7 +2881,7 @@ export function activate(api: ExtensionAPI): void {
     const root = dataRoot()
     return scoutedConverge(
       {
-        startScout: (scoutOrder, onStarted, onFinished) => {
+        startScout: (scoutOrder) => {
           void readOnlyRound({
             api,
             root,
@@ -2871,62 +2902,27 @@ export function activate(api: ExtensionAPI): void {
               })
             },
             startedAction: 'scout.started',
-            startedReason: 'reading the repository before the first draft',
-            onStarted,
+            startedReason: 'reading the repository beside the first draft',
             onFinished: async (updated) => {
               // A failure or an empty write was already recorded as
-              // `scout.refused` — the architect still starts, from what it
-              // can read itself, rather than the whole draft waiting on the
-              // scout.
-              if (updated !== null) {
-                await createOrderStore(root).record({
-                  at: new Date().toISOString(),
-                  orderId: scoutOrder.id,
-                  actor: 'role:scout',
-                  action: 'scout.collected',
-                  subject: scoutOrder.id,
-                  reason: `found ${updated.context.entryPoints.length} entry point${
-                    updated.context.entryPoints.length === 1 ? '' : 's'
-                  }`,
-                  evidence: [],
-                })
-              }
-              onFinished(updated)
+              // `scout.refused`; the architect never waited on it.
+              if (updated === null) return
+              await createOrderStore(root).record({
+                at: new Date().toISOString(),
+                orderId: scoutOrder.id,
+                actor: 'role:scout',
+                action: 'scout.collected',
+                subject: scoutOrder.id,
+                reason: `found ${updated.context.entryPoints.length} entry point${
+                  updated.context.entryPoints.length === 1 ? '' : 's'
+                }`,
+                evidence: [],
+              })
             },
           })
         },
         startArchitect: (architectOrder, architectMessage) =>
           convergeWithFollowUps(architectOrder, architectMessage, 0),
-        // `runArchitectTurn` (forge-channels.ts) is the usual recorder of
-        // `converge.started` / `converge.refused` — it records whatever
-        // `ConvergeStarted` this call resolves with. For a scouted first
-        // draft that is the scout's own session, so by the time the
-        // architect actually starts, that recording has already happened for
-        // the scout and nothing else will happen for the architect.
-        recordArchitectStarted: async (architectOrder, architectMessage, started) => {
-          const store = createOrderStore(root)
-          if (!started.ok) {
-            await store.record({
-              at: new Date().toISOString(),
-              orderId: architectOrder.id,
-              actor: 'role:architect',
-              action: 'converge.refused',
-              subject: architectOrder.id,
-              reason: started.reason,
-              evidence: [],
-            })
-            return
-          }
-          await store.record({
-            at: new Date().toISOString(),
-            orderId: architectOrder.id,
-            actor: 'role:architect',
-            action: 'converge.started',
-            subject: started.sessionId,
-            reason: architectMessage === '' ? 'drafting the plan' : architectMessage,
-            evidence: [],
-          })
-        },
       },
       order,
       message
@@ -3842,6 +3838,13 @@ export function activate(api: ExtensionAPI): void {
             'Which rules are allowed to stop for you. Risk, budget, destructive actions and the merge decision are live at every setting — at lights-out they refuse rather than wait, because nobody is there to answer.',
           options: ['escorted', 'standard', 'lights-out'],
           default: 'standard',
+        },
+        'terminator.foundry.lighterRedTeam': {
+          type: 'boolean',
+          label: 'Lighter red team',
+          description:
+            'On: the red team runs on the balanced model instead of the deep one. Faster and cheaper, with a shallower attack. Orders graded P3 with one lane and no risk triggers skip the red team either way.',
+          default: false,
         },
         'terminator.foundry.letAutoModeDecide': {
           type: 'boolean',

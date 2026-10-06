@@ -8,6 +8,9 @@ import {
   nextRound,
   afterRelease,
   afterFix,
+  reviewSkipReason,
+  scoutFindingsSection,
+  lighterRedTeamModel,
 } from '../../src/forge/review-loop.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder, RedTeamFinding } from '../../src/order/schema.js'
@@ -350,5 +353,102 @@ describe('afterRelease', () => {
     expect(afterRelease(asked, { loop: clean, reviewedCurrentPlan: false })).toEqual({
       kind: 'nothing',
     })
+  })
+})
+
+describe('reviewSkipReason', () => {
+  const unit = (id: string, lane: number): WorkOrder['plan']['units'][number] => ({
+    id,
+    title: id,
+    role: 'builder',
+    lane,
+    touches: ['src/a.ts'],
+    dependsOn: [],
+    acceptance: [],
+  })
+  const small = (over: Partial<WorkOrder> = {}): WorkOrder => {
+    const base = order()
+    return order({
+      risk: { ...base.risk, grade: 'P3', triggers: [] },
+      plan: { ...base.plan, units: [unit('U1', 1), unit('U2', 1)] },
+      ...over,
+    })
+  }
+
+  it('skips an order graded P3 with one lane and no risk triggers, and says why', () => {
+    expect(reviewSkipReason(small())).toBe('graded P3, one lane, no risk triggers')
+  })
+
+  it.each(['P0', 'P1', 'P2'] as const)('runs the red team for grade %s', (grade) => {
+    const base = small()
+    expect(reviewSkipReason({ ...base, risk: { ...base.risk, grade } })).toBeNull()
+  })
+
+  it('runs the red team for two lanes', () => {
+    const base = small()
+    const plan = { ...base.plan, units: [unit('U1', 1), unit('U2', 2)] }
+    expect(reviewSkipReason({ ...base, plan })).toBeNull()
+  })
+
+  it('runs the red team when a risk trigger is present', () => {
+    const base = small()
+    expect(
+      reviewSkipReason({ ...base, risk: { ...base.risk, triggers: ['public_interface'] } })
+    ).toBeNull()
+  })
+
+  it('runs the red team for a plan with no units, which has no lane to be one of', () => {
+    const base = small()
+    expect(reviewSkipReason({ ...base, plan: { ...base.plan, units: [] } })).toBeNull()
+  })
+
+  it('does not skip while a blocking finding is open', () => {
+    expect(reviewSkipReason(small({ redTeam: [finding()] }))).toBeNull()
+  })
+})
+
+describe('scoutFindingsSection', () => {
+  it('is null when the scout found nothing', () => {
+    expect(scoutFindingsSection(order())).toBeNull()
+  })
+
+  it('lists entry points, prior art and conventions', () => {
+    const base = order()
+    const section = scoutFindingsSection({
+      ...base,
+      context: {
+        ...base.context,
+        entryPoints: ['src/picker.ts'],
+        priorArt: ['abc123 hid done tickets'],
+        conventions: ['kebab-case files'],
+      },
+    })
+    expect(section).toContain('## What the scout found')
+    expect(section).toContain('- src/picker.ts')
+    expect(section).toContain('- abc123 hid done tickets')
+    expect(section).toContain('- kebab-case files')
+  })
+
+  it('goes into the red-team brief when given', () => {
+    const base = order()
+    const prompt = reviewPrompt({
+      order: { ...base, context: { ...base.context, entryPoints: ['src/picker.ts'] } },
+      role: redTeamRole(),
+      rules: [],
+      outputPath: '/tmp/review-1.json',
+      round: 1,
+    })
+    expect(prompt).toContain('## What the scout found')
+    expect(prompt).toContain('- src/picker.ts')
+  })
+})
+
+describe('lighterRedTeamModel', () => {
+  it('runs on the balanced tier', () => {
+    expect(lighterRedTeamModel('opus')).toBe('sonnet')
+  })
+
+  it('leaves an operator who configures the model themselves alone', () => {
+    expect(lighterRedTeamModel('')).toBe('')
   })
 })
