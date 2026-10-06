@@ -38,7 +38,10 @@ export interface ReviewPromptInput {
 export function reviewPrompt(input: ReviewPromptInput): string {
   const { order, role, rules, outputPath, round, changed } = input
   const base = brief({ order, role, units: [], rules, outputPath })
-  const sections = [base, '', `## Round ${round}`]
+  const sections = [base]
+  const scout = scoutFindingsSection(order)
+  if (scout !== null) sections.push('', scout)
+  sections.push('', `## Round ${round}`)
 
   if (round > 1 && changed !== undefined && changed.trim() !== '') {
     sections.push(
@@ -52,6 +55,50 @@ export function reviewPrompt(input: ReviewPromptInput): string {
   }
 
   return sections.join('\n')
+}
+
+/**
+ * What the scout read, for the red team to check the plan against.
+ *
+ * The scout now runs beside the first draft rather than ahead of it, so the
+ * architect may never have seen these; the red team is the reader that does.
+ */
+export function scoutFindingsSection(order: WorkOrder): string | null {
+  const { entryPoints, priorArt, conventions } = order.context
+  const groups: [string, readonly string[]][] = [
+    ['Entry points', entryPoints],
+    ['Prior art', priorArt],
+    ['Conventions', conventions],
+  ]
+  const lines = groups.flatMap(([title, items]) =>
+    items.length === 0 ? [] : ['', `${title}:`, ...items.map((item) => `- ${item}`)]
+  )
+  return lines.length === 0 ? null : ['## What the scout found', ...lines].join('\n')
+}
+
+/**
+ * Why this order needs no red-team round, or null when it does (ADR 084).
+ *
+ * The Direct shape's own test: graded P3, one lane, no risk triggers. An order
+ * that small has given the red team nothing to catch that the six compile
+ * checks do not — and an open blocking finding is never skipped over, since
+ * it is the architect's fix turn that is owed.
+ */
+export function reviewSkipReason(order: WorkOrder): string | null {
+  if (order.risk.grade !== 'P3') return null
+  if (order.risk.triggers.length > 0) return null
+  if (new Set(order.plan.units.map((unit) => unit.lane)).size !== 1) return null
+  if (fixMessage(order) !== null) return null
+  return 'graded P3, one lane, no risk triggers'
+}
+
+/**
+ * The model for a red team the operator asked to keep light: the balanced
+ * tier. An empty choice means the operator configures the model themselves,
+ * and stays theirs.
+ */
+export function lighterRedTeamModel(chosen: string): string {
+  return chosen === '' ? '' : 'sonnet'
 }
 
 /**

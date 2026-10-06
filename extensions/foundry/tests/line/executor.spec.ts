@@ -177,11 +177,14 @@ describe('execute', () => {
     const run = vi.fn(ok)
     const o = order()
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
-    // Two units. The third passed node is the recipe's own checkpoint, which
-    // is raised rather than run — nothing was launched for it.
+    // Two units. The third node is the recipe's own ship gate, which is
+    // reached rather than run — nothing was launched for it, and it is left
+    // running because the tail has not shipped anything yet.
     expect(run).toHaveBeenCalledTimes(2)
     expect(run.mock.calls.every((c) => c[0].node.kind !== 'gate')).toBe(true)
-    expect(outcome.graph.nodes.filter((n) => n.state === 'passed')).toHaveLength(3)
+    expect(outcome.graph.nodes.filter((n) => n.state === 'passed')).toHaveLength(2)
+    expect(outcome.graph.nodes.find((n) => n.id === 'ship')?.state).toBe('running')
+    expect(outcome.complete).toBe(true)
   })
 
   it('honours the agent budget rather than starting everything at once', async () => {
@@ -1403,7 +1406,7 @@ describe('a graph that cannot move on its own', () => {
 })
 
 describe('a shape that opens nothing (FR-019)', () => {
-  const spike = `
+  const question = `
 schemaVersion: 1
 id: direct
 steps:
@@ -1418,12 +1421,12 @@ steps:
 
   it('is never shippable, however well it went', async () => {
     const o = order([])
-    const outcome = await execute(o, recipe(spike), buildRunGraph(o, recipe(spike)), {
+    const outcome = await execute(o, recipe(question), buildRunGraph(o, recipe(question)), {
       ...deps(vi.fn(ok)),
       autonomy: 'lights-out',
       runStep: async () => 0,
     })
-    // A spike is a question, not a change. Shipping one would turn every
+    // A question is not a change. Shipping one would turn every
     // investigation into a branch.
     expect(outcome.complete).toBe(true)
     expect(outcome.ladder?.ok).toBe(true)
@@ -1431,7 +1434,7 @@ steps:
   })
 
   it('is decided by the recipe having a ship step, not by a flag', () => {
-    expect(opensPullRequest(recipe(spike))).toBe(false)
+    expect(opensPullRequest(recipe(question))).toBe(false)
     expect(opensPullRequest(recipe())).toBe(true)
   })
 
@@ -2336,6 +2339,9 @@ steps:
     })
     expect(runCommand).not.toHaveBeenCalled()
     expect(outcome.graph.nodes.find((n) => n.id === 'lint')?.state).toBe('skipped')
+    expect(outcome.graph.nodes.find((n) => n.id === 'lint')?.skipReason).toBe(
+      'no lint command in this repository'
+    )
     expect(record).toHaveBeenCalledWith(
       'step.not_measured',
       'lint',
@@ -2507,5 +2513,395 @@ steps:
       },
     })
     expect(recorded.some(([action]) => action === 'skills.mounted')).toBe(false)
+  })
+})
+
+describe('shipping order (ADR 085)', () => {
+  function log() {
+    const calls: string[] = []
+    return {
+      calls,
+      record: vi.fn(async (action: string, subject: string) => {
+        calls.push(`record:${action}:${subject}`)
+      }),
+      runStep: async (step: { name: string }, logPath: string) => {
+        calls.push(`step:${step.name}`)
+        fs.mkdirSync(path.dirname(logPath), { recursive: true })
+        fs.writeFileSync(logPath, 'ok\n')
+        return step.name === 'Lint' ? 1 : 0
+      },
+    }
+  }
+
+  it('opens the drafts before the final check climbs, for a change nobody has to inspect', async () => {
+    const seen = log()
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async (step, logPath) => (seen.runStep(step, logPath), 0),
+      beforeFinalCheck: async () => {
+        seen.calls.push('drafts')
+        return true
+      },
+    })
+    expect(seen.calls[0]).toBe('drafts')
+    expect(seen.calls.filter((c) => c.startsWith('step:')).length).toBeGreaterThan(0)
+  })
+
+  it('does not open anything first when an inspection is owed', async () => {
+    const beforeFinalCheck = vi.fn(async () => true)
+    const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      beforeFinalCheck,
+    })
+    expect(beforeFinalCheck).not.toHaveBeenCalled()
+  })
+
+  it('does not open anything first when the run halted at a gate', async () => {
+    const beforeFinalCheck = vi.fn(async () => true)
+    const o = order([unit('U-1')])
+    await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
+      ...deps(vi.fn(ok)),
+      beforeFinalCheck,
+    })
+    expect(beforeFinalCheck).not.toHaveBeenCalled()
+  })
+
+  it('records ship.final_check_failed and raises the executor gate when the draft is already open', async () => {
+    const seen = log()
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'standard',
+      record: seen.record,
+      runStep: seen.runStep,
+      beforeFinalCheck: async () => true,
+    })
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
+    expect(outcome.shippable).toBe(false)
+    expect(seen.calls.some((c) => c === 'record:ship.final_check_failed:Lint')).toBe(true)
+  })
+
+  it('records no ship.final_check_failed when nothing was opened first', async () => {
+    const seen = log()
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'standard',
+      record: seen.record,
+      runStep: seen.runStep,
+    })
+    expect(seen.calls.some((c) => c.includes('ship.final_check_failed'))).toBe(false)
+  })
+
+  it('leaves the ship node running while the tail is owed, and still counts the work as done', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.graph.nodes.find((n) => n.id === 'ship')?.state).toBe('running')
+    expect(outcome.complete).toBe(true)
+    expect(outcome.shippable).toBe(true)
+  })
+
+  it('treats a ship node already running (a resume) as the tail owed, not as a stall', async () => {
+    const o = order([unit('U-1')])
+    const first = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(vi.fn(ok)))
+    const run = vi.fn(ok)
+    const again = await execute(o, recipe(), first.graph, {
+      ...deps(run),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(run).not.toHaveBeenCalled()
+    expect(again.gates).toHaveLength(0)
+    expect(again.shippable).toBe(true)
+  })
+})
+
+// What an agent that writes leaves in its checkout is committed by the line,
+// because nothing else ever runs `git commit` and a pull request needs commits.
+describe('committing what an agent wrote', () => {
+  const WRITING = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units by lane
+    step: { kind: agent, role: builder }
+  - id: lint
+    kind: run
+    command: '\${toolchain.lint}'
+    after: [build]
+  - id: document
+    kind: agent
+    role: scribe
+    after: [build]
+  - id: verify
+    kind: agent
+    role: verifier
+    after: [build]
+`
+
+  const o = () =>
+    order([unit('U-1', { title: 'refuse an expired token' }), unit('U-2', { title: 'log it' })])
+
+  function committing(committed: (nodeId: string) => boolean) {
+    const commitNode = vi.fn(async (input: { node: { id: string }; message: string }) =>
+      committed(input.node.id)
+    )
+    return { commitNode }
+  }
+
+  it('commits the builder once it passes, naming the step and its units', async () => {
+    const { commitNode } = committing(() => true)
+    const order1 = o()
+    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+      commitNode,
+    })
+    const built = commitNode.mock.calls.find((call) => call[0].node.id === 'build:lane-1')
+    expect(built?.[0].message).toBe('build: refuse an expired token, log it')
+    expect(outcome.graph.nodes.find((n) => n.id === 'build:lane-1')?.state).toBe('passed')
+  })
+
+  it('commits a scribe by its step id, which has no units', async () => {
+    const { commitNode } = committing(() => true)
+    const order1 = o()
+    await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+      commitNode,
+    })
+    const documented = commitNode.mock.calls.find((call) => call[0].node.id === 'document')
+    expect(documented?.[0].message).toBe('document: document')
+  })
+
+  it('never commits a role that may not write, nor a command', async () => {
+    const { commitNode } = committing(() => true)
+    const order1 = o()
+    await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+      commitNode,
+    })
+    const ids = commitNode.mock.calls.map((call) => call[0].node.id)
+    expect(ids).not.toContain('verify')
+    expect(ids).not.toContain('lint')
+  })
+
+  it('does not commit a builder that failed', async () => {
+    const { commitNode } = committing(() => true)
+    const order1 = o()
+    await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(async (input) => ({ sessionId: `s-${input.node.id}`, exitCode: 1 })),
+      runCommand: async () => 0,
+      commitNode,
+    })
+    expect(commitNode).not.toHaveBeenCalled()
+  })
+
+  it('fails a builder that passed and changed nothing, and says why', async () => {
+    const { commitNode } = committing((id) => id !== 'build:lane-1')
+    const record = vi.fn(async () => undefined)
+    const order1 = o()
+    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+      commitNode,
+      record,
+    })
+    expect(outcome.graph.nodes.find((n) => n.id === 'build:lane-1')?.state).toBe('failed')
+    expect(record).toHaveBeenCalledWith(
+      'step.no_change',
+      'build:lane-1',
+      'made no change to the checkout'
+    )
+    // The work after it never started, so nothing downstream ran on nothing.
+    expect(outcome.graph.nodes.find((n) => n.id === 'document')?.state).not.toBe('passed')
+  })
+
+  it('lets a scribe with nothing to document pass', async () => {
+    const { commitNode } = committing((id) => id !== 'document')
+    const order1 = o()
+    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+      commitNode,
+    })
+    expect(outcome.graph.nodes.find((n) => n.id === 'document')?.state).toBe('passed')
+  })
+
+  it('changes nothing for a caller that commits nothing', async () => {
+    const order1 = o()
+    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+    })
+    expect(outcome.graph.nodes.find((n) => n.id === 'build:lane-1')?.state).toBe('passed')
+  })
+})
+
+describe('an author handing back a document', () => {
+  const AUTHORING = `
+schemaVersion: 1
+id: direct
+steps:
+  - id: write
+    kind: agent
+    role: author
+`
+  const collecting = (document: unknown) =>
+    vi.fn(async () => ({
+      order: order([]),
+      note: 'wrote it',
+      defect: null,
+      document: document as never,
+    }))
+
+  it('is given the order\u2019s outputs directory, and a builder is not', async () => {
+    const run = vi.fn(ok)
+    const order1 = order([])
+    await execute(order1, recipe(AUTHORING), buildRunGraph(order1, recipe(AUTHORING)), {
+      ...deps(run),
+      collect: collecting(null),
+    })
+    expect(run.mock.calls[0][0].outputsDir).toBe(path.join(dataRoot, 'orders', 'WO-1', 'outputs'))
+
+    const run2 = vi.fn(ok)
+    const order2 = order()
+    await execute(order2, recipe(), buildRunGraph(order2, recipe()), {
+      ...deps(run2),
+      collect: collecting(null),
+    })
+    expect(run2.mock.calls[0][0].outputsDir).toBeNull()
+  })
+
+  it('is recorded when it is handed back', async () => {
+    const record = vi.fn(async () => undefined)
+    const order1 = order([])
+    await execute(order1, recipe(AUTHORING), buildRunGraph(order1, recipe(AUTHORING)), {
+      ...deps(vi.fn(ok)),
+      collect: collecting({
+        path: '/data/orders/WO-1/outputs/answer.md',
+        url: 'https://example.com/d/1',
+        location: 'published',
+      }),
+      commitNode: async () => false,
+      record,
+    })
+    expect(record).toHaveBeenCalledWith(
+      'document.handed_back',
+      'write',
+      'published: /data/orders/WO-1/outputs/answer.md (https://example.com/d/1)'
+    )
+  })
+
+  it('passes with nothing to commit when the document is outside the checkout', async () => {
+    const order1 = order([])
+    const outcome = await execute(
+      order1,
+      recipe(AUTHORING),
+      buildRunGraph(order1, recipe(AUTHORING)),
+      {
+        ...deps(vi.fn(ok)),
+        collect: collecting({ path: '/o/answer.md', location: 'outputs' }),
+        commitNode: async () => false,
+      }
+    )
+    expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('passed')
+  })
+
+  it('fails when the document is said to be in the checkout and nothing changed there', async () => {
+    const order1 = order([])
+    const outcome = await execute(
+      order1,
+      recipe(AUTHORING),
+      buildRunGraph(order1, recipe(AUTHORING)),
+      {
+        ...deps(vi.fn(ok)),
+        collect: collecting({ path: 'docs/answer.md', location: 'checkout' }),
+        commitNode: async () => false,
+      }
+    )
+    expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('failed')
+  })
+
+  it('fails when it handed back nothing and changed nothing', async () => {
+    const order1 = order([])
+    const outcome = await execute(
+      order1,
+      recipe(AUTHORING),
+      buildRunGraph(order1, recipe(AUTHORING)),
+      {
+        ...deps(vi.fn(ok)),
+        collect: collecting(null),
+        commitNode: async () => false,
+      }
+    )
+    expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('failed')
+  })
+
+  it('passes when it handed back nothing but did commit a change', async () => {
+    const order1 = order([])
+    const outcome = await execute(
+      order1,
+      recipe(AUTHORING),
+      buildRunGraph(order1, recipe(AUTHORING)),
+      {
+        ...deps(vi.fn(ok)),
+        collect: collecting(null),
+        commitNode: async () => true,
+      }
+    )
+    expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('passed')
+  })
+})
+
+describe('the final check for a change that only touches documentation', () => {
+  const docsUnit = (id: string) => unit(id, { touches: [`docs/${id}.md`] })
+
+  it('runs format and lint, and marks the rest not run as documentation only', async () => {
+    const o = order([docsUnit('U-1')])
+    const ran: string[] = []
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      observedChange: async () => ({ changedFiles: ['docs/U-1.md'], linesChanged: 3 }),
+      runStep: async (step) => {
+        ran.push(step.name)
+        return 0
+      },
+    })
+    expect(ran).toEqual(['Format', 'Lint'])
+    expect(outcome.ladder?.ok).toBe(true)
+    expect(outcome.ladder?.steps.find((s) => s.name === "The unit's own tests")).toMatchObject({
+      result: 'not_triggered',
+      reason: 'documentation only',
+    })
+    expect(outcome.shippable).toBe(true)
+  })
+
+  it('runs the tests as well once the work touched code', async () => {
+    const o = order([docsUnit('U-1')])
+    const ran: string[] = []
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      observedChange: async () => ({ changedFiles: ['docs/U-1.md', 'src/a.ts'], linesChanged: 3 }),
+      runStep: async (step) => {
+        ran.push(step.name)
+        return 0
+      },
+    })
+    expect(ran).toContain("The unit's own tests")
   })
 })

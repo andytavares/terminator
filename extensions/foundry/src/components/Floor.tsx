@@ -1,34 +1,34 @@
-import { defaultInWords } from '../gates/rules.js'
-import { GateEvidence } from './GateEvidence.js'
+import { GateCard } from './GateCard.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Terminal,
+  ScrollText,
   ShieldQuestion,
   Square,
   CornerDownLeft,
-  Check,
   X,
   ScanEye,
   BellOff,
   AlertCircle,
   Loader,
   CheckCircle2,
+  GitPullRequest,
+  Ticket,
+  Eye,
+  ExternalLink as OpenOutside,
 } from 'lucide-react'
 import type { RunNode } from '../line/run-graph.js'
-import type { CiState } from '../line/ci-state.js'
+import { ciLabel } from '../line/ci-label.js'
+import { pullNumber } from '../line/pull-number.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
-import { RaiseBudgetForm } from './BudgetForm.js'
-import { HunkLines } from './HunkLines.js'
 import { ordinal } from '../factory/format.js'
-import { Markdown, MarkdownInline } from './Markdown.js'
+import { ExternalLink, Markdown, MarkdownInline } from './Markdown.js'
 import {
   useRunObservation,
   type FloorView,
   type PendingAsk,
 } from '../renderer/use-run-observation.js'
-import { gradeInWords } from '../runtime/review/risk-grader.js'
-import type { RiskGrade } from '../runtime/review/risk-grader.js'
 
 // Where you watch, not where you act.
 //
@@ -37,44 +37,6 @@ import type { RiskGrade } from '../runtime/review/risk-grader.js'
 // any running agent's live session, because however good a structured view
 // gets, there are moments when the only useful thing is to be in the terminal
 // typing at it.
-
-/** A finished run whose change nobody has looked at yet. */
-interface ReviewItem {
-  sessionId: string
-  branch: string
-  grade: 'P0' | 'P1' | 'P2' | 'P3'
-  gradeTrigger: string
-  diffSummary: { files: number; added: number; removed: number }
-  /** Where this review has got to: intent, risk, structure, tests. */
-  step: 'intent' | 'risk' | 'structure' | 'tests'
-}
-
-/** What each review step is asking, in the reviewer's terms. */
-const STEP_ASKS: Record<ReviewItem['step'], string> = {
-  intent: 'Is this what was asked for?',
-  risk: 'What does it put at risk?',
-  structure: 'Does it fit the code around it?',
-  tests: 'Is it proven?',
-}
-
-interface Hunk {
-  id: string
-  newStart: number
-  lines: string[]
-  decision: 'accept' | 'reject' | null
-}
-
-interface HunkFile {
-  file: string
-  hunks: Hunk[]
-}
-
-/** The request set against what the agent says it did. */
-interface IntentReview {
-  unexpectedFiles: string[]
-  untouchedFiles: string[]
-  hasScopeConcern: boolean
-}
 
 interface FeedEntry {
   id: string
@@ -89,14 +51,6 @@ interface FeedEntry {
 interface MuteRule {
   sessionId?: string
   author?: string
-}
-
-/** Why a new run would be refused, and how deep the queue is. */
-interface Backpressure {
-  allowed: boolean
-  unreviewed: number
-  limit: number
-  reason: string | null
 }
 
 /** A run that stopped making progress without asking for anything. */
@@ -166,11 +120,14 @@ const STATE_LABEL: Record<RunNode['state'], string> = {
   ready: 'ready',
   running: 'building',
   verifying: 'verifying',
-  passed: 'verified',
+  passed: 'done',
   failed: 'failed',
   blocked: 'blocked',
   skipped: 'skipped',
 }
+
+/** The git extension's review of one pull request, by its full command id. */
+const REVIEW_COMMAND = 'terminator.git-integration.command.review-pull-request'
 
 function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
@@ -191,15 +148,6 @@ function laneName(view: FloorView, lane: number): string {
   return named === undefined ? `lane ${lane}` : named.repo
 }
 
-/** What the CI band says about a status, in words rather than the raw enum. */
-const CI_STATUS_LABEL: Record<CiState['status'], string> = {
-  watching: 'Watching',
-  green: 'Green',
-  red: 'Red',
-  not_measured: 'Not measured',
-  reworking: 'Sending the failures back',
-}
-
 export interface FloorProps {
   readonly orderId: string
 }
@@ -216,16 +164,12 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const [live, setLive] = useState<Record<string, TranscriptLine[]>>({})
   const [watching, setWatching] = useState<string | null>(null)
   const [redirect, setRedirect] = useState('')
-  const [review, setReview] = useState<ReviewItem[]>([])
-  const [reviewing, setReviewing] = useState<string | null>(null)
-  const [hunks, setHunks] = useState<HunkFile[] | null>(null)
-  const [intent, setIntent] = useState<IntentReview | null>(null)
-  const [decided, setDecided] = useState(false)
-  const [fullReject, setFullReject] = useState(false)
-  const [step, setStep] = useState<ReviewItem['step'] | null>(null)
+  /** What a step's attach was refused with, beside the step that asked. */
+  const [attachProblems, setAttachProblems] = useState<Record<string, string>>({})
+  /** Whether the git extension's review can be reached; null until asked. */
+  const [reviewable, setReviewable] = useState<boolean | null>(null)
   const [feed, setFeed] = useState<FeedEntry[]>([])
   const [mutes, setMutes] = useState<MuteRule[]>([])
-  const [backpressure, setBackpressure] = useState<Backpressure | null>(null)
   const [stalls, setStalls] = useState<StallFiring[]>([])
   const [shadowMode, setShadowMode] = useState(true)
 
@@ -236,12 +180,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   // of those — the agent is genuinely stopped, waiting on somebody who has
   // been told there is nothing to do.
   const pollLive = useCallback(async () => {
-    const snapshot = (await invoke('foundry:supervision-snapshot')) as {
-      review?: ReviewItem[]
-      backpressure?: Backpressure
-    }
-    setReview(snapshot.review ?? [])
-    setBackpressure(snapshot.backpressure ?? null)
     const stalled = (await invoke('foundry:stalls-list')) as {
       firings?: StallFiring[]
       shadowMode?: boolean
@@ -315,41 +253,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     [pollLive]
   )
 
-  const openReview = useCallback(
-    async (item: ReviewItem) => {
-      setReviewing(item.sessionId)
-      const next = (await invoke('foundry:review-hunks', { sessionId: item.sessionId })) as {
-        files: HunkFile[] | null
-        complete?: boolean
-        fullReject?: boolean
-      }
-      setDecided(next.complete === true)
-      setFullReject(next.fullReject === true)
-      // Null is "the runtime never started", which is not the same as "this
-      // change was empty" — a panel that cannot tell them apart shows an empty
-      // review for a run that never happened.
-      setHunks(next.files)
-
-      // The request against the agent's own account of it. The step every diff
-      // viewer skips, and the one that catches work that is defensible in
-      // isolation and was never asked for.
-      const checked = (await invoke('foundry:review-intent', {
-        sessionId: item.sessionId,
-        request: view?.graph.orderId ?? '',
-        agentAccount: item.branch,
-      })) as { intent: IntentReview | null }
-      setIntent(checked.intent)
-
-      // Move the queue on, and keep what it moved to: a reviewer working
-      // through four questions should be told which one they are on.
-      const advanced = (await invoke('foundry:review-advance', {
-        sessionId: item.sessionId,
-      })) as { step: ReviewItem['step'] | null }
-      setStep(advanced.step ?? item.step)
-    },
-    [view]
-  )
-
   const dismiss = useCallback(
     async (entry: FeedEntry, mute: boolean) => {
       await invoke(mute ? 'foundry:feed-mute' : 'foundry:feed-dismiss', {
@@ -361,54 +264,47 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     [pollLive]
   )
 
-  const decideHunk = useCallback(
-    async (hunkId: string, decision: 'accept' | 'reject') => {
-      if (reviewing === null) return
-      const took = (await invoke('foundry:review-decide-hunk', {
-        sessionId: reviewing,
-        hunkId,
-        decision,
-      })) as { ok?: boolean }
-      if (took.ok !== true) setProblem('that review is no longer open')
-      const next = (await invoke('foundry:review-hunks', { sessionId: reviewing })) as {
-        files: HunkFile[] | null
-        complete?: boolean
-        fullReject?: boolean
-      }
-      setHunks(next.files)
-      setDecided(next.complete === true)
-      setFullReject(next.fullReject === true)
-    },
-    [reviewing]
-  )
+  const hasPulls = (view?.pulls ?? []).length > 0
+  useEffect(() => {
+    if (!hasPulls) return
+    let cancelled = false
+    void window.electronAPI.extension?.hasCommand(REVIEW_COMMAND).then((found) => {
+      if (!cancelled) setReviewable(found)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [hasPulls])
 
-  const applyReview = useCallback(async () => {
-    if (reviewing === null) return
-    const result = (await invoke('foundry:review-apply', { sessionId: reviewing })) as {
-      ok: boolean
-      reverted?: number
-      error?: string
-    }
-    if (!result.ok) {
-      setProblem(result.error ?? 'the decisions could not be applied')
-      return
-    }
-    // Said out loud: rejecting a hunk takes lines back out of the working
-    // copy, and "applied" without a count reads as though nothing happened.
-    setProblem(
-      (result.reverted ?? 0) === 0
-        ? 'Applied. Nothing was reverted.'
-        : `Applied. ${result.reverted} ${result.reverted === 1 ? 'hunk' : 'hunks'} reverted.`
-    )
-    await invoke('foundry:review-done', { sessionId: reviewing })
-    setReviewing(null)
-    setHunks(null)
-    setIntent(null)
-    setDecided(false)
-    setFullReject(false)
-    setStep(null)
-    await pollLive()
-  }, [reviewing, pollLive])
+  /**
+   * Review a pull request in the git extension, or open it where it lives.
+   *
+   * Foundry used to draw its own hunk-by-hunk review of the working copy, a
+   * second and worse review beside the one the git extension already has for
+   * the pull request. Asking that one is the whole of it; when it is not
+   * there, the pull request on GitHub is the next best thing.
+   */
+  const review = useCallback(
+    async (pull: { url: string; number: number; cwd: string }) => {
+      setProblem(null)
+      if (reviewable === false) {
+        void window.electronAPI.shell?.openExternal(pull.url)
+        return
+      }
+      const opened = await window.electronAPI.extension?.runCommand(REVIEW_COMMAND, {
+        repoRoot: pull.cwd,
+        number: pull.number,
+      })
+      if (opened === undefined || opened.ok) return
+      if (opened.reason === 'not-registered') {
+        setReviewable(false)
+        void window.electronAPI.shell?.openExternal(pull.url)
+        return
+      }
+      setProblem(`The review could not open: ${opened.reason}`)
+    },
+    [reviewable]
+  )
 
   const unmute = useCallback(
     async (rule: MuteRule) => {
@@ -420,11 +316,21 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
 
   const attach = useCallback(
     async (nodeId: string) => {
+      // Said beside the step that was clicked: a refusal at the foot of a page
+      // this long was a refusal nobody could connect to what they had pressed.
+      const refuse = (message: string | null): void =>
+        setAttachProblems((was) => {
+          const next = { ...was }
+          if (message === null) delete next[nodeId]
+          else next[nodeId] = message
+          return next
+        })
+      refuse(null)
       const r = (await invoke('foundry:session.attach', { orderId, nodeId })) as
         | { terminalSessionId: string }
         | { error: string }
       if ('error' in r) {
-        setProblem(r.error)
+        refuse(r.error)
         return
       }
       // And then actually go there. This resolved the session and dropped it,
@@ -433,7 +339,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       const gone = (await invoke('foundry:run-terminal', {
         sessionId: r.terminalSessionId,
       })) as { ok?: boolean }
-      if (gone.ok !== true) setProblem('That agent is no longer in a terminal.')
+      if (gone.ok !== true) refuse('That agent is no longer in a terminal.')
     },
     [orderId]
   )
@@ -470,11 +376,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
    * it is the one blocking thing on this order put where the person looking at
    * the order will see it. The inbox stays the cross-order queue.
    */
-  const [raising, setRaising] = useState<string | null>(null)
   const decideGate = useCallback(
     async (gateId: string, option: string, limit?: number | null) => {
       setBusy(true)
-      setRaising(null)
       try {
         const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
         const r = (await invoke('foundry:inbox.decide', payload)) as {
@@ -532,8 +436,74 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const orphaned = view.orphaned ?? []
 
   const standing = view.standing
+  const pulls = view.pulls ?? []
+  const source = view.source ?? null
   const waiting = view.waiting ?? []
+  const allChecks = view.ci?.pulls.flatMap((pull) => pull.checks) ?? []
   const stranded = view.stranded ?? []
+
+  // The step being read, so its transcript opens under that step's own row.
+  // A session no step owns — a stall names one by session — has no row to sit
+  // under, and goes at the foot.
+  const watchedNode =
+    watching === null ? undefined : view.graph.nodes.find((n) => n.sessionId === watching)
+  const watchedLane = watchedNode === undefined ? null : (watchedNode.lane ?? 0)
+  const watchPanel =
+    watching === null ? null : (
+      <section
+        className="fdry-panel fdry-watch"
+        style={{ marginTop: 12 }}
+        aria-labelledby="fdry-watching-h"
+      >
+        <h3 className="fdry-panel-h" id="fdry-watching-h">
+          {watchedNode === undefined
+            ? watching
+            : (view.labels?.[watchedNode.id] ?? watchedNode.role ?? 'this step')}
+        </h3>
+        <pre className="fdry-transcript">
+          {transcript.length === 0 ? 'Nothing yet.' : transcript.map((l) => l.text).join('\n')}
+        </pre>
+        <form
+          className="fdry-redirect"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (redirect.trim() === '') return
+            void control('foundry:run-redirect', {
+              sessionId: watching,
+              message: redirect.trim(),
+            })
+            setRedirect('')
+          }}
+        >
+          <input
+            aria-label="Tell it what to do instead"
+            placeholder="Tell it what to do instead…"
+            value={redirect}
+            onChange={(event) => setRedirect(event.target.value)}
+          />
+          <button type="submit" disabled={redirect.trim() === ''}>
+            <CornerDownLeft aria-hidden="true" /> Redirect
+          </button>
+          <button
+            type="button"
+            onClick={() => void control('foundry:run-interrupt', { sessionId: watching })}
+          >
+            Interrupt
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void control('foundry:run-stop', {
+                sessionId: watching,
+                reason: 'stopped from the floor',
+              })
+            }
+          >
+            <Square aria-hidden="true" /> Stop
+          </button>
+        </form>
+      </section>
+    )
 
   return (
     <div className="fdry-shell">
@@ -548,6 +518,43 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           ? view.graph.recipe
           : `${view.graph.orderId} · ${view.graph.recipe}`}
       </p>
+
+      {/* Where the work is, one click away: the pull requests it opened and
+          the ticket it came from, and the review of each. */}
+      {pulls.length > 0 || source !== null ? (
+        <p className="fdry-order-links">
+          {pulls.map((pull) => (
+            <ExternalLink key={pull.url} href={pull.url}>
+              <GitPullRequest aria-hidden="true" />#{pull.number}
+            </ExternalLink>
+          ))}
+          {source === null ? null : (
+            <ExternalLink href={source.url}>
+              <Ticket aria-hidden="true" />
+              {source.key}
+            </ExternalLink>
+          )}
+          {pulls.map((pull) => (
+            <button
+              key={pull.url}
+              type="button"
+              className="fdry-order-review"
+              onClick={() => void review(pull)}
+            >
+              {reviewable === false ? (
+                <OpenOutside aria-hidden="true" />
+              ) : (
+                <Eye aria-hidden="true" />
+              )}
+              {reviewable === false
+                ? 'Open on GitHub'
+                : pulls.length > 1
+                  ? `Review #${pull.number}`
+                  : 'Review'}
+            </button>
+          ))}
+        </p>
+      ) : null}
 
       {/* The refinery's file-overlap queue: what this order sits behind, and
           why — the collision the merge-order section cannot see, because it
@@ -736,52 +743,14 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
               wall: this one was answerable only from a tab the operator had no
               reason to connect to the run they were looking at. */}
           {waiting.map((gate) => (
-            <div key={gate.id} className="fdry-standing-gate">
-              <p className="fdry-standing-gate-h">{gate.summary}</p>
-              <p className="fdry-note">{gate.why}</p>
-              <GateEvidence evidence={gate.evidence ?? []} />
-              {raising === gate.id && gate.breach ? (
-                <RaiseBudgetForm
-                  breach={gate.breach}
-                  disabled={busy}
-                  onRaise={(limit) => void decideGate(gate.id, 'raise', limit)}
-                  onCancel={() => setRaising(null)}
-                />
-              ) : (
-                <div className="fdry-standing-options">
-                  {/* One recommended action, not two. Every rule lists the
-                      affirmative — carry on, approve, raise — first, and the
-                      ways of stopping after it; drawing "Stop here" as loudly as
-                      "Raise the budget" makes the operator read three buttons to
-                      find out which one keeps the work alive. */}
-                  {gate.options.map((option, index) => (
-                    <div key={option.id} className="fdry-standing-option">
-                      <button
-                        type="button"
-                        className={index === 0 ? 'is-primary' : undefined}
-                        disabled={busy}
-                        onClick={() =>
-                          option.id === 'raise' && gate.breach
-                            ? setRaising(gate.id)
-                            : void decideGate(gate.id, option.id)
-                        }
-                      >
-                        {option.label}
-                      </button>
-                      <small>{option.consequence}</small>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {/* What happens if this is left alone, in the option's own
-                  words. It printed the option id — "this holds: hold" — which
-                  is a token from a rules file, not a sentence. */}
-              <p className="fdry-note">
-                Nothing happens until you answer. Left alone, Foundry takes &ldquo;
-                {defaultInWords(gate)}
-                &rdquo;.
-              </p>
-            </div>
+            <GateCard
+              key={gate.id}
+              gate={gate}
+              busy={busy}
+              pulls={pulls}
+              source={source}
+              onDecide={(option, limit) => void decideGate(gate.id, option, limit)}
+            />
           ))}
         </section>
       )}
@@ -901,20 +870,30 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           <h3 className="fdry-panel-h" id="fdry-ci-h">
             CI
           </h3>
-          <p>
-            {CI_STATUS_LABEL[view.ci.status]}
-            {view.ci.status === 'not_measured' ? `: ${view.ci.reason}` : ''}
+          <p className="fdry-ci-status">
+            {view.ci.status === 'watching' || view.ci.status === 'reworking' ? (
+              <span className="fdry-ci-spin" role="status" aria-label="Checks are running">
+                <Loader className="fdry-spin" aria-hidden="true" />
+              </span>
+            ) : null}
+            {ciLabel(view.ci)}
           </p>
-          <p>
-            Round {view.ci.round} of {view.ci.max}
-          </p>
+          {allChecks.length === 0 ? null : (
+            <p className="fdry-note">
+              {allChecks.filter((check) => check.bucket !== 'pending').length} of {allChecks.length}{' '}
+              checks done
+            </p>
+          )}
+          {view.ci.pulls.map((pull) => (
+            <ExternalLink key={pull.url} href={pull.url} className="fdry-ci-pull">
+              Pull request #{pullNumber(pull.url)}
+            </ExternalLink>
+          ))}
           <ul className="fdry-ci-checks">
             {view.ci.pulls.flatMap((pull, pullIndex) =>
               pull.checks.map((check, checkIndex) => (
                 <li key={`${pullIndex}-${checkIndex}`}>
-                  <a href={check.link} target="_blank" rel="noreferrer noopener">
-                    {check.name}
-                  </a>
+                  <ExternalLink href={check.link}>{check.name}</ExternalLink>
                   <span className="fdry-ci-bucket" data-bucket={check.bucket}>
                     {check.bucket}
                   </span>
@@ -940,19 +919,30 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                 // that contradicts itself is worse than one that says less.
                 const gone = orphaned.includes(node.id)
                 const { feedback, reworks } = node
+                const name = view.labels?.[node.id] ?? node.role ?? 'this step'
+                const skipped =
+                  node.state === 'skipped' && node.skipReason != null && node.skipReason !== ''
+                    ? `Skipped: ${node.skipReason}`
+                    : null
+                const attachProblem = attachProblems[node.id]
                 return (
                   <React.Fragment key={node.id}>
                     <span
                       className={`fdry-unit is-${node.state}${gone ? ' is-orphaned' : ''}`}
                       // The id stays reachable because it is what the ledger and
                       // the graph call this node, but it is not what a person
-                      // watching the run needs to read.
-                      title={node.id}
+                      // watching the run needs to read. A skipped step is
+                      // better explained by why it did not run.
+                      title={skipped ?? node.id}
+                      aria-describedby={skipped === null ? undefined : `fdry-skip-${node.id}`}
                     >
-                      <span className="fdry-unit-label">
-                        {view.labels?.[node.id] ?? node.role ?? 'this step'}
-                      </span>
+                      <span className="fdry-unit-label">{name}</span>
                       <u>{gone ? 'stopped' : STATE_LABEL[node.state]}</u>
+                      {skipped === null ? null : (
+                        <span id={`fdry-skip-${node.id}`} className="fdry-sr-only">
+                          {skipped}
+                        </span>
+                      )}
                       {reworks > 0 ? (
                         <span className="fdry-unit-rework">{`Sent back ${reworks}×`}</span>
                       ) : null}
@@ -961,22 +951,32 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                           <button
                             type="button"
                             className="fdry-unit-attach"
-                            aria-label={`Watch ${view.labels?.[node.id] ?? node.role ?? 'this step'}`}
+                            aria-label="Transcript"
+                            title="Transcript"
                             onClick={() => setWatching(node.sessionId)}
                           >
-                            <ShieldQuestion aria-hidden="true" />
+                            <ScrollText aria-hidden="true" />
                           </button>
-                          <button
-                            type="button"
-                            className="fdry-unit-attach"
-                            aria-label={`Attach to ${view.labels?.[node.id] ?? node.role ?? 'this step'}`}
-                            onClick={() => void attach(node.id)}
-                          >
-                            <Terminal aria-hidden="true" />
-                          </button>
+                          {/* A finished step's session is closed (ADR 076), so
+                              there is nothing to go to. */}
+                          {node.state === 'running' ? (
+                            <button
+                              type="button"
+                              className="fdry-unit-attach"
+                              aria-label={`Attach to ${name}`}
+                              onClick={() => void attach(node.id)}
+                            >
+                              <Terminal aria-hidden="true" />
+                            </button>
+                          ) : null}
                         </>
                       ) : null}
                     </span>
+                    {attachProblem === undefined ? null : (
+                      <p className="fdry-unit-problem" role="alert">
+                        {attachProblem}
+                      </p>
+                    )}
                     {(view.skills?.[node.id]?.length ?? 0) > 0 ? (
                       <p className="fdry-unit-skills">{`Skills: ${view.skills?.[node.id]?.join(', ')}`}</p>
                     ) : null}
@@ -999,171 +999,14 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                 )
               })}
           </div>
+          {/* Under the row of the step it belongs to, not at the foot of the
+              page — which on a long run is a scroll away from the chip that
+              was clicked. */}
+          {watchedLane === lane ? watchPanel : null}
         </div>
       ))}
 
-      {/* What the agent has been saying, and the three things you can do to it
-          without leaving. */}
-      {watching !== null ? (
-        <section className="fdry-panel" style={{ marginTop: 12 }} aria-labelledby="fdry-watching-h">
-          <h3 className="fdry-panel-h" id="fdry-watching-h">
-            {watching}
-          </h3>
-          <pre className="fdry-transcript">
-            {transcript.length === 0 ? 'Nothing yet.' : transcript.map((l) => l.text).join('\n')}
-          </pre>
-          <form
-            className="fdry-redirect"
-            onSubmit={(event) => {
-              event.preventDefault()
-              if (redirect.trim() === '') return
-              void control('foundry:run-redirect', {
-                sessionId: watching,
-                message: redirect.trim(),
-              })
-              setRedirect('')
-            }}
-          >
-            <input
-              aria-label="Tell it what to do instead"
-              placeholder="Tell it what to do instead…"
-              value={redirect}
-              onChange={(event) => setRedirect(event.target.value)}
-            />
-            <button type="submit" disabled={redirect.trim() === ''}>
-              <CornerDownLeft aria-hidden="true" /> Redirect
-            </button>
-            <button
-              type="button"
-              onClick={() => void control('foundry:run-interrupt', { sessionId: watching })}
-            >
-              Interrupt
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                void control('foundry:run-stop', {
-                  sessionId: watching,
-                  reason: 'stopped from the floor',
-                })
-              }
-            >
-              <Square aria-hidden="true" /> Stop
-            </button>
-          </form>
-        </section>
-      ) : null}
-
-      {/* Finished work nobody has looked at, worst risk first. Rejecting is
-          hunk by hunk, because one file routinely holds both the change you
-          asked for and the one you did not. */}
-      {review.length > 0 ? (
-        <section className="fdry-panel" style={{ marginTop: 12 }}>
-          <h3 className="fdry-panel-h">To review — {review.length}</h3>
-          {review.map((item) => (
-            <div key={item.sessionId} className="fdry-review-row">
-              <span className={`fdry-grade is-${item.grade.toLowerCase()}`}>
-                {gradeInWords(item.grade as RiskGrade)}
-              </span>
-              <div className="fdry-review-main">
-                <b>{item.branch}</b>
-                <small>
-                  {item.gradeTrigger} · {item.diffSummary.files} files, +{item.diffSummary.added}/−
-                  {item.diffSummary.removed}
-                </small>
-              </div>
-              <button type="button" onClick={() => void openReview(item)}>
-                <ScanEye aria-hidden="true" /> Review
-              </button>
-            </div>
-          ))}
-        </section>
-      ) : null}
-
-      {reviewing !== null ? (
-        <section className="fdry-panel" style={{ marginTop: 12 }}>
-          <h3 className="fdry-panel-h">
-            Reviewing {reviewing}
-            {step === null ? '' : ` — ${STEP_ASKS[step]}`}
-          </h3>
-          {intent?.hasScopeConcern === true ? (
-            <p className="fdry-note fdry-scope">
-              {intent.unexpectedFiles.length > 0
-                ? `Touched without being asked: ${intent.unexpectedFiles.join(', ')}.`
-                : ''}
-              {intent.untouchedFiles.length > 0
-                ? ` Asked for and never touched: ${intent.untouchedFiles.join(', ')}.`
-                : ''}
-            </p>
-          ) : null}
-          {hunks === null ? (
-            <p className="fdry-note">
-              The supervision runtime is not running, so there is no diff to show. That is not the
-              same as a change that touched nothing.
-            </p>
-          ) : hunks.length === 0 ? (
-            <p className="fdry-note">This run changed nothing.</p>
-          ) : (
-            hunks.map((file) => (
-              <div key={file.file} className="fdry-hunk-file">
-                <code>{file.file}</code>
-                {file.hunks.map((hunk) => (
-                  <div key={hunk.id} className={`fdry-hunk is-${hunk.decision ?? 'undecided'}`}>
-                    <HunkLines file={file.file} newStart={hunk.newStart} lines={hunk.lines} />
-                    <div className="fdry-hunk-actions">
-                      <button
-                        type="button"
-                        aria-label={`Accept ${hunk.id}`}
-                        className={hunk.decision === 'accept' ? 'is-primary' : ''}
-                        onClick={() => void decideHunk(hunk.id, 'accept')}
-                      >
-                        <Check aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Reject ${hunk.id}`}
-                        className={hunk.decision === 'reject' ? 'is-primary' : ''}
-                        onClick={() => void decideHunk(hunk.id, 'reject')}
-                      >
-                        <X aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))
-          )}
-          {fullReject ? (
-            <p className="fdry-note fdry-scope">
-              Every hunk is rejected. Applying this takes the whole change back out.
-            </p>
-          ) : null}
-          <div className="fdry-hunk-actions" style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              className="is-primary"
-              // Half a review is not a review: applying it would accept by
-              // default every hunk nobody looked at.
-              disabled={!decided}
-              title={decided ? '' : 'Decide every hunk first'}
-              onClick={() => void applyReview()}
-            >
-              {decided ? 'Apply what I decided' : 'Decide every hunk first'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setReviewing(null)
-                setHunks(null)
-                setIntent(null)
-                setStep(null)
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </section>
-      ) : null}
+      {watchedLane === null ? watchPanel : null}
 
       {/* What happened while you were away. Every row can be cleared, and a
           run that keeps interrupting can be muted without hiding what it
@@ -1211,16 +1054,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             </div>
           ))}
         </section>
-      ) : null}
-
-      {/* Why a new run would be refused. Overriding is one click and is
-          recorded with how deep the queue was at the time. */}
-      {backpressure !== null && !backpressure.allowed ? (
-        <p className="fdry-note fdry-scope">
-          {backpressure.reason ??
-            `${backpressure.unreviewed} diffs are unreviewed, and the limit is ${backpressure.limit}.`}{' '}
-          A new run is refused until one is reviewed.
-        </p>
       ) : null}
 
       {/* Work that stopped making progress without asking for anything — the

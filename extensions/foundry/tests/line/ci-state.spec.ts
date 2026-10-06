@@ -3,7 +3,10 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { writeCiState, readCiState } from '../../src/line/ci-state.js'
+import { ciLabel } from '../../src/line/ci-label.js'
 import type { CiState } from '../../src/line/ci-state.js'
+import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
+import { orderDir } from '../../src/data-root.js'
 
 let root: string
 
@@ -34,7 +37,46 @@ describe('ci-state', () => {
     expect(loaded).toEqual(state())
   })
 
+  it("writes CI into the order's timeline when it changes, so a replay can show the wait", async () => {
+    forgetTimelines()
+    await writeCiState(root, 'WO-1', state())
+    await writeCiState(root, 'WO-1', state({ at: '2026-09-26T10:00:15.000Z' }))
+    await writeCiState(root, 'WO-1', state({ status: 'green' }))
+    const timeline = await readTimeline(orderDir(root, 'WO-1'))
+    expect(timeline.ci?.map((c) => c.status)).toEqual(['watching', 'green'])
+  })
+
   it('returns null for a missing file', async () => {
     expect(await readCiState(root, 'WO-missing')).toBeNull()
+  })
+})
+
+describe('ciLabel', () => {
+  it('says the first run is the first run, with the fixes still available', () => {
+    expect(ciLabel(state({ round: 0, max: 2, status: 'watching' }))).toBe(
+      'First run · up to 2 fixes'
+    )
+  })
+
+  it('says which fix is being watched', () => {
+    expect(ciLabel(state({ round: 1, max: 2, status: 'watching' }))).toBe('Fix 1 of 2')
+  })
+
+  it('says passed', () => {
+    expect(ciLabel(state({ status: 'green' }))).toBe('Passed')
+  })
+
+  it('says how many fixes were spent when it failed', () => {
+    expect(ciLabel(state({ round: 2, max: 2, status: 'red' }))).toBe('Failed after 2 fixes')
+  })
+
+  it('says why it was not measured', () => {
+    expect(ciLabel(state({ status: 'not_measured', reason: 'no checks reported' }))).toBe(
+      'Not measured: no checks reported'
+    )
+  })
+
+  it('says a fix is under way', () => {
+    expect(ciLabel(state({ round: 1, max: 2, status: 'reworking' }))).toBe('Fixing: round 1 of 2')
   })
 })

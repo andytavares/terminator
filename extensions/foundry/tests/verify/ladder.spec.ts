@@ -141,12 +141,92 @@ describe('ladderFor', () => {
   })
 })
 
+describe('a change that is documentation only', () => {
+  const steps = (changedFiles: readonly string[]) =>
+    ladderFor({ toolchain: full, risk: noRisk, touchesUi: false, changedFiles })
+
+  it.each([
+    ['a markdown file', ['notes/answer.md']],
+    ['a docs file that is not markdown', ['docs/diagram.svg']],
+    ['a specs file', ['specs/054/plan.txt']],
+    ['a readme', ['README']],
+    ['a changelog', ['CHANGELOG.txt']],
+    ['several of them', ['docs/a.md', 'README.md', 'specs/x/y.json']],
+  ])('runs only format and lint for %s', (_name, files) => {
+    const commandSteps = steps(files).filter((s) => s.check !== null)
+    const runnable = commandSteps.filter((s) => s.status === 'runnable').map((s) => s.name)
+    expect(runnable).toEqual(['Format', 'Lint'])
+  })
+
+  it('marks every other command step not run, with the reason', () => {
+    const others = steps(['docs/a.md']).filter(
+      (s) => s.check !== null && s.check !== 'format' && s.check !== 'lint'
+    )
+    expect(others.map((s) => s.check)).toEqual(['test', 'coverage', 'e2e'])
+    for (const other of others) {
+      expect(other.status).toBe('not_triggered')
+      expect(other.reason).toBe('documentation only')
+      expect(other.command).toBeNull()
+    }
+  })
+
+  it('does not count those steps as unmeasured gaps when it climbs', async () => {
+    const outcome = await climb(steps(['docs/a.md']), async () => 0)
+    expect(outcome.ok).toBe(true)
+    expect(outcome.unmeasured).toEqual([])
+    expect(outcome.steps.filter((s) => s.result === 'pass').map((s) => s.name)).toEqual([
+      'Format',
+      'Lint',
+    ])
+    expect(outcome.steps.find((s) => s.name === "The unit's own tests")).toMatchObject({
+      result: 'not_triggered',
+      reason: 'documentation only',
+    })
+  })
+
+  it('runs the whole ladder as soon as one changed file is code', () => {
+    const runnable = steps(['docs/a.md', 'src/a.ts'])
+      .filter((s) => s.status === 'runnable')
+      .map((s) => s.name)
+    expect(runnable).toEqual(expect.arrayContaining(['Format', 'Lint', "The unit's own tests"]))
+  })
+
+  it('treats a markdown-looking name outside the checkout as code', () => {
+    const runnable = steps(['../outside/a.md']).filter((s) => s.status === 'runnable')
+    expect(runnable.length).toBeGreaterThan(2)
+  })
+
+  it('runs the whole ladder when nothing is known about what changed', () => {
+    for (const files of [undefined, []] as const) {
+      const runnable = ladderFor({
+        toolchain: full,
+        risk: noRisk,
+        touchesUi: false,
+        changedFiles: files,
+      })
+        .filter((s) => s.status === 'runnable')
+        .map((s) => s.name)
+      expect(runnable).toContain("The unit's own tests")
+    }
+  })
+
+  it('still reports the inspection a risk trigger asked for', () => {
+    const inspection = ladderFor({
+      toolchain: full,
+      risk: risky,
+      touchesUi: false,
+      changedFiles: ['docs/a.md'],
+    }).find((s) => s.rung === 'L4')
+    expect(inspection?.status).toBe('elsewhere')
+  })
+})
+
 describe('climb', () => {
   const steps = (over: Partial<LadderStep>[] = []): LadderStep[] =>
     over.map((o, i) => ({
       rung: 'L0',
       name: `step-${i}`,
-      command: 'run',
+      command: `run-${i}`,
       status: 'runnable',
       reason: '',
       check: null,
@@ -298,5 +378,49 @@ describe('rulesAtRung', () => {
       { id: 'c', rung: 'L2' },
     ] as Parameters<typeof rulesAtRung>[0]
     expect(rulesAtRung(rules, 'L2').map((r) => r.id)).toEqual(['a', 'c'])
+  })
+})
+
+describe('climb with two steps that resolve to the same command', () => {
+  const step = (name: string, command: string): LadderStep => ({
+    rung: 'L1',
+    name,
+    command,
+    status: 'runnable',
+    reason: '',
+    check: null,
+  })
+
+  it('runs the command once and says the later step reused it', async () => {
+    const run = vi.fn(async () => 0)
+    const outcome = await climb(
+      [
+        step('The unit’s own tests', 'vitest run --coverage'),
+        step('Repository gate', 'vitest run --coverage'),
+      ],
+      run
+    )
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(outcome.ok).toBe(true)
+    expect(outcome.steps[1]).toMatchObject({
+      result: 'pass',
+      exitCode: 0,
+      reusedFrom: 'The unit’s own tests',
+    })
+    expect(outcome.steps[1].reason).toContain('same command as The unit’s own tests')
+  })
+
+  it('runs distinct commands each', async () => {
+    const run = vi.fn(async () => 0)
+    await climb([step('a', 'one'), step('b', 'two')], run)
+    expect(run).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not reuse a failure: the climb stopped at it', async () => {
+    const run = vi.fn(async () => 1)
+    const outcome = await climb([step('a', 'one'), step('b', 'one')], run)
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(outcome.steps).toHaveLength(1)
+    expect(outcome.ok).toBe(false)
   })
 })

@@ -29,6 +29,8 @@ export interface LoopFacts {
   readonly heldAt: string | null
   /** The loop gave up after its last round and handed the findings to a person. */
   readonly exhausted: boolean
+  /** Why the red team was not needed, when it was skipped for a small order (ADR 084). */
+  readonly skipped?: string
 }
 
 /** How the order was agreed, once it has been. */
@@ -49,8 +51,21 @@ export interface ReadinessInput {
   readonly shape: { readonly name: string | null; readonly yours: boolean }
   /** Which optional steps the Forge offers on this order. */
   readonly offers: { readonly shape: boolean; readonly tracker: boolean }
+  /** Whose move it is on a run already under way, from the order's standing. Absent on a draft. */
+  readonly turn?: 'you' | 'foundry'
   /** Formats an ISO time for display. Injected so specs do not depend on the time zone. */
   readonly clock: (iso: string) => string
+}
+
+export type RunState = 'Running' | 'Shipped' | 'Cancelled' | 'Shipped · waiting on you'
+
+function runStateOf(status: WorkOrder['status']): Exclude<RunState, 'Shipped · waiting on you'> {
+  return status === 'shipped' ? 'Shipped' : status === 'cancelled' ? 'Cancelled' : 'Running'
+}
+
+/** A shipped order can still be waiting on a person, and the pill says so. */
+function pillOf(status: WorkOrder['status'], turn: ReadinessInput['turn']): RunState {
+  return status === 'shipped' && turn === 'you' ? 'Shipped · waiting on you' : runStateOf(status)
 }
 
 export type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
@@ -112,12 +127,14 @@ export interface FindingView {
 export interface Readiness {
   readonly holder: Holder
   readonly strip: Strip
-  /** "Low risk · 1 unit · Shape: Quick (proposed) · Draft" */
+  /** "Low risk · 1 unit · Shape: Direct (proposed) · Draft" */
   readonly summary: string
   readonly rows: readonly Row[]
   readonly steps: readonly StepView[]
   readonly findings: readonly FindingView[]
   readonly canHandOff: boolean
+  /** What the run is doing once the order is off the draft: the hand-off pill's word. */
+  readonly runState: RunState
   /**
    * Why each control that the order's state can lock is locked, or null.
    * The text is shown verbatim as the tooltip and inline reason.
@@ -227,7 +244,7 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
           tone: 'ready',
           icon: 'play',
           headline: `Handed off automatically at ${clock(agreed.at)}`,
-          detail: `Running with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
+          detail: `${runStateOf(order.status)} with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
           actions: ['open-run'],
         },
       }
@@ -239,7 +256,7 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
         tone: 'ready',
         icon: 'play',
         headline: `Handed off at ${t}`,
-        detail: `Running with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
+        detail: `${runStateOf(order.status)} with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
         actions: ['open-run'],
       },
     }
@@ -511,7 +528,11 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
   const { order, compile, intake, loop } = input
   const failure = compile.failures.find((f) => f.check === id)
   if (failure === undefined) {
-    return { id, label: ROW_LABELS[id], state: 'passed', detail: PASSED_DETAIL[id](order) }
+    const detail =
+      id === 'redTeam' && loop.skipped !== undefined
+        ? `Skipped: ${loop.skipped}.`
+        : PASSED_DETAIL[id](order)
+    return { id, label: ROW_LABELS[id], state: 'passed', detail }
   }
   const inProgress = intake.kind === 'running' && loop.heldAt === null
   if (inProgress) return { id, label: ROW_LABELS[id], state: 'in-progress', detail: failure.detail }
@@ -596,6 +617,7 @@ function nonDraftWord(id: StepId, input: ReadinessInput, Shape: string): string 
       return 'Agreed'
     case 'redTeam': {
       const last = loop.rounds.length > 0 ? loop.rounds[loop.rounds.length - 1].round : null
+      if (last === null && loop.skipped !== undefined) return `Skipped: ${loop.skipped}`
       return last !== null ? `Clean after round ${last}` : 'Not reviewed'
     }
     case 'shape':
@@ -685,6 +707,9 @@ function computeBaseStep(
     const last = lastFinishedRound(loop)
     if (last !== null && openBlocking.length === 0) {
       return { state: 'done', mark: 'check', word: `Clean after round ${last.round}` }
+    }
+    if (loop.skipped !== undefined && openBlocking.length === 0) {
+      return { state: 'done', mark: 'check', word: `Skipped: ${loop.skipped}` }
     }
     return { state: 'not-yet', mark: 'number', word: 'Not reviewed yet' }
   }
@@ -954,6 +979,7 @@ export function readiness(input: ReadinessInput): Readiness {
     steps,
     findings,
     canHandOff,
+    runState: pillOf(order.status, input.turn),
     locks: { handOff, redraft, message: redraft },
     handOffWhy,
   }

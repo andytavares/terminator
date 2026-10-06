@@ -124,7 +124,20 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
     },
     acceptance: proposal.acceptance ?? order.acceptance,
     risk: { ...order.risk, ...proposal.risk },
-    plan: { ...order.plan, ...proposal.plan },
+    plan: {
+      ...order.plan,
+      ...proposal.plan,
+      // A lane's branch can be fixed by the ticket; a proposal that leaves it
+      // blank must not erase it.
+      ...(proposal.plan?.lanes === undefined
+        ? {}
+        : {
+            lanes: proposal.plan.lanes.map((lane) => {
+              const kept = order.plan.lanes.find((l) => l.ord === lane.ord)?.branch ?? ''
+              return lane.branch.trim() === '' && kept !== '' ? { ...lane, branch: kept } : lane
+            }),
+          }),
+    },
     // An operator's struck assumption stays struck: the proposal's version of
     // one already on the order does not resurrect it.
     assumptions: (proposal.assumptions ?? order.assumptions).map((assumption) => {

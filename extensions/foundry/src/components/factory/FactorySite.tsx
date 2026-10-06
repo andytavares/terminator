@@ -5,6 +5,7 @@ import { MetricsTiles, WindowToggle } from '../MetricsTiles.js'
 import type { Signal } from '../../sensors/types.js'
 import type { CiState } from '../../line/ci-state.js'
 import { HallThumbnail } from './HallThumbnail.js'
+import { ciLabel } from '../../line/ci-label.js'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
@@ -137,19 +138,10 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
-/** Plain words for a CI status, keyed so a new status the store starts
- *  emitting fails to compile here rather than showing the operator a raw
- *  code. */
-const CI_STATUS_WORDS: Record<CiState['status'], string> = {
-  watching: 'still running',
-  green: 'passed',
-  red: 'failing',
-  not_measured: 'not measured yet',
-  reworking: 'sent back for rework',
-}
-
+/** The CI round in the words every other surface uses (`ciLabel`). A row
+ *  carries no reason, so an unmeasured CI says only that. */
 function ciLine(ci: NonNullable<FactoryOrderRow['ci']>): string {
-  return `CI check round ${ci.round} of ${ci.max}: ${CI_STATUS_WORDS[ci.status]}`
+  return `CI · ${ci.status === 'not_measured' ? 'not measured yet' : ciLabel({ ...ci, reason: '' })}`
 }
 
 /** How often the grid is refetched. Slower than a live run's own poll: this

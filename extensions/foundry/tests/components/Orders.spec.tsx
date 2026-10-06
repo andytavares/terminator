@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { Orders } from '../../src/components/Orders.js'
 
@@ -13,10 +13,12 @@ function mount(orders: unknown[], props: Record<string, unknown> = {}) {
     if (channel === 'foundry:order.list') return { orders }
     return {}
   })
+  const openExternal = vi.fn()
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    shell: { openExternal },
   }
-  return { ...render(<Orders repoRoot="/repos/app" {...props} />), invoke }
+  return { ...render(<Orders repoRoot="/repos/app" {...props} />), invoke, openExternal }
 }
 
 function row(over: Record<string, unknown> = {}) {
@@ -217,5 +219,143 @@ describe('offering a ticket for a typed idea', () => {
     fire.click(screen.getByRole('button', { name: 'Create ticket' }))
     await waitFor(() => screen.getByText('Linear refused'))
     expect(orderCreates(invoke)).toHaveLength(0)
+  })
+})
+
+// A shipped order still has a gate to answer (mark the draft ready), and the
+// Floor is where gates are answered. It used to open in the Forge, which only
+// describes the agreement.
+describe('opening an order that has a run', () => {
+  // Neither surface has its order yet, so each shows its own loading line,
+  // which is what tells them apart.
+  async function opened(status: string) {
+    const invoke = vi.fn(async (channel: string) =>
+      channel === 'foundry:order.list' ? { orders: [row({ status })] } : new Promise(() => {})
+    )
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Orders repoRoot="/repos/app" openOrderId="WO-1" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'All orders' })).toBeTruthy())
+  }
+
+  it.each(['running', 'shipped'])('opens a %s order on the Floor', async (status) => {
+    await opened(status)
+    await waitFor(() => expect(screen.getByText('Loading the run…')).toBeTruthy())
+  })
+
+  it('opens a draft in the Forge, not the Floor', async () => {
+    await opened('draft')
+    expect(screen.getByText('Loading the order…')).toBeTruthy()
+    expect(screen.queryByText('Loading the run…')).toBeNull()
+  })
+})
+
+// What a row has to say without being opened: where the order's pull request and
+// ticket are, how CI is going, and the one answer the operator owes.
+describe('what a row carries without being opened', () => {
+  const pull = { number: 233, url: 'https://github.com/andytavares/terminator/pull/233' }
+  const ticket = {
+    kind: 'tracker',
+    tracker: 'linear',
+    key: 'TAV-15',
+    url: 'https://linear.app/team/issue/TAV-15',
+  }
+  const watching = {
+    status: 'watching',
+    round: 0,
+    max: 2,
+    reason: '',
+    checks: { done: 1, total: 3 },
+  }
+  const readyGate = {
+    id: 'G-1',
+    options: [
+      { id: 'mark_ready', label: 'Mark ready', consequence: 'The draft becomes a review request.' },
+      { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
+    ],
+    breach: null,
+  }
+
+  it('links the pull request and the ticket, and opens them outside the application', async () => {
+    const { openExternal } = mount([row({ status: 'running', pulls: [pull], source: ticket })])
+    const pullLink = await screen.findByRole('link', { name: '#233' })
+    const ticketLink = screen.getByRole('link', { name: 'TAV-15' })
+    fireEvent.click(pullLink)
+    fireEvent.click(ticketLink)
+    expect(openExternal).toHaveBeenCalledWith(pull.url)
+    expect(openExternal).toHaveBeenCalledWith(ticket.url)
+    // A link is not the door: it must not open the order behind it.
+    expect(screen.queryByRole('heading', { name: 'What is being asked' })).toBeNull()
+  })
+
+  it('shows a spinner and the CI wording while CI is watching', async () => {
+    const { container } = mount([
+      row({
+        status: 'running',
+        standing: standing({ label: 'building', kind: 'running' }),
+        ci: watching,
+      }),
+    ])
+    const pill = await screen.findByRole('status')
+    expect(within(pill).getByText(/First run · up to 2 fixes/)).toBeTruthy()
+    expect(within(pill).getByText(/1 of 3 checks done/)).toBeTruthy()
+    expect(pill.querySelector('.fdry-spin')).not.toBeNull()
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
+  })
+
+  it('shows the standing, not a spinner, once CI has passed', async () => {
+    mount([
+      row({
+        status: 'shipped',
+        standing: standing({ label: 'shipped', kind: 'done' }),
+        ci: { ...watching, status: 'green' },
+      }),
+    ])
+    await screen.findByText('shipped')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('answers a shipped order open ready-for-review gate on the row', async () => {
+    const { invoke } = mount([
+      row({
+        status: 'shipped',
+        standing: standing({
+          kind: 'halted',
+          turn: 'you',
+          label: 'Mark the pull request ready',
+          gateId: 'G-1',
+        }),
+        gate: readyGate,
+      }),
+    ])
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark ready' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: 'G-1',
+        option: 'mark_ready',
+      })
+    )
+    expect(screen.getByRole('button', { name: 'Hold' })).toBeTruthy()
+  })
+
+  it('offers no inline answers for a gate that needs a new limit typed in', async () => {
+    mount([
+      row({
+        status: 'running',
+        standing: standing({ turn: 'you', label: 'over budget', gateId: 'G-2' }),
+        gate: {
+          id: 'G-2',
+          options: [
+            { id: 'raise', label: 'Raise it', consequence: 'More.' },
+            { id: 'stop', label: 'Stop', consequence: 'Ends.' },
+          ],
+          breach: { kind: 'turns', used: 10, limit: 10 },
+        },
+      }),
+    ])
+    await screen.findByText('over budget')
+    expect(screen.queryByRole('button', { name: 'Raise it' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeTruthy()
   })
 })

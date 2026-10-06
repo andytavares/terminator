@@ -421,6 +421,81 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].openQuestions).toBe(1)
   })
 
+  it('counts the checks that have finished, and links the pull requests', async () => {
+    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const url = 'https://github.com/andytavares/terminator/pull/233'
+    await writeCiState(root, seeded.order.id, {
+      round: 0,
+      max: 2,
+      status: 'watching',
+      pulls: [
+        {
+          url,
+          checks: [
+            { name: 'lint', bucket: 'pass', link: '', workflow: 'ci' },
+            { name: 'test', bucket: 'pending', link: '', workflow: 'ci' },
+            { name: 'build', bucket: 'fail', link: '', workflow: 'ci' },
+          ],
+        },
+      ],
+      reason: '',
+      at: NOW,
+    })
+    const loaded = await store.load(seeded.order.id)
+    if (loaded === null) throw new Error('the order this test needs was not saved')
+    await store.save({ ...loaded, status: 'running' })
+    const dir = path.join(root, 'orders', seeded.order.id)
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'pulls.json'), JSON.stringify([{ url, repo: 'r', cwd: '/c' }]))
+
+    const r = (await c.list()) as {
+      orders: {
+        ci: { checks: { done: number; total: number } }
+        pulls: { number: number; url: string }[]
+      }[]
+    }
+    expect(r.orders[0].ci.checks).toEqual({ done: 2, total: 3 })
+    expect(r.orders[0].pulls).toEqual([{ number: 233, url }])
+  })
+
+  it('hands the row the open gate whose move is yours, and nothing for another', async () => {
+    const held = raiseGate({
+      id: 'G-1',
+      rule: 'ready-for-review',
+      orderId: 'WO-x',
+      summary: 'Mark the pull requests ready',
+      why: 'the work shipped as drafts',
+      at: '2026-09-06T11:30:00.000Z',
+    })
+    const c = createForgeChannels({
+      store,
+      now: () => '2026-09-06T10:00:00.000Z',
+      standingSources: { gatesFor: async () => [held] },
+    })
+    const seeded = (await c.create({
+      source: { kind: 'typed', text: 'first idea' },
+      repoPaths: [repo],
+    })) as OrderView
+    const loaded = await store.load(seeded.order.id)
+    if (loaded === null) throw new Error('the order this test needs was not saved')
+    await store.save({ ...loaded, status: 'shipped' })
+
+    const r = (await c.list()) as {
+      orders: { gate: { id: string; options: { id: string }[] } | null }[]
+    }
+    expect(r.orders[0].gate?.id).toBe('G-1')
+    expect(r.orders[0].gate?.options[0].id).toBe('mark_ready')
+
+    await store.save({ ...loaded, status: 'running' })
+    const none = createForgeChannels({ store, now: () => NOW })
+    const again = (await none.list()) as { orders: { gate: unknown }[] }
+    expect(again.orders[0].gate).toBeNull()
+  })
+
   it('carries no ci field when this host has no records location wired', async () => {
     const c = channels()
     await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
@@ -457,7 +532,13 @@ describe('foundry:order.list', () => {
       orders: { id: string; ci: { status: string; round: number; max: number } }[]
     }
     const row = r.orders.find((o) => o.id === seeded.order.id)
-    expect(row?.ci).toEqual({ status: 'red', round: 2, max: 3 })
+    expect(row?.ci).toEqual({
+      status: 'red',
+      round: 2,
+      max: 3,
+      reason: '',
+      checks: { done: 0, total: 0 },
+    })
   })
 })
 
@@ -1666,19 +1747,19 @@ describe('foundry:order.recipe', () => {
   it('sets the recipe and records who chose it', async () => {
     const seed = await drafted()
     const c = channels()
-    const r = (await c.recipe({ id: seed.order.id, recipe: 'quick' })) as OrderView
-    expect(r.order.recipe).toBe('quick')
+    const r = (await c.recipe({ id: seed.order.id, recipe: 'direct' })) as OrderView
+    expect(r.order.recipe).toBe('direct')
 
     const entries = await store.entries(seed.order.id)
     const last = entries[entries.length - 1]
     expect(last.action).toBe('recipe.chosen')
-    expect(last.reason).toBe('quick')
+    expect(last.reason).toBe('direct')
   })
 
   it('records "the proposal" when the choice is cleared', async () => {
     const seed = await drafted()
     const c = channels()
-    await c.recipe({ id: seed.order.id, recipe: 'quick' })
+    await c.recipe({ id: seed.order.id, recipe: 'direct' })
     await c.recipe({ id: seed.order.id, recipe: null })
 
     const entries = await store.entries(seed.order.id)
@@ -1690,7 +1771,7 @@ describe('foundry:order.recipe', () => {
     const seed = await drafted()
     const c = channels()
     await store.save({ ...seed.order, status: 'agreed' })
-    const r = (await c.recipe({ id: seed.order.id, recipe: 'quick' })) as { error?: string }
+    const r = (await c.recipe({ id: seed.order.id, recipe: 'direct' })) as { error?: string }
     expect(r.error).toBe('Only a draft can have its shape chosen; this order is agreed.')
   })
 })

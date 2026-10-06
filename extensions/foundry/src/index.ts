@@ -33,7 +33,15 @@ import { markReady, readPulls, shipOrder, finishShipping, pushLanes } from './li
 import type { ShellExec } from './line/integrate.js'
 import { watchChecks, failedLogs } from './line/ci.js'
 import type { Check, CiVerdict } from './line/ci.js'
-import { ciRounds, ciReworkTarget, shipNodeId } from './line/ship-tail.js'
+import {
+  afterFinalCheck,
+  ciRounds,
+  ciReworkTarget,
+  settledOnce,
+  shipNodeId,
+  settleShip,
+} from './line/ship-tail.js'
+import { createEarlyShip } from './line/early-ship.js'
 import { writeCiState } from './line/ci-state.js'
 import type { CiState } from './line/ci-state.js'
 import { rework, sendBack } from './line/scheduler.js'
@@ -80,7 +88,11 @@ import {
   readProposal,
 } from './forge/converge.js'
 import type { AskModel } from './forge/converge.js'
-import { convergeMaybeScouted as scoutedConverge } from './forge/scouted-converge.js'
+import {
+  convergeMaybeScouted as scoutedConverge,
+  waitForScout,
+  withScoutContext,
+} from './forge/scouted-converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
 import { execute, opensPullRequest } from './line/executor.js'
 import { interruptedRuns, interruptedGate } from './line/adopt.js'
@@ -89,6 +101,8 @@ import type { RunOutcome, StartedRun, ExecutorDeps } from './line/executor.js'
 import type { RunGraph, RunNode, Feedback } from './line/run-graph.js'
 import type { EffortLevel, Recipe, Role } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
+import { commitWorktree } from './line/commit.js'
+import { documentOutcome } from './line/document-outcome.js'
 import { collectableWrites, readRungOutput, rungOutputPath } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
 import { agentTitle } from './runtime/agent-title.js'
@@ -102,13 +116,15 @@ import {
   fixMessage,
   nextRound,
   afterRelease,
+  reviewSkipReason,
+  lighterRedTeamModel,
 } from './forge/review-loop.js'
 import { forgeDefectAnswer } from './gates/act-decision.js'
 import { brief } from './line/brief.js'
 import { decideTool } from './runtime/tool-decision.js'
 import { ensureTrusted } from './runtime/workspace-trust.js'
 import type { LedgerEntry } from './ledger/append.js'
-import type { IntegrateDeps } from './line/integrate.js'
+import type { IntegrateDeps, Shipment } from './line/integrate.js'
 import { checkCapability, writeBack } from './trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
 import type { Budgets, WorkOrder, WriteBack } from './order/schema.js'
@@ -128,15 +144,6 @@ import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import { readTranscript } from './runtime/transcript-tailer.js'
 import { recordTools } from './factory/timeline-store.js'
-import type { HunkDecision } from './runtime/review/hunk-decisions.js'
-
-/** One hunk as a surface renders it: the change, and what was decided. */
-interface HunkView {
-  id: string
-  newStart: number
-  lines: string[]
-  decision: HunkDecision | null
-}
 import type { StallFiring } from './runtime/evaluate-stall.js'
 
 const disposables: Disposable[] = []
@@ -443,6 +450,11 @@ function autonomyFor(api: ExtensionAPI): 'escorted' | 'standard' | 'lights-out' 
     api.settings?.get<'escorted' | 'standard' | 'lights-out'>('terminator.foundry.autonomy') ??
     'standard'
   )
+}
+
+/** Whether the red team runs on the balanced tier. Off unless the operator asks. */
+function lighterRedTeam(api: ExtensionAPI): boolean {
+  return api.settings.get<boolean>('terminator.foundry.lighterRedTeam') ?? false
 }
 
 function askModel(api: ExtensionAPI): AskModel {
@@ -1163,7 +1175,7 @@ async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string
     sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
   })
   const gates = createLiveGateStore(() => root)
-  await finishShipping(
+  const finished = await finishShipping(
     order,
     { verdicts: [], findings: [] },
     pulls,
@@ -1176,6 +1188,7 @@ async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string
       },
     }
   )
+  await settleShipNode(root, recipe, graphRef, finished.gate?.rule === 'ready-for-review')
 }
 
 /**
@@ -1274,6 +1287,14 @@ async function runRefineryTick(
       return waiting
     },
     resume,
+    // The issue's last move: Done only once the pull requests are merged.
+    onMerged: async (orderId) => {
+      const order = await store.load(orderId)
+      const port = issuesPortFor(api)
+      if (order !== null && port !== null) {
+        await writeBack(order, 'merged', writeBackDepsFor(api, root, order, port))
+      }
+    },
     now: () => new Date().toISOString(),
   }
 
@@ -1481,8 +1502,12 @@ async function buildExecutorDeps(
     effort: EffortLevel | null
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
+    /** The role writes documentation only; edits elsewhere are refused. */
+    docsOnly?: boolean
     /** The one file this rung may write, or null when it has no artefact. */
     outputPath?: string | null
+    /** The order's `outputs/` directory, for a role that hands back a document. */
+    outputsDir?: string | null
     /** Where this node's skills were mounted, or null when it declared none. */
     skillsMount: string | null
     /** Called as soon as the session exists, not when its turn ends. */
@@ -1554,6 +1579,7 @@ async function buildExecutorDeps(
               readOnly: input.readOnly,
               role: input.role,
               mayUseTool: input.mayUseTool,
+              docsOnly: input.docsOnly,
               isProbed: (name, given) => isProbedCommand(order, name, given),
               readOnlyTools: readOnlyTools(api),
               autonomy: autonomyFor(api),
@@ -1561,6 +1587,7 @@ async function buildExecutorDeps(
                 api.settings?.get<boolean>('terminator.foundry.letAutoModeDecide') ?? true,
               worktreePath: checkout.path,
               outputPath: input.outputPath ?? null,
+              outputsDir: input.outputsDir ?? null,
               skillsMount: input.skillsMount,
             }),
           onPending: (pending) => {
@@ -1664,9 +1691,8 @@ async function buildExecutorDeps(
           // refuses, structurally — and neither is a role that is not the one
           // whose conversation this is.
           conversations.set(conversation(lane, input.role), run.sessionId)
-          // On the register, which is what the stall detector, the review
-          // queue and the backpressure gate all read from. Without this the
-          // agent is running and every one of them sees an idle factory —
+          // On the register, which is what the stall detector and the palette
+          // read from. Without this the agent is running and both see an idle factory —
           // the register was the seam the old phase dispatcher filled.
           supervision?.runs.add({
             sessionId: run.sessionId,
@@ -1755,7 +1781,19 @@ async function buildExecutorDeps(
         }
 
         await store.save(result.order)
-        return { order: result.order, note: result.note, defect: result.defect }
+        return {
+          order: result.order,
+          note: result.note,
+          defect: result.defect,
+          document: result.document,
+        }
+      },
+      // Nothing else ever runs `git commit`: a branch the agents only edited
+      // has nothing to push, and a pull request opened on it fails with "No
+      // commits between".
+      commitNode: async ({ node, message }) => {
+        const checkout = checkouts.get(node.lane ?? 1)
+        return checkout === undefined ? false : commitWorktree(checkout.path, message, exec)
       },
       priorGates: await gates.list(),
       raise: async (gate) => {
@@ -1926,7 +1964,97 @@ async function executeRun(
     await writeBack(order, 'started', writeBackDepsFor(api, root, order, issuesPort))
   }
 
-  const outcome = await execute(order, recipe, graph, executorDeps)
+  const gates = createLiveGateStore(() => root)
+  const graphRef = { current: graph }
+  // Shipped against the grade the change turned out to deserve, not the one
+  // the plan predicted — which is the whole reason the executor regrades. The
+  // CI send-back reads it, so it follows the early drafts' regrade.
+  const shippedOrderRef = { current: order }
+
+  const shipmentFor = (found: {
+    verdicts: RunOutcome['verdicts']
+    ladder: RunOutcome['ladder']
+    inspectionRequired: boolean
+    reason: string
+  }): Shipment => ({
+    verdicts: found.verdicts,
+    findings: found.inspectionRequired ? [found.reason] : [],
+    inspection: {
+      ran: found.inspectionRequired,
+      reason: `graded ${shippedOrderRef.current.risk.grade} with no risk triggers`,
+    },
+    ladder: found.ladder,
+    // Grouped by rung, so the record says what was in force where rather
+    // than listing every rule as though they all applied at once.
+    rulesInForce: RUNGS.flatMap((rung) =>
+      rulesAtRung(houseRules, rung).map(
+        (rule) => `${rule.asserts.trim()} (${rungLevelInWords(rung)})`
+      )
+    ),
+  })
+
+  // The CI watch can start before the final check ends (ADR 085). A red round
+  // sends work back only once the check has settled, so a builder never edits
+  // the checkout the check is climbing over.
+  const finalCheck = settledOnce<boolean>()
+  const shipDeps: IntegrateDeps = {
+    ...integrateDepsFor(api, root, order.id),
+    // The shipping decision, where the grade calls for one, is the operator's
+    // and reaches them through the inbox like every other.
+    decide: (gate) => askOnce(gates, gate),
+    raiseGate: async (gate) => {
+      await gates.save(gate)
+    },
+    // The ticket moves to In Review when the draft opens, not when the CI
+    // watch that follows it ends.
+    onDraftOpened: async (pulls) => {
+      if (issuesPort === null) return
+      await writeBack(order, 'draft_opened', writeBackDepsFor(api, root, order, issuesPort), {
+        pulls: pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
+      })
+    },
+    // A recipe with no `ci` never asks to watch anything (`rounds: null`
+    // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
+    watchCi: (pulls) =>
+      ciRounds({
+        pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+        rounds: recipe.ci?.rounds ?? null,
+        ...ciRoundDepsFor(root, order.id, exec),
+        sendBack: afterFinalCheck(
+          finalCheck.settled,
+          ciSendBackFor(
+            root,
+            shippedOrderRef.current,
+            recipe,
+            executorDeps,
+            integrateDepsFor(api, root, order.id),
+            graphRef
+          )
+        ),
+      }),
+  }
+
+  // The draft opens before the final check, and the check runs while CI does
+  // (ADR 085) — unless the operator decides before anything is pushed.
+  const early = createEarlyShip({ order, deps: shipDeps, shipment: shipmentFor })
+  let outcome: Awaited<ReturnType<typeof execute>>
+  try {
+    outcome = await execute(order, recipe, graph, {
+      ...executorDeps,
+      beforeFinalCheck: async (found) => {
+        shippedOrderRef.current = { ...order, risk: found.risk }
+        // A document outside the checkout has no change to open a draft on.
+        const end = documentOutcome(recipe, (await store.load(order.id))?.document ?? null)
+        if (end.kind === 'ready' || end.kind === 'missing') return false
+        return early.beforeFinalCheck(found)
+      },
+    })
+  } catch (error) {
+    finalCheck.settle(false)
+    throw error
+  }
+  finalCheck.settle(outcome.ladder?.ok ?? false)
+  graphRef.current = outcome.graph
 
   await writeRunGraph(root, outcome.graph)
   await store.record({
@@ -1943,6 +2071,28 @@ async function executeRun(
 
   // ── The tail ───────────────────────────────────────────────────────────
   //
+  // A shape whose product is a document ends on where its author put it. In
+  // the checkout it ships as a pull request below; anywhere else there is no
+  // change to open one on, and an author that handed nothing back has not
+  // finished.
+  const latest = await store.load(order.id)
+  const documentEnd = outcome.shippable
+    ? documentOutcome(recipe, latest?.document ?? null)
+    : ({ kind: 'not-a-document-shape' } as const)
+  if (documentEnd.kind === 'missing' || documentEnd.kind === 'ready') {
+    await store.record({
+      at: new Date().toISOString(),
+      orderId: order.id,
+      actor: 'rule:line',
+      action: documentEnd.kind === 'missing' ? 'run.failed' : 'run.document_ready',
+      subject: order.id,
+      reason: documentEnd.kind === 'missing' ? documentEnd.reason : documentEnd.where,
+      evidence: [],
+    })
+    await settleShipNode(root, recipe, graphRef, documentEnd.kind === 'ready')
+    return
+  }
+
   // Work that is finished and waiting on nobody ships, without being asked
   // (FR-053). Work that is waiting on somebody does not — the run halts, the
   // inbox has the question, and answering it resumes from here.
@@ -1961,64 +2111,59 @@ async function executeRun(
       reason: whyNotShipped(recipe, outcome),
       evidence: [],
     })
+    await settleShipNode(root, recipe, graphRef, false)
     return
   }
 
-  const gates = createLiveGateStore(() => root)
-  const shippedOrder = { ...order, risk: outcome.risk }
-  const graphRef = { current: outcome.graph }
+  shippedOrderRef.current = { ...order, risk: outcome.risk }
 
-  // Shipped against the grade the change turned out to deserve, not the one
-  // the plan predicted — which is the whole reason the executor regrades.
-  const shipped = await shipOrder(
-    shippedOrder,
-    {
-      verdicts: outcome.verdicts,
-      findings: outcome.inspection.required ? [outcome.inspection.reason] : [],
-      ladder: outcome.ladder,
-      // Grouped by rung, so the record says what was in force where rather
-      // than listing every rule as though they all applied at once.
-      rulesInForce: RUNGS.flatMap((rung) =>
-        rulesAtRung(houseRules, rung).map(
-          (rule) => `${rule.asserts.trim()} (${rungLevelInWords(rung)})`
-        )
-      ),
-    },
-    {
-      ...integrateDepsFor(api, root, order.id),
-      // The shipping decision, where the grade calls for one, is the operator's
-      // and reaches them through the inbox like every other.
-      decide: (gate) => askOnce(gates, gate),
-      raiseGate: async (gate) => {
-        await gates.save(gate)
-      },
-      // A recipe with no `ci` never asks to watch anything (`rounds: null`
-      // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
-      watchCi: (pulls) =>
-        ciRounds({
-          pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
-          rounds: recipe.ci?.rounds ?? null,
-          ...ciRoundDepsFor(root, order.id, exec),
-          sendBack: ciSendBackFor(
-            root,
-            shippedOrder,
-            recipe,
-            executorDeps,
-            integrateDepsFor(api, root, order.id),
-            graphRef
-          ),
-        }),
-    }
-  )
+  const earlyShipped = early.opened ? await early.finish(outcome) : null
+  const shipped =
+    earlyShipped ??
+    (early.opened
+      ? null
+      : await shipOrder(
+          shippedOrderRef.current,
+          shipmentFor({
+            verdicts: outcome.verdicts,
+            ladder: outcome.ladder,
+            inspectionRequired: outcome.inspection.required,
+            reason: outcome.inspection.reason,
+          }),
+          shipDeps
+        ))
 
-  if (shipped.held || shipped.pulls.length === 0) return
+  // The ship node was left running when the executor reached it. It passes
+  // when the ready question is raised, and goes back to waiting when shipping
+  // stopped short of it, so a resume owes the tail again.
+  await settleShipNode(root, recipe, graphRef, shipped?.gate?.rule === 'ready-for-review')
 
-  await store.save({ ...order, status: 'shipped' })
-  if (issuesPort !== null) {
-    await writeBack(order, 'draft_opened', writeBackDepsFor(api, root, order, issuesPort), {
-      pulls: shipped.pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
-    })
-  }
+  if (shipped === null || shipped.held || shipped.pulls.length === 0) return
+
+  await store.save({
+    ...order,
+    document: (await store.load(order.id))?.document ?? order.document,
+    status: 'shipped',
+  })
+}
+
+/**
+ * Settle the recipe's ship node once the tail has finished: passed when the
+ * ready-for-review question was raised, waiting otherwise. A ship node that is
+ * neither running nor (when asked) waiting is left as it is.
+ */
+async function settleShipNode(
+  root: string,
+  recipe: Recipe,
+  graphRef: { current: RunGraph },
+  asked: boolean
+): Promise<void> {
+  const shipId = shipNodeId(recipe)
+  if (shipId === null) return
+  const settled = settleShip(graphRef.current, shipId, asked, new Date().toISOString())
+  if (settled === graphRef.current) return
+  graphRef.current = settled
+  await writeRunGraph(root, graphRef.current)
 }
 
 /**
@@ -2254,6 +2399,8 @@ async function readOnlyRound(input: {
    * Absent for a round nothing else needs to answer early for.
    */
   readonly onStarted?: (sessionId: string) => void
+  /** Overrides the role's own tier, for a round the operator asked to keep light. */
+  readonly model?: string
 }): Promise<void> {
   const { api, root, order, roleId, nodeId, startedAction, startedReason, onFinished } = input
   if (deletedOrders.has(order.id)) return
@@ -2351,7 +2498,7 @@ async function readOnlyRound(input: {
       title: agentTitle(roleId),
       prompt: input.prompt(role),
       phase: roleId,
-      model: modelForTier(api, role.modelTier),
+      model: input.model ?? modelForTier(api, role.modelTier),
       // Read-only, enforced by the hook rather than by the prompt, with the
       // one exception being the rung's own output file.
       autoDecide: readOnlyAutoDecide(outputPath),
@@ -2586,7 +2733,10 @@ export function activate(api: ExtensionAPI): void {
           )
           return
         }
-        await store.save(outcome.order)
+        // The scout runs beside a first draft, so it may have stored its
+        // findings while this turn was still writing.
+        const drafted = withScoutContext(outcome.order, await store.load(order.id))
+        await store.save(drafted)
         await store.record({
           at: new Date().toISOString(),
           orderId: order.id,
@@ -2602,28 +2752,24 @@ export function activate(api: ExtensionAPI): void {
         // nothing starts on its own from here until the operator releases it.
         if (loopFacts(await store.entries(order.id)).heldAt !== null) return
 
-        const next = followUpFor(compileOrder(outcome.order).failures, autoTurns)
+        const next = followUpFor(compileOrder(drafted).failures, autoTurns)
         if (next === null) {
           // Nothing left the architect can close on its own by compiling again.
           // If the order is otherwise ready, the red team gets a round before
           // the operator ever sees it — the whole point of the loop.
-          if (shouldReview(outcome.order)) {
+          if (shouldReview(drafted)) {
             // A fix turn is ready for hand-off unless the red team asked to see the fix.
             if (
               loopRound !== undefined &&
               afterFix({
-                order: outcome.order,
+                order: drafted,
                 anotherPass: anotherPassWanted(await store.entries(order.id)),
               }) === 'hand-off'
             ) {
-              sayReady(outcome.order)
+              sayReady(drafted)
               return
             }
-            await startReview(
-              outcome.order,
-              loopRound ?? (await nextReviewRound(order.id)),
-              outcome.note
-            )
+            await startReview(drafted, loopRound ?? (await nextReviewRound(order.id)), outcome.note)
           }
           return
         }
@@ -2640,7 +2786,7 @@ export function activate(api: ExtensionAPI): void {
             'continuing in a follow-up turn'
           )
         }
-        const started = await convergeWithFollowUps(outcome.order, next, autoTurns + 1, loopRound)
+        const started = await convergeWithFollowUps(drafted, next, autoTurns + 1, loopRound)
         await store.record({
           at: new Date().toISOString(),
           orderId: order.id,
@@ -2664,6 +2810,26 @@ export function activate(api: ExtensionAPI): void {
    */
   const startReview = async (order: WorkOrder, round: number, changed: string): Promise<void> => {
     const root = dataRoot()
+    const skipReason = round === 1 ? reviewSkipReason(order) : null
+    if (skipReason !== null) {
+      // Recorded rather than silent: the Forge reads this as the red team
+      // step passed, with the reason, instead of a step still owed.
+      await createOrderStore(root).record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'rule:forge',
+        action: 'review.skipped',
+        subject: order.id,
+        reason: skipReason,
+        evidence: [],
+      })
+      sayReady(order)
+      return
+    }
+    // The scout runs beside the first draft, so what it found reaches the red
+    // team from the store rather than from the draft it is attacking.
+    await waitForScout(order.id)
+    const attacked = withScoutContext(order, (await createOrderStore(root).load(order.id)) ?? null)
     await readOnlyRound({
       api,
       root,
@@ -2671,10 +2837,11 @@ export function activate(api: ExtensionAPI): void {
       roleId: 'red-team',
       nodeId: `review-${round}`,
       round,
+      model: lighterRedTeam(api) ? lighterRedTeamModel(defaultModel(api)) : undefined,
       prompt: (role) => {
         const sources = resolveSources(api, root)
         return reviewPrompt({
-          order,
+          order: attacked,
           role,
           rules: rulesFor(sources, {
             repoPaths: sources.repoPaths,
@@ -2835,8 +3002,8 @@ export function activate(api: ExtensionAPI): void {
   }
 
   /**
-   * Before the very first draft, the scout reads the repository so the
-   * architect starts from code it has already seen rather than a guess.
+   * Beside the very first draft, the scout reads the repository; the
+   * architect does not wait for it (ADR 084).
    *
    * Only for a first draft: `provenance.decisions` is empty until a proposal
    * has been applied, and `context.entryPoints` is empty until something has
@@ -2850,35 +3017,35 @@ export function activate(api: ExtensionAPI): void {
     const root = dataRoot()
     return scoutedConverge(
       {
-        startScout: (scoutOrder, onStarted, onFinished) => {
-          void readOnlyRound({
-            api,
-            root,
-            order: scoutOrder,
-            roleId: 'scout',
-            nodeId: 'forge-scout',
-            prompt: (role) => {
-              const sources = resolveSources(api, root)
-              return brief({
-                order: scoutOrder,
-                role,
-                units: [],
-                rules: rulesFor(sources, {
-                  repoPaths: sources.repoPaths,
-                  houseDocs: [...scoutOrder.context.houseDocs],
-                }).rules,
-                outputPath: rungOutputPath(orderDir(root, scoutOrder.id), 'forge-scout'),
-              })
-            },
-            startedAction: 'scout.started',
-            startedReason: 'reading the repository before the first draft',
-            onStarted,
-            onFinished: async (updated) => {
-              // A failure or an empty write was already recorded as
-              // `scout.refused` — the architect still starts, from what it
-              // can read itself, rather than the whole draft waiting on the
-              // scout.
-              if (updated !== null) {
+        // Settles when the scout's turn ends, so a red team that would start
+        // meanwhile can wait for what it found.
+        startScout: (scoutOrder) =>
+          new Promise<void>((settled) => {
+            void readOnlyRound({
+              api,
+              root,
+              order: scoutOrder,
+              roleId: 'scout',
+              nodeId: 'forge-scout',
+              prompt: (role) => {
+                const sources = resolveSources(api, root)
+                return brief({
+                  order: scoutOrder,
+                  role,
+                  units: [],
+                  rules: rulesFor(sources, {
+                    repoPaths: sources.repoPaths,
+                    houseDocs: [...scoutOrder.context.houseDocs],
+                  }).rules,
+                  outputPath: rungOutputPath(orderDir(root, scoutOrder.id), 'forge-scout'),
+                })
+              },
+              startedAction: 'scout.started',
+              startedReason: 'reading the repository beside the first draft',
+              onFinished: async (updated) => {
+                // A failure or an empty write was already recorded as
+                // `scout.refused`; the architect never waited on it.
+                if (updated === null) return settled()
                 await createOrderStore(root).record({
                   at: new Date().toISOString(),
                   orderId: scoutOrder.id,
@@ -2890,43 +3057,12 @@ export function activate(api: ExtensionAPI): void {
                   }`,
                   evidence: [],
                 })
-              }
-              onFinished(updated)
-            },
-          })
-        },
+                settled()
+              },
+            }).catch(settled)
+          }),
         startArchitect: (architectOrder, architectMessage) =>
           convergeWithFollowUps(architectOrder, architectMessage, 0),
-        // `runArchitectTurn` (forge-channels.ts) is the usual recorder of
-        // `converge.started` / `converge.refused` — it records whatever
-        // `ConvergeStarted` this call resolves with. For a scouted first
-        // draft that is the scout's own session, so by the time the
-        // architect actually starts, that recording has already happened for
-        // the scout and nothing else will happen for the architect.
-        recordArchitectStarted: async (architectOrder, architectMessage, started) => {
-          const store = createOrderStore(root)
-          if (!started.ok) {
-            await store.record({
-              at: new Date().toISOString(),
-              orderId: architectOrder.id,
-              actor: 'role:architect',
-              action: 'converge.refused',
-              subject: architectOrder.id,
-              reason: started.reason,
-              evidence: [],
-            })
-            return
-          }
-          await store.record({
-            at: new Date().toISOString(),
-            orderId: architectOrder.id,
-            actor: 'role:architect',
-            action: 'converge.started',
-            subject: started.sessionId,
-            reason: architectMessage === '' ? 'drafting the plan' : architectMessage,
-            evidence: [],
-          })
-        },
       },
       order,
       message
@@ -3113,12 +3249,6 @@ export function activate(api: ExtensionAPI): void {
     store: createLiveOrderStore(dataRoot),
     dataRoot,
     sources: () => resolveSources(api, dataRoot()),
-    // One person's capacity to review is the constraint, and it does not scale
-    // with the number of orders. No runtime means nobody to ask, which is not
-    // a reason to refuse a run.
-    backpressure: () =>
-      supervision?.backpressure.check() ?? { allowed: true, unreviewed: 0, limit: 0, reason: null },
-    noteOverride: (orderId) => supervision?.backpressure.override(orderId, Date.now()),
     now: () => new Date().toISOString(),
     // Marked while it runs, so nothing reclaims a node out from under an
     // executor that is part way through starting it.
@@ -3231,6 +3361,7 @@ export function activate(api: ExtensionAPI): void {
     gates: createLiveGateStore(dataRoot),
     orders: createLiveOrderStore(dataRoot),
     autonomy: () => autonomyFor(api),
+    readPulls: (orderId) => readPulls(dataRoot(), orderId),
     now: () => new Date().toISOString(),
     record: async (orderId, action, subject, reason) => {
       await createOrderStore(dataRoot()).record({
@@ -3255,13 +3386,6 @@ export function activate(api: ExtensionAPI): void {
         const deps = integrateDepsFor(api, dataRoot(), gate.orderId)
         for (const pull of await readPulls(dataRoot(), gate.orderId)) {
           await markReady(pull, deps)
-        }
-        // The issue's last move. Marking ready is as close to merged as
-        // Foundry gets — it never merges anything itself.
-        const order = await createOrderStore(dataRoot()).load(gate.orderId)
-        const port = issuesPortFor(api)
-        if (order !== null && port !== null) {
-          await writeBack(order, 'merged', writeBackDepsFor(api, dataRoot(), order, port))
         }
         return
       }
@@ -3297,7 +3421,7 @@ export function activate(api: ExtensionAPI): void {
           sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
         })
         const gates = createLiveGateStore(dataRoot)
-        await finishShipping(
+        const finished = await finishShipping(
           order,
           { verdicts: [], findings: [] },
           pulls,
@@ -3310,6 +3434,7 @@ export function activate(api: ExtensionAPI): void {
             },
           }
         )
+        await settleShipNode(root, recipe, graphRef, finished.gate?.rule === 'ready-for-review')
         return
       }
 
@@ -3530,12 +3655,9 @@ export function activate(api: ExtensionAPI): void {
     shadowMode: stallShadowMode(api),
   }))
 
-  // What is running, what is waiting to be reviewed, and whether a new run
-  // would be refused.
+  // What is running, and what is over.
   reg(api, 'foundry:supervision-snapshot', () =>
-    supervision === null
-      ? { runs: [], review: [], backpressure: { allowed: true, unreviewed: 0, limit: 0 } }
-      : supervision.snapshot()
+    supervision === null ? { runs: [], history: [] } : supervision.snapshot()
   )
 
   reg(api, 'foundry:feed-list', () => ({
@@ -3584,94 +3706,6 @@ export function activate(api: ExtensionAPI): void {
     const { from, to } = payload as { from: number; to?: number }
     const entries = supervision?.feed.list() ?? []
     return buildDigest(entries, from, to ?? Date.now())
-  })
-
-  reg(api, 'foundry:review-advance', (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    return { step: supervision?.review.advance(sessionId) ?? null }
-  })
-
-  // The unit of review is the hunk, not the file: one file routinely holds both
-  // the change you asked for and the one you did not.
-  reg(api, 'foundry:review-hunks', async (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    if (supervision === null) {
-      // Distinguished from "changed nothing": a panel that cannot tell them
-      // apart shows an empty review for a runtime that never started.
-      return { files: null, complete: false, fullReject: false }
-    }
-    const set = await supervision.hunksFor(sessionId)
-    if (set === null) return { files: [], complete: false, fullReject: false }
-    // Grouped by file, with the hunk's own lines: a reviewer decides on what
-    // the change says, and a list of identifiers is not a diff.
-    const files = new Map<string, HunkView[]>()
-    for (const { hunk, decision } of set.list()) {
-      const entry = files.get(hunk.file) ?? []
-      entry.push({ id: hunk.id, newStart: hunk.newStart, lines: [...hunk.lines], decision })
-      files.set(hunk.file, entry)
-    }
-    return {
-      files: [...files]
-        .map(([file, hunks]) => ({ file, hunks }))
-        .sort((a, b) => a.file.localeCompare(b.file)),
-      complete: set.isComplete(),
-      fullReject: set.isFullReject(),
-    }
-  })
-
-  reg(api, 'foundry:review-decide-hunk', async (payload: unknown) => {
-    const { sessionId, hunkId, decision } = payload as {
-      sessionId: string
-      hunkId: string
-      decision: 'accept' | 'reject'
-    }
-    const ok = (await supervision?.decideHunk(sessionId, hunkId, decision)) ?? false
-    return { ok }
-  })
-
-  // The request set against the agent's own account of what it did. The step
-  // every diff viewer skips, and the one that catches work that is defensible
-  // in isolation and was never asked for.
-  reg(api, 'foundry:review-intent', async (payload: unknown) => {
-    const { sessionId, request, agentAccount } = payload as {
-      sessionId: string
-      request: string
-      agentAccount: string
-    }
-    const intent = await supervision?.intentFor(sessionId, request, agentAccount)
-    return { intent: intent ?? null }
-  })
-
-  // Applying the decisions is what makes a rejection mean anything: the
-  // rejected hunks come back out of the working copy, the accepted ones stay.
-  reg(api, 'foundry:review-apply', async (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    const result = (await supervision?.applyDecisions(sessionId)) ?? {
-      ok: false,
-      reverted: 0,
-      error: 'the supervision runtime is not running',
-    }
-    if (result.ok && result.reverted > 0) {
-      supervision?.feed.post({
-        at: Date.now(),
-        sessionId,
-        author: 'console',
-        summary: `reverted ${result.reverted} rejected ${result.reverted === 1 ? 'hunk' : 'hunks'}`,
-      })
-      // The diff changed under it, so the queue's summary is now wrong.
-      await supervision?.measure(sessionId)
-    }
-    return result
-  })
-
-  reg(api, 'foundry:review-done', async (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    supervision?.review.remove(sessionId)
-    supervision?.runs.forget(sessionId)
-    // Reviewing one reopens the backpressure gate. What starts next is the
-    // scheduler's decision now, taken from the run graph rather than from a
-    // queue this channel had to remember to drain.
-    return { ok: true }
   })
 
   reg(api, 'foundry:permission-resolve', (payload: unknown) => {
@@ -3843,6 +3877,13 @@ export function activate(api: ExtensionAPI): void {
           options: ['escorted', 'standard', 'lights-out'],
           default: 'standard',
         },
+        'terminator.foundry.lighterRedTeam': {
+          type: 'boolean',
+          label: 'Lighter red team',
+          description:
+            'On: the red team runs on the balanced model instead of the deep one. Faster and cheaper, with a shallower attack. Orders graded P3 with one lane and no risk triggers skip the red team either way.',
+          default: false,
+        },
         'terminator.foundry.letAutoModeDecide': {
           type: 'boolean',
           label: 'Let auto mode decide',
@@ -4003,7 +4044,7 @@ export function activate(api: ExtensionAPI): void {
 }
 
 /**
- * Puts what is running, and what is waiting to be reviewed, one keystroke away.
+ * Puts what is running one keystroke away.
  *
  * Three surfaces answer the same question — what needs me, ranked — and this is
  * the one you reach without moving your hands.
@@ -4020,9 +4061,9 @@ export function activate(api: ExtensionAPI): void {
  * Shared by the command palette and by clicking a notification, because they
  * are the same request phrased twice, and two copies would drift.
  */
-function gotoRun(api: ExtensionAPI, kind: 'run' | 'review', sessionId: string): void {
+function gotoRun(api: ExtensionAPI, kind: 'run', sessionId: string): void {
   api.window.focusSelf()
-  const terminal = kind === 'run' ? (supervisedRunner?.terminalFor(sessionId) ?? null) : null
+  const terminal = supervisedRunner?.terminalFor(sessionId) ?? null
   if (terminal !== null) {
     // Through the core's own navigation: it selects the workspace, the project
     // and the tab, none of which this extension's separate renderer can do.
@@ -4037,7 +4078,7 @@ function gotoRun(api: ExtensionAPI, kind: 'run' | 'review', sessionId: string): 
 
 function refreshPalette(api: ExtensionAPI): void {
   const snapshot = supervision?.snapshot() ?? null
-  const entries = snapshot === null ? [] : paletteEntries(snapshot.runs, snapshot.review)
+  const entries = snapshot === null ? [] : paletteEntries(snapshot.runs)
   // Rebuilt only when it would read differently, so an open palette is not
   // re-registered under the cursor every tick.
   const signature = entries.map((e) => `${e.id}:${e.description}`).join('|')

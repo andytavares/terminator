@@ -34,6 +34,9 @@ const SourceSchema = z.object({
   tracker: z.enum(['linear', 'jira']).nullable().default(null),
   key: z.string().nullable().default(null),
   url: z.string().nullable().default(null),
+  // The tracker's own branch name. Kept here because the plan's lanes are the
+  // architect's to rewrite, and the ticket's branch is not.
+  branch: z.string().optional(),
 })
 
 const IntentSchema = z.object({
@@ -287,6 +290,24 @@ const ProvenanceSchema = z.object({
   amendments: z.array(z.string()).default([]),
 })
 
+/**
+ * Where an author put the document it was asked for.
+ *
+ * `checkout` ships as a pull request. `outputs` is the order's own directory
+ * and `published` is a link the author made, so neither has a change to ship.
+ */
+export const DOCUMENT_LOCATIONS = ['checkout', 'outputs', 'published'] as const
+
+export const DocumentHandBackSchema = z
+  .object({
+    path: nonEmpty,
+    url: nonEmpty.optional(),
+    location: z.enum(DOCUMENT_LOCATIONS),
+  })
+  .strict()
+
+export type DocumentHandBack = z.infer<typeof DocumentHandBackSchema>
+
 export const WorkOrderSchema = z.object({
   schemaVersion: z.number().int(),
   id: nonEmpty,
@@ -307,6 +328,7 @@ export const WorkOrderSchema = z.object({
   openQuestions: z.array(OpenQuestionSchema).default([]),
   redTeam: z.array(RedTeamFindingSchema).default([]),
   provenance: ProvenanceSchema,
+  document: DocumentHandBackSchema.nullable().default(null),
   createdAt: nonEmpty,
   agreedAt: z.string().nullable().default(null),
 })

@@ -506,3 +506,110 @@ describe('letting auto mode decide', () => {
     ).toMatchObject({ allow: false })
   })
 })
+
+describe('a role that writes documentation only', () => {
+  const documenting = (file: string, tool = 'Edit') =>
+    decideTool(
+      request({
+        role: 'scribe',
+        docsOnly: true,
+        tool,
+        input: { file_path: file },
+        worktreePath: '/work/checkout',
+      })
+    )
+
+  it('is refused an edit to source, with a reason it can act on', () => {
+    const decision = documenting(
+      '/work/checkout/src/main/integrations/providers/linear.provider.ts'
+    )
+    expect(decision).toMatchObject({ allow: false })
+    expect((decision as { reason: string }).reason).toContain('documentation only')
+  })
+
+  it.each([
+    '/work/checkout/docs/x.md',
+    '/work/checkout/docs/diagram.svg',
+    '/work/checkout/specs/054/plan.txt',
+    '/work/checkout/README',
+    '/work/checkout/extensions/foundry/CHANGELOG.txt',
+    '/work/checkout/notes.md',
+  ])('may write %s', (file) => {
+    expect(documenting(file)).not.toMatchObject({ allow: false })
+  })
+
+  it.each(['Write', 'MultiEdit', 'NotebookEdit'])('refuses %s to source too', (tool) => {
+    expect(documenting('/work/checkout/src/a.ts', tool)).toMatchObject({ allow: false })
+  })
+
+  it('is refused a path outside the checkout, even a markdown one', () => {
+    expect(documenting('/elsewhere/notes.md')).toMatchObject({ allow: false })
+  })
+
+  it('is not held to it when the role writes more than documentation', () => {
+    const decision = decideTool(
+      request({ docsOnly: false, tool: 'Edit', input: { file_path: '/work/checkout/src/a.ts' } })
+    )
+    expect(decision).not.toMatchObject({ allow: false })
+  })
+})
+
+describe('where an author may put a document', () => {
+  const authoring = (file: string, over: Partial<ToolRequest> = {}) =>
+    decideTool(
+      request({
+        role: 'author',
+        docsOnly: true,
+        tool: 'Write',
+        input: { file_path: file },
+        worktreePath: '/work/checkout',
+        outputsDir: '/data/orders/WO-1/outputs',
+        outputPath: '/data/orders/WO-1/rungs/write.json',
+        autonomy: 'lights-out',
+        ...over,
+      })
+    )
+
+  it('may write under the order\u2019s outputs directory, even unattended', () => {
+    expect(authoring('/data/orders/WO-1/outputs/answer.md')).toMatchObject({ allow: true })
+    expect(authoring('/data/orders/WO-1/outputs/notes/answer.txt')).toMatchObject({ allow: true })
+  })
+
+  it('may write its own hand-back file', () => {
+    expect(authoring('/data/orders/WO-1/rungs/write.json')).toMatchObject({ allow: true })
+  })
+
+  it('may still write documentation in the checkout', () => {
+    expect(authoring('/work/checkout/docs/answer.md')).not.toMatchObject({ allow: false })
+  })
+
+  it('is refused source in the checkout', () => {
+    expect(authoring('/work/checkout/src/a.ts')).toMatchObject({ allow: false })
+  })
+
+  it('is refused another order\u2019s outputs and a path that escapes with ..', () => {
+    expect(authoring('/data/orders/WO-2/outputs/answer.md')).toMatchObject({ allow: false })
+    expect(authoring('/data/orders/WO-1/outputs/../rungs/other.json')).toMatchObject({
+      allow: false,
+    })
+  })
+
+  it('is refused a sibling that only starts with the same letters', () => {
+    expect(authoring('/data/orders/WO-1/outputs-old/answer.md')).toMatchObject({ allow: false })
+  })
+
+  it('has no outputs to write to when the node was given none', () => {
+    expect(
+      authoring('/data/orders/WO-1/outputs/answer.md', { outputsDir: null, outputPath: null })
+    ).toMatchObject({ allow: false })
+  })
+
+  it('does not let a shell command write there', () => {
+    expect(
+      authoring('/data/orders/WO-1/outputs/answer.md', {
+        tool: 'Bash',
+        input: { command: 'echo hi > /data/orders/WO-1/outputs/answer.md' },
+      })
+    ).not.toMatchObject({ allow: true })
+  })
+})

@@ -1,9 +1,11 @@
 import { gateNodeId } from './events.js'
 import type { FactoryEvent } from './events.js'
 import { ordinal } from './format.js'
-import type { Gate, GateOption } from '../gates/rules.js'
+import type { Gate } from '../gates/rules.js'
 import type { NodeState, RunGraph } from '../line/run-graph.js'
 import { DISPATCH_NODE_ID } from './layout.js'
+import { tallyChecks, waitingOnChecks } from './ci-tally.js'
+import type { Check } from '../line/ci.js'
 
 // What the hall says, and where it says it.
 //
@@ -20,6 +22,24 @@ export interface Callout {
   readonly tone: CalloutTone
   readonly text: string
   readonly at: number
+}
+
+/** The pinned wait's id: one at a time, so it keeps its place in a stack. */
+export const CI_WAITING_ID = 'ci-waiting'
+
+/**
+ * The callout that stays pinned to the tower for as long as any check is
+ * pending: "Waiting on checks · 12 of 19 done". Unlike a raised callout it has
+ * no time to leave in; it goes when the last check lands. Null otherwise.
+ */
+export function ciWaitingCallout(
+  ci: { readonly pulls: readonly { readonly checks: readonly Pick<Check, 'bucket'>[] }[] } | null
+): Callout | null {
+  if (ci === null) return null
+  const text = waitingOnChecks(tallyChecks(ci.pulls.flatMap((p) => p.checks.map((c) => c.bucket))))
+  return text === null
+    ? null
+    : { id: CI_WAITING_ID, nodeId: DISPATCH_NODE_ID, tone: 'start', text, at: 0 }
 }
 
 function name(labels: Readonly<Record<string, string>>, nodeId: string): string {
@@ -161,9 +181,8 @@ export type Interruption =
       readonly nodeId: string | null
       readonly title: string
       readonly detail: string
-      readonly options: readonly GateOption[]
-      /** A budget raise needs a number typed, which the Inbox's form does. */
-      readonly needsInbox: boolean
+      /** The gate itself, so a surface can draw it with its own answers. */
+      readonly gate: Gate
     }
   | {
       readonly kind: 'stranded'
@@ -200,8 +219,7 @@ export function interruptionsFor(input: InterruptionInput): Interruption[] {
     nodeId: gateNodeId(gate, input.graph),
     title: gate.summary,
     detail: gate.why,
-    options: gate.options,
-    needsInbox: gate.breach != null,
+    gate,
   }))
 
   // A held call already says its agent is stopped; saying it twice is noise.

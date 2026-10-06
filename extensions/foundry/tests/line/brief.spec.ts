@@ -497,6 +497,31 @@ describe('where a rung hands back what it found', () => {
     expect(text).not.toContain('"entryPoints"')
   })
 
+  it('gives an author the outputs directory beside the file to hand back', () => {
+    const text = brief({
+      order: order(),
+      role: role({ id: 'author', writes: ['docs', 'document'], reads: ['order'], tools: ['edit'] }),
+      units: [],
+      rules: [],
+      outputPath: '/data/orders/WO-1/rungs/write.json',
+      outputsDir: '/data/orders/WO-1/outputs',
+    })
+    expect(text).toContain('/data/orders/WO-1/outputs')
+    expect(text).toContain('"location"')
+  })
+
+  it('names no outputs directory to a role that hands back no document', () => {
+    const text = brief({
+      order: order(),
+      role: role({ id: 'scout', writes: ['context'], tools: ['read'] }),
+      units: [],
+      rules: [],
+      outputPath: '/rungs/scout.json',
+      outputsDir: '/data/orders/WO-1/outputs',
+    })
+    expect(text).not.toContain('/data/orders/WO-1/outputs')
+  })
+
   it('says nothing to a role whose product is the diff', () => {
     // The builder writes the worktree. A second channel would be two answers
     // to the question of what the rung did.

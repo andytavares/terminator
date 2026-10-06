@@ -19,6 +19,37 @@ import React from 'react'
 // not know is shown as the text it is, which is the honest failure for a
 // renderer: never a blank space where a paragraph was.
 
+/**
+ * A link that opens in the person's browser.
+ *
+ * An extension's view has no window-open handler, so `target="_blank"` goes
+ * nowhere. The href stays for the status bar and assistive technology; the
+ * click is what actually opens it.
+ */
+export function ExternalLink({
+  href,
+  children,
+  className,
+}: {
+  readonly href: string
+  readonly children: React.ReactNode
+  readonly className?: string
+}): JSX.Element {
+  return (
+    <a
+      href={href}
+      className={className}
+      rel="noreferrer noopener"
+      onClick={(event) => {
+        event.preventDefault()
+        void window.electronAPI.shell?.openExternal(href)
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+
 /** Inline spans: code, bold, italic, links. Everything else is text. */
 function inline(text: string, keyPrefix: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
@@ -45,9 +76,9 @@ function inline(text: string, keyPrefix: string): React.ReactNode[] {
       // clickable, which is the whole reason this does not emit markup.
       out.push(
         /^https?:\/\//i.test(href) ? (
-          <a key={key} href={href} target="_blank" rel="noreferrer noopener">
+          <ExternalLink key={key} href={href}>
             {label}
-          </a>
+          </ExternalLink>
         ) : (
           <span key={key}>{token}</span>
         )

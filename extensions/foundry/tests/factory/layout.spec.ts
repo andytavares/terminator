@@ -309,6 +309,22 @@ describe('layoutHall — properties, across every recipe and lane count', () => 
           }
         })
 
+        it('gives the scoreboard three tiles, and no wall fixture overlaps another', () => {
+          const board = map.props.find((p) => p.kind === 'statuswall') as HallProp
+          expect(board.w).toBe(3)
+          const wall = map.props.filter((p) =>
+            ['shelves', 'racks', 'statuswall', 'lockers'].includes(p.kind)
+          )
+          for (const a of wall) {
+            expect(a.x).toBeGreaterThanOrEqual(1)
+            expect(a.x + a.w).toBeLessThanOrEqual(map.width - 1)
+            for (const b of wall) {
+              if (a === b) continue
+              expect(a.x + a.w <= b.x || b.x + b.w <= a.x).toBe(true)
+            }
+          }
+        })
+
         it('stands the archive and the rack under their own wall fixture', () => {
           const shelves = map.props.find((p) => p.kind === 'shelves') as HallProp
           const racks = map.props.find((p) => p.kind === 'racks') as HallProp
@@ -320,6 +336,31 @@ describe('layoutHall — properties, across every recipe and lane count', () => 
       })
     }
   }
+
+  // a -> { b -> c, d } -> e: the short branch (d) skips a column, so it stands
+  // on a second row beside b and runs straight to the merge at e.
+  it('lays an uneven fork out without any belt falling back to the BFS path', () => {
+    const map = layoutHall(
+      graph([
+        rn({ id: 'a', kind: 'agent' }),
+        rn({ id: 'b', kind: 'agent', dependsOn: ['a'] }),
+        rn({ id: 'c', kind: 'agent', dependsOn: ['b'] }),
+        rn({ id: 'd', kind: 'agent', dependsOn: ['a'] }),
+        rn({ id: 'e', kind: 'join', dependsOn: ['c', 'd'] }),
+      ])
+    )
+    expect(map.belts.map((b) => b.id).sort()).toEqual(['a->b', 'a->d', 'b->c', 'c->e', 'd->e'])
+    const blocked = blockedForBeltKeys(map)
+    for (const belt of map.belts) {
+      for (const t of belt.path) expect(blocked.has(`${t.x},${t.y}`)).toBe(false)
+    }
+    const at = (id: string): HallProp => map.props.find((p) => p.nodeId === id) as HallProp
+    expect(at('d').x).toBe(at('b').x)
+    expect(at('d').y).toBeGreaterThan(at('b').y)
+    expect(at('c').y).toBe(at('b').y)
+    const merge = map.belts.find((b) => b.id === 'd->e') as HallMap['belts'][number]
+    expect(merge.path[merge.path.length - 1]).toEqual({ x: at('e').x - 1, y: at('e').y })
+  })
 
   it('gives the 3-lane standard graph at least one split and one merge', () => {
     const map = layoutHall(graphFor('standard.yaml', [1, 2, 3]))

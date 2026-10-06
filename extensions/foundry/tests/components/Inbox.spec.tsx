@@ -11,6 +11,7 @@ import type { Signal } from '../../src/sensors/types.js'
 // click through without reading.
 
 let invoke: ReturnType<typeof vi.fn>
+const openExternal = vi.fn()
 
 function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
   return raiseGate({
@@ -91,6 +92,7 @@ function mount(over: Record<string, unknown> = {}) {
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    shell: { openExternal },
   }
   render(<Inbox />)
 }
@@ -104,8 +106,40 @@ describe('a row the operator can act on', () => {
   it('names the rule, the reason and what happens if it is ignored', async () => {
     mount({ gates: [gate()] })
     await waitFor(() => expect(screen.getByText(ruleInWords('risk.p0'))).toBeTruthy())
-    expect(screen.getByText(/session\.ts/)).toBeTruthy()
     expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
+    // The reason is a click away rather than printed on every row.
+    expect(screen.queryByText(/session\.ts/)).toBeNull()
+    fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
+    expect(screen.getByText(/session\.ts/)).toBeTruthy()
+  })
+
+  it('shows what the gate saw only once it is opened, and closed even then', async () => {
+    mount({
+      gates: [gate({ evidence: [{ kind: 'stdout', excerpt: 'Error: token refresh failed' }] })],
+    })
+    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
+    expect(screen.queryByText(/token refresh failed/)).toBeNull()
+    fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
+    expect((document.querySelector('details') as HTMLDetailsElement).open).toBe(false)
+  })
+
+  it('links the order\u2019s pull request and ticket from the gate', async () => {
+    const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
+    const ticketUrl = 'https://linear.app/team/issue/TAV-15'
+    mount({
+      gates: [
+        {
+          ...gate({ rule: 'ready-for-review' }),
+          orderTitle: 'Refuse an expired refresh token',
+          pulls: [{ number: 233, url: pullUrl }],
+          source: { key: 'TAV-15', url: ticketUrl },
+        },
+      ],
+    })
+    fireEvent.click(await screen.findByRole('link', { name: '#233' }))
+    fireEvent.click(screen.getByRole('link', { name: 'TAV-15' }))
+    expect(openExternal).toHaveBeenCalledWith(pullUrl)
+    expect(openExternal).toHaveBeenCalledWith(ticketUrl)
   })
 
   it('says how much work the decision unblocks', async () => {

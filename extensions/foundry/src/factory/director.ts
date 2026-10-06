@@ -54,7 +54,7 @@ function withCrew(world: World, nodeId: string, update: (crew: Crew) => Crew): W
 }
 
 function sendTo(crew: Crew, goal: Crew['goal'], then: Crew['then']): Crew {
-  return { ...crew, goal, then, restSeat: null, settle: null }
+  return { ...crew, goal, then, restSeat: null, settle: null, wander: null, idleAt: null }
 }
 
 /**
@@ -82,6 +82,8 @@ function sendToRest(world: World, nodeId: string): World {
     then: 'couch',
     settle: seat.facing,
     restSeat: seat.id,
+    wander: null,
+    idleAt: null,
   }))
 }
 

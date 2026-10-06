@@ -12,6 +12,7 @@ vi.mock('../../../../src/main/ipc/channel-registrar.js', () => ({
 
 const {
   mockExecuteExtensionCommand,
+  mockIsRegistered,
   mockListExtensionCommands,
   mockListExtensionSettingsSections,
   mockListExtensionSidebarItems,
@@ -20,6 +21,7 @@ const {
   mockDispatchContextMenuClick,
 } = vi.hoisted(() => ({
   mockExecuteExtensionCommand: vi.fn(),
+  mockIsRegistered: vi.fn(() => false),
   mockListExtensionCommands: vi.fn(() => [] as unknown[]),
   mockListExtensionSettingsSections: vi.fn(() => [] as unknown[]),
   mockListExtensionSidebarItems: vi.fn(() => [] as unknown[]),
@@ -36,6 +38,7 @@ vi.mock('../../../../src/main/extensions/api.js', () => ({
   dispatchContextMenuClick: mockDispatchContextMenuClick,
   listExtensionCommands: mockListExtensionCommands,
   executeExtensionCommand: mockExecuteExtensionCommand,
+  isExtensionCommandRegistered: mockIsRegistered,
 }))
 
 const { mockGetAllExtensionSettings, mockSetExtensionSetting } = vi.hoisted(() => ({
@@ -79,6 +82,34 @@ describe('extension:execute-command', () => {
     listener({}, { key: 'ext.command.push', ctx })
 
     expect(mockExecuteExtensionCommand).toHaveBeenCalledWith('ext.command.push', ctx)
+  })
+})
+
+describe('extension:run-command', () => {
+  it('runs the command with args and a null ctx, returning its result', async () => {
+    mockExecuteExtensionCommand.mockResolvedValue({ ok: false, reason: 'not-registered' })
+    registerExtensionHandlers(makeExtensionHost())
+    const handler = handleHandlers.get('extension:run-command')!
+
+    const result = await handler({}, { key: 'ext.command.open', args: { n: 1 } })
+
+    expect(mockExecuteExtensionCommand).toHaveBeenCalledWith(
+      'ext.command.open',
+      { projectId: null, sessionId: null, repoRoot: null },
+      { n: 1 }
+    )
+    expect(result).toEqual({ ok: false, reason: 'not-registered' })
+  })
+})
+
+describe('extension:has-command', () => {
+  it('answers from isExtensionCommandRegistered', () => {
+    mockIsRegistered.mockReturnValue(true)
+    registerExtensionHandlers(makeExtensionHost())
+    const handler = handleHandlers.get('extension:has-command')!
+
+    expect(handler({}, { key: 'ext.command.open' })).toBe(true)
+    expect(mockIsRegistered).toHaveBeenCalledWith('ext.command.open')
   })
 })
 

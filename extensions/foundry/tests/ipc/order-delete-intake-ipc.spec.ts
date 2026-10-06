@@ -158,17 +158,18 @@ describe('deleting an order while its scout is still reading', () => {
     dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-delete-intake-'))
     await createOrderStore(dataDir).save(order())
 
+    // The architect starts at seed, beside the scout rather than after it.
     await call('foundry:order.converge', { id: 'WO-1' })
-    expect(runner.start).toHaveBeenCalledTimes(1)
-    const scout = runner.start.mock.calls[0][0] as Started
+    expect(runner.start).toHaveBeenCalledTimes(2)
+    const started = runner.start.mock.calls.map((c) => c[0] as Started)
 
     await call('foundry:order.delete', { id: 'WO-1' })
-    // Deleting the project closes the scout's terminal.
-    scout.onEnd?.(0)
+    // Deleting the project closes both terminals.
+    for (const run of started) run.onEnd?.(0)
     // What would follow is a chain of file reads and writes; let it run out.
     await new Promise((settle) => setTimeout(settle, 200))
 
-    expect(runner.start).toHaveBeenCalledTimes(1)
+    expect(runner.start).toHaveBeenCalledTimes(2)
     expect(fs.existsSync(path.join(dataDir, 'orders', 'WO-1'))).toBe(false)
   })
 })

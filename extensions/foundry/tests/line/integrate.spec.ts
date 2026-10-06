@@ -9,8 +9,12 @@ import {
   shipOrder,
   pushLanes,
   markReady,
+  readPulls,
   PushRefusedError,
   finishShipping,
+  openDrafts,
+  watchAndFinish,
+  commitAndPushLanes,
 } from '../../src/line/integrate.js'
 import type { IntegrateDeps } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
@@ -435,6 +439,16 @@ describe('the pull request body (FR-056)', () => {
     expect(body).toMatch(/inspection/i)
   })
 
+  it('says the inspection did not run, with the reason, when it did not', () => {
+    const body = prBody(order(), {
+      verdicts: [verdict()],
+      findings: [],
+      inspection: { ran: false, reason: 'graded P3 with no risk triggers' },
+    })
+    expect(body).toContain('Not run: graded P3 with no risk triggers')
+    expect(body).not.toContain('Nothing found.')
+  })
+
   it('names the order it came from', () => {
     expect(prBody(order(), { verdicts: [], findings: [] })).toContain('WO-1')
   })
@@ -775,16 +789,66 @@ describe('the decision the operator is finally offered (FR-057)', () => {
       },
       deps()
     )
-    expect(result.gate?.why).toContain('Not measured here: Lint, Repository gate')
+    expect(result.gate?.why).toContain('### Not measured here')
+    expect(result.gate?.why).toContain('- Lint')
+    expect(result.gate?.why).toContain('- Repository gate')
   })
 
-  it('says the inspection found nothing, rather than staying silent about it', async () => {
+  it('says the inspection found nothing only when it ran', async () => {
     const result = await shipOrder(
       order(),
-      { verdicts: [verdict()], findings: [], ladder: ladderOk },
+      {
+        verdicts: [verdict()],
+        findings: [],
+        ladder: ladderOk,
+        inspection: { ran: true, reason: '' },
+      },
       deps()
     )
-    expect(result.gate?.why).toContain('inspection found nothing')
+    expect(result.gate?.why).toContain('### Inspection\n\n- Found nothing.')
+  })
+
+  it('says why the inspection did not run, never that it found nothing', async () => {
+    const result = await shipOrder(
+      order(),
+      {
+        verdicts: [verdict()],
+        findings: [],
+        ladder: ladderOk,
+        inspection: { ran: false, reason: 'graded P3 with no risk triggers' },
+      },
+      deps()
+    )
+    expect(result.gate?.why).toContain('- Not run: graded P3 with no risk triggers')
+    expect(result.gate?.why).not.toContain('Found nothing')
+  })
+
+  it('writes the decision as Markdown with one fact per line', async () => {
+    const result = await shipOrder(
+      order(),
+      {
+        verdicts: [verdict()],
+        findings: [],
+        ladder: ladderOk,
+        rulesInForce: ['Tests come first (every unit)', 'No secrets (the whole order)'],
+      },
+      deps()
+    )
+    const why = result.gate?.why ?? ''
+    expect(why).toContain('**0 units.**')
+    expect(why).toContain('### Acceptance\n\n- AC-1: An expired token is refused — passed')
+    expect(why).toContain('### Judged against\n\n- Tests come first · every unit')
+    expect(why).toContain('- No secrets · the whole order')
+  })
+
+  it('does not call an order with no verdicts passed', async () => {
+    const result = await shipOrder(
+      order(),
+      { verdicts: [], findings: [], ladder: ladderOk },
+      deps()
+    )
+    expect(result.gate?.why).toContain('- No verdicts were recorded. The criteria were not judged.')
+    expect(result.gate?.why).not.toContain('every criterion passed')
   })
 
   it('points at the body, so the decision is taken on the evidence', async () => {
@@ -954,6 +1018,36 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     expect(result.held).toBe(false)
   })
 
+  it('tells the caller the drafts are open before the CI watch starts', async () => {
+    const calls: string[] = []
+    const onDraftOpened = vi.fn(async () => {
+      calls.push('onDraftOpened')
+    })
+    const watchCi = vi.fn(async (): Promise<CiOutcome> => {
+      calls.push('watchCi')
+      return { kind: 'green', checks: [check()] }
+    })
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ watchCi, onDraftOpened })
+    )
+    expect(calls).toEqual(['onDraftOpened', 'watchCi'])
+    expect(onDraftOpened).toHaveBeenCalledTimes(1)
+    expect(onDraftOpened).toHaveBeenCalledWith(result.pulls)
+  })
+
+  it('does not fail shipping when the draft-opened callback throws', async () => {
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({
+        onDraftOpened: vi.fn(async () => Promise.reject(new Error('tracker down'))),
+      })
+    )
+    expect(result.held).toBe(false)
+  })
+
   it('adds "CI passed: N checks." to the ready gate when CI is green', async () => {
     const outcome: CiOutcome = { kind: 'green', checks: [check(), check({ name: 'lint' })] }
     const watchCi = vi.fn(async () => outcome)
@@ -1002,7 +1096,8 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     expect(result.gate?.id).toBe('WO-1-ci-red')
     expect(result.gate?.summary).toContain('unit-tests')
     expect(result.gate?.summary).toContain(order().title)
-    expect(result.gate?.why).toContain('3 automatic rounds ran and CI is still red.')
+    expect(result.gate?.why).toContain('**3 automatic rounds ran and CI is still red.**')
+    expect(result.gate?.why).toContain('```\nline 10')
     expect(result.gate?.why).toContain('line 29')
     expect(result.gate?.why).not.toContain('line 9\n')
     expect(result.held).toBe(true)
@@ -1145,4 +1240,67 @@ describe('pushLanes (D2)', () => {
   function multiDepsForPush() {
     return deps()
   }
+})
+
+describe('opening drafts apart from watching them (ADR 085)', () => {
+  it('opens and records the drafts without watching CI or raising the ready question', async () => {
+    const watchCi = vi.fn(async () => ({ kind: 'none' }) as CiOutcome)
+    const raise = vi.fn(async () => undefined)
+    const d = deps({ watchCi, raiseGate: raise })
+    const opened = await openDrafts(order(), { verdicts: [verdict()], findings: [] }, d)
+    expect(opened.pulls).toHaveLength(1)
+    expect(opened.held).toBe(false)
+    expect(watchCi).not.toHaveBeenCalled()
+    expect(raise).not.toHaveBeenCalled()
+    expect((await readPulls(root, 'WO-1'))[0].url).toBe('https://github.com/tav/app/pull/7')
+  })
+
+  it('reuses a lane’s existing draft: pushes, creates nothing, and does not announce it again', async () => {
+    const onDraftOpened = vi.fn(async () => undefined)
+    const first = deps({ onDraftOpened })
+    await openDrafts(order(), { verdicts: [], findings: [] }, first)
+    expect(onDraftOpened).toHaveBeenCalledTimes(1)
+
+    const again = deps({ onDraftOpened })
+    const reopened = await openDrafts(order(), { verdicts: [], findings: [] }, again)
+    expect(callsTo(again.exec, 'gh', 'create')).toHaveLength(0)
+    expect(callsTo(again.exec, 'git').some((c) => c.args[0] === 'push')).toBe(true)
+    expect(reopened.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
+    expect(onDraftOpened).toHaveBeenCalledTimes(1)
+  })
+
+  it('shipOrder is still opening then watching, in that order', async () => {
+    const seen: string[] = []
+    const d = deps({
+      onDraftOpened: async () => void seen.push('opened'),
+      watchCi: async () => (seen.push('watched'), { kind: 'none' }) as CiOutcome,
+      raiseGate: async () => void seen.push('asked'),
+    })
+    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    expect(seen).toEqual(['opened', 'watched', 'asked'])
+  })
+
+  it('watchAndFinish raises the ready question for drafts that are already open', async () => {
+    const raise = vi.fn(async () => undefined)
+    const d = deps({ raiseGate: raise })
+    const result = await watchAndFinish(order(), { verdicts: [verdict()], findings: [] }, [], [], d)
+    expect(result.gate?.rule).toBe('ready-for-review')
+    expect(raise).toHaveBeenCalledTimes(1)
+  })
+
+  it('commits and pushes a lane only when the check wrote something', async () => {
+    const dirty = deps()
+    dirty.exec.mockImplementation(async (options: { args: string[] }) => ({
+      exitCode: 0,
+      stdout: options.args[0] === 'status' ? ' M a.ts\n' : '',
+      stderr: '',
+      timedOut: false,
+    }))
+    expect(await commitAndPushLanes(order(), 'final check: format', dirty)).toBe(true)
+    expect(callsTo(dirty.exec, 'git').some((c) => c.args[0] === 'push')).toBe(true)
+
+    const clean = deps()
+    expect(await commitAndPushLanes(order(), 'final check: format', clean)).toBe(false)
+    expect(callsTo(clean.exec, 'git').some((c) => c.args[0] === 'push')).toBe(false)
+  })
 })

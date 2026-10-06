@@ -16,8 +16,10 @@ import {
 } from '../forge/intake-outcome.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
 import type { LoopFacts, AgreedFacts } from '../forge/readiness.js'
-import { runFailure } from '../line/run-outcome.js'
+import { runDocumentReady, runFailure } from '../line/run-outcome.js'
 import { readCiState } from '../line/ci-state.js'
+import { readPulls } from '../line/integrate.js'
+import { pullNumber } from '../line/pull-number.js'
 import { queue, advisory as advisoryFor } from '../line/refinery.js'
 import type { QueueEntry } from '../line/refinery.js'
 import type { StandingSources } from '../order/standing.js'
@@ -814,25 +816,13 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     const queuePositions = deps.queueEntries === undefined ? null : queue(await deps.queueEntries())
     return {
       orders: await Promise.all(
-        live.map(async (order) => ({
-          id: order.id,
-          title: order.title,
-          status: order.status,
-          risk: order.risk.grade,
-          source: order.source,
-          failures: compileOrder(order).failures.length,
-          // Which order the tab's badge is counting. A number on the chrome
-          // that sends you to a list saying nothing about where it came from
-          // is a number you have to open every row to act on.
-          openQuestions:
-            order.status === 'draft' ? surfacedQuestions(order.openQuestions).length : 0,
-          // Where the order actually stands. The row used to derive that from
-          // `failures`, which is a draft-time compile result and therefore
-          // zero for every running order for ever — so every running order,
-          // including one halted at a gate two hours earlier, said "ready to
-          // hand off".
-          standing: await readStanding(order, {
+        live.map(async (order) => {
+          // Read once: the standing needs the order's gates to say whose move
+          // it is, and the row needs the open one to put its answers on the line.
+          const gates = (await deps.standingSources?.gatesFor?.(order.id)) ?? []
+          const standing = await readStanding(order, {
             ...deps.standingSources,
+            gatesFor: async () => gates,
             openQuestionsFor: (o) =>
               o.status === 'draft' ? surfacedQuestions(o.openQuestions).length : 0,
             failuresFor: (o) => compileOrder(o).failures.length,
@@ -841,23 +831,71 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
             // the same files to answer it.
             intakeRefusedFor: async (orderId) => intakeRefusal(await deps.store.entries(orderId)),
             runFailureFor: async (orderId) => runFailure(await deps.store.entries(orderId)),
-          }),
-          // Absent when this host has never wired a records location for CI;
-          // null once it has one and this order has not shipped a pull yet.
-          ...(deps.dataRoot === undefined
-            ? {}
-            : {
-                ci: await readCiState(deps.dataRoot(), order.id).then((state) =>
-                  state === null
-                    ? null
-                    : { status: state.status, round: state.round, max: state.max }
-                ),
-              }),
-          // Where this order stands in the refinery's file-overlap queue.
-          // Null when it is not in a queue at all, or the host has never
-          // wired the refinery.
-          queue: queuePositions?.find((position) => position.orderId === order.id) ?? null,
-        }))
+            documentReadyFor: async (orderId) =>
+              runDocumentReady(await deps.store.entries(orderId)),
+          })
+          const holding =
+            standing.turn === 'you' && standing.gateId !== null
+              ? gates.find((gate) => gate.id === standing.gateId && gate.decision === null)
+              : undefined
+          return {
+            id: order.id,
+            title: order.title,
+            status: order.status,
+            risk: order.risk.grade,
+            source: order.source,
+            failures: compileOrder(order).failures.length,
+            // Which order the tab's badge is counting. A number on the chrome
+            // that sends you to a list saying nothing about where it came from
+            // is a number you have to open every row to act on.
+            openQuestions:
+              order.status === 'draft' ? surfacedQuestions(order.openQuestions).length : 0,
+            // Where the order actually stands. The row used to derive that from
+            // `failures`, which is a draft-time compile result and therefore
+            // zero for every running order for ever — so every running order,
+            // including one halted at a gate two hours earlier, said "ready to
+            // hand off".
+            standing,
+            // The one answer the operator owes, so the row can carry it. Only
+            // what the buttons need: this list is polled.
+            gate:
+              holding === undefined
+                ? null
+                : { id: holding.id, options: holding.options, breach: holding.breach ?? null },
+            // Absent when this host has never wired a records location for CI;
+            // null once it has one and this order has not shipped a pull yet.
+            ...(deps.dataRoot === undefined
+              ? {}
+              : {
+                  ci: await readCiState(deps.dataRoot(), order.id).then((state) => {
+                    if (state === null) return null
+                    const checks = state.pulls.flatMap((pull) => pull.checks)
+                    return {
+                      status: state.status,
+                      round: state.round,
+                      max: state.max,
+                      reason: state.reason,
+                      checks: {
+                        done: checks.filter((check) => check.bucket !== 'pending').length,
+                        total: checks.length,
+                      },
+                    }
+                  }),
+                  // Where the pull requests are, for the link on the row.
+                  pulls:
+                    order.status === 'draft'
+                      ? []
+                      : (await readPulls(deps.dataRoot(), order.id)).map((pull) => ({
+                          number: pullNumber(pull.url),
+                          url: pull.url,
+                        })),
+                }),
+            // Where this order stands in the refinery's file-overlap queue.
+            // Null when it is not in a queue at all, or the host has never
+            // wired the refinery.
+            queue: queuePositions?.find((position) => position.orderId === order.id) ?? null,
+          }
+        })
       ),
     }
   }

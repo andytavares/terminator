@@ -55,6 +55,11 @@ export interface BriefInput {
    * path the read-only policy lets through.
    */
   readonly outputPath?: string
+  /**
+   * The order's own `outputs/` directory, named to a role that hands back a
+   * document so it can write one outside the checkout. Absent for the rest.
+   */
+  readonly outputsDir?: string
 }
 
 function oneUnit(order: WorkOrder, unit: PlanUnit, heading: string): string[] {
@@ -223,7 +228,7 @@ function notesSection(order: WorkOrder): string[] {
  * being enforced rather than requested.
  */
 export function brief(input: BriefInput): string {
-  const { order, role, units, rules, command, outputPath, feedback = [] } = input
+  const { order, role, units, rules, command, outputPath, outputsDir, feedback = [] } = input
 
   // A `run` step is a command, not a conversation. Wrapping it in context
   // would invite an agent to reinterpret it.
@@ -307,7 +312,7 @@ export function brief(input: BriefInput): string {
   // four of the standard shape's nine steps were told what to think about and
   // never where to put it.
   if (outputPath !== undefined) {
-    const contract = rungOutputContract(outputPath, collectableWrites(role ?? null))
+    const contract = rungOutputContract(outputPath, collectableWrites(role ?? null), { outputsDir })
     if (contract !== '') sections.push(contract)
   }
 

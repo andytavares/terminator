@@ -45,6 +45,7 @@ const REVIEW_ROUND = 'review.round'
 const REVIEW_REFUSED = 'review.refused'
 const REVIEW_EXHAUSTED = 'review.exhausted'
 const REVIEW_ANOTHER_PASS = 'review.another_pass'
+const REVIEW_SKIPPED = 'review.skipped'
 
 export type IntakeOutcome =
   /** Intake has never run on this order. */
@@ -187,6 +188,7 @@ export function loopFacts(entries: readonly LedgerEntry[]): LoopFacts {
   let heldAt: string | null = null
   let releasedAt: string | null = null
   let lastOfStartedOrExhausted: 'started' | 'exhausted' | null = null
+  let skipped: string | undefined
 
   for (const entry of entries) {
     if (entry.action === REVIEW_STARTED) {
@@ -205,6 +207,10 @@ export function loopFacts(entries: readonly LedgerEntry[]): LoopFacts {
       const open = [...rounds].reverse().find((round) => round.finishedAt === null)
       if (open !== undefined) open.finishedAt = entry.at
       if (entry.action === REVIEW_EXHAUSTED) lastOfStartedOrExhausted = 'exhausted'
+    } else if (entry.action === REVIEW_SKIPPED) {
+      skipped = entry.reason
+    } else if (entry.action === REDRAFTED) {
+      skipped = undefined
     } else if (entry.action === REVIEW_HELD) {
       heldAt = entry.at
     } else if (entry.action === REVIEW_RELEASED) {
@@ -216,6 +222,7 @@ export function loopFacts(entries: readonly LedgerEntry[]): LoopFacts {
     rounds,
     heldAt: heldAt !== null && (releasedAt === null || heldAt > releasedAt) ? heldAt : null,
     exhausted: lastOfStartedOrExhausted === 'exhausted',
+    ...(skipped === undefined ? {} : { skipped }),
   }
 }
 
@@ -244,7 +251,7 @@ export function turnEndedAt(entries: readonly LedgerEntry[]): string | null {
 /** Whether a red-team round finished after the plan last changed. */
 export function reviewedCurrentPlan(entries: readonly LedgerEntry[]): boolean {
   for (let i = entries.length - 1; i >= 0; i -= 1) {
-    if (entries[i].action === REVIEW_ROUND) return true
+    if (entries[i].action === REVIEW_ROUND || entries[i].action === REVIEW_SKIPPED) return true
     if (entries[i].action === REDRAFTED) return false
   }
   return false

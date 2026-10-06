@@ -277,7 +277,7 @@ describe('no form control may drift back to a native or half-styled widget', () 
     const withInline = tsFiles.filter((f) => /accentColor/.test(readFileSync(f, 'utf8'))).map(rel)
     expect(withInline.sort()).toEqual([
       // passes the workspace colour to a pop-out window as a URL param
-      'extensions/git-integration/src/index.ts',
+      'extensions/git-integration/src/review-command.ts',
       // reads that param and paints a 3px accent bar
       'src/renderer/ExtensionWindowView.tsx',
     ])

@@ -117,6 +117,14 @@ export interface StandingInput {
    * operator, which without this reads as an order that has been abandoned.
    */
   readonly waitingOn?: { readonly id: string; readonly title: string } | null
+  /**
+   * Where the document is, when the run ended on one. Running orders only.
+   *
+   * A document outside the checkout has no pull request, so the run finishes
+   * without shipping anything. That is the end of the work, not a refusal to
+   * ship it.
+   */
+  readonly documentReady?: string | null
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -138,6 +146,21 @@ export function standingOf(input: StandingInput): Standing {
   const running = nodes.filter((n) => n.state === 'running' || n.state === 'verifying').length
   const failed = nodes.filter((n) => n.state === 'failed').length
   const counts = { done, total, gateId: null, waitingOn: null }
+  const holding = input.gates.find((gate) => gate.decision === null)
+
+  // A shipped order can still be waiting: the draft pull request's
+  // ready-for-review gate opens after the work is done, and it is the operator's.
+  if (input.status === 'shipped' && holding !== undefined) {
+    return {
+      ...counts,
+      kind: 'halted',
+      turn: 'you',
+      gateId: holding.id,
+      label: holding.summary,
+      headline: `Shipped — ${holding.summary}`,
+      detail: 'The work shipped. One decision is still open, and it is yours.',
+    }
+  }
 
   if (input.status === 'shipped') {
     return {
@@ -190,7 +213,6 @@ export function standingOf(input: StandingInput): Standing {
 
   // Halted before anything else. Nothing the line does next is scheduled until
   // this is answered, so every other condition below is a symptom of it.
-  const holding = input.gates.find((gate) => gate.decision === null)
   if (holding !== undefined) {
     return {
       ...counts,
@@ -269,6 +291,17 @@ export function standingOf(input: StandingInput): Standing {
       label: 'stalled',
       headline: 'Stopped making progress',
       detail: `${n} ${plural(n, 'run', 'runs')} stopped making progress without asking for anything.`,
+    }
+  }
+
+  if (input.documentReady !== undefined && input.documentReady !== null) {
+    return {
+      ...counts,
+      kind: 'done',
+      turn: 'foundry',
+      label: 'Finished · document ready',
+      headline: 'Finished · document ready',
+      detail: `The author handed back the document, and there is no pull request to open for it: ${input.documentReady}`,
     }
   }
 
@@ -365,6 +398,8 @@ export interface StandingSources {
   readonly intakeRefusedFor?: (orderId: string) => Promise<string | null>
   /** Why this order's run last stopped on an error or refused to ship. */
   readonly runFailureFor?: (orderId: string) => Promise<string | null>
+  /** Where this order's run left its document, when it ended on one. */
+  readonly documentReadyFor?: (orderId: string) => Promise<string | null>
   /** The order whose merge this order is waiting for, when it is. */
   readonly waitingOnFor?: (
     orderId: string
@@ -399,6 +434,8 @@ export async function readStanding(order: WorkOrder, sources: StandingSources): 
     // nothing.
     runFailure:
       order.status === 'running' ? ((await sources.runFailureFor?.(order.id)) ?? null) : null,
+    documentReady:
+      order.status === 'running' ? ((await sources.documentReadyFor?.(order.id)) ?? null) : null,
     waitingOn:
       order.status === 'running' ? ((await sources.waitingOnFor?.(order.id)) ?? null) : null,
   })

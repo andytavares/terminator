@@ -15,13 +15,12 @@ Architecture and the verified hook contract:
 The **supervision panel** sits above the board (`components/SupervisionPanel.tsx`)
 in four sections:
 
-| Section     | Reads                                      | Answers                                |
-| ----------- | ------------------------------------------ | -------------------------------------- |
-| **runs**    | `foundry:supervision-snapshot`             | what is running, and how it is going   |
-| **stalls**  | `foundry:stalls-list`                      | what stopped making progress           |
-| **review**  | `foundry:supervision-snapshot`             | what is waiting on a decision from you |
-| **feed**    | `foundry:feed-list`, `foundry:feed-digest` | what happened while you were away      |
-| **history** | `foundry:supervision-snapshot`             | what is over, and what it did          |
+| Section     | Reads                                      | Answers                              |
+| ----------- | ------------------------------------------ | ------------------------------------ |
+| **runs**    | `foundry:supervision-snapshot`             | what is running, and how it is going |
+| **stalls**  | `foundry:stalls-list`                      | what stopped making progress         |
+| **feed**    | `foundry:feed-list`, `foundry:feed-digest` | what happened while you were away    |
+| **history** | `foundry:supervision-snapshot`             | what is over, and what it did        |
 
 A card's drawer shows the same run: the phase's console renders the **terminal's
 transcript**, with **Open the terminal** next to it. A supervised phase
@@ -37,7 +36,7 @@ process, so a core store imported into it is a second copy that nothing renders.
 The **permission queue** sits above it, because a held tool call is the one
 state where nothing moves until a person acts.
 
-The **command palette** (`Cmd+P`) carries every live run and every queued diff, worst
+The **command palette** (`Cmd+P`) carries every live run, worst
 state first — `waiting`, `stalled`, `ready`, `working`. Choosing one focuses the
 window and lands on the thing: a run's terminal if it still has one, otherwise
 the panel opened on it.
@@ -98,6 +97,16 @@ buttons here, each over its consequence, answered through `foundry:inbox.decide`
 — the same channel the inbox answers them with. This is not a second queue; the
 inbox stays the cross-order one. It is this order's one blocking thing, put
 where the person looking at the order will see it.
+
+The same gate is drawn the same way in three more places, all through the one
+`GateCard` (a line with the answers on it, the reason a click away, read as
+markdown): the Inbox, the factory hall's pinned cards, and — as just its answers
+— the order list's row. A row whose move is yours carries the gate's first two
+answers inline; a raise, which needs a number typed, is not offered there and is
+answered on the Floor or in the Inbox. A shipped order's open ready-for-review
+gate is answerable in all of them. A row also links the pull request and the
+ticket, and while CI is watching or fixing says so with a spinner and
+**k of n checks done**.
 
 `adrift` and `stranded` carry their moves the same way — _Pick it back up_ and
 _Go to its terminal_. The separate "nothing is running this" panel is gone with
@@ -455,15 +464,12 @@ When the session is gone — the tab was closed, the console restarted —
 
 ## What is over
 
-Approving a phase takes its diff off the review queue and its run off the live
-list, and writes a row into **history** instead.
+Approving a phase takes its run off the live list, and writes a row into
+**history** instead.
 
-Neither happened before. The queue kept offering work that had already been
-accepted — and since the queue is what backpressure counts, three approved
-phases were enough to refuse the next run outright. The run list, meanwhile, was
-the only record there was, so it stacked every finished phase forever and by the
-third card answered "what has this workspace ever done" rather than "what is
-happening now".
+The run list was the only record there was, so it stacked every finished phase
+forever and by the third card answered "what has this workspace ever done"
+rather than "what is happening now".
 
 History records one row per phase (`approved`, `stopped`, `discarded`, `ended`)
 with what that phase actually did — turns, diff, how often it asked. It is in
@@ -478,62 +484,24 @@ later, and stayed in the Stalls tab offering to interrupt work that was done.
 
 ## Review
 
-A finished turn with changes goes into the queue **worst first**, graded by what
-it touched (`runtime/review/risk-grader.ts`):
+**Foundry does not review, and it keeps no review queue.** Review happens on the
+pull request: the Floor's **Review** button runs the git extension's
+`review-pull-request` command for the draft pull request (and says **Open on
+GitHub** when that extension is off). The per-hunk review, its queue, the
+backpressure gate that counted the queue and the channels that drained it
+(`foundry:review-advance`, `foundry:review-done`) were removed; nothing counts
+finished turns any more, and `run.start` is never refused for them.
 
-| Grade  | Trigger                                                        |
-| ------ | -------------------------------------------------------------- |
-| **P0** | auth, payments, secrets, migrations, public API, critical path |
-| **P1** | schema change, shared contract file, >300 changed lines        |
-| **P2** | ordinary feature work                                          |
-| **P3** | formatting, lockfile-only, dep bumps with green CI             |
-
-The grade is always shown with **its trigger**. A grade with no reason is a
-number you learn to ignore.
-
-The unit of decision is the **hunk**, not the file: one file routinely holds both
-the change you asked for and the one you did not, and accepting a file wholesale
-is how the second one ships. A review cannot be finished with a hunk still
-undecided, and a fully rejected branch says so rather than offering a merge.
-
-**Finishing a review applies it.** The rejected hunks are reverted out of the
-working copy (`git apply --reverse` against a patch rebuilt from exactly those
-hunks) and the accepted ones stay. The button says which it is going to be
-before you press it — "revert 2 hunks" or "keep everything" — because this is
-not undoable from here. If git refuses the patch the review stays open with the
-reason, rather than closing over a rejection that never landed: a reject that
-changes nothing is worse than no review, because you believe the change is gone.
+What stays of the grading is `runtime/review/risk-grader.ts`, which the gates
+and the verification ladder read: a change's grade (P0 to P3) and the trigger
+that produced it. A grade is always shown with **its trigger** — a grade with
+no reason is a number you learn to ignore.
 
 Checks are reported as `unavailable` rather than assumed passing — the extension
 does not poll a code host, and assuming green would let a change auto-merge on
 evidence nobody has.
 
-## Backpressure
-
-**Three unreviewed diffs and a new run is refused**, with the reason and the
-depth. The constraint is one person's capacity to review, which does not scale
-with the number of cards.
-
-The refusal appears in the Forge, with **Start anyway** next to it. Overriding
-is one click and is recorded twice — in the order's own ledger as
-`backpressure.overridden`, and in `foundry-runtime/backpressure-overrides.jsonl`
-— both carrying **the queue depth at the moment it was ignored**, so the debt
-built by overriding is visible afterwards rather than only felt.
-
-`run.start` is what asks. It did not, for the whole of this feature's first
-life: the gate was built, the Floor showed its verdict, and nothing consulted
-it — so runs began regardless and the override had nothing to override. This
-section described the behaviour anyway.
-
-## Review steps, and multi-repository cards
-
-A review is walked in four steps — **intent → risk → structure → tests**. Intent
-is first deliberately: it is the step that catches work which is defensible in
-isolation and was never asked for, and reading the diff first is how you end up
-justifying such work instead of questioning it. It reads what the card asked for
-against the agent's own account of what it did against what actually changed.
-
-### Multi-repository cards
+## Multi-repository cards
 
 A card that touches more than one repository declares **lanes** in a
 `workitem.json` the plan phase writes into the feature directory — the contract
@@ -830,13 +798,13 @@ waiting on it and sends you to the terminal.
 
 ## Where state lives
 
-- **In memory** — the run register, the review queue, the stall firings. A run
+- **In memory** — the run register, the stall firings. A run
   does not outlive the application: its terminal is a child of this process, and
   a registry reloaded from disk would describe runs that no longer exist. What
   survives is the **graph**, not the sessions — see "A run whose agents are
   gone" for how the two are reconciled when the application reopens.
 - **On disk**, under `userData/foundry-runtime/` — the feed
-  (`feed.jsonl`), backpressure overrides, mute rules, and the per-session
+  (`feed.jsonl`), mute rules, and the per-session
   `--settings` files and hook script.
 - **In the browser** — when you last read the feed. That is a property of the
   person looking, not of the runs.

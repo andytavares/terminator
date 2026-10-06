@@ -117,7 +117,7 @@ describe('FactorySite', () => {
       { id: 'WO-1', title: 'Shipping', status: 'running', ci: { status: 'red', round: 2, max: 3 } },
     ])
     await waitFor(() => screen.getByText('Shipping'))
-    expect(screen.getByText('CI check round 2 of 3: failing')).toBeTruthy()
+    expect(screen.getByText('CI · Failed after 3 fixes')).toBeTruthy()
   })
 
   it('says nothing about CI for an order that has not shipped one', async () => {

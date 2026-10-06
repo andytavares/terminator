@@ -25,6 +25,15 @@ declare global {
         invoke(channel: string, payload?: unknown): Promise<unknown>
         on(channel: string, handler: (data: unknown) => void): () => void
       }
+      /** Optional: a view that is not hosted by the application has no shell. */
+      shell?: { openExternal(url: string): Promise<{ ok: true } | { error: string }> }
+      extension?: {
+        runCommand(
+          key: string,
+          args?: unknown
+        ): Promise<{ ok: true } | { ok: false; reason: string }>
+        hasCommand(key: string): Promise<boolean>
+      }
       workspace: { list(): Promise<unknown> }
       project: { create(input: unknown): Promise<unknown> }
     }

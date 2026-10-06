@@ -127,6 +127,9 @@ function collectionAt(path: string, order: WorkOrder): unknown[] | null {
   }
 }
 
+/** `risk.grade is P3`, `risk.grade is not P3`. Only the four grades parse. */
+const GRADE_CONDITION = /^risk\.grade\s+is\s+(not\s+)?(P[0-3])$/
+
 /**
  * `risk.triggers is not empty`, `plan.lanes count > 1`.
  *
@@ -144,6 +147,12 @@ export function evaluateWhen(expression: string | undefined, order: WorkOrder): 
     return negated === undefined ? measured : !measured
   }
 
+  const grade = GRADE_CONDITION.exec(expression.trim())
+  if (grade !== null) {
+    const matches = order.risk.grade === grade[2]
+    return grade[1] === undefined ? matches : !matches
+  }
+
   const emptiness = /^([\w.]+)\s+is\s+(not\s+)?empty$/.exec(expression.trim())
   if (emptiness !== null) {
     const items = collectionAt(emptiness[1], order)
@@ -159,6 +168,53 @@ export function evaluateWhen(expression: string | undefined, order: WorkOrder): 
   }
 
   return false
+}
+
+/**
+ * The condition in words, for the record of a step that did not run.
+ *
+ * Meant for an expression `evaluateWhen` judged false; one it cannot read is
+ * quoted rather than guessed at.
+ */
+export function whenSkipReason(expression: string, order: WorkOrder): string {
+  const text = expression.trim()
+
+  const toolchainSet = /^toolchain\.(\w+)\s+is\s+(not\s+)?set$/.exec(text)
+  if (toolchainSet !== null) {
+    const [, check, negated] = toolchainSet
+    return negated === undefined
+      ? `runs only when the repository has a ${check} command; it has none`
+      : `runs only when the repository has no ${check} command; it has one`
+  }
+
+  const grade = GRADE_CONDITION.exec(text)
+  if (grade !== null) {
+    return grade[1] === undefined
+      ? `runs only when the change is graded ${grade[2]}; it is graded ${order.risk.grade}`
+      : `runs only when the change is not graded ${grade[2]}; it is graded ${order.risk.grade}`
+  }
+
+  const emptiness = /^([\w.]+)\s+is\s+(not\s+)?empty$/.exec(text)
+  if (emptiness !== null) {
+    const [, path, negated] = emptiness
+    const size = collectionAt(path, order)?.length ?? 0
+    if (path === 'risk.triggers') {
+      return negated === undefined
+        ? `runs only when no risk triggers fire; this order has ${size}`
+        : 'runs only when risk triggers fire; this order has none'
+    }
+    return negated === undefined
+      ? `runs only when ${path} is empty; it has ${size}`
+      : `runs only when ${path} is not empty; it is empty`
+  }
+
+  const count = /^([\w.]+)\s+count\s+(>=|<=|>|<|==|!=)\s+(\d+)$/.exec(text)
+  if (count !== null) {
+    const size = collectionAt(count[1], order)?.length ?? 0
+    return `runs only when ${text}; it has ${size}`
+  }
+
+  return `condition "${text}" was false`
 }
 
 function compareNumbers(left: number, operator: string, right: number): boolean {

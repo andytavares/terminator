@@ -637,9 +637,14 @@ says:
 
 - **which rule raised it** — `risk.p0`, `budget.exceeded`, `destructive`,
   `ready-for-review`, and five more;
-- **why it fired**, and the evidence it looked at;
-- **what each option does**, on the button itself;
-- **what happens if you ignore it**, and whether it will wait for ever.
+- **what it asks**, on one line, with the risk, the pull request and ticket
+  links and **what happens if you ignore it** (and whether it will wait for
+  ever) under it;
+- **the answers**, on the same line — the first is the recommended one;
+- **why it fired**, and the evidence it looked at, when you click the row. The
+  reason is formatted text; the evidence starts closed.
+
+The same line is used for the gate holding an order on its Floor.
 
 When nothing has fired, it says "Nothing needs you" and tells you what is
 building, what is converging, and how many decisions were taken by rule while
@@ -781,25 +786,42 @@ Your choice is saved to the order straight away, recorded in the ledger, and
 used by both your hand-off and the automatic one. The card shows **Your
 choice**, and **Use the proposal** goes back.
 
-Each shape also says how hard its agents think. `quick`, `spike`, `research`
-and `poc` run at `medium` effort; `direct`, `standard`, `bugfix`, `refactor`,
-`speckit` and `design-doc` run at `high`, because a second look, a root cause
-or a refactor that must prove behaviour unchanged is where deeper reasoning
-pays. A recipe of your own sets it with one line, `effort: high`, on the recipe
-or on a single step.
+There are six shapes. **Direct** is the one for a single lane: it builds,
+lints, checks the change with your project's own test command (or a fresh
+verifier when the repository has none), has the change inspected when
+something risky was touched, updates the documentation unless the change is
+the smallest grade, and ships. **Standard** is for work spanning more than one
+lane or graded above ordinary risk. **Bugfix** proves the bug first,
+**refactor** proves behaviour unchanged, and **speckit** runs the Spec Kit
+pipeline where it is installed.
 
-Three shapes are never proposed and are there to be picked: **research**
-(a question whose answer is a document), **design-doc** (the order is attacked
-first, then the document is written and checked by a fresh reader) and **poc**
-(the smallest thing that demonstrates a claim, with a note of what was
-learned). Each still ends in a draft pull request carrying the result. Write
-the acceptance criteria as statements about the document or the demonstration,
-so the verifier has something to check.
+**Research** is never proposed and is there to be picked: a question whose
+answer is a document. The author writes it where the order says. A document in
+the repository ends in a draft pull request. A document the order wants
+somewhere else, or in another repository, is written to the order's own
+outputs folder, or published and linked, and the run finishes on it with
+**Finished · document ready** and no pull request. Write the acceptance
+criteria as statements about the document, so the verifier has something to
+check.
+
+A change that only touches documentation (markdown, `docs/`, `specs/`, a
+readme or a changelog) gets a short final check: format and lint, and the
+rest is marked not run, "documentation only".
+
+Each shape also says how hard its agents think. `direct` and `research` run at
+`medium` effort; `standard`, `bugfix`, `refactor` and `speckit` run at `high`,
+because a second look, a root cause or a refactor that must prove behaviour
+unchanged is where deeper reasoning pays. A recipe of your own sets it with
+one line, `effort: high`, on the recipe or on a single step.
 
 **Tracker** lets you say which of _your_ workflow states each moment means —
 when work starts, when the draft opens, when it merges. Left alone, the tracker
 decides. It also says, for this order alone, what goes back to the issue: the
 agreed order as a comment, the workflow state, and the pull request links.
+The issue moves to In Progress when the work starts, to In Review as soon as the
+draft pull request opens (not after its checks finish), and to Done only once the
+pull request is merged. A team with a single "started" state has no review state,
+so its issue stays In Progress, and the order's history says why.
 
 **Hand off** also says when the repository has no command for a check — **"Not
 measurable here"**. Those report **"not measured"** rather than passing. A green
@@ -814,13 +836,18 @@ work with the shape it names (**Hand off with Direct**). Beside it, **Hand off o
 its own when clean** is the same setting as Settings → Foundry. When it is on,
 an order whose red-team round finds nothing blocking hands itself off, and the
 status strip says so in advance. Afterwards it says **Handed off automatically
-at 13:07:53**, and the ledger records that Foundry agreed it, not you. If the
-run is held back because too much finished work is waiting for your review,
-**Start anyway** appears beside it.
+at 13:07:53**, and the ledger records that Foundry agreed it, not you.
 
 In the list of orders, a row that is waiting on an answer says **"N waiting on
 you"** where the others say what is blocking them — so the count on the Forge
 tab tells you which order to open.
+
+A row also carries what you would otherwise open the order to find: the pull
+request (**#233**) and the ticket (**TAV-15**), each opening in your browser;
+while CI is watching or fixing, a spinner with the same words the Floor uses
+(**First run · up to 2 fixes**) and **1 of 3 checks done**; and, when the move is
+yours, the gate's first two answers on the row itself (a shipped order waiting to
+be marked ready says **Mark ready** right there).
 
 ### Floor — watching a run
 
@@ -833,9 +860,25 @@ what each one is doing: its last few tool calls and messages, newest last, with
 how long ago it last did anything. It refreshes every two seconds. An agent that
 has just started says **Starting — nothing yet.**
 
-**To review** opens finished work hunk by hunk. Each hunk is shown as a diff,
-with line numbers from the new file, added and removed lines tinted, and the
-code syntax-highlighted, in the same colours as the Git view.
+Under the title sit the **pull request** (`#233`) and the **ticket** (`TAV-15`)
+the order came from, once they exist; each opens in your browser. Next to them,
+**Review** opens that pull request in the Git extension's review. With the Git
+extension turned off the button says **Open on GitHub** and opens the pull
+request there instead. Foundry no longer draws a hunk-by-hunk review of its
+own.
+
+Once the draft pull request is open the **CI** card says where the checks
+stand in words (**First run · up to 2 fixes**, **Fix 1 of 2**, **Passed**), shows
+a spinner while it is still watching or sending failures back, counts the
+checks that have finished (**1 of 2 checks done**) as they arrive, and links
+the pull request and each check.
+
+Each step is a chip. A step that passed reads **done**; a skipped step says why
+when you hover it (**Skipped: runs only when risk triggers fire; this order has
+none**). The scroll icon (**Transcript**) opens that step's transcript directly
+under its row; the terminal icon appears only while the step is running, since
+a finished step's terminal is closed. If going to a terminal is refused, the
+reason shows next to that step.
 
 Two things you can do without leaving:
 
@@ -850,17 +893,6 @@ Two things you can do without leaving:
 - **Watch** a unit to read its transcript, and **Redirect**, **Interrupt** or
   **Stop** it. The terminal is always there as the backstop: the agent runs in
   a real terminal in its own worktree project, and you can go and type at it.
-
-### When it refuses to start another one
-
-Three finished pieces of work waiting for your review, and starting a fourth is
-refused — with the count and the limit, and **Start anyway** next to it. The
-constraint being modelled is your own capacity to read a diff, which does not
-grow with the number of orders.
-
-Overriding is one click, and what you chose to ignore is recorded with it: the
-order's ledger gets `backpressure.overridden` naming the depth at that moment.
-The debt is visible afterwards rather than only felt.
 
 ### Autonomy — how much it asks you
 
@@ -917,6 +949,13 @@ whether to **mark it ready** — never whether to create it.
 For an order graded at either of the two highest risk levels, your decision is
 taken **before** anything reaches the remote. For everything lower the draft
 opens first, so review happens on a real change.
+
+For a change that needs no inspection and is graded below the two highest
+levels, the draft opens as soon as the work is done, and the final check runs
+while the draft's own checks do. "Mark it ready?" appears only when both are
+green; if the final check fails, the draft stays a draft and you are asked what
+to do about the failed check. The recipe's last step reads as running until
+then, because it is: shipping is still under way.
 
 ### Where Foundry keeps its things
 

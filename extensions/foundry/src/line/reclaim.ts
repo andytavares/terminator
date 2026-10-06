@@ -35,8 +35,13 @@ export interface Reclaimed {
 }
 
 export function orphanedNodes(graph: RunGraph, isLive: SessionLiveness): RunNode[] {
+  // A gate has no session, ever: a `running` ship gate means the tail is owed
+  // (the final check and the CI watch), not that an agent died.
   return graph.nodes.filter(
-    (node) => IN_FLIGHT.includes(node.state) && (node.sessionId === null || !isLive(node.sessionId))
+    (node) =>
+      node.kind !== 'gate' &&
+      IN_FLIGHT.includes(node.state) &&
+      (node.sessionId === null || !isLive(node.sessionId))
   )
 }
 

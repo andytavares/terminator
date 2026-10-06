@@ -63,6 +63,23 @@ describe('preload-webview', () => {
     expect(typeof api['extensionBridge']['invoke']).toBe('function')
   })
 
+  it('runCommand and hasCommand invoke the extension channels with key and args', async () => {
+    const { ipcRenderer } = await import('electron')
+    const api = exposed['electronAPI'] as Record<
+      string,
+      Record<string, (...a: unknown[]) => unknown>
+    >
+    api['extension']['runCommand']('ext.command.open', { n: 1 })
+    api['extension']['hasCommand']('ext.command.open')
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('extension:run-command', {
+      key: 'ext.command.open',
+      args: { n: 1 },
+    })
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('extension:has-command', {
+      key: 'ext.command.open',
+    })
+  })
+
   it('exposes workspace.list as a function', () => {
     const api = exposed['electronAPI'] as Record<string, Record<string, unknown>>
     expect(typeof api['workspace']['list']).toBe('function')

@@ -1081,8 +1081,8 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   `scheduler.rework`: the target's node in the checked lane, everything between
   it and the check, and the check go back to `waiting`, and the target's
   `feedback` carries the command, exit status and the last 120 lines of output
-  into the builder's next brief. Ledger: `rework.started`. `quick`, `direct`,
-  `standard`, `bugfix` and `poc` lint in the lane right after the build when the
+  into the builder's next brief. Ledger: `rework.started`. `direct`,
+  `standard` and `bugfix` lint in the lane right after the build when the
   probe found a lint command. Before a node resumes a lane's conversation, its
   previous process is ended (`endSession` → `endAndWait`).
 - **Skills are mounted, never installed** (ADR-065). Roles and steps declare
@@ -1109,28 +1109,47 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   an order it may not change — `applyRungOutput` refuses a `plan` from a rung —
   so it could only end in silence or a halt. It cost 8.2 minutes doing neither.
 - **The shape is chosen from lanes and risk, never from unit count**
-  (`proposeRecipe`, `recipeLadder`): `quick` (one lane, P3, nothing flagged) →
-  `direct` (one lane, P2 or a trigger fired) → `standard` (more than one lane,
-  or above P2). A proposal walks the ladder to the first shape this repository
-  can run — `quick` needs a `test` command, being the only check it has — while
-  an operator's explicit choice is honoured or refused, never quietly swapped.
+  (`proposeRecipe`, `recipeLadder`): `direct` (one lane at P2 or P3,
+  flagged or not) → `standard` (more than one lane, or above P2). `direct`
+  needs nothing from the repository: it checks with the project's own test
+  command when there is one and with a fresh verifier when there is not (ADR
+  086). A proposal walks the ladder to the first shape this repository can
+  run, while an operator's explicit choice is honoured or refused, never
+  quietly swapped.
 - **Effort is a property of the shape** (ADR-050). A recipe declares
   `effort: low | medium | high | xhigh | max`, every agent step inherits it and
   a step may override it; the executor hands it to the launch beside the model
-  tier and `buildLaunchSpec` passes it as `--effort`. `quick`, `spike`,
-  `research` and `poc` run at `medium`, every other built-in at `high`. A recipe that declares none
+  tier and `buildLaunchSpec` passes it as `--effort`. `direct` and
+  `research` run at `medium`, every other built-in at `high`. A recipe that declares none
   passes no flag, and a fast-tier role is never passed one — the fast model
   does not take it.
-- **Three shapes produce a document or a demonstration, not a code change**:
-  `research` (scout, author, fresh verifier), `design-doc` (scout, author, fresh
-  verifier; the order was already attacked in the Forge) and `poc` (builders by lane, fresh
-  verifier, scribe). All three still end in a draft pull request — the
-  deliverable has to land somewhere a reviewer looks — and none is proposed by
-  the ladder; an operator picks them in the Forge. The **author** role is the
-  tenth: deep tier, writes `docs` in the checkout, edits nothing else. Two
-  universal rules ship with them, `scope-as-asked` (L3) and `outcome-first`
-  (L0), so every brief carries the scope discipline and the lead-with-the-
-  outcome instruction the model guidance calls for.
+- **Six shapes** (ADR 086): `direct`, `standard`, `bugfix`, `refactor`,
+  `speckit` and `research`. `direct` builds by lane, lints, checks (the test
+  command as a `check` step when the repository has one, a fresh `verify` agent
+  when it has not), inspects on a risk trigger, documents unless the change is
+  graded P3, and ships. `research` (scout, author, fresh verifier) is the one
+  shape whose product is a document, and it is never proposed: an operator
+  picks it in the Forge.
+- **Agents' work is committed by the line, and an empty change is a failure**
+  (ADR 086). After an agent whose role may write the checkout passes, the
+  executor commits its lane's worktree (`commitNode` → `commitWorktree`) with
+  `<step>: <unit titles>`. A builder or author that passed with nothing to
+  commit fails with `made no change to the checkout` (`step.no_change`); a
+  scribe with nothing to document does not, and neither does an author whose
+  document is outside the checkout.
+- **The author hands back a document** (ADR 086). `writes: [docs, document]`:
+  the author writes `{ path, url?, location }` to its rung file, collected
+  like the other artefacts onto `order.document` and recorded as
+  `document.handed_back`. It may write under `<order>/outputs/` (named in its
+  brief) as well as documentation in the checkout. `checkout` ships as a pull
+  request; `outputs` and `published` open none, and the run ends on
+  `run.document_ready`, which `standingOf` reads as done, "Finished · document
+  ready". An author that hands nothing back fails the run with "the author
+  handed back no document".
+- **A documentation-only change runs a short final check** (ADR 086). When every
+  changed path is documentation (`*.md`, `docs/`, `specs/`, `README*`,
+  `CHANGELOG*`), `ladderFor` leaves only Format and Lint runnable and marks the
+  other command steps not run, reason "documentation only".
 - **Roles** are YAML data too, with a write list. A role with none is run
   read-only, enforced by the `PreToolUse` hook rather than by its prompt.
   `verifier` carries `allowResume: false`, and `assertResumable` refuses to
@@ -1276,6 +1295,21 @@ it ready — never whether to create it. For the two highest risk grades the
 operator decides before anything reaches the remote; for everything lower the
 draft opens first, so review happens on a real change.
 
+**The draft opens before the final check** (ADR-085, `src/line/early-ship.ts`).
+`shipOrder` is `openDrafts` then `watchAndFinish`. For a run whose work is done,
+with no open gate and no inspection owed, and a grade below P1, the executor
+calls `beforeFinalCheck` just before the ladder climbs: the drafts open and the
+CI watch starts, and the ladder runs beside it. The ready gate is raised only
+when the ladder passed and CI is green. A failed ladder raises the executor's
+`verify.*` gates, records `ship.final_check_failed` and leaves the draft a
+draft. Files a check wrote are committed (`commitWorktree`), pushed and watched
+again. A lane already in `pulls.json` is reused, never created twice. The
+recipe's terminal `ready-for-review` node stays `running` through all of this;
+`settleShip` passes it when the ready gate is raised and returns it to
+`waiting` if shipping stopped short, and `reclaim` ignores a running gate. The
+ladder runs each distinct command once (`reusedFrom` on the step outcome), and
+a role that writes only `docs` is refused edits outside documentation paths.
+
 **CI is a check with rounds** (ADR-064, `src/line/ci.ts`, `src/line/ship-tail.ts`).
 Before the ready gate, a recipe with `ci: { rounds }` has every draft's checks
 polled through `gh pr checks --json` until nothing is pending. Green adds "CI
@@ -1283,7 +1317,14 @@ passed" to the ready gate; no checks is "not measured", never green. Red with
 rounds left sends `gh run view --log-failed` back to the build step as `ci`
 feedback, runs the Line again and pushes the lanes (`pushLanes`). With the
 rounds spent, `ci.red` replaces the ready gate, and its "Another round" runs
-one more. The state is in the order's `ci.json`.
+one more. The state is in the order's `ci.json`, rewritten whenever the set of
+check buckets changes while a round is watched (and `ci.watching` is recorded as
+each round starts); `ciLabel` (`src/line/ci-state.ts`) is the words a surface
+shows for it. The ready gate's `why` is Markdown, one fact per line: units and CI,
+Acceptance (or "No verdicts were recorded"), Inspection ("Not run: <reason>"
+when it was skipped), Not measured here, Judged against. A skipped `RunNode`
+carries `skipReason` (from `whenSkipReason`, or "no <name> command in this
+repository" for an unresolved `run` step).
 
 **The refinery restacks, it never merges** (ADR-067, `src/line/refinery.ts`,
 `src/line/restack.ts`). Running and shipped orders in one repository and base
@@ -1309,6 +1350,17 @@ workflow state (`ExtensionAPI.issues.transition`, v2.3.0, ADR-041), and the
 pull request links. A tracker write never affects the work: a failure is
 retried, an unsupported capability is recorded once at agreement and never
 asked about again.
+
+The state follows the work, at three moments: the run starting moves the issue
+to In Progress; opening the draft moves it to In Review (`shipOrder` calls
+`IntegrateDeps.onDraftOpened` once every lane's draft is open, before the CI
+watch, so the move no longer waits for CI); and the issue goes to Done only when
+the refinery tick first sees every lane's pull request merged
+(`RefineryTickDeps.onMerged`, once per order, guarded by `mergedAt`). Marking a
+draft ready writes nothing to the tracker. Each successful write records
+`writeback.ok` in the ledger beside the existing `writeback.failed`. A Linear
+team with a single started state has no review state: the In Review move fails
+and the ledger says the issue stays In Progress for that reason.
 
 ### Sensors and signals (`src/sensors/`, ADR-066)
 
@@ -1370,13 +1422,15 @@ App
   ├─ Inbox   — the one surface required to visit: one queue, ranked by how much
   │            work each decision unblocks, every row naming the rule that
   │            raised it and what happens if it is ignored
-  ├─ Orders  — the door
+  ├─ Orders  — the door; a row links its pull request and ticket, spins while
+  │            CI works, and answers an open gate in place. The factory hall
+  │            draws its waiting gates through the same one-line gate card
   │    ├─ Forge  — steps (intent → hand off), five checks, at most three questions
   │    └─ Floor  — the standing band with each running agent's last few
   │                transcript lines, the run graph, the merge order, held tool
-  │                calls, review hunks as highlighted diffs (`HunkLines`,
-  │                highlight.js on the --tm-syntax-* tokens), and a way into
-  │                the terminal
+  │                calls, the pull request and ticket links, the CI card, a
+  │                Review button that runs the git extension's
+  │                `review-pull-request` command, and a way into the terminal
   ├─ Ledger  — every decision, filtered by order / actor / action; the one
   │            button that asks the curator
   └─ Settings — the model picker; everything else is registered through the
@@ -1415,6 +1469,12 @@ App
 - [ADR-067: the refinery restacks, it never merges](adr/067-the-refinery-restacks-it-never-merges.md) — overlapping orders queue; a merge restacks the later ones with lease and rechecks CI, or raises `refinery.conflict`.
 - [ADR-066: sensors propose work, they never start it](adr/066-sensors-propose-never-start.md) — YAML sensors on a tick while the app is open, clustered signals in the Inbox, promote seeds a draft.
 - [ADR-065: skills are mounted, never installed](adr/065-skills-are-mounted-never-installed.md) — `skills:` on roles and steps, three rungs, copied per node and passed with `--add-dir`.
+- [ADR-087: the hall labels what it draws](adr/087-the-hall-labels-what-it-draws.md) — scoreboard, queue plate, junctions and CI tower say what they mean; aggregates replace per-check lamps; CI is recorded for replay.
+- [ADR-086: six shapes and a document hand-back](adr/086-six-shapes-and-a-document-hand-back.md) — design-doc, poc, spike and quick removed; Foundry commits what agents write; research finishes on a document.
+- [ADR-085: the draft opens before the final check](adr/085-the-draft-opens-before-the-final-check.md) — the final check runs beside CI; the scribe writes documentation only; repeated commands run once; the ship node stays running.
+- [ADR-084: shaping starts with the architect](adr/084-shaping-starts-with-the-architect.md) — the scout runs beside the first draft; small orders skip the red team; amends ADR 075.
+- [ADR-083: extension commands take validated arguments](adr/083-extension-commands-take-arguments.md) — `api.commands.register` accepts an `args` schema; views run another extension's command by id; v2.7.0.
+- [ADR-082: the hall keeps time for its animations](adr/082-the-hall-keeps-time-for-its-animations.md) — a beat scheduler gives each animation its minimum time; replay starts at the first movement; idle crew wander.
 - [ADR-064: CI is a check with rounds](adr/064-ci-is-a-check-with-rounds.md) — drafts' CI is watched, a red one goes back to the builder twice, then `ci.red`.
 - [ADR-063: a failed check sends the work back](adr/063-a-failed-check-sends-the-work-back.md) — run steps run as commands, `onFail` reworks the builder with the failing output, the stalled gate names its node.
 - [ADR-062: the Forge decides what it is sure of](adr/062-the-forge-decides-what-it-is-sure-of.md) — questions at ≥ 90% confidence are decided, low/medium findings dismissable, failing checks sent back up to twice.

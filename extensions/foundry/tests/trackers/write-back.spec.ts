@@ -297,3 +297,48 @@ describe('an order with nothing to write back to', () => {
     expect(issues.comment).not.toHaveBeenCalled()
   })
 })
+
+describe('successful writes are recorded too', () => {
+  it('records writeback.ok for a state move, naming the state the ticket moved to', async () => {
+    await writeBack(order(), 'draft_opened', deps({ issues: port() }), { pulls: [] })
+    expect(record).toHaveBeenCalledWith('writeback.ok', 'TAV-42', 'TAV-42 moved to In Review')
+  })
+
+  it.each([
+    ['started', 'In Progress'],
+    ['merged', 'Done'],
+  ] as const)('says %s moved the ticket to %s', async (event, name) => {
+    await writeBack(order(), event, deps())
+    expect(record).toHaveBeenCalledWith('writeback.ok', 'TAV-42', `TAV-42 moved to ${name}`)
+  })
+
+  it('keeps the event to intent mapping', () => {
+    expect(INTENT_FOR_EVENT).toEqual({
+      agreed: null,
+      amended: null,
+      started: 'started',
+      draft_opened: 'in_review',
+      merged: 'done',
+    })
+  })
+
+  it('records no writeback.ok for a write that failed', async () => {
+    const issues = port({ transition: vi.fn(async () => Promise.reject(new Error('boom'))) })
+    await writeBack(order(), 'started', deps({ issues }))
+    expect(record).not.toHaveBeenCalledWith('writeback.ok', expect.anything(), expect.anything())
+  })
+
+  it('says the ticket stays In Progress when the team has no review state', async () => {
+    const issues = port({
+      transition: vi.fn(async () =>
+        Promise.reject(new Error('No available Linear state on TAV-42 satisfies "in_review"'))
+      ),
+    })
+    await writeBack(order(), 'draft_opened', deps({ issues }), { pulls: [] })
+    expect(record).toHaveBeenCalledWith(
+      'writeback.failed',
+      'TAV-42',
+      expect.stringContaining('stays In Progress because the team has no review state')
+    )
+  })
+})

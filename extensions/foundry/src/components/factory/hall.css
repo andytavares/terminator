@@ -1,0 +1,76 @@
+/* What the hall labels about what it draws (ADR 087). Loaded beside foundry.css,
+ * which owns the callout's own look; this only adds the pinned variant, the
+ * hover labels and the monitor's line for a step with no agent. */
+
+/* A pinned callout stays up for as long as what it says is true, so it does
+ * not rise and fade, and it is wide enough for its whole sentence. */
+.fdry-callout[data-pinned='true'] {
+  animation: none;
+  opacity: 1;
+}
+
+.fdry-callout[data-pinned='true'] .fdry-callout__text {
+  max-width: none;
+  overflow: visible;
+}
+
+/* A fixture's own label sits over it, and shows its sentence on hover or focus. */
+.fdry-hall-sign {
+  position: absolute;
+  cursor: help;
+}
+
+.fdry-hall-sign:hover,
+.fdry-hall-sign:focus-visible {
+  z-index: var(--tm-layer-panel);
+  outline: 1px dashed rgba(114, 216, 242, 0.6);
+  outline-offset: 1px;
+}
+
+.fdry-hall-sign__tip {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 2px #07090d,
+    0 4px 0 0 rgba(0, 0, 0, 0.35);
+  color: #06202a;
+  background: #72d8f2;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.fdry-hall-sign:hover .fdry-hall-sign__tip,
+.fdry-hall-sign:focus-visible .fdry-hall-sign__tip {
+  display: block;
+}
+
+.fdry-hall-sign[data-place='below'] .fdry-hall-sign__tip {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+/* Near an edge the tip would run off the hall: grow inward instead. */
+.fdry-hall-sign[data-align='end'] .fdry-hall-sign__tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.fdry-hall-sign[data-align='start'] .fdry-hall-sign__tip {
+  left: 0;
+  transform: none;
+}
+
+/* "Automatic step · no agent", above what the step decided. */
+.fdry-crt__auto {
+  margin-bottom: 4px;
+  opacity: 0.8;
+}

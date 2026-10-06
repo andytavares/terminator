@@ -2,8 +2,14 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { z } from 'zod'
 import { amendOrder } from '../order/amend.js'
-import { RED_TEAM_CATEGORIES, WorkOrderSchema, isBlocking } from '../order/schema.js'
-import type { WorkOrder } from '../order/schema.js'
+import {
+  DOCUMENT_LOCATIONS,
+  DocumentHandBackSchema,
+  RED_TEAM_CATEGORIES,
+  WorkOrderSchema,
+  isBlocking,
+} from '../order/schema.js'
+import type { DocumentHandBack, WorkOrder } from '../order/schema.js'
 import type { Role } from '../recipe/parse.js'
 
 // How a rung hands back what it found.
@@ -41,6 +47,8 @@ export const COLLECTABLE = {
   /** Reported, never applied. See `applyRungOutput`. */
   plan: 'plan',
   acceptance: 'acceptance',
+  /** Where the document the order asked for ended up. See `DocumentHandBack`. */
+  document: 'document',
 } as const
 
 export type Collectable = keyof typeof COLLECTABLE
@@ -83,6 +91,7 @@ const SHAPES: Record<Collectable, z.ZodTypeAny> = {
   findings: z.array(AgentFindingSchema),
   plan: orderShape.plan,
   acceptance: orderShape.acceptance,
+  document: DocumentHandBackSchema,
 }
 
 export interface RungOutput {
@@ -90,6 +99,7 @@ export interface RungOutput {
   readonly redTeam?: readonly z.infer<typeof AgentFindingSchema>[]
   readonly plan?: WorkOrder['plan']
   readonly acceptance?: WorkOrder['acceptance']
+  readonly document?: DocumentHandBack
   readonly anotherPass?: boolean
   readonly note: string
 }
@@ -186,6 +196,13 @@ const EXAMPLE: Record<Collectable, string[]> = {
     '    }',
     '  ],',
   ],
+  document: [
+    '  "document": {',
+    '    "path": "where the document is: a path in the checkout, or in outputs/",',
+    '    "url": "the link to it, only when you published it somewhere",',
+    `    "location": "${DOCUMENT_LOCATIONS.join(' | ')}"`,
+    '  },',
+  ],
 }
 
 /** The bar a finding is held to, shown wherever a role may raise one. */
@@ -214,13 +231,31 @@ const REPORTED_NOT_APPLIED = [
   'actually is. Say it in `note` as well as in the field.',
 ]
 
+/** What an author is told about where a document may go. */
+function documentGuide(outputsDir: string | undefined): string[] {
+  return [
+    '',
+    'Say where the document is in `document`. `location` is `checkout` when you',
+    'wrote it in the repository, which ships as a pull request; `outputs` when',
+    'you wrote it to the order\u2019s own directory',
+    ...(outputsDir === undefined ? [] : [`(\`${outputsDir}\`), which ships nothing;`]),
+    'and `published` when you put it somewhere else and have a link for it. Give',
+    'that link as `url`. When the order names a target outside the checkout, or',
+    'in another repository, write the document to outputs and say so here.',
+  ]
+}
+
 /**
  * What to write, and where.
  *
  * Empty for a role with nothing to hand back — a contract offering no keys is
  * an instruction to write `{}`, which is a turn spent producing nothing.
  */
-export function rungOutputContract(file: string, writes: readonly Collectable[]): string {
+export function rungOutputContract(
+  file: string,
+  writes: readonly Collectable[],
+  options: { readonly outputsDir?: string } = {}
+): string {
   if (writes.length === 0) return ''
 
   const body = writes.flatMap((artefact) => EXAMPLE[artefact])
@@ -252,6 +287,7 @@ export function rungOutputContract(file: string, writes: readonly Collectable[])
     '}',
     '```',
     ...(reported ? REPORTED_NOT_APPLIED : []),
+    ...(writes.includes('document') ? documentGuide(options.outputsDir) : []),
     ...(findsThings ? FINDING_BAR : []),
   ].join('\n')
 }
@@ -303,6 +339,8 @@ export interface AppliedRungOutput {
    * itself and which, until this, nothing ever raised.
    */
   readonly defect: string | null
+  /** The document this turn handed back, or null when it handed none. */
+  readonly document: DocumentHandBack | null
   /** The red team asked to attack the fix for its findings too. */
   readonly anotherPass: boolean
 }
@@ -382,6 +420,8 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
       },
     }
   }
+
+  if (output.document !== undefined) next = { ...next, document: output.document }
 
   // What forces the order back to draft, named for the defect message.
   const blockingReasons: string[] = []
@@ -474,6 +514,7 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
       order: next === order ? order : WorkOrderSchema.parse(next),
       note: finalNote,
       defect: null,
+      document: output.document ?? null,
       anotherPass,
     }
   }
@@ -503,6 +544,7 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
     }),
     note,
     defect,
+    document: output.document ?? null,
     anotherPass,
   }
 }
@@ -513,6 +555,7 @@ export type CollectResult =
       readonly order: WorkOrder
       readonly note: string
       readonly defect: string | null
+      readonly document: DocumentHandBack | null
       readonly anotherPass: boolean
     }
   | { readonly ok: false; readonly reason: string }

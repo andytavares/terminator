@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import type { Check } from './ci.js'
+import { recordCi } from '../factory/timeline-store.js'
 
 // The CI state of one order, on disk.
 //
@@ -29,6 +30,14 @@ export async function writeCiState(root: string, orderId: string, state: CiState
     `${JSON.stringify(state, null, 2)}\n`,
     'utf8'
   )
+  // The replay's record of CI. Best effort, as the graph's frame is: the file
+  // just written is the truth, and a timeline that cannot be appended to must
+  // not undo it.
+  try {
+    await recordCi(orderDir(root, orderId), state, Date.now())
+  } catch {
+    // The run goes on without this frame.
+  }
 }
 
 /** A missing or unreadable file is no state, never a thrown surface. */

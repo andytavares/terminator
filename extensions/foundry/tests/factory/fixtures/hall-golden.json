@@ -236,9 +236,9 @@
       {
         "id": "fixture-statuswall",
         "kind": "statuswall",
-        "x": 25,
+        "x": 24,
         "y": 2,
-        "w": 1,
+        "w": 3,
         "h": 1,
         "nodeId": null,
         "seat": null
@@ -1776,9 +1776,9 @@
       {
         "id": "fixture-statuswall",
         "kind": "statuswall",
-        "x": 25,
+        "x": 24,
         "y": 2,
-        "w": 1,
+        "w": 3,
         "h": 1,
         "nodeId": null,
         "seat": null
@@ -2945,9 +2945,9 @@
       {
         "id": "fixture-statuswall",
         "kind": "statuswall",
-        "x": 25,
+        "x": 24,
         "y": 2,
-        "w": 1,
+        "w": 3,
         "h": 1,
         "nodeId": null,
         "seat": null

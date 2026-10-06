@@ -6,6 +6,7 @@ import type { Observation } from './events.js'
 import type { NodeState, RunNode } from '../line/run-graph.js'
 import type { StepKind } from '../recipe/parse.js'
 import type { Check } from '../line/ci.js'
+import { mulberry32 } from './art/kit.js'
 
 // The world a scene renders: crew walking a hall, crates riding belts.
 //
@@ -32,6 +33,10 @@ export interface Crew {
   readonly restSeat: number | null
   /** The facing to adopt on arrival at `goal` — set alongside a rest seat, cleared for every other errand. */
   readonly settle: Facing | null
+  /** Clock ms of the next stroll, or of the walk home once one has reached its spot; null when none is due. */
+  readonly idleAt?: number | null
+  /** Where an idle stroll has got to. Null while seated, or on any errand a real event sent. */
+  readonly wander?: 'out' | 'there' | 'back' | null
 }
 
 export interface Crate {
@@ -369,9 +374,92 @@ function tickCrew(map: HallMap, crew: Crew, dtSec: number): Crew {
   return { ...crew, x, y, facing, path, anim: 'walk' }
 }
 
+const STROLL_EVERY_MS = { min: 20_000, max: 40_000 }
+const STROLL_LINGER_MS = { min: 3_000, max: 6_000 }
+const MAX_LOITER_POINTS = 8
+
+function hashOf(text: string): number {
+  let h = 5381
+  for (let i = 0; i < text.length; i++) h = (Math.imul(h, 33) + text.charCodeAt(i)) | 0
+  return h
+}
+
+/** A seeded duration in `[min, max)`: the same crew member at the same clock always draws the same one. */
+function seededSpan(nodeId: string, clockMs: number, span: { min: number; max: number }): number {
+  const rnd = mulberry32(hashOf(nodeId) ^ Math.floor(clockMs))
+  return span.min + rnd() * (span.max - span.min)
+}
+
+const loiterCache = new WeakMap<HallMap, readonly Tile[]>()
+
+/**
+ * Where an idle crew member may stroll to: the free floor beside the coffee
+ * bar and the vending machine, and beside a few belts. Only tiles the
+ * breakroom door can walk to count, so nobody is ever sent somewhere
+ * unreachable. Derived from the map alone, in a fixed order.
+ */
+export function loiterPoints(map: HallMap): readonly Tile[] {
+  const cached = loiterCache.get(map)
+  if (cached !== undefined) return cached
+  const door = map.breakroom.door[0]
+  const reach = door === undefined ? new Map<string, number>() : distancesFrom(map.walk, door)
+  const free = (t: Tile): boolean => map.walk[t.y]?.[t.x] === false && reach.has(key(t))
+  const beside = (t: Tile): Tile | undefined =>
+    NEIGHBOUR_STEPS.map((s) => ({ x: t.x + s.x, y: t.y + s.y })).find(free)
+
+  const points: Tile[] = []
+  const add = (t: Tile | undefined): void => {
+    if (t !== undefined && !points.some((p) => p.x === t.x && p.y === t.y)) points.push(t)
+  }
+  for (const prop of map.props) {
+    if (prop.kind === 'coffeebar' || prop.kind === 'vending') add(beside({ x: prop.x, y: prop.y }))
+  }
+  const belts = map.belts.filter((b) => b.path.length > 2)
+  const stride = Math.max(1, Math.ceil(belts.length / (MAX_LOITER_POINTS - points.length)))
+  for (let i = 0; i < belts.length && points.length < MAX_LOITER_POINTS; i += stride) {
+    add(beside(belts[i].path[Math.floor(belts[i].path.length / 2)]))
+  }
+  loiterCache.set(map, points)
+  return points
+}
+
+/**
+ * Ambient life for a crew member at rest: every 20-40s, seeded, they walk to a
+ * loiter point, linger a few seconds and walk back to their own seat. The seat
+ * stays reserved throughout; a real event always wins, because `sendTo` clears
+ * `wander` and the seat with it.
+ */
+function idle(map: HallMap, crew: Crew, clockMs: number): Crew {
+  const seat = crew.restSeat === null ? undefined : map.restSeats[crew.restSeat]
+  if (seat === undefined || crew.goal !== null || crew.path.length > 0) return crew
+  const wander = crew.wander ?? null
+
+  if (wander === 'back') return { ...crew, wander: null, idleAt: null }
+  if (wander === 'out') {
+    const idleAt = clockMs + seededSpan(crew.nodeId, clockMs, STROLL_LINGER_MS)
+    return { ...crew, wander: 'there', idleAt }
+  }
+  if (wander === 'there') {
+    if (clockMs < (crew.idleAt ?? 0)) return crew
+    return { ...crew, goal: seat.tile, then: 'couch', settle: seat.facing, wander: 'back' }
+  }
+
+  if (crew.then !== 'couch') return crew
+  if (crew.idleAt === undefined || crew.idleAt === null) {
+    return { ...crew, idleAt: clockMs + seededSpan(crew.nodeId, clockMs, STROLL_EVERY_MS) }
+  }
+  if (clockMs < crew.idleAt) return crew
+  const points = loiterPoints(map)
+  if (points.length === 0) return { ...crew, idleAt: null }
+  const spot =
+    points[Math.floor(mulberry32(hashOf(crew.nodeId) ^ Math.floor(clockMs))() * points.length)]
+  return { ...crew, goal: spot, then: 'idle', settle: null, wander: 'out', idleAt: null }
+}
+
 export function tick(world: World, dtMs: number): World {
   const dtSec = dtMs / 1000
-  const crew = world.crew.map((c) => tickCrew(world.map, c, dtSec))
+  const clock = world.clockMs + dtMs
+  const crew = world.crew.map((c) => idle(world.map, tickCrew(world.map, c, dtSec), clock))
   const crates = world.crates
     .map((crate) => tickCrate(world, crate, dtSec))
     .filter((crate): crate is Crate => crate !== null)

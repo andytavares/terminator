@@ -1,4 +1,4 @@
-import { fanoutTargets, evaluateWhen } from '../recipe/step-kinds.js'
+import { fanoutTargets, evaluateWhen, whenSkipReason } from '../recipe/step-kinds.js'
 import type { Recipe, Step, StepKind } from '../recipe/parse.js'
 import type { PlanUnit, WorkOrder } from '../order/schema.js'
 
@@ -57,6 +57,8 @@ export interface RunNode {
   readonly worktreePath: string | null
   readonly startedAt: string | null
   readonly endedAt: string | null
+  /** Why a skipped step did not run. Absent on graphs written before it existed. */
+  readonly skipReason?: string | null
 }
 
 export interface RunGraph {
@@ -79,6 +81,7 @@ function node(over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId' | 'kind'>):
     worktreePath: null,
     startedAt: null,
     endedAt: null,
+    skipReason: null,
     ...over,
   }
 }
@@ -95,6 +98,7 @@ export function buildRunGraph(order: WorkOrder, recipe: Recipe): RunGraph {
     // A condition that is false skips the step rather than removing it: the
     // record has to show that the inspector did not run, and why (FR-044).
     const applies = evaluateWhen(step.when, order)
+    const skipReason = applies ? null : whenSkipReason(step.when ?? '', order)
 
     if (step.kind === 'fanout') {
       const targets = fanoutTargets(step.over ?? '', order)
@@ -125,6 +129,7 @@ export function buildRunGraph(order: WorkOrder, recipe: Recipe): RunGraph {
             stepId: step.id,
             kind: 'fanout',
             state: applies ? 'waiting' : 'skipped',
+            skipReason,
             unitIds: target.units.map((unit) => unit.id),
             lane: target.lane,
             role: inner.role ?? target.units[0]?.role ?? null,
@@ -147,6 +152,7 @@ export function buildRunGraph(order: WorkOrder, recipe: Recipe): RunGraph {
         stepId: step.id,
         kind: step.kind,
         state: applies ? 'waiting' : 'skipped',
+        skipReason,
         role: step.role ?? null,
         dependsOn: step.after.flatMap((after) => nodesOfStep(nodes, after)),
       })

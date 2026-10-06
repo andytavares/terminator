@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
+import { GateAnswers } from './GateCard.js'
+import { OrderLinks } from './OrderLinks.js'
+import { ciLabel } from '../line/ci-label.js'
+import type { CiState } from '../line/ci-state.js'
+import type { Gate, GateOption } from '../gates/rules.js'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
 import { ConfirmButton } from './ConfirmButton.js'
@@ -34,7 +39,21 @@ interface OrderRow {
   readonly status: string
   readonly risk: string
   readonly failures: number
-  readonly source: { kind: string; tracker: string | null; key: string | null }
+  readonly source: { kind: string; tracker: string | null; key: string | null; url?: string | null }
+  /** The pull requests this order opened. */
+  readonly pulls?: readonly { readonly number: number; readonly url: string }[]
+  /** Where CI stands, with how many of the checks have finished. */
+  readonly ci?:
+    | (Pick<CiState, 'status' | 'round' | 'max' | 'reason'> & {
+        readonly checks: { readonly done: number; readonly total: number }
+      })
+    | null
+  /** The open gate this row can answer itself, when the move is yours. */
+  readonly gate?: {
+    readonly id: string
+    readonly options: readonly GateOption[]
+    readonly breach: Gate['breach']
+  } | null
   /** Questions this order is waiting on an answer to. */
   readonly openQuestions?: number
   /**
@@ -91,6 +110,26 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
     const r = (await invoke('foundry:order.list')) as { orders?: OrderRow[] }
     setRows(r.orders ?? [])
   }, [])
+
+  // The same channel the inbox answers with: the row is not a second queue, it
+  // is the gate that holds this order put where you are already looking.
+  const [answering, setAnswering] = useState<string | null>(null)
+  const answer = useCallback(
+    async (gateId: string, option: string) => {
+      setAnswering(gateId)
+      try {
+        const r = (await invoke('foundry:inbox.decide', { gateId, option })) as {
+          error?: string
+          actionError?: string
+        }
+        setProblem(r.error ?? r.actionError ?? null)
+        await refresh()
+      } finally {
+        setAnswering(null)
+      }
+    },
+    [refresh]
+  )
 
   useEffect(() => {
     if (openOrderId) setOpen(openOrderId)
@@ -236,6 +275,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
     // `started` is what the Forge reports the moment a run begins, so the
     // surface swaps without waiting for the list to be refetched.
     const running = status === 'running' || started === open
+    const hasRun = running || status === 'shipped'
     return (
       /* An open order is a frame, not a page: the way back at the top, the
          order in the middle scrolling inside it, the controls that end it at
@@ -253,13 +293,15 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
         >
           All orders
         </button>
-        {/* An order that is running is watched on the Floor; one that is still
+        {/* An order that has a run, shipped or not, is watched on the Floor, where its
+            open gates are answered; one that is still
             being agreed is worked on in the Forge. */}
-        {running ? (
+        {hasRun ? (
           <Floor orderId={open} />
         ) : (
           <Forge
             orderId={open}
+            standing={rows.find((row) => row.id === open)?.standing}
             onStarted={(id) => {
               setStarted(id)
               void refresh()
@@ -474,7 +516,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
         <ul className="fdry-orders">
           {rows.map((row) => (
             <li key={row.id}>
-              <button type="button" onClick={() => setOpen(row.id)}>
+              <button type="button" className="fdry-order-open" onClick={() => setOpen(row.id)}>
                 <span className="fdry-order-mark" aria-hidden="true">
                   {row.standing?.turn === 'you' ? (
                     <AlertCircle />
@@ -488,7 +530,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
                   <b>{row.title}</b>
                   <small>
                     {row.id} · {statusInWords(row.status as OrderStatus)} ·{' '}
-                    {gradeInWords(row.risk as RiskGrade)} risk
+                    {gradeInWords(row.risk as RiskGrade)}
                     {row.source.key !== null ? ` · ${row.source.tracker} ${row.source.key}` : ''}
                   </small>
                 </span>
@@ -500,8 +542,21 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
                     for every running order for ever. Every running order
                     therefore claimed to be ready to hand off — including one
                     that had been halted at an undecided gate for two hours,
-                    with an agent sitting at a terminal prompt nobody was at. */}
-                {row.standing === undefined ? null : (
+                    with an agent sitting at a terminal prompt nobody was at.
+
+                    While CI is working the pill says so, with the wording the
+                    Floor uses, and spins: a standing of "building" for the
+                    whole of a CI watch is true and tells you nothing. */}
+                {row.ci != null &&
+                (row.ci.status === 'watching' || row.ci.status === 'reworking') ? (
+                  <span role="status" className="fdry-order-state is-ci">
+                    <Loader className="fdry-spin" aria-hidden="true" />
+                    {ciLabel(row.ci)}
+                    {row.ci.checks.total === 0
+                      ? ''
+                      : ` · ${row.ci.checks.done} of ${row.ci.checks.total} checks done`}
+                  </span>
+                ) : row.standing === undefined ? null : (
                   <span
                     className={`fdry-order-state${row.standing.turn === 'you' ? ' is-waiting' : ''}`}
                   >
@@ -509,6 +564,27 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
                   </span>
                 )}
               </button>
+              {(row.pulls?.length ?? 0) > 0 || row.source.url != null || row.gate != null ? (
+                <div className="fdry-order-extras">
+                  <span className="fdry-order-links">
+                    <OrderLinks
+                      pulls={row.pulls}
+                      source={
+                        row.source.key !== null && row.source.url != null
+                          ? { key: row.source.key, url: row.source.url }
+                          : null
+                      }
+                    />
+                  </span>
+                  {row.gate == null ? null : (
+                    <GateAnswers
+                      gate={{ options: row.gate.options.slice(0, 2), breach: row.gate.breach }}
+                      busy={answering === row.gate.id}
+                      onDecide={(option) => void answer((row.gate as { id: string }).id, option)}
+                    />
+                  )}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

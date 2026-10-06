@@ -1,4 +1,5 @@
 import type { Observation } from './events.js'
+import type { CiState } from '../line/ci-state.js'
 import type { Gate } from '../gates/rules.js'
 import type { NodeState, RunGraph } from '../line/run-graph.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
@@ -34,9 +35,20 @@ export interface ToolEntry {
   readonly activity: ToolActivity
 }
 
+/** CI as it stood when it last changed: its status, round and every check's bucket. */
+export interface CiFrame {
+  readonly at: number
+  readonly round: number
+  readonly max: number
+  readonly status: CiState['status']
+  readonly pulls: CiState['pulls']
+}
+
 export interface Timeline {
   readonly frames: readonly GraphFrame[]
   readonly tools: readonly ToolEntry[]
+  /** Absent in a recording made before CI was written down. */
+  readonly ci?: readonly CiFrame[]
 }
 
 /** As many calls per node as the live activity channel hands back. */
@@ -53,6 +65,24 @@ function frameAt(timeline: Timeline, at: number): GraphFrame | null {
 
 function decidedAt(gate: Gate): number | null {
   return gate.decision === null ? null : Date.parse(gate.decision.at)
+}
+
+/** The CI state last recorded at or before `at`; null before the first. */
+function ciAt(timeline: Timeline, at: number): CiState | null {
+  let found: CiFrame | null = null
+  for (const frame of timeline.ci ?? []) {
+    if (frame.at > at) break
+    found = frame
+  }
+  if (found === null) return null
+  return {
+    round: found.round,
+    max: found.max,
+    status: found.status,
+    pulls: found.pulls,
+    reason: '',
+    at: new Date(found.at).toISOString(),
+  }
 }
 
 /** What the hall would have observed at `at`, from what was recorded. */
@@ -92,23 +122,56 @@ export function observationAt(
     return Date.parse(gate.raisedAt) <= at && (decided === null || decided > at)
   })
 
-  // The timeline never records CI or the refinery's queue (ADR-060: only what
-  // was recorded plays back), so a replay shows no dispatch tower or queue
-  // nameplate at any point in a run.
-  return { graph, orphaned: [], stranded: [], waiting, activity, ci: null, queue: null }
+  // CI is recorded when it changes, so a replay shows the tower and the wait
+  // as they were. The refinery's queue is not recorded, so a replay shows no
+  // queue plate at any point in a run (ADR-060: only what was recorded plays back).
+  return {
+    graph,
+    orphaned: [],
+    stranded: [],
+    waiting,
+    activity,
+    ci: ciAt(timeline, at),
+    queue: null,
+  }
 }
 
-/** Every recorded moment, in order: the beats a replay's clock is built on. */
+/** How long before the first thing happens a replay begins. */
+const LEAD_IN_MS = 1000
+
+/** The first moment any step was past `waiting`, or null when nothing ever moved. */
+function firstMovementAt(timeline: Timeline): number | null {
+  const frame = timeline.frames.find((f) => f.nodes.some((n) => n.state !== 'waiting'))
+  return frame === undefined ? null : frame.at
+}
+
+/**
+ * Every recorded moment, in order: the beats a replay's clock is built on.
+ *
+ * Tool calls from a session no step ever carried (a shaping session, before
+ * the graph existed) show nothing, so they add no moments. Nothing before
+ * `LEAD_IN_MS` ahead of the first movement is kept either: that stretch is a
+ * hall with nobody working in it.
+ */
 export function momentsOf(timeline: Timeline, gates: readonly Gate[]): number[] {
+  const carried = new Set<string>()
+  for (const frame of timeline.frames) {
+    for (const n of frame.nodes) if (n.sessionId !== null) carried.add(n.sessionId)
+  }
   const all = new Set<number>()
   for (const frame of timeline.frames) all.add(frame.at)
-  for (const entry of timeline.tools) all.add(entry.at)
+  for (const entry of timeline.tools) if (carried.has(entry.sessionId)) all.add(entry.at)
+  for (const frame of timeline.ci ?? []) all.add(frame.at)
   for (const gate of gates) {
     all.add(Date.parse(gate.raisedAt))
     const decided = decidedAt(gate)
     if (decided !== null) all.add(decided)
   }
-  return [...all].sort((a, b) => a - b)
+  const moved = firstMovementAt(timeline)
+  const start = moved === null ? -Infinity : moved - LEAD_IN_MS
+  const kept = [...all].filter((at) => at >= start)
+  if (moved !== null) kept.push(start)
+  return [...new Set(kept)].sort((a, b) => a - b)
 }
 
 export interface ReplayClock {

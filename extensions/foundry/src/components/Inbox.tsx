@@ -1,6 +1,5 @@
-import { GateEvidence } from './GateEvidence.js'
-import { ruleInWords, defaultInWords } from '../gates/rules.js'
-import { gradeInWords } from '../runtime/review/risk-grader.js'
+import { GateCard } from './GateCard.js'
+import { ruleInWords } from '../gates/rules.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
@@ -14,8 +13,7 @@ import {
   Unplug,
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
-import { RaiseBudgetForm } from './BudgetForm.js'
-import { MarkdownInline } from './Markdown.js'
+import { ExternalLink, MarkdownInline } from './Markdown.js'
 import type { Signal } from '../sensors/types.js'
 
 // The one surface the operator is required to visit.
@@ -26,7 +24,11 @@ import type { Signal } from '../sensors/types.js'
 // attribute is one they learn to click through without reading.
 
 interface InboxView {
-  gates: (Gate & { orderTitle: string | null })[]
+  gates: (Gate & {
+    orderTitle: string | null
+    pulls?: { number: number; url: string }[]
+    source?: { key: string; url: string } | null
+  })[]
   autonomy?: 'escorted' | 'standard' | 'lights-out'
   /** Rules this setting is not asking about. Shown, so quiet is explicable. */
   silenced?: GateRuleId[]
@@ -156,12 +158,10 @@ export function Inbox(): JSX.Element {
     return () => clearInterval(timer)
   }, [refreshSignals])
 
-  const [raising, setRaising] = useState<string | null>(null)
   const answer = useCallback(
     async (gateId: string, option: string, limit?: number | null) => {
       setBusy(gateId)
       setProblem(null)
-      setRaising(null)
       try {
         // Said out loud. This is the control the whole autonomy dial exists to
         // reach: a decision the handler refused — already answered, gate gone,
@@ -252,54 +252,31 @@ export function Inbox(): JSX.Element {
             return (
               <li key={gate.id} className={`fdry-gate ${RULE_TONE[gate.rule]}`}>
                 <span className="fdry-gate-stripe" aria-hidden="true" />
-                <div className="fdry-gate-main">
-                  <div className="fdry-gate-head">
-                    <span className="fdry-gate-icon" aria-hidden="true">
-                      <Icon />
-                    </span>
-                    <code className="fdry-gate-rule">{ruleInWords(gate.rule)}</code>
-                    <b>{gate.summary}</b>
-                  </div>
-                  <p className="fdry-gate-why">{gate.why}</p>
-                  <div className="fdry-gate-meta">
-                    <span>{gate.orderTitle ?? `work order ${gate.orderId}`}</span>
-                    {gate.blockedUnits > 0 ? <span>{gate.blockedUnits} units waiting</span> : null}
-                    <span>{gradeInWords(gate.riskGrade)} risk</span>
-                    <span className="fdry-gate-default">
-                      If nobody answers: {defaultInWords(gate)}
-                      {gate.deadline === null ? ' (it waits for you)' : ''}
-                    </span>
-                  </div>
-                  <GateEvidence evidence={gate.evidence} />
-                  {raising === gate.id && gate.breach ? (
-                    <RaiseBudgetForm
-                      breach={gate.breach}
-                      disabled={busy === gate.id}
-                      onRaise={(limit) => void answer(gate.id, 'raise', limit)}
-                      onCancel={() => setRaising(null)}
-                    />
-                  ) : null}
-                </div>
-                {raising === gate.id ? null : (
-                  <div className="fdry-gate-actions">
-                    {gate.options.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        title={option.consequence}
-                        disabled={busy === gate.id}
-                        className={option.id === gate.defaultIfIgnored ? '' : 'is-primary'}
-                        onClick={() =>
-                          option.id === 'raise' && gate.breach
-                            ? setRaising(gate.id)
-                            : void answer(gate.id, option.id)
-                        }
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <GateCard
+                  gate={gate}
+                  busy={busy === gate.id}
+                  pulls={gate.pulls}
+                  source={gate.source}
+                  onDecide={(option, limit) => void answer(gate.id, option, limit)}
+                  lead={
+                    <>
+                      <span className="fdry-gate-icon" aria-hidden="true">
+                        <Icon />
+                      </span>
+                      <code className="fdry-gate-rule" title={ruleInWords(gate.rule)}>
+                        {ruleInWords(gate.rule)}
+                      </code>
+                    </>
+                  }
+                  meta={
+                    <>
+                      <span>{gate.orderTitle ?? `work order ${gate.orderId}`}</span>
+                      {gate.blockedUnits > 0 ? (
+                        <span>{gate.blockedUnits} units waiting</span>
+                      ) : null}
+                    </>
+                  }
+                />
               </li>
             )
           })}
@@ -324,9 +301,7 @@ export function Inbox(): JSX.Element {
                       <span>{signal.severity}</span>
                       <span>{sensor?.def.description ?? signal.sensorId}</span>
                       {evidence !== undefined ? (
-                        <a href={evidence.url} target="_blank" rel="noreferrer">
-                          {evidence.title}
-                        </a>
+                        <ExternalLink href={evidence.url}>{evidence.title}</ExternalLink>
                       ) : null}
                     </div>
                     {promoting === signal.id ? (

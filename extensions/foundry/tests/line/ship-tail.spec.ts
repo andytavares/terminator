@@ -1,8 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ciRounds, ciReworkTarget, shipNodeId } from '../../src/line/ship-tail.js'
+import {
+  afterFinalCheck,
+  ciRounds,
+  ciReworkTarget,
+  settledOnce,
+  shipNodeId,
+  settleShip,
+} from '../../src/line/ship-tail.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { CiVerdict, Check } from '../../src/line/ci.js'
-import type { Feedback } from '../../src/line/run-graph.js'
+import type { Feedback, RunGraph } from '../../src/line/run-graph.js'
 import type { CiState } from '../../src/line/ci-state.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 
@@ -44,6 +51,32 @@ describe('ciRounds', () => {
     const secondIgnored = h.watch.mock.calls[1][2] as ReadonlySet<string>
     expect([...firstIgnored]).toEqual([])
     expect([...secondIgnored]).toEqual(['111'])
+  })
+
+  it('writes the checks while they are watched, once per change in what is passing', async () => {
+    const h = harness([])
+    h.watch.mockImplementation(async (_pull, onPoll) => {
+      const pending = check({ bucket: 'pending' })
+      onPoll([pending])
+      onPoll([pending])
+      onPoll([check({ bucket: 'pass' })])
+      return { kind: 'green', checks: [check()] }
+    })
+    await ciRounds({ pulls: [PULL], rounds: 2, ...h })
+    const watching = h.states.filter((s) => s.status === 'watching')
+    expect(watching.map((s) => s.pulls[0].checks.map((c) => c.bucket))).toEqual([
+      [],
+      ['pending'],
+      ['pass'],
+    ])
+  })
+
+  it('records once that it started watching, naming the pull request', async () => {
+    const h = harness([{ kind: 'green', checks: [check()] }])
+    await ciRounds({ pulls: [PULL], rounds: 2, ...h })
+    const watching = h.record.mock.calls.filter((c) => c[0] === 'ci.watching')
+    expect(watching).toHaveLength(1)
+    expect(watching[0][1]).toBe(PULL.url)
   })
 
   it('declares none when the recipe has no ci', async () => {
@@ -112,9 +145,12 @@ describe('ciRounds', () => {
       state: h.state,
     })
     expect(outcome.kind).toBe('green')
-    expect(h.record).toHaveBeenCalledTimes(2)
-    expect(h.record.mock.calls[0][0]).toBe('ci.round')
-    expect(h.record.mock.calls[1][0]).toBe('ci.green')
+    expect(h.record.mock.calls.map((c) => c[0])).toEqual([
+      'ci.watching',
+      'ci.round',
+      'ci.watching',
+      'ci.green',
+    ])
     expect(h.sendBack).toHaveBeenCalledTimes(1)
     const feedback = h.sendBack.mock.calls[0][0] as Feedback
     expect(feedback.source).toBe('ci')
@@ -294,5 +330,77 @@ steps:
     role: builder
 `)
     expect(shipNodeId(r)).toBeNull()
+  })
+})
+
+describe('settleShip', () => {
+  const graph = (state: string): RunGraph =>
+    ({
+      orderId: 'WO-1',
+      recipe: 'direct',
+      nodes: [{ id: 'ship', stepId: 'ship', kind: 'gate', state, dependsOn: [] }],
+    }) as unknown as RunGraph
+  const stateOf = (g: RunGraph) => g.nodes[0].state
+
+  it('passes a running ship node once the ready question is raised', () => {
+    const settled = settleShip(graph('running'), 'ship', true, '2026-10-05T10:00:00.000Z')
+    expect(stateOf(settled)).toBe('passed')
+    expect(settled.nodes[0].endedAt).toBe('2026-10-05T10:00:00.000Z')
+  })
+
+  it('sends it back to waiting when shipping stopped before the question', () => {
+    expect(stateOf(settleShip(graph('running'), 'ship', false, 'x'))).toBe('waiting')
+  })
+
+  it('passes a waiting one when the question was raised after a send-back reset it', () => {
+    expect(stateOf(settleShip(graph('waiting'), 'ship', true, 'x'))).toBe('passed')
+  })
+
+  it('leaves a node that is not owed alone', () => {
+    const passed = graph('passed')
+    expect(settleShip(passed, 'ship', false, 'x')).toBe(passed)
+    const waiting = graph('waiting')
+    expect(settleShip(waiting, 'ship', false, 'x')).toBe(waiting)
+    expect(settleShip(waiting, 'nonesuch', true, 'x')).toBe(waiting)
+  })
+})
+
+describe('a CI send-back during the final check', () => {
+  const feedback: Feedback = {
+    attempt: 1,
+    source: 'ci',
+    command: null,
+    exitCode: 1,
+    excerpt: 'red',
+    logPath: null,
+  }
+
+  it('waits for the final check, then sends back when it passed', async () => {
+    const check = settledOnce<boolean>()
+    const sendBack = vi.fn(async () => true)
+    const guarded = afterFinalCheck(check.settled, sendBack)
+
+    const pending = guarded(feedback)
+    await Promise.resolve()
+    expect(sendBack).not.toHaveBeenCalled()
+
+    check.settle(true)
+    await expect(pending).resolves.toBe(true)
+    expect(sendBack).toHaveBeenCalledWith(feedback)
+  })
+
+  it('sends nothing back when the final check failed', async () => {
+    const check = settledOnce<boolean>()
+    const sendBack = vi.fn(async () => true)
+    check.settle(false)
+    await expect(afterFinalCheck(check.settled, sendBack)(feedback)).resolves.toBe(false)
+    expect(sendBack).not.toHaveBeenCalled()
+  })
+
+  it('keeps the first settlement', async () => {
+    const check = settledOnce<boolean>()
+    check.settle(true)
+    check.settle(false)
+    await expect(check.settled).resolves.toBe(true)
   })
 })

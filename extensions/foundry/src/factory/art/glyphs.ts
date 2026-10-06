@@ -79,3 +79,29 @@ export function drawDigit(paint: Paint, x: number, y: number, digit: string, col
     }
   }
 }
+
+/** A 7 by 7 icon, row-major: one character a pixel, `1` inked. */
+export const ICONS = {
+  clock: ['0011100', '0100010', '1001001', '1001111', '1000001', '0100010', '0011100'],
+  rework: ['0111110', '1000001', '1000111', '1000010', '1000000', '0100010', '0011100'],
+  check: ['0000001', '0000011', '1000110', '1101100', '0111000', '0010000', '0000000'],
+} as const
+
+export const ICON_SIZE = 7
+
+export function drawIcon(
+  paint: Paint,
+  x: number,
+  y: number,
+  icon: keyof typeof ICONS,
+  color: string
+): void {
+  ICONS[icon].forEach((row, j) => {
+    for (let i = 0; i < ICON_SIZE; i++) if (row[i] === '1') rect(paint, x + i, y + j, 1, 1, color)
+  })
+}
+
+/** Pixels a whole number occupies at 2px: six per digit, one between. */
+export function digitsWidth(text: string): number {
+  return text.length * 7 - 1
+}

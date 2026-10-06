@@ -46,6 +46,8 @@ export interface CheckoutDeps {
  * otherwise one derived from the order id, which is unique by construction.
  */
 export function branchFor(order: WorkOrder, lane: number): string {
+  const fromSource = order.source.branch?.trim() ?? ''
+  if (fromSource !== '') return fromSource
   const declared = order.plan.lanes.find((l) => l.ord === lane)?.branch.trim() ?? ''
   if (declared !== '') return declared
   const fromRepo = order.context.repos.find((r) => r.lane === lane)?.headBranch.trim() ?? ''

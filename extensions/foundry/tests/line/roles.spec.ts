@@ -167,3 +167,21 @@ describe('who may write to the checkout', () => {
     expect(writers.sort()).toEqual(['builder', 'integrator', 'scribe'])
   })
 })
+
+describe('writesOnlyDocs', () => {
+  it('is true for the scribe, whose whole product is documentation', () => {
+    expect(createRoleRegistry(sources()).writesOnlyDocs('scribe')).toBe(true)
+  })
+
+  it('is true for the author, whose document hand-back is not a second kind of write', () => {
+    // Its `writes` is `docs` and `document`; the second is what it reports,
+    // not somewhere it edits, so the documentation-only rule still holds it.
+    expect(createRoleRegistry(sources()).writesOnlyDocs('author')).toBe(true)
+  })
+
+  it('is false for the builder and for a role nobody defines', () => {
+    const roles = createRoleRegistry(sources())
+    expect(roles.writesOnlyDocs('builder')).toBe(false)
+    expect(roles.writesOnlyDocs('nonesuch')).toBe(false)
+  })
+})

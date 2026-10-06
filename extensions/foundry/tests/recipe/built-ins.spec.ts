@@ -8,6 +8,8 @@ import { resolveSkill } from '../../src/recipe/resolve.js'
 import { createRoleRegistry } from '../../src/line/roles.js'
 import { brief } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/draft.js'
+import { buildRunGraph } from '../../src/line/run-graph.js'
+import { readyNodes } from '../../src/line/scheduler.js'
 
 // The built-ins ship inside the extension, so they are available in a
 // repository that contains nothing of Foundry's. They are data, which means
@@ -33,17 +35,13 @@ function recipe(file: string): Recipe {
 }
 
 describe('built-in recipes', () => {
-  it('ships the seven shapes of work the design names, and the three whose product is a document or a demonstration', () => {
+  it('ships six shapes: five that change the repository and one whose product is a document', () => {
     expect(recipeFiles.sort()).toEqual([
       'bugfix.yaml',
-      'design-doc.yaml',
       'direct.yaml',
-      'poc.yaml',
-      'quick.yaml',
       'refactor.yaml',
       'research.yaml',
       'speckit.yaml',
-      'spike.yaml',
       'standard.yaml',
     ])
   })
@@ -92,12 +90,6 @@ describe('built-in recipes', () => {
     expect(steps.find((s) => s.id === 'change')?.after).toContain('baseline')
   })
 
-  it('opens no pull request from a spike — the answer is the deliverable', () => {
-    const ids = recipe('spike.yaml').steps.map((s) => s.id)
-    expect(ids).not.toContain('ship')
-    expect(ids).not.toContain('integrate')
-  })
-
   it('keeps the whole ten-stage pipeline in the speckit recipe', () => {
     const ids = recipe('speckit.yaml').steps.map((s) => s.id)
     for (const phase of [
@@ -124,14 +116,7 @@ describe('built-in recipes', () => {
   })
 
   it('asks nothing of a repository for the shapes that need nothing', () => {
-    for (const file of [
-      'direct.yaml',
-      'standard.yaml',
-      'spike.yaml',
-      'research.yaml',
-      'design-doc.yaml',
-      'poc.yaml',
-    ]) {
+    for (const file of ['direct.yaml', 'standard.yaml', 'research.yaml']) {
       expect(recipe(file).requires).toEqual([])
     }
   })
@@ -174,14 +159,35 @@ describe('built-in recipes', () => {
     }
   })
 
-  it('gives the quick shape one builder, a lint pass, one check and nothing else', () => {
-    const steps = recipe('quick.yaml').steps
-    expect(steps.map((s) => s.id)).toEqual(['build', 'lint', 'check', 'ship'])
-    expect(steps.filter((s) => s.kind === 'agent' || s.kind === 'fanout')).toHaveLength(1)
+  it('checks the direct shape with the test command when there is one and a verifier when there is not', () => {
+    const steps = recipe('direct.yaml').steps
+    const check = steps.find((s) => s.id === 'check')
+    const verify = steps.find((s) => s.id === 'verify')
+    expect(check?.kind).toBe('run')
+    expect(check?.command).toBe('${toolchain.test}')
+    expect(check?.when).toBe('toolchain.test is set')
+    expect(check?.after).toEqual(['lint'])
+    expect(check?.onFail).toEqual({ rework: 'build', max: 1 })
+    expect(verify?.kind).toBe('agent')
+    expect(verify?.when).toBe('toolchain.test is not set')
+    // Only one of the two ever runs, so a skipped `check` never holds it.
+    expect(verify?.after).toEqual(['check'])
   })
 
-  it('needs a test command for the quick shape, because nothing else checks it', () => {
-    expect(recipe('quick.yaml').requires).toEqual([{ kind: 'toolchain', value: 'test' }])
+  it("skips the direct shape's documentation pass for the smallest changes only", () => {
+    const document = recipe('direct.yaml').steps.find((s) => s.id === 'document')
+    expect(document?.role).toBe('scribe')
+    expect(document?.when).toBe('risk.grade is not P3')
+    expect(document?.after).toEqual(['lint'])
+  })
+
+  it("waits the direct shape's join on every check, so a skipped one never lets work through", () => {
+    const integrate = recipe('direct.yaml').steps.find((s) => s.id === 'integrate')
+    expect(integrate?.after).toEqual(['check', 'verify', 'inspect', 'document'])
+  })
+
+  it('needs nothing from the repository for the direct shape', () => {
+    expect(recipe('direct.yaml').requires).toEqual([])
   })
 
   it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'speckit.yaml'])(
@@ -194,34 +200,150 @@ describe('built-in recipes', () => {
   )
 })
 
-// Three shapes whose deliverable is a document or a demonstration rather
-// than a code change. They still end in a draft pull request, because a
-// document nobody can find is a document nobody reads; and they are still
-// checked by a fresh reader, because the author's own summary is not evidence.
-describe('the shapes whose product is a document', () => {
-  it.each(['research.yaml', 'design-doc.yaml'])('%s is written by the author', (file) => {
-    expect(recipe(file).steps.find((s) => s.id === 'write')?.role).toBe('author')
+// The research shape's deliverable is a document rather than a code change.
+// It is still checked by a fresh reader, because the author's own summary is
+// not evidence.
+describe('the shape whose product is a document', () => {
+  it('is written by the author', () => {
+    expect(recipe('research.yaml').steps.find((s) => s.id === 'write')?.role).toBe('author')
   })
 
-  it.each(['research.yaml', 'design-doc.yaml', 'poc.yaml'])(
-    '%s is checked in a fresh context and ships as a draft',
-    (file) => {
-      const steps = recipe(file).steps
-      expect(steps.find((s) => s.id === 'verify')?.context).toBe('fresh')
-      expect(steps.find((s) => s.id === 'ship')?.rule).toBe('ready-for-review')
-    }
-  )
+  it('is checked in a fresh context and ends at a ready-for-review gate', () => {
+    const steps = recipe('research.yaml').steps
+    expect(steps.find((s) => s.id === 'verify')?.context).toBe('fresh')
+    expect(steps.find((s) => s.id === 'ship')?.rule).toBe('ready-for-review')
+  })
 
   it('has no red-team step on the Line, because the red team argues with the architect in the Forge before agreement', () => {
-    const write = recipe('design-doc.yaml').steps.find((s) => s.id === 'write')
-    expect(recipe('design-doc.yaml').steps.some((s) => s.role === 'red-team')).toBe(false)
+    const write = recipe('research.yaml').steps.find((s) => s.id === 'write')
+    expect(recipe('research.yaml').steps.some((s) => s.role === 'red-team')).toBe(false)
     expect(write?.after).toContain('scout')
   })
+})
 
-  it('records what a proof of concept learned before it ships', () => {
-    const document = recipe('poc.yaml').steps.find((s) => s.id === 'document')
-    expect(document?.role).toBe('scribe')
-    expect(recipe('poc.yaml').steps.find((s) => s.id === 'integrate')?.after).toContain('document')
+// The direct shape, built into a graph for the repositories it meets. Which of
+// its steps run is decided per order, and a step that does not apply must not
+// hold up the ones behind it.
+describe('the direct shape on a real graph', () => {
+  const direct = recipe('direct.yaml')
+
+  function graphFor(opts: {
+    test: boolean
+    lint: boolean
+    grade: 'P2' | 'P3'
+    triggers?: boolean
+  }) {
+    const base = draftOrder({
+      id: 'WO-1',
+      title: 'x',
+      source: { kind: 'typed', tracker: null, key: null, url: null },
+      repoPaths: ['/repo'],
+      now: '2026-10-05T10:00:00.000Z',
+    })
+    const found = (command: string) => ({ command, source: 'package.json' })
+    const o = {
+      ...base,
+      risk: {
+        ...base.risk,
+        grade: opts.grade,
+        triggers: opts.triggers === true ? ['secrets' as const] : [],
+      },
+      context: {
+        ...base.context,
+        toolchain: {
+          ...base.context.toolchain,
+          test: opts.test ? found('npm test') : null,
+          lint: opts.lint ? found('npm run lint') : null,
+        },
+      },
+      plan: {
+        ...base.plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'a',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: [],
+            verify: [],
+          },
+        ],
+      },
+    }
+    return buildRunGraph(o, direct)
+  }
+
+  const stateOf = (graph: ReturnType<typeof graphFor>, id: string) =>
+    graph.nodes.find((n) => n.stepId === id)?.state
+
+  it('checks with the test command and skips the verifier when the repository has one', () => {
+    const graph = graphFor({ test: true, lint: true, grade: 'P2' })
+    expect(stateOf(graph, 'check')).toBe('waiting')
+    expect(stateOf(graph, 'verify')).toBe('skipped')
+  })
+
+  it('checks with a verifier and skips the test step when the repository has none', () => {
+    const graph = graphFor({ test: false, lint: true, grade: 'P2' })
+    expect(stateOf(graph, 'check')).toBe('skipped')
+    expect(stateOf(graph, 'verify')).toBe('waiting')
+  })
+
+  it('skips the documentation pass for a P3 change and keeps it above that', () => {
+    expect(stateOf(graphFor({ test: true, lint: true, grade: 'P3' }), 'document')).toBe('skipped')
+    expect(stateOf(graphFor({ test: true, lint: true, grade: 'P2' }), 'document')).toBe('waiting')
+  })
+
+  it('says why a step was skipped, in words', () => {
+    const graph = graphFor({ test: true, lint: true, grade: 'P3' })
+    expect(graph.nodes.find((n) => n.stepId === 'document')?.skipReason).toBe(
+      'runs only when the change is not graded P3; it is graded P3'
+    )
+  })
+
+  it('lets the verifier start once lint passes even though the test step was skipped', () => {
+    const graph = graphFor({ test: false, lint: true, grade: 'P2' })
+    const passed = {
+      ...graph,
+      nodes: graph.nodes.map((n) =>
+        n.stepId === 'build' || n.stepId === 'lint' ? { ...n, state: 'passed' as const } : n
+      ),
+    }
+    const ready = readyNodes(passed, { agents: null } as never).map((n) => n.stepId)
+    expect(ready).toContain('verify')
+    expect(ready).toContain('document')
+    expect(ready).not.toContain('check')
+  })
+
+  it('lets the join through when every step that applied has passed and the rest were skipped', () => {
+    const graph = graphFor({ test: true, lint: false, grade: 'P3' })
+    const done = {
+      ...graph,
+      nodes: graph.nodes.map((n) =>
+        n.state === 'skipped' || n.kind === 'gate' || n.stepId === 'integrate'
+          ? n
+          : { ...n, state: 'passed' as const }
+      ),
+    }
+    const ready = readyNodes(done, { agents: null } as never).map((n) => n.stepId)
+    expect(ready).toEqual(['integrate'])
+  })
+})
+
+describe('the author role', () => {
+  const author = parseRole(read(rolesDir, 'author.yaml'), 'author.yaml')
+
+  it('hands back where the document is, beside writing documentation', () => {
+    expect(author.ok && author.value.writes).toEqual(['docs', 'document'])
+  })
+
+  it('is told about outputs, the checkout and a published link', () => {
+    const prompt = author.ok ? author.value.prompt : ''
+    expect(prompt).toContain('outputs')
+    expect(prompt).toContain('`checkout`')
+    expect(prompt).toContain('`published`')
+    expect(prompt).toContain('`url`')
   })
 })
 
@@ -398,16 +520,12 @@ describe('the effort each built-in shape asks for', () => {
   })
 
   it.each([
-    ['quick.yaml', 'medium'],
-    ['direct.yaml', 'high'],
+    ['direct.yaml', 'medium'],
     ['standard.yaml', 'high'],
     ['bugfix.yaml', 'high'],
     ['refactor.yaml', 'high'],
     ['speckit.yaml', 'high'],
-    ['spike.yaml', 'medium'],
     ['research.yaml', 'medium'],
-    ['design-doc.yaml', 'high'],
-    ['poc.yaml', 'medium'],
   ])('%s runs at %s', (file, effort) => {
     expect(recipe(file).effort).toBe(effort)
   })
@@ -418,10 +536,8 @@ describe('the effort each built-in shape asks for', () => {
 // reaches a reviewer. It costs a terminal tab, not a session.
 describe('the lint pass every code-producing shape adds after its build', () => {
   it.each([
-    ['quick.yaml', 'build'],
     ['direct.yaml', 'build'],
     ['standard.yaml', 'build'],
-    ['poc.yaml', 'build'],
     ['bugfix.yaml', 'fix'],
   ])('%s runs lint after %s, only when the repository has a lint command', (file, buildStep) => {
     const lint = recipe(file).steps.find((s) => s.id === 'lint')
@@ -432,24 +548,20 @@ describe('the lint pass every code-producing shape adds after its build', () => 
   })
 
   it.each([
-    ['quick.yaml', 'build'],
     ['direct.yaml', 'build'],
     ['standard.yaml', 'build'],
-    ['poc.yaml', 'build'],
     ['bugfix.yaml', 'fix'],
   ])('%s sends a failing lint back to %s', (file, buildStep) => {
     const lint = recipe(file).steps.find((s) => s.id === 'lint')
     expect(lint?.onFail).toEqual({ rework: buildStep, max: 1 })
   })
 
-  it.each(['quick.yaml', 'direct.yaml', 'standard.yaml', 'poc.yaml', 'bugfix.yaml'])(
+  it.each(['direct.yaml', 'standard.yaml', 'bugfix.yaml'])(
     '%s waits its next step on lint rather than the build it followed',
     (file) => {
       const nextId: Record<string, string> = {
-        'quick.yaml': 'check',
-        'direct.yaml': 'verify',
+        'direct.yaml': 'check',
         'standard.yaml': 'verify',
-        'poc.yaml': 'verify',
         'bugfix.yaml': 'flip',
       }
       const step = recipe(file).steps.find((s) => s.id === nextId[file])
@@ -468,7 +580,7 @@ describe('the lint pass every code-producing shape adds after its build', () => 
   // own, so a failing suite sends the same builder back rather than holding
   // the whole order for an operator.
   it.each([
-    ['quick.yaml', 'check', 'build'],
+    ['direct.yaml', 'check', 'build'],
     ['bugfix.yaml', 'flip', 'fix'],
     ['refactor.yaml', 'unchanged', 'change'],
   ])('%s reworks %s back to %s on failure', (file, stepId, buildStep) => {
@@ -486,22 +598,19 @@ describe('the lint pass every code-producing shape adds after its build', () => 
 
 // CI is watched on the draft a `ready-for-review` gate opens: every shape
 // that opens one gets two rounds back to the lane's builder before it holds
-// for the operator. Only spike opens none — it is a question, not a change,
-// and ships no pull request at all.
+// for the operator.
 describe('ci rounds on every shape that ships code', () => {
   // A document shape's draft carries prose; a red CI on the code around it is
   // not something its scribe can fix.
-  const DOCUMENT_SHAPES = ['research.yaml', 'design-doc.yaml']
+  const DOCUMENT_SHAPES = ['research.yaml']
   const withReadyForReviewGate = recipeFiles.filter((file) =>
     recipe(file).steps.some((s) => s.kind === 'gate' && s.rule === 'ready-for-review')
   )
   const watched = withReadyForReviewGate.filter((file) => !DOCUMENT_SHAPES.includes(file))
   const unwatched = recipeFiles.filter((file) => !watched.includes(file))
 
-  it('finds a ready-for-review gate in every shape but spike', () => {
-    expect(recipeFiles.filter((file) => !withReadyForReviewGate.includes(file))).toEqual([
-      'spike.yaml',
-    ])
+  it('finds a ready-for-review gate in every shape', () => {
+    expect(recipeFiles.filter((file) => !withReadyForReviewGate.includes(file))).toEqual([])
   })
 
   it.each(watched)('%s gives its draft two rounds of CI', (file) => {
@@ -512,8 +621,8 @@ describe('ci rounds on every shape that ships code', () => {
     expect(recipe(file).ci).toBeUndefined()
   })
 
-  it('leaves exactly spike and the document shapes unwatched', () => {
-    expect([...unwatched].sort()).toEqual(['design-doc.yaml', 'research.yaml', 'spike.yaml'])
+  it('leaves exactly the document shape unwatched', () => {
+    expect([...unwatched].sort()).toEqual(['research.yaml'])
   })
 })
 
@@ -541,5 +650,27 @@ describe('the built-in ci-fix skill', () => {
   it('names itself ci-fix in its own frontmatter', () => {
     const text = fs.readFileSync(path.join(root, 'skills', 'ci-fix', 'SKILL.md'), 'utf8')
     expect(text).toMatch(/^name:\s*ci-fix\s*$/m)
+  })
+})
+
+describe('the shapes a one-lane order takes (ADR 085)', () => {
+  it('standard has no Line scout: the Forge scout already read the repository', () => {
+    const steps = recipe('standard.yaml').steps
+    expect(steps.some((s) => s.role === 'scout')).toBe(false)
+    expect(steps.find((s) => s.id === 'build')?.after ?? []).not.toContain('scout')
+  })
+
+  it.each(['standard.yaml', 'direct.yaml'])(
+    '%s documents beside the verifier, not after it',
+    (file) => {
+      const steps = recipe(file).steps
+      const document = steps.find((s) => s.id === 'document')
+      expect(document?.after).toEqual(['lint'])
+      expect(steps.find((s) => s.id === 'integrate')?.after).toContain('document')
+    }
+  )
+
+  it.each(['standard.yaml', 'direct.yaml'])('%s keeps the scribe in a fresh session', (file) => {
+    expect(recipe(file).steps.find((s) => s.id === 'document')?.context).toBe('fresh')
   })
 })

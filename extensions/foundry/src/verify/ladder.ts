@@ -1,6 +1,7 @@
 import type { Toolchain } from './toolchain-probe.js'
 import type { CheckName } from './check-names.js'
 import type { RiskAssessment } from '../order/schema.js'
+import { isDocumentationRelative } from './documentation-path.js'
 
 // The verification ladder.
 //
@@ -69,6 +70,12 @@ export interface LadderInput {
   readonly risk: RiskAssessment
   /** True when the change alters something a person looks at. */
   readonly touchesUi: boolean
+  /**
+   * What the change touched. When every path is documentation the climb runs
+   * Format and Lint and nothing else. Absent or empty means nobody knows what
+   * changed, which is never a reason to run less.
+   */
+  readonly changedFiles?: readonly string[]
 }
 
 /**
@@ -79,7 +86,7 @@ export interface LadderInput {
  * people learn to skim security findings.
  */
 export function ladderFor(input: LadderInput): LadderStep[] {
-  const { toolchain, risk, touchesUi } = input
+  const { toolchain, risk, touchesUi, changedFiles = [] } = input
 
   const inspection: LadderStep =
     risk.triggers.length > 0
@@ -104,7 +111,7 @@ export function ladderFor(input: LadderInput): LadderStep[] {
     ? step('L5', 'Integration and a picture of the running application', toolchain.e2e, 'e2e')
     : step('L5', 'Integration', toolchain.e2e, 'e2e')
 
-  return [
+  const rungs: LadderStep[] = [
     step('L0', 'Format', toolchain.format, 'format'),
     step('L0', 'Lint', toolchain.lint, 'lint'),
     step('L1', "The unit's own tests", toolchain.test, 'test'),
@@ -137,6 +144,18 @@ export function ladderFor(input: LadderInput): LadderStep[] {
       check: null,
     },
   ]
+
+  // Words cannot break a build or a test, so a change that only touches them
+  // is held to Format and Lint. Said on each step rather than dropped, so the
+  // record shows what was not run and why.
+  if (changedFiles.length === 0 || !changedFiles.every(isDocumentationRelative)) {
+    return rungs
+  }
+  return rungs.map((rung) =>
+    rung.check === null || rung.check === 'format' || rung.check === 'lint'
+      ? rung
+      : { ...rung, command: null, status: 'not_triggered' as const, reason: 'documentation only' }
+  )
 }
 
 export interface StepOutcome {
@@ -147,6 +166,8 @@ export interface StepOutcome {
   readonly exitCode: number | null
   /** The command this step ran, so a failure can be reported by name, not by rung code. */
   readonly command: string | null
+  /** The earlier step this one reused the result of: the same command string, run once. */
+  readonly reusedFrom?: string
 }
 
 export interface LadderOutcome {
@@ -171,6 +192,10 @@ export type RunStep = (step: LadderStep) => Promise<number | null>
 export async function climb(steps: readonly LadderStep[], run: RunStep): Promise<LadderOutcome> {
   const outcomes: StepOutcome[] = []
   let stoppedAt: Rung | null = null
+  // A command that passed in this climb. A repository whose `test` and
+  // `coverage` are both `vitest run --coverage` would otherwise run it twice
+  // on the same commit for the same answer.
+  const passed = new Map<string, string>()
 
   for (const step of steps) {
     if (stoppedAt !== null) break
@@ -216,6 +241,20 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
       continue
     }
 
+    const earlier = step.command === null ? undefined : passed.get(step.command)
+    if (earlier !== undefined) {
+      outcomes.push({
+        rung: step.rung,
+        name: step.name,
+        result: 'pass',
+        reason: `same command as ${earlier}; its result was reused, not run again`,
+        exitCode: 0,
+        command: step.command,
+        reusedFrom: earlier,
+      })
+      continue
+    }
+
     const exitCode = await run(step)
     if (exitCode === null) {
       outcomes.push({
@@ -229,16 +268,17 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
       continue
     }
 
-    const passed = exitCode === 0
+    const succeeded = exitCode === 0
+    if (succeeded && step.command !== null) passed.set(step.command, step.name)
     outcomes.push({
       rung: step.rung,
       name: step.name,
-      result: passed ? 'pass' : 'fail',
-      reason: passed ? '' : `exited ${exitCode}`,
+      result: succeeded ? 'pass' : 'fail',
+      reason: succeeded ? '' : `exited ${exitCode}`,
       exitCode,
       command: step.command,
     })
-    if (!passed) stoppedAt = step.rung
+    if (!succeeded) stoppedAt = step.rung
   }
 
   return {

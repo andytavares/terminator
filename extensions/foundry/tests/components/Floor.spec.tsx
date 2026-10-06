@@ -55,34 +55,22 @@ function reply(over: Record<string, unknown> = {}) {
 }
 
 let invoke: ReturnType<typeof vi.fn>
+let openExternal: ReturnType<typeof vi.fn>
+let runCommand: ReturnType<typeof vi.fn>
+let hasCommand: ReturnType<typeof vi.fn>
 
 function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}) {
   invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:run.observe') return view
     if (channel === 'foundry:permissions-list') return { pending: live.pending ?? [] }
-    if (channel === 'foundry:supervision-snapshot') {
-      return { review: live.review ?? [], backpressure: live.backpressure }
-    }
     if (channel === 'foundry:stalls-list') {
       return { firings: live.stalls ?? [], shadowMode: live.shadowMode ?? true }
-    }
-    if (channel === 'foundry:review-hunks') {
-      return {
-        files: live.hunks ?? [],
-        complete: live.complete ?? true,
-        fullReject: live.fullReject ?? false,
-      }
     }
     if (channel === 'foundry:run.resume') return live.resume ?? { started: true, reclaimed: [] }
     if (channel === 'foundry:inbox.decide') return live.decide ?? { ok: true }
     if (channel === 'foundry:run.stop') return live.stop ?? { ok: true }
-    if (channel === 'foundry:review-decide-hunk') return live.decideHunk ?? { ok: true }
     if (channel === 'foundry:permission-hand-back') return live.handBack ?? { ok: true }
     if (channel === 'foundry:run-terminal') return live.terminal ?? { ok: true }
-    if (channel === 'foundry:review-apply') return live.apply ?? { ok: true, reverted: 0 }
-    if (channel === 'foundry:review-done') return { ok: true }
-    if (channel === 'foundry:review-intent') return { intent: live.intent ?? null }
-    if (channel === 'foundry:review-advance') return { step: live.step ?? null }
     if (channel === 'foundry:feed-list') {
       return { entries: live.feed ?? [], mutes: live.mutes ?? [] }
     }
@@ -97,10 +85,13 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
     ) {
       return live.control ?? { ok: true }
     }
+    if (channel === 'foundry:session.attach') return live.attach ?? { terminalSessionId: 't-1' }
     return { terminalSessionId: 't-1', ok: true }
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    shell: { openExternal },
+    extension: { runCommand, hasCommand },
   }
   render(<Floor orderId="WO-1" />)
 }
@@ -124,7 +115,12 @@ const TWO_LANES = [
   },
 ]
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  openExternal = vi.fn(async () => ({ ok: true }))
+  runCommand = vi.fn(async () => ({ ok: true }))
+  hasCommand = vi.fn(async () => true)
+})
 
 describe('the refinery queue', () => {
   it('says the position and what it is behind, with the shared-file count', async () => {
@@ -234,8 +230,8 @@ describe('the CI band', () => {
       })
     )
     await waitFor(() => screen.getByText('CI'))
-    expect(screen.getByText('Green')).toBeTruthy()
-    expect(screen.getByText('Round 2 of 3')).toBeTruthy()
+    expect(screen.getByText('Passed')).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/Round \d of \d/)
   })
 
   it('says why CI is not measured', async () => {
@@ -253,6 +249,86 @@ describe('the CI band', () => {
     )
     await waitFor(() => screen.getByText('CI'))
     expect(screen.getByText(/Not measured: no checks were reported/)).toBeTruthy()
+  })
+
+  describe('while it is still running', () => {
+    const CHECKS = [
+      {
+        name: 'lint',
+        bucket: 'pass',
+        link: 'https://github.com/x/y/actions/runs/1',
+        workflow: 'CI',
+      },
+      {
+        name: 'test',
+        bucket: 'pending',
+        link: 'https://github.com/x/y/actions/runs/2',
+        workflow: 'CI',
+      },
+    ]
+
+    function watching(over: Record<string, unknown> = {}) {
+      return reply({
+        ci: {
+          round: 0,
+          max: 2,
+          status: 'watching',
+          pulls: [{ url: 'https://github.com/x/y/pull/233', checks: CHECKS }],
+          reason: '',
+          at: '2026-09-06T10:00:00.000Z',
+          ...over,
+        },
+      })
+    }
+
+    it('says what round it is in words, and how many fixes are allowed', async () => {
+      mount(watching())
+      await waitFor(() => screen.getByText('CI'))
+      expect(screen.getByText('First run · up to 2 fixes')).toBeTruthy()
+    })
+
+    it('shows a spinner while it watches, and says what it is for', async () => {
+      mount(watching())
+      await waitFor(() => screen.getByText('CI'))
+      expect(screen.getByRole('status', { name: 'Checks are running' })).toBeTruthy()
+    })
+
+    it('keeps spinning while it sends the failures back', async () => {
+      mount(watching({ status: 'reworking', round: 1 }))
+      await waitFor(() => screen.getByText('CI'))
+      expect(screen.getByText('Fixing: round 1 of 2')).toBeTruthy()
+      expect(screen.getByRole('status', { name: 'Checks are running' })).toBeTruthy()
+    })
+
+    it('stops spinning once there is an answer', async () => {
+      mount(watching({ status: 'green' }))
+      await waitFor(() => screen.getByText('CI'))
+      expect(screen.queryByRole('status', { name: 'Checks are running' })).toBeNull()
+    })
+
+    it('counts the checks that have finished out of those that have arrived', async () => {
+      mount(watching())
+      await waitFor(() => screen.getByText('CI'))
+      expect(screen.getByText('1 of 2 checks done')).toBeTruthy()
+      expect(screen.getByText('lint')).toBeTruthy()
+      expect(screen.getByText('test')).toBeTruthy()
+    })
+
+    it('links the pull request', async () => {
+      mount(watching())
+      await waitFor(() => screen.getByText('CI'))
+      fireEvent.click(screen.getByRole('link', { name: 'Pull request #233' }))
+      expect(openExternal).toHaveBeenCalledWith('https://github.com/x/y/pull/233')
+    })
+
+    it('opens a check outside the application, with no window of its own', async () => {
+      mount(watching())
+      await waitFor(() => screen.getByText('CI'))
+      const link = screen.getByRole('link', { name: /lint/ })
+      expect(link.getAttribute('target')).toBeNull()
+      fireEvent.click(link)
+      expect(openExternal).toHaveBeenCalledWith('https://github.com/x/y/actions/runs/1')
+    })
   })
 
   it('lists each check by name, bucket and a link to it', async () => {
@@ -486,8 +562,8 @@ describe('watching a run', () => {
   it('shows what the agent has been saying', async () => {
     mount(reply(), { lines: [said('reading src/auth/session.ts')] })
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
-    const panel = await screen.findByRole('region', { name: 's-1' })
+    fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
+    const panel = await screen.findByRole('region', { name: 'builder' })
     await waitFor(() => expect(within(panel).getByText(/reading src\/auth/)).toBeTruthy())
     expect(panel.textContent).not.toContain('[object Object]')
   })
@@ -505,8 +581,8 @@ describe('watching a run', () => {
       ],
     })
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
-    const panel = await screen.findByRole('region', { name: 's-1' })
+    fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
+    const panel = await screen.findByRole('region', { name: 'builder' })
     await waitFor(() => expect(panel.querySelector('pre.fdry-transcript')).not.toBeNull())
     expect(panel.querySelector('pre.fdry-transcript')?.textContent).toBe(
       'checking\nRead: /repo/a.ts\nBash: npm test'
@@ -516,14 +592,14 @@ describe('watching a run', () => {
   it('says so when there is nothing yet, rather than showing an empty box', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
     await waitFor(() => expect(screen.getByText('Nothing yet.')).toBeTruthy())
   })
 
   it('redirects it', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
     await waitFor(() => screen.getByLabelText('Tell it what to do instead'))
 
     fireEvent.change(screen.getByLabelText('Tell it what to do instead'), {
@@ -541,7 +617,7 @@ describe('watching a run', () => {
   it('interrupts it', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
     await waitFor(() => screen.getByRole('button', { name: 'Interrupt' }))
     fireEvent.click(screen.getByRole('button', { name: 'Interrupt' }))
     await waitFor(() =>
@@ -552,7 +628,7 @@ describe('watching a run', () => {
   it('stops it, saying why', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
     await waitFor(() => screen.getByRole('button', { name: 'Stop' }))
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
     await waitFor(() =>
@@ -566,7 +642,7 @@ describe('watching a run', () => {
   it('says so when the run is already over', async () => {
     mount(reply(), { control: { ok: false } })
     await waitFor(() => screen.getByText(/WO-1/))
-    fireEvent.click(screen.getByRole('button', { name: 'Watch builder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
     await waitFor(() => screen.getByRole('button', { name: 'Interrupt' }))
     fireEvent.click(screen.getByRole('button', { name: 'Interrupt' }))
     await waitFor(() => expect(screen.getByText('that run is no longer live')).toBeTruthy())
@@ -575,185 +651,9 @@ describe('watching a run', () => {
   it('offers neither control for a unit with no session', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
-    expect(screen.queryByRole('button', { name: 'Watch N-2' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Attach to N-2' })).toBeNull()
-  })
-})
-
-const REVIEW = {
-  sessionId: 's-1',
-  branch: 'foundry/wo-1',
-  grade: 'P0',
-  gradeTrigger: 'touches authentication',
-  diffSummary: { files: 2, added: 40, removed: 3 },
-  step: 'intent',
-}
-
-const HUNKS = [
-  {
-    file: 'src/auth/session.ts',
-    hunks: [
-      { id: 'h-1', newStart: 10, lines: ['+  if (expired) return null'], decision: null },
-      { id: 'h-2', newStart: 40, lines: ['+  console.log(token)'], decision: null },
-    ],
-  },
-]
-
-describe('finished work nobody has looked at', () => {
-  it('lists it worst risk first, with the reason for the grade', async () => {
-    mount(reply(), { review: [REVIEW] })
-    await waitFor(() => expect(screen.getByText('To review — 1')).toBeTruthy())
-    expect(screen.getByText('highest risk')).toBeTruthy()
-    expect(screen.getByText(/touches authentication/)).toBeTruthy()
-    expect(screen.getByText(/2 files/)).toBeTruthy()
-  })
-
-  it('shows nothing when nothing is waiting', async () => {
-    mount(reply())
-    await waitFor(() => screen.getByText(/WO-1/))
-    expect(screen.queryByText(/To review/)).toBeNull()
-  })
-
-  it('opens the diff hunk by hunk, because one file holds both changes', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-
-    await waitFor(() => expect(screen.getByText('src/auth/session.ts')).toBeTruthy())
-    const hunks = Array.from(document.querySelectorAll('.fdry-hunk')).map((h) => h.textContent)
-    expect(hunks).toHaveLength(2)
-    expect(hunks[0]).toContain('if (expired) return null')
-    expect(hunks[1]).toContain('console.log(token)')
-  })
-
-  // Reported: the review needed "syntax highlighting and change highlighting
-  // similar to how the git plugin works". It was one grey block.
-  it('shows each hunk as a diff: added lines marked, the code highlighted', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByText('src/auth/session.ts'))
-
-    const added = document.querySelector('.fdry-hunk .fdry-diff-line.is-add') as HTMLElement
-    expect(added.querySelector('.fdry-diff-num')?.textContent).toBe('10')
-    expect(added.querySelector('.hljs-keyword')?.textContent).toBe('if')
-  })
-
-  it('accepts and rejects one at a time', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByText('src/auth/session.ts'))
-
-    fireEvent.click(screen.getByRole('button', { name: 'Accept h-1' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:review-decide-hunk', {
-        sessionId: 's-1',
-        hunkId: 'h-1',
-        decision: 'accept',
-      })
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reject h-2' }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:review-decide-hunk', {
-        sessionId: 's-1',
-        hunkId: 'h-2',
-        decision: 'reject',
-      })
-    )
-  })
-
-  it('applies what was decided, which is what makes a rejection mean anything', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByText('src/auth/session.ts'))
-
-    fireEvent.click(screen.getByRole('button', { name: /Apply what I decided/ }))
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:review-apply', { sessionId: 's-1' })
-    )
-    expect(invoke).toHaveBeenCalledWith('foundry:review-done', { sessionId: 's-1' })
-  })
-
-  it('says why it could not apply them, rather than closing as though it had', async () => {
-    mount(reply(), {
-      review: [REVIEW],
-      hunks: HUNKS,
-      apply: { ok: false, error: 'the worktree moved under it' },
-    })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByText('src/auth/session.ts'))
-
-    fireEvent.click(screen.getByRole('button', { name: /Apply what I decided/ }))
-    await waitFor(() => expect(screen.getByText(/worktree moved under it/)).toBeTruthy())
-    expect(screen.getByText('src/auth/session.ts')).toBeTruthy()
-  })
-
-  it('tells a runtime that never started apart from a change that touched nothing', async () => {
-    mount(reply(), { review: [REVIEW], hunks: null })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => expect(screen.getByText(/supervision runtime is not running/)).toBeTruthy())
-  })
-
-  it('says a run that changed nothing changed nothing', async () => {
-    mount(reply(), { review: [REVIEW], hunks: [] })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => expect(screen.getByText('This run changed nothing.')).toBeTruthy())
-  })
-})
-
-describe('the request against what the agent says it did', () => {
-  it('names what was touched without being asked', async () => {
-    mount(reply(), {
-      review: [REVIEW],
-      hunks: HUNKS,
-      intent: {
-        unexpectedFiles: ['src/config/timeouts.ts'],
-        untouchedFiles: [],
-        hasScopeConcern: true,
-      },
-    })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Touched without being asked: src\/config\/timeouts\.ts/)
-      ).toBeTruthy()
-    )
-  })
-
-  it('names what was asked for and never touched, which often means it was not done', async () => {
-    mount(reply(), {
-      review: [REVIEW],
-      hunks: HUNKS,
-      intent: {
-        unexpectedFiles: [],
-        untouchedFiles: ['src/auth/refresh.ts'],
-        hasScopeConcern: true,
-      },
-    })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() =>
-      expect(screen.getByText(/never touched: src\/auth\/refresh\.ts/)).toBeTruthy()
-    )
-  })
-
-  it('says nothing when the change was what was asked for', async () => {
-    mount(reply(), {
-      review: [REVIEW],
-      hunks: HUNKS,
-      intent: { unexpectedFiles: [], untouchedFiles: [], hasScopeConcern: false },
-    })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByText('src/auth/session.ts'))
-    expect(screen.queryByText(/Touched without being asked/)).toBeNull()
+    // One chip has an agent behind it, so exactly one of each control exists.
+    expect(screen.getAllByRole('button', { name: 'Transcript' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /^Attach to/ })).toHaveLength(1)
   })
 })
 
@@ -820,18 +720,11 @@ describe('a mute you can find again', () => {
   })
 })
 
-describe('why a new run would be refused', () => {
-  it('says so, with the queue depth', async () => {
-    mount(reply(), {
-      backpressure: { allowed: false, unreviewed: 3, limit: 3, reason: '3 diffs are unreviewed' },
-    })
-    await waitFor(() => expect(screen.getByText(/3 diffs are unreviewed/)).toBeTruthy())
-    expect(screen.getByText(/A new run is refused/)).toBeTruthy()
-  })
-
-  it('says nothing while runs are allowed', async () => {
-    mount(reply(), { backpressure: { allowed: true, unreviewed: 0, limit: 3, reason: null } })
+describe('a finished run no longer holds a new one back', () => {
+  it('never asks for the review queue and says nothing about refusing a run', async () => {
+    mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
+    expect(invoke).not.toHaveBeenCalledWith('foundry:supervision-snapshot')
     expect(screen.queryByText(/A new run is refused/)).toBeNull()
   })
 })
@@ -933,82 +826,6 @@ describe('work that stopped making progress', () => {
   })
 })
 
-describe('half a review is not a review', () => {
-  it('refuses to apply until every hunk is decided', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS, complete: false })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByText('src/auth/session.ts'))
-
-    const apply = screen.getByRole('button', { name: /Decide every hunk first/ })
-    expect(apply.hasAttribute('disabled')).toBe(true)
-  })
-
-  it('allows it once they are', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS, complete: true })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: /Apply what I decided/ }).hasAttribute('disabled')
-      ).toBe(false)
-    )
-  })
-
-  it('warns before applying a full rejection', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS, complete: true, fullReject: true })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => expect(screen.getByText(/takes the whole change back out/)).toBeTruthy())
-  })
-
-  it('says how much came back out, so "applied" is not read as "nothing happened"', async () => {
-    mount(reply(), {
-      review: [REVIEW],
-      hunks: HUNKS,
-      complete: true,
-      apply: { ok: true, reverted: 2 },
-    })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByRole('button', { name: /Apply what I decided/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Apply what I decided/ }))
-    await waitFor(() => expect(screen.getByText(/2 hunks reverted/)).toBeTruthy())
-  })
-
-  it('says so when nothing was reverted', async () => {
-    mount(reply(), {
-      review: [REVIEW],
-      hunks: HUNKS,
-      complete: true,
-      apply: { ok: true, reverted: 0 },
-    })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByRole('button', { name: /Apply what I decided/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Apply what I decided/ }))
-    await waitFor(() => expect(screen.getByText(/Nothing was reverted/)).toBeTruthy())
-  })
-})
-
-describe('which of the four questions the reviewer is on', () => {
-  it('says it, rather than leaving a queue with steps invisible', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS, step: 'risk' })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => expect(screen.getByText(/What does it put at risk/)).toBeTruthy())
-  })
-
-  it("falls back to the item's own step when the queue has no next one", async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS, step: null })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => expect(screen.getByText(/Is this what was asked for/)).toBeTruthy())
-  })
-})
-
-// Watching a run means knowing what is being built. `N-1` is the handle the
-// graph and the ledger use, and on its own it says nothing.
 describe('what a node is called on the Floor', () => {
   const LABELS = { 'N-1': 'builder · U-1 refresh the token on a 401', 'N-2': 'verifier · U-2' }
 
@@ -1032,7 +849,7 @@ describe('what a node is called on the Floor', () => {
     mount(reply({ labels: LABELS }))
     await waitFor(() =>
       expect(
-        screen.getByRole('button', { name: /Watch builder · U-1 refresh the token on a 401/ })
+        screen.getByRole('button', { name: /Attach to builder · U-1 refresh the token on a 401/ })
       ).toBeTruthy()
     )
   })
@@ -1115,24 +932,6 @@ describe('the refusals a click used to swallow', () => {
     await waitFor(() => expect(screen.getByText(/no longer has a terminal/)).toBeTruthy())
   })
 })
-
-describe('a hunk decision the review refused', () => {
-  it('says the review is gone rather than looking like it stuck', async () => {
-    mount(reply(), { review: [REVIEW], hunks: HUNKS, complete: false, decideHunk: { ok: false } })
-    await waitFor(() => screen.getByText('To review — 1'))
-    fireEvent.click(screen.getByRole('button', { name: /Review/ }))
-    await waitFor(() => screen.getByText('src/auth/session.ts'))
-    fireEvent.click(screen.getByRole('button', { name: 'Reject h-1' }))
-    await waitFor(() => expect(screen.getByText(/no longer open/)).toBeTruthy())
-  })
-})
-
-// ── A run nothing is running ────────────────────────────────────────────
-//
-// The graph on disk says `running` and every agent's terminal died with the
-// application that started it. Before this the Floor drew the same chips it
-// draws for working agents, so the only way to find out was to come back later
-// and notice nothing had moved.
 
 describe('a run whose agents are gone', () => {
   // It is the standing band that says this now, rather than a second panel
@@ -1265,9 +1064,10 @@ describe('a run whose agents are gone', () => {
   it('offers no way into a terminal that is gone', async () => {
     mount(ORPHANED)
     await screen.findByText(/Nothing is running this/)
-    // Both the Watch and the Attach control: one reads a transcript that has
-    // stopped growing, the other navigates to a tab that no longer exists.
+    // Both the transcript and the Attach control: one reads a transcript that
+    // has stopped growing, the other navigates to a tab that no longer exists.
     expect(screen.queryByRole('button', { name: /Attach to/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Transcript' })).toBeNull()
   })
 
   it('says nothing when every agent is where it should be', async () => {
@@ -1403,6 +1203,9 @@ describe('the standing band', () => {
     )
     await waitFor(() => expect(screen.getByText('Halted — your move')).toBeTruthy())
     expect(screen.getByText(GATE.summary)).toBeTruthy()
+    // One line until it is opened.
+    expect(screen.queryByText(GATE.why)).toBeNull()
+    fireEvent.click(screen.getByText(GATE.summary))
     expect(screen.getByText(GATE.why)).toBeTruthy()
     for (const option of GATE.options) {
       expect(screen.getByRole('button', { name: new RegExp(option.label) })).toBeTruthy()
@@ -1504,8 +1307,10 @@ describe('the standing band', () => {
         waiting: [GATE],
       })
     )
-    await waitFor(() => expect(screen.getByText('Work continues with more room.')).toBeTruthy())
-    expect(screen.getByText(/Nothing happens until you answer/)).toBeTruthy()
+    await waitFor(() => expect(screen.getByText(GATE.summary)).toBeTruthy())
+    expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
+    fireEvent.click(screen.getByText(GATE.summary))
+    expect(screen.getByText('Work continues with more room.')).toBeTruthy()
   })
 
   it('marks the band as yours when the move is yours', async () => {
@@ -1629,5 +1434,249 @@ describe('agent text on the Floor', () => {
     })
     await waitFor(() => screen.getByText('a.ts'))
     expect(screen.getByText('a.ts').tagName).toBe('CODE')
+  })
+})
+
+const PULL = {
+  repo: 'proto',
+  url: 'https://github.com/x/proto/pull/233',
+  number: 233,
+  cwd: '/work/proto-lane-1',
+}
+const TICKET = { key: 'TAV-15', url: 'https://linear.app/t/issue/TAV-15' }
+
+describe('where the order lives', () => {
+  it('links the pull request and the ticket, and opens them outside the application', async () => {
+    mount(reply({ pulls: [PULL], source: TICKET }))
+    const pull = await screen.findByRole('link', { name: '#233' })
+    fireEvent.click(pull)
+    expect(openExternal).toHaveBeenCalledWith(PULL.url)
+    fireEvent.click(screen.getByRole('link', { name: 'TAV-15' }))
+    expect(openExternal).toHaveBeenCalledWith(TICKET.url)
+    expect(pull.getAttribute('target')).toBeNull()
+  })
+
+  it('shows neither for an order with no pull request and no ticket', async () => {
+    mount(reply({ pulls: [], source: null }))
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Review|Open on GitHub/ })).toBeNull()
+  })
+
+  it('shows neither when the host sends neither', async () => {
+    mount(reply())
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+})
+
+describe('reviewing the pull request', () => {
+  const COMMAND = 'terminator.git-integration.command.review-pull-request'
+
+  it('hands the pull request to the git extension’s review, against the lane checkout', async () => {
+    mount(reply({ pulls: [PULL] }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Review' }))
+    await waitFor(() =>
+      expect(runCommand).toHaveBeenCalledWith(COMMAND, { repoRoot: PULL.cwd, number: 233 })
+    )
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('falls back to opening it on GitHub when the review is not installed', async () => {
+    runCommand.mockResolvedValue({ ok: false, reason: 'not-registered' })
+    hasCommand.mockResolvedValue(true)
+    mount(reply({ pulls: [PULL] }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Review' }))
+    await waitFor(() => expect(openExternal).toHaveBeenCalledWith(PULL.url))
+    expect(await screen.findByRole('button', { name: 'Open on GitHub' })).toBeTruthy()
+  })
+
+  it('says Open on GitHub from the start when the review is not there', async () => {
+    hasCommand.mockResolvedValue(false)
+    mount(reply({ pulls: [PULL] }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open on GitHub' }))
+    expect(openExternal).toHaveBeenCalledWith(PULL.url)
+    expect(runCommand).not.toHaveBeenCalled()
+  })
+
+  it('says why when the review refused, rather than looking like it did nothing', async () => {
+    runCommand.mockResolvedValue({ ok: false, reason: 'invalid-args: number' })
+    mount(reply({ pulls: [PULL] }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Review' }))
+    expect(await screen.findByText(/invalid-args: number/)).toBeTruthy()
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('names the pull request on each button when there is more than one', async () => {
+    mount(reply({ pulls: [PULL, { ...PULL, repo: 'cli', number: 41, url: 'https://x/pull/41' }] }))
+    expect(await screen.findByRole('button', { name: 'Review #233' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Review #41' })).toBeTruthy()
+  })
+
+  it('no longer carries the per-hunk review that nothing could use', async () => {
+    mount(reply({ pulls: [PULL] }))
+    await waitFor(() => screen.getByText(/WO-1/))
+    expect(screen.queryByText(/To review/)).toBeNull()
+    expect(invoke.mock.calls.some((c) => String(c[0]).startsWith('foundry:review-'))).toBe(false)
+  })
+})
+
+describe('a gate on the Floor', () => {
+  it('links the pull request and the ticket on its line', async () => {
+    const gate = {
+      id: 'G-1',
+      rule: 'ready-for-review',
+      orderId: 'WO-1',
+      nodeId: null,
+      summary: 'Ready for you to look at',
+      why: 'Every step passed.',
+      evidence: [],
+      options: [{ id: 'approve', label: 'Approve', consequence: 'It ships.' }],
+      defaultIfIgnored: 'hold',
+      deadline: null,
+      blockedUnits: 0,
+      riskGrade: 'P2',
+      raisedAt: '2026-09-09T18:12:21.514Z',
+      decision: null,
+    }
+    mount(
+      reply({
+        pulls: [PULL],
+        source: TICKET,
+        waiting: [gate],
+        standing: {
+          kind: 'halted',
+          turn: 'you',
+          label: 'x',
+          headline: 'Halted — your move',
+          detail: 'd',
+          done: 0,
+          total: 0,
+          gateId: 'G-1',
+          waitingOn: null,
+        },
+      })
+    )
+    await screen.findByText('Ready for you to look at')
+    const line = screen
+      .getByText('Ready for you to look at')
+      .closest('.fdry-gate-card') as HTMLElement
+    fireEvent.click(within(line).getByRole('link', { name: /#233/ }))
+    expect(openExternal).toHaveBeenCalledWith(PULL.url)
+    fireEvent.click(within(line).getByRole('link', { name: /TAV-15/ }))
+    expect(openExternal).toHaveBeenCalledWith(TICKET.url)
+  })
+})
+
+describe('the step chips', () => {
+  function node(over: Record<string, unknown>) {
+    return { ...NODES[0], ...over }
+  }
+
+  function chipOf(label: string): HTMLElement {
+    return screen.getAllByText(label)[0].closest('.fdry-unit') as HTMLElement
+  }
+
+  it('reads done for a step that passed, whatever the step was', async () => {
+    mount(
+      reply({
+        graph: {
+          orderId: 'WO-1',
+          recipe: 'standard',
+          nodes: [node({ id: 'N-1', state: 'passed', sessionId: null, role: 'scout' })],
+        },
+      })
+    )
+    await waitFor(() => screen.getByText('scout'))
+    expect(chipOf('scout').textContent).toContain('done')
+    expect(document.body.textContent).not.toContain('verified')
+  })
+
+  it('says why a skipped step was skipped, as a tooltip and as a description', async () => {
+    const reason = 'runs only when risk triggers fire; this order has none'
+    mount(
+      reply({
+        graph: {
+          orderId: 'WO-1',
+          recipe: 'standard',
+          nodes: [
+            node({
+              id: 'N-1',
+              state: 'skipped',
+              sessionId: null,
+              role: 'architect',
+              skipReason: reason,
+            }),
+          ],
+        },
+      })
+    )
+    await waitFor(() => screen.getByText('architect'))
+    const chip = chipOf('architect')
+    expect(chip.getAttribute('title')).toBe(`Skipped: ${reason}`)
+    const described = chip.getAttribute('aria-describedby')
+    expect(described).not.toBeNull()
+    expect(document.getElementById(described as string)?.textContent).toBe(`Skipped: ${reason}`)
+  })
+
+  it('keeps the id as the tooltip for a step that was not skipped', async () => {
+    mount(reply())
+    await waitFor(() => screen.getAllByText('builder'))
+    expect(chipOf('builder').getAttribute('title')).toBe('N-1')
+    expect(chipOf('builder').getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('offers the terminal only while the step is running', async () => {
+    mount(
+      reply({
+        graph: {
+          orderId: 'WO-1',
+          recipe: 'standard',
+          nodes: [node({ id: 'N-1', state: 'passed', sessionId: 's-1', role: 'builder' })],
+        },
+      })
+    )
+    await waitFor(() => screen.getAllByText('builder'))
+    expect(screen.queryByRole('button', { name: /^Attach to/ })).toBeNull()
+    // What it said is still there to read.
+    expect(screen.getByRole('button', { name: 'Transcript' })).toBeTruthy()
+  })
+
+  it('opens the transcript directly under the row of the step it belongs to', async () => {
+    mount(
+      reply({
+        graph: {
+          orderId: 'WO-1',
+          recipe: 'standard',
+          nodes: [
+            node({ id: 'N-1', lane: 1, sessionId: 's-1', role: 'builder' }),
+            node({ id: 'N-3', lane: 2, sessionId: 's-3', role: 'verifier' }),
+          ],
+        },
+      })
+    )
+    await waitFor(() => screen.getByText('verifier'))
+    fireEvent.click(within(chipOf('verifier')).getByRole('button', { name: 'Transcript' }))
+    const panel = await screen.findByRole('region', { name: 'verifier' })
+    expect(panel.closest('.fdry-lane')).toBe(chipOf('verifier').closest('.fdry-lane'))
+    expect(chipOf('builder').closest('.fdry-lane')?.contains(panel)).toBe(false)
+  })
+
+  it('shows an attach refusal beside the step that caused it, not at the foot', async () => {
+    mount(reply(), { attach: { error: 'builder finished at 09:41; its agent has closed.' } })
+    await waitFor(() => screen.getAllByText('builder'))
+    fireEvent.click(screen.getByRole('button', { name: /^Attach to/ }))
+    const message = await screen.findByText('builder finished at 09:41; its agent has closed.')
+    expect(message.closest('.fdry-problem')).toBeNull()
+    expect(message.closest('.fdry-lane')).toBe(chipOf('builder').closest('.fdry-lane'))
+    expect(chipOf('builder').nextElementSibling).toBe(message)
+  })
+
+  it('shows a refusal to open the terminal beside its step as well', async () => {
+    mount(reply(), { terminal: { ok: false } })
+    await waitFor(() => screen.getAllByText('builder'))
+    fireEvent.click(screen.getByRole('button', { name: /^Attach to/ }))
+    const message = await screen.findByText('That agent is no longer in a terminal.')
+    expect(chipOf('builder').nextElementSibling).toBe(message)
   })
 })

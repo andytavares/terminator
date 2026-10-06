@@ -47,6 +47,8 @@ export interface RoleRegistry {
    */
   mayUseTool(id: string, tool: string): boolean
   mayWrite(id: string): boolean
+  /** Whether the only thing this role writes is documentation. */
+  writesOnlyDocs(id: string): boolean
 }
 
 /**
@@ -124,6 +126,14 @@ export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
      * Three destinations are the checkout, and they are the same three the
      * built-in role tests already name.
      */
+    writesOnlyDocs(id) {
+      const role = get(id)
+      if (role === null) return false
+      // `document` is what the role reports, not somewhere it edits.
+      const edited = role.writes.filter((target) => target !== 'document')
+      return edited.length === 1 && edited[0] === 'docs'
+    },
+
     mayWrite(id) {
       const role = get(id)
       return role !== null && role.writes.some((target) => CHECKOUT_WRITES.has(target))

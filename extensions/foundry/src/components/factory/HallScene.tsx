@@ -37,7 +37,7 @@ export interface HallSceneProps {
   readonly orphaned?: readonly string[]
 }
 
-type Lamps = Pick<SceneContext, 'needsYou' | 'orphaned'>
+type Lamps = Pick<SceneContext, 'needsYou' | 'orphaned' | 'steady'>
 
 const DARKNESS = 'rgba(5,8,18,0.42)'
 const LIGHT_RADIUS = 70
@@ -253,8 +253,10 @@ export function HallScene({
   // rAF loop, just be read on the next frame it already draws.
   const metricsRef = useRef(metrics)
   metricsRef.current = metrics
-  const lampsRef = useRef<Lamps>({ needsYou, orphaned })
-  lampsRef.current = { needsYou, orphaned }
+  // A beacon that would blink burns steadily for someone who asked for less motion.
+  const steady = reducedMotion ?? prefersReducedMotion()
+  const lampsRef = useRef<Lamps>({ needsYou, orphaned, steady })
+  lampsRef.current = { needsYou, orphaned, steady }
   const bakeRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
   const lightRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
 

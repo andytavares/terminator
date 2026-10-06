@@ -1,8 +1,12 @@
 schemaVersion: 1
 id: direct
-description: One lane, but something worth a second look. Build it, prove it, inspect it, ship it.
-# Worth a second look means one level above the model's default.
-effort: high
+description: >
+  One lane. Build it, check it with the project's own tests or a fresh
+  verifier, inspect it when something is flagged, document it, ship it.
+# One lane: the model's default is enough. The extra thinking is spent on the
+# shapes that span lanes or carry risk. Set explicitly, because the default
+# differs between models.
+effort: medium
 requires: []
 ci:
   # A red CI goes back to the lane's builder with the failed logs twice, then to you.
@@ -26,27 +30,45 @@ steps:
     when: toolchain.lint is set
     after: [build]
     onFail: { rework: build, max: 1 }
+  # The repository's own test command is the cheapest honest check, so it is
+  # used when there is one. A repository with none gets a verifier instead, so
+  # the shape never ships with its only check quietly missing.
+  - id: check
+    kind: run
+    command: '${toolchain.test}'
+    when: toolchain.test is set
+    after: [lint]
+    expect: { exit_code: '== 0' }
+    onFail: { rework: build, max: 1 }
   # One verifier, not one per unit. A fresh context is what makes verification
-  # independent of the work; a fresh context *per unit* adds nothing on top of
-  # that and doubled the session count of every order that ever ran.
+  # independent of the work. After `check` rather than beside it: only one of
+  # the two ever runs, so waiting on the other costs nothing, and the factory
+  # hall cannot lay out a third branch leaving lint.
   - id: verify
     kind: agent
     role: verifier
+    when: toolchain.test is not set
     context: fresh
-    after: [lint]
+    after: [check]
   - id: inspect
     kind: agent
     role: inspector
     when: risk.triggers is not empty
-    after: [verify]
+    after: [check, verify]
+  # Beside the check, not after it: the scribe documents what the builder did
+  # and needs no verdict. A fresh session, never the builder's — a resumed
+  # session keeps its old role's identity. The smallest changes (graded P3)
+  # are not worth a documentation pass.
   - id: document
     kind: agent
     role: scribe
-    after: [verify]
+    when: risk.grade is not P3
+    context: fresh
+    after: [lint]
   - id: integrate
     kind: join
     order: lane.ord
-    after: [inspect, document]
+    after: [check, verify, inspect, document]
   - id: ship
     kind: gate
     rule: ready-for-review

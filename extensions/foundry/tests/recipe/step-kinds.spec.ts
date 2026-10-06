@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   selectOver,
   evaluateWhen,
+  whenSkipReason,
   checkExpect,
   resolveCommand,
 } from '../../src/recipe/step-kinds.js'
@@ -94,6 +95,21 @@ describe('evaluateWhen', () => {
     o.risk.triggers = ['secrets']
     expect(evaluateWhen('risk.triggers is not empty', o)).toBe(true)
     expect(evaluateWhen('risk.triggers is empty', o)).toBe(false)
+  })
+
+  it('tests the grade, with or without a negation', () => {
+    const o = order()
+    o.risk.grade = 'P3'
+    expect(evaluateWhen('risk.grade is P3', o)).toBe(true)
+    expect(evaluateWhen('risk.grade is not P3', o)).toBe(false)
+    o.risk.grade = 'P2'
+    expect(evaluateWhen('risk.grade is P3', o)).toBe(false)
+    expect(evaluateWhen('risk.grade is not P3', o)).toBe(true)
+  })
+
+  it('is false for a grade that does not exist', () => {
+    expect(evaluateWhen('risk.grade is P9', order())).toBe(false)
+    expect(evaluateWhen('risk.grade is not P9', order())).toBe(false)
   })
 
   it('compares a collection count', () => {
@@ -204,5 +220,63 @@ describe('checkExpect', () => {
     const [failure] = checkExpect({ exit_code: '== 0' }, { exit_code: 2 })
     expect(failure.expected).toBe('== 0')
     expect(failure.actual).toBe(2)
+  })
+})
+
+describe('whenSkipReason', () => {
+  it('says risk triggers did not fire', () => {
+    expect(whenSkipReason('risk.triggers is not empty', order())).toBe(
+      'runs only when risk triggers fire; this order has none'
+    )
+  })
+
+  it('says risk triggers fired when the step wanted none', () => {
+    const o = order()
+    o.risk.triggers = ['secrets']
+    expect(whenSkipReason('risk.triggers is empty', o)).toBe(
+      'runs only when no risk triggers fire; this order has 1'
+    )
+  })
+
+  it('names the toolchain command the repository lacks', () => {
+    expect(whenSkipReason('toolchain.lint is set', order())).toBe(
+      'runs only when the repository has a lint command; it has none'
+    )
+  })
+
+  it('names the toolchain command the repository has when the step wanted none', () => {
+    expect(whenSkipReason('toolchain.lint is not set', order())).toBe(
+      'runs only when the repository has no lint command; it has one'
+    )
+  })
+
+  it('states a collection count that did not hold', () => {
+    expect(whenSkipReason('plan.units count > 5', order())).toBe(
+      'runs only when plan.units count > 5; it has 2'
+    )
+  })
+
+  it('states an emptiness test on another collection', () => {
+    expect(whenSkipReason('plan.sharedFiles is not empty', order())).toBe(
+      'runs only when plan.sharedFiles is not empty; it is empty'
+    )
+  })
+
+  it('falls back to quoting the condition', () => {
+    expect(whenSkipReason('risk.owner is nobody', order())).toBe(
+      'condition "risk.owner is nobody" was false'
+    )
+  })
+
+  it('names the grade a step wanted and the grade the order has', () => {
+    const o = order()
+    o.risk.grade = 'P3'
+    expect(whenSkipReason('risk.grade is not P3', o)).toBe(
+      'runs only when the change is not graded P3; it is graded P3'
+    )
+    o.risk.grade = 'P1'
+    expect(whenSkipReason('risk.grade is P3', o)).toBe(
+      'runs only when the change is graded P3; it is graded P1'
+    )
   })
 })

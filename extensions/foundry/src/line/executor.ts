@@ -18,13 +18,14 @@ import type { RunGraph, RunNode, Feedback } from './run-graph.js'
 import { createRoleRegistry } from './roles.js'
 import type { RoleRegistry } from './roles.js'
 import { brief } from './brief.js'
+import { describeDocument } from './document-outcome.js'
 import { collectableWrites, rungOutputPath } from './rung-output.js'
 import { orderDir } from '../data-root.js'
 import { mountSkills } from './skills-mount.js'
 import { resolveSkills } from '../recipe/resolve.js'
 import type { ResolveSources } from '../recipe/resolve.js'
 import type { EffortLevel, Recipe, Rule, Step } from '../recipe/parse.js'
-import type { Budgets, RiskAssessment, WorkOrder } from '../order/schema.js'
+import type { Budgets, DocumentHandBack, RiskAssessment, WorkOrder } from '../order/schema.js'
 import { verdictFromExit, summarise } from '../verify/verdict.js'
 import type { Evidence } from '../verify/verdict.js'
 import type { Verdict } from '../verify/verdict.js'
@@ -90,6 +91,8 @@ export interface RungCollection {
    * raised.
    */
   readonly defect: string | null
+  /** The document this rung handed back, when it handed one back. */
+  readonly document?: DocumentHandBack | null
 }
 
 export interface ExecutorDeps {
@@ -116,6 +119,11 @@ export interface ExecutorDeps {
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
     /**
+     * The role writes documentation and nothing else, so the caller refuses
+     * its edits to anything that is not a documentation path.
+     */
+    docsOnly?: boolean
+    /**
      * Where this rung writes what it found, or null when it has no artefact.
      *
      * The caller lets exactly this path through the read-only policy, the way
@@ -123,6 +131,13 @@ export interface ExecutorDeps {
      * the diff, and for a bare command.
      */
     outputPath: string | null
+    /**
+     * The order's own `outputs/` directory, or null.
+     *
+     * Given only to a role that hands back a document, which may write there
+     * as well as to documentation in the checkout.
+     */
+    outputsDir: string | null
     /**
      * Where this node's skills were mounted, or null when it declared none.
      *
@@ -158,6 +173,18 @@ export interface ExecutorDeps {
     title: string
     logPath: string
   }) => Promise<number | null>
+
+  /**
+   * Commit what a node's agent left in its lane's checkout.
+   *
+   * Nothing else ever runs `git commit`, so without it a branch has no commits
+   * to push and a pull request has nothing to open on. Resolves whether a
+   * commit was made: false for a clean tree, which is how an agent that passed
+   * having changed nothing is told from one that did the work. Absent means the
+   * caller commits nothing here and no node is judged on whether it changed
+   * anything.
+   */
+  readonly commitNode?: (input: { node: RunNode; message: string }) => Promise<boolean>
 
   /**
    * End a lane's live session before it is resumed.
@@ -259,6 +286,18 @@ export interface ExecutorDeps {
    */
   readonly wait?: (ms: number) => Promise<void>
 
+  /**
+   * Called once the graph's work is done and before the final check climbs,
+   * but only when no inspection is owed. The caller opens the drafts here (and
+   * starts watching their CI) so the check runs while CI does. It decides for
+   * itself whether the shipping mode allows that; resolves true when drafts are
+   * open, in which case a failed climb is recorded as `ship.final_check_failed`.
+   */
+  readonly beforeFinalCheck?: (input: {
+    readonly risk: RiskAssessment
+    readonly verdicts: readonly Verdict[]
+  }) => Promise<boolean>
+
   /** How often to re-read the budget while a wave is running. */
   readonly budgetPollMs?: number
 
@@ -313,9 +352,9 @@ export type ExecutorEvent =
 /**
  * Whether this shape of work ends in a pull request at all.
  *
- * A spike is a question, not a change: it opens nothing, which is FR-019 and
- * is stated in the recipe by having no ship step rather than by a flag. A
- * caller that shipped regardless would turn every investigation into a branch.
+ * A recipe that is a question, not a change, opens nothing (FR-019), and says
+ * so by having no ship step rather than by a flag. A caller that shipped
+ * regardless would turn every investigation into a branch.
  */
 export function opensPullRequest(recipe: Recipe): boolean {
   return recipe.steps.some((step) => step.kind === 'gate' && step.rule === 'ready-for-review')
@@ -393,6 +432,12 @@ export function skillsFor(recipe: Recipe, node: RunNode, roles: RoleRegistry): s
   return [...new Set([...roleSkills, ...stepSkills])]
 }
 
+/** What a node's commit says: its step, then the units it built or the step again. */
+function commitMessage(node: RunNode, order: WorkOrder): string {
+  const titles = unitsOf(order, node).map((unit) => unit.title)
+  return `${node.stepId}: ${titles.length === 0 ? node.stepId : titles.join(', ')}`
+}
+
 /** The tail of a log, for a feedback excerpt — never the whole thing. */
 function lastLines(text: string, count: number): string {
   return text.split('\n').slice(-count).join('\n')
@@ -404,7 +449,8 @@ function promptFor(
   node: RunNode,
   roles: RoleRegistry,
   rules: readonly Rule[],
-  outputPath: string | null
+  outputPath: string | null,
+  outputsDir: string | null
 ): string {
   const step = stepFor(recipe, node)
   if (step === undefined) return ''
@@ -415,6 +461,7 @@ function promptFor(
     rules,
     command: step.kind === 'run' ? (step.command ?? '') : undefined,
     outputPath: outputPath ?? undefined,
+    outputsDir: outputsDir ?? undefined,
     feedback: node.feedback,
   })
 }
@@ -510,6 +557,19 @@ export async function execute(
   }
 
   /**
+   * The order's `outputs/` directory, for a role that hands back a document.
+   *
+   * Under the same condition as `outputFor`: a caller that collects nothing
+   * has no use for a document a role could not hand back.
+   */
+  function outputsDirFor(roleId: string | null): string | null {
+    if (roleId === null || deps.collect === undefined) return null
+    const role = roles.get(roleId)
+    if (!collectableWrites(role).includes('document')) return null
+    return path.join(orderDir(deps.sources.dataRoot, order.id), 'outputs')
+  }
+
+  /**
    * Raise one, if this autonomy setting is asking about it.
    *
    * Returns true when the run must stop. A rule this setting silences raises
@@ -575,7 +635,7 @@ export async function execute(
     const observed = (await deps.observe?.()) ?? { elapsedMinutes: 0 }
     return budgetBreach(budgets, {
       ...observed,
-      agents: current.nodes.filter((n) => n.state === 'running').length,
+      agents: current.nodes.filter((n) => n.state === 'running' && n.kind !== 'gate').length,
     })
   }
 
@@ -674,9 +734,20 @@ export async function execute(
       // raised once the drafts exist, by whatever opens them, because "mark it
       // ready?" asked before there is anything to mark is a question with no
       // answer. So it passes, and the tail takes it from here.
+      //
+      // It is left `running`, not passed: the final check and the CI watch
+      // still stand between here and the question, and a graph that reads
+      // complete while minutes of work remain is a lie on the Floor. The tail
+      // marks it passed when the ready gate is raised.
       if (declared === 'ready-for-review') {
-        await advance(markPassed(current, blocking.id, deps.now()))
-        continue
+        await advance(
+          withNode(current, blocking.id, {
+            state: 'running',
+            startedAt: blocking.startedAt ?? deps.now(),
+            attempts: blocking.attempts + 1,
+          })
+        )
+        break
       }
 
       const rule: GateRuleId = isGateRule(declared) ? declared : 'unit.boundary'
@@ -725,7 +796,12 @@ export async function execute(
                 node.id,
                 `${node.stepId} names "${step.command}", which nothing in this repository's toolchain resolves.`
               )
-              return { node, skipped: true as const }
+              const name = /toolchain\.(\w+)/.exec(step.command)?.[1] ?? node.stepId
+              return {
+                node,
+                skipped: true as const,
+                skipReason: `no ${name} command in this repository`,
+              }
             }
             const logPath = path.join(
               orderDir(deps.sources.dataRoot, order.id),
@@ -792,6 +868,7 @@ export async function execute(
           if (roleId !== null) roles.assertResumable(roleId, resumeSessionId)
           const readOnly = roleId !== null && !roles.mayWrite(roleId)
           const outputPath = outputFor(node, roleId)
+          const outputsDir = outputsDirFor(roleId)
           const tier = (roleId === null ? null : roles.get(roleId))?.modelTier ?? 'deep'
 
           // This node's skills, mounted for its agent — outside the checkout,
@@ -825,7 +902,7 @@ export async function execute(
           const result = await deps.run({
             node,
             role: roleId,
-            prompt: promptFor(briefed, recipe, node, roles, rules, outputPath),
+            prompt: promptFor(briefed, recipe, node, roles, rules, outputPath, outputsDir),
             resumeSessionId,
             readOnly,
             modelTier: tier,
@@ -833,7 +910,9 @@ export async function execute(
             effort:
               tier === 'fast' ? null : (stepFor(recipe, node)?.effort ?? recipe.effort ?? null),
             mayUseTool: (tool) => roleId === null || roles.mayUseTool(roleId, tool),
+            docsOnly: roleId !== null && roles.writesOnlyDocs(roleId),
             outputPath,
+            outputsDir,
             // Reported as it happens rather than waited for: this is what puts
             // a session on a node while there is still an agent in it.
             onStarted: (sessionId) => void noteStarted(node.id, sessionId),
@@ -871,7 +950,13 @@ export async function execute(
       // — not a pass, and not a failure, which is why it does not go through
       // the pass/fail machinery below.
       if ('skipped' in run) {
-        await advance(withNode(current, run.node.id, { state: 'skipped', endedAt: deps.now() }))
+        await advance(
+          withNode(current, run.node.id, {
+            state: 'skipped',
+            endedAt: deps.now(),
+            skipReason: run.skipReason,
+          })
+        )
         continue
       }
       const { node, result, roleId, readOnly, outputPath, command, logPath } = run
@@ -884,6 +969,7 @@ export async function execute(
       // nothing read a result past its exit status, so a scout's report, an
       // architect's plan and a red team's attack all ended in a terminal
       // nobody read and the node passed regardless.
+      let handedBack: DocumentHandBack | null = null
       if (outputPath !== null && roleId !== null) {
         const collected = await deps
           .collect?.({ nodeId: node.id, role: roleId, outputPath })
@@ -901,6 +987,10 @@ export async function execute(
           // What the next rung is told. The agreement it is judged against is
           // deliberately not this.
           briefed = collected.order
+          handedBack = collected.document ?? null
+          if (handedBack !== null) {
+            await deps.record?.('document.handed_back', node.id, describeDocument(handedBack))
+          }
           await deps.record?.(
             'rung.collected',
             node.id,
@@ -1003,7 +1093,26 @@ export async function execute(
       // reproduction must fail before the fix exists — the one place a passing
       // command is the wrong answer, and where reading exit 0 as success would
       // pass a reproduction that reproduces nothing.
-      const passed = promised ? unmet.length === 0 : result.exitCode === 0
+      let passed = promised ? unmet.length === 0 : result.exitCode === 0
+
+      // An agent that may write has to have written something, and what it
+      // wrote is committed here: nothing else ever runs `git commit`, so a
+      // branch the agent only edited has nothing to push. A role that only
+      // ever documents may have nothing to document, and an author whose
+      // document is outside the checkout changes nothing in it.
+      let madeNoChange = false
+      if (passed && roleId !== null && roles.mayWrite(roleId) && deps.commitNode !== undefined) {
+        const committed = await deps.commitNode({ node, message: commitMessage(node, order) })
+        const mayChangeNothing =
+          (handedBack !== null && handedBack.location !== 'checkout') ||
+          (roles.writesOnlyDocs(roleId) &&
+            !collectableWrites(roles.get(roleId)).includes('document'))
+        if (!committed && !mayChangeNothing) {
+          madeNoChange = true
+          passed = false
+          await deps.record?.('step.no_change', node.id, 'made no change to the checkout')
+        }
+      }
 
       if (passed) {
         await advance(markPassed(current, node.id, deps.now()))
@@ -1068,7 +1177,7 @@ export async function execute(
             halted =
               (await raise('verify.repeat-fail', {
                 summary: `${node.unitIds.join(', ') || node.id} failed twice`,
-                why: `Attempt ${node.attempts + 1} of ${node.id} exited ${result.exitCode ?? 'without a status'}. A third try is a decision, not a retry.`,
+                why: `Attempt ${node.attempts + 1} of ${node.id} ${madeNoChange ? 'made no change to the checkout' : `exited ${result.exitCode ?? 'without a status'}`}. A third try is a decision, not a retry.`,
                 nodeId: node.id,
               })) || halted
           }
@@ -1086,6 +1195,14 @@ export async function execute(
   const seen = deps.observedChange === undefined ? null : await deps.observedChange()
   const touched = [...new Set([...declared, ...(seen?.changedFiles ?? [])])]
   const summary = summarise(verdicts)
+  // The graph's work is done when everything but the held ship node has passed.
+  // That node is the tail's to settle, so it is not waited for here.
+  const isShipNode = (n: RunNode) =>
+    n.kind === 'gate' && n.state === 'running' && stepFor(recipe, n)?.rule === 'ready-for-review'
+  const workDone =
+    isComplete(current) ||
+    (current.nodes.some(isShipNode) &&
+      current.nodes.every((n) => n.state === 'passed' || n.state === 'skipped' || isShipNode(n)))
   const observed = {
     changedFiles: touched,
     linesChanged: seen?.linesChanged ?? 0,
@@ -1114,6 +1231,7 @@ export async function execute(
     toolchain: order.context.toolchain,
     risk,
     touchesUi: touched.some((path) => /\.(tsx|css|html|svelte|vue)$/.test(path)),
+    changedFiles: touched,
   })
 
   /** One climb, with each step's log kept so a gate can show what it saw. */
@@ -1133,6 +1251,11 @@ export async function execute(
       logs.set(step.name, logPath)
       return runner(step, logPath)
     })
+    // A step that reused another's result shows that step's log.
+    for (const reused of outcome.steps) {
+      const from = reused.reusedFrom === undefined ? undefined : logs.get(reused.reusedFrom)
+      if (from !== undefined) logs.set(reused.name, from)
+    }
     return { outcome, logs }
   }
 
@@ -1143,7 +1266,14 @@ export async function execute(
       : ''
   }
 
-  if (!halted && !stalled && isComplete(current)) {
+  // The drafts open first when nothing needs the operator before they exist:
+  // no inspection is owed, and the caller judges the shipping mode.
+  let draftsOpen = false
+  if (!halted && !stalled && workDone && !inspection.required && deps.beforeFinalCheck) {
+    draftsOpen = await deps.beforeFinalCheck({ risk, verdicts })
+  }
+
+  if (!halted && !stalled && workDone) {
     const first = await climbWith(ladderSteps, deps.runStep, '')
     ladder = first.outcome
     ladderLogs = first.logs
@@ -1263,7 +1393,18 @@ export async function execute(
     }
   }
 
-  const complete = isComplete(current)
+  if (draftsOpen && ladder !== null && !ladder.ok) {
+    const failedStep = ladder.steps.find((s) => s.result === 'fail')
+    await deps.record?.(
+      'ship.final_check_failed',
+      failedStep?.name ?? order.id,
+      failedStep === undefined
+        ? 'The final check could not be completed; the draft stays a draft.'
+        : `${failedStep.name} failed${failedStep.command === null ? '' : `: ${failedStep.command}`}; the draft stays a draft.`
+    )
+  }
+
+  const complete = workDone
   return {
     graph: current,
     verdicts,

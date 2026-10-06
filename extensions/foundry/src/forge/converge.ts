@@ -68,7 +68,9 @@ function outputContract(file: string, order: WorkOrder): string {
     '      }',
     '    ],',
     '    "lanes": [',
-    '      { "ord": 1, "repo": "…", "branch": "", "role": null, "blocks": [], "blockedBy": [] }',
+    `      { "ord": 1, "repo": "…", "branch": ${JSON.stringify(
+      order.plan.lanes.find((l) => l.branch !== '')?.branch ?? ''
+    )}, "role": null, "blocks": [], "blockedBy": [] }`,
     '    ],',
     '    "sharedFiles": []',
     '  },',
@@ -119,6 +121,9 @@ function outputContract(file: string, order: WorkOrder): string {
     'is not the same field as a unit\u2019s `role`, which names a role from the',
     'toolchain. Leave it `null` unless lanes share files.',
     '',
+    ...(order.plan.lanes.some((l) => l.branch !== '')
+      ? ['A lane\u2019s `branch` is fixed by the ticket and must be kept exactly as shown.', '']
+      : []),
     'Anything else in that object is refused outright, including `status` — you',
     'do not agree your own work.',
     '',

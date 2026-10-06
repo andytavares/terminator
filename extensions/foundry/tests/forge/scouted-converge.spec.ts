@@ -1,14 +1,18 @@
 import { describe, it, expect, vi } from 'vitest'
-import { convergeMaybeScouted } from '../../src/forge/scouted-converge.js'
-import type { ScoutedConvergeDeps } from '../../src/forge/scouted-converge.js'
+import {
+  convergeMaybeScouted,
+  withScoutContext,
+  waitForScout,
+  SCOUT_WAIT_MS,
+} from '../../src/forge/scouted-converge.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
-// `converge`'s contract (forge-channels.ts) is to answer once a turn has
-// *started*, not once it has finished — the redraft lands later, through the
-// store. A first draft used to break that: it waited out the scout's whole
-// turn before answering at all, so on a host with no `claude` binary the
-// channel never answered and the IPC caller timed out (PR #210, ac0b65e0).
+// The first draft starts at once; the scout reads the repository beside it.
+// Two writers to one draft is how a scout's findings and the architect's plan
+// overwrite each other, so the architect never waits for the scout and never
+// takes its output into the first draft — `withScoutContext` keeps the
+// scout's findings on the order when the architect's save lands after them.
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -28,100 +32,121 @@ function amendedOrder(): WorkOrder {
   })
 }
 
-/** A scout that never calls onStarted and finishes straight to refusal. */
-function refusedBeforeStart(): ScoutedConvergeDeps['startScout'] {
-  return (_order, _onStarted, onFinished) => {
-    onFinished(null)
-  }
-}
-
 describe('convergeMaybeScouted', () => {
-  it('resolves with the scout session while the scout has not finished', async () => {
-    let finish: (updated: WorkOrder | null) => void = () => {}
-    const startScout: ScoutedConvergeDeps['startScout'] = (_order, onStarted, onFinished) => {
-      onStarted('scout-session-1')
-      finish = onFinished
-    }
+  it('starts the architect with the order as given while the scout is still running', async () => {
+    const startScout = vi.fn() // never finishes
     const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'architect-1' })
-    const recordArchitectStarted = vi.fn().mockResolvedValue(undefined)
 
-    const result = await convergeMaybeScouted(
-      { startScout, startArchitect, recordArchitectStarted },
-      order(),
-      'do the thing'
-    )
-
-    expect(result).toEqual({ ok: true, sessionId: 'scout-session-1' })
-    expect(startArchitect).not.toHaveBeenCalled()
-    // Nothing has forced the scout to finish yet.
-    expect(finish).toBeTypeOf('function')
-  })
-
-  it('starts the architect once the scout finishes, with the scout-collected order', async () => {
-    let finish: (updated: WorkOrder | null) => void = () => {}
-    const startScout: ScoutedConvergeDeps['startScout'] = (_order, onStarted, onFinished) => {
-      onStarted('scout-session-1')
-      finish = onFinished
-    }
-    const collected = order({ context: { ...order().context, entryPoints: ['src/foo.ts'] } })
-    const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'architect-1' })
-    const recordArchitectStarted = vi.fn().mockResolvedValue(undefined)
-
-    const promise = convergeMaybeScouted(
-      { startScout, startArchitect, recordArchitectStarted },
-      order(),
-      'do the thing'
-    )
-    await promise
-
-    expect(startArchitect).not.toHaveBeenCalled()
-    finish(collected)
-    // The architect starts asynchronously off the scout's onFinished.
-    await Promise.resolve()
-    await Promise.resolve()
-
-    expect(startArchitect).toHaveBeenCalledWith(collected, 'do the thing')
-    expect(recordArchitectStarted).toHaveBeenCalledWith(collected, 'do the thing', {
-      ok: true,
-      sessionId: 'architect-1',
-    })
-  })
-
-  it('resolves with the architect result when the scout is refused before starting', async () => {
-    const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'architect-1' })
-    const recordArchitectStarted = vi.fn().mockResolvedValue(undefined)
-
-    const result = await convergeMaybeScouted(
-      { startScout: refusedBeforeStart(), startArchitect, recordArchitectStarted },
-      order(),
-      'do the thing'
-    )
+    const result = await convergeMaybeScouted({ startScout, startArchitect }, order(), 'draft it')
 
     expect(result).toEqual({ ok: true, sessionId: 'architect-1' })
-    expect(startArchitect).toHaveBeenCalledWith(order(), 'do the thing')
-    expect(recordArchitectStarted).toHaveBeenCalledWith(order(), 'do the thing', {
-      ok: true,
-      sessionId: 'architect-1',
-    })
+    expect(startScout).toHaveBeenCalledWith(order())
+    expect(startArchitect).toHaveBeenCalledWith(order(), 'draft it')
   })
 
-  it('skips the scout for a non-first (amending) draft', async () => {
+  it('answers with the architect result even when the scout throws', async () => {
+    const startScout = vi.fn().mockImplementation(() => {
+      throw new Error('no claude binary')
+    })
+    const startArchitect = vi.fn().mockResolvedValue({ ok: false, reason: 'refused' })
+
+    const result = await convergeMaybeScouted({ startScout, startArchitect }, order(), 'draft it')
+
+    expect(result).toEqual({ ok: false, reason: 'refused' })
+    expect(startArchitect).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips the scout for an amending draft', async () => {
     const startScout = vi.fn()
     const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'architect-1' })
-    const recordArchitectStarted = vi.fn().mockResolvedValue(undefined)
 
     const result = await convergeMaybeScouted(
-      { startScout, startArchitect, recordArchitectStarted },
+      { startScout, startArchitect },
       amendedOrder(),
-      'do the thing'
+      'amend it'
     )
 
     expect(result).toEqual({ ok: true, sessionId: 'architect-1' })
     expect(startScout).not.toHaveBeenCalled()
-    expect(startArchitect).toHaveBeenCalledWith(amendedOrder(), 'do the thing')
-    // The architect's later start is `startArchitect`'s own caller's to
-    // record for the amending path — `converge.started` there comes from
-    // `runArchitectTurn`, the same as before this change.
-    expect(recordArchitectStarted).not.toHaveBeenCalled()
+    expect(startArchitect).toHaveBeenCalledWith(amendedOrder(), 'amend it')
+  })
+})
+
+describe('withScoutContext', () => {
+  const scouted = order({
+    context: {
+      ...order().context,
+      entryPoints: ['src/foo.ts'],
+      priorArt: ['abc123 hid done tickets'],
+      conventions: ['kebab-case files'],
+    },
+  })
+
+  it('carries the scout findings onto a draft saved without them', () => {
+    const drafted = order({ title: 'The architect title' })
+    const merged = withScoutContext(drafted, scouted)
+    expect(merged.title).toBe('The architect title')
+    expect(merged.context.entryPoints).toEqual(['src/foo.ts'])
+    expect(merged.context.priorArt).toEqual(['abc123 hid done tickets'])
+    expect(merged.context.conventions).toEqual(['kebab-case files'])
+  })
+
+  it('keeps what the architect wrote and adds only what is missing', () => {
+    const drafted = order({
+      context: { ...order().context, entryPoints: ['src/foo.ts', 'src/bar.ts'] },
+    })
+    const merged = withScoutContext(drafted, scouted)
+    expect(merged.context.entryPoints).toEqual(['src/foo.ts', 'src/bar.ts'])
+  })
+
+  it('returns the draft untouched when nothing is stored or the scout found nothing', () => {
+    const drafted = order()
+    expect(withScoutContext(drafted, null)).toBe(drafted)
+    expect(withScoutContext(drafted, order())).toBe(drafted)
+  })
+})
+
+describe('waitForScout', () => {
+  it('returns at once when no scout is running for the order', async () => {
+    await expect(waitForScout('WO-none')).resolves.toBe('none')
+  })
+
+  it('waits for a running scout to finish, then returns', async () => {
+    let finish: () => void = () => undefined
+    const startScout = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)))
+    const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'a' })
+    await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-w' }), 'draft')
+
+    let settled: string | null = null
+    const waiting = waitForScout('WO-w').then((r) => (settled = r))
+    await Promise.resolve()
+    expect(settled).toBeNull()
+
+    finish()
+    await waiting
+    expect(settled).toBe('finished')
+    await expect(waitForScout('WO-w')).resolves.toBe('none')
+  })
+
+  it('gives up after the time box and lets the red team start with what is stored', async () => {
+    vi.useFakeTimers()
+    try {
+      const startScout = vi.fn(() => new Promise<void>(() => undefined)) // never ends
+      const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'a' })
+      await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-t' }), 'draft')
+
+      const waiting = waitForScout('WO-t')
+      await vi.advanceTimersByTimeAsync(SCOUT_WAIT_MS)
+      await expect(waiting).resolves.toBe('timed_out')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('treats a scout that rejects as finished, not as an error', async () => {
+    const startScout = vi.fn(() => Promise.reject(new Error('crashed')))
+    const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'a' })
+    await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-x' }), 'draft')
+    await expect(waitForScout('WO-x')).resolves.toMatch(/^(finished|none)$/)
   })
 })

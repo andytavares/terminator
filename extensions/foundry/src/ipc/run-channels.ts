@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { z } from 'zod'
 import { orderDir, ensureWritable } from '../data-root.js'
 import { laneViews, mayMergeLane } from '../order/lanes.js'
-import { buildRunGraph, nodeLabels } from '../line/run-graph.js'
+import { buildRunGraph, nodeLabel, nodeLabels } from '../line/run-graph.js'
 import type { RunGraph, RunNode } from '../line/run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
 import { readyNodes, blockedReason, retry as retryNode } from '../line/scheduler.js'
@@ -16,16 +16,18 @@ import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
 import type { StandingSources } from '../order/standing.js'
-import { runFailure } from '../line/run-outcome.js'
+import { runDocumentReady, runFailure } from '../line/run-outcome.js'
 import { skillsFor } from '../line/executor.js'
 import { gradeInWords } from '../runtime/review/risk-grader.js'
 import { createRoleRegistry } from '../line/roles.js'
 import { readCiState } from '../line/ci-state.js'
+import { readPulls } from '../line/integrate.js'
 import { queue } from '../line/refinery.js'
 import type { QueueEntry, QueuePosition } from '../line/refinery.js'
 import type { Gate } from '../gates/rules.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import { recordGraph, readTimeline } from '../factory/timeline-store.js'
+import { pullNumber } from '../line/pull-number.js'
 
 // Starting a run.
 //
@@ -38,9 +40,16 @@ import { recordGraph, readTimeline } from '../factory/timeline-store.js'
 const StartPayload = z.object({
   id: z.string(),
   recipe: z.string().optional(),
-  /** The operator's "Start anyway", against a backpressure refusal (FR-054). */
-  force: z.boolean().optional(),
 })
+/** Steps the line runs itself: there is no agent to attach to, ever. */
+const AUTOMATIC_KINDS: readonly RunNode['kind'][] = ['gate', 'join']
+
+/** "09:41", in the operator's own time zone. */
+function clockTime(iso: string): string {
+  const at = new Date(iso)
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+}
+
 const ObservePayload = z.object({ id: z.string(), retry: z.array(z.string()).optional() })
 const AttachPayload = z.object({ orderId: z.string(), nodeId: z.string() })
 const ActivityPayload = z.object({ id: z.string() })
@@ -65,21 +74,6 @@ export interface RunDeps {
    * graph and says so, rather than reporting a run that never began.
    */
   readonly execute?: (order: WorkOrder, recipe: Recipe, graph: RunGraph) => Promise<void>
-  /**
-   * Whether there is room to start another agent (FR-053).
-   *
-   * The constraint is one person's capacity to review, which does not scale
-   * with the number of orders. Absent means no runtime to ask, which is not a
-   * reason to refuse a run.
-   */
-  readonly backpressure?: () => {
-    allowed: boolean
-    unreviewed: number
-    limit: number
-    reason: string | null
-  }
-  /** Record that the operator started anyway, with the depth they ignored. */
-  readonly noteOverride?: (orderId: string) => void
   /**
    * Whether this process is still running that agent's session.
    *
@@ -293,16 +287,6 @@ export function recipeLadder(order: WorkOrder): ProposedRecipe[] {
         : `one lane graded ${gradeInWords(grade)}, and ${triggers.join(', ')} fired`,
   }
 
-  if (grade === 'P3' && triggers.length === 0) {
-    // `quick` needs a test command and `direct` does not, so the fallback is
-    // not decoration: in a repository with no suite, `quick`'s only check does
-    // not exist, and proposing a shape that cannot run here would refuse the
-    // run rather than choose a shape that can.
-    return [
-      { name: 'quick', why: `one lane, graded ${gradeInWords('P3')}, nothing flagged` },
-      direct,
-    ]
-  }
   if (grade === 'P2' || grade === 'P3') return [direct]
   return [heaviest]
 }
@@ -385,31 +369,6 @@ export function createRunChannels(deps: RunDeps): RunChannels {
 
     const writable = await ensureWritable(deps.dataRoot())
     if (!writable.ok) return { error: writable.reason }
-
-    // Refused before anything is cut, with the reason and the depth — and
-    // overridable, which is the half that did not exist: the gate was built,
-    // the Floor showed its verdict, and `run.start` never asked it, so runs
-    // began regardless and the override had nothing to override.
-    const room = deps.backpressure?.() ?? null
-    if (room !== null && !room.allowed && parsed.data.force !== true) {
-      return {
-        error: room.reason ?? 'There is too much waiting to be reviewed.',
-        backpressure: room,
-      }
-    }
-    if (room !== null && !room.allowed) {
-      deps.noteOverride?.(order.id)
-      await deps.store.record({
-        at: deps.now(),
-        orderId: order.id,
-        actor: 'operator',
-        action: 'backpressure.overridden',
-        subject: order.id,
-        // What they chose to ignore, at the moment they ignored it.
-        reason: `started anyway with ${room.unreviewed} waiting to be reviewed (limit ${room.limit})`,
-        evidence: [],
-      })
-    }
 
     const chosenByOperator = parsed.data.recipe !== undefined
     // An operator's choice is honoured or refused, never quietly swapped. A
@@ -545,6 +504,18 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       // re-derived here — a surface that only wants "where does CI stand"
       // reads one small file instead of walking nodes and feedback.
       ci: await readCiState(deps.dataRoot(), parsed.data.id),
+      // Where the pull requests are, and the ticket the order came from, so the
+      // Floor can link both. `cwd` is the checkout a review opens against.
+      pulls: (await readPulls(deps.dataRoot(), parsed.data.id)).map((pull) => ({
+        repo: pull.repo,
+        url: pull.url,
+        number: pullNumber(pull.url),
+        cwd: pull.cwd,
+      })),
+      source:
+        order?.source.key != null && order.source.url != null
+          ? { key: order.source.key, url: order.source.url }
+          : null,
       // What the operator called it. The surface's heading was the order id
       // and the recipe name — two identifiers nobody chose — so the screen
       // showing a run never said which piece of work it was.
@@ -567,6 +538,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
           strandedFor: deps.strandedFor,
           orphansFor: () => orphaned,
           runFailureFor: async (id) => runFailure(await deps.store.entries(id)),
+          documentReadyFor: async (id) => runDocumentReady(await deps.store.entries(id)),
         }
       ),
       // The agents waiting at a terminal prompt, so the band can offer the one
@@ -761,6 +733,22 @@ export function createRunChannels(deps: RunDeps): RunChannels {
 
     const node = graph.nodes.find((n) => n.id === parsed.data.nodeId)
     if (node === undefined) return { error: `No step ${parsed.data.nodeId}.` }
+    const step = nodeLabel(await deps.store.load(parsed.data.orderId), node)
+    // A step that never has an agent, said as such rather than as "no session
+    // yet", which promises one is coming.
+    if (AUTOMATIC_KINDS.includes(node.kind)) {
+      return { error: `${step} is an automatic step with no agent.` }
+    }
+    // A finished step's session is closed (ADR 076); the resume advice below is
+    // for a run that died, and sent people to resume a step that had succeeded.
+    if (node.state === 'passed' || node.state === 'failed' || node.state === 'skipped') {
+      return {
+        error:
+          node.endedAt === null
+            ? `${step} has finished; its agent has closed.`
+            : `${step} finished at ${clockTime(node.endedAt)}; its agent has closed.`,
+      }
+    }
     if (node.sessionId === null) {
       return { error: `${node.id} has no session yet — it is ${node.state}.` }
     }

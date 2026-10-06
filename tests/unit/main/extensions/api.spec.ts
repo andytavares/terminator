@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { z } from 'zod'
 
 const mockSend = vi.fn()
 const mockWindow = {
@@ -74,6 +75,7 @@ import {
   globalRegistry,
   listExtensionCommands,
   executeExtensionCommand,
+  isExtensionCommandRegistered,
 } from '../../../../src/main/extensions/api'
 
 beforeEach(() => {
@@ -183,7 +185,7 @@ describe('executeExtensionCommand', () => {
   it('is a no-op for an unknown key', async () => {
     await expect(
       executeExtensionCommand('unknown-key', { projectId: null, sessionId: null, repoRoot: null })
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual({ ok: false, reason: 'not-registered' })
   })
 
   it('logs, and does not throw, when the handler rejects', async () => {
@@ -196,7 +198,7 @@ describe('executeExtensionCommand', () => {
 
     await expect(
       executeExtensionCommand(key, { projectId: null, sessionId: null, repoRoot: null })
-    ).resolves.toBeUndefined()
+    ).resolves.toMatchObject({ ok: false, reason: expect.stringContaining('kaboom') })
   })
 
   it('logs, and does not throw, when the handler throws synchronously', async () => {
@@ -211,7 +213,83 @@ describe('executeExtensionCommand', () => {
 
     await expect(
       executeExtensionCommand(key, { projectId: null, sessionId: null, repoRoot: null })
-    ).resolves.toBeUndefined()
+    ).resolves.toMatchObject({ ok: false, reason: expect.stringContaining('kaboom') })
+  })
+})
+
+describe('executeExtensionCommand with args', () => {
+  const noCtx = { projectId: null, sessionId: null, repoRoot: null }
+  const schema = z.object({ repoRoot: z.string(), number: z.number() })
+
+  function register(handler = vi.fn()) {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    api.commands.register({ id: 'review', label: 'Review', args: schema }, handler)
+    return { handler, key: 'test.ext.command.review' }
+  }
+
+  it('hands the validated args to the handler', async () => {
+    const { handler, key } = register()
+
+    const result = await executeExtensionCommand(key, noCtx, { repoRoot: '/r', number: 7 })
+
+    expect(result).toEqual({ ok: true })
+    expect(handler).toHaveBeenCalledWith(noCtx, { repoRoot: '/r', number: 7 })
+  })
+
+  it('rejects invalid args with a reason and never runs the handler', async () => {
+    const { handler, key } = register()
+
+    const result = await executeExtensionCommand(key, noCtx, { repoRoot: '/r', number: 'seven' })
+
+    expect(result).toMatchObject({ ok: false, reason: expect.stringMatching(/^invalid-args: /) })
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing args when a schema is declared', async () => {
+    const { handler, key } = register()
+
+    const result = await executeExtensionCommand(key, noCtx)
+
+    expect(result).toMatchObject({ ok: false })
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('a command without a schema receives no args', async () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const handler = vi.fn()
+    api.commands.register({ id: 'plain', label: 'Plain' }, handler)
+
+    await executeExtensionCommand('test.ext.command.plain', noCtx, { sneaky: true })
+
+    expect(handler).toHaveBeenCalledWith(noCtx)
+  })
+
+  it('reports not-registered for an unknown command and after dispose', async () => {
+    const { key } = register()
+    expect(isExtensionCommandRegistered(key)).toBe(true)
+    await expect(executeExtensionCommand('nobody.command.x', noCtx, {})).resolves.toEqual({
+      ok: false,
+      reason: 'not-registered',
+    })
+
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    api.commands.register({ id: 'gone', label: 'Gone' }, vi.fn()).dispose()
+    expect(isExtensionCommandRegistered('test.ext.command.gone')).toBe(false)
+  })
+
+  it('keeps a command that takes args out of the quick-actions list', () => {
+    register()
+    expect(listExtensionCommands().find((c) => c.id === 'review')).toBeUndefined()
+  })
+
+  it('reports disabled for a command dimmed by setEnabled', async () => {
+    const { handler, key } = register()
+    createExtensionAPI('test.ext', '0.1.0').commands.setEnabled('review', false, 'busy')
+
+    const result = await executeExtensionCommand(key, noCtx, { repoRoot: '/r', number: 1 })
+
+    expect(result).toEqual({ ok: false, reason: 'disabled' })
+    expect(handler).not.toHaveBeenCalled()
   })
 })
 

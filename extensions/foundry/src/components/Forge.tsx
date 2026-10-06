@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { isBlocking } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
+import type { Standing } from '../order/standing.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
 import { surfacedQuestions } from '../forge/interview.js'
@@ -265,6 +266,8 @@ function clockOf(iso: string): string {
 export interface ForgeProps {
   readonly orderId: string
   readonly onStarted?: (orderId: string) => void
+  /** Where the run stands, once there is one: the hand-off pill says whose move it is. */
+  readonly standing?: Standing
 }
 
 async function attachToSession(sessionId: string): Promise<string | null> {
@@ -319,12 +322,11 @@ const GROUP_META: Record<FindingGroup, { readonly heading: string; readonly cls:
   resolved: { heading: 'Resolved', cls: 'done' },
 }
 
-export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
+export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element {
   const [view, setView] = useState<OrderView | null>(null)
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
-  const [heldBack, setHeldBack] = useState<{ unreviewed: number; limit: number } | null>(null)
   const [states, setStates] = useState<StatesView | null>(null)
   const [moved, setMoved] = useState<string[]>([])
   const [questionChoices, setQuestionChoices] = useState<Record<string, number>>({})
@@ -508,43 +510,36 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     void applySettle(toSend)
   }, [drafting, queuedSettle, applySettle])
 
-  const handOff = useCallback(
-    async (force = false) => {
-      setBusy(true)
-      setProblem(null)
-      try {
-        const next = (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
-          | OrderView
-          | { error: string }
-        if ('error' in next) {
-          setProblem(next.error)
-          return
-        }
-        setView(next)
-        if (next.order.status !== 'agreed') return
-
-        const started = (await invoke('foundry:run.start', {
-          id: orderId,
-          ...(recipes?.chosen != null ? { recipe: recipes.chosen } : {}),
-          ...(force ? { force: true } : {}),
-        })) as {
-          error?: string
-          order?: { status: string }
-          backpressure?: { unreviewed: number; limit: number }
-        }
-        if (started.error !== undefined) {
-          setProblem(`The order is agreed, but the run did not start: ${started.error}`)
-          setHeldBack(started.backpressure ?? null)
-          return
-        }
-        setHeldBack(null)
-        onStarted?.(orderId)
-      } finally {
-        setBusy(false)
+  const handOff = useCallback(async () => {
+    setBusy(true)
+    setProblem(null)
+    try {
+      const next = (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
+        | OrderView
+        | { error: string }
+      if ('error' in next) {
+        setProblem(next.error)
+        return
       }
-    },
-    [orderId, onStarted, recipes?.chosen]
-  )
+      setView(next)
+      if (next.order.status !== 'agreed') return
+
+      const started = (await invoke('foundry:run.start', {
+        id: orderId,
+        ...(recipes?.chosen != null ? { recipe: recipes.chosen } : {}),
+      })) as {
+        error?: string
+        order?: { status: string }
+      }
+      if (started.error !== undefined) {
+        setProblem(`The order is agreed, but the run did not start: ${started.error}`)
+        return
+      }
+      onStarted?.(orderId)
+    } finally {
+      setBusy(false)
+    }
+  }, [orderId, onStarted, recipes?.chosen])
 
   if (view === null) {
     return <div className="fdry-empty">Loading the order…</div>
@@ -575,6 +570,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     turnEndedAt: view.turnEndedAt ?? null,
     shape: { name: shapeName, yours: shapeYours },
     offers,
+    turn: standing?.turn,
     clock: clockOf,
   })
 
@@ -1497,7 +1493,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                               ''}
                           </small>
                         </div>
-                        <span className="fdry-pill fdry-pill--work">Running</span>
+                        <span className="fdry-pill fdry-pill--work">{r.runState}</span>
                       </div>
                     </div>
                   </>
@@ -1543,7 +1539,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
           </section>
         </div>
 
-        {isDraft || problem !== null || heldBack !== null || view.advisory != null ? (
+        {isDraft || problem !== null || view.advisory != null ? (
           <footer className="fdry-foot">
             {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
             {previous !== undefined ? (
@@ -1568,16 +1564,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
 
             {stepView.id === 'handOff' ? (
               <>
-                {heldBack !== null ? (
-                  <button
-                    type="button"
-                    className="fdry-btn fdry-btn--primary"
-                    onClick={() => void handOff(true)}
-                  >
-                    <Play aria-hidden="true" /> Start anyway — {heldBack.unreviewed} waiting for
-                    review
-                  </button>
-                ) : view.agreed !== undefined && !isDraft ? null : (
+                {view.agreed !== undefined && !isDraft ? null : (
                   <ReasonButton
                     className="fdry-btn fdry-btn--primary"
                     reason={r.locks.handOff}

@@ -1,15 +1,26 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, History, Pause, Play, Radio, ShieldQuestion, Terminal } from 'lucide-react'
 import { useRunObservation } from '../../renderer/use-run-observation.js'
 import type { FloorView, PendingAsk } from '../../renderer/use-run-observation.js'
-import { layoutHall } from '../../factory/layout.js'
+import { layoutHall, TILE_PX } from '../../factory/layout.js'
 import type { HallMap, HallProp } from '../../factory/layout.js'
 import { createWorld } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import { diffObservation, describeEvent } from '../../factory/events.js'
+import { hallSigns } from '../../factory/signs.js'
+import type { HallSign } from '../../factory/signs.js'
+import { stepFacts } from '../../factory/step-facts.js'
 import type { FactoryEvent, Observation } from '../../factory/events.js'
 import { direct } from '../../factory/director.js'
-import { calloutLevels, calloutsFor, interruptionsFor, stateWord } from '../../factory/callouts.js'
+import { createBeats, release, schedule } from '../../factory/beats.js'
+import type { Beats } from '../../factory/beats.js'
+import {
+  calloutLevels,
+  calloutsFor,
+  ciWaitingCallout,
+  interruptionsFor,
+  stateWord,
+} from '../../factory/callouts.js'
 import type { Callout, CalloutBox, Interruption } from '../../factory/callouts.js'
 import { momentsOf, observationAt, replayClock } from '../../factory/replay.js'
 import type { ReplayClock, Timeline } from '../../factory/replay.js'
@@ -22,6 +33,12 @@ import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { MarkdownInline } from '../Markdown.js'
+import { GateCard } from '../GateCard.js'
+import { OrderLinks } from '../OrderLinks.js'
+import './hall.css'
+
+/** Half of a gate card's width, `min(360px, 60%)`, plus 16px to the scene's edge. */
+const GATE_CARD_INSET = 'calc(min(180px, 30%) + 16px)'
 
 // One order, drawn as a hall instead of a list of chips.
 //
@@ -68,6 +85,15 @@ interface Replay {
   readonly playing: boolean
   readonly speed: ReplaySpeed
   readonly observation: Observation
+  /** What each station is showing: the states the beat scheduler has released so far. */
+  readonly shown: Readonly<Record<string, NodeState>>
+}
+
+/** How often held beats are looked at, between polls. */
+const BEAT_CHECK_MS = 200
+
+function statesOf(graph: RunGraph): Record<string, NodeState> {
+  return Object.fromEntries(graph.nodes.map((n) => [n.id, n.state]))
 }
 
 function clockText(ms: number): string {
@@ -150,6 +176,12 @@ export function FactoryHall({
   const mapKeyRef = useRef<string | null>(null)
   const worldRef = useRef<World | null>(null)
   const prevObservationRef = useRef<Observation | null>(null)
+  // Beats the scene has been handed, and the node states they add up to. Held
+  // beats are released on a timer as well as on a poll, so a step that passed
+  // in the same instant as its feeder still plays out after it.
+  const beatsRef = useRef<Beats | null>(null)
+  const replayBeatsRef = useRef<Beats | null>(null)
+  const [liveShown, setLiveShown] = useState<Readonly<Record<string, NodeState>>>({})
 
   const pollActivity = useCallback(async () => {
     const r = (await invoke('foundry:run.activity', { id: orderId })) as {
@@ -236,6 +268,8 @@ export function FactoryHall({
       setMap(nextMap)
       worldRef.current = createWorld(nextMap, observation)
       prevObservationRef.current = observation
+      beatsRef.current = createBeats(statesOf(view.graph))
+      setLiveShown(beatsRef.current.shown)
       return
     }
 
@@ -243,12 +277,33 @@ export function FactoryHall({
     // above — reaching here means both are already populated.
     const world = worldRef.current as World
     const now = Date.now()
-    const events = diffObservation(prevObservationRef.current, observation)
+    const seen = diffObservation(prevObservationRef.current, observation)
+    const held = schedule(beatsRef.current as Beats, seen, view.graph.nodes, now)
+    const { beats, events } = release(held, now)
+    beatsRef.current = beats
+    setLiveShown(beats.shown)
     worldRef.current = direct(world, events, now)
     prevObservationRef.current = observation
     // A replay has the stage; live events still move the live world, silently.
     if (replayRef.current === null) announce(events, view.labels ?? {})
   }, [view, activity, announce])
+
+  // A held beat comes due with no poll to carry it.
+  const liveLabels = view?.labels
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const held = beatsRef.current
+      if (held === null || held.held.length === 0 || worldRef.current === null) return
+      const now = Date.now()
+      const { beats, events } = release(held, now)
+      if (events.length === 0) return
+      beatsRef.current = beats
+      setLiveShown(beats.shown)
+      worldRef.current = direct(worldRef.current, events, now)
+      if (replayRef.current === null) announce(events, liveLabels ?? {})
+    }, BEAT_CHECK_MS)
+    return () => clearInterval(timer)
+  }, [announce, liveLabels])
 
   const labelsNow = view?.labels
 
@@ -267,9 +322,11 @@ export function FactoryHall({
     const gates = r.gates ?? []
     const clock = replayClock(momentsOf(r.timeline, gates), REPLAY_MAX_GAP_MS)
     const observation = observationAt(r.timeline, gates, r.graph, clock.toReal(0))
-    const replayMap = layoutHall(r.graph, labelsNow ?? {})
+    // A recording that wrote CI down has a tower to wait at.
+    const replayMap = layoutHall(r.graph, labelsNow ?? {}, (r.timeline.ci?.length ?? 0) > 0)
     replayWorldRef.current = createWorld(replayMap, observation)
     replayPrevRef.current = observation
+    replayBeatsRef.current = createBeats(statesOf(observation.graph))
     setCallouts([])
     const next: Replay = {
       graph: r.graph,
@@ -281,6 +338,7 @@ export function FactoryHall({
       playing: true,
       speed: 1,
       observation,
+      shown: (replayBeatsRef.current as Beats).shown,
     }
     replayRef.current = next
     setReplay(next)
@@ -298,14 +356,25 @@ export function FactoryHall({
       const observation = observationAt(r.timeline, r.gates, r.graph, real)
       if (seek) {
         replayWorldRef.current = createWorld(r.map, observation)
+        replayBeatsRef.current = createBeats(statesOf(observation.graph))
         setCallouts([])
       } else {
-        const events = diffObservation(replayPrevRef.current, observation)
+        const seen = diffObservation(replayPrevRef.current, observation)
+        const held = schedule(replayBeatsRef.current as Beats, seen, r.graph.nodes, real)
+        // The recording's end shows everything still held rather than cutting it off.
+        const { beats, events } = release(held, at >= r.clock.duration ? Infinity : real)
+        replayBeatsRef.current = beats
         replayWorldRef.current = direct(replayWorldRef.current as World, events, real)
         announce(events, labelsNow ?? {})
       }
       replayPrevRef.current = observation
-      const next = { ...r, pos: at, observation, playing: r.playing && at < r.clock.duration }
+      const next = {
+        ...r,
+        pos: at,
+        observation,
+        shown: (replayBeatsRef.current as Beats).shown,
+        playing: r.playing && at < r.clock.duration,
+      }
       replayRef.current = next
       setReplay(next)
     },
@@ -323,6 +392,7 @@ export function FactoryHall({
   const leaveReplay = (): void => {
     replayRef.current = null
     replayWorldRef.current = null
+    replayBeatsRef.current = null
     setCallouts([])
     setReplay(null)
   }
@@ -341,6 +411,9 @@ export function FactoryHall({
   // ones would cover each other. Measured before paint, so a
   // callout is never seen at the level it is about to leave.
   const liveMap = replay?.map ?? map
+  const shownCi = (replay === null ? view?.ci : replay.observation.ci) ?? null
+  // Pinned to the tower while any check is pending; stacked like a raised one.
+  const pinnedWait = useMemo(() => ciWaitingCallout(shownCi), [shownCi])
   useLayoutEffect(() => {
     const overlay = overlayRef.current
     if (overlay === null || liveMap === null) return
@@ -356,7 +429,8 @@ export function FactoryHall({
         el,
       ])
     )
-    const boxes: CalloutBox[] = callouts.map((c) => {
+    const everything = pinnedWait === null ? callouts : [pinnedWait, ...callouts]
+    const boxes: CalloutBox[] = everything.map((c) => {
       const el = raised.get(c.id)
       const { x, y } = ground(c.nodeId)
       return {
@@ -374,7 +448,7 @@ export function FactoryHall({
         Object.entries(next).every(([id, level]) => kept[id] === level)
       return same ? kept : next
     })
-  }, [callouts, liveMap])
+  }, [callouts, liveMap, pinnedWait])
 
   const selectedSessionId =
     selected === null ? null : (view?.graph.nodes.find((n) => n.id === selected)?.sessionId ?? null)
@@ -450,9 +524,10 @@ export function FactoryHall({
       return r.ok === true ? null : (r.reason ?? 'That request is no longer waiting.')
     })
 
-  const decideGate = (gateId: string, option: string): void =>
+  const decideGate = (gateId: string, option: string, limit?: number | null): void =>
     void answer(gateId, async () => {
-      const r = (await invoke('foundry:inbox.decide', { gateId, option })) as { error?: string }
+      const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
+      const r = (await invoke('foundry:inbox.decide', payload)) as { error?: string }
       return r.error ?? null
     })
 
@@ -484,7 +559,9 @@ export function FactoryHall({
   const flaggedNodes = new Set(interruptions.map((i) => i.nodeId))
   const needsYou = [...flaggedNodes].filter((id): id is string => id !== null)
   const states: Record<string, NodeState> = {}
-  for (const n of shownGraph.nodes) states[n.id] = n.state
+  // The scene shows what the beat scheduler has released, not the raw graph.
+  const shownStates = replay === null ? liveShown : replay.shown
+  for (const n of shownGraph.nodes) states[n.id] = shownStates[n.id] ?? n.state
   const selectedNode =
     selected === null ? null : (view.graph.nodes.find((n) => n.id === selected) ?? null)
   const monitorStatus: MonitorStatus =
@@ -510,6 +587,40 @@ export function FactoryHall({
             : `FAILED: ${view.standing.headline}`
           ).toUpperCase()
         : null
+
+  const ciChecks = Object.fromEntries(
+    (shownCi?.pulls ?? []).flatMap((pull) => pull.checks.map((c) => [c.name, c.bucket] as const))
+  )
+  const signs = hallSigns(shownMap, {
+    labels,
+    metrics:
+      orderMetrics === null
+        ? null
+        : {
+            leadTimeMs: orderMetrics.leadTimeMs,
+            reworks: orderMetrics.reworks,
+            ciRounds: orderMetrics.ciRounds,
+          },
+    queue: shownWorldRef.current?.queue ?? null,
+    ci: shownCi === null ? null : { checks: ciChecks },
+  })
+  const waitingGates = replay?.observation.waiting ?? view.waiting ?? []
+  const monitorFacts =
+    selectedNode === null
+      ? null
+      : stepFacts({
+          node: selectedNode,
+          graph: shownGraph,
+          labels,
+          pulls: view.pulls,
+          ci: shownCi,
+          waiting: waitingGates,
+        })
+  // An agent step that has finished has closed its agent; there is nothing to attach to.
+  const agentClosed =
+    selectedNode !== null &&
+    monitorFacts === null &&
+    (selectedNode.state === 'passed' || selectedNode.state === 'skipped')
 
   return (
     <div
@@ -600,6 +711,29 @@ export function FactoryHall({
             )
           })}
 
+          {pinnedWait === null ? null : (
+            <div
+              className="fdry-callout"
+              data-tone={pinnedWait.tone}
+              data-pinned="true"
+              data-callout-id={pinnedWait.id}
+              aria-hidden="true"
+              style={
+                {
+                  left: `${anchorOf(shownMap, pinnedWait.nodeId).left}%`,
+                  top: `${anchorOf(shownMap, pinnedWait.nodeId).top}%`,
+                  '--fdry-lift': `${CALLOUT_BASE_PX + (calloutLift[pinnedWait.id] ?? 0) * CALLOUT_PITCH_PX}px`,
+                } as React.CSSProperties
+              }
+            >
+              <span className="fdry-callout__text">{pinnedWait.text}</span>
+            </div>
+          )}
+
+          {signs.map((sign) => (
+            <HallSignLabel key={sign.id} sign={sign} map={shownMap} />
+          ))}
+
           {interruptions.map((item) => (
             <InterruptionCard
               key={`${item.kind}:${item.id}`}
@@ -611,8 +745,9 @@ export function FactoryHall({
               problem={answerProblem[item.id] ?? null}
               onAllow={() => resolveAsk(item.id, 'allow')}
               onDeny={() => resolveAsk(item.id, 'deny')}
-              onDecide={(option) => decideGate(item.id, option)}
-              onOpenInbox={onOpenInbox}
+              onDecide={(option, limit) => decideGate(item.id, option, limit)}
+              pulls={view.pulls}
+              source={view.source}
               onTerminal={() => {
                 const sessionId =
                   item.kind === 'stranded'
@@ -685,6 +820,8 @@ export function FactoryHall({
             status={monitorStatus}
             alert={monitorAlert}
             attachProblem={attachProblem}
+            facts={monitorFacts}
+            attachable={!agentClosed}
             onAttach={() => void attach(selectedNode.id)}
             onClose={() => setSelected(null)}
           />
@@ -694,6 +831,40 @@ export function FactoryHall({
       <p className="fdry-sr-only" aria-live="polite">
         {spoken}
       </p>
+    </div>
+  )
+}
+
+/** A fixture's one sentence: its accessible name, and a tip on hover or focus. */
+function HallSignLabel({
+  sign,
+  map,
+}: {
+  readonly sign: HallSign
+  readonly map: HallMap
+}): JSX.Element {
+  const width = map.width * TILE_PX
+  const height = map.height * TILE_PX
+  const { left, top, right, bottom } = sign.rect
+  const centre = (left + right) / 2 / width
+  return (
+    <div
+      role="img"
+      tabIndex={0}
+      aria-label={sign.text}
+      className="fdry-hall-sign"
+      data-align={centre > 0.75 ? 'end' : centre < 0.25 ? 'start' : 'middle'}
+      data-place={top / height < 0.25 ? 'below' : 'above'}
+      style={{
+        left: `${(left / width) * 100}%`,
+        top: `${(top / height) * 100}%`,
+        width: `${((right - left) / width) * 100}%`,
+        height: `${((bottom - top) / height) * 100}%`,
+      }}
+    >
+      <span className="fdry-hall-sign__tip" aria-hidden="true">
+        {sign.text}
+      </span>
     </div>
   )
 }
@@ -748,6 +919,11 @@ function HallHud({
           <History aria-hidden="true" /> Replay
         </button>
       )}
+      {(view.pulls?.length ?? 0) > 0 || view.source != null ? (
+        <span className="fdry-hall-hud__links">
+          <OrderLinks pulls={view.pulls} source={view.source} />
+        </span>
+      ) : null}
       {note !== null ? <span className="fdry-hall-hud__note">{note}</span> : null}
       {!replaying && waitingCount > 0 ? (
         <span className="fdry-hall-hud__needs">{waitingCount} need you</span>
@@ -782,8 +958,9 @@ interface InterruptionCardProps {
   readonly problem: string | null
   readonly onAllow: () => void
   readonly onDeny: () => void
-  readonly onDecide: (option: string) => void
-  readonly onOpenInbox: () => void
+  readonly onDecide: (option: string, limit?: number | null) => void
+  readonly pulls?: readonly { readonly number: number; readonly url: string }[]
+  readonly source?: { readonly key: string; readonly url: string } | null
   readonly onTerminal: () => void
 }
 
@@ -798,10 +975,39 @@ function InterruptionCard({
   onAllow,
   onDeny,
   onDecide,
-  onOpenInbox,
+  pulls,
+  source,
   onTerminal,
 }: InterruptionCardProps): JSX.Element {
   const titleId = `fdry-card-${item.kind}-${item.id}`
+  if (item.kind === 'gate') {
+    // The same one-line gate the list views draw: collapsed, its answers on
+    // the line, the reason a click away and read as markdown. A replay shows
+    // it where it happened with every answer disabled.
+    return (
+      <div
+        role="group"
+        aria-label={item.title}
+        className={`fdry-card fdry-card--gate${flip ? ' is-below' : ''}`}
+        style={{
+          // Centred on its anchor but kept whole inside the scene: the inset is
+          // half the card's own width (see .fdry-card--gate) plus a margin.
+          left: `clamp(${GATE_CARD_INSET}, ${anchor.left}%, calc(100% - ${GATE_CARD_INSET}))`,
+          top: `${flip ? anchor.bottom : anchor.top}%`,
+        }}
+      >
+        <GateCard
+          gate={item.gate}
+          busy={busy || readOnly}
+          pulls={pulls}
+          source={source}
+          onDecide={onDecide}
+        />
+        {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
+        {readOnly ? <p className="fdry-card__history">Waited on you here.</p> : null}
+      </div>
+    )
+  }
   return (
     <div
       role="group"
@@ -841,25 +1047,6 @@ function InterruptionCard({
                 <Terminal aria-hidden="true" /> Terminal
               </button>
             </>
-          ) : item.kind === 'gate' ? (
-            item.needsInbox ? (
-              <button type="button" className="fdry-hall-btn is-primary" onClick={onOpenInbox}>
-                Open Inbox
-              </button>
-            ) : (
-              item.options.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  title={option.consequence}
-                  className="fdry-hall-btn is-primary"
-                  disabled={busy}
-                  onClick={() => onDecide(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))
-            )
           ) : (
             <button
               type="button"

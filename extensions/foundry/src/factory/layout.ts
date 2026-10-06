@@ -120,8 +120,9 @@ export interface HallMap {
 export const TILE_PX = 16
 
 const TOP_WALL_ROWS = 3
-const YARD_ROWS = 4
 const LANE_BAND_ROWS = 4
+/** A yard band is a lane band: a station row, a seat row, a belt row, an aisle. */
+const YARD_ROWS = LANE_BAND_ROWS
 const BREAKROOM_ROWS = 5
 /** How far the room extends past the last station's column — the hall hugs its content. */
 const CONTENT_MARGIN = 3
@@ -239,6 +240,31 @@ function depths(nodes: readonly RunNode[]): Map<string, number> {
   return memo
 }
 
+/**
+ * The yard nodes that stand on a second row: the short branch of an uneven
+ * fork. A yard node qualifies when everything downstream of it skips at least
+ * one depth column (it merges further on than the next column) while a
+ * sibling at its own depth does not — that sibling's longer branch keeps the
+ * main row, and the short one runs beside it to the merge.
+ */
+function offshootIds(nodes: readonly RunNode[], depthOf: ReadonlyMap<string, number>): Set<string> {
+  const skips = (node: RunNode): boolean => {
+    const dependents = nodes.filter((n) => n.dependsOn.includes(node.id))
+    const here = depthOf.get(node.id) as number
+    return (
+      dependents.length > 0 && dependents.every((n) => (depthOf.get(n.id) as number) > here + 1)
+    )
+  }
+  const yard = nodes.filter((n) => n.lane === null)
+  const offshoots = new Set<string>()
+  for (const node of yard) {
+    if (!skips(node)) continue
+    const siblings = yard.filter((n) => n !== node && depthOf.get(n.id) === depthOf.get(node.id))
+    if (siblings.some((n) => !skips(n))) offshoots.add(node.id)
+  }
+  return offshoots
+}
+
 // Every caller passes a rect the grid was already sized to hold — the
 // perimeter fills the exact width/height, and a station's (x, y, w, h) comes
 // from the same band/column arithmetic that sized the grid in the first
@@ -279,7 +305,9 @@ export function layoutHall(
   // rather than a fixed reserved bay past the deepest column.
   // Nodes sharing a band and a depth stand side by side rather than on top of
   // one another, so a depth column is as wide as its most crowded band.
-  const bandKey = (node: RunNode): string => (node.lane === null ? 'yard' : `lane-${node.lane}`)
+  const offshoots = offshootIds(graph.nodes, nodeDepths)
+  const bandKey = (node: RunNode): string =>
+    node.lane !== null ? `lane-${node.lane}` : offshoots.has(node.id) ? 'yard-2' : 'yard'
   const slotOf = new Map<string, number>()
   const slotsAtDepth = new Map<number, number>()
   const taken = new Map<string, number>()
@@ -321,8 +349,12 @@ export function layoutHall(
   const yardSeatRow = yardStationRow + 1
   const yardBeltRow = yardStationRow + 2
 
+  // A second yard band, directly under the first, for the short branch of an uneven fork.
+  const yardBands = offshoots.size > 0 ? 2 : 1
+  const yardStationRow2 = yardStationRow + YARD_ROWS
+
   function laneBandStart(index: number): number {
-    return TOP_WALL_ROWS + YARD_ROWS + index * LANE_BAND_ROWS
+    return TOP_WALL_ROWS + YARD_ROWS * yardBands + index * LANE_BAND_ROWS
   }
 
   const roomRow = laneBandStart(laneValues.length)
@@ -377,7 +409,11 @@ export function layoutHall(
   // seat or an aisle costs a walk more).
   const role: string[] = Array(height).fill('wall')
   role[TOP_WALL_ROWS] = 'head'
-  const bandStarts = [yardStationRow, ...laneValues.map((_, i) => laneBandStart(i))]
+  const bandStarts = [
+    yardStationRow,
+    ...(yardBands === 2 ? [yardStationRow2] : []),
+    ...laneValues.map((_, i) => laneBandStart(i)),
+  ]
   for (const r of bandStarts) {
     role[r] = 'station'
     role[r + 1] = 'seat'
@@ -393,7 +429,12 @@ export function layoutHall(
     const kind = stationKind(node.kind)
     const w = stationWidth(kind)
     const x = stationX(node)
-    const stationRow = node.lane === null ? yardStationRow : (laneRowOf.get(node.lane) as number)
+    const stationRow =
+      node.lane !== null
+        ? (laneRowOf.get(node.lane) as number)
+        : offshoots.has(node.id)
+          ? yardStationRow2
+          : yardStationRow
     const h = kind === 'press' ? 2 : 1
     const y = stationRow
     const seat: Tile = { x: x + Math.floor(w / 2), y: y + h }
@@ -437,12 +478,14 @@ export function layoutHall(
   // happens to sit directly under the fixture's own column.
   for (const [index, kind] of FIXTURE_KINDS.entries()) {
     const col = Math.round(2 + ((width - 4) * (index + 1)) / (FIXTURE_KINDS.length + 1))
+    // The scoreboard is three tiles wide, centred on its column.
+    const board = kind === 'statuswall'
     props.push({
       id: `fixture-${kind}`,
       kind,
-      x: col,
+      x: board ? col - 1 : col,
       y: TOP_WALL_ROWS - 1,
-      w: 1,
+      w: board ? 3 : 1,
       h: 1,
       solid: true,
       nodeId: null,
@@ -452,7 +495,7 @@ export function layoutHall(
   }
   const fixtureCol = (kind: FixtureKind): number => {
     const prop = props.find((p) => p.id === `fixture-${kind}`) as HallProp
-    return prop.x
+    return prop.x + Math.floor(prop.w / 2)
   }
   // Under a station's body, beside its seat: a gap between two stations is
   // where a belt turns down to get round the next one.
@@ -548,7 +591,11 @@ export function layoutHall(
   // Lights: one per ~6 columns, per belt row, plus one over the breakroom's
   // near seat row.
   const lights: Tile[] = []
-  const litRows = [yardBeltRow, ...laneValues.map((_, i) => laneBandStart(i) + 2)]
+  const litRows = [
+    yardBeltRow,
+    ...(yardBands === 2 ? [yardBeltRow + YARD_ROWS] : []),
+    ...laneValues.map((_, i) => laneBandStart(i) + 2),
+  ]
   for (const row of litRows) {
     for (let col = 3; col < width - 1; col += 6) lights.push({ x: col, y: row })
   }

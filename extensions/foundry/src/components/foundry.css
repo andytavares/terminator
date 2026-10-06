@@ -1056,206 +1056,8 @@
   padding-left: 10px;
 }
 
-/* Finished work nobody has looked at. Worst risk first, so the queue's order
-   and the eye's order are the same. */
-.fdry-review-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--tm-border);
-  font-size: 12px;
-}
-
-.fdry-review-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.fdry-review-main small {
-  color: var(--tm-text-secondary);
-}
-
-.fdry-grade {
-  flex: 0 0 auto;
-  padding: 1px 7px;
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  font-size: 11px;
-  font-weight: 600;
-}
-
 /* Only the two that warrant stopping take colour. A list where every row is
    coloured is a list where none of them stand out. */
-.fdry-grade.is-p0 {
-  border-color: var(--tm-danger);
-  color: var(--tm-danger);
-}
-
-.fdry-grade.is-p1 {
-  border-color: var(--tm-warning);
-  color: var(--tm-warning);
-}
-
-.fdry-hunk-file {
-  margin-top: 10px;
-}
-
-.fdry-hunk-file > code {
-  font-size: 11px;
-  color: var(--tm-text-secondary);
-}
-
-.fdry-hunk {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 6px;
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm);
-  overflow: hidden;
-}
-
-/* The border says which way it was decided, rather than a wash of colour over
-   the diff itself — which is the thing being read. */
-.fdry-hunk.is-accept {
-  border-color: var(--tm-success);
-}
-
-.fdry-hunk.is-reject {
-  border-color: var(--tm-danger);
-}
-
-/* A hunk as a diff, tinted and highlighted the way the git view does it: the
-   same --tm-diff-* line tints and --tm-syntax-* colours, which are checked for
-   contrast against those tints in both themes. */
-.fdry-diff {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  padding: 4px 0;
-  overflow-x: auto;
-  font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11.5px;
-  line-height: 1.5;
-  background: var(--tm-bg-input);
-}
-
-.fdry-diff > code {
-  display: grid;
-  min-width: max-content;
-}
-
-.fdry-diff-line {
-  display: grid;
-  grid-template-columns: 40px 16px auto;
-  white-space: pre;
-}
-
-.fdry-diff-line.is-add {
-  background: var(--tm-diff-added-bg);
-}
-
-.fdry-diff-line.is-remove {
-  background: var(--tm-diff-removed-bg);
-}
-
-.fdry-diff-line.is-meta {
-  color: var(--tm-text-muted);
-  font-style: italic;
-}
-
-.fdry-diff-num {
-  padding: 0 8px 0 0;
-  text-align: right;
-  color: var(--tm-text-secondary);
-  user-select: none;
-}
-
-.fdry-diff-sign {
-  text-align: center;
-  user-select: none;
-}
-
-.fdry-diff-line.is-add .fdry-diff-sign {
-  color: var(--tm-success);
-}
-
-.fdry-diff-line.is-remove .fdry-diff-sign {
-  color: var(--tm-danger);
-}
-
-.fdry-diff-code {
-  padding-right: 12px;
-  color: var(--tm-text-primary);
-}
-
-.fdry-diff .hljs-comment,
-.fdry-diff .hljs-quote {
-  color: var(--tm-syntax-comment);
-  font-style: italic;
-}
-
-.fdry-diff .hljs-doctag,
-.fdry-diff .hljs-keyword,
-.fdry-diff .hljs-formula {
-  color: var(--tm-syntax-keyword);
-}
-
-.fdry-diff .hljs-section,
-.fdry-diff .hljs-name,
-.fdry-diff .hljs-selector-tag,
-.fdry-diff .hljs-deletion,
-.fdry-diff .hljs-subst {
-  color: var(--tm-syntax-tag);
-}
-
-.fdry-diff .hljs-literal {
-  color: var(--tm-syntax-literal);
-}
-
-.fdry-diff .hljs-string,
-.fdry-diff .hljs-regexp,
-.fdry-diff .hljs-addition,
-.fdry-diff .hljs-attribute,
-.fdry-diff .hljs-meta .hljs-string {
-  color: var(--tm-syntax-string);
-}
-
-.fdry-diff .hljs-attr,
-.fdry-diff .hljs-variable,
-.fdry-diff .hljs-template-variable,
-.fdry-diff .hljs-type,
-.fdry-diff .hljs-selector-class,
-.fdry-diff .hljs-selector-attr,
-.fdry-diff .hljs-selector-pseudo,
-.fdry-diff .hljs-number {
-  color: var(--tm-syntax-number);
-}
-
-.fdry-diff .hljs-symbol,
-.fdry-diff .hljs-bullet,
-.fdry-diff .hljs-link,
-.fdry-diff .hljs-meta,
-.fdry-diff .hljs-selector-id,
-.fdry-diff .hljs-title {
-  color: var(--tm-syntax-title);
-}
-
-.fdry-diff .hljs-built_in,
-.fdry-diff .hljs-title.class_,
-.fdry-diff .hljs-class .hljs-title {
-  color: var(--tm-syntax-attribute);
-}
-
-.fdry-hunk-actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 6px;
-  padding: 6px;
-}
 
 /* Quiet has to be explicable: which rules this setting is not asking about. */
 .fdry-silenced {
@@ -2105,7 +1907,20 @@
   gap: 8px;
 }
 
-.fdry-orders button {
+/* The list item is the card, so the links and answers below the door sit
+   inside it rather than hanging under it. */
+.fdry-orders > li {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+
+.fdry-orders > li:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-orders .fdry-order-open {
   appearance: none;
   width: 100%;
   display: grid;
@@ -2113,16 +1928,11 @@
   gap: 12px;
   align-items: center;
   text-align: left;
-  background: var(--tm-bg-card);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-md);
+  background: transparent;
+  border: 0;
   padding: 11px 14px;
   cursor: pointer;
   color: inherit;
-}
-
-.fdry-orders button:hover {
-  background: var(--tm-bg-card-hover);
 }
 
 .fdry-order-mark svg {
@@ -2152,6 +1962,56 @@
   font-size: 11.5px;
   color: var(--tm-text-secondary);
   white-space: nowrap;
+}
+
+/* CI at work: the spinner sits before the wording and takes its colour. */
+.fdry-order-state.is-ci {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fdry-order-state.is-ci svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* What the row carries below the door: links, and the answers when the move
+   is yours. Outside the button, because a control cannot sit in a control. */
+.fdry-order-extras {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  /* Under the title: the mark's 20px column and the 12px gap, then the row's
+     own 14px inset. */
+  padding: 0 14px 10px 46px;
+  margin-top: -4px;
+}
+
+.fdry-order-extras .fdry-order-links {
+  margin: 0;
+}
+
+.fdry-order-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.fdry-order-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--tm-accent);
+}
+
+.fdry-order-links a svg {
+  width: 11px;
+  height: 11px;
 }
 
 /* The row the tab's badge is counting.
@@ -2209,8 +2069,7 @@
 
 .fdry-gate {
   display: grid;
-  grid-template-columns: 3px 1fr auto;
-  gap: 0 14px;
+  grid-template-columns: 3px minmax(0, 1fr);
   background: var(--tm-bg-card);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-md);
@@ -2237,25 +2096,18 @@
   background: var(--tm-accent);
 }
 
-.fdry-gate-main {
-  padding: 11px 0 11px 2px;
-  min-width: 0;
-}
-
-.fdry-gate-head {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
-  margin-bottom: 3px;
-}
-
 .fdry-gate-icon svg {
   width: 13px;
   height: 13px;
 }
 
 .fdry-gate-rule {
+  /* A label beside the question, never wider than it. */
+  flex: 0 1 auto;
+  max-width: 28%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
   font-size: 11px;
   color: var(--tm-accent);
@@ -2264,20 +2116,9 @@
   border-radius: var(--tm-radius-xs);
 }
 
-.fdry-gate-head b {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.fdry-gate-why {
-  margin: 0;
-  color: var(--tm-text-secondary);
-  font-size: 12.5px;
-}
-
 .fdry-gate-meta {
-  margin-top: 6px;
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
@@ -2295,11 +2136,100 @@
   border-style: dashed !important;
 }
 
-.fdry-gate-actions {
+/* One gate is one line: the chevron, the question with its facts under it, and
+   the answers. Why it fired and what it saw open underneath on a click. */
+.fdry-gate-card {
+  min-width: 0;
+}
+
+.fdry-standing .fdry-gate-card {
+  margin-top: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.fdry-gate-row {
   display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 4px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.fdry-gate-chevron {
+  appearance: none;
+  display: flex;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tm-text-muted);
+  cursor: pointer;
+}
+
+.fdry-gate-chevron svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.12s ease;
+}
+
+.fdry-gate-card.is-open .fdry-gate-chevron svg {
+  transform: rotate(90deg);
+}
+
+.fdry-gate-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fdry-gate-summary {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fdry-gate-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--tm-accent);
+}
+
+.fdry-gate-meta a svg {
+  width: 11px;
+  height: 11px;
+}
+
+.fdry-gate-detail {
+  padding: 0 12px 10px 26px;
+  font-size: 12.5px;
+  color: var(--tm-text-secondary);
+}
+
+.fdry-gate-consequences {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+
+.fdry-gate-consequences b {
+  color: var(--tm-text-secondary);
+  font-weight: 500;
+}
+
+.fdry-gate-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
   gap: 6px;
-  padding: 11px 12px 11px 0;
 }
 
 .fdry-gate-actions button {
@@ -2602,6 +2532,20 @@
   height: 12px;
 }
 
+/* A refusal beside the step that was clicked, on a line of its own. */
+.fdry-unit-problem {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--tm-danger);
+}
+
+/* A transcript opens under its row, across the lane's own two columns. */
+.fdry-lane > .fdry-watch {
+  grid-column: 1 / -1;
+  margin-top: 0 !important;
+}
+
 /* ─── Foundry: settings ──────────────────────────────────────────── */
 
 .fdry-settings {
@@ -2812,6 +2756,41 @@
   font-weight: 600;
   line-height: 1.3;
   color: var(--tm-text-primary);
+}
+
+.fdry-order-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: -6px 0 14px;
+  font-size: 12px;
+}
+
+.fdry-order-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tm-accent);
+}
+
+.fdry-order-links svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fdry-order-review {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .fdry-order-sub {
@@ -3338,6 +3317,21 @@
   white-space: nowrap;
 }
 
+.fdry-ci-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fdry-ci-spin {
+  display: inline-flex;
+}
+
+.fdry-ci-spin svg {
+  width: 13px;
+  height: 13px;
+}
+
 .fdry-ci-checks {
   display: flex;
   flex-direction: column;
@@ -3357,6 +3351,13 @@
 
 .fdry-ci-checks a {
   color: var(--tm-text-primary);
+}
+
+.fdry-ci-pull {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--tm-accent-text);
+  font-size: 12px;
 }
 
 .fdry-ci-bucket {
@@ -3734,6 +3735,73 @@
   background: rgba(10, 12, 18, 0.86);
   color: #98a2b1;
   font-size: 11px;
+}
+
+/* Where the order's pull requests and ticket are, on the heads-up bar. */
+.fdry-hall-hud__links {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.fdry-hall-hud__links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #72d8f2;
+}
+
+.fdry-hall-hud__links a svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* A gate drawn by the shared one-line card, on the hall's fixed dark palette:
+   the card's own text colours are the application theme's, which this surface
+   does not follow. Wider than a plain card because the answers sit on the line,
+   and wrapping rather than clipping them. */
+.fdry-card--gate {
+  width: min(360px, 60%);
+  max-width: calc(100% - 32px);
+  padding: 2px 6px;
+}
+
+.fdry-card--gate .fdry-gate-row {
+  flex-wrap: wrap;
+  padding: 4px 2px;
+}
+
+/* The text takes the whole first line; the answers wrap beneath it rather
+   than squeezing the summary to a word per line or running past the scene. */
+.fdry-card--gate .fdry-gate-text {
+  flex: 1 1 calc(100% - 24px);
+}
+
+.fdry-card--gate .fdry-gate-actions {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  padding-left: 22px;
+}
+
+.fdry-card--gate .fdry-gate-summary {
+  color: #e8a93a;
+  white-space: normal;
+}
+
+.fdry-card--gate .fdry-gate-meta,
+.fdry-card--gate .fdry-gate-detail,
+.fdry-card--gate .fdry-gate-consequences,
+.fdry-card--gate .fdry-gate-chevron {
+  color: #98a2b1;
+}
+
+.fdry-card--gate .fdry-gate-meta a {
+  color: #72d8f2;
+}
+
+.fdry-card--gate .fdry-gate-detail {
+  padding-left: 22px;
 }
 
 .fdry-card__history {

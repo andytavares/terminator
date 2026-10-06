@@ -1,3 +1,4 @@
+import { commitWorktree } from './commit.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
@@ -63,6 +64,11 @@ export interface IntegrateDeps {
    * all — no watching, no note on the gate, nothing withheld.
    */
   readonly watchCi?: (pulls: readonly LanePullRequest[]) => Promise<CiOutcome>
+  /**
+   * Every lane's draft is open and `pulls.json` is written; the CI watch has
+   * not started. A failure here never affects shipping.
+   */
+  readonly onDraftOpened?: (pulls: readonly LanePullRequest[]) => Promise<void>
 }
 
 export interface Shipment {
@@ -84,6 +90,11 @@ export interface Shipment {
    * answerable at review time rather than inferred from a directory listing.
    */
   readonly rulesInForce?: readonly string[]
+  /**
+   * Whether the inspector ran, and why not when it did not. Absent means not
+   * known, which reads as the older "no findings" rather than as a skip.
+   */
+  readonly inspection?: { readonly ran: boolean; readonly reason: string }
 }
 
 export interface LanePullRequest {
@@ -105,14 +116,37 @@ export interface ShipOutcome {
   readonly gate?: Gate
 }
 
-/** One line on how the criteria came out, for the gate's own reason. */
-function criteriaSummary(shipment: Shipment): string {
-  const results = shipment.verdicts.map((v) => v.result)
-  const failed = results.filter((r) => r === 'fail').length
-  const unmeasured = results.filter((r) => r === 'not_measured').length
-  if (failed > 0) return `${failed} criteria failed`
-  if (unmeasured > 0) return `${unmeasured} criteria not measured`
-  return 'every criterion passed'
+/** One bullet per criterion; a run that judged nothing says so instead of passing. */
+function acceptanceLines(order: WorkOrder, shipment: Shipment): string[] {
+  if (shipment.verdicts.length === 0) {
+    return ['- No verdicts were recorded. The criteria were not judged.']
+  }
+  return order.acceptance.map((criterion) => {
+    const found = shipment.verdicts.filter((v) => v.criterionId === criterion.id)
+    const worst =
+      found.find((v) => v.result === 'fail') ??
+      found.find((v) => v.result === 'not_measured') ??
+      found[0]
+    const outcome =
+      worst === undefined
+        ? 'not measured: nothing ran'
+        : worst.result === 'pass'
+          ? 'passed'
+          : `${worst.result === 'fail' ? 'failed' : 'not measured'}: ${worst.reason}`
+    return `- ${criterion.id}: ${criterion.statement} — ${outcome}`
+  })
+}
+
+/** What the inspection did, one bullet per fact. */
+function inspectionLines(shipment: Shipment): string[] {
+  if (shipment.inspection?.ran === false) return [`- Not run: ${shipment.inspection.reason}`]
+  if (shipment.findings.length === 0) return ['- Found nothing.']
+  return shipment.findings.map((finding) => `- ${finding}`)
+}
+
+/** "Tests come first (every unit)" becomes "Tests come first · every unit". */
+function ruleBullet(rule: string): string {
+  return `- ${rule.replace(/ \(([^()]*)\)$/, ' · $1')}`
 }
 
 /**
@@ -278,12 +312,7 @@ export function prBody(
     )
   }
 
-  lines.push('', '### Inspection', '')
-  if (shipment.findings.length === 0) {
-    lines.push('Nothing found.')
-  } else {
-    for (const finding of shipment.findings) lines.push(`- ${finding}`)
-  }
+  lines.push('', '### Inspection', '', ...inspectionLines(shipment))
 
   lines.push(...laneSection(order, lane, opened))
 
@@ -366,6 +395,25 @@ export async function pushLanes(order: WorkOrder, deps: IntegrateDeps): Promise<
 }
 
 /**
+ * Commit what a step wrote into each lane's checkout, and push the lanes that
+ * gained a commit. Returns whether anything was committed.
+ */
+export async function commitAndPushLanes(
+  order: WorkOrder,
+  message: string,
+  deps: IntegrateDeps
+): Promise<boolean> {
+  let any = false
+  for (const repo of resolvedRepos(order, deps)) {
+    if (await commitWorktree(repo.path, message, deps.exec)) {
+      any = true
+      await pushLane(repo, deps)
+    }
+  }
+  return any
+}
+
+/**
  * Push one lane's branch.
  *
  * `HEAD:<branch>` rather than the branch name alone so this works from a
@@ -441,7 +489,14 @@ export async function markReady(
 }
 
 /**
- * Ship the order: push, and open a draft per repository, in merge order.
+ * Open the order's drafts: push, and open a draft per repository, in merge
+ * order. Nothing here watches CI or raises the ready question — see
+ * `watchAndFinish`, which is the other half of `shipOrder`.
+ *
+ * A lane that already has a draft in `pulls.json` — the order came back round
+ * after a send-back, or a resumed run reached the tail again — is pushed to
+ * and left as it is: a second `gh pr create` for the same branch is refused.
+ * `onDraftOpened` fires only when a draft was actually created here.
  *
  * The body is written whatever happens, including when the operator has turned
  * pushing off — what would have shipped is worth reading even when it did not.
@@ -451,7 +506,7 @@ export async function markReady(
  * reviewer opens them in the order they land. Lanes that share nothing are
  * unordered and this loop costs them one comparison.
  */
-export async function shipOrder(
+export async function openDrafts(
   order: WorkOrder,
   shipment: Shipment,
   deps: IntegrateDeps
@@ -497,8 +552,17 @@ export async function shipOrder(
     }
   }
 
+  const existing = await readPulls(deps.root, order.id)
   const pulls: LanePullRequest[] = []
+  let created = 0
   for (const repo of repos) {
+    const already = existing.find((pull) => pull.lane === repo.lane)
+    if (already !== undefined) {
+      await pushLane(repo, deps)
+      pulls.push(already)
+      continue
+    }
+
     // The lanes this one waits on are open by now — this loop runs in merge
     // order — so the cross-links in its body are real URLs rather than
     // "merges before this".
@@ -513,6 +577,7 @@ export async function shipOrder(
     await pushLane(repo, deps)
     const pull = await openDraft(order, repo, file, deps)
     pulls.push(pull)
+    created += 1
     await deps.record(
       'ship.draft_opened',
       pull.url,
@@ -529,7 +594,7 @@ export async function shipOrder(
   //
   // Only where there is a sibling to link to, and never for the last lane,
   // whose body already had every URL when it was created.
-  if (pulls.length > 1) {
+  if (created > 0 && pulls.length > 1) {
     for (const pull of pulls.slice(0, -1)) {
       await writeBody(pull.bodyPath, prBody(order, shipment, pull.lane, pulls))
       const edited = await deps.exec({
@@ -556,6 +621,68 @@ export async function shipOrder(
     'utf8'
   )
 
+  if (created > 0) {
+    try {
+      await deps.onDraftOpened?.(pulls)
+    } catch {
+      // Telling a tracker is never worth the drafts that are already open.
+    }
+  }
+
+  return { pulls, bodyPaths, held: false, reason: '' }
+}
+
+/**
+ * Rewrite each draft's body from a shipment that now knows more — the final
+ * check ran after the drafts opened, so the first body carried no verification
+ * table. A failed edit is cosmetic and recorded, like a failed cross-link.
+ */
+export async function refreshBodies(
+  order: WorkOrder,
+  shipment: Shipment,
+  pulls: readonly LanePullRequest[],
+  deps: IntegrateDeps
+): Promise<void> {
+  for (const pull of pulls) {
+    await writeBody(pull.bodyPath, prBody(order, shipment, pull.lane, pulls))
+    const edited = await deps.exec({
+      command: 'gh',
+      args: ['pr', 'edit', pull.url, '--body-file', pull.bodyPath],
+      cwd: pull.cwd,
+      timeoutMs: 60_000,
+    })
+    if (edited.exitCode !== 0) {
+      await deps.record(
+        'ship.body_refresh_failed',
+        pull.url,
+        `The body could not be updated: ${edited.stderr.trim()}`
+      )
+    }
+  }
+}
+
+/**
+ * Ship the order: open the drafts, watch their CI, then ask whether to mark
+ * them ready.
+ */
+export async function shipOrder(
+  order: WorkOrder,
+  shipment: Shipment,
+  deps: IntegrateDeps
+): Promise<ShipOutcome> {
+  const opened = await openDrafts(order, shipment, deps)
+  if (opened.held) return opened
+  return watchAndFinish(order, shipment, opened.pulls, opened.bodyPaths, deps)
+}
+
+/** Watch the drafts' CI, then `finishShipping`. */
+export async function watchAndFinish(
+  order: WorkOrder,
+  shipment: Shipment,
+  pulls: readonly LanePullRequest[],
+  bodyPaths: readonly string[],
+  deps: IntegrateDeps
+): Promise<ShipOutcome> {
   // Watched before the ready-for-review gate is raised (D2): a draft whose
   // CI has not been watched, or is still red, is not "ready for review" —
   // it is a fix round away, or the automatic rounds already ran and it needs
@@ -599,7 +726,7 @@ export async function finishShipping(
       rule: 'ci.red',
       orderId: order.id,
       summary: `CI is still red on ${names} for ${order.title}`,
-      why: `${ci.rounds} automatic rounds ran and CI is still red. ${tail}`,
+      why: `**${ci.rounds} automatic rounds ran and CI is still red.**\n\n\`\`\`\n${tail}\n\`\`\``,
       evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
       riskGrade: order.risk.grade,
       blockedUnits: 0,
@@ -629,18 +756,16 @@ export async function finishShipping(
     orderId: order.id,
     summary: `Mark ${pulls.length === 1 ? 'the draft' : `${pulls.length} drafts`} for ${order.title} ready?`,
     why: [
-      `${order.plan.units.length} units, ${criteriaSummary(shipment)}.`,
+      `**${order.plan.units.length} ${order.plan.units.length === 1 ? 'unit' : 'units'}.**${ciNote === '' ? '' : ` ${ciNote}`}`,
+      '### Acceptance\n\n' + acceptanceLines(order, shipment).join('\n'),
+      '### Inspection\n\n' + inspectionLines(shipment).join('\n'),
       unmeasured.length === 0
-        ? 'Everything this repository can check was checked.'
-        : `Not measured here: ${unmeasured.join(', ')}.`,
-      shipment.findings.length === 0
-        ? 'The inspection found nothing.'
-        : `The inspection found ${shipment.findings.length}.`,
-      rules.length === 0 ? '' : `Judged against: ${rules.join(', ')}.`,
-      ciNote,
+        ? ''
+        : '### Not measured here\n\n' + unmeasured.map((name) => `- ${name}`).join('\n'),
+      rules.length === 0 ? '' : '### Judged against\n\n' + rules.map(ruleBullet).join('\n'),
     ]
-      .filter((line) => line !== '')
-      .join(' '),
+      .filter((block) => block !== '')
+      .join('\n\n'),
     evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
     riskGrade: order.risk.grade,
     blockedUnits: 0,

@@ -3,6 +3,11 @@ import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { registerQuickActionCommands } from './commands.js'
+import {
+  openPrReviewWindow,
+  registerReviewPullRequestCommand,
+  type PrReviewWindowParams,
+} from './review-command.js'
 
 // Every notification kind this extension ever raises, so the user can
 // independently choose its delivery target(s) (system/in-app/toast) in this
@@ -62,6 +67,7 @@ export function activate(api: ExtensionAPI): void {
   }
   registerGitExtensionHandlers(registerFn)
   disposables.push(...registerQuickActionCommands(api))
+  disposables.push(registerReviewPullRequestCommand(api))
   registerGithubHandlers(
     registerFn,
     {
@@ -227,21 +233,7 @@ export function activate(api: ExtensionAPI): void {
 
   disposables.push(
     api.ipc.registerHandler('window:open-pr-review', (payload) => {
-      const { repoRoot, accentColor, prNumber, showOverview } = (payload ?? {}) as {
-        repoRoot?: string
-        accentColor?: string
-        prNumber?: string
-        showOverview?: string
-      }
-      const params: Record<string, string> = {
-        repoRoot: repoRoot ?? '',
-        accentColor: accentColor ?? '',
-      }
-      if (prNumber) {
-        params.prNumber = prNumber
-        params.showOverview = showOverview ?? 'false'
-      }
-      api.window.openAuxiliary('pr-review', params)
+      openPrReviewWindow(api, (payload ?? {}) as PrReviewWindowParams)
       return { ok: true }
     })
   )
