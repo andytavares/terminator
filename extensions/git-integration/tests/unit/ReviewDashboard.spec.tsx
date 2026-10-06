@@ -122,6 +122,33 @@ beforeEach(() => {
 })
 
 describe('ReviewDashboard', () => {
+  it('reloads when a review is submitted elsewhere', async () => {
+    mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    const bridge = (
+      window as unknown as {
+        electronAPI: {
+          extensionBridge: { invoke: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> }
+        }
+      }
+    ).electronAPI.extensionBridge
+    const listeners: Record<string, () => void> = {}
+    bridge.on.mockImplementation((channel: string, cb: () => void) => {
+      listeners[channel] = cb
+      return () => {}
+    })
+    render(<ReviewDashboard />)
+    await screen.findByText('REQUESTED OF YOU')
+    bridge.invoke.mockImplementation((channel: string) =>
+      Promise.resolve(
+        channel === 'github:dashboard-search'
+          ? { prs: [], login: 'andytavares', fetchedAt: new Date().toISOString() }
+          : {}
+      )
+    )
+    listeners['reviews:changed']()
+    await screen.findByText('Nothing needs you')
+  })
+
   it('renders the three tabs with counts', async () => {
     mockInvoke({
       prs: [pr211, pr210, pr212, pr213],

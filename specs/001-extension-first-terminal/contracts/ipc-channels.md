@@ -948,6 +948,28 @@ Creates a new focused BrowserWindow pre-loaded with the Code Reviews view for th
 
 ---
 
+### `window:review-submitted`
+
+Sent by a review surface after an approval lands. The handler broadcasts `reviews:changed` so every open Reviews list reloads; the approving pop-out then closes itself, returning the user to the list behind it.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{}`
+
+**Response**: `{ ok: true }`
+
+---
+
+### `reviews:changed`
+
+Push telling the Reviews list (`view=reviews`) to re-run `github:dashboard-search`.
+
+**Direction**: main → renderer (broadcast)
+
+**Payload**: `{}`
+
+---
+
 ### `github:list-open-prs`
 
 Lists pull requests for the active repo with cursor-based pagination, optional text/number search, and open/closed state filter.

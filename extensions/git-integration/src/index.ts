@@ -6,6 +6,7 @@ import { registerQuickActionCommands } from './commands.js'
 import {
   openPrReviewWindow,
   registerReviewPullRequestCommand,
+  registerReviewSubmittedRelay,
   type PrReviewWindowParams,
 } from './review-command.js'
 
@@ -68,6 +69,7 @@ export function activate(api: ExtensionAPI): void {
   registerGitExtensionHandlers(registerFn)
   disposables.push(...registerQuickActionCommands(api))
   disposables.push(registerReviewPullRequestCommand(api))
+  disposables.push(registerReviewSubmittedRelay(api))
   registerGithubHandlers(
     registerFn,
     {

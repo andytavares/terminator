@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import * as githubModule from '../../src/api/github'
@@ -58,14 +58,17 @@ vi.mock('../../src/components/pr-review/PrReviewView', () => ({
     onRefresh,
     onShowOverview,
     onPopOut,
+    onApproved,
   }: {
     onClose: () => void
     onRefresh: () => void
     onShowOverview?: () => void
     onPopOut?: () => void
+    onApproved?: () => void
   }) => (
     <div data-testid="pr-review-view">
       <button onClick={onClose}>Close PR</button>
+      {onApproved && <button onClick={onApproved}>Approved</button>}
       <button onClick={onRefresh}>Refresh PR</button>
       {onShowOverview && <button onClick={onShowOverview}>Show Overview</button>}
       {onPopOut && (
@@ -247,6 +250,42 @@ describe('PrReviewTab', () => {
       '/repo:::1',
       expect.objectContaining({ pausedAt: expect.any(String) })
     )
+  })
+
+  describe('after an approval', () => {
+    const activePr = { number: 7, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
+
+    afterEach(() => {
+      window.history.replaceState(null, '', '/')
+    })
+
+    it('closes the pop-out so the review list behind it shows, and tells the list to reload', async () => {
+      window.history.replaceState(null, '', '/?view=pr-review')
+      const close = vi.spyOn(window, 'close').mockImplementation(() => {})
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...defaultStoreState,
+        activePr,
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      render(<PrReviewTab repoRoot="/repo" />)
+      fireEvent.click(screen.getByText('Approved'))
+      await waitFor(() => expect(close).toHaveBeenCalled())
+      expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
+      close.mockRestore()
+    })
+
+    it('returns the docked panel to its queue', async () => {
+      const close = vi.spyOn(window, 'close').mockImplementation(() => {})
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...defaultStoreState,
+        activePr,
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      render(<PrReviewTab repoRoot="/repo" />)
+      fireEvent.click(screen.getByText('Approved'))
+      await waitFor(() => expect(mockSetActivePr).toHaveBeenCalledWith(null))
+      expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
+      expect(close).not.toHaveBeenCalled()
+      close.mockRestore()
+    })
   })
 
   it('calls setIncludeClosedPrs when toggle closed is clicked', () => {

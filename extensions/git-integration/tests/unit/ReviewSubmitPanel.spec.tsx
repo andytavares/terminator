@@ -80,6 +80,28 @@ describe('ReviewSubmitPanel', () => {
     await waitFor(() => expect(screen.getByText('Review submitted successfully.')).toBeTruthy())
   })
 
+  it('hands back to the caller once an approval lands', async () => {
+    mockPrReviewSubmit.mockResolvedValue({ success: true })
+    const onApproved = vi.fn()
+    render(<ReviewSubmitPanel {...defaultProps} onApproved={onApproved} />)
+    fireEvent.click(screen.getByText('Approve').closest('label')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Submit review' }))
+    await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText('Review submitted successfully.')).toBeNull()
+  })
+
+  it('stays on the success screen after a comment review', async () => {
+    mockPrReviewSubmit.mockResolvedValue({ success: true })
+    const onApproved = vi.fn()
+    render(<ReviewSubmitPanel {...defaultProps} onApproved={onApproved} />)
+    fireEvent.change(screen.getByPlaceholderText(/Leave a summary comment/), {
+      target: { value: 'looks fine' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit review' }))
+    await waitFor(() => screen.getByText('Review submitted successfully.'))
+    expect(onApproved).not.toHaveBeenCalled()
+  })
+
   it('shows close button after successful submission', async () => {
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     const onClose = vi.fn()

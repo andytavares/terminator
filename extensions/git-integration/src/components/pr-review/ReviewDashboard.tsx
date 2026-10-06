@@ -263,6 +263,11 @@ export function ReviewDashboard(): JSX.Element {
     return () => clearInterval(id)
   }, [])
 
+  useEffect(
+    () => window.electronAPI.extensionBridge.on('reviews:changed', () => void load()),
+    [load]
+  )
+
   useEffect(() => {
     const onFocus = () => {
       if (Date.now() - lastFetchRef.current >= FOCUS_REFRESH_MS) {

@@ -36,6 +36,7 @@ interface Props {
   onRefresh: () => Promise<void>
   onShowOverview?: () => void
   onPopOut?: () => void
+  onApproved?: () => void
   sinceInfo?: SinceInfo | null
 }
 
@@ -48,6 +49,7 @@ export function PrReviewView({
   onRefresh,
   onShowOverview,
   onPopOut,
+  onApproved,
   sinceInfo,
 }: Props) {
   const {
@@ -488,6 +490,7 @@ export function PrReviewView({
             headSHA={pr.headSHA}
             isOwnPr={!!currentUserLogin && currentUserLogin === pr.author}
             onClose={() => setShowSubmit(false)}
+            onApproved={onApproved}
           />
         </Dialog>
       )}
