@@ -212,4 +212,38 @@ describe('githubAPI bridge', () => {
       ['github:tests-for-block', { repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' }],
     ])
   })
+
+  it('batch channels send the payloads their handlers validate', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.filesMetrics('/repo', ['a.ts', 'b.ts'])
+    await githubAPI.filesViewedSet('/repo', 211, 'PR_node1', ['a.ts'], true)
+    await githubAPI.prFileDiff('/repo', 211, 'a.ts', { baseRef: 'main', headSHA: 'abc' })
+    await githubAPI.fileViewedSet('/repo', 211, 'a.ts', true, 'PR_node1')
+    expect(mockInvoke.mock.calls).toEqual([
+      ['github:files-metrics', { repoRoot: '/repo', paths: ['a.ts', 'b.ts'] }],
+      [
+        'github:files-viewed-set',
+        { repoRoot: '/repo', prNumber: 211, nodeId: 'PR_node1', paths: ['a.ts'], viewed: true },
+      ],
+      [
+        'github:pr-file-diff',
+        { repoRoot: '/repo', prNumber: 211, path: 'a.ts', baseRef: 'main', headSHA: 'abc' },
+      ],
+      [
+        'github:file-viewed-set',
+        { repoRoot: '/repo', prNumber: 211, path: 'a.ts', viewed: true, nodeId: 'PR_node1' },
+      ],
+    ])
+  })
+
+  it('leaves nodeId out of a batch viewed mark when the PR has none', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.filesViewedSet('/repo', 211, undefined, ['a.ts'], false)
+    expect(mockInvoke.mock.calls).toEqual([
+      [
+        'github:files-viewed-set',
+        { repoRoot: '/repo', prNumber: 211, paths: ['a.ts'], viewed: false },
+      ],
+    ])
+  })
 })

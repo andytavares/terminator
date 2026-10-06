@@ -20,14 +20,21 @@ export const githubAPI = {
   prUpdateBranch: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-update-branch', { repoRoot, prNumber }),
 
-  prFileDiff: (repoRoot: string, prNumber: number, path: string) =>
-    bridge().invoke('github:pr-file-diff', { repoRoot, prNumber, path }),
+  prFileDiff: (
+    repoRoot: string,
+    prNumber: number,
+    path: string,
+    known?: { baseRef?: string; headSHA?: string }
+  ) => bridge().invoke('github:pr-file-diff', { repoRoot, prNumber, path, ...known }),
 
   prFileContent: (repoRoot: string, prNumber: number, path: string, ref: string) =>
     bridge().invoke('github:pr-file-content', { repoRoot, prNumber, path, ref }),
 
   fileMetrics: (repoRoot: string, path: string) =>
     bridge().invoke('github:file-metrics', { repoRoot, path }),
+
+  filesMetrics: (repoRoot: string, paths: string[]) =>
+    bridge().invoke('github:files-metrics', { repoRoot, paths }),
 
   prInlineComments: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-inline-comments', { repoRoot, prNumber }),
@@ -68,8 +75,35 @@ export const githubAPI = {
 
   dashboardSearch: () => bridge().invoke('github:dashboard-search', {}),
 
-  fileViewedSet: (repoRoot: string, prNumber: number, path: string, viewed: boolean) =>
-    bridge().invoke('github:file-viewed-set', { repoRoot, prNumber, path, viewed }),
+  fileViewedSet: (
+    repoRoot: string,
+    prNumber: number,
+    path: string,
+    viewed: boolean,
+    nodeId?: string
+  ) =>
+    bridge().invoke('github:file-viewed-set', {
+      repoRoot,
+      prNumber,
+      path,
+      viewed,
+      ...(nodeId ? { nodeId } : {}),
+    }),
+
+  filesViewedSet: (
+    repoRoot: string,
+    prNumber: number,
+    nodeId: string | undefined,
+    paths: string[],
+    viewed: boolean
+  ) =>
+    bridge().invoke('github:files-viewed-set', {
+      repoRoot,
+      prNumber,
+      paths,
+      viewed,
+      ...(nodeId ? { nodeId } : {}),
+    }),
 
   prCompare: (repoRoot: string, fromSha: string, toSha: string) =>
     bridge().invoke('github:pr-compare', { repoRoot, fromSha, toSha }),

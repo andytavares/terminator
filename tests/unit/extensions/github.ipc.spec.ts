@@ -482,10 +482,10 @@ describe('github:pr-review-submit', () => {
   })
 
   it('accepts all valid event types', async () => {
+    // Owner and name are looked up once per registration and then cached.
+    customMock().mockResolvedValueOnce({ stdout: OWNER_REPO_MOCK, stderr: '' })
     for (const event of ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'] as const) {
-      customMock()
-        .mockResolvedValueOnce({ stdout: OWNER_REPO_MOCK, stderr: '' })
-        .mockResolvedValueOnce({ stdout: JSON.stringify({ id: 1 }), stderr: '' })
+      customMock().mockResolvedValueOnce({ stdout: JSON.stringify({ id: 1 }), stderr: '' })
       const result = (await getHandler('github:pr-review-submit')({
         repoRoot: '/repo',
         prNumber: 42,

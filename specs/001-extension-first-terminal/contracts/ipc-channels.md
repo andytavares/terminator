@@ -1018,6 +1018,55 @@ Returns churn, blast radius (actual code importers only — not prose), test fil
 
 ---
 
+### `github:files-metrics`
+
+The same answer as `github:file-metrics` for every path, from three git processes in total (one history read, one import search, one test-file listing) instead of three per path. If the combined import search overflows its 20 MB buffer it falls back to one search per path.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; paths: string[] }`
+
+**Response**: `{ metrics: Record<string, FileMetrics> } | { error: string }`, where `FileMetrics` is the `github:file-metrics` response shape above.
+
+---
+
+### `github:pr-file-diff` (changed)
+
+**Request**: `{ repoRoot: string; prNumber: number; path: string; baseRef?: string; headSHA?: string }`
+
+- `baseRef`: the PR's base branch (`PrReviewDetail.baseRefName`). When given, `gh pr view` is not called.
+- `headSHA`: the PR's head commit (`PrReviewDetail.headSHA`). When it equals the commit this process last fetched for the PR, `git fetch` and the merge-base lookup are skipped and only `git diff` runs. When it differs or is absent the handler fetches as before.
+
+**Response**: unchanged.
+
+---
+
+### `github:pr-review-detail` (changed)
+
+**Response**: `pr` gains `nodeId?: string`, the pull request's GraphQL node id.
+
+---
+
+### `github:file-viewed-set` (changed)
+
+**Request**: `{ repoRoot: string; prNumber: number; path: string; viewed: boolean; nodeId?: string }`. With `nodeId`, only the mutation runs (one gh call); without it the id is looked up first.
+
+**Response**: unchanged.
+
+---
+
+### `github:files-viewed-set`
+
+Marks or unmarks several files as viewed in one GraphQL request, one aliased mutation per path.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; prNumber: number; nodeId?: string; paths: string[]; viewed: boolean }`
+
+**Response**: `{ ok: true } | { error: string }`
+
+---
+
 ### `github:active-reviews-for-repo`
 
 Returns all PRs that the user has opened a review session for in the given repo (stored in `pr-active-reviews` electron-store). Used to surface orphan in-progress PRs that are no longer in the paginated queue.

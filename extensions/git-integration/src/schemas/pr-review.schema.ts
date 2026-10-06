@@ -201,6 +201,8 @@ export const PrReviewDetailSchema = z.object({
   headRefName: z.string(),
   baseRefName: z.string(),
   headSHA: z.string(),
+  /** GraphQL node id; lets viewed-file mutations skip the lookup. */
+  nodeId: z.string().optional(),
   isDraft: z.boolean().default(false),
   mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).default('unknown'),
   ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
