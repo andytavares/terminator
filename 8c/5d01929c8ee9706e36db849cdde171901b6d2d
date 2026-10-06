@@ -1,0 +1,67 @@
+extensions/git-integration/src/components/merge-flow/merge-flow.css
+  s_e6b0138361e070::t_149242b9b1e44b 350
+  s_e6b0138361e070::t_5c33dc26604425 24,273,922,1044
+src/main/extensions/extension-view-host.ts
+  s_e6b0138361e070::t_20abd962f63a29 64,215
+extensions/git-integration/tests/unit/FullFileList.spec.tsx
+  s_e6b0138361e070::t_88d8b27cdc4314 131-132
+  s_e6b0138361e070::t_20abd962f63a29 112
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_e6b0138361e070::t_a4bc8bc0c04ec8 346,637,683-705,995,1068,1736-1757,1843,2038
+  s_e6b0138361e070::t_149242b9b1e44b 1687
+extensions/git-integration/src/components/pr-review/FullFileList.tsx
+  s_e6b0138361e070::t_20abd962f63a29 96
+  s_e6b0138361e070::t_88d8b27cdc4314 139
+package.json
+  s_e6b0138361e070::t_9331fb9a582c1d 55,76
+extensions/git-integration/tests/unit/ChapterFileList.spec.tsx
+  s_e6b0138361e070::t_88d8b27cdc4314 100-102
+extensions/git-integration/src/components/merge-flow/ConflictHub.tsx
+  s_e6b0138361e070::t_149242b9b1e44b 20,25-28,30-33,41
+extensions/git-integration/src/components/git-integration.css
+  s_e6b0138361e070::t_149242b9b1e44b 265-268,271-274
+tests/e2e/git-integration-contrast.spec.ts
+  s_e6b0138361e070::t_a3daeb056017e6 162-163,200
+  s_e6b0138361e070::t_0d4450dfe82047 5-6
+  s_e6b0138361e070::t_240fe1ee9536b7 74-110,169-191
+  s_e6b0138361e070::t_2dcc8f9aca640b 15
+  s_e6b0138361e070::t_81ca40a6a7a321 1-4,7-14,16-73,111-161,164-168,192-199,201-204
+docs/EXTENSION-DEVELOPMENT.md
+  s_e6b0138361e070::t_20abd962f63a29 1061
+extensions/git-integration/src/components/pr-review/review-surface.css
+  s_e6b0138361e070::t_5c33dc26604425 209
+extensions/remote-control/src/server/remote-server.ts
+  s_e6b0138361e070::t_20abd962f63a29 46,197
+src/renderer/styles.css
+  s_e6b0138361e070::t_20abd962f63a29 33,174
+scripts/e2e-select.mjs
+  s_e6b0138361e070::t_05278b49ddb088 38
+  s_e6b0138361e070::t_00bb136d47c93a 34
+.github/workflows/ci.yml
+  s_e6b0138361e070::t_05278b49ddb088 290-292,303
+extensions/git-integration/src/components/pr-review/review-dashboard.css
+  s_e6b0138361e070::t_149242b9b1e44b 92
+tests/e2e/git-integration-contrast.entry.tsx
+  s_e6b0138361e070::t_240fe1ee9536b7 22-28,123-128,130,132-137
+  s_e6b0138361e070::t_38a92d9a93349e 1-21,29-122,129,131,138-324
+extensions/git-integration/src/components/pr-review/ChapterFileList.tsx
+  s_e6b0138361e070::t_88d8b27cdc4314 110
+package-lock.json
+  s_e6b0138361e070::t_d2f2e98ec7c7cd 41,343-355,4912-4921
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8c5d01929c8ee9706e36db849cdde171901b6d2d",
+  "prompts": {},
+  "sessions": {
+    "s_e6b0138361e070": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "974a24d0-f11c-4acf-8158-afff495d008a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
