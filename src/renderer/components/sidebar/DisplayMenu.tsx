@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import type { GroupKey, SessionView, SortKey } from '../../sidebar/view-model'
 import { closeAllContextMenus } from '../ContextMenu'
+import { useMenuPlacement } from '../use-menu-placement'
 import './SidebarMenu.css'
 
 /**
@@ -30,6 +31,9 @@ export interface DisplayMenuProps {
 /** How the branch list is arranged: grouping and sort, behind one control. */
 export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Element {
   const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const placement = useMenuPlacement(open, buttonRef, panelRef)
 
   useEffect(() => {
     if (!open) return
@@ -45,6 +49,7 @@ export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Eleme
   return (
     <div className="sidebar-menu" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={buttonRef}
         type="button"
         className="sidebar-menu__button"
         aria-expanded={open}
@@ -59,7 +64,7 @@ export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Eleme
       </button>
 
       {open && (
-        <div className="sidebar-menu__panel" role="menu">
+        <div ref={panelRef} className="sidebar-menu__panel" role="menu" style={placement}>
           <div className="sidebar-menu__heading">Group</div>
           {(Object.keys(GROUP_LABELS) as GroupKey[]).map((key) => (
             <button

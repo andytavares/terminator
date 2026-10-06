@@ -181,6 +181,23 @@ test('every view, grouping and sort control lives in two menus (FR-034)', async 
   for (const name of ['Workspace', 'None', 'Recent', 'Name']) {
     await expect(handle.page.getByRole('menuitemradio', { name })).toBeVisible()
   }
+  // The panel is wider than the button's room in the sidebar, so it reaches
+  // past the sidebar's edge; there it must be drawn over the pane beside it.
+  await handle.page.evaluate(() => {
+    const sidebar = document.querySelector('.unified-sidebar') as HTMLElement
+    sidebar.style.width = '200px'
+  })
+  const covered = await handle.page.evaluate(() => {
+    const sidebar = document.querySelector('.unified-sidebar')!.getBoundingClientRect()
+    const panel = document.querySelector('[role="menu"]')!.getBoundingClientRect()
+    const x = sidebar.right + 4
+    const y = panel.top + panel.height / 2
+    return {
+      overhangs: panel.right > x,
+      onTop: document.elementFromPoint(x, y)?.closest('[role="menu"]') !== null,
+    }
+  })
+  expect(covered).toEqual({ overhangs: true, onTop: true })
   await handle.page.keyboard.press('Escape')
   await handle.page.locator('.unified-sidebar__list').click({ position: { x: 5, y: 5 } })
 
