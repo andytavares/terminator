@@ -142,6 +142,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       key: string,
       ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }
     ) => ipcRenderer.send('extension:execute-command', { key, ctx }),
+    /** Run another extension's command by full id, e.g. 'terminator.git-integration.command.review-pull-request'. */
+    runCommand: (key: string, args?: unknown) =>
+      ipcRenderer.invoke('extension:run-command', { key, args }),
+    hasCommand: (key: string) => ipcRenderer.invoke('extension:has-command', { key }),
   },
   shell: {
     exec: (options: unknown) => ipcRenderer.invoke('shell:exec', options),

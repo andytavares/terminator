@@ -102,7 +102,15 @@ export interface CommandContribution {
   mnemonic?: string
   /** Dims the action, with a stock reason, when the focused context lacks this. */
   requires?: 'repo' | 'session'
+  /**
+   * Shape of the `args` another surface may pass when it runs this command
+   * (v2.7.0, ADR-083). A command without one never receives args.
+   */
+  args?: ZodTypeAny
 }
+
+/** Outcome of running a command by id: `reason` is 'not-registered', 'disabled' or 'invalid-args: …'. */
+export type CommandRunResult = { ok: true } | { ok: false; reason: string }
 
 /** Core-owned focus context, passed outbound to a command's handler. */
 export interface CommandContext {
@@ -449,7 +457,7 @@ export interface ExtensionAPI {
   commands: {
     register(
       command: CommandContribution,
-      handler: (ctx: CommandContext) => void | Promise<void>
+      handler: (ctx: CommandContext, args?: never) => void | Promise<void>
     ): Disposable
     setEnabled(id: string, enabled: boolean, reason?: string): void
   }
@@ -492,6 +500,7 @@ import { BrowserWindow, globalShortcut as electronGlobalShortcut } from 'electro
 import { EXTENSION_BASE_CSS } from './extension-view-host.js'
 import { sendToWindow } from '../safe-send.js'
 import { join } from 'path'
+import type { ZodTypeAny } from 'zod'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
@@ -553,7 +562,7 @@ interface Registry {
   panelMenuItemIds: Map<string, string>
   contextMenuItems: Map<string, { target: ContextMenuTarget; item: MenuItemContribution }>
   commandContributions: Map<string, CommandContribution>
-  commandHandlers: Map<string, (ctx: CommandContext) => void | Promise<void>>
+  commandHandlers: Map<string, (ctx: CommandContext, args?: unknown) => void | Promise<void>>
   commandDisabledReasons: Map<string, string>
   sessionCreateHandlers: Set<(session: Readonly<SessionSnapshot>) => void>
   sessionCloseHandlers: Set<(sessionId: string) => void>
@@ -706,28 +715,49 @@ export function listExtensionCommands(): Array<{
   requires?: 'repo' | 'session'
   disabledReason?: string
 }> {
-  return [...globalRegistry.commandContributions.entries()].map(([key, cmd]) => ({
-    key,
-    extensionId: key.slice(0, key.indexOf('.command.')),
-    id: cmd.id,
-    label: cmd.label,
-    description: cmd.description,
-    shortcut: cmd.shortcut,
-    category: cmd.category,
-    mnemonic: cmd.mnemonic,
-    requires: cmd.requires,
-    disabledReason: globalRegistry.commandDisabledReasons.get(key),
-  }))
+  // A command that takes args needs a caller to supply them; it is not a quick action.
+  return [...globalRegistry.commandContributions.entries()]
+    .filter(([, cmd]) => !cmd.args)
+    .map(([key, cmd]) => ({
+      key,
+      extensionId: key.slice(0, key.indexOf('.command.')),
+      id: cmd.id,
+      label: cmd.label,
+      description: cmd.description,
+      shortcut: cmd.shortcut,
+      category: cmd.category,
+      mnemonic: cmd.mnemonic,
+      requires: cmd.requires,
+      disabledReason: globalRegistry.commandDisabledReasons.get(key),
+    }))
 }
 
-export async function executeExtensionCommand(key: string, ctx: CommandContext): Promise<void> {
-  if (globalRegistry.commandDisabledReasons.has(key)) return
+export function isExtensionCommandRegistered(key: string): boolean {
+  return globalRegistry.commandHandlers.has(key)
+}
+
+export async function executeExtensionCommand(
+  key: string,
+  ctx: CommandContext,
+  args?: unknown
+): Promise<CommandRunResult> {
   const handler = globalRegistry.commandHandlers.get(key)
-  if (!handler) return
+  if (!handler) return { ok: false, reason: 'not-registered' }
+  if (globalRegistry.commandDisabledReasons.has(key)) return { ok: false, reason: 'disabled' }
+  let validated: unknown
+  const schema = globalRegistry.commandContributions.get(key)?.args
+  if (schema) {
+    const parsed = schema.safeParse(args)
+    if (!parsed.success) return { ok: false, reason: `invalid-args: ${parsed.error.message}` }
+    validated = parsed.data
+  }
   try {
-    await handler(ctx)
+    if (schema) await handler(ctx, validated)
+    else await handler(ctx)
+    return { ok: true }
   } catch (error) {
     apiLog.error(`Command "${key}" threw: ${String(error)}`)
+    return { ok: false, reason: `failed: ${String(error)}` }
   }
 }
 
@@ -1080,11 +1110,14 @@ export function createExtensionAPI(
     commands: {
       register(
         command: CommandContribution,
-        handler: (ctx: CommandContext) => void | Promise<void>
+        handler: (ctx: CommandContext, args?: never) => void | Promise<void>
       ): Disposable {
         const key = `${extensionId}.command.${command.id}`
         globalRegistry.commandContributions.set(key, command)
-        globalRegistry.commandHandlers.set(key, handler)
+        globalRegistry.commandHandlers.set(
+          key,
+          handler as (ctx: CommandContext, args?: unknown) => void | Promise<void>
+        )
         return disposable(() => {
           globalRegistry.commandContributions.delete(key)
           globalRegistry.commandHandlers.delete(key)

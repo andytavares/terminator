@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 2.6.0 (`pty.closeTerminalTab` closes a tab `openTerminalTab` opened — see [`closeTerminalTab`](#closeterminaltab--closing-a-tab-you-opened-v260); 2.5.0: `api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
+**Current API version**: 2.7.0 (`api.commands.register` takes an optional `args` schema and the handler an `args` argument; extension views gain `electronAPI.extension.runCommand` and `hasCommand` — see [Commands that take arguments](#commands-that-take-arguments-v270), [ADR-083](adr/083-extension-commands-take-arguments.md); 2.6.0: `pty.closeTerminalTab` closes a tab `openTerminalTab` opened — see [`closeTerminalTab`](#closeterminaltab--closing-a-tab-you-opened-v260); 2.5.0: `api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
 
 ---
 
@@ -296,6 +296,32 @@ api.commands.setEnabled('push', true)
 ```
 
 Disposing a command clears any `setEnabled` reason along with the registration.
+
+#### Commands that take arguments _(v2.7.0)_
+
+A command may declare a Zod schema for `args`. Another extension's view runs it by full id (`<extensionId>.command.<id>`); core validates the args before the handler runs. A command with no `args` schema never receives any, and is the only kind listed in quick actions.
+
+```typescript
+// Provider (git-integration)
+api.commands.register(
+  {
+    id: 'review-pull-request',
+    label: 'Review pull request',
+    args: z.object({ repoRoot: z.string().min(1), number: z.number().int().positive() }),
+  },
+  (ctx, args) => openReview(args.repoRoot, args.number)
+)
+
+// Caller, in any extension view
+const key = 'terminator.git-integration.command.review-pull-request'
+const result = await window.electronAPI.extension.runCommand(key, { repoRoot, number: 42 })
+if (!result.ok && result.reason === 'not-registered') {
+  // the provider is missing or disabled: fall back
+}
+await window.electronAPI.extension.hasCommand(key) // boolean
+```
+
+`runCommand` resolves `{ ok: true }` or `{ ok: false, reason }`; `reason` is `'not-registered'`, `'disabled'`, `'invalid-args: …'` or `'failed: …'`. It is not reachable over the remote bridge.
 
 ---
 

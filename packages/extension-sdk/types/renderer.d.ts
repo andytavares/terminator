@@ -120,6 +120,15 @@ export interface ElectronAPI {
       key: string,
       ctx: { projectId: string | null; sessionId: string | null; repoRoot: string | null }
     ): void
+    /**
+     * Run another extension's command by its full id, with arguments the
+     * command declared (v2.7.0, ADR-083). `reason` is 'not-registered' when the
+     * command does not exist or its extension is disabled, so the caller can
+     * fall back; 'disabled', 'invalid-args: …' and 'failed: …' otherwise.
+     */
+    runCommand(key: string, args?: unknown): Promise<{ ok: true } | { ok: false; reason: string }>
+    /** Whether a command is registered, by full id: `<extensionId>.command.<id>`. */
+    hasCommand(key: string): Promise<boolean>
     updatePanelBounds(payload: {
       extensionId: string
       viewParam: string

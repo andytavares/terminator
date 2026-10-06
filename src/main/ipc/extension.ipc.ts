@@ -8,6 +8,7 @@ import {
   dispatchContextMenuClick,
   listExtensionCommands,
   executeExtensionCommand,
+  isExtensionCommandRegistered,
 } from '../extensions/api.js'
 import type { CommandContext } from '../extensions/api.js'
 import {
@@ -92,5 +93,20 @@ export function registerExtensionHandlers(
     (_event, { key, ctx }: { key: string; ctx: CommandContext }) => {
       void executeExtensionCommand(key, ctx)
     }
+  )
+
+  // Not on the remote allowlist: an extension view runs another extension's command locally.
+  handleChannel(
+    'extension:run-command',
+    (_event, { key, args, ctx }: { key: string; args?: unknown; ctx?: CommandContext }) =>
+      executeExtensionCommand(
+        key,
+        ctx ?? { projectId: null, sessionId: null, repoRoot: null },
+        args
+      )
+  )
+
+  handleChannel('extension:has-command', (_event, { key }: { key: string }) =>
+    isExtensionCommandRegistered(key)
   )
 }
