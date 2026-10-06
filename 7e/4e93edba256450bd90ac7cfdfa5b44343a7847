@@ -1,0 +1,22 @@
+extensions/git-integration/src/components/pr-review/review-surface.css
+  s_71a39504a89e7e::t_aadbbaac0e5336 20-22,24
+  s_71a39504a89e7e::t_ff11554ab5c31c 18-19,23,25-32
+extensions/git-integration/src/components/pr-review/view-menu.css
+  s_71a39504a89e7e::t_ff80ac3176f48f 50-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7e4e93edba256450bd90ac7cfdfa5b44343a7847",
+  "prompts": {},
+  "sessions": {
+    "s_71a39504a89e7e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec9314a5-ad73-4edf-8e6a-62a7e6985ed7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
