@@ -1,0 +1,29 @@
+tests/unit/integrations/providers/linear.provider.spec.ts
+  s_5af30e50b12dcc::t_e0888203cea3fd 38,44-50
+  s_5af30e50b12dcc::t_a5877fc3dae188 106-107,111-114,118-120
+  s_5af30e50b12dcc::t_27afd6c2843257 55,60-65
+specs/031-linear-project-integration/contracts/tracker-provider.md
+  s_5af30e50b12dcc::t_0d58c9667069ef 55-57,59-63
+  s_5af30e50b12dcc::t_c3bf7f34d49149 58
+src/main/integrations/providers/linear.provider.ts
+  s_5af30e50b12dcc::t_ef303b6f6b5dba 300
+  s_5af30e50b12dcc::t_bb16a25bba445c 33,35
+  s_5af30e50b12dcc::t_c654c8610ad416 32,34,36
+  s_5af30e50b12dcc::t_0d58c9667069ef 295-298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bbddc520efd06b6d207a884c0f581efd71a353ef",
+  "prompts": {},
+  "sessions": {
+    "s_5af30e50b12dcc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "58226796-bbb7-40d4-9b8a-dcce58652a79",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
