@@ -2087,6 +2087,12 @@
 }
 
 .fdry-gate-rule {
+  /* A label beside the question, never wider than it. */
+  flex: 0 1 auto;
+  max-width: 28%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
   font-size: 11px;
   color: var(--tm-accent);

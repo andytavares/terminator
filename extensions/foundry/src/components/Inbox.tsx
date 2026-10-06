@@ -263,7 +263,9 @@ export function Inbox(): JSX.Element {
                       <span className="fdry-gate-icon" aria-hidden="true">
                         <Icon />
                       </span>
-                      <code className="fdry-gate-rule">{ruleInWords(gate.rule)}</code>
+                      <code className="fdry-gate-rule" title={ruleInWords(gate.rule)}>
+                        {ruleInWords(gate.rule)}
+                      </code>
                     </>
                   }
                   meta={
