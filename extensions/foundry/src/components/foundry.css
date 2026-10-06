@@ -1846,37 +1846,55 @@
   text-decoration: underline;
 }
 
+.fdry-list-h {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tm-text-secondary);
+}
+
+/* The orders heading follows the tickets list when both are on screen. */
+.fdry-tickets + .fdry-list-h {
+  margin-top: 20px;
+}
+
+/* A ticket row is the same card as an order row below it: one surface, two
+   lists, told apart by their headings rather than by two unrelated styles. */
 .fdry-tickets {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  gap: 8px;
 }
 
 .fdry-tickets button {
+  appearance: none;
   width: 100%;
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
   text-align: left;
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border-subtle);
-  border-radius: var(--tm-radius-sm);
-  padding: 8px 12px;
-  font-size: 12.5px;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: 11px 14px;
+  font-size: 13px;
   color: var(--tm-text-primary);
+  cursor: pointer;
 }
 
 .fdry-tickets button:hover:not(:disabled) {
-  border-color: var(--tm-border-strong);
+  background: var(--tm-bg-card-hover);
 }
 
 .fdry-ticket-key {
   flex: 0 0 auto;
-  font-family: var(--tm-font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   color: var(--tm-text-secondary);
 }
 
@@ -1889,7 +1907,7 @@
 
 .fdry-ticket-status {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--tm-text-muted);
 }
 
@@ -1953,8 +1971,7 @@
 .fdry-order-main small {
   display: block;
   margin-top: 2px;
-  font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--tm-text-muted);
 }
 

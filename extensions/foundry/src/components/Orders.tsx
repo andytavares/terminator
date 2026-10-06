@@ -491,19 +491,24 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
         ) : tickets.length === 0 ? (
           <p className="fdry-note">No tickets matched. Try a different search.</p>
         ) : (
-          <ul className="fdry-tickets">
-            {tickets.map((ticket) => (
-              <li key={`${ticket.tracker}-${ticket.key}`}>
-                <button type="button" disabled={busy} onClick={() => void seedFromTicket(ticket)}>
-                  <span className="fdry-ticket-key">{ticket.key}</span>
-                  <span className="fdry-ticket-title">{ticket.title}</span>
-                  {ticket.status === '' ? null : (
-                    <span className="fdry-ticket-status">{ticket.status}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <h2 className="fdry-list-h">
+              Tickets<span className="fdry-cnt">{tickets.length}</span>
+            </h2>
+            <ul className="fdry-tickets">
+              {tickets.map((ticket) => (
+                <li key={`${ticket.tracker}-${ticket.key}`}>
+                  <button type="button" disabled={busy} onClick={() => void seedFromTicket(ticket)}>
+                    <span className="fdry-ticket-key">{ticket.key}</span>
+                    <span className="fdry-ticket-title">{ticket.title}</span>
+                    {ticket.status === '' ? null : (
+                      <span className="fdry-ticket-status">{ticket.status}</span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )
       ) : null}
 
@@ -513,28 +518,37 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
           repository before it asks you anything.
         </p>
       ) : (
-        <ul className="fdry-orders">
-          {rows.map((row) => (
-            <li key={row.id}>
-              <button type="button" className="fdry-order-open" onClick={() => setOpen(row.id)}>
-                <span className="fdry-order-mark" aria-hidden="true">
-                  {row.standing?.turn === 'you' ? (
-                    <AlertCircle />
-                  ) : row.standing?.kind === 'done' ? (
-                    <CheckCircle2 />
-                  ) : (
-                    <Loader />
-                  )}
-                </span>
-                <span className="fdry-order-main">
-                  <b>{row.title}</b>
-                  <small>
-                    {row.id} · {statusInWords(row.status as OrderStatus)} ·{' '}
-                    {gradeInWords(row.risk as RiskGrade)}
-                    {row.source.key !== null ? ` · ${row.source.tracker} ${row.source.key}` : ''}
-                  </small>
-                </span>
-                {/* Where the order stands, said once, by the one derivation
+        <>
+          <h2 className="fdry-list-h">
+            Orders<span className="fdry-cnt">{rows.length}</span>
+          </h2>
+          <ul className="fdry-orders">
+            {rows.map((row) => (
+              <li key={row.id}>
+                <button type="button" className="fdry-order-open" onClick={() => setOpen(row.id)}>
+                  <span className="fdry-order-mark" aria-hidden="true">
+                    {row.standing?.turn === 'you' ? (
+                      <AlertCircle />
+                    ) : row.standing?.kind === 'done' ? (
+                      <CheckCircle2 />
+                    ) : (
+                      <Loader />
+                    )}
+                  </span>
+                  <span className="fdry-order-main">
+                    <b>{row.title}</b>
+                    <small>
+                      {row.id} ·{' '}
+                      {/* The pill on the right says where the order stands; only a
+                        row from an older shape, with no standing, needs it here. */}
+                      {row.standing === undefined
+                        ? `${statusInWords(row.status as OrderStatus)} · `
+                        : ''}
+                      {gradeInWords(row.risk as RiskGrade)}
+                      {row.source.key !== null ? ` · ${row.source.tracker} ${row.source.key}` : ''}
+                    </small>
+                  </span>
+                  {/* Where the order stands, said once, by the one derivation
                     every surface reads.
 
                     This used to be `failures === 0 ? 'ready to hand off' : …`,
@@ -547,47 +561,48 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
                     While CI is working the pill says so, with the wording the
                     Floor uses, and spins: a standing of "building" for the
                     whole of a CI watch is true and tells you nothing. */}
-                {row.ci != null &&
-                (row.ci.status === 'watching' || row.ci.status === 'reworking') ? (
-                  <span role="status" className="fdry-order-state is-ci">
-                    <Loader className="fdry-spin" aria-hidden="true" />
-                    {ciLabel(row.ci)}
-                    {row.ci.checks.total === 0
-                      ? ''
-                      : ` · ${row.ci.checks.done} of ${row.ci.checks.total} checks done`}
-                  </span>
-                ) : row.standing === undefined ? null : (
-                  <span
-                    className={`fdry-order-state${row.standing.turn === 'you' ? ' is-waiting' : ''}`}
-                  >
-                    {row.standing.label}
-                  </span>
-                )}
-              </button>
-              {(row.pulls?.length ?? 0) > 0 || row.source.url != null || row.gate != null ? (
-                <div className="fdry-order-extras">
-                  <span className="fdry-order-links">
-                    <OrderLinks
-                      pulls={row.pulls}
-                      source={
-                        row.source.key !== null && row.source.url != null
-                          ? { key: row.source.key, url: row.source.url }
-                          : null
-                      }
-                    />
-                  </span>
-                  {row.gate == null ? null : (
-                    <GateAnswers
-                      gate={{ options: row.gate.options.slice(0, 2), breach: row.gate.breach }}
-                      busy={answering === row.gate.id}
-                      onDecide={(option) => void answer((row.gate as { id: string }).id, option)}
-                    />
+                  {row.ci != null &&
+                  (row.ci.status === 'watching' || row.ci.status === 'reworking') ? (
+                    <span role="status" className="fdry-order-state is-ci">
+                      <Loader className="fdry-spin" aria-hidden="true" />
+                      {ciLabel(row.ci)}
+                      {row.ci.checks.total === 0
+                        ? ''
+                        : ` · ${row.ci.checks.done} of ${row.ci.checks.total} checks done`}
+                    </span>
+                  ) : row.standing === undefined ? null : (
+                    <span
+                      className={`fdry-order-state${row.standing.turn === 'you' ? ' is-waiting' : ''}`}
+                    >
+                      {row.standing.label}
+                    </span>
                   )}
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+                </button>
+                {(row.pulls?.length ?? 0) > 0 || row.source.url != null || row.gate != null ? (
+                  <div className="fdry-order-extras">
+                    <span className="fdry-order-links">
+                      <OrderLinks
+                        pulls={row.pulls}
+                        source={
+                          row.source.key !== null && row.source.url != null
+                            ? { key: row.source.key, url: row.source.url }
+                            : null
+                        }
+                      />
+                    </span>
+                    {row.gate == null ? null : (
+                      <GateAnswers
+                        gate={{ options: row.gate.options.slice(0, 2), breach: row.gate.breach }}
+                        busy={answering === row.gate.id}
+                        onDecide={(option) => void answer((row.gate as { id: string }).id, option)}
+                      />
+                    )}
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   )

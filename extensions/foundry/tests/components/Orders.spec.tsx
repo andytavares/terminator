@@ -359,3 +359,48 @@ describe('what a row carries without being opened', () => {
     expect(screen.getByRole('button', { name: 'Stop' })).toBeTruthy()
   })
 })
+
+// Tickets and orders are two different lists stacked on one screen; without a
+// name each they read as one list in two styles.
+describe('the ticket picker beside the orders', () => {
+  function mountWithTickets(orders: unknown[]) {
+    const invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.list') return { orders }
+      if (channel === 'foundry:issues.mine')
+        return {
+          connected: [{ tracker: 'linear', account: 'me' }],
+          issues: [
+            { tracker: 'linear', key: 'TAV-14', title: 'Make all text red', status: 'Todo' },
+            { tracker: 'linear', key: 'TAV-16', title: 'Group the Ledger', status: 'Backlog' },
+          ],
+        }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      shell: { openExternal: vi.fn() },
+    }
+    return render(<Orders repoRoot="/repos/app" />)
+  }
+
+  it('names each list and counts it', async () => {
+    mountWithTickets([row()])
+    screen.getByRole('button', { name: 'Ticket' }).click()
+    const tickets = await screen.findByRole('heading', { name: /Tickets/ })
+    expect(tickets.textContent).toBe('Tickets2')
+    expect(screen.getByRole('heading', { name: /Orders/ }).textContent).toBe('Orders1')
+  })
+
+  it('says where an order stands once, not in the meta line as well', async () => {
+    mountWithTickets([
+      row({
+        id: 'WO-1006-6b5',
+        status: 'shipped',
+        risk: 'P3',
+        standing: standing({ label: 'shipped', kind: 'done' }),
+      }),
+    ])
+    await screen.findByText('WO-1006-6b5 · low risk')
+    expect(screen.getAllByText('shipped')).toHaveLength(1)
+  })
+})
