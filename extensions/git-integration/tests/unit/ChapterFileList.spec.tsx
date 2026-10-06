@@ -97,7 +97,9 @@ describe('ChapterFileList', () => {
 
   it('marks active file with active class', () => {
     const { container } = render(<ChapterFileList {...defaultProps} currentFilePath="src/foo.ts" />)
-    expect(container.querySelector('.chapter-file-row--active')).toBeTruthy()
+    const active = container.querySelector('.chapter-file-row--active')
+    expect(active?.getAttribute('aria-current')).toBe('true')
+    expect(container.querySelectorAll('[aria-current]')).toHaveLength(1)
   })
 
   it('shows viewed check for viewed files', () => {

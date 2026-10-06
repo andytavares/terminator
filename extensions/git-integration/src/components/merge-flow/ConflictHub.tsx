@@ -17,20 +17,20 @@ interface LangBadge {
 
 function getLangBadge(filePath: string): LangBadge {
   const name = filePath.split('/').pop()?.toLowerCase() ?? ''
-  if (name === 'dockerfile') return { label: 'DO', bg: '#0ea5e9', text: '#fff' }
+  if (name === 'dockerfile') return { label: 'DO', bg: '#0369a1', text: '#fff' }
   const ext = name.split('.').pop() ?? ''
   const map: Record<string, LangBadge> = {
     ts: { label: 'TS', bg: '#2563eb', text: '#fff' },
     tsx: { label: 'TS', bg: '#2563eb', text: '#fff' },
-    js: { label: 'JS', bg: '#ca8a04', text: '#fff' },
-    jsx: { label: 'JS', bg: '#ca8a04', text: '#fff' },
-    mjs: { label: 'JS', bg: '#ca8a04', text: '#fff' },
-    py: { label: 'PY', bg: '#3b82f6', text: '#fff' },
+    js: { label: 'JS', bg: '#a16207', text: '#fff' },
+    jsx: { label: 'JS', bg: '#a16207', text: '#fff' },
+    mjs: { label: 'JS', bg: '#a16207', text: '#fff' },
+    py: { label: 'PY', bg: '#1d4ed8', text: '#fff' },
     rb: { label: 'RB', bg: '#dc2626', text: '#fff' },
-    go: { label: 'GO', bg: '#06b6d4', text: '#fff' },
-    rs: { label: 'RS', bg: '#ea580c', text: '#fff' },
-    java: { label: 'JV', bg: '#f97316', text: '#fff' },
-    json: { label: '{ }', bg: '#0891b2', text: '#fff' },
+    go: { label: 'GO', bg: '#155e75', text: '#fff' },
+    rs: { label: 'RS', bg: '#c2410c', text: '#fff' },
+    java: { label: 'JV', bg: '#b45309', text: '#fff' },
+    json: { label: '{ }', bg: '#0e7490', text: '#fff' },
     css: { label: 'CSS', bg: '#db2777', text: '#fff' },
     scss: { label: 'CSS', bg: '#db2777', text: '#fff' },
     md: { label: 'MD', bg: '#6b7280', text: '#fff' },
@@ -38,7 +38,7 @@ function getLangBadge(filePath: string): LangBadge {
     yml: { label: 'YML', bg: '#7c3aed', text: '#fff' },
     sh: { label: 'SH', bg: '#374151', text: '#fff' },
     sql: { label: 'SQL', bg: '#0f766e', text: '#fff' },
-    html: { label: 'HTML', bg: '#e25822', text: '#fff' },
+    html: { label: 'HTML', bg: '#9a3412', text: '#fff' },
   }
   return map[ext] ?? { label: ext.slice(0, 3).toUpperCase() || '?', bg: '#4b5563', text: '#fff' }
 }

@@ -109,7 +109,7 @@ describe('FullFileList', () => {
 
   it('toggles chapter collapsed state when header is clicked', () => {
     render(<FullFileList {...defaultProps} />)
-    const chapterHeader = screen.getByRole('button', { name: /Ch 1/ })
+    const chapterHeader = screen.getByRole('button', { name: /Chapter 1/ })
     fireEvent.click(chapterHeader)
     expect(screen.queryByText('foo.ts')).toBeNull()
   })
@@ -128,6 +128,8 @@ describe('FullFileList', () => {
     const { container } = render(<FullFileList {...defaultProps} currentFilePath="src/foo.ts" />)
     const activeRow = container.querySelector('.full-file-row--active')
     expect(activeRow).toBeTruthy()
+    expect(activeRow?.getAttribute('aria-current')).toBe('true')
+    expect(container.querySelectorAll('[aria-current]')).toHaveLength(1)
   })
 
   it('shows progress per chapter', () => {

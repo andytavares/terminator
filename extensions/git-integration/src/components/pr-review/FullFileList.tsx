@@ -93,7 +93,7 @@ export function FullFileList({
                 aria-expanded={isOpen}
               >
                 <span className={`full-file-chapter-status full-file-chapter-status--${status}`} />
-                <span className="full-file-chapter-num">Ch {ci + 1}</span>
+                <span className="full-file-chapter-num">Chapter {ci + 1}</span>
                 <span className="full-file-chapter-name">{chapter.name}</span>
                 {chapter.files.some((f) => f.tier !== 3) ? (
                   <span
@@ -136,6 +136,7 @@ export function FullFileList({
                       .filter(Boolean)
                       .join(' ')}
                     onClick={() => onSelectFile(file.path, chapter.id)}
+                    aria-current={isActive ? 'true' : undefined}
                     title={file.path}
                   >
                     {state === 'default' ? (

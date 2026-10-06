@@ -262,12 +262,16 @@
   background: var(--tm-bg-card-hover);
 }
 
-.staging-area__file-row--selected {
-  background: color-mix(in srgb, var(--tm-accent) 12%, transparent);
+/* The selected row is a solid accent fill with on-accent text (WCAG 1.4.11, 1.4.3). */
+.staging-area__file-row--selected,
+.staging-area__file-row--selected:hover {
+  background: var(--tm-accent);
 }
 
-.staging-area__file-row--selected:hover {
-  background: color-mix(in srgb, var(--tm-accent) 18%, transparent);
+.staging-area__file-row--selected .staging-area__badge,
+.staging-area__file-row--selected .staging-area__file-path,
+.staging-area__file-row--selected .staging-area__conflict-badge {
+  color: var(--tm-on-accent);
 }
 
 /* Was 14px — the width of the single porcelain letter this used to print.

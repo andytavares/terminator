@@ -31,10 +31,11 @@ export const IMPACT_MAP = [
     specs: ['foundry*.spec.ts', ...EXTENSION_TRIO],
   },
   {
-    globs: ['extensions/git-integration/**'],
+    globs: ['extensions/git-integration/**', 'tests/e2e/git-integration-contrast.entry.tsx'],
     specs: [
       'git-sidebar.spec.ts',
       'git-integration-smoke.spec.ts',
+      'git-integration-contrast.spec.ts',
       'merge-flow.spec.ts',
       ...EXTENSION_TRIO,
     ],

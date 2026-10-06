@@ -206,7 +206,7 @@
 }
 
 .rs-thread--resolved {
-  opacity: 0.6;
+  border-style: dashed;
 }
 
 .rs-thread--agent {
@@ -419,5 +419,4 @@ tr.diff-gap-row > td {
 
 .diff-line--expanded .diff-line__num-gutter {
   color: var(--tm-text-muted);
-  opacity: 0.8;
 }

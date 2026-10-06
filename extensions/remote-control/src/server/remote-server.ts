@@ -43,7 +43,7 @@ const EXTENSION_BASE_CSS = `
   --tm-accent-hover: #5361b5;
   --tm-accent-dim: rgba(92,107,192,0.18);
   --tm-accent-glow: rgba(92,107,192,0.35);
-  --tm-danger: #e05c5c;
+  --tm-danger: #e46a6a;
   --tm-success: #4ade80;
   --tm-warning: #facc15;
   /* Work an agent produced for the reader alone: private notes, findings. */
@@ -194,7 +194,7 @@ button:has(> svg) {
   --tm-accent-glow: rgba(74,87,168,0.28);
   --tm-danger: #962d20;
   --tm-success: #0f5c2a;
-  --tm-warning: #a85a00;
+  --tm-warning: #9c5400;
   --tm-agent: #6b4fbf;
   --tm-agent-dim: rgba(107,79,191,0.08);
   --tm-diff-added-bg: rgba(15,92,42,0.10);

@@ -47,12 +47,12 @@
     "*.{json,md,css,html,yml,yaml}": "prettier --write"
   },
   "dependencies": {
-    "@terminator/extension-ui": "*",
     "@electric-sql/pglite": "^0.2.17",
     "@fastify/static": "10.1.2",
     "@fastify/websocket": "11.2.0",
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@linear/sdk": "91.0.0",
+    "@terminator/extension-ui": "*",
     "@testing-library/dom": "^10.4.1",
     "@xterm/addon-attach": "0.12.0",
     "@xterm/addon-fit": "0.11.0",
@@ -73,6 +73,7 @@
     "zustand": "4.5.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "1.61.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

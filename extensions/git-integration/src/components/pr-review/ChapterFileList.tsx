@@ -107,6 +107,7 @@ export function ChapterFileList({
             onDragEnd={handleDragEnd}
             onClick={() => onSelectFile(file.path)}
             role="button"
+            aria-current={isActive ? 'true' : undefined}
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onSelectFile(file.path)}
           >
