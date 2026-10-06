@@ -54,6 +54,14 @@ if (!existsSync(xdgGitConfig) || readFileSync(xdgGitConfig, 'utf8') !== wanted) 
 }
 process.env.XDG_CONFIG_HOME = xdgHome
 
+// A trace2 event target in the operator's global git config (git-ai's daemon)
+// answers every commit and fetch by writing notes and objects into `.git` for
+// seconds after git returns, so a spec that deletes its temporary repository
+// races it and fails with ENOTEMPTY. trace2 is read only from global config and
+// the environment, so the environment is the one place to turn it off. Specs
+// that scrub GIT_* from git's environment keep this one.
+process.env.GIT_TRACE2_EVENT = '0'
+
 vi.mock('*.css', () => ({}))
 vi.mock('*.module.css', () => ({ default: {} }))
 

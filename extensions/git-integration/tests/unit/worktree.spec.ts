@@ -115,7 +115,7 @@ describe('ensureReviewWorktree against real git', () => {
   let dir: string
   // Scrub GIT_* so a hook's environment can never point these commands at the real repo.
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_'))
+    Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k === 'GIT_TRACE2_EVENT')
   ) as NodeJS.ProcessEnv
   const git = (cwd: string, ...args: string[]) =>
     execFileSync('git', args, { cwd, env, encoding: 'utf-8' }).trim()

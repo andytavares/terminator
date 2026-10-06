@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -32,7 +32,7 @@ describe('git run by the test suite', () => {
     )
     git(dir, 'clone', '-q', 'origin', 'clone')
     const scrubbed = Object.fromEntries(
-      Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_'))
+      Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k === 'GIT_TRACE2_EVENT')
     ) as NodeJS.ProcessEnv
     const commit = execFileSync(
       'sh',
@@ -46,5 +46,20 @@ describe('git run by the test suite', () => {
     })
     expect(trace).toContain('fetch')
     expect(trace).not.toMatch(/maintenance run --auto/)
+  })
+
+  it('leaves nothing writing into .git after a commit returns', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'git-test-env-'))
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir })
+    execFileSync(
+      'git',
+      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'c'],
+      { cwd: dir }
+    )
+    const files = (): string[] =>
+      readdirSync(join(dir, '.git'), { recursive: true }).map(String).sort()
+    const before = files()
+    await new Promise((settle) => setTimeout(settle, 1500))
+    expect(files()).toEqual(before)
   })
 })
