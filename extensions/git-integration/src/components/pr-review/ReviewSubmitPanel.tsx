@@ -8,11 +8,19 @@ interface Props {
   headSHA: string
   isOwnPr?: boolean
   onClose: () => void
+  onApproved?: () => void
 }
 
 type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
 
-export function ReviewSubmitPanel({ repoRoot, prNumber, headSHA, isOwnPr, onClose }: Props) {
+export function ReviewSubmitPanel({
+  repoRoot,
+  prNumber,
+  headSHA,
+  isOwnPr,
+  onClose,
+  onApproved,
+}: Props) {
   const drafts = usePrReviewStore((s) => s.drafts)
   const clearDrafts = usePrReviewStore((s) => s.clearDrafts)
   const [event, setEvent] = useState<ReviewEvent>('COMMENT')
@@ -44,6 +52,10 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, headSHA, isOwnPr, onClos
       })
       if ('error' in result) throw new Error((result as { error: string }).error)
       if (drafts.length > 0) clearDrafts(repoRoot, prNumber, headSHA)
+      if (event === 'APPROVE' && onApproved) {
+        onApproved()
+        return
+      }
       setSubmitted(true)
     } catch (e) {
       setError(String(e).replace(/^Error:\s*/, ''))

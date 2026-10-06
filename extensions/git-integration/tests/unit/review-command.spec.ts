@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { CommandContribution, CommandContext } from '../../../../src/main/extensions/api'
-import { registerReviewPullRequestCommand, openPrReviewWindow } from '../../src/review-command'
+import {
+  registerReviewPullRequestCommand,
+  registerReviewSubmittedRelay,
+  openPrReviewWindow,
+} from '../../src/review-command'
 
 type Handler = (ctx: CommandContext, args?: unknown) => void
 
@@ -66,5 +70,24 @@ describe('openPrReviewWindow', () => {
       repoRoot: '/repo',
       accentColor: '#fff',
     })
+  })
+})
+
+describe('window:review-submitted relay', () => {
+  it('tells every open review list to reload', () => {
+    const handlers: Record<string, () => unknown> = {}
+    const broadcast = vi.fn()
+    const api = {
+      ipc: {
+        registerHandler: vi.fn((channel: string, handler: () => unknown) => {
+          handlers[channel] = handler
+          return { dispose: vi.fn() }
+        }),
+      },
+      window: { broadcast },
+    }
+    registerReviewSubmittedRelay(api as never)
+    expect(handlers['window:review-submitted']()).toEqual({ ok: true })
+    expect(broadcast).toHaveBeenCalledWith('reviews:changed', {})
   })
 })

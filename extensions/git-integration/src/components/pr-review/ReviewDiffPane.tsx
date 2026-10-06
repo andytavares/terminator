@@ -9,6 +9,7 @@ import { CommentComposer } from './CommentComposer'
 import { AgentNote } from './AgentNote'
 import { SelectionBar } from './SelectionBar'
 import { MovedRow } from './MovedRow'
+import { useShallow } from 'zustand/react/shallow'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../../stores/review-ui.store'
 import {
@@ -50,6 +51,35 @@ type FileText =
   | { status: 'ready'; lines: string[] }
 
 type ContentResult = { content: string } | { tooLarge: true } | { error: string }
+
+interface CachedDiff {
+  diff: FileDiff
+  note: string | null
+}
+
+const HIGHLIGHT_CACHE_CAP = 20_000
+const highlightCache = new Map<string, string>()
+
+/** Highlighting is pure in (language, line); the pane re-renders on every hover and drag. */
+function highlightLine(content: string, lang: ReturnType<typeof detectLanguage>): string {
+  const key = `${lang}\u0000${content}`
+  let html = highlightCache.get(key)
+  if (html === undefined) {
+    html = highlight(content, lang)
+    if (highlightCache.size >= HIGHLIGHT_CACHE_CAP) highlightCache.clear()
+    highlightCache.set(key, html)
+  }
+  return html
+}
+
+const REWRITTEN_NOTE = 'History rewritten — showing the whole file'
+const DIFF_CACHE_CAP = 60
+
+function rememberDiff(cache: Map<string, CachedDiff>, key: string, entry: CachedDiff): void {
+  cache.delete(key)
+  cache.set(key, entry)
+  if (cache.size > DIFF_CACHE_CAP) cache.delete(cache.keys().next().value as string)
+}
 
 function findChapterId(chapters: Chapter[], path: string): string | null {
   return chapters.find((c) => c.files.some((f) => f.path === path))?.id ?? null
@@ -110,7 +140,26 @@ export function ReviewDiffPane({
     setCurrentFile,
     markFileViewed,
     unmarkFileViewed,
-  } = usePrReviewStore()
+  } = usePrReviewStore(
+    useShallow((s) => ({
+      viewedFiles: s.viewedFiles,
+      threads: s.threads,
+      patchFileComplexity: s.patchFileComplexity,
+      changedSince: s.changedSince,
+      viewedAt: s.viewedAt,
+      historyRewritten: s.historyRewritten,
+      notes: s.notes,
+      drafts: s.drafts,
+      addNote: s.addNote,
+      removeNote: s.removeNote,
+      updateDraft: s.updateDraft,
+      removeDraft: s.removeDraft,
+      setCurrentChapter: s.setCurrentChapter,
+      setCurrentFile: s.setCurrentFile,
+      markFileViewed: s.markFileViewed,
+      unmarkFileViewed: s.unmarkFileViewed,
+    }))
+  )
   const {
     commentVisibility,
     setCommentVisibility,
@@ -125,10 +174,27 @@ export function ReviewDiffPane({
     requestComposer,
     agentRuns,
     openAgentPanel,
-  } = useReviewUiStore()
+  } = useReviewUiStore(
+    useShallow((s) => ({
+      commentVisibility: s.commentVisibility,
+      setCommentVisibility: s.setCommentVisibility,
+      agentNotesOn: s.agentNotesOn,
+      diffViewMode: s.diffViewMode,
+      hideFormattingHunks: s.hideFormattingHunks,
+      setHideFormattingHunks: s.setHideFormattingHunks,
+      diffRange: s.diffRange,
+      selection: s.selection,
+      setSelection: s.setSelection,
+      composerRequest: s.composerRequest,
+      requestComposer: s.requestComposer,
+      agentRuns: s.agentRuns,
+      openAgentPanel: s.openAgentPanel,
+    }))
+  )
   const scrollRef = useRef<HTMLDivElement>(null)
   const [expansions, setExpansions] = useState<Map<string, Expansion>>(new Map())
   const [fileText, setFileText] = useState<FileText>({ status: 'idle' })
+  const diffCacheRef = useRef(new Map<string, CachedDiff>())
   const fileTextCache = useRef(new Map<string, string[]>())
   const fileTextKey = `${file.path}@${pr.headSHA}`
   const fileTextKeyRef = useRef(fileTextKey)
@@ -182,71 +248,94 @@ export function ReviewDiffPane({
     [movedHere, movedAway]
   )
 
+  // Only a since-range view reads when the file was last viewed. Depending on the
+  // whole viewedAt map would refetch the open file every time it is marked viewed.
+  const sinceSha = diffRange === 'since' && isChangedSince ? viewedAt[file.path] : undefined
+  const diffKey = `${pr.number}:${pr.headSHA}:${file.path}:${sinceSha ? `since:${sinceSha}` : 'whole'}`
+  const historyNote = historyRewritten && isChangedSince ? REWRITTEN_NOTE : null
+
   useEffect(() => {
-    setDiff(null)
     setDiffError(null)
     setSinceNote(null)
     setExpansions(new Map())
     setFileText({ status: 'idle' })
     currentHunkIndexRef.current = 0
-    if (file.isBinary) return
+    if (file.isBinary) {
+      setDiff(null)
+      return
+    }
+    const cached = diffCacheRef.current.get(diffKey)
+    if (cached) {
+      setDiff(cached.diff)
+      setSinceNote(cached.note)
+      setDiffLoading(false)
+      return
+    }
+    setDiff(null)
     setDiffLoading(true)
 
-    const loadFull = () =>
+    let cancelled = false
+    const show = (next: FileDiff, note: string | null) => {
+      rememberDiff(diffCacheRef.current, diffKey, { diff: next, note })
+      if (cancelled) return
+      setDiff(next)
+      setSinceNote(note)
+    }
+
+    const loadFull = (note: string | null) =>
       githubAPI
-        .prFileDiff(repoRoot, pr.number, file.path)
+        .prFileDiff(repoRoot, pr.number, file.path, {
+          baseRef: pr.baseRefName,
+          headSHA: pr.headSHA,
+        })
         .then((result) => {
+          if (cancelled) return
           if ('error' in result) {
             setDiffError((result as { error: string }).error)
             return
           }
           const parsed = FileDiffSchema.safeParse((result as { diff: unknown }).diff)
           if (parsed.success) {
-            setDiff(parsed.data)
+            show(parsed.data, note)
           } else {
             setDiffError('Unexpected diff format from server')
           }
         })
-        .catch((e) => setDiffError(String(e)))
+        .catch((e) => {
+          if (!cancelled) setDiffError(String(e))
+        })
 
-    const viewedSha = viewedAt[file.path]
-    if (diffRange === 'since' && isChangedSince && viewedSha) {
+    const done = () => {
+      if (!cancelled) setDiffLoading(false)
+    }
+
+    if (sinceSha) {
       githubAPI
-        .prCompare(repoRoot, viewedSha, pr.headSHA)
+        .prCompare(repoRoot, sinceSha, pr.headSHA)
         .then((cmp) => {
+          if (cancelled) return
           if ('error' in cmp || (cmp as { rewritten?: boolean }).rewritten) {
-            if ((cmp as { rewritten?: boolean }).rewritten) {
-              setSinceNote('History rewritten — showing the whole file')
-            }
-            return loadFull()
+            if ((cmp as { rewritten?: boolean }).rewritten) setSinceNote(REWRITTEN_NOTE)
+            return loadFull((cmp as { rewritten?: boolean }).rewritten ? REWRITTEN_NOTE : null)
           }
           const entry = (cmp as { files: Array<{ path: string; patch: string }> }).files.find(
             (f) => f.path === file.path
           )
-          if (!entry) return loadFull()
-          setDiff(parseDiff(entry.patch, file.path))
-          setSinceNote(`Showing ${viewedSha.slice(0, 8)} … head`)
+          if (!entry) return loadFull(null)
+          show(parseDiff(entry.patch, file.path), `Showing ${sinceSha.slice(0, 8)} … head`)
         })
-        .catch(() => loadFull())
-        .finally(() => setDiffLoading(false))
-      return
+        .catch(() => loadFull(null))
+        .finally(done)
+      return () => {
+        cancelled = true
+      }
     }
 
-    if (historyRewritten && isChangedSince) {
-      setSinceNote('History rewritten — showing the whole file')
+    loadFull(null).finally(done)
+    return () => {
+      cancelled = true
     }
-    loadFull().finally(() => setDiffLoading(false))
-  }, [
-    file.path,
-    file.isBinary,
-    repoRoot,
-    pr.number,
-    pr.headSHA,
-    diffRange,
-    isChangedSince,
-    viewedAt,
-    historyRewritten,
-  ])
+  }, [diffKey, file.path, file.isBinary, repoRoot, pr.number, pr.headSHA, pr.baseRefName, sinceSha])
 
   // Feed complexity delta into the risk score whenever the diff changes.
   // Runs independently so it doesn't trigger a diff reload.
@@ -1084,7 +1173,7 @@ export function ReviewDiffPane({
           <td className="diff-line__content">
             <pre
               dangerouslySetInnerHTML={{
-                __html: highlight(line.content, lang),
+                __html: highlightLine(line.content, lang),
               }}
             />
           </td>
@@ -1151,7 +1240,7 @@ export function ReviewDiffPane({
                   <td className="diff-line__content">
                     <pre
                       dangerouslySetInnerHTML={{
-                        __html: highlight(leftLine.content, lang),
+                        __html: highlightLine(leftLine.content, lang),
                       }}
                     />
                   </td>
@@ -1203,7 +1292,7 @@ export function ReviewDiffPane({
                   <td className="diff-line__content">
                     <pre
                       dangerouslySetInnerHTML={{
-                        __html: highlight(rightLine.content, lang),
+                        __html: highlightLine(rightLine.content, lang),
                       }}
                     />
                   </td>
@@ -1372,7 +1461,7 @@ export function ReviewDiffPane({
           }))}
           onPeekDefinition={handlePeekDefinition}
         />
-        <ViewMenu sinceNote={sinceNote} />
+        <ViewMenu sinceNote={sinceNote ?? historyNote} />
         <span className="rs-fh-sep" />
         <label className="rs-viewed">
           <input

@@ -26,10 +26,9 @@ beforeEach(() => {
     extensionBridge: { invoke: mockInvoke },
     fs: { onChanged: mockOnChanged },
   }
-  vi.mocked(useGitStore).mockReturnValue({
-    setStatus: mockSetStatus,
-    setLoading: mockSetLoading,
-  } as unknown as ReturnType<typeof useGitStore>)
+  const state = { setStatus: mockSetStatus, setLoading: mockSetLoading }
+  vi.mocked(useGitStore).mockImplementation(((sel?: (s: unknown) => unknown) =>
+    sel ? sel(state) : state) as unknown as typeof useGitStore)
 })
 
 afterEach(() => {
@@ -96,5 +95,102 @@ describe('useGitStatus', () => {
     })
     unmount()
     expect(mockUnsubFs).toHaveBeenCalled()
+  })
+
+  describe('polling', () => {
+    const setVisibility = (state: 'hidden' | 'visible') => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
+    }
+    afterEach(() => setVisibility('visible'))
+
+    it('polls on the interval while visible', async () => {
+      renderHook(() => useGitStatus('/repo', 3000))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+      expect(mockGitStatus).toHaveBeenCalledTimes(2)
+    })
+
+    it('skips poll ticks while the document is hidden', async () => {
+      renderHook(() => useGitStatus('/repo', 3000))
+      await act(async () => {
+        await Promise.resolve()
+      })
+      mockGitStatus.mockClear()
+      setVisibility('hidden')
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(9000)
+      })
+      expect(mockGitStatus).not.toHaveBeenCalled()
+    })
+
+    it('refreshes once when the document becomes visible again', async () => {
+      renderHook(() => useGitStatus('/repo', 3000))
+      await act(async () => {
+        await Promise.resolve()
+      })
+      mockGitStatus.mockClear()
+      setVisibility('visible')
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+        await Promise.resolve()
+      })
+      expect(mockGitStatus).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not start a second refresh while one is in flight', async () => {
+      let resolve!: (v: unknown) => void
+      mockGitStatus.mockReturnValue(new Promise((r) => (resolve = r)))
+      renderHook(() => useGitStatus('/repo', 3000))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(9000)
+      })
+      expect(mockGitStatus).toHaveBeenCalledTimes(1)
+      resolve({ branch: 'main', files: [] })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+      expect(mockGitStatus).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('drops a status that lands after the view unmounted', async () => {
+    let resolve!: (v: unknown) => void
+    mockGitStatus.mockReturnValue(new Promise((r) => (resolve = r)))
+    const { unmount } = renderHook(() => useGitStatus('/repo'))
+    unmount()
+    await act(async () => {
+      resolve({ branch: 'main', staged: [], unstaged: [], untracked: [] })
+      await Promise.resolve()
+    })
+    expect(mockSetStatus).not.toHaveBeenCalled()
+    expect(mockSetLoading).not.toHaveBeenCalledWith(false)
+  })
+
+  it('drops a failure that lands after the view unmounted', async () => {
+    let reject!: (e: unknown) => void
+    mockGitStatus.mockReturnValue(new Promise((_, r) => (reject = r)))
+    const { unmount } = renderHook(() => useGitStatus('/repo'))
+    unmount()
+    await act(async () => {
+      reject(new Error('gone'))
+      await Promise.resolve()
+    })
+    expect(mockSetStatus).not.toHaveBeenCalled()
+  })
+
+  it('does not refresh when the view becomes hidden', async () => {
+    renderHook(() => useGitStatus('/repo'))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    const calls = mockGitStatus.mock.calls.length
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      await Promise.resolve()
+    })
+    expect(mockGitStatus.mock.calls.length).toBe(calls)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   })
 })

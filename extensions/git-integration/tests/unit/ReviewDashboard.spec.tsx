@@ -122,6 +122,33 @@ beforeEach(() => {
 })
 
 describe('ReviewDashboard', () => {
+  it('reloads when a review is submitted elsewhere', async () => {
+    mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    const bridge = (
+      window as unknown as {
+        electronAPI: {
+          extensionBridge: { invoke: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> }
+        }
+      }
+    ).electronAPI.extensionBridge
+    const listeners: Record<string, () => void> = {}
+    bridge.on.mockImplementation((channel: string, cb: () => void) => {
+      listeners[channel] = cb
+      return () => {}
+    })
+    render(<ReviewDashboard />)
+    await screen.findByText('REQUESTED OF YOU')
+    bridge.invoke.mockImplementation((channel: string) =>
+      Promise.resolve(
+        channel === 'github:dashboard-search'
+          ? { prs: [], login: 'andytavares', fetchedAt: new Date().toISOString() }
+          : {}
+      )
+    )
+    listeners['reviews:changed']()
+    await screen.findByText('Nothing needs you')
+  })
+
   it('renders the three tabs with counts', async () => {
     mockInvoke({
       prs: [pr211, pr210, pr212, pr213],
@@ -139,7 +166,7 @@ describe('ReviewDashboard', () => {
     expect(screen.getByRole('tab', { name: /Involved/ })).toBeTruthy()
   })
 
-  it('renders groups in order with correct headings and row content', async () => {
+  it('puts the reviews requested of you above every other group', async () => {
     mockInvoke({
       prs: [pr211, pr210, pr212],
       login: 'andytavares',
@@ -148,8 +175,8 @@ describe('ReviewDashboard', () => {
     render(<ReviewDashboard />)
     const headings = await screen.findAllByText(/RE-REVIEW|REQUESTED OF YOU|REQUESTED OF YOUR TEAM/)
     expect(headings.map((h) => h.textContent)).toEqual([
-      'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED',
       'REQUESTED OF YOU',
+      'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED',
       'REQUESTED OF YOUR TEAM',
     ])
     const size = screen.getByText('+4,043').closest('.rd-size')!

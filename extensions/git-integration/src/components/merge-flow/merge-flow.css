@@ -21,7 +21,7 @@
   align-items: center;
   justify-content: center;
   font-size: 0.875rem;
-  opacity: 0.6;
+  color: var(--tm-text-muted);
 }
 
 .merge-flow-view__header {
@@ -270,7 +270,7 @@
 }
 
 .conflict-hub__file-card--resolved {
-  opacity: 0.6;
+  border-style: dashed;
   cursor: default;
 }
 
@@ -347,7 +347,7 @@
   padding: 3px 10px;
   border-radius: 12px;
   background: color-mix(in srgb, var(--tm-text-muted) 15%, transparent);
-  color: var(--tm-text-muted);
+  color: var(--tm-text-secondary);
   white-space: nowrap;
 }
 
@@ -525,7 +525,6 @@
   border-radius: var(--tm-radius-xs);
   white-space: nowrap;
   flex-shrink: 0;
-  opacity: 0.7;
 }
 
 .conflict-header__start-over:hover {
@@ -920,7 +919,7 @@
 .action-bar__btn kbd {
   font-family: var(--tm-font-mono);
   font-size: 0.625rem;
-  opacity: 0.6;
+  color: var(--tm-text-muted);
   background: var(--tm-bg-base);
   border: 1px solid var(--tm-border);
   border-radius: 3px;
@@ -1019,7 +1018,6 @@
 
 .keep-both-modal__drag-hint {
   color: var(--tm-text-muted);
-  opacity: 0.5;
   font-size: 0.625rem;
 }
 
@@ -1043,7 +1041,7 @@
 
 .keep-both-modal__drag-handle {
   font-size: 0.875rem;
-  opacity: 0.4;
+  color: var(--tm-text-muted);
   cursor: grab;
 }
 
@@ -1099,7 +1097,6 @@
   font-family: var(--tm-font-mono);
   font-size: 0.75rem;
   color: var(--tm-text-muted);
-  opacity: 0.5;
   user-select: none;
   flex-shrink: 0;
   border-right: 1px solid var(--tm-border);

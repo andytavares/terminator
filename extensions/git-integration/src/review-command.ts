@@ -35,3 +35,11 @@ export function registerReviewPullRequestCommand(api: ExtensionAPI): Disposable 
     }
   )
 }
+
+/** A submitted review changes what every open review list should show. */
+export function registerReviewSubmittedRelay(api: ExtensionAPI): Disposable {
+  return api.ipc.registerHandler('window:review-submitted', () => {
+    api.window.broadcast('reviews:changed', {})
+    return { ok: true }
+  })
+}

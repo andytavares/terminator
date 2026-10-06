@@ -225,6 +225,16 @@ export function PrReviewTab({ repoRoot }: Props) {
     if (repoRoot) void loadQueue({ search: undefined })
   }
 
+  const handleApproved = async () => {
+    void window.electronAPI.extensionBridge.invoke('window:review-submitted', {})
+    // The pop-out sits over the main window's review list, so closing it is the way back.
+    if (isPopoutWindow) {
+      window.close()
+      return
+    }
+    await handleClosePr()
+  }
+
   const handleDismissPr = useCallback(
     async (prNumber: number) => {
       if (!repoRoot) return
@@ -308,6 +318,7 @@ export function PrReviewTab({ repoRoot }: Props) {
         onRefresh={handleRefreshPr}
         onShowOverview={() => setShowOverview(true)}
         onPopOut={isPoppedOut ? undefined : handlePopOut}
+        onApproved={handleApproved}
         sinceInfo={sinceInfo}
       />
     )

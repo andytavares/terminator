@@ -80,6 +80,7 @@ interface PrReviewStore {
   setCurrentFile(filePath: string | null): void
 
   markFileViewed(repoRoot: string, prNumber: number, headSHA: string, filePath: string): void
+  markFilesViewed(repoRoot: string, prNumber: number, headSHA: string, filePaths: string[]): void
   unmarkFileViewed(repoRoot: string, prNumber: number, headSHA: string, filePath: string): void
   reorderFiles(
     chapterId: string,
@@ -95,6 +96,8 @@ interface PrReviewStore {
   setIssueComments(comments: IssueComment[]): void
 
   updateFileRiskScore(chapterId: string, filePath: string, riskScore: RiskScore): void
+  /** Applies many risk scores in one update, rebuilding the chapters once. */
+  updateFileRiskScores(scores: Record<string, RiskScore>): void
   patchFileComplexity(chapterId: string, filePath: string, complexityDelta: number): void
   updateQueuePrRisk(
     prNumber: number,
@@ -180,11 +183,37 @@ async function persistSession(
   await githubAPI.sessionSet(key, session)
 }
 
-/** Mirrors a viewed mark onto GitHub (S1). Best-effort: local state is the source of truth. */
-function syncViewed(repoRoot: string, prNumber: number, path: string, viewed: boolean): void {
+function nodeIdFor(state: Pick<PrReviewStore, 'activePr'>, prNumber: number): string | undefined {
+  return state.activePr?.number === prNumber ? state.activePr.nodeId : undefined
+}
+
+function syncViewedMany(
+  repoRoot: string,
+  prNumber: number,
+  paths: string[],
+  nodeId?: string
+): void {
   if (typeof window === 'undefined') return
   try {
-    void Promise.resolve(githubAPI.fileViewedSet(repoRoot, prNumber, path, viewed)).catch(
+    void Promise.resolve(githubAPI.filesViewedSet(repoRoot, prNumber, nodeId, paths, true)).catch(
+      () => undefined
+    )
+  } catch {
+    // No bridge: nothing to mirror to.
+  }
+}
+
+/** Mirrors a viewed mark onto GitHub (S1). Best-effort: local state is the source of truth. */
+function syncViewed(
+  repoRoot: string,
+  prNumber: number,
+  path: string,
+  viewed: boolean,
+  nodeId?: string
+): void {
+  if (typeof window === 'undefined') return
+  try {
+    void Promise.resolve(githubAPI.fileViewedSet(repoRoot, prNumber, path, viewed, nodeId)).catch(
       () => undefined
     )
   } catch {
@@ -254,7 +283,34 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     })
     const state = get()
     persistSession(state, repoRoot, prNumber, headSHA)
-    syncViewed(repoRoot, prNumber, filePath, true)
+    syncViewed(repoRoot, prNumber, filePath, true, nodeIdFor(state, prNumber))
+  },
+
+  markFilesViewed: (repoRoot, prNumber, headSHA, filePaths) => {
+    if (filePaths.length === 0) return
+    set((state) => {
+      const next = new Set(state.viewedFiles)
+      const changed = new Set(state.changedSince)
+      const viewedAt = { ...state.viewedAt }
+      for (const path of filePaths) {
+        next.add(path)
+        changed.delete(path)
+        viewedAt[path] = headSHA
+      }
+      return {
+        viewedFiles: next,
+        changedSince: changed,
+        viewedAt,
+        prQueue: state.prQueue.map((pr) =>
+          pr.number === prNumber
+            ? { ...pr, sessionStatus: 'in-progress' as const, viewedFileCount: next.size }
+            : pr
+        ),
+      }
+    })
+    const state = get()
+    persistSession(state, repoRoot, prNumber, headSHA)
+    syncViewedMany(repoRoot, prNumber, filePaths, nodeIdFor(state, prNumber))
   },
 
   unmarkFileViewed: (repoRoot, prNumber, headSHA, filePath) => {
@@ -276,7 +332,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     })
     const state = get()
     persistSession(state, repoRoot, prNumber, headSHA)
-    syncViewed(repoRoot, prNumber, filePath, false)
+    syncViewed(repoRoot, prNumber, filePath, false, nodeIdFor(state, prNumber))
   },
 
   reorderFiles: (chapterId, orderedPaths, repoRoot, prNumber, headSHA) => {
@@ -310,6 +366,16 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
           files: chapter.files.map((f) => (f.path === filePath ? { ...f, riskScore } : f)),
         }
       })
+      return { activePr: { ...state.activePr, chapters } }
+    }),
+
+  updateFileRiskScores: (scores) =>
+    set((state) => {
+      if (!state.activePr) return {}
+      const chapters = state.activePr.chapters.map((chapter) => ({
+        ...chapter,
+        files: chapter.files.map((f) => (scores[f.path] ? { ...f, riskScore: scores[f.path] } : f)),
+      }))
       return { activePr: { ...state.activePr, chapters } }
     }),
 

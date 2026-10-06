@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import './git-integration.css'
-import { useGitStore } from '../stores/git.store'
+import { useGitStore, diffCacheKey } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
 import { useResizePanel } from '../hooks/useResizePanel'
 import { StagingArea } from './StagingArea'
@@ -25,17 +25,16 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     -1
   )
 
-  const {
-    status,
-    selectedFile,
-    diffCache,
-    setSelectedFile,
-    setDiff,
-    setLoading,
-    clearDiffCache,
-    view,
-    setView,
-  } = useGitStore()
+  const status = useGitStore((s) => s.status)
+  const selectedFile = useGitStore((s) => s.selectedFile)
+  const diffCache = useGitStore((s) => s.diffCache)
+  const setSelectedFile = useGitStore((s) => s.setSelectedFile)
+  const setDiff = useGitStore((s) => s.setDiff)
+  const setLoading = useGitStore((s) => s.setLoading)
+  const clearDiffCache = useGitStore((s) => s.clearDiffCache)
+  const view = useGitStore((s) => s.view)
+  const setView = useGitStore((s) => s.setView)
+  const [selectedStaged, setSelectedStaged] = useState(false)
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
@@ -50,7 +49,9 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const commitMessageRef = useRef<HTMLTextAreaElement | null>(null)
 
-  const selectedDiff: FileDiff | null = selectedFile ? (diffCache.get(selectedFile) ?? null) : null
+  const selectedDiff: FileDiff | null = selectedFile
+    ? (diffCache.get(diffCacheKey(selectedFile, selectedStaged)) ?? null)
+    : null
 
   // Listen for cross-iframe broadcast (from sidebar or PR review) requesting merge-flow view.
   useEffect(() => {
@@ -81,7 +82,9 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     async (path: string, staged: boolean) => {
       if (!repoRoot) return
       setSelectedFile(path)
-      if (!diffCache.has(path)) {
+      setSelectedStaged(staged)
+      const cacheKey = diffCacheKey(path, staged)
+      if (!diffCache.has(cacheKey)) {
         setLoading(true)
         try {
           const fileStatus = status?.files.find((f) => f.path === path)
@@ -89,7 +92,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
           const result = (await gitAPI.diffFile(repoRoot, path, staged, isUntracked)) as
             | { diff: FileDiff }
             | { error: string }
-          if ('diff' in result) setDiff(path, result.diff)
+          if ('diff' in result) setDiff(cacheKey, result.diff)
         } finally {
           setLoading(false)
         }

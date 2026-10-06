@@ -9,16 +9,14 @@ import {
 } from '../git/git-service.js'
 import { registerMergeFlowHandlers } from './merge-flow.ipc.js'
 
-type RegisterFn = (
-  channel: string,
-  handler: (payload: unknown) => Promise<unknown> | unknown
-) => void
+import { withTiming, type RegisterFn } from '../github/gh-cli.js'
 
 // Lines emitted by the running commit process, keyed by repoRoot.
 // Cleared when commit finishes; consumed incrementally by commitOutputPoll.
 const commitOutputBuffer = new Map<string, string[]>()
 
-export function registerGitExtensionHandlers(register: RegisterFn): void {
+export function registerGitExtensionHandlers(registerRaw: RegisterFn): void {
+  const register = withTiming(registerRaw)
   register('git:status', async (payload) => {
     const schema = z.object({
       path: z.string().min(1),

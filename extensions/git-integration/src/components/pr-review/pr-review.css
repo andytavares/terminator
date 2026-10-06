@@ -343,7 +343,7 @@
 .pr-checks-chevron {
   font-size: 8px;
   flex-shrink: 0;
-  opacity: 0.6;
+  color: var(--tm-text-muted);
 }
 
 .pr-checks-list {
@@ -634,7 +634,7 @@
 }
 .chapter-nav-meta {
   font-size: 10px;
-  opacity: 0.7;
+  color: var(--tm-text-muted);
 }
 .chapter-nav-check {
   font-size: 10px;
@@ -678,14 +678,31 @@
 .chapter-file-row:hover {
   background: var(--tm-overlay-subtle);
 }
-.chapter-file-row--active {
-  background: color-mix(in srgb, var(--tm-accent) 10%, transparent);
-}
-.chapter-file-row--viewed {
-  opacity: 0.65;
-}
 .chapter-file-row--viewed .chapter-file-name {
   text-decoration: line-through;
+  color: var(--tm-text-muted);
+}
+/* The selected row is a solid accent fill with white text (WCAG 1.4.11, 1.4.3). */
+.chapter-file-row--active,
+.chapter-file-row--active:hover {
+  background: var(--tm-accent);
+}
+.chapter-file-row--active,
+.chapter-file-row--active .chapter-file-num,
+.chapter-file-row--active .chapter-file-name,
+.chapter-file-row--active .chapter-file-add,
+.chapter-file-row--active .chapter-file-del,
+.chapter-file-row--active .chapter-file-viewed-check,
+.chapter-file-row--active .chapter-file-why,
+.chapter-file-row--active .rc-frow-state,
+.chapter-file-row--active .rc-frow-sub {
+  color: #fff;
+}
+.chapter-file-row--active .chapter-file-name {
+  font-weight: 600;
+}
+.chapter-file-row--active .chapter-file-risk-dot {
+  box-shadow: 0 0 0 1.5px #fff;
 }
 .chapter-file-row--drag-over {
   border-top: 2px solid var(--tm-accent);
@@ -975,7 +992,7 @@
 }
 
 .review-diff-formatting-show-btn:hover {
-  opacity: 0.8;
+  color: var(--tm-text-primary);
 }
 
 /* Complexity hotspot annotation */
@@ -1048,7 +1065,7 @@
 }
 
 .inline-comment-thread--outdated {
-  opacity: 0.65;
+  border-style: dashed;
 }
 
 .inline-comment-outdated-label {
@@ -1667,7 +1684,7 @@
 }
 .full-file-chapter-risk--medium {
   background: color-mix(in srgb, var(--tm-warning) 15%, transparent);
-  color: var(--tm-warning);
+  color: color-mix(in srgb, var(--tm-warning) 75%, var(--tm-text-primary));
 }
 .full-file-chapter-risk--high {
   background: color-mix(in srgb, var(--tm-danger) 15%, transparent);
@@ -1714,14 +1731,30 @@
 .full-file-row:hover {
   background: var(--tm-overlay-subtle);
 }
-.full-file-row--active {
-  background: color-mix(in srgb, var(--tm-accent) 10%, transparent);
-}
-.full-file-row--viewed {
-  opacity: 0.65;
-}
 .full-file-row--viewed .full-file-row-name {
   text-decoration: line-through;
+  color: var(--tm-text-muted);
+}
+/* The selected row is a solid accent fill with white text (WCAG 1.4.11, 1.4.3). */
+.full-file-row--active,
+.full-file-row--active:hover {
+  background: var(--tm-accent);
+}
+.full-file-row--active,
+.full-file-row--active .full-file-row-num,
+.full-file-row--active .full-file-row-name,
+.full-file-row--active .full-file-row-add,
+.full-file-row--active .full-file-row-del,
+.full-file-row--active .rc-frow-state,
+.full-file-row--active .rc-frow-sub,
+.full-file-row--active .rc-frow-reason {
+  color: #fff;
+}
+.full-file-row--active .full-file-row-name {
+  font-weight: 600;
+}
+.full-file-row--active .full-file-row-risk {
+  box-shadow: 0 0 0 1.5px #fff;
 }
 
 .full-file-row-num {
@@ -1807,14 +1840,13 @@
 }
 
 .pr-overview-meta-sep {
-  opacity: 0.35;
+  color: var(--tm-text-muted);
 }
 
 .pr-overview-meta-branch {
   font-family: monospace;
   font-size: 10px;
   color: var(--tm-accent-text);
-  opacity: 0.8;
 }
 
 .pr-overview-approvals-bar {
@@ -2003,7 +2035,7 @@
 
 .pr-overview-section-toggle {
   font-size: 10px;
-  opacity: 0.6;
+  color: var(--tm-text-muted);
 }
 
 /* Issue refs */

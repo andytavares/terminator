@@ -30,7 +30,7 @@
   --accent-glow: rgba(92, 107, 192, 0.35);
 
   /* semantic */
-  --danger: #e05c5c;
+  --danger: #e46a6a;
   --success: #4ade80;
   --warning: #facc15;
   --agent-clr: #8b5cf6;
@@ -171,7 +171,7 @@
      composited under the same-hue diff-added/removed tints (TAV-8). */
   --danger: #962d20;
   --success: #0f5c2a;
-  --warning: #a85a00;
+  --warning: #9c5400;
 
   /* state fills/edges — recomputed here so the tint stays 14% of the
      light-theme hue rather than the dark one's. */

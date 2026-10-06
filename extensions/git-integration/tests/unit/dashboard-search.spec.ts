@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   DASHBOARD_QUERIES,
-  buildDashboardQuery,
+  buildSectionQueries,
   parseDashboard,
 } from '../../src/github/dashboard-search'
 
@@ -52,18 +52,21 @@ describe('DASHBOARD_QUERIES', () => {
   })
 })
 
-describe('buildDashboardQuery', () => {
-  it('substitutes LOGIN into the team query and aliases every section', () => {
-    const query = buildDashboardQuery('bob')
-    expect(query).toContain('team-review-requested-user:bob')
-    expect(query).not.toContain('LOGIN')
-    expect(query).toContain('reReview: search')
-    expect(query).toContain('requested: search')
-    expect(query).toContain('team: search')
-    expect(query).toContain('mine: search')
-    expect(query).toContain('involved: search')
-    expect(query).toContain('viewer { login }')
-    expect(query).toContain('fragment prFields on PullRequest')
+describe('buildSectionQueries', () => {
+  // GitHub resolves aliased searches one after another inside a single request,
+  // so one combined query took the sum of every section and hit the ~10 s cutoff.
+  it('builds one query per section, each holding exactly one search', () => {
+    const queries = buildSectionQueries('bob')
+    expect(Object.keys(queries).sort()).toEqual(
+      ['involved', 'mine', 're-review', 'requested', 'team'].sort()
+    )
+    for (const query of Object.values(queries)) {
+      expect(query.match(/: search\(/g)).toHaveLength(1)
+      expect(query).toContain('fragment prFields on PullRequest')
+    }
+    expect(queries['re-review']).toContain('reReview: search')
+    expect(queries.team).toContain('team-review-requested-user:bob')
+    expect(queries.team).not.toContain('LOGIN')
   })
 })
 
@@ -210,25 +213,36 @@ describe('parseDashboard', () => {
     expect(pr.commitsSinceMyReview).toBe(0)
   })
 
-  it('dedupes across sections by precedence re-review > requested > team > involved', () => {
+  it('dedupes across sections by precedence requested > re-review > team > involved', () => {
     const shared = prNode({ number: 9 })
     const sharedRequested = prNode({ number: 9 })
     const raw = {
       data: {
         reReview: { nodes: [shared] },
         requested: { nodes: [sharedRequested] },
-        team: { nodes: [] },
-        involved: { nodes: [] },
+        team: { nodes: [prNode({ number: 9 })] },
+        involved: { nodes: [prNode({ number: 9 })] },
         mine: { nodes: [] },
       },
     }
-    // Make it survive the re-review filter.
     shared.latestReviews.nodes = [
       { author: { login: 'alice' }, submittedAt: '2020-01-01', commit: { oid: 'a' } },
     ]
     const result = parseDashboard(raw, 'alice', new Map())
     expect(result).toHaveLength(1)
-    expect(result[0].section).toBe('re-review')
+    expect(result[0].section).toBe('requested')
+  })
+
+  it('keeps a re-review row the reviewer was not re-requested on', () => {
+    const shared = prNode({ number: 9 })
+    shared.latestReviews.nodes = [
+      { author: { login: 'alice' }, submittedAt: '2020-01-01', commit: { oid: 'a' } },
+    ]
+    const raw = {
+      data: { reReview: { nodes: [shared] }, team: { nodes: [prNode({ number: 9 })] } },
+    }
+    const result = parseDashboard(raw, 'alice', new Map())
+    expect(result.map((r) => r.section)).toEqual(['re-review'])
   })
 
   it('keeps mine rows independent of dedup against other sections', () => {

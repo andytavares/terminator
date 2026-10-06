@@ -263,6 +263,11 @@ export function ReviewDashboard(): JSX.Element {
     return () => clearInterval(id)
   }, [])
 
+  useEffect(
+    () => window.electronAPI.extensionBridge.on('reviews:changed', () => void load()),
+    [load]
+  )
+
   useEffect(() => {
     const onFocus = () => {
       if (Date.now() - lastFetchRef.current >= FOCUS_REFRESH_MS) {
@@ -314,7 +319,7 @@ export function ReviewDashboard(): JSX.Element {
   const mine = sortByOldest(prs.filter((p) => p.section === 'mine'))
   const involved = sortByOldest(prs.filter((p) => p.section === 'involved'))
 
-  const needsYou = [...reReview, ...requested, ...team]
+  const needsYou = [...requested, ...reReview, ...team]
   const needsYouCount = needsYou.length
   const mineCount = mine.length
   const involvedCount = involved.length
@@ -383,11 +388,11 @@ export function ReviewDashboard(): JSX.Element {
             <span className="rd-note">Sorted by closest to merging</span>
           </div>
           {needsYouCount === 0 && <div className="rd-empty">Nothing needs you</div>}
-          {reReview.length > 0 && (
+          {requested.length > 0 && (
             <>
-              <div className="rd-grp">{'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED'}</div>
+              <div className="rd-grp">REQUESTED OF YOU</div>
               <div className="rd-rows">
-                {reReview.map((pr) => (
+                {requested.map((pr) => (
                   <Row
                     key={pr.number}
                     cfg={toNeedsRow(pr)}
@@ -400,11 +405,11 @@ export function ReviewDashboard(): JSX.Element {
               </div>
             </>
           )}
-          {requested.length > 0 && (
+          {reReview.length > 0 && (
             <>
-              <div className="rd-grp">REQUESTED OF YOU</div>
+              <div className="rd-grp">{'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED'}</div>
               <div className="rd-rows">
-                {requested.map((pr) => (
+                {reReview.map((pr) => (
                   <Row
                     key={pr.number}
                     cfg={toNeedsRow(pr)}

@@ -15,13 +15,22 @@ interface GitStore {
   setView(view: 'default' | 'merge-flow'): void
 }
 
+export function diffCacheKey(path: string, staged: boolean): string {
+  return `${staged ? 'staged' : 'unstaged'}:${path}`
+}
+
+/** Cached diffs (see diffCacheKey) are dropped whenever the status changes. */
 export const useGitStore = create<GitStore>((set) => ({
   status: null,
   selectedFile: null,
   diffCache: new Map(),
   isLoading: false,
   view: 'default',
-  setStatus: (status) => set({ status }),
+  setStatus: (status) =>
+    set((state) => {
+      if (JSON.stringify(state.status) === JSON.stringify(status)) return state
+      return { status, diffCache: new Map() }
+    }),
   setSelectedFile: (selectedFile) => set({ selectedFile }),
   setDiff: (path, diff) =>
     set((state) => {

@@ -79,6 +79,28 @@ function mockGitFailure(message: string) {
   )
 }
 
+// The dashboard sends one graphql request per section in parallel, so replies are
+// routed by the alias in each query rather than queued in call order.
+function mockDashboardExec(
+  sections: Record<string, unknown[]>,
+  remotes: Record<string, string | Error> = {}
+) {
+  mockExecFile.mockImplementation(
+    (_cmd: string, args: string[], opts: { cwd?: string }, cb: ExecCallback) => {
+      if (args[0] === 'api' && args[1] === 'user') return cb(null, { stdout: 'alice', stderr: '' })
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        const alias = /(\w+): search\(/.exec(args[3])![1]
+        const data = { [alias]: { nodes: sections[alias] ?? [] } }
+        return cb(null, { stdout: JSON.stringify({ data }), stderr: '' })
+      }
+      const remote = remotes[opts.cwd ?? '']
+      if (remote instanceof Error || remote === undefined)
+        return cb(remote ?? new Error('no remote'))
+      return cb(null, { stdout: remote, stderr: '' })
+    }
+  )
+}
+
 function mockGitFailureWithStdout(message: string, stdout: string) {
   mockExecFile.mockImplementationOnce(
     (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
@@ -270,6 +292,7 @@ describe('github:pr-review-detail', () => {
 
   it('maps TIMED_OUT and ACTION_REQUIRED conclusions to fail', async () => {
     for (const conclusion of ['TIMED_OUT', 'ACTION_REQUIRED', 'ERROR']) {
+      handlers = captureHandlers() // the owner lookup is cached per registration
       mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
@@ -283,6 +306,7 @@ describe('github:pr-review-detail', () => {
 
   it('maps IN_PROGRESS and QUEUED to pending state', async () => {
     for (const conclusion of ['IN_PROGRESS', 'QUEUED', 'PENDING', 'WAITING']) {
+      handlers = captureHandlers() // the owner lookup is cached per registration
       mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
@@ -296,6 +320,7 @@ describe('github:pr-review-detail', () => {
 
   it('maps SKIPPED, NEUTRAL, CANCELLED to skipped state', async () => {
     for (const conclusion of ['SKIPPED', 'NEUTRAL', 'CANCELLED']) {
+      handlers = captureHandlers() // the owner lookup is cached per registration
       mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
@@ -2482,22 +2507,14 @@ describe('review revamp — edge branches', () => {
       commits: { nodes: [] },
       latestReviews: { nodes: [] },
     })
-    mockGitSuccess('alice')
-    mockGitSuccess(
-      JSON.stringify({
-        data: {
-          viewer: { login: 'alice' },
-          reReview: { nodes: [] },
-          requested: { nodes: [] },
-          team: { nodes: [] },
-          involved: { nodes: [] },
-          mine: { nodes: [node('acme/widgets', 1), node('acme/gadgets', 2)] },
-        },
-      })
+    mockDashboardExec(
+      { mine: [node('acme/widgets', 1), node('acme/gadgets', 2)] },
+      {
+        '/src/widgets': 'git@github.com:acme/widgets.git',
+        '/src/gadgets': 'https://gitlab.com/acme/gadgets.git',
+        '/src/broken': new Error('not a git repository'),
+      }
     )
-    mockGitSuccess('git@github.com:acme/widgets.git')
-    mockGitSuccess('https://gitlab.com/acme/gadgets.git')
-    mockGitFailure('not a git repository')
     const result = (await hs['github:dashboard-search']({})) as {
       prs: Array<{ repo: string; localRepoRoot: string | null }>
     }
@@ -2523,50 +2540,40 @@ describe('github:dashboard-search', () => {
       () => ['/Users/me/repos/widgets']
     )
 
-    mockGitSuccess('alice') // gh api user --jq .login
-    mockGitSuccess(
-      JSON.stringify({
-        data: {
-          viewer: { login: 'alice' },
-          reReview: { nodes: [] },
-          requested: { nodes: [] },
-          team: { nodes: [] },
-          involved: { nodes: [] },
-          mine: {
-            nodes: [
-              {
-                number: 1,
-                title: 'Fix bug',
-                url: 'https://github.com/acme/widgets/pull/1',
-                isDraft: false,
-                additions: 10,
-                deletions: 5,
-                changedFiles: 2,
-                createdAt: '2026-01-01T00:00:00Z',
-                repository: { nameWithOwner: 'acme/widgets' },
-                author: { login: 'alice' },
-                reviewDecision: 'REVIEW_REQUIRED',
-                reviewRequests: { totalCount: 0 },
-                reviewThreads: { nodes: [] },
-                commits: {
-                  nodes: [
-                    {
-                      commit: {
-                        oid: 'a',
-                        committedDate: '2026-01-01',
-                        statusCheckRollup: { state: 'SUCCESS' },
-                      },
-                    },
-                  ],
+    mockDashboardExec(
+      {
+        mine: [
+          {
+            number: 1,
+            title: 'Fix bug',
+            url: 'https://github.com/acme/widgets/pull/1',
+            isDraft: false,
+            additions: 10,
+            deletions: 5,
+            changedFiles: 2,
+            createdAt: '2026-01-01T00:00:00Z',
+            repository: { nameWithOwner: 'acme/widgets' },
+            author: { login: 'alice' },
+            reviewDecision: 'REVIEW_REQUIRED',
+            reviewRequests: { totalCount: 0 },
+            reviewThreads: { nodes: [] },
+            commits: {
+              nodes: [
+                {
+                  commit: {
+                    oid: 'a',
+                    committedDate: '2026-01-01',
+                    statusCheckRollup: { state: 'SUCCESS' },
+                  },
                 },
-                latestReviews: { nodes: [] },
-              },
-            ],
+              ],
+            },
+            latestReviews: { nodes: [] },
           },
-        },
-      })
-    ) // gh api graphql (dashboard query)
-    mockGitSuccess('https://github.com/acme/widgets.git') // git remote get-url origin
+        ],
+      },
+      { '/Users/me/repos/widgets': 'https://github.com/acme/widgets.git' }
+    )
 
     const result = (await handlers['github:dashboard-search']({})) as {
       prs: Array<{ localRepoRoot: string | null; repo: string }>
@@ -2579,6 +2586,18 @@ describe('github:dashboard-search', () => {
 
     const userCallOpts = mockExecFile.mock.calls[0][2] as { cwd?: string }
     expect(userCallOpts.cwd).toBe(homedir())
+  })
+
+  it('sends each section as its own graphql request', async () => {
+    const handlers = captureHandlers()
+    mockDashboardExec({})
+    await handlers['github:dashboard-search']({})
+    const queries = mockExecFile.mock.calls
+      .map((c) => c[1] as string[])
+      .filter((args) => args[1] === 'graphql')
+      .map((args) => args[3])
+    expect(queries).toHaveLength(5)
+    for (const q of queries) expect(q.match(/: search\(/g)).toHaveLength(1)
   })
 
   it('returns catchError shape when the login lookup fails', async () => {
@@ -2680,5 +2699,341 @@ describe('gh: pseudo-root (uncloned repo)', () => {
     })) as { affinity: Record<string, unknown> }
     expect(mockExecFile).not.toHaveBeenCalled()
     expect(result.affinity).toEqual({})
+  })
+})
+
+// ── repeated-work removal ─────────────────────────────────────────────────────
+
+type Spawn = { cmd: string; args: string[] }
+
+/** Routes every spawned process to `route`; returns the list of spawns for counting. */
+function routeExec(route: (args: string[]) => string | Error): Spawn[] {
+  const spawns: Spawn[] = []
+  mockExecFile.mockReset()
+  mockExecFile.mockImplementation(
+    (cmd: string, args: string[], _opts: unknown, cb: ExecCallback) => {
+      spawns.push({ cmd, args })
+      const out = route(args)
+      if (out instanceof Error) return cb(out)
+      return cb(null, { stdout: out, stderr: '' })
+    }
+  )
+  return spawns
+}
+
+const isGhPrView = (a: string[]) => a[0] === 'pr' && a[1] === 'view'
+const isGhRepoView = (a: string[]) => a[0] === 'repo' && a[1] === 'view'
+
+describe('handler timing', () => {
+  it('logs each handler with its duration and passes the result through', async () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    const handlers = captureHandlers()
+    const result = await handlers['github:file-metrics']({ path: 'src/foo.ts' })
+    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
+    expect(debug).toHaveBeenCalledWith(
+      expect.stringMatching(/^\[git-integration\] github:file-metrics \d+ms$/)
+    )
+    debug.mockRestore()
+  })
+})
+
+describe('github:pr-file-diff caching', () => {
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts' }
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    handlers = captureHandlers()
+  })
+
+  const gitRoute = (a: string[]) => {
+    if (isGhPrView(a)) return 'main\n'
+    if (a[0] === 'merge-base') return 'mb111\n'
+    return ''
+  }
+
+  it('skips fetch and gh pr view when the head commit is unchanged', async () => {
+    const spawns = routeExec(gitRoute)
+    await handlers['github:pr-file-diff']({ ...payload, headSHA: 'h1' })
+    spawns.length = 0
+
+    const result = await handlers['github:pr-file-diff']({ ...payload, headSHA: 'h1' })
+
+    expect(result).toEqual({ diff: expect.objectContaining({ path: 'src/foo.ts' }) })
+    expect(spawns.map((s) => s.args.slice(0, 2))).toEqual([
+      ['diff', 'mb111...refs/remotes/pull/6/head'],
+    ])
+  })
+
+  it('fetches again when the head commit changed', async () => {
+    const spawns = routeExec(gitRoute)
+    await handlers['github:pr-file-diff']({ ...payload, headSHA: 'h1' })
+    spawns.length = 0
+
+    await handlers['github:pr-file-diff']({ ...payload, headSHA: 'h2' })
+
+    expect(spawns.some((s) => s.args[0] === 'fetch')).toBe(true)
+  })
+
+  it('does not ask gh for the base branch when the caller supplies it', async () => {
+    const spawns = routeExec(gitRoute)
+
+    await handlers['github:pr-file-diff']({ ...payload, baseRef: 'develop', headSHA: 'h1' })
+
+    expect(spawns.some((s) => isGhPrView(s.args))).toBe(false)
+    expect(spawns.find((s) => s.args[0] === 'merge-base')?.args).toContain('origin/develop')
+  })
+
+  it('does not reuse a cached merge base without a head commit', async () => {
+    const spawns = routeExec(gitRoute)
+    await handlers['github:pr-file-diff']({ ...payload, headSHA: 'h1' })
+    spawns.length = 0
+
+    await handlers['github:pr-file-diff'](payload)
+
+    expect(spawns.some((s) => s.args[0] === 'fetch')).toBe(true)
+  })
+})
+
+describe('repository lookups run once', () => {
+  it('asks gh for the owner and name once across handlers', async () => {
+    const handlers = captureHandlers()
+    const spawns = routeExec((a) => {
+      if (isGhRepoView(a)) return JSON.stringify(REPO_VIEW)
+      return JSON.stringify({ ahead_by: 0, files: [] })
+    })
+
+    await handlers['github:pr-compare']({ repoRoot: '/repo', fromSha: 'a', toSha: 'b' })
+    await handlers['github:file-viewed-set']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      path: 'a.ts',
+      viewed: true,
+    })
+
+    expect(spawns.filter((s) => isGhRepoView(s.args))).toHaveLength(1)
+  })
+
+  it('asks again after a failed lookup', async () => {
+    const handlers = captureHandlers()
+    let fail = true
+    const spawns = routeExec((a) => {
+      if (isGhRepoView(a)) return fail ? new Error('network down') : JSON.stringify(REPO_VIEW)
+      return JSON.stringify({ ahead_by: 0, files: [] })
+    })
+    const input = { repoRoot: '/repo', fromSha: 'a', toSha: 'b' }
+
+    await handlers['github:pr-compare'](input)
+    fail = false
+    await handlers['github:pr-compare'](input)
+
+    expect(spawns.filter((s) => isGhRepoView(s.args))).toHaveLength(2)
+  })
+
+  it('looks up the signed-in user once across handlers', async () => {
+    const handlers = captureHandlers()
+    const spawns = routeExec((a) => (a[0] === 'api' && a[1] === 'user' ? 'alice\n' : '{"data":{}}'))
+
+    const first = await handlers['github:current-user']({ repoRoot: '/repo' })
+    await handlers['github:dashboard-search']({})
+    await handlers['github:current-user']({ repoRoot: '/repo' })
+
+    expect(first).toEqual({ login: 'alice' })
+    expect(spawns.filter((s) => s.args[0] === 'api' && s.args[1] === 'user')).toHaveLength(1)
+  })
+})
+
+describe('github:files-metrics', () => {
+  const REPO_FILES: Record<string, string> = {
+    'src/a.ts': 'export const a = 1',
+    'src/b.ts': "import { a } from './a'\nexport const b = a",
+    'src/c.ts': "import x from './b'\nimport y from './a'",
+    'src/a.spec.ts': "import { a } from './a'",
+    'lib/d.py': 'import a',
+    'top.ts': 'export const t = 1',
+    'top.spec.ts': 'x',
+  }
+  const COMMITS: Record<string, string[]> = {
+    ['1'.repeat(40)]: ['src/a.ts', 'src/b.ts'],
+    ['2'.repeat(40)]: ['src/a.ts'],
+    ['3'.repeat(40)]: ['lib/d.py', 'top.ts'],
+  }
+  const globToRegExp = (g: string) =>
+    new RegExp('^' + g.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*') + '$')
+
+  /** A fake repository answering the git commands the metrics handlers use. */
+  function fakeGit(a: string[]): string {
+    const log = a.indexOf('log')
+    if (log >= 0 && a.includes('--name-only')) {
+      return Object.entries(COMMITS)
+        .map(([h, files]) => `${h}\n\n${files.join('\n')}`)
+        .join('\n\n')
+    }
+    if (log >= 0) {
+      const path = a[a.indexOf('--') + 1]
+      return Object.entries(COMMITS)
+        .filter(([, files]) => files.includes(path))
+        .map(([h]) => `${h.slice(0, 7)} c`)
+        .join('\n')
+    }
+    if (a[0] === 'grep') {
+      const pattern = new RegExp(a[a.length - 1])
+      const lines = Object.entries(REPO_FILES).flatMap(([file, text]) =>
+        text
+          .split('\n')
+          .map((l, i) => ({ file, n: i + 1, l }))
+          .filter((x) => pattern.test(x.l))
+      )
+      if (a.includes('-rl')) return [...new Set(lines.map((x) => x.file))].join('\n')
+      return lines.map((x) => `${x.file}\0${x.n}\0${x.l}`).join('\n')
+    }
+    if (a[0] === 'ls-files') {
+      const globs = a.slice(a.indexOf('--') + 1).map(globToRegExp)
+      return Object.keys(REPO_FILES)
+        .filter((f) => globs.some((g) => g.test(f)))
+        .join('\n')
+    }
+    return ''
+  }
+
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    handlers = captureHandlers()
+  })
+
+  it('returns what github:file-metrics returns for each path', async () => {
+    routeExec(fakeGit)
+    const paths = Object.keys(REPO_FILES)
+
+    const perFile: Record<string, unknown> = {}
+    for (const path of paths) {
+      perFile[path] = await handlers['github:file-metrics']({ repoRoot: '/repo', path })
+    }
+    const batch = (await handlers['github:files-metrics']({ repoRoot: '/repo', paths })) as {
+      metrics: Record<string, unknown>
+    }
+
+    expect(batch.metrics).toEqual(perFile)
+    expect(batch.metrics['src/a.ts']).toMatchObject({
+      churn90d: 2,
+      importerCount: 3,
+      testFilePresent: true,
+    })
+  })
+
+  it('spawns the same number of processes for 1 path as for 20', async () => {
+    const few = routeExec(fakeGit)
+    await handlers['github:files-metrics']({ repoRoot: '/repo', paths: ['src/a.ts'] })
+    const manyPaths = Array.from({ length: 20 }, (_, i) => `src/gen${i}.ts`)
+    const many = routeExec(fakeGit)
+    await handlers['github:files-metrics']({ repoRoot: '/repo', paths: manyPaths })
+
+    expect(few.length).toBe(3)
+    expect(many.length).toBe(few.length)
+  })
+
+  it('falls back to a search per file when the combined search overflows', async () => {
+    const overflow = Object.assign(new Error('maxBuffer'), {
+      code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
+    })
+    const spawns = routeExec((a) => (a[0] === 'grep' && !a.includes('-rl') ? overflow : fakeGit(a)))
+    const paths = ['src/a.ts', 'src/b.ts']
+
+    const batch = (await handlers['github:files-metrics']({ repoRoot: '/repo', paths })) as {
+      metrics: Record<string, { importerCount: number }>
+    }
+
+    expect(spawns.filter((s) => s.args[0] === 'grep' && s.args.includes('-rl'))).toHaveLength(2)
+    expect(batch.metrics['src/a.ts'].importerCount).toBe(3)
+  })
+
+  it('returns an error object when the history cannot be read', async () => {
+    routeExec((a) => (a.includes('log') ? new Error('not a git repo') : ''))
+    const result = await handlers['github:files-metrics']({ repoRoot: '/repo', paths: ['a.ts'] })
+    expect(result).toMatchObject({ error: expect.stringContaining('not a git repo') })
+  })
+
+  it('returns VALIDATION_ERROR without paths', async () => {
+    expect(await handlers['github:files-metrics']({ repoRoot: '/repo' })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+  })
+})
+
+describe('viewed files', () => {
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    handlers = captureHandlers()
+  })
+
+  it('github:pr-review-detail asks for and returns the pull request node id', async () => {
+    const spawns = routeExec((a) => {
+      if (isGhRepoView(a)) return JSON.stringify(REPO_VIEW)
+      if (isGhPrView(a)) return JSON.stringify({ ...PR_META, id: 'PR_node1' })
+      if (a[0] === 'api' && a[1] === '--paginate') return '[]'
+      if (a[0] === 'api') return '[]'
+      return ''
+    })
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { nodeId?: string } }
+
+    expect(result.pr.nodeId).toBe('PR_node1')
+    expect(spawns.find((s) => isGhPrView(s.args))?.args.join(' ')).toContain('id,')
+  })
+
+  it('github:file-viewed-set with a node id makes one gh call', async () => {
+    const spawns = routeExec(() => '{}')
+
+    const result = await handlers['github:file-viewed-set']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      nodeId: 'PR_node1',
+      path: 'a.ts',
+      viewed: true,
+    })
+
+    expect(result).toEqual({ ok: true })
+    expect(spawns).toHaveLength(1)
+    expect(spawns[0].args.join(' ')).toContain('markFileAsViewed')
+    expect(spawns[0].args).toContain('id=PR_node1')
+  })
+
+  it('github:files-viewed-set sends one request with one mutation per path', async () => {
+    const spawns = routeExec(() => '{}')
+
+    const result = await handlers['github:files-viewed-set']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      nodeId: 'PR_node1',
+      paths: ['a.ts', 'b.ts', 'c.ts'],
+      viewed: false,
+    })
+
+    expect(result).toEqual({ ok: true })
+    expect(spawns).toHaveLength(1)
+    const query = spawns[0].args.find((x) => x.startsWith('query='))!
+    expect(query.match(/unmarkFileAsViewed/g)).toHaveLength(3)
+    expect(spawns[0].args).toEqual(expect.arrayContaining(['p0=a.ts', 'p1=b.ts', 'p2=c.ts']))
+  })
+
+  it('github:files-viewed-set looks up the node id when none is given', async () => {
+    const spawns = routeExec((a) =>
+      a.join(' ').includes('pullRequest(number')
+        ? JSON.stringify({ data: { repository: { pullRequest: { id: 'PR_looked_up' } } } })
+        : isGhRepoView(a)
+          ? JSON.stringify(REPO_VIEW)
+          : '{}'
+    )
+
+    await handlers['github:files-viewed-set']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      paths: ['a.ts'],
+      viewed: true,
+    })
+
+    expect(spawns.at(-1)!.args).toContain('id=PR_looked_up')
   })
 })

@@ -948,6 +948,28 @@ Creates a new focused BrowserWindow pre-loaded with the Code Reviews view for th
 
 ---
 
+### `window:review-submitted`
+
+Sent by a review surface after an approval lands. The handler broadcasts `reviews:changed` so every open Reviews list reloads; the approving pop-out then closes itself, returning the user to the list behind it.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{}`
+
+**Response**: `{ ok: true }`
+
+---
+
+### `reviews:changed`
+
+Push telling the Reviews list (`view=reviews`) to re-run `github:dashboard-search`.
+
+**Direction**: main → renderer (broadcast)
+
+**Payload**: `{}`
+
+---
+
 ### `github:list-open-prs`
 
 Lists pull requests for the active repo with cursor-based pagination, optional text/number search, and open/closed state filter.
@@ -993,6 +1015,55 @@ Returns churn, blast radius (actual code importers only — not prose), test fil
 **Request**: `{ repoRoot: string; path: string }`
 
 **Response**: `{ churn90d: number; blastRadius: number; topImporters: string[]; importerCount: number; testFilePresent: boolean; patchCoverage: number | null } | { error: string }`
+
+---
+
+### `github:files-metrics`
+
+The same answer as `github:file-metrics` for every path, from three git processes in total (one history read, one import search, one test-file listing) instead of three per path. If the combined import search overflows its 20 MB buffer it falls back to one search per path.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; paths: string[] }`
+
+**Response**: `{ metrics: Record<string, FileMetrics> } | { error: string }`, where `FileMetrics` is the `github:file-metrics` response shape above.
+
+---
+
+### `github:pr-file-diff` (changed)
+
+**Request**: `{ repoRoot: string; prNumber: number; path: string; baseRef?: string; headSHA?: string }`
+
+- `baseRef`: the PR's base branch (`PrReviewDetail.baseRefName`). When given, `gh pr view` is not called.
+- `headSHA`: the PR's head commit (`PrReviewDetail.headSHA`). When it equals the commit this process last fetched for the PR, `git fetch` and the merge-base lookup are skipped and only `git diff` runs. When it differs or is absent the handler fetches as before.
+
+**Response**: unchanged.
+
+---
+
+### `github:pr-review-detail` (changed)
+
+**Response**: `pr` gains `nodeId?: string`, the pull request's GraphQL node id.
+
+---
+
+### `github:file-viewed-set` (changed)
+
+**Request**: `{ repoRoot: string; prNumber: number; path: string; viewed: boolean; nodeId?: string }`. With `nodeId`, only the mutation runs (one gh call); without it the id is looked up first.
+
+**Response**: unchanged.
+
+---
+
+### `github:files-viewed-set`
+
+Marks or unmarks several files as viewed in one GraphQL request, one aliased mutation per path.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; prNumber: number; nodeId?: string; paths: string[]; viewed: boolean }`
+
+**Response**: `{ ok: true } | { error: string }`
 
 ---
 

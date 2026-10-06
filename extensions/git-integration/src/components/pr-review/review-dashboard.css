@@ -89,7 +89,7 @@
 .rd-btn.rd-pri {
   background: var(--tm-accent);
   border-color: var(--tm-accent);
-  color: var(--tm-accent-text);
+  color: var(--tm-on-accent);
 }
 
 .rd-tabs {

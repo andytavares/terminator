@@ -1058,7 +1058,7 @@ Extensions MUST use only `--tm-*` CSS custom properties for colors, typography, 
 | `--tm-accent-dim`  | `rgba(92,107,192,0.18)` | Tinted accent background                  |
 | `--tm-accent-glow` | `rgba(92,107,192,0.35)` | Glow / shadow effects                     |
 | `--tm-on-accent`   | `#ffffff`               | Foreground on an accent fill              |
-| `--tm-danger`      | `#E05C5C`               | Error / destructive actions               |
+| `--tm-danger`      | `#E46A6A`               | Error / destructive actions               |
 | `--tm-success`     | `#4ade80`               | Success states                            |
 | `--tm-warning`     | `#facc15`               | Warning / caution states                  |
 

@@ -93,7 +93,9 @@ export function StagingArea({
   onFileSelect,
   onStagingChange,
 }: StagingAreaProps): JSX.Element {
-  const { status, setStatus, selectedFile } = useGitStore()
+  const status = useGitStore((s) => s.status)
+  const setStatus = useGitStore((s) => s.setStatus)
+  const selectedFile = useGitStore((s) => s.selectedFile)
 
   const toggleFile = useCallback(
     async (filePath: string, currentlyStaged: boolean) => {

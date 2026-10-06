@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { useEffect } from 'react'
 import { renderHook, act } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import {
@@ -16,6 +17,7 @@ vi.mock('../../src/stores/pr-review.store', () => ({
 const mockListOpenPrsAPI = vi.fn()
 const mockPrReviewDetailAPI = vi.fn()
 const mockFileMetricsAPI = vi.fn()
+const mockFilesMetricsAPI = vi.fn()
 const mockPrInlineCommentsAPI = vi.fn()
 const mockSessionsForRepoAPI = vi.fn().mockResolvedValue({ sessions: [] })
 const mockActiveReviewsForRepoAPI = vi.fn().mockResolvedValue({ error: 'NOT_FOUND' })
@@ -30,6 +32,16 @@ vi.mock('../../src/api/github', () => ({
     listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
     prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
     fileMetrics: (...args: unknown[]) => mockFileMetricsAPI(...args),
+    // Adapts the per-file fixtures below to the batched call the hook now makes.
+    filesMetrics: async (root: string, paths: string[]) => {
+      mockFilesMetricsAPI(root, paths)
+      const metrics: Record<string, unknown> = {}
+      for (const path of paths) {
+        const one = await mockFileMetricsAPI(root, path)
+        if (one && !('error' in one)) metrics[path] = one
+      }
+      return { metrics }
+    },
     prInlineComments: (...args: unknown[]) => mockPrInlineCommentsAPI(...args),
     prIssueComments: (...args: unknown[]) => mockPrIssueCommentsAPI(...args),
     sessionsForRepo: (...args: unknown[]) => mockSessionsForRepoAPI(...args),
@@ -81,7 +93,7 @@ const mockSetNextPrCursor = vi.fn()
 const mockSetActivePr = vi.fn()
 const mockSetThreads = vi.fn()
 const mockSetIssueComments = vi.fn()
-const mockUpdateFileRiskScore = vi.fn()
+const mockUpdateFileRiskScores = vi.fn()
 const mockUpdateQueuePrRisk = vi.fn()
 const mockSetCurrentUserLogin = vi.fn()
 
@@ -109,6 +121,9 @@ const validActivePr = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // The hooks read the live PR through getState(); serve whatever the test configured.
+  ;(usePrReviewStore as unknown as { getState: () => unknown }).getState = () =>
+    vi.mocked(usePrReviewStore)()
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     github: {
       listOpenPrs: mockListOpenPrs,
@@ -128,7 +143,7 @@ beforeEach(() => {
     setNextPrCursor: mockSetNextPrCursor,
     setActivePr: mockSetActivePr,
     setThreads: mockSetThreads,
-    updateFileRiskScore: mockUpdateFileRiskScore,
+    updateFileRiskScores: mockUpdateFileRiskScores,
     updateQueuePrRisk: mockUpdateQueuePrRisk,
     setCurrentUserLogin: mockSetCurrentUserLogin,
     includeClosedPrs: false,
@@ -728,7 +743,7 @@ describe('useFetchFileMetrics', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: prWithFiles,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
     mockFileMetrics.mockResolvedValue({
@@ -743,7 +758,7 @@ describe('useFetchFileMetrics', () => {
       await result.current()
     })
     expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
-    expect(mockUpdateFileRiskScore).toHaveBeenCalled()
+    expect(mockUpdateFileRiskScores).toHaveBeenCalled()
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
   })
 
@@ -790,7 +805,7 @@ describe('useFetchFileMetrics', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: prBigSimple,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
     // Low per-file signals → per-file risk is 'low', but 500 lines changed
@@ -852,7 +867,7 @@ describe('useFetchFileMetrics', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: prWithLockFiles,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -907,7 +922,7 @@ describe('useFetchFileMetrics', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: prWithFiles,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -919,7 +934,7 @@ describe('useFetchFileMetrics', () => {
       await result.current()
     })
     // collected.length === 0 so no updateFileRiskScore or updateQueuePrRisk
-    expect(mockUpdateFileRiskScore).not.toHaveBeenCalled()
+    expect(mockUpdateFileRiskScores).not.toHaveBeenCalled()
     expect(mockUpdateQueuePrRisk).not.toHaveBeenCalled()
   })
 })
@@ -1166,7 +1181,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: pr,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -1195,7 +1210,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: pr,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -1223,7 +1238,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: pr,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -1251,7 +1266,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: pr,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -1278,7 +1293,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: pr,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -1305,7 +1320,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: pr,
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -1332,7 +1347,7 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: null, // no activePr
-      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateFileRiskScores: mockUpdateFileRiskScores,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
     } as unknown as ReturnType<typeof usePrReviewStore>)
 
@@ -1457,5 +1472,150 @@ describe('useLoadIssueComments', () => {
     })
 
     expect(mockSetIssueComments).not.toHaveBeenCalled()
+  })
+})
+
+describe('useFetchFileMetrics — one batched request', () => {
+  const file = (path: string, tier: 1 | 2 | 3 = 1) => ({
+    path,
+    changeType: 'modified' as const,
+    additions: 4,
+    deletions: 1,
+    isBinary: false,
+    tier,
+    whyHere: 'changed',
+    estimatedMinutes: 1,
+    riskScore: {
+      level: 'low' as const,
+      composite: null,
+      dominantDriver: '',
+      topImporters: [],
+      importerCount: 0,
+      metrics: {
+        changeSize: null,
+        churn90d: null,
+        blastRadius: null,
+        testFilePresent: null,
+        complexityDelta: null,
+        patchCoverage: null,
+      },
+    },
+  })
+
+  it('asks for every non-generated file in one call and applies the scores in one update', async () => {
+    const pr = {
+      ...validActivePr,
+      chapters: [
+        {
+          id: 'ch-1',
+          name: 'One',
+          estimatedMinutes: 1,
+          status: 'not-started' as const,
+          files: [file('src/a.ts'), file('src/b.ts'), file('package-lock.json', 3)],
+        },
+        {
+          id: 'ch-2',
+          name: 'Two',
+          estimatedMinutes: 1,
+          status: 'not-started' as const,
+          files: [file('src/c.ts')],
+        },
+      ],
+    }
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: pr,
+      updateFileRiskScores: mockUpdateFileRiskScores,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 1,
+      blastRadius: 1,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+    })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockFilesMetricsAPI).toHaveBeenCalledTimes(1)
+    expect(mockFilesMetricsAPI).toHaveBeenCalledWith('/repo', ['src/a.ts', 'src/b.ts', 'src/c.ts'])
+    expect(mockUpdateFileRiskScores).toHaveBeenCalledTimes(1)
+    expect(Object.keys(mockUpdateFileRiskScores.mock.calls[0][0]).sort()).toEqual([
+      'src/a.ts',
+      'src/b.ts',
+      'src/c.ts',
+    ])
+  })
+})
+
+describe('comment loaders — stable across activePr patches', () => {
+  const setActive = (pr: typeof validActivePr | null) =>
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: pr,
+      setThreads: mockSetThreads,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+  it('keeps the inline loader identity when activePr is patched for the same PR', () => {
+    setActive(validActivePr)
+    const { result, rerender } = renderHook(() => useLoadInlineComments('/repo'))
+    const first = result.current
+    setActive({ ...validActivePr, title: 'patched complexity' })
+    rerender()
+    expect(result.current).toBe(first)
+  })
+
+  it('changes the inline loader identity when a different PR becomes active', () => {
+    setActive(validActivePr)
+    const { result, rerender } = renderHook(() => useLoadInlineComments('/repo'))
+    const first = result.current
+    setActive({ ...validActivePr, number: 43 })
+    rerender()
+    expect(result.current).not.toBe(first)
+  })
+
+  it('does not fetch inline comments again when activePr is patched', async () => {
+    mockPrInlineComments.mockResolvedValue({ comments: [] })
+    setActive(validActivePr)
+    const { rerender } = renderHook(() => {
+      const load = useLoadInlineComments('/repo')
+      useEffect(() => {
+        void load()
+      }, [load])
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    setActive({ ...validActivePr, title: 'patched complexity' })
+    rerender()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(mockPrInlineComments).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not fetch issue comments again when activePr is patched', async () => {
+    mockPrIssueCommentsAPI.mockResolvedValue({ comments: [] })
+    setActive(validActivePr)
+    const { rerender } = renderHook(() => {
+      const load = useLoadIssueComments('/repo')
+      useEffect(() => {
+        void load()
+      }, [load])
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    setActive({ ...validActivePr, title: 'patched complexity' })
+    rerender()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(mockPrIssueCommentsAPI).toHaveBeenCalledTimes(1)
   })
 })
