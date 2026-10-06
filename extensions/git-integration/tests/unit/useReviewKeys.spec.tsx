@@ -46,16 +46,18 @@ describe('useReviewKeys', () => {
     })
   })
 
-  it('dispatches nextHunk on j and prevHunk on k', () => {
+  it('dispatches nextHunk on k and prevHunk on j', () => {
     render(<TestHarness handlers={handlers} />)
     const nextSpy = vi.fn()
     const prevSpy = vi.fn()
     window.addEventListener(REVIEW_KEY_EVENTS.nextHunk, nextSpy)
     window.addEventListener(REVIEW_KEY_EVENTS.prevHunk, prevSpy)
-    fireKey('j')
     fireKey('k')
     expect(nextSpy).toHaveBeenCalledTimes(1)
+    expect(prevSpy).not.toHaveBeenCalled()
+    fireKey('j')
     expect(prevSpy).toHaveBeenCalledTimes(1)
+    expect(nextSpy).toHaveBeenCalledTimes(1)
     window.removeEventListener(REVIEW_KEY_EVENTS.nextHunk, nextSpy)
     window.removeEventListener(REVIEW_KEY_EVENTS.prevHunk, prevSpy)
   })

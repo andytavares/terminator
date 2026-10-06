@@ -60,10 +60,10 @@ export function useReviewKeys(handlers: ReviewKeyHandlers): void {
       const ui = useReviewUiStore.getState()
 
       switch (key) {
-        case 'j':
+        case 'k':
           window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.nextHunk))
           return
-        case 'k':
+        case 'j':
           window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.prevHunk))
           return
         case ']':
