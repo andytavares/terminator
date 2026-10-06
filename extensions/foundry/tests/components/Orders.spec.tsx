@@ -219,3 +219,32 @@ describe('offering a ticket for a typed idea', () => {
     expect(orderCreates(invoke)).toHaveLength(0)
   })
 })
+
+// A shipped order still has a gate to answer (mark the draft ready), and the
+// Floor is where gates are answered. It used to open in the Forge, which only
+// describes the agreement.
+describe('opening an order that has a run', () => {
+  // Neither surface has its order yet, so each shows its own loading line,
+  // which is what tells them apart.
+  async function opened(status: string) {
+    const invoke = vi.fn(async (channel: string) =>
+      channel === 'foundry:order.list' ? { orders: [row({ status })] } : new Promise(() => {})
+    )
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Orders repoRoot="/repos/app" openOrderId="WO-1" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'All orders' })).toBeTruthy())
+  }
+
+  it.each(['running', 'shipped'])('opens a %s order on the Floor', async (status) => {
+    await opened(status)
+    await waitFor(() => expect(screen.getByText('Loading the run…')).toBeTruthy())
+  })
+
+  it('opens a draft in the Forge, not the Floor', async () => {
+    await opened('draft')
+    expect(screen.getByText('Loading the order…')).toBeTruthy()
+    expect(screen.queryByText('Loading the run…')).toBeNull()
+  })
+})

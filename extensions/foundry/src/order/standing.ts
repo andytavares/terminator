@@ -138,6 +138,21 @@ export function standingOf(input: StandingInput): Standing {
   const running = nodes.filter((n) => n.state === 'running' || n.state === 'verifying').length
   const failed = nodes.filter((n) => n.state === 'failed').length
   const counts = { done, total, gateId: null, waitingOn: null }
+  const holding = input.gates.find((gate) => gate.decision === null)
+
+  // A shipped order can still be waiting: the draft pull request's
+  // ready-for-review gate opens after the work is done, and it is the operator's.
+  if (input.status === 'shipped' && holding !== undefined) {
+    return {
+      ...counts,
+      kind: 'halted',
+      turn: 'you',
+      gateId: holding.id,
+      label: holding.summary,
+      headline: `Shipped — ${holding.summary}`,
+      detail: 'The work shipped. One decision is still open, and it is yours.',
+    }
+  }
 
   if (input.status === 'shipped') {
     return {
@@ -190,7 +205,6 @@ export function standingOf(input: StandingInput): Standing {
 
   // Halted before anything else. Nothing the line does next is scheduled until
   // this is answered, so every other condition below is a symptom of it.
-  const holding = input.gates.find((gate) => gate.decision === null)
   if (holding !== undefined) {
     return {
       ...counts,

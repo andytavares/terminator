@@ -1497,7 +1497,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
                               ''}
                           </small>
                         </div>
-                        <span className="fdry-pill fdry-pill--work">Running</span>
+                        <span className="fdry-pill fdry-pill--work">{r.runState}</span>
                       </div>
                     </div>
                   </>

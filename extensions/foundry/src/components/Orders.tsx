@@ -236,6 +236,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
     // `started` is what the Forge reports the moment a run begins, so the
     // surface swaps without waiting for the list to be refetched.
     const running = status === 'running' || started === open
+    const hasRun = running || status === 'shipped'
     return (
       /* An open order is a frame, not a page: the way back at the top, the
          order in the middle scrolling inside it, the controls that end it at
@@ -253,9 +254,10 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
         >
           All orders
         </button>
-        {/* An order that is running is watched on the Floor; one that is still
+        {/* An order that has a run, shipped or not, is watched on the Floor, where its
+            open gates are answered; one that is still
             being agreed is worked on in the Forge. */}
-        {running ? (
+        {hasRun ? (
           <Floor orderId={open} />
         ) : (
           <Forge

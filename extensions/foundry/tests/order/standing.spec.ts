@@ -320,6 +320,38 @@ describe('standingOf', () => {
     expect(standing.turn).toBe('foundry')
   })
 
+  // After shipping, the draft pull request is open and its ready-for-review
+  // gate is waiting on the operator. "Nothing is left to do" hid it from every
+  // surface that reads the standing.
+  it('is your move when the order shipped and a gate is still open', () => {
+    const open = gate({
+      id: 'WO-1-ready-for-review-1',
+      rule: 'ready-for-review',
+      summary: 'Mark the draft pull request ready?',
+    })
+    const standing = standingOf(input({ status: 'shipped', gates: [open] }))
+    expect(standing.turn).toBe('you')
+    expect(standing.label).toBe('Mark the draft pull request ready?')
+    expect(standing.gateId).toBe('WO-1-ready-for-review-1')
+  })
+
+  it('stays done when the order shipped and its gate was answered', () => {
+    const answered = gate({ rule: 'ready-for-review' })
+    const standing = standingOf(
+      input({
+        status: 'shipped',
+        gates: [
+          {
+            ...answered,
+            decision: { by: 'you', at: '2026-09-09T19:00:00.000Z', verdict: 'approve' },
+          } as unknown as Gate,
+        ],
+      })
+    )
+    expect(standing.kind).toBe('done')
+    expect(standing.turn).toBe('foundry')
+  })
+
   // A running order with no graph on disk is not "0 of 0 steps": that reads as
   // finished. It has not started.
   it('does not read as finished when there is no graph', () => {

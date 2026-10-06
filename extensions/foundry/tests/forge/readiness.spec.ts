@@ -133,6 +133,23 @@ describe('readiness — holder and strip', () => {
     expect(result.strip.actions).toEqual(['open-run'])
   })
 
+  it('1. a shipped order is not described as running', () => {
+    const order = wo0928Order({ status: 'shipped', agreedAt: T1 })
+    const result = readiness(baseInput({ order, agreed: { at: T1, by: 'you' } }))
+    expect(result.strip.detail).toBe('Shipped with the Quick shape, 1 unit.')
+    expect(result.strip.detail).not.toContain('Running')
+    expect(result.runState).toBe('Shipped')
+  })
+
+  it('1. a cancelled order says cancelled, a running one says running', () => {
+    const cancelled = readiness(baseInput({ order: wo0928Order({ status: 'cancelled' }) }))
+    expect(cancelled.strip.detail).toBe('Cancelled with the Quick shape, 1 unit.')
+    expect(cancelled.runState).toBe('Cancelled')
+    const running = readiness(baseInput({ order: wo0928Order({ status: 'running' }) }))
+    expect(running.strip.detail).toBe('Running with the Quick shape, 1 unit.')
+    expect(running.runState).toBe('Running')
+  })
+
   it('1. handed off by you, uses agreed.at', () => {
     const order = wo0928Order({ status: 'agreed', agreedAt: T1 })
     const result = readiness(baseInput({ order, agreed: { at: T2, by: 'you' } }))
