@@ -123,7 +123,7 @@ export function GateCard({
           </b>
           <div className="fdry-gate-meta">
             {meta}
-            <span>{gradeInWords(gate.riskGrade)} risk</span>
+            <span>{gradeInWords(gate.riskGrade)}</span>
             <OrderLinks pulls={pulls} source={source} />
             <span className="fdry-gate-default">
               If nobody answers: {defaultInWords(gate)}

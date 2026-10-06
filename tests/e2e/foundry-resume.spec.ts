@@ -427,9 +427,18 @@ test('the Floor carries the same move, above the graph', async () => {
   // gate is held, which is a different screen. This assertion predates that
   // ordering.
   expect(text, `the Floor rendered:\n${text}`).toContain('Halted — your move')
+  // A gate is one line until it is opened; its reason is behind the chevron.
+  expect(
+    await inFoundry<boolean>(`(function () {
+      var b = document.querySelector('button[aria-label="Show the reason"]')
+      if (!b) return false
+      b.click(); return true
+    })()`),
+    'no collapsed gate to open'
+  ).toBe(true)
   // The interrupted gate's own words, so this proves the resume band rendered
   // rather than any halt at any gate.
-  expect(text).toContain('Nothing is moving this run')
+  await expect.poll(() => bodyText(), { timeout: 5_000 }).toContain('Nothing is moving this run')
   expect(text).toContain('builder · U-1 refresh the token on a 401')
   expect(text).toContain('Pick it back up')
 

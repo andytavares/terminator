@@ -164,4 +164,10 @@ describe('raising a budget from the card', () => {
     expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Raise the budget' })).toBeTruthy()
   })
+
+  it('names the grade once, in words', () => {
+    const { container } = render(<GateCard gate={gate({ riskGrade: 'P2' })} onDecide={vi.fn()} />)
+    expect(container.textContent).toContain('ordinary risk')
+    expect(container.textContent).not.toContain('risk risk')
+  })
 })

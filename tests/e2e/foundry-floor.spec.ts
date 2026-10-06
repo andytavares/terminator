@@ -145,7 +145,7 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
     return h && h.closest('section') ? h.closest('section').innerText : ''
   })()`
     )
-  await expect.poll(band, { timeout: 15_000 }).toContain('Round 1 of 2')
+  await expect.poll(band, { timeout: 15_000 }).toContain('Fix 1 of 2')
   expect(await band()).toContain('Test')
 
   await captureFoundry(handle, 'floor-ci.png')

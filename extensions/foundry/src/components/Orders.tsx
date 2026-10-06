@@ -530,7 +530,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
                   <b>{row.title}</b>
                   <small>
                     {row.id} · {statusInWords(row.status as OrderStatus)} ·{' '}
-                    {gradeInWords(row.risk as RiskGrade)} risk
+                    {gradeInWords(row.risk as RiskGrade)}
                     {row.source.key !== null ? ` · ${row.source.tracker} ${row.source.key}` : ''}
                   </small>
                 </span>
