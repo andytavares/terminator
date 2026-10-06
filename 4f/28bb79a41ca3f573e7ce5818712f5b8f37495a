@@ -1,0 +1,41 @@
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_e6b0138361e070::t_71a51569ba6b03 3,61,67,71,255-288
+  s_e6b0138361e070::t_2e9326ee8067ff 289-290
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_e6b0138361e070::t_74363e0fb9d514 228-237,321
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_e6b0138361e070::t_71a51569ba6b03 125-151
+extensions/git-integration/src/review-command.ts
+  s_e6b0138361e070::t_542a88b3aa6ac6 38-45
+extensions/git-integration/tests/unit/ReviewSubmitPanel.spec.tsx
+  s_e6b0138361e070::t_71a51569ba6b03 83-104
+extensions/git-integration/src/index.ts
+  s_e6b0138361e070::t_542a88b3aa6ac6 9,72
+extensions/git-integration/src/components/pr-review/ReviewSubmitPanel.tsx
+  s_e6b0138361e070::t_cbad1dba3bea9d 11,16-23,55-58
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_e6b0138361e070::t_0542f7837e6b4d 951-972
+extensions/git-integration/tests/unit/review-command.spec.ts
+  s_e6b0138361e070::t_afbaf8706d5bf1 3-7,75-91
+  s_e6b0138361e070::t_af7b2e79a22490 92-93
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_e6b0138361e070::t_74363e0fb9d514 39,52,493
+extensions/git-integration/src/components/pr-review/ReviewDashboard.tsx
+  s_e6b0138361e070::t_74363e0fb9d514 266-270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4f28bb79a41ca3f573e7ce5818712f5b8f37495a",
+  "prompts": {},
+  "sessions": {
+    "s_e6b0138361e070": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "974a24d0-f11c-4acf-8158-afff495d008a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
