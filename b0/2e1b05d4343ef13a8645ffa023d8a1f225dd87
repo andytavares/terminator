@@ -1,0 +1,19 @@
+docs/user-guide/USER-GUIDE.md
+  s_71a39504a89e7e::t_810a79a4c0d5a7 561
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b02e1b05d4343ef13a8645ffa023d8a1f225dd87",
+  "prompts": {},
+  "sessions": {
+    "s_71a39504a89e7e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec9314a5-ad73-4edf-8e6a-62a7e6985ed7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
