@@ -11,6 +11,7 @@ import {
   classifyHunk,
   extractIssueRefs,
   detectDryViolations,
+  parseDiff,
 } from '../../src/github/pr-review-service'
 import { ReviewSessionSchema } from '../../src/schemas/pr-review.schema'
 import type { PrChangedFile, ReviewSession, FileMetrics } from '../../src/schemas/pr-review.schema'
@@ -1020,5 +1021,49 @@ describe('enrichIssueRefs — no tracker available', () => {
     // An older host has no api.issues; the review view must render exactly as
     // it always did rather than failing.
     await expect(enrichIssueRefs(refs, undefined)).resolves.toEqual(refs)
+  })
+})
+
+describe('parseDiff', () => {
+  const head = 'diff --git a/x b/x\n--- a/x\n+++ b/x\n'
+
+  const flat = (raw: string) =>
+    parseDiff(raw, 'x').hunks.flatMap((h) =>
+      h.lines.map((l) => [l.type, l.content, l.oldLineNumber, l.newLineNumber])
+    )
+
+  it('drops the "No newline at end of file" marker and the trailing empty element', () => {
+    const raw = `${head}@@ -1,2 +1,2 @@\n a\n-b\n+c\n\\ No newline at end of file\n`
+    expect(flat(raw)).toEqual([
+      ['context', 'a', 1, 1],
+      ['remove', 'b', 2, null],
+      ['add', 'c', null, 2],
+    ])
+  })
+
+  it('does not add an empty line after the final newline', () => {
+    const raw = `${head}@@ -1,2 +1,2 @@\n a\n-b\n+c\n`
+    expect(flat(raw)).toHaveLength(3)
+  })
+
+  it('keeps a genuinely blank context line (a single space) mid-hunk', () => {
+    const raw = `${head}@@ -1,3 +1,3 @@\n a\n \n-b\n+c\n`
+    expect(flat(raw)).toEqual([
+      ['context', 'a', 1, 1],
+      ['context', '', 2, 2],
+      ['remove', 'b', 3, null],
+      ['add', 'c', null, 3],
+    ])
+  })
+
+  it('numbers a second hunk from its own header', () => {
+    const raw = `${head}@@ -1,1 +1,1 @@\n a\n@@ -10,2 +20,2 @@\n-x\n+y\n z\n`
+    const hunks = parseDiff(raw, 'x').hunks
+    expect(hunks).toHaveLength(2)
+    expect(hunks[1].lines.map((l) => [l.oldLineNumber, l.newLineNumber])).toEqual([
+      [10, null],
+      [null, 20],
+      [11, 21],
+    ])
   })
 })
