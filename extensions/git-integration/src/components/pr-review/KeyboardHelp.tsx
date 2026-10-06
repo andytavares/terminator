@@ -8,6 +8,7 @@ interface Props {
 const ROWS: Array<{ keys: string[]; label: string }> = [
   { keys: ['k', 'j'], label: 'Next / previous hunk' },
   { keys: [']', '['], label: 'Next / previous file' },
+  { keys: ['}', '{'], label: 'Next / previous chapter' },
   { keys: ['n'], label: 'Next unviewed' },
   { keys: ['v'], label: 'Mark file viewed' },
   { keys: ['s'], label: 'Since my review / whole PR' },

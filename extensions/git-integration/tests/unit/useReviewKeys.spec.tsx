@@ -22,6 +22,8 @@ describe('useReviewKeys', () => {
   let handlers: {
     nextFile: ReturnType<typeof vi.fn>
     prevFile: ReturnType<typeof vi.fn>
+    nextChapter: ReturnType<typeof vi.fn>
+    prevChapter: ReturnType<typeof vi.fn>
     nextUnviewedFile: ReturnType<typeof vi.fn>
     markViewed: ReturnType<typeof vi.fn>
     toggleInsights: ReturnType<typeof vi.fn>
@@ -32,6 +34,8 @@ describe('useReviewKeys', () => {
     handlers = {
       nextFile: vi.fn(),
       prevFile: vi.fn(),
+      nextChapter: vi.fn(),
+      prevChapter: vi.fn(),
       nextUnviewedFile: vi.fn(),
       markViewed: vi.fn(),
       toggleInsights: vi.fn(),
@@ -72,6 +76,29 @@ describe('useReviewKeys', () => {
     expect(handlers.prevFile).toHaveBeenCalledTimes(1)
     expect(handlers.nextUnviewedFile).toHaveBeenCalledTimes(1)
     expect(handlers.markViewed).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls nextChapter on } and prevChapter on {', () => {
+    render(<TestHarness handlers={handlers} />)
+    fireKey('}', { shiftKey: true })
+    expect(handlers.nextChapter).toHaveBeenCalledTimes(1)
+    expect(handlers.prevChapter).not.toHaveBeenCalled()
+    fireKey('{', { shiftKey: true })
+    expect(handlers.prevChapter).toHaveBeenCalledTimes(1)
+    expect(handlers.nextFile).not.toHaveBeenCalled()
+  })
+
+  it('binds the window listener once across rerenders and calls the latest handlers', () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    const { rerender } = render(<TestHarness handlers={handlers} />)
+    const newer = { ...handlers, nextFile: vi.fn() }
+    rerender(<TestHarness handlers={newer} />)
+    rerender(<TestHarness handlers={{ ...newer }} />)
+    expect(addSpy.mock.calls.filter(([type]) => type === 'keydown')).toHaveLength(1)
+    fireKey(']')
+    expect(newer.nextFile).toHaveBeenCalledTimes(1)
+    expect(handlers.nextFile).not.toHaveBeenCalled()
+    addSpy.mockRestore()
   })
 
   it('toggles diffRange on s and comment visibility on c', () => {

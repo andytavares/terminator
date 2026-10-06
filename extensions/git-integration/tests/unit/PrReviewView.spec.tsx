@@ -101,6 +101,7 @@ const mockPr = {
   chapters: [mockChapter],
 }
 
+const mockMarkFilesViewed = vi.fn()
 const mockClose = vi.fn()
 const mockRefresh = vi.fn().mockResolvedValue(undefined)
 
@@ -113,6 +114,7 @@ function setupStore(overrides: Record<string, unknown> = {}) {
     viewedFiles: new Set<string>(),
     fileOrderOverrides: {},
     markFileViewed: mockMarkFileViewed,
+    markFilesViewed: mockMarkFilesViewed,
     setPaused: mockSetPaused,
     changedSince: new Set<string>(),
     lastAccessedAt: null,
@@ -275,6 +277,29 @@ describe('PrReviewView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Finish chapter ↵' }))
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
     expect(screen.queryByTestId('submit-panel')).toBeNull()
+  })
+
+  it('finishing a chapter marks its unviewed files in one batch', async () => {
+    const file2 = { ...mockFile, path: 'src/bar.ts' }
+    const file3 = { ...mockFile, path: 'src/baz.ts' }
+    const chapter = { ...mockChapter, files: [mockFile, file2, file3] }
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentFilePath: 'src/baz.ts', viewedFiles: new Set(['src/bar.ts']) })
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={{ ...mockPr, chapters: [chapter] }}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Finish review ↵' }))
+    expect(mockMarkFilesViewed).toHaveBeenCalledTimes(1)
+    expect(mockMarkFilesViewed).toHaveBeenCalledWith('/repo', 1, 'abc', [
+      'src/foo.ts',
+      'src/baz.ts',
+    ])
+    expect(mockMarkFileViewed).not.toHaveBeenCalled()
   })
 
   it('calls markFileViewed and advances file on MarkViewed', async () => {
@@ -483,6 +508,106 @@ describe('PrReviewView', () => {
       expect(Number(bar.getAttribute('aria-valuenow'))).toBeLessThanOrEqual(
         Number(bar.getAttribute('aria-valuemax'))
       )
+    })
+  })
+
+  describe('chapter keyboard navigation', () => {
+    const f = (path: string) => ({ ...mockFile, path })
+    const chapters = [
+      { ...mockChapter, id: 'ch-1', name: 'One', files: [f('a.ts'), f('b.ts')] },
+      { ...mockChapter, id: 'ch-2', name: 'Two', files: [f('c.ts'), f('d.ts')] },
+      { ...mockChapter, id: 'ch-3', name: 'Three', files: [f('e.ts')] },
+    ]
+    const press = (key: string) => fireEvent.keyDown(window, { key })
+
+    it('} selects the next chapter and its first file', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
+      press('}')
+      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    })
+
+    it('{ selects the previous chapter and its first file', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
+      press('{')
+      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    })
+
+    it('chapter keys do not wrap at the ends', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
+      press('{')
+      expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+      expect(mockSetCurrentFile).not.toHaveBeenCalled()
+    })
+
+    it('chapter keys do not wrap past the last chapter', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
+      press('}')
+      expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+    })
+
+    it('} respects the file order override of the target chapter', async () => {
+      await renderView(
+        { chapters },
+        {
+          currentChapterId: 'ch-1',
+          currentFilePath: 'a.ts',
+          fileOrderOverrides: { 'ch-2': ['d.ts', 'c.ts'] },
+        }
+      )
+      press('}')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('d.ts')
+    })
+
+    it('] crosses into the next chapter from the last file of a chapter (Files view)', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
+      press(']')
+      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    })
+
+    it('] stays in the chapter and does not switch it mid-chapter', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'a.ts' })
+      press(']')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
+      expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+    })
+
+    it('] crosses chapters in the Chapters view too', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
+      fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
+      press(']')
+      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    })
+
+    it('[ crosses back to the last file of the previous chapter', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
+      press('[')
+      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-1')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
+    })
+
+    it('] and [ stop at the first and last files of the whole PR', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-3', currentFilePath: 'e.ts' })
+      press(']')
+      expect(mockSetCurrentFile).not.toHaveBeenCalled()
+    })
+
+    it('marking the last file of a chapter viewed advances into the next chapter', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-1', currentFilePath: 'b.ts' })
+      fireEvent.click(screen.getByText('MarkViewed'))
+      expect(mockMarkFileViewed).toHaveBeenCalledWith('/repo', 1, 'abc', 'b.ts')
+      expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+      expect(mockSetCurrentFile).toHaveBeenCalledWith('c.ts')
+    })
+
+    it('shows "Chapter 2 of 3" in the Chapters view only', async () => {
+      await renderView({ chapters }, { currentChapterId: 'ch-2', currentFilePath: 'c.ts' })
+      expect(screen.queryByText('Chapter 2 of 3')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Chapters' }))
+      expect(screen.getByText('Chapter 2 of 3')).toBeTruthy()
     })
   })
 })

@@ -27,6 +27,7 @@ describe('KeyboardHelp', () => {
     expect(screen.getByText('Keyboard')).toBeTruthy()
     expect(screen.getByText('Next / previous hunk')).toBeTruthy()
     expect(screen.getByText('Next / previous file')).toBeTruthy()
+    expect(screen.getByText('Next / previous chapter')).toBeTruthy()
     expect(screen.getByText('Submit review')).toBeTruthy()
     expect(screen.getByText('Peek definition')).toBeTruthy()
   })

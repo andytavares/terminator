@@ -4,6 +4,8 @@ import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../stores/review-ui.store'
 export interface ReviewKeyHandlers {
   nextFile(): void
   prevFile(): void
+  nextChapter(): void
+  prevChapter(): void
   nextUnviewedFile(): void
   markViewed(): void
   toggleFileList?(): void
@@ -27,6 +29,10 @@ function isEditableTarget(target: EventTarget | null): boolean {
  */
 export function useReviewKeys(handlers: ReviewKeyHandlers): void {
   const gPressedAtRef = useRef<number | null>(null)
+  const handlersRef = useRef(handlers)
+  useEffect(() => {
+    handlersRef.current = handlers
+  })
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -36,7 +42,7 @@ export function useReviewKeys(handlers: ReviewKeyHandlers): void {
       const isCmdEnter = (e.metaKey || e.ctrlKey) && e.key === 'Enter'
       if (isCmdEnter) {
         e.preventDefault()
-        handlers.openSubmit()
+        handlersRef.current.openSubmit()
         return
       }
 
@@ -58,6 +64,7 @@ export function useReviewKeys(handlers: ReviewKeyHandlers): void {
       gPressedAtRef.current = null
 
       const ui = useReviewUiStore.getState()
+      const handlers = handlersRef.current
 
       switch (key) {
         case 'k':
@@ -71,6 +78,12 @@ export function useReviewKeys(handlers: ReviewKeyHandlers): void {
           return
         case '[':
           handlers.prevFile()
+          return
+        case '}':
+          handlers.nextChapter()
+          return
+        case '{':
+          handlers.prevChapter()
           return
         case 'n':
           handlers.nextUnviewedFile()
@@ -116,5 +129,5 @@ export function useReviewKeys(handlers: ReviewKeyHandlers): void {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handlers])
+  }, [])
 }

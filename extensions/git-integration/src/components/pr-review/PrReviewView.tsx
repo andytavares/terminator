@@ -19,7 +19,7 @@ import { useAgentRuns } from '../../hooks/useAgentRuns'
 import { useReviewKeys } from '../../hooks/useReviewKeys'
 import { QUEUE_RISK_HIGH_LINES } from '../../github/pr-review-service'
 import { useResizePanel } from '../../hooks/useResizePanel'
-import type { PrReviewDetail, PrChangedFile } from '../../schemas/pr-review.schema'
+import type { PrReviewDetail, PrChangedFile, Chapter } from '../../schemas/pr-review.schema'
 import './review-chrome.css'
 
 /** S1 banner info, computed by PrReviewTab from a prCompare against the stored session's head. */
@@ -60,6 +60,7 @@ export function PrReviewView({
     viewedFiles,
     fileOrderOverrides,
     markFileViewed,
+    markFilesViewed,
     setPaused,
     currentUserLogin,
     changedSince,
@@ -175,18 +176,36 @@ export function PrReviewView({
     loadInlineComments()
   }, [pr.number, loadInlineComments])
 
+  const orderedFilesOf = (chapter: Chapter): PrChangedFile[] => {
+    const overrideOrder = fileOrderOverrides[chapter.id]
+    return overrideOrder
+      ? overrideOrder
+          .map((p) => chapter.files.find((f) => f.path === p))
+          .filter((f): f is PrChangedFile => !!f)
+      : chapter.files
+  }
+
   const handleSelectChapter = (id: string) => {
     setCurrentChapter(id)
     const chapter = displayPr.chapters.find((c) => c.id === id)
-    if (chapter) {
-      const overrideOrder = fileOrderOverrides[chapter.id]
-      const files = overrideOrder
-        ? overrideOrder
-            .map((p) => chapter.files.find((f) => f.path === p))
-            .filter((f): f is PrChangedFile => !!f)
-        : chapter.files
-      setCurrentFile(files[0]?.path ?? null)
-    }
+    if (chapter) setCurrentFile(orderedFilesOf(chapter)[0]?.path ?? null)
+  }
+
+  const stepChapter = (delta: 1 | -1) => {
+    const target = displayPr.chapters[activeChapterIndex + delta]
+    if (target) handleSelectChapter(target.id)
+  }
+
+  // Every displayed file in review order, each tagged with its chapter.
+  const stepFile = (delta: 1 | -1) => {
+    const all = displayPr.chapters.flatMap((c) =>
+      orderedFilesOf(c).map((f) => ({ chapterId: c.id, path: f.path }))
+    )
+    const at = all.findIndex((e) => e.chapterId === activeChapterId && e.path === activeFile?.path)
+    const target = all[at + delta]
+    if (at < 0 || !target) return
+    if (target.chapterId !== activeChapterId) setCurrentChapter(target.chapterId)
+    setCurrentFile(target.path)
   }
 
   const handleSelectFile = (path: string) => {
@@ -204,21 +223,12 @@ export function PrReviewView({
   const handleMarkViewed = () => {
     if (!activeFile) return
     markFileViewed(repoRoot, pr.number, pr.headSHA, activeFile.path)
-    const nextIndex = resolvedIndex + 1
-    if (nextIndex < orderedFiles.length) {
-      setCurrentFile(orderedFiles[nextIndex].path)
-    }
+    stepFile(1)
   }
 
-  const handlePrevFile = () => {
-    const prevIndex = resolvedIndex - 1
-    if (prevIndex >= 0) setCurrentFile(orderedFiles[prevIndex].path)
-  }
+  const handlePrevFile = () => stepFile(-1)
 
-  const handleNextFile = () => {
-    const nextIndex = resolvedIndex + 1
-    if (nextIndex < orderedFiles.length) setCurrentFile(orderedFiles[nextIndex].path)
-  }
+  const handleNextFile = () => stepFile(1)
 
   const handleNextUnviewedFile = () => {
     const allFiles = displayPr.chapters.flatMap((c) => c.files.map((f) => ({ chapterId: c.id, f })))
@@ -235,11 +245,12 @@ export function PrReviewView({
 
   const handleFinishChapter = () => {
     if (!activeChapter) return
-    orderedFiles.forEach((f) => {
-      if (!viewedFiles.has(f.path)) {
-        markFileViewed(repoRoot, pr.number, pr.headSHA, f.path)
-      }
-    })
+    markFilesViewed(
+      repoRoot,
+      pr.number,
+      pr.headSHA,
+      orderedFiles.map((f) => f.path).filter((path) => !viewedFiles.has(path))
+    )
     const chapterIndex = displayPr.chapters.findIndex((c) => c.id === activeChapterId)
     const nextChapter = displayPr.chapters[chapterIndex + 1]
     if (nextChapter) {
@@ -266,6 +277,8 @@ export function PrReviewView({
   useReviewKeys({
     nextFile: handleNextFile,
     prevFile: handlePrevFile,
+    nextChapter: () => stepChapter(1),
+    prevChapter: () => stepChapter(-1),
     nextUnviewedFile: handleNextUnviewedFile,
     markViewed: handleMarkViewed,
     toggleInsights: () => (onShowOverview ? onShowOverview() : undefined),
@@ -298,9 +311,14 @@ export function PrReviewView({
           <span className="pr-review-chapter-name">Files</span>
         )}
         {viewMode === 'guided' && activeChapter && (
-          <span className="pr-review-chapter-count">
-            {viewedInActiveChapter}/{orderedFiles.length}
-          </span>
+          <>
+            <span className="pr-review-chapter-count">
+              Chapter {activeChapterIndex + 1} of {displayPr.chapters.length}
+            </span>
+            <span className="pr-review-chapter-count">
+              {viewedInActiveChapter}/{orderedFiles.length}
+            </span>
+          </>
         )}
       </div>
       {viewMode === 'guided' && activeChapter ? (
