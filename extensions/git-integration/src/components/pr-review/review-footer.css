@@ -13,6 +13,8 @@
   border-top: 1px solid var(--tm-border);
   font: 13px/1.45 var(--tm-font-ui);
   color: var(--tm-text-primary);
+  white-space: nowrap;
+  container-type: inline-size;
 }
 
 .rf-btn {
@@ -27,6 +29,7 @@
   color: var(--tm-text-primary);
   font: 13px/1 var(--tm-font-ui);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .rf-btn svg {
@@ -54,8 +57,41 @@
 .rf-hint {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
   color: var(--tm-text-muted);
+}
+
+.rf-hint-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rf-short {
+  display: none;
+}
+
+/* The buttons never wrap; the key hints give way first, then the long label. */
+@container (max-width: 860px) {
+  .rf-hint-group--nav {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
+  .rf-hint {
+    display: none;
+  }
+
+  .rf-long {
+    display: none;
+  }
+
+  .rf-short {
+    display: inline;
+  }
 }
 
 .rf-kbd {

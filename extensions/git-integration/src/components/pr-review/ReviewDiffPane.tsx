@@ -1418,8 +1418,10 @@ export function ReviewDiffPane({
                     <tbody>
                       <tr>
                         <td colSpan={5} className="diff-hunk-header rs-hunk-anchor">
-                          {hunk.header}
-                          {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
+                          <div className="rs-hunk-bar">
+                            <span className="rs-hunk-bar__text">{hunk.header}</span>
+                            {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
+                          </div>
                         </td>
                       </tr>
                       {hunk.lines.map((line, li) => {
@@ -1472,8 +1474,10 @@ export function ReviewDiffPane({
                 ) : (
                   <div className="diff-split-hunk">
                     <div className="diff-split-header rs-hunk-anchor">
-                      {hunk.header}
-                      {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
+                      <div className="rs-hunk-bar">
+                        <span className="rs-hunk-bar__text">{hunk.header}</span>
+                        {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
+                      </div>
                     </div>
                     {buildSplitRows(hunk.lines).map((row, ri) => {
                       const leftLine = row.kind === 'context' ? row.line : row.oldLine

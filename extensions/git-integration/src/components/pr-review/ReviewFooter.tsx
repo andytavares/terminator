@@ -46,16 +46,24 @@ export function ReviewFooter({
         </button>
       ) : (
         <span className="rf-hint">
-          <kbd className="rf-kbd">[</kbd>
-          <kbd className="rf-kbd">]</kbd>
-          <span>files</span>
-          <kbd className="rf-kbd">j</kbd>
-          <kbd className="rf-kbd">k</kbd>
-          <span>hunks</span>
-          <kbd className="rf-kbd">v</kbd>
-          <span>viewed</span>
-          <kbd className="rf-kbd">?</kbd>
-          <span>all keys</span>
+          <span className="rf-hint-group rf-hint-group--nav">
+            <kbd className="rf-kbd">[</kbd>
+            <kbd className="rf-kbd">]</kbd>
+            <span>files</span>
+          </span>
+          <span className="rf-hint-group rf-hint-group--nav">
+            <kbd className="rf-kbd">j</kbd>
+            <kbd className="rf-kbd">k</kbd>
+            <span>hunks</span>
+          </span>
+          <span className="rf-hint-group rf-hint-group--nav">
+            <kbd className="rf-kbd">v</kbd>
+            <span>viewed</span>
+          </span>
+          <span className="rf-hint-group">
+            <kbd className="rf-kbd">?</kbd>
+            <span>all keys</span>
+          </span>
         </span>
       )}
 
@@ -75,8 +83,14 @@ export function ReviewFooter({
           {isLastChapter ? 'Finish review ↵' : 'Finish chapter ↵'}
         </button>
       ) : (
-        <button type="button" className="rf-btn rf-pri" onClick={onMarkViewed}>
-          Mark viewed, go to next
+        <button
+          type="button"
+          className="rf-btn rf-pri"
+          onClick={onMarkViewed}
+          aria-label="Mark viewed, go to next"
+        >
+          <span className="rf-long">Mark viewed, go to next</span>
+          <span className="rf-short">Next</span>
         </button>
       )}
 

@@ -14,8 +14,22 @@
   background: var(--tm-bg-elevated);
   flex-shrink: 0;
   white-space: nowrap;
-  overflow: hidden;
   container-type: inline-size;
+  /* Not overflow: hidden. The View and Uses menus open below this bar, so it
+     must not clip them; clipping also let focus scroll the bar's contents up.
+     container-type makes this a stacking context, so it takes the overlay
+     layer: the diff's resize handle and comment markers sit on the panel layer
+     and come later in the page, so they would otherwise draw over the menus. */
+  position: relative;
+  z-index: var(--tm-layer-overlay);
+}
+
+.rs-fh > * {
+  flex-shrink: 0;
+}
+
+.rs-fh > .rs-p {
+  flex-shrink: 1;
 }
 
 .rs-fh .rs-p {
