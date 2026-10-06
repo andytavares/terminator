@@ -1,0 +1,25 @@
+docs/user-guide/USER-GUIDE.md
+  s_71a39504a89e7e::t_583a42a0de8873 568
+extensions/git-integration/src/hooks/useReviewKeys.ts
+  s_71a39504a89e7e::t_583a42a0de8873 63,66
+extensions/git-integration/src/components/pr-review/KeyboardHelp.tsx
+  s_71a39504a89e7e::t_583a42a0de8873 9
+extensions/git-integration/tests/unit/useReviewKeys.spec.tsx
+  s_71a39504a89e7e::t_a613d236f21192 49,57-58,60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1379cee044568d37d75f3f2bac2b9d2f080468f6",
+  "prompts": {},
+  "sessions": {
+    "s_71a39504a89e7e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec9314a5-ad73-4edf-8e6a-62a7e6985ed7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
