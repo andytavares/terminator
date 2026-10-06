@@ -1907,6 +1907,19 @@
   gap: 8px;
 }
 
+/* The list item is the card, so the links and answers below the door sit
+   inside it rather than hanging under it. */
+.fdry-orders > li {
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+
+.fdry-orders > li:hover {
+  background: var(--tm-bg-card-hover);
+}
+
 .fdry-orders .fdry-order-open {
   appearance: none;
   width: 100%;
@@ -1915,16 +1928,11 @@
   gap: 12px;
   align-items: center;
   text-align: left;
-  background: var(--tm-bg-card);
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-md);
+  background: transparent;
+  border: 0;
   padding: 11px 14px;
   cursor: pointer;
   color: inherit;
-}
-
-.fdry-orders .fdry-order-open:hover {
-  background: var(--tm-bg-card-hover);
 }
 
 .fdry-order-mark svg {
@@ -1976,7 +1984,14 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 6px 14px 0;
+  /* Under the title: the mark's 20px column and the 12px gap, then the row's
+     own 14px inset. */
+  padding: 0 14px 10px 46px;
+  margin-top: -4px;
+}
+
+.fdry-order-extras .fdry-order-links {
+  margin: 0;
 }
 
 .fdry-order-links {

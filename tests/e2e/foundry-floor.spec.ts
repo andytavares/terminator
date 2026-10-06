@@ -36,7 +36,7 @@ test.afterAll(async () => {
   rmSync(repo, { recursive: true, force: true, maxRetries: 5 })
 })
 
-async function openOrderRow(id: string): Promise<void> {
+async function openOrderRow(id: string, listShot?: string): Promise<string> {
   expect(await clickByName(handle, 'button', 'Forge')).toBe(true)
   await expect
     .poll(() => bodyText(handle), { timeout: 15_000 })
@@ -58,6 +58,8 @@ async function openOrderRow(id: string): Promise<void> {
       { timeout: 15_000 }
     )
     .toBe(true)
+  if (listShot !== undefined) await captureFoundry(handle, listShot)
+  const list = await bodyText(handle)
   const opened = await inFoundry<boolean>(
     handle,
     `(function () {
@@ -72,6 +74,7 @@ async function openOrderRow(id: string): Promise<void> {
   })()`
   )
   expect(opened, `no row for ${id} in the Forge`).toBe(true)
+  return list
 }
 
 test('a draft’s CI is on the Floor while it is watched', async () => {
@@ -113,6 +116,20 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
       nodes: [node('build:lane-1', 'fanout', 'builder', 1), node('ship', 'gate', null, null)],
     })
   )
+  // The draft this run opened, as shipping records it.
+  writeFileSync(
+    join(dir, 'pulls.json'),
+    JSON.stringify([
+      {
+        lane: 1,
+        repo: 'r',
+        cwd: repo,
+        branch: 'foundry/ci-watched',
+        url: 'https://github.com/o/r/pull/7',
+        bodyPath: join(dir, 'pull-request-lane-1.md'),
+      },
+    ])
+  )
   const link = (run: number) => `https://github.com/o/r/actions/runs/${run}/job/1`
   writeFileSync(
     join(dir, 'ci.json'),
@@ -135,7 +152,11 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
     })
   )
 
-  await openOrderRow(id)
+  // The order's row says the same as its Floor before it is opened: the pull
+  // request, and the CI round with a spinner while the checks run.
+  const list = await openOrderRow(id, 'order-list-ci.png')
+  expect(list).toContain('#7')
+  expect(list).toContain('Fix 1 of 2')
 
   const band = () =>
     inFoundry<string>(
