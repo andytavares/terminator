@@ -3,6 +3,8 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { seedOrder, houseDocsIn, newOrderId, pathsNamedIn } from '../../src/forge/intake-source.js'
+import { applyProposal, parseProposal } from '../../src/order/proposal.js'
+import { branchFor } from '../../src/line/worktree.js'
 import type { SeedDeps } from '../../src/forge/intake-source.js'
 
 // Scout runs before the operator is asked anything (FR-002). By the time a
@@ -110,6 +112,18 @@ describe('seedOrder from a tracker issue', () => {
     branchName: 'andrew/tav-42-row-clipping',
   }
 
+  it("still pushes to the ticket's branch after an architect blanks the lane branch", async () => {
+    const r = await seedOrder(
+      { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
+      deps({ readIssue: vi.fn(async () => issue) })
+    )
+    if (!('order' in r)) throw new Error('expected an order')
+    const lane = r.order.plan.lanes[0]
+    const proposal = parseProposal({ plan: { lanes: [{ ...lane, branch: '' }] } })
+    const converged = applyProposal(r.order, proposal, '2026-09-06T12:00:00.000Z')
+    expect(branchFor(converged, lane.ord)).toBe('andrew/tav-42-row-clipping')
+  })
+
   it('seeds title, intent and provenance from the issue', async () => {
     const r = await seedOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
@@ -123,6 +137,7 @@ describe('seedOrder from a tracker issue', () => {
       tracker: 'linear',
       key: 'TAV-42',
       url: issue.url,
+      branch: issue.branchName,
     })
   })
 

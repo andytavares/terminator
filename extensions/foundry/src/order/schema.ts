@@ -34,6 +34,9 @@ const SourceSchema = z.object({
   tracker: z.enum(['linear', 'jira']).nullable().default(null),
   key: z.string().nullable().default(null),
   url: z.string().nullable().default(null),
+  // The tracker's own branch name. Kept here because the plan's lanes are the
+  // architect's to rewrite, and the ticket's branch is not.
+  branch: z.string().optional(),
 })
 
 const IntentSchema = z.object({

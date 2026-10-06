@@ -78,6 +78,16 @@ describe('which branch a lane works on', () => {
     expect(branchFor(withBranch, 1)).toBe('andrew/tav-42-refuse-expired')
   })
 
+  it("prefers the ticket's branch on the source over the lane's", () => {
+    const seeded = order()
+    const withSource: WorkOrder = {
+      ...seeded,
+      source: { ...seeded.source, branch: 'andrew/tav-15-ticket' },
+      plan: { ...seeded.plan, lanes: [{ ...seeded.plan.lanes[0], branch: '' }] },
+    }
+    expect(branchFor(withSource, 1)).toBe('andrew/tav-15-ticket')
+  })
+
   it('falls back to the repository own head branch', () => {
     const seeded = order()
     const withHead: WorkOrder = {

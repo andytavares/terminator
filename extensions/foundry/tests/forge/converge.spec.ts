@@ -55,6 +55,26 @@ afterEach(() => {
 })
 
 describe('what the architect is told', () => {
+  it('shows a lane branch the ticket fixed, and says to keep it', () => {
+    const base = order()
+    const fixed: WorkOrder = {
+      ...base,
+      plan: {
+        ...base.plan,
+        lanes: [{ ...base.plan.lanes[0], branch: 'andrew/tav-15-the-ticket' }],
+      },
+    }
+    const plan = convergeBrief({ order: fixed, root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('"branch": "andrew/tav-15-the-ticket"')
+    expect(plan.prompt).toContain('fixed by the ticket')
+  })
+
+  it('leaves the branch blank in the template when nothing fixed one', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('"branch": ""')
+    expect(plan.prompt).not.toContain('fixed by the ticket')
+  })
+
   it('tells the architect to decide what it is 90% sure of rather than ask', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('90%')

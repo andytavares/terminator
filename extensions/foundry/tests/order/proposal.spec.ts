@@ -250,3 +250,28 @@ describe('what an agent read, as opposed to what Foundry measured', () => {
     expect(after.context.conventions).toEqual(before.context.conventions)
   })
 })
+
+describe('a lane branch the ticket fixed', () => {
+  const lane = { ord: 1, repo: 'app', branch: '', role: null, blocks: [], blockedBy: [] }
+
+  function seeded(): WorkOrder {
+    const base = order()
+    return {
+      ...base,
+      plan: { ...base.plan, lanes: [{ ...lane, repo: '/repos/app', branch: 'andrew/tav-15-x' }] },
+    }
+  }
+
+  it('survives a proposal whose lane leaves the branch empty', () => {
+    const proposal = parseProposal({ plan: { lanes: [{ ...lane, repo: '/repos/app' }] } })
+    const next = applyProposal(seeded(), proposal, NOW)
+    expect(next.plan.lanes[0].branch).toBe('andrew/tav-15-x')
+  })
+
+  it('yields to a branch the proposal actually names', () => {
+    const proposal = parseProposal({
+      plan: { lanes: [{ ...lane, repo: '/repos/app', branch: 'other' }] },
+    })
+    expect(applyProposal(seeded(), proposal, NOW).plan.lanes[0].branch).toBe('other')
+  })
+})

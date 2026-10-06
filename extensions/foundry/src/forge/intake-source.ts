@@ -186,6 +186,7 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
 
   const seeded: WorkOrder = {
     ...order,
+    source: branchName !== null ? { ...order.source, branch: branchName } : order.source,
     intent: { ...order.intent, problem, outcome },
     acceptance,
     context: { ...order.context, toolchain, houseDocs, priorArt },
