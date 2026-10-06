@@ -885,7 +885,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             </p>
           )}
           {view.ci.pulls.map((pull) => (
-            <ExternalLink key={pull.url} href={pull.url}>
+            <ExternalLink key={pull.url} href={pull.url} className="fdry-ci-pull">
               Pull request #{pullNumber(pull.url)}
             </ExternalLink>
           ))}

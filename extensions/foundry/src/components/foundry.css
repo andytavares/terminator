@@ -3332,6 +3332,13 @@
   color: var(--tm-text-primary);
 }
 
+.fdry-ci-pull {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--tm-accent-text);
+  font-size: 12px;
+}
+
 .fdry-ci-bucket {
   padding: 1px 6px;
   border: 1px solid var(--tm-border);
@@ -3735,12 +3742,25 @@
    and wrapping rather than clipping them. */
 .fdry-card--gate {
   width: min(360px, 60%);
+  max-width: calc(100% - 32px);
   padding: 2px 6px;
 }
 
 .fdry-card--gate .fdry-gate-row {
   flex-wrap: wrap;
   padding: 4px 2px;
+}
+
+/* The text takes the whole first line; the answers wrap beneath it rather
+   than squeezing the summary to a word per line or running past the scene. */
+.fdry-card--gate .fdry-gate-text {
+  flex: 1 1 calc(100% - 24px);
+}
+
+.fdry-card--gate .fdry-gate-actions {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  padding-left: 22px;
 }
 
 .fdry-card--gate .fdry-gate-summary {

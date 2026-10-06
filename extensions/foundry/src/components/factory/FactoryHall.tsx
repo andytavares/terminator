@@ -37,6 +37,9 @@ import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
 import './hall.css'
 
+/** Half of a gate card's width, `min(360px, 60%)`, plus 16px to the scene's edge. */
+const GATE_CARD_INSET = 'calc(min(180px, 30%) + 16px)'
+
 // One order, drawn as a hall instead of a list of chips.
 //
 // This is a projection: it owns no state a poll did not put there. `World`
@@ -987,7 +990,9 @@ function InterruptionCard({
         aria-label={item.title}
         className={`fdry-card fdry-card--gate${flip ? ' is-below' : ''}`}
         style={{
-          left: `${Math.min(Math.max(anchor.left, 16), 84)}%`,
+          // Centred on its anchor but kept whole inside the scene: the inset is
+          // half the card's own width (see .fdry-card--gate) plus a margin.
+          left: `clamp(${GATE_CARD_INSET}, ${anchor.left}%, calc(100% - ${GATE_CARD_INSET}))`,
           top: `${flip ? anchor.bottom : anchor.top}%`,
         }}
       >
