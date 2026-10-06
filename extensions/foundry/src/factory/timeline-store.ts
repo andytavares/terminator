@@ -3,7 +3,8 @@ import path from 'node:path'
 import { z } from 'zod'
 import type { RunGraph } from '../line/run-graph.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
-import type { FrameNode, Timeline, ToolEntry, GraphFrame } from './replay.js'
+import type { CiState } from '../line/ci-state.js'
+import type { FrameNode, Timeline, ToolEntry, GraphFrame, CiFrame } from './replay.js'
 
 // What a run did, written down as it happened, so the hall can play it back.
 //
@@ -53,13 +54,35 @@ const ToolLine = z.object({
   }),
 })
 
-const Line = z.discriminatedUnion('kind', [GraphLine, ToolLine])
+const CiLine = z.object({
+  kind: z.literal('ci'),
+  at: z.number(),
+  round: z.number(),
+  max: z.number(),
+  status: z.enum(['watching', 'green', 'red', 'not_measured', 'reworking']),
+  pulls: z.array(
+    z.object({
+      url: z.string(),
+      checks: z.array(
+        z.object({
+          name: z.string(),
+          bucket: z.enum(['pass', 'fail', 'pending', 'skipping', 'cancel']),
+          link: z.string().default(''),
+          workflow: z.string().default(''),
+        })
+      ),
+    })
+  ),
+})
+
+const Line = z.discriminatedUnion('kind', [GraphLine, ToolLine, CiLine])
 
 // What each file last recorded, so a graph written twice with the same states
 // and a transcript read every thirty seconds do not fill the file with repeats.
 // Seeded from the file on first touch, so a restart does not repeat either.
 interface Recorded {
   lastFrame: string | null
+  lastCi: string | null
   tools: Set<string>
 }
 const recorded = new Map<string, Recorded>()
@@ -79,6 +102,15 @@ function toolKey(sessionId: string, activity: ToolActivity): string {
 
 function frameKey(nodes: readonly FrameNode[]): string {
   return JSON.stringify(nodes)
+}
+
+/** What the replay shows of CI: the round, the status and every check's bucket. */
+function ciKey(ci: Pick<CiFrame, 'round' | 'status' | 'pulls'>): string {
+  return JSON.stringify([
+    ci.round,
+    ci.status,
+    ci.pulls.map((pull) => [pull.url, pull.checks.map((c) => [c.name, c.bucket])]),
+  ])
 }
 
 /** Every well-formed line, in the order written. */
@@ -105,9 +137,10 @@ async function readLines(dir: string): Promise<z.infer<typeof Line>[]> {
 async function memoryOf(dir: string): Promise<Recorded> {
   const known = recorded.get(dir)
   if (known !== undefined) return known
-  const memory: Recorded = { lastFrame: null, tools: new Set() }
+  const memory: Recorded = { lastFrame: null, lastCi: null, tools: new Set() }
   for (const line of await readLines(dir)) {
     if (line.kind === 'graph') memory.lastFrame = frameKey(line.nodes)
+    else if (line.kind === 'ci') memory.lastCi = ciKey(line)
     else memory.tools.add(toolKey(line.sessionId, line.activity))
   }
   recorded.set(dir, memory)
@@ -135,6 +168,22 @@ export async function recordGraph(dir: string, graph: RunGraph, at: number): Pro
   await append(dir, [{ kind: 'graph', at, nodes }])
 }
 
+/**
+ * Record the CI state, when its status, round or any check's bucket differs
+ * from the last one recorded. A state that only moved its timestamp or its
+ * reason is not a change a replay could show.
+ */
+export async function recordCi(dir: string, ci: CiState | null, at: number): Promise<void> {
+  if (ci === null) return
+  const memory = await memoryOf(dir)
+  const key = ciKey(ci)
+  if (memory.lastCi === key) return
+  memory.lastCi = key
+  await append(dir, [
+    { kind: 'ci', at, round: ci.round, max: ci.max, status: ci.status, pulls: ci.pulls },
+  ])
+}
+
 /** Record the tool calls in `activity` this timeline does not already hold. */
 export async function recordTools(
   dir: string,
@@ -154,10 +203,21 @@ export async function recordTools(
 export async function readTimeline(dir: string): Promise<Timeline> {
   const frames: GraphFrame[] = []
   const tools: ToolEntry[] = []
+  const ci: CiFrame[] = []
   const seen = new Set<string>()
   for (const line of await readLines(dir)) {
     if (line.kind === 'graph') {
       frames.push({ at: line.at, nodes: line.nodes })
+      continue
+    }
+    if (line.kind === 'ci') {
+      ci.push({
+        at: line.at,
+        round: line.round,
+        max: line.max,
+        status: line.status,
+        pulls: line.pulls,
+      })
       continue
     }
     const key = toolKey(line.sessionId, line.activity)
@@ -167,5 +227,6 @@ export async function readTimeline(dir: string): Promise<Timeline> {
   }
   frames.sort((a, b) => a.at - b.at)
   tools.sort((a, b) => a.at - b.at)
-  return { frames, tools }
+  ci.sort((a, b) => a.at - b.at)
+  return { frames, tools, ci }
 }

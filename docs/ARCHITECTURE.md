@@ -1467,11 +1467,16 @@ App
 - [ADR-067: the refinery restacks, it never merges](adr/067-the-refinery-restacks-it-never-merges.md) — overlapping orders queue; a merge restacks the later ones with lease and rechecks CI, or raises `refinery.conflict`.
 - [ADR-066: sensors propose work, they never start it](adr/066-sensors-propose-never-start.md) — YAML sensors on a tick while the app is open, clustered signals in the Inbox, promote seeds a draft.
 - [ADR-065: skills are mounted, never installed](adr/065-skills-are-mounted-never-installed.md) — `skills:` on roles and steps, three rungs, copied per node and passed with `--add-dir`.
+- [ADR-087: the hall labels what it draws](adr/087-the-hall-labels-what-it-draws.md) — scoreboard, queue plate, junctions and CI tower say what they mean; aggregates replace per-check lamps; CI is recorded for replay.
+- [ADR-086: six shapes and a document hand-back](adr/086-six-shapes-and-a-document-hand-back.md) — design-doc, poc, spike and quick removed; Foundry commits what agents write; research finishes on a document.
+- [ADR-085: the draft opens before the final check](adr/085-the-draft-opens-before-the-final-check.md) — the final check runs beside CI; the scribe writes documentation only; repeated commands run once; the ship node stays running.
+- [ADR-084: shaping starts with the architect](adr/084-shaping-starts-with-the-architect.md) — the scout runs beside the first draft; small orders skip the red team; amends ADR 075.
+- [ADR-083: extension commands take validated arguments](adr/083-extension-commands-take-arguments.md) — `api.commands.register` accepts an `args` schema; views run another extension's command by id; v2.7.0.
+- [ADR-082: the hall keeps time for its animations](adr/082-the-hall-keeps-time-for-its-animations.md) — a beat scheduler gives each animation its minimum time; replay starts at the first movement; idle crew wander.
 - [ADR-064: CI is a check with rounds](adr/064-ci-is-a-check-with-rounds.md) — drafts' CI is watched, a red one goes back to the builder twice, then `ci.red`.
 - [ADR-063: a failed check sends the work back](adr/063-a-failed-check-sends-the-work-back.md) — run steps run as commands, `onFail` reworks the builder with the failing output, the stalled gate names its node.
 - [ADR-062: the Forge decides what it is sure of](adr/062-the-forge-decides-what-it-is-sure-of.md) — questions at ≥ 90% confidence are decided, low/medium findings dismissable, failing checks sent back up to twice.
 - [ADR-061: one project per order, and an extension may file an issue](adr/061-one-project-per-order.md) — an order is one sidebar project named after its ticket's branch; `ExtensionAPI.issues.create` v2.5.0.
-- [ADR-083: extension commands take validated arguments](adr/083-extension-commands-take-arguments.md) — `api.commands.register` accepts an `args` schema; views run another extension's command by id; v2.7.0.
 - [ADR-042: Foundry installs nothing](adr/042-foundry-installs-nothing.md) — the data root, the three rungs, and the toolchain probe.
 - [ADR-043: an agent proposes the order](adr/043-an-agent-proposes-the-order-and-never-writes-it.md) — intake is an agent turn, and what it may and may not write.
 - [ADR-049: an accidental question costs five minutes](adr/049-an-accidental-question-costs-five-minutes.md) — why a policy that asks by accident is a latency defect, and the eight changes measured against one live run.

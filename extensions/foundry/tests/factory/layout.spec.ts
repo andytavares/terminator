@@ -309,6 +309,22 @@ describe('layoutHall — properties, across every recipe and lane count', () => 
           }
         })
 
+        it('gives the scoreboard three tiles, and no wall fixture overlaps another', () => {
+          const board = map.props.find((p) => p.kind === 'statuswall') as HallProp
+          expect(board.w).toBe(3)
+          const wall = map.props.filter((p) =>
+            ['shelves', 'racks', 'statuswall', 'lockers'].includes(p.kind)
+          )
+          for (const a of wall) {
+            expect(a.x).toBeGreaterThanOrEqual(1)
+            expect(a.x + a.w).toBeLessThanOrEqual(map.width - 1)
+            for (const b of wall) {
+              if (a === b) continue
+              expect(a.x + a.w <= b.x || b.x + b.w <= a.x).toBe(true)
+            }
+          }
+        })
+
         it('stands the archive and the rack under their own wall fixture', () => {
           const shelves = map.props.find((p) => p.kind === 'shelves') as HallProp
           const racks = map.props.find((p) => p.kind === 'racks') as HallProp

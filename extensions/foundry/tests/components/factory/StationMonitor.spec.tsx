@@ -234,3 +234,52 @@ describe('StationMonitor', () => {
     expect(log.scrollTop).toBe(100)
   })
 })
+
+describe('StationMonitor on a step with no agent', () => {
+  const exact = { normalizer: (t: string) => t }
+  const gate = { id: 'ship', state: 'running' as const, attempts: 0, role: null }
+
+  it('says the step is automatic and shows what it decided, with no attempt count', () => {
+    mount({
+      node: gate,
+      label: 'Ship',
+      lines: [],
+      status: 'running',
+      facts: ['Draft opened · #233', 'Checks · 12 of 19 passed', 'Waiting on you · mark ready?'],
+    })
+    expect(screen.getByText('Automatic step · no agent')).toBeTruthy()
+    const decided = screen.getByRole('log', { name: 'What this step decided' })
+    expect(decided.textContent).toBe(
+      'Draft opened · #233\nChecks · 12 of 19 passed\nWaiting on you · mark ready?'
+    )
+    expect(document.body.textContent).not.toMatch(/attempt/i)
+    expect(document.body.textContent).not.toContain('NOTHING YET')
+    expect(screen.getByText('WORKING', exact)).toBeTruthy()
+  })
+
+  it('offers no attach key, and no cursor, for a step with no agent', () => {
+    mount({ node: gate, facts: ['Joined Inspector and Scribe'], lines: [] })
+    expect(screen.queryByRole('button', { name: /ATTACH/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Agent closed/ })).toBeNull()
+    expect(document.querySelector('.fdry-crt__cursor')).toBeNull()
+  })
+
+  it('says so when a step with no agent has decided nothing yet', () => {
+    mount({ node: gate, facts: [], lines: [], status: 'idle' })
+    expect(screen.getByRole('log', { name: 'What this step decided' }).textContent).toBe(
+      'Nothing decided yet.'
+    )
+  })
+})
+
+describe('StationMonitor on a finished agent', () => {
+  it('keeps the transcript and disables attach, naming the reason on the key', () => {
+    const { onAttach } = mount({ attachable: false, status: 'idle' })
+    expect(screen.getByRole('log', { name: 'Transcript' }).textContent).toContain('go on')
+    const key = screen.getByRole('button', { name: /Agent closed/i }) as HTMLButtonElement
+    expect(key.disabled).toBe(true)
+    fireEvent.click(key)
+    expect(onAttach).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /^ATTACH$/ })).toBeNull()
+  })
+})

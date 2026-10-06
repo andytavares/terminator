@@ -29,6 +29,13 @@ export interface StationMonitorProps {
   readonly status: MonitorStatus
   readonly alert: string | null
   readonly attachProblem: string | null
+  /**
+   * What a step with no agent decided, one line each. Non-null marks the step
+   * automatic: no attempt count, no transcript, no attach key.
+   */
+  readonly facts?: readonly string[] | null
+  /** False once the step's agent has closed: the key stays, disabled, and says why. */
+  readonly attachable?: boolean
   readonly onAttach: () => void
   readonly onClose: () => void
 }
@@ -92,6 +99,8 @@ export function StationMonitor({
   status,
   alert,
   attachProblem,
+  facts = null,
+  attachable = true,
   onAttach,
   onClose,
 }: StationMonitorProps): JSX.Element {
@@ -168,7 +177,8 @@ export function StationMonitor({
   // to run it, or running and waiting on you.
   const word =
     status === 'gone' ? 'No agent' : status === 'waiting' ? 'Needs you' : stateWord(node.state)
-  const meta = [word, `attempt ${node.attempts}`, node.role]
+  const automatic = facts !== null
+  const meta = [word, automatic ? null : `attempt ${node.attempts}`, node.role]
     .filter((part) => part !== null)
     .join('  ')
     .toUpperCase()
@@ -193,43 +203,54 @@ export function StationMonitor({
           <div className="fdry-crt__rule" aria-hidden="true">
             {'-'.repeat(80)}
           </div>
-          <pre
-            ref={logRef}
-            className="fdry-crt__log"
-            role="log"
-            aria-label="Transcript"
-            onScroll={onScroll}
-          >
-            {lines.length === 0 ? 'NOTHING YET.' : null}
-            {lines.map((line, i) => (
-              <React.Fragment key={`${line.at}:${i}`}>
-                {i > 0 ? '\n' : null}
-                <span className={lineClass(line)}>{line.text}</span>
-              </React.Fragment>
-            ))}
-            {status === 'gone' ? (
-              <>
-                {'\n'}
-                <span className="nocarrier">NO CARRIER</span>
-              </>
-            ) : null}
-            {status === 'running' ? (
-              <>
-                {'\n'}
-                <span className="fdry-crt__cursor" />
-              </>
-            ) : null}
-          </pre>
+          {automatic ? (
+            <>
+              <div className="fdry-crt__auto">Automatic step · no agent</div>
+              <pre className="fdry-crt__log" role="log" aria-label="What this step decided">
+                {facts.length === 0 ? 'Nothing decided yet.' : facts.join('\n')}
+              </pre>
+            </>
+          ) : (
+            <pre
+              ref={logRef}
+              className="fdry-crt__log"
+              role="log"
+              aria-label="Transcript"
+              onScroll={onScroll}
+            >
+              {lines.length === 0 ? 'NOTHING YET.' : null}
+              {lines.map((line, i) => (
+                <React.Fragment key={`${line.at}:${i}`}>
+                  {i > 0 ? '\n' : null}
+                  <span className={lineClass(line)}>{line.text}</span>
+                </React.Fragment>
+              ))}
+              {status === 'gone' ? (
+                <>
+                  {'\n'}
+                  <span className="nocarrier">NO CARRIER</span>
+                </>
+              ) : null}
+              {status === 'running' ? (
+                <>
+                  {'\n'}
+                  <span className="fdry-crt__cursor" />
+                </>
+              ) : null}
+            </pre>
+          )}
         </div>
       </div>
       <div className="fdry-crt__chin">
         <span className="fdry-crt__badge">{(sign ?? label).toUpperCase()}</span>
         <span className="fdry-crt__spacer" />
         <span className="fdry-crt__led" role="img" aria-label={LED_LABEL[status]} />
-        <button type="button" className="fdry-crt__key" onClick={onAttach}>
-          <Terminal aria-hidden="true" />
-          ATTACH
-        </button>
+        {automatic ? null : (
+          <button type="button" className="fdry-crt__key" disabled={!attachable} onClick={onAttach}>
+            <Terminal aria-hidden="true" />
+            {attachable ? 'ATTACH' : 'AGENT CLOSED'}
+          </button>
+        )}
         <button
           type="button"
           className="fdry-crt__power"

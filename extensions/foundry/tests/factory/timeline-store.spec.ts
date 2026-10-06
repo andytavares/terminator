@@ -5,6 +5,7 @@ import path from 'node:path'
 import {
   recordGraph,
   recordTools,
+  recordCi,
   readTimeline,
   forgetTimelines,
   TIMELINE_FILE,
@@ -91,7 +92,7 @@ describe('the run timeline', () => {
   })
 
   it('reads an absent timeline as empty, and skips a line it cannot parse', async () => {
-    expect(await readTimeline(dir)).toEqual({ frames: [], tools: [] })
+    expect(await readTimeline(dir)).toEqual({ frames: [], tools: [], ci: [] })
     await recordGraph(dir, graph({ a: 'running' }), 1000)
     fs.appendFileSync(path.join(dir, TIMELINE_FILE), '{not json\n{"kind":"mystery"}\n')
     await recordGraph(dir, graph({ a: 'passed' }), 2000)
@@ -102,5 +103,53 @@ describe('the run timeline', () => {
     await recordTools(dir, 's-1', [call('late', 900)])
     await recordTools(dir, 's-1', [call('early', 100)])
     expect((await readTimeline(dir)).tools.map((t) => t.activity.callId)).toEqual(['early', 'late'])
+  })
+})
+
+describe('factory/timeline-store CI', () => {
+  const ci = (status: string, buckets: Record<string, 'pass' | 'pending' | 'fail'>, round = 0) => ({
+    round,
+    max: 2,
+    status: status as 'watching',
+    reason: '',
+    at: '2026-10-05T10:00:00.000Z',
+    pulls: [
+      {
+        url: 'https://github.com/a/b/pull/1',
+        checks: Object.entries(buckets).map(([name, bucket]) => ({
+          name,
+          bucket,
+          link: '',
+          workflow: 'CI',
+        })),
+      },
+    ],
+  })
+
+  it('records the CI state as its own line, and reads it back in order', async () => {
+    await recordCi(dir, ci('watching', { lint: 'pending' }), 100)
+    await recordCi(dir, ci('green', { lint: 'pass' }), 200)
+    const timeline = await readTimeline(dir)
+    expect(timeline.frames).toEqual([])
+    expect(timeline.ci?.map((c) => [c.at, c.status, c.pulls[0].checks[0].bucket])).toEqual([
+      [100, 'watching', 'pending'],
+      [200, 'green', 'pass'],
+    ])
+  })
+
+  it('skips a CI state that matches the last one recorded, even after a restart', async () => {
+    const same = ci('watching', { lint: 'pending' })
+    await recordCi(dir, same, 100)
+    await recordCi(dir, { ...same, at: 'later', reason: 'still going' }, 150)
+    forgetTimelines()
+    await recordCi(dir, same, 160)
+    expect((await readTimeline(dir)).ci).toHaveLength(1)
+    await recordCi(dir, ci('watching', { lint: 'pending' }, 1), 170)
+    expect((await readTimeline(dir)).ci).toHaveLength(2)
+  })
+
+  it('records nothing for a missing CI state', async () => {
+    await recordCi(dir, null, 100)
+    expect(fs.existsSync(path.join(dir, TIMELINE_FILE))).toBe(false)
   })
 })

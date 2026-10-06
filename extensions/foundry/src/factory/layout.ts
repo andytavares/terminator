@@ -478,12 +478,14 @@ export function layoutHall(
   // happens to sit directly under the fixture's own column.
   for (const [index, kind] of FIXTURE_KINDS.entries()) {
     const col = Math.round(2 + ((width - 4) * (index + 1)) / (FIXTURE_KINDS.length + 1))
+    // The scoreboard is three tiles wide, centred on its column.
+    const board = kind === 'statuswall'
     props.push({
       id: `fixture-${kind}`,
       kind,
-      x: col,
+      x: board ? col - 1 : col,
       y: TOP_WALL_ROWS - 1,
-      w: 1,
+      w: board ? 3 : 1,
       h: 1,
       solid: true,
       nodeId: null,
@@ -493,7 +495,7 @@ export function layoutHall(
   }
   const fixtureCol = (kind: FixtureKind): number => {
     const prop = props.find((p) => p.id === `fixture-${kind}`) as HallProp
-    return prop.x
+    return prop.x + Math.floor(prop.w / 2)
   }
   // Under a station's body, beside its seat: a gap between two stations is
   // where a belt turns down to get round the next one.

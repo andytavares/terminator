@@ -196,3 +196,49 @@ describe('replayClock', () => {
     expect(replayClock([], 6000).duration).toBe(0)
   })
 })
+
+describe('a replay of CI', () => {
+  const pull = (buckets: ('pass' | 'pending')[]) => [
+    {
+      url: 'https://github.com/a/b/pull/1',
+      checks: buckets.map((bucket, i) => ({
+        name: `check-${i}`,
+        bucket,
+        link: '',
+        workflow: 'CI',
+      })),
+    },
+  ]
+  const withCi: Timeline = {
+    ...timeline,
+    ci: [
+      { at: 5500, round: 0, max: 2, status: 'watching', pulls: pull(['pass', 'pending']) },
+      { at: 7500, round: 1, max: 2, status: 'green', pulls: pull(['pass', 'pass']) },
+    ],
+  }
+
+  it('shows no CI before the first recorded state, and none for a recording without any', () => {
+    expect(observationAt(withCi, [], base, 5000).ci).toBeNull()
+    expect(observationAt(timeline, [], base, 9000).ci).toBeNull()
+  })
+
+  it('rebuilds the CI state the run had at that moment', () => {
+    const waiting = observationAt(withCi, [], base, 6000).ci
+    expect(waiting?.status).toBe('watching')
+    expect(waiting?.pulls[0].checks.map((c) => c.bucket)).toEqual(['pass', 'pending'])
+    const done = observationAt(withCi, [], base, 8000).ci
+    expect(done?.round).toBe(1)
+    expect(done?.pulls[0].checks.map((c) => c.bucket)).toEqual(['pass', 'pass'])
+  })
+
+  it('counts each recorded CI change as a moment worth showing', () => {
+    expect(momentsOf(withCi, [])).toEqual([0, 1000, 2000, 5000, 5500, 6000, 7500])
+  })
+})
+
+describe.skipIf(!existsSync(REAL_TIMELINE))('a recorded run', () => {
+  it('has no CI line to replay yet, which is not an error', async () => {
+    const recorded = await readTimeline(dirname(REAL_TIMELINE))
+    expect(observationAt(recorded, [], base, Date.now()).ci).toBeNull()
+  })
+})

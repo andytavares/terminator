@@ -7,7 +7,17 @@ import type { ToolProp } from '../events.js'
 import type { Paint } from './kit.js'
 import { rect, bevel, rivets, wear, mulberry32 } from './kit.js'
 import { HALL, CODE_LINE_COLORS } from './palette.js'
-import { drawDigit, drawText, textWidth } from './glyphs.js'
+import {
+  ICONS,
+  drawDigit,
+  drawIcon,
+  drawText,
+  textWidth,
+  digitsWidth,
+  ICON_SIZE,
+} from './glyphs.js'
+import { boardRect, plateRect, BOARD_HEIGHT, BEACON_HEIGHT, TOWER_HEIGHT } from './fixtures.js'
+import { tallyChecks } from '../ci-tally.js'
 
 // One draw function per `PropKind`, plus the floor/wall bake and the belts and
 // crate that move over it.
@@ -61,6 +71,8 @@ export interface SceneContext {
   }[]
   /** Fixtures a present crew member is standing at, using them. */
   readonly reaching?: readonly ('archive' | 'rack')[]
+  /** Reduced motion: a beacon that would blink burns steadily instead. */
+  readonly steady?: boolean
 }
 
 /** How long a verdict shows — matches `VERDICT_MS` in sim.ts. */
@@ -170,6 +182,32 @@ function drawWhiteboard(paint: Paint, x: number, y: number): void {
   for (const [sx, sy, sw, color] of strokes) rect(paint, x + sx, y + sy, sw, 1, color)
 }
 
+const WALL_FIXTURES: ReadonlySet<PropKind> = new Set(['shelves', 'racks', 'statuswall', 'lockers'])
+const VENDING_W = 14
+const VENDING_MARGIN = 2
+
+/**
+ * Where the baked vending machine stands: the first spot along the wall that
+ * clears every wall fixture (a three-tile scoreboard among them), the
+ * whiteboard and the extinguisher sign.
+ */
+export function vendingDecorX(map: Pick<HallMap, 'width' | 'props'>): number {
+  const wallPx = map.width * TILE_PX
+  const taken: [number, number][] = [
+    [Math.round(wallPx * 0.08), Math.round(wallPx * 0.08) + 48],
+    [Math.round(wallPx * 0.94), Math.round(wallPx * 0.94) + 18],
+    ...map.props
+      .filter((prop) => WALL_FIXTURES.has(prop.kind))
+      .map((prop): [number, number] => [prop.x * TILE_PX, (prop.x + prop.w) * TILE_PX]),
+  ]
+  const fits = (x: number): boolean =>
+    taken.every(
+      ([left, right]) => x + VENDING_W + VENDING_MARGIN <= left || x >= right + VENDING_MARGIN
+    )
+  const preferred = [0.62, 0.5, 0.7, 0.4, 0.78, 0.3, 0.86, 0.2].map((f) => Math.round(wallPx * f))
+  return preferred.find(fits) ?? preferred[0]
+}
+
 function drawVendingMachine(paint: Paint, x: number, y: number): void {
   rect(paint, x, y, 14, 33, '#8a2f2a')
   bevel(paint, x, y, 14, 33, '#b04a3c', '#4a1512')
@@ -247,7 +285,7 @@ export function bakeHall(map: HallMap, paint: Paint): void {
   // whiteboard, a vending machine and an extinguisher/sign, spread across
   // the wall independent of the interactive fixtures.
   drawWhiteboard(paint, Math.round(w * 0.08), TILE_PX + 4)
-  drawVendingMachine(paint, Math.round(w * 0.62), TILE_PX + 16)
+  drawVendingMachine(paint, vendingDecorX(map), TILE_PX + 16)
   drawExtinguisherSign(paint, Math.round(w * 0.94), TILE_PX + 20)
 
   for (let y = TOP_WALL_ROWS; y < map.height - 1; y++) {
@@ -387,6 +425,50 @@ function treads(paint: Paint, x: number, y: number, d: Side, offset: number): vo
 }
 
 /** One belt tile: its bed, rails, direction chevron and — on a crossing — the raised deck. */
+const ARM: Record<Side, [number, number, number, number]> = {
+  E: [11, 7, 4, 2],
+  W: [1, 7, 4, 2],
+  N: [7, 1, 2, 4],
+  S: [7, 11, 2, 4],
+}
+const CHEVRON_AT: Record<Side, [number, number]> = { E: [5, 0], W: [-5, 0], N: [0, -5], S: [0, 5] }
+
+/** A split: a hub with an arm pointing down each belt that leaves it. */
+function drawDiverter(paint: Paint, x: number, y: number, outs: readonly Side[]): void {
+  rect(paint, x + 5, y + 5, 6, 6, HALL.amber)
+  rect(paint, x + 6, y + 6, 4, 4, HALL.amberDim)
+  for (const d of outs) {
+    const [ax, ay, aw, ah] = ARM[d]
+    rect(paint, x + ax, y + ay, aw, ah, HALL.amber)
+    const [ox, oy] = CHEVRON_AT[d]
+    chevron(paint, x + 8 + ox, y + 8 + oy, d, HALL.amber)
+  }
+}
+
+/** A merge: a steel funnel whose mouth is the whole tile, narrowing into the belt that leaves. */
+function drawFunnel(paint: Paint, x: number, y: number, out: Side): void {
+  const column = (p: number, thickness: number, color: string): void => {
+    const half = Math.floor(thickness / 2)
+    switch (out) {
+      case 'E':
+        return rect(paint, x + p, y + 8 - half, 1, thickness, color)
+      case 'W':
+        return rect(paint, x + 15 - p, y + 8 - half, 1, thickness, color)
+      case 'S':
+        return rect(paint, x + 8 - half, y + p, thickness, 1, color)
+      case 'N':
+        return rect(paint, x + 8 - half, y + 15 - p, thickness, 1, color)
+    }
+  }
+  for (let p = 1; p <= 14; p++) {
+    const thickness = Math.max(4, 12 - p)
+    column(p, thickness, HALL.steel)
+    column(p, thickness - 2, HALL.steelDark)
+  }
+  const [ox, oy] = CHEVRON_AT[out]
+  chevron(paint, x + 8 + ox, y + 8 + oy, out, HALL.amber)
+}
+
 function drawBeltTile(
   paint: Paint,
   tx: number,
@@ -410,22 +492,9 @@ function drawBeltTile(
     }
     chevron(paint, x + 8, y + 8, out, HALL.amberDim)
   } else {
-    // Junction: a turntable in the hub — amber diverter for a split, steel for a merge.
     rails(paint, x, y, sides)
-    const disc = tile.kind === 'split' ? HALL.amber : HALL.steel
-    rect(paint, x + 4, y + 5, 8, 6, disc)
-    rect(paint, x + 5, y + 4, 6, 8, disc)
-    rect(paint, x + 6, y + 6, 4, 4, tile.kind === 'split' ? HALL.amberDim : HALL.steelDark)
-    const chevronOffset: Record<Side, [number, number]> = {
-      E: [5, 0],
-      W: [-5, 0],
-      N: [0, -5],
-      S: [0, 5],
-    }
-    for (const d of tile.outs) {
-      const [ox, oy] = chevronOffset[d]
-      chevron(paint, x + 8 + ox, y + 8 + oy, d, HALL.amber)
-    }
+    if (tile.kind === 'split') drawDiverter(paint, x, y, tile.outs)
+    else drawFunnel(paint, x, y, out)
   }
   if (tile.kind === 'cross' && tile.over !== null) {
     // The crossing belt rides over on a raised deck.
@@ -879,7 +948,19 @@ function drawGate(paint: Paint, prop: HallProp, context: SceneContext, tMs: numb
   bevel(paint, x + TILE_PX - 4, y - 24, 4, 40, HALL.steelLight, HALL.steelDark)
 
   const flashOn = Math.floor(tMs / 250) % 2 === 0
-  const beacon = waiting ? (flashOn ? HALL.amber : HALL.amberDim) : open ? HALL.green : '#3a414b'
+  // A gate whose step is running (the ship step, through the final check and
+  // CI) is busy, not idle: its beacon burns steady cyan.
+  const state = prop.nodeId === null ? undefined : context.states[prop.nodeId]
+  const working = !waiting && !open && (state === 'running' || state === 'verifying')
+  const beacon = waiting
+    ? flashOn
+      ? HALL.amber
+      : HALL.amberDim
+    : open
+      ? HALL.green
+      : working
+        ? HALL.cyan
+        : '#3a414b'
   rect(paint, x + 1, y - 30, TILE_PX - 2, 5, beacon)
 
   if (swinging) {
@@ -993,104 +1074,133 @@ function drawRacks(paint: Paint, prop: HallProp, context: SceneContext, tMs: num
   }
 }
 
+const BOARD_DIM = '#2a3a44'
+const BOARD_DIVIDER = '#1d3440'
+/** Past three digits the board shows 999; the hover label carries the real figure. */
+const BOARD_MAX = 999
+
+/**
+ * The scoreboard: one cell per figure, each with an icon above its number.
+ * Lead time (a clock), reworks (a loop) and CI fix rounds (a check mark).
+ * A lead time the order has not earned yet is a dash, not a zero: zero would
+ * claim it shipped instantly.
+ */
 function drawStatuswall(paint: Paint, prop: HallProp, context: SceneContext): void {
-  const x = prop.x * TILE_PX
-  const y = prop.y * TILE_PX
+  const { left, top } = boardRect(prop)
   const w = prop.w * TILE_PX
+  rect(paint, left, top, w, BOARD_HEIGHT, '#15181e')
+  rect(paint, left + 2, top + 2, w - 4, BOARD_HEIGHT - 4, '#0a1a20')
 
-  rect(paint, x, y - 20, w, 20, '#15181e')
-  rect(paint, x + 2, y - 18, w - 4, 16, '#0a1a20')
-
-  const values = Object.values(context.states)
-  const passedCount = values.filter((s) => s === 'passed').length
-  const total = Math.max(values.length, 1)
-  const filled = Math.round((passedCount / total) * (w - 4))
-  rect(paint, x + 2, y - 4, filled, 2, HALL.green)
-  rect(paint, x + 2 + filled, y - 4, w - 4 - filled, 2, '#1d3440')
-
-  const metrics = context.metrics
-  if (metrics == null) return
-
-  // Minutes to ship, reworks, CI rounds — three digit readouts along the
-  // wall, in the order's own numbers. Minutes is skipped, not zeroed, while
-  // the order has not shipped: a run that has not shipped has no lead time,
-  // and zero would claim it shipped instantly.
-  const minutes = metrics.leadTimeMs === null ? null : Math.round(metrics.leadTimeMs / MINUTE_MS)
-  const readouts: readonly [number | null, string][] = [
-    [minutes, HALL.cyan],
-    [metrics.reworks, HALL.red],
-    [metrics.ciRounds, HALL.amber],
+  const metrics = context.metrics ?? null
+  const minutes =
+    metrics === null || metrics.leadTimeMs === null
+      ? null
+      : Math.round(metrics.leadTimeMs / MINUTE_MS)
+  const cells: readonly [keyof typeof ICONS, number | null, string][] = [
+    ['clock', minutes, HALL.cyan],
+    ['rework', metrics?.reworks ?? null, HALL.red],
+    ['check', metrics?.ciRounds ?? null, HALL.amber],
   ]
-  let dx = x + 3
-  for (const [value, color] of readouts) {
-    if (value === null) continue
-    for (const digit of String(Math.min(Math.max(value, 0), 99))) {
-      drawDigit(paint, dx, y - 14, digit, color)
-      dx += 7
+  // One third of the board each. A cell keeps clear of the frame on the
+  // board's outer edges and of the divider on its own left.
+  const cellW = w / 3
+  cells.forEach(([icon, value, color], index) => {
+    const cellLeft = left + index * cellW
+    const clearLeft = index === 0 ? 2 : 1
+    const clearRight = index === 2 ? 2 : 0
+    const place = (width: number): number =>
+      cellLeft +
+      Math.min(Math.max(Math.floor((cellW - width) / 2), clearLeft), cellW - clearRight - width)
+    if (index > 0) rect(paint, cellLeft, top + 3, 1, BOARD_HEIGHT - 6, BOARD_DIVIDER)
+    drawIcon(paint, place(ICON_SIZE), top + 3, icon, value === null ? BOARD_DIM : color)
+    const numberTop = top + 3 + ICON_SIZE + 3
+    if (value === null) {
+      if (metrics !== null) rect(paint, place(6), numberTop + 4, 6, 2, BOARD_DIM)
+      return
     }
-    dx += 4
-  }
-}
-
-function lampColor(bucket: Check['bucket']): string {
-  switch (bucket) {
-    case 'pass':
-      return HALL.green
-    case 'fail':
-    case 'cancel':
-      return HALL.red
-    case 'pending':
-    case 'skipping':
-      return HALL.amber
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
-    default: {
-      const never: never = bucket
-      throw new Error(`unhandled check bucket: ${String(never)}`)
+    const digits = String(Math.min(Math.max(value, 0), BOARD_MAX))
+    if (digits.length <= 2) {
+      let dx = place(digitsWidth(digits))
+      for (const digit of digits) {
+        drawDigit(paint, dx, numberTop, digit, color)
+        dx += 7
+      }
+    } else {
+      drawText(paint, place(textWidth(digits)), numberTop + 3, digits, color)
     }
-  }
-}
-
-/** A small tower beside the exit, one lamp per check the ship tail is watching. */
-function drawDispatch(paint: Paint, prop: HallProp, context: SceneContext): void {
-  const x = prop.x * TILE_PX
-  const y = prop.y * TILE_PX
-
-  rect(paint, x + 3, y - 24, 10, 24, '#20242c')
-  bevel(paint, x + 3, y - 24, 10, 24, '#3a414d', '#12151b')
-
-  const buckets = Object.values(context.ci?.checks ?? {})
-  buckets.forEach((bucket, index) => {
-    const ly = y - 21 + index * 5
-    if (ly < y - 24) return
-    rect(paint, x + 5, ly, 6, 3, lampColor(bucket))
   })
 }
 
+const TOWER_LAMPS: readonly [
+  keyof Pick<ReturnType<typeof tallyChecks>, 'passed' | 'pending' | 'failed'>,
+  string,
+  string,
+][] = [
+  ['passed', HALL.green, '#1e4a2a'],
+  ['pending', HALL.amber, '#4a3515'],
+  ['failed', HALL.red, '#4a1f1a'],
+]
+const CRATE_AT_EXIT = { dx: 24, dy: 14 }
+
 /**
- * A small amber plaque beside the exit, showing the position this order
- * holds in the refinery's file-overlap queue — flashing, the way a gate's
- * beacon flashes while it waits, for as long as `context.queue` says there is
- * one. Nothing here spells out the ordinal's letters: the hall's pixel font
- * only has digits, so the plaque shows the number and leans on its flash and
- * its place at the exit to say what it means.
+ * A small tower beside the exit with three lamps (passed, pending, failed),
+ * each with its count beside it however many checks there are. While a check
+ * is pending an amber beacon blinks on top and a crate waits at the exit.
+ */
+function drawDispatch(paint: Paint, prop: HallProp, context: SceneContext, tMs: number): void {
+  const x = prop.x * TILE_PX
+  const y = prop.y * TILE_PX
+  const tally = tallyChecks(Object.values(context.ci?.checks ?? {}))
+
+  rect(paint, x + 1, y - TOWER_HEIGHT, 14, TOWER_HEIGHT, '#20242c')
+  bevel(paint, x + 1, y - TOWER_HEIGHT, 14, TOWER_HEIGHT, '#3a414d', '#12151b')
+
+  TOWER_LAMPS.forEach(([bucket, lit, dim], row) => {
+    const top = y - 22 + row * 7
+    const count = tally[bucket]
+    rect(paint, x + 3, top + 1, 3, 3, count > 0 ? lit : dim)
+    // The font has two digits of room beside a lamp; a hundred or more reads 99.
+    if (tally.total > 0) drawText(paint, x + 7, top, String(Math.min(count, 99)), '#e9ecef')
+  })
+
+  if (tally.pending > 0) {
+    const on = context.steady === true || Math.floor(tMs / 400) % 2 === 0
+    rect(
+      paint,
+      x + 5,
+      y - TOWER_HEIGHT - BEACON_HEIGHT,
+      6,
+      BEACON_HEIGHT,
+      on ? HALL.amber : HALL.amberDim
+    )
+    drawCrate(paint, x + CRATE_AT_EXIT.dx, y + CRATE_AT_EXIT.dy)
+  }
+}
+
+/**
+ * A small amber plaque beside the exit with the position this order holds in
+ * the refinery's file-overlap queue, flashing the way a gate's beacon flashes
+ * while it waits. The number is drawn one pixel at a time on whole pixels; the
+ * hover label says it in words ("1st in the merge queue").
  */
 export function drawQueuePlate(paint: Paint, exit: Tile, context: SceneContext, tMs: number): void {
   const queue = context.queue ?? null
   if (queue === null) return
-  const x = exit.x * TILE_PX
-  const y = exit.y * TILE_PX
+  const plate = plateRect(exit)
   const flashOn = Math.floor(tMs / 250) % 2 === 0
 
-  rect(paint, x - 18, y - 40, 16, 12, '#20242c')
-  bevel(paint, x - 18, y - 40, 16, 12, HALL.steelLight, HALL.steelDark)
-  rect(paint, x - 16, y - 38, 12, 8, flashOn ? HALL.amber : HALL.amberDim)
+  rect(paint, plate.left, plate.top, 16, 16, '#20242c')
+  bevel(paint, plate.left, plate.top, 16, 16, HALL.steelLight, HALL.steelDark)
+  rect(paint, plate.left + 2, plate.top + 2, 12, 12, flashOn ? HALL.amber : HALL.amberDim)
 
-  const digits = String(Math.max(queue.position, 0))
-  let dx = x - 15 + Math.max(0, (12 - digits.length * 7) / 2)
-  for (const digit of digits) {
-    drawDigit(paint, dx, y - 36, digit, '#1a1508')
-    dx += 7
-  }
+  const digits = String(Math.min(Math.max(Math.trunc(queue.position), 0), BOARD_MAX))
+  drawText(
+    paint,
+    plate.left + 2 + Math.floor((12 - textWidth(digits)) / 2),
+    plate.top + 2 + Math.floor((12 - 5) / 2),
+    digits,
+    '#1a1508'
+  )
 }
 
 function drawLockers(paint: Paint, prop: HallProp): void {
@@ -1296,7 +1406,7 @@ export function drawProp(paint: Paint, prop: HallProp, context: SceneContext, tM
     case 'vending':
       return drawVendingProp(paint, prop)
     case 'dispatch':
-      return drawDispatch(paint, prop, context)
+      return drawDispatch(paint, prop, context, tMs)
     /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = kind

@@ -523,25 +523,30 @@ describe('factory/art/props drawBelts', () => {
     expect(hasRect(paint.calls, x + 2, y + 13, 12, 1, HALL.steelLight)).toBe(true)
   })
 
-  it('paints a split junction with the amber disc', () => {
+  it('paints a split junction as an amber diverter with an arm into each outgoing belt', () => {
     const tile: BeltTile = { x: 12, y: 7, ins: ['N'], outs: ['E', 'S'], kind: 'split', over: null }
     const map = baseMap({ beltTiles: [tile] })
     const paint = createRecordingPaint()
     drawBelts(paint, map, new Set(), 0)
     const x = tile.x * TILE_PX
     const y = tile.y * TILE_PX
-    expect(hasRect(paint.calls, x + 4, y + 5, 8, 6, HALL.amber)).toBe(true)
+    expect(hasRect(paint.calls, x + 5, y + 5, 6, 6, HALL.amber)).toBe(true)
+    expect(hasRect(paint.calls, x + 11, y + 7, 4, 2, HALL.amber)).toBe(true)
+    expect(hasRect(paint.calls, x + 7, y + 11, 2, 4, HALL.amber)).toBe(true)
+    expect(hasRect(paint.calls, x + 7, y + 1, 2, 4, HALL.amber)).toBe(false)
   })
 
-  it('paints a merge junction with the steel disc, not amber', () => {
+  it('paints a merge junction as a steel funnel narrowing into the outgoing belt, with no hub', () => {
     const tile: BeltTile = { x: 17, y: 7, ins: ['W', 'S'], outs: ['N'], kind: 'merge', over: null }
     const map = baseMap({ beltTiles: [tile] })
     const paint = createRecordingPaint()
     drawBelts(paint, map, new Set(), 0)
     const x = tile.x * TILE_PX
     const y = tile.y * TILE_PX
-    expect(hasRect(paint.calls, x + 4, y + 5, 8, 6, HALL.steel)).toBe(true)
-    expect(hasRect(paint.calls, x + 4, y + 5, 8, 6, HALL.amber)).toBe(false)
+    // The mouth is wide at the tile's far edge and the neck is four wide at the belt.
+    expect(hasRect(paint.calls, x + 3, y + 14, 11, 1, HALL.steel)).toBe(true)
+    expect(hasRect(paint.calls, x + 6, y + 1, 4, 1, HALL.steel)).toBe(true)
+    expect(hasRect(paint.calls, x + 5, y + 5, 6, 6, HALL.amber)).toBe(false)
   })
 
   it('paints the over deck for a cross tile', () => {

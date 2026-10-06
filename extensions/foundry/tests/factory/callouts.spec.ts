@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   calloutFor,
+  ciWaitingCallout,
+  CI_WAITING_ID,
   calloutLevels,
   calloutsFor,
   interruptionsFor,
@@ -379,5 +381,38 @@ describe('calloutsFor', () => {
       1000
     )
     expect(raised.map((c) => c.text)).toEqual(['Agent gone'])
+  })
+})
+
+describe('ciWaitingCallout', () => {
+  const pull = (buckets: ('pass' | 'pending' | 'fail')[]) => ({
+    checks: buckets.map((bucket) => ({ bucket })),
+  })
+
+  it('is pinned to the tower, with how far the wait has got, while any check is pending', () => {
+    const buckets = [...Array(12).fill('pass'), ...Array(7).fill('pending')]
+    expect(ciWaitingCallout({ pulls: [pull(buckets)] })).toEqual({
+      id: CI_WAITING_ID,
+      nodeId: 'ci',
+      tone: 'start',
+      text: 'Waiting on checks · 12 of 19 done',
+      at: 0,
+    })
+  })
+
+  it('counts the checks of every pull together', () => {
+    expect(ciWaitingCallout({ pulls: [pull(['pass']), pull(['pending'])] })?.text).toBe(
+      'Waiting on checks · 1 of 2 done'
+    )
+  })
+
+  it('is absent once nothing is pending, with no checks, or with no CI', () => {
+    expect(ciWaitingCallout({ pulls: [pull(['pass', 'fail'])] })).toBeNull()
+    expect(ciWaitingCallout({ pulls: [pull([])] })).toBeNull()
+    expect(ciWaitingCallout(null)).toBeNull()
+  })
+
+  it('still raises no callout for a single check going pending', () => {
+    expect(calloutFor({ kind: 'ci-check', name: 'Test', bucket: 'pending' }, {}, 0)).toBeNull()
   })
 })

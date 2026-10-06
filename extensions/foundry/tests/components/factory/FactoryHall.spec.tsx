@@ -449,7 +449,7 @@ describe('FactoryHall', () => {
     )
   })
 
-  function replayable(frames: unknown[]) {
+  function replayable(frames: unknown[], ci?: unknown[]) {
     invoke = vi.fn(async (channel: string) => {
       if (channel === 'foundry:run.observe') return view()
       if (channel === 'foundry:permissions-list') return { pending: [] }
@@ -457,7 +457,7 @@ describe('FactoryHall', () => {
       if (channel === 'foundry:run.timeline')
         return {
           graph: view().graph,
-          timeline: { frames, tools: [] },
+          timeline: { frames, tools: [], ci },
           gates: [],
         }
       return {}
@@ -491,6 +491,38 @@ describe('FactoryHall', () => {
       expect(screen.queryByRole('slider', { name: 'Replay position' })).toBeNull()
     )
     expect(plateText()).toContain('Working')
+  })
+
+  it('replays the wait on CI, and the tower to wait at, from what was recorded', async () => {
+    const pulls = (buckets: ('pass' | 'pending')[]) => [
+      {
+        url: 'https://github.com/a/b/pull/1',
+        checks: buckets.map((bucket, i) => ({ name: `c${i}`, bucket, link: '', workflow: '' })),
+      },
+    ]
+    replayable(
+      [
+        { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
+        { at: 9000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
+      ],
+      [
+        { at: 0, round: 0, max: 2, status: 'watching', pulls: pulls(['pass', 'pending']) },
+        { at: 9000, round: 0, max: 2, status: 'green', pulls: pulls(['pass', 'pass']) },
+      ]
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    const position = (await screen.findByRole('slider', {
+      name: 'Replay position',
+    })) as HTMLInputElement
+    await waitFor(() =>
+      expect(document.querySelector('.fdry-callout[data-pinned="true"]')?.textContent).toBe(
+        'Waiting on checks · 1 of 2 done'
+      )
+    )
+    fireEvent.change(position, { target: { value: position.max } })
+    await waitFor(() =>
+      expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
+    )
   })
 
   it('plays, pauses and changes speed', async () => {
@@ -590,5 +622,103 @@ describe('an open station monitor is live', () => {
     await screen.findByRole('log', { name: 'Transcript' })
     expect(invoke.mock.calls.some((c) => c[0] === 'foundry:run-transcript')).toBe(false)
     expect(screen.getByRole('log', { name: 'Transcript' }).textContent?.trim()).toBe('NOTHING YET.')
+  })
+})
+
+describe('FactoryHall labels what it draws', () => {
+  const pull = (buckets: ('pass' | 'pending')[]) => ({
+    url: 'https://github.com/a/b/pull/233',
+    checks: buckets.map((bucket, i) => ({ name: `check-${i}`, bucket, link: '', workflow: 'CI' })),
+  })
+  const ci = (buckets: ('pass' | 'pending')[]) => ({
+    round: 0,
+    max: 2,
+    status: 'watching',
+    reason: '',
+    at: '2026-10-05T10:00:00.000Z',
+    pulls: [pull(buckets)],
+  })
+  const shipGraph = {
+    orderId: 'WO-1',
+    recipe: 'standard',
+    nodes: [
+      node({ id: 'N-1', state: 'passed', sessionId: 's-1' }),
+      node({
+        id: 'ship',
+        kind: 'gate',
+        state: 'running',
+        role: null,
+        sessionId: null,
+        dependsOn: ['N-1'],
+      }),
+    ],
+  }
+
+  it("names the scoreboard with this order's real figures", async () => {
+    mount({
+      metrics: [{ orderId: 'WO-1', leadTimeMs: 25 * 60_000, reworks: 0, ciRounds: 0 }],
+    })
+    await waitFor(() =>
+      expect(
+        screen.getByRole('img', { name: 'Lead time 25 min · 0 reworks · 0 CI fix rounds' })
+      ).toBeTruthy()
+    )
+  })
+
+  it('keeps a callout pinned to the tower while checks are pending, and drops it when they land', async () => {
+    const pending = [...Array(12).fill('pass'), ...Array(7).fill('pending')] as (
+      | 'pass'
+      | 'pending'
+    )[]
+    mount({
+      view: view({ graph: shipGraph, labels: { 'N-1': 'Build', ship: 'Ship' }, ci: ci(pending) }),
+    })
+    await waitFor(() =>
+      expect(document.querySelector('.fdry-callout[data-pinned="true"]')?.textContent).toBe(
+        'Waiting on checks · 12 of 19 done'
+      )
+    )
+    expect(screen.getByRole('img', { name: 'Waiting on checks · 12 of 19 done' })).toBeTruthy()
+  })
+
+  it('pins no wait when every check has landed', async () => {
+    mount({
+      view: view({
+        graph: shipGraph,
+        labels: { 'N-1': 'Build', ship: 'Ship' },
+        ci: ci(['pass', 'pass']),
+      }),
+    })
+    await waitFor(() => screen.getByRole('img', { name: 'Checks · 2 passed · 0 failed' }))
+    expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
+  })
+
+  it("opens the ship gate's monitor with what it decided and no attach key", async () => {
+    mount({
+      view: view({
+        graph: shipGraph,
+        labels: { 'N-1': 'Build', ship: 'Ship' },
+        ci: ci(['pass', 'pending']),
+        pulls: [{ repo: 'a/b', url: 'https://github.com/a/b/pull/233', number: 233, cwd: '/x' }],
+      }),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /Ship/ }))
+    const decided = await screen.findByRole('log', { name: 'What this step decided' })
+    expect(decided.textContent).toBe('Draft opened · #233\nChecks · 1 of 2 passed')
+    expect(screen.queryByRole('button', { name: /ATTACH/ })).toBeNull()
+  })
+
+  it("opens a finished agent's monitor with its transcript and attach disabled", async () => {
+    mount({
+      view: view({
+        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
+      }),
+      lines: [{ role: 'assistant', kind: 'text', text: 'All done.', at: 1 }],
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await waitFor(() => screen.getByText('All done.'))
+    expect(
+      (screen.getByRole('button', { name: /Agent closed/i }) as HTMLButtonElement).disabled
+    ).toBe(true)
   })
 })

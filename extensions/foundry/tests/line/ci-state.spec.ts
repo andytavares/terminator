@@ -5,6 +5,8 @@ import * as path from 'node:path'
 import { writeCiState, readCiState } from '../../src/line/ci-state.js'
 import { ciLabel } from '../../src/line/ci-label.js'
 import type { CiState } from '../../src/line/ci-state.js'
+import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
+import { orderDir } from '../../src/data-root.js'
 
 let root: string
 
@@ -33,6 +35,15 @@ describe('ci-state', () => {
     await writeCiState(root, 'WO-1', state())
     const loaded = await readCiState(root, 'WO-1')
     expect(loaded).toEqual(state())
+  })
+
+  it("writes CI into the order's timeline when it changes, so a replay can show the wait", async () => {
+    forgetTimelines()
+    await writeCiState(root, 'WO-1', state())
+    await writeCiState(root, 'WO-1', state({ at: '2026-09-26T10:00:15.000Z' }))
+    await writeCiState(root, 'WO-1', state({ status: 'green' }))
+    const timeline = await readTimeline(orderDir(root, 'WO-1'))
+    expect(timeline.ci?.map((c) => c.status)).toEqual(['watching', 'green'])
   })
 
   it('returns null for a missing file', async () => {
