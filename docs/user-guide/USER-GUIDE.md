@@ -565,7 +565,7 @@ The review screen has one header, one file header and one footer around the diff
 - **Since your review.** When the author pushes, files you viewed that did not change stay viewed. Changed ones show **Changed since you viewed** and open on just what changed since you looked (`s` toggles the whole PR). Viewed marks are mirrored to GitHub.
 - **Where you left off.** Come back after 15 minutes and a card shows your last position, your notes, unread agent findings, unsent drafts and what moved.
 - **Drafts.** New comments collect as a pending review and go to GitHub together when you submit, so the author gets one notification.
-- **Keyboard.** `?` shows every key: `j`/`k` hunks, `]`/`[` files, `n` next unviewed, `v` viewed, `a` ask agent, `m` note, `r` comment, `⌘↵` submit.
+- **Keyboard.** `?` shows every key: `k`/`j` next/previous hunk, `]`/`[` files, `n` next unviewed, `v` viewed, `a` ask agent, `m` note, `r` comment, `⌘↵` submit.
 
 ### MergeFlow conflict resolver
 

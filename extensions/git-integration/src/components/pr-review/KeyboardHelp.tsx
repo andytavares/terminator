@@ -6,7 +6,7 @@ interface Props {
 }
 
 const ROWS: Array<{ keys: string[]; label: string }> = [
-  { keys: ['j', 'k'], label: 'Next / previous hunk' },
+  { keys: ['k', 'j'], label: 'Next / previous hunk' },
   { keys: [']', '['], label: 'Next / previous file' },
   { keys: ['n'], label: 'Next unviewed' },
   { keys: ['v'], label: 'Mark file viewed' },
