@@ -98,17 +98,41 @@ export function observationAt(
   return { graph, orphaned: [], stranded: [], waiting, activity, ci: null, queue: null }
 }
 
-/** Every recorded moment, in order: the beats a replay's clock is built on. */
+/** How long before the first thing happens a replay begins. */
+const LEAD_IN_MS = 1000
+
+/** The first moment any step was past `waiting`, or null when nothing ever moved. */
+function firstMovementAt(timeline: Timeline): number | null {
+  const frame = timeline.frames.find((f) => f.nodes.some((n) => n.state !== 'waiting'))
+  return frame === undefined ? null : frame.at
+}
+
+/**
+ * Every recorded moment, in order: the beats a replay's clock is built on.
+ *
+ * Tool calls from a session no step ever carried (a shaping session, before
+ * the graph existed) show nothing, so they add no moments. Nothing before
+ * `LEAD_IN_MS` ahead of the first movement is kept either: that stretch is a
+ * hall with nobody working in it.
+ */
 export function momentsOf(timeline: Timeline, gates: readonly Gate[]): number[] {
+  const carried = new Set<string>()
+  for (const frame of timeline.frames) {
+    for (const n of frame.nodes) if (n.sessionId !== null) carried.add(n.sessionId)
+  }
   const all = new Set<number>()
   for (const frame of timeline.frames) all.add(frame.at)
-  for (const entry of timeline.tools) all.add(entry.at)
+  for (const entry of timeline.tools) if (carried.has(entry.sessionId)) all.add(entry.at)
   for (const gate of gates) {
     all.add(Date.parse(gate.raisedAt))
     const decided = decidedAt(gate)
     if (decided !== null) all.add(decided)
   }
-  return [...all].sort((a, b) => a - b)
+  const moved = firstMovementAt(timeline)
+  const start = moved === null ? -Infinity : moved - LEAD_IN_MS
+  const kept = [...all].filter((at) => at >= start)
+  if (moved !== null) kept.push(start)
+  return [...new Set(kept)].sort((a, b) => a - b)
 }
 
 export interface ReplayClock {

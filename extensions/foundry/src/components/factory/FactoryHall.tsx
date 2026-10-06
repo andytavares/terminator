@@ -9,6 +9,8 @@ import type { World } from '../../factory/sim.js'
 import { diffObservation, describeEvent } from '../../factory/events.js'
 import type { FactoryEvent, Observation } from '../../factory/events.js'
 import { direct } from '../../factory/director.js'
+import { createBeats, release, schedule } from '../../factory/beats.js'
+import type { Beats } from '../../factory/beats.js'
 import { calloutLevels, calloutsFor, interruptionsFor, stateWord } from '../../factory/callouts.js'
 import type { Callout, CalloutBox, Interruption } from '../../factory/callouts.js'
 import { momentsOf, observationAt, replayClock } from '../../factory/replay.js'
@@ -68,6 +70,15 @@ interface Replay {
   readonly playing: boolean
   readonly speed: ReplaySpeed
   readonly observation: Observation
+  /** What each station is showing: the states the beat scheduler has released so far. */
+  readonly shown: Readonly<Record<string, NodeState>>
+}
+
+/** How often held beats are looked at, between polls. */
+const BEAT_CHECK_MS = 200
+
+function statesOf(graph: RunGraph): Record<string, NodeState> {
+  return Object.fromEntries(graph.nodes.map((n) => [n.id, n.state]))
 }
 
 function clockText(ms: number): string {
@@ -150,6 +161,12 @@ export function FactoryHall({
   const mapKeyRef = useRef<string | null>(null)
   const worldRef = useRef<World | null>(null)
   const prevObservationRef = useRef<Observation | null>(null)
+  // Beats the scene has been handed, and the node states they add up to. Held
+  // beats are released on a timer as well as on a poll, so a step that passed
+  // in the same instant as its feeder still plays out after it.
+  const beatsRef = useRef<Beats | null>(null)
+  const replayBeatsRef = useRef<Beats | null>(null)
+  const [liveShown, setLiveShown] = useState<Readonly<Record<string, NodeState>>>({})
 
   const pollActivity = useCallback(async () => {
     const r = (await invoke('foundry:run.activity', { id: orderId })) as {
@@ -236,6 +253,8 @@ export function FactoryHall({
       setMap(nextMap)
       worldRef.current = createWorld(nextMap, observation)
       prevObservationRef.current = observation
+      beatsRef.current = createBeats(statesOf(view.graph))
+      setLiveShown(beatsRef.current.shown)
       return
     }
 
@@ -243,12 +262,33 @@ export function FactoryHall({
     // above — reaching here means both are already populated.
     const world = worldRef.current as World
     const now = Date.now()
-    const events = diffObservation(prevObservationRef.current, observation)
+    const seen = diffObservation(prevObservationRef.current, observation)
+    const held = schedule(beatsRef.current as Beats, seen, view.graph.nodes, now)
+    const { beats, events } = release(held, now)
+    beatsRef.current = beats
+    setLiveShown(beats.shown)
     worldRef.current = direct(world, events, now)
     prevObservationRef.current = observation
     // A replay has the stage; live events still move the live world, silently.
     if (replayRef.current === null) announce(events, view.labels ?? {})
   }, [view, activity, announce])
+
+  // A held beat comes due with no poll to carry it.
+  const liveLabels = view?.labels
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const held = beatsRef.current
+      if (held === null || held.held.length === 0 || worldRef.current === null) return
+      const now = Date.now()
+      const { beats, events } = release(held, now)
+      if (events.length === 0) return
+      beatsRef.current = beats
+      setLiveShown(beats.shown)
+      worldRef.current = direct(worldRef.current, events, now)
+      if (replayRef.current === null) announce(events, liveLabels ?? {})
+    }, BEAT_CHECK_MS)
+    return () => clearInterval(timer)
+  }, [announce, liveLabels])
 
   const labelsNow = view?.labels
 
@@ -270,6 +310,7 @@ export function FactoryHall({
     const replayMap = layoutHall(r.graph, labelsNow ?? {})
     replayWorldRef.current = createWorld(replayMap, observation)
     replayPrevRef.current = observation
+    replayBeatsRef.current = createBeats(statesOf(observation.graph))
     setCallouts([])
     const next: Replay = {
       graph: r.graph,
@@ -281,6 +322,7 @@ export function FactoryHall({
       playing: true,
       speed: 1,
       observation,
+      shown: (replayBeatsRef.current as Beats).shown,
     }
     replayRef.current = next
     setReplay(next)
@@ -298,14 +340,25 @@ export function FactoryHall({
       const observation = observationAt(r.timeline, r.gates, r.graph, real)
       if (seek) {
         replayWorldRef.current = createWorld(r.map, observation)
+        replayBeatsRef.current = createBeats(statesOf(observation.graph))
         setCallouts([])
       } else {
-        const events = diffObservation(replayPrevRef.current, observation)
+        const seen = diffObservation(replayPrevRef.current, observation)
+        const held = schedule(replayBeatsRef.current as Beats, seen, r.graph.nodes, real)
+        // The recording's end shows everything still held rather than cutting it off.
+        const { beats, events } = release(held, at >= r.clock.duration ? Infinity : real)
+        replayBeatsRef.current = beats
         replayWorldRef.current = direct(replayWorldRef.current as World, events, real)
         announce(events, labelsNow ?? {})
       }
       replayPrevRef.current = observation
-      const next = { ...r, pos: at, observation, playing: r.playing && at < r.clock.duration }
+      const next = {
+        ...r,
+        pos: at,
+        observation,
+        shown: (replayBeatsRef.current as Beats).shown,
+        playing: r.playing && at < r.clock.duration,
+      }
       replayRef.current = next
       setReplay(next)
     },
@@ -323,6 +376,7 @@ export function FactoryHall({
   const leaveReplay = (): void => {
     replayRef.current = null
     replayWorldRef.current = null
+    replayBeatsRef.current = null
     setCallouts([])
     setReplay(null)
   }
@@ -484,7 +538,9 @@ export function FactoryHall({
   const flaggedNodes = new Set(interruptions.map((i) => i.nodeId))
   const needsYou = [...flaggedNodes].filter((id): id is string => id !== null)
   const states: Record<string, NodeState> = {}
-  for (const n of shownGraph.nodes) states[n.id] = n.state
+  // The scene shows what the beat scheduler has released, not the raw graph.
+  const shownStates = replay === null ? liveShown : replay.shown
+  for (const n of shownGraph.nodes) states[n.id] = shownStates[n.id] ?? n.state
   const selectedNode =
     selected === null ? null : (view.graph.nodes.find((n) => n.id === selected) ?? null)
   const monitorStatus: MonitorStatus =

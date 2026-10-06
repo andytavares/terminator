@@ -10,6 +10,7 @@ import {
   tileCenter,
   stationOf,
   workAnimFor,
+  loiterPoints,
   VERDICT_MS,
 } from '../../src/factory/sim.js'
 import type { World } from '../../src/factory/sim.js'
@@ -695,5 +696,96 @@ describe('cratePosition', () => {
   it('stays on the only tile of a one-tile belt', () => {
     const short = { ...belt, path: [{ x: 4, y: 4 }] }
     expect(cratePosition(short, 0.5)).toEqual({ x: 4 * 16 + 8, y: 4 * 16 + 10 })
+  })
+})
+
+describe('idle crew wander', () => {
+  function restingWorld(): World {
+    let g = graphFor('standard.yaml', [1, 2], RECORDED_RECIPES)
+    for (const node of g.nodes) g = withNode(g, node.id, { state: 'passed' })
+    return createWorld(layoutHall(g), obs(g))
+  }
+
+  function run(world: World, ms: number, step = 100): World {
+    let w = world
+    for (let t = 0; t < ms; t += step) w = tick(w, step)
+    return w
+  }
+
+  function trail(world: World, ms: number): string[] {
+    const out: string[] = []
+    let w = world
+    for (let t = 0; t < ms; t += 100) {
+      w = tick(w, 100)
+      out.push(w.crew.map((c) => `${Math.round(c.x)},${Math.round(c.y)}`).join('|'))
+    }
+    return out
+  }
+
+  it('picks loiter points from the map alone: free, reachable floor, in a fixed order', () => {
+    const map = restingWorld().map
+    const points = loiterPoints(map)
+    expect(points.length).toBeGreaterThan(0)
+    expect(points.length).toBeLessThanOrEqual(8)
+    for (const p of points) expect(map.walk[p.y][p.x]).toBe(false)
+    expect(loiterPoints(map)).toBe(points)
+  })
+
+  it('leaves everyone seated before the first stroll is due', () => {
+    const start = restingWorld()
+    const after = run(start, 19_000)
+    expect(after.crew.map((c) => [c.x, c.y])).toEqual(start.crew.map((c) => [c.x, c.y]))
+  })
+
+  it('sends a resting crew member to a loiter point and back to their own seat', () => {
+    const start = restingWorld()
+    const seats = start.crew.map((c) => c.restSeat)
+    let w = start
+    let walked = false
+    let left = false
+    for (let t = 0; t < 120_000; t += 100) {
+      w = tick(w, 100)
+      for (const c of w.crew) {
+        if (c.wander === 'out' || c.wander === 'back') walked = true
+        if (c.wander !== null && c.wander !== undefined) {
+          // the seat stays reserved for the whole stroll
+          expect(c.restSeat).not.toBeNull()
+        }
+      }
+      if (w.crew.some((c) => c.wander === 'there')) left = true
+    }
+    expect(walked).toBe(true)
+    expect(left).toBe(true)
+    // after enough time everyone has either come home or is out strolling
+    const homeAgain = run(w, 120_000).crew.filter((c) => c.goal === null && c.wander == null)
+    for (const c of homeAgain) {
+      const seat = start.map.restSeats[c.restSeat as number]
+      expect([c.x, c.y]).toEqual([tileCenter(seat.tile).x, tileCenter(seat.tile).y])
+    }
+    expect(w.crew.map((c) => c.restSeat)).toEqual(seats)
+  })
+
+  it('is deterministic: the same world and tick sizes walk the same path', () => {
+    expect(trail(restingWorld(), 90_000)).toEqual(trail(restingWorld(), 90_000))
+  })
+
+  it('lets a real node-state event override a stroll', () => {
+    let w = restingWorld()
+    let strolling: string | undefined
+    for (let t = 0; t < 120_000 && strolling === undefined; t += 100) {
+      w = tick(w, 100)
+      strolling = w.crew.find((c) => c.wander === 'out')?.nodeId
+    }
+    expect(strolling).toBeDefined()
+    const id = strolling as string
+    w = direct(w, [{ kind: 'node-state', nodeId: id, from: 'passed', to: 'running' }], w.clockMs)
+    const crew = w.crew.find((c) => c.nodeId === id)!
+    expect(crew.wander).toBeNull()
+    expect(crew.restSeat).toBeNull()
+    expect(crew.goal).toEqual(seatOf(w.map, id))
+    // and it stays on its errand: never pulled back into a stroll
+    const later = run(w, 60_000).crew.find((c) => c.nodeId === id)!
+    expect(later.wander ?? null).toBeNull()
+    expect(later.anim).not.toBe('couch')
   })
 })
