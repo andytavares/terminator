@@ -1,0 +1,97 @@
+extensions/foundry/tests/components/GateEvidence.spec.tsx
+  s_f5ff94286b0398::t_8138c496aba63f 40-48
+extensions/foundry/src/runtime/supervision.ts
+  s_f5ff94286b0398::t_78ffa8b398a254 12
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_f5ff94286b0398::t_141922e19bf90e 100
+  s_f5ff94286b0398::t_319d8785b882f1 154-168
+extensions/foundry/src/forge/readiness.ts
+  s_f5ff94286b0398::t_141922e19bf90e 54-55,60,62,66-70,982
+extensions/foundry/src/components/Markdown.tsx
+  s_f5ff94286b0398::t_8138c496aba63f 22-52,79,81
+extensions/foundry/SUPERVISION.md
+  s_f5ff94286b0398::t_da82dd5174109e 494-499,524-526
+extensions/foundry/src/components/Orders.tsx
+  s_f5ff94286b0398::t_4470dc4650d2b5 265
+extensions/foundry/src/components/Floor.tsx
+  s_f5ff94286b0398::t_0716df467f8068 21
+  s_f5ff94286b0398::t_80f76cd28cb8b6 130,179-182,336-345,350,359
+  s_f5ff94286b0398::t_ddda55abbe8702 462-524
+  s_f5ff94286b0398::t_16b647fd41dabd 307-310,323
+  s_f5ff94286b0398::t_2756db76d61ef3 136-143,284-306,311-319,321,939-944,951-954,956,958-962,971-972,975,977-988,992-996,1019-1022,1026
+  s_f5ff94286b0398::t_78ffa8b398a254 900-901
+  s_f5ff94286b0398::t_a7cf8e98702a90 893
+  s_f5ff94286b0398::t_29361179f65184 456-457,459,539-575,763-770,890-892,894-896,898-899,902-908,913
+  s_f5ff94286b0398::t_a71b0992b0cc96 1,5,15-18,25
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_f5ff94286b0398::t_fdd89b76618c70 227-282,713-753
+  s_f5ff94286b0398::t_d4624bd5ab8b12 754
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_f5ff94286b0398::t_16b647fd41dabd 1634,1649,1677,1687
+  s_f5ff94286b0398::t_a71b0992b0cc96 1587
+  s_f5ff94286b0398::t_1a413a1e4ceff1 58-60,67,96-97,121-126,568-569,587-588,598,605,623,634,648
+  s_f5ff94286b0398::t_b44a2673cf2906 91,1449-1570,1574-1586,1588-1612,1620-1633,1635-1648,1650-1676,1678-1686,1688-1692
+  s_f5ff94286b0398::t_2c67468018899a 236-237,257-258,271-336,657-659,862,1077-1078,1080,1216-1218,1320-1323
+  s_f5ff94286b0398::t_78ffa8b398a254 259-270,1571-1573,1613-1619
+extensions/foundry/tests/line/ci-state.spec.ts
+  s_f5ff94286b0398::t_a09ed22368cafc 5-6
+extensions/foundry/src/line/ci-label.ts
+  s_f5ff94286b0398::t_0716df467f8068 1-20
+extensions/foundry/src/components/foundry.css
+  s_f5ff94286b0398::t_a7cf8e98702a90 2014,2057,2075-2163,2166,2471-2484,2697-2731,3256-3269
+  s_f5ff94286b0398::t_2fb2340a61f4d2 3270
+extensions/foundry/src/renderer/use-run-observation.ts
+  s_f5ff94286b0398::t_ddda55abbe8702 59-62
+extensions/foundry/tests/components/Markdown.spec.tsx
+  s_f5ff94286b0398::t_b4db2d4962fcea 121-133
+  s_f5ff94286b0398::t_e16a97b7565ce4 1-2
+extensions/foundry/tests/components/GateCard.spec.tsx
+  s_f5ff94286b0398::t_f6e04b019a6f33 87,89
+  s_f5ff94286b0398::t_54099155e92ca1 2,163
+  s_f5ff94286b0398::t_5b63edc66d927a 1,3-86,88,90-117,121-162,164-167
+  s_f5ff94286b0398::t_78ffa8b398a254 118-120
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_f5ff94286b0398::t_b53338ef0808c9 629-657
+extensions/foundry/src/components/Inbox.tsx
+  s_f5ff94286b0398::t_2f88f0814b7824 1-2,16,251-271,296
+extensions/foundry/src/components/Forge.tsx
+  s_f5ff94286b0398::t_f2eb590a405169 19
+  s_f5ff94286b0398::t_4470dc4650d2b5 269-270,325,581
+docs/ARCHITECTURE.md
+  s_f5ff94286b0398::t_afbe721cbbb15a 1429-1431
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_f5ff94286b0398::t_afbe721cbbb15a 268-270
+  s_f5ff94286b0398::t_da82dd5174109e 549-552
+extensions/foundry/src/types/electron.ts
+  s_f5ff94286b0398::t_8138c496aba63f 28-36
+extensions/foundry/src/components/GateEvidence.tsx
+  s_f5ff94286b0398::t_8138c496aba63f 25
+extensions/foundry/src/ipc/run-channels.ts
+  s_f5ff94286b0398::t_865018c9df3a07 6,24,45,47-58,553-564,782-797
+  s_f5ff94286b0398::t_8412f44cb8b686 46
+docs/user-guide/USER-GUIDE.md
+  s_f5ff94286b0398::t_afbe721cbbb15a 640-647,858-876
+extensions/foundry/src/components/GateCard.tsx
+  s_f5ff94286b0398::t_54099155e92ca1 1-147
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_f5ff94286b0398::t_d1c01ef63d401f 108-115,117-121
+  s_f5ff94286b0398::t_78ffa8b398a254 116
+extensions/foundry/tests/runtime/supervision.spec.ts
+  s_f5ff94286b0398::t_3f9c623770b218 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c4194cd4043a771ecdaa85ac9595b15273a6b90c",
+  "prompts": {},
+  "sessions": {
+    "s_f5ff94286b0398": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ae147c9a-1299-42b3-a6cc-5d19c4b0ab13",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
