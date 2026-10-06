@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ListFilter } from 'lucide-react'
 import type { SessionView } from '../../sidebar/view-model'
 import { closeAllContextMenus } from '../ContextMenu'
+import { useMenuPlacement } from '../use-menu-placement'
 import './SidebarMenu.css'
 
 export interface FilterMenuProps {
@@ -40,6 +41,9 @@ export function FilterMenu({
   onShowAll,
 }: FilterMenuProps): JSX.Element {
   const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const placement = useMenuPlacement(open, buttonRef, panelRef)
   const active = views.find((v) => v.id === activeViewId) ?? views[0]
   const hidden = Math.max(0, total - shown)
 
@@ -57,6 +61,7 @@ export function FilterMenu({
   return (
     <div className="sidebar-menu" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={buttonRef}
         type="button"
         className={`sidebar-menu__button${hidden > 0 ? ' sidebar-menu__button--on' : ''}`}
         aria-expanded={open}
@@ -72,7 +77,7 @@ export function FilterMenu({
       </button>
 
       {open && (
-        <div className="sidebar-menu__panel" role="menu">
+        <div ref={panelRef} className="sidebar-menu__panel" role="menu" style={placement}>
           {views.map((view) => (
             <button
               key={view.id}
