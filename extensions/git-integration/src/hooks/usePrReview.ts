@@ -8,6 +8,7 @@ import {
 } from '../schemas/pr-review.schema'
 import type {
   PrReviewDetail,
+  RiskScore,
   FileMetrics,
   IssueComment,
   SignalDots,
@@ -258,8 +259,17 @@ export function useLoadPrDetail(repoRoot: string | null) {
 
 // ─── File metrics loading ─────────────────────────────────────────────────────
 
+interface RawFileMetrics {
+  churn90d: number
+  blastRadius: number
+  topImporters: string[]
+  importerCount: number
+  testFilePresent: boolean
+  patchCoverage?: number | null
+}
+
 export function useFetchFileMetrics(repoRoot: string | null) {
-  const { activePr, updateFileRiskScore, updateQueuePrRisk } = usePrReviewStore()
+  const { activePr, updateFileRiskScores, updateQueuePrRisk } = usePrReviewStore()
 
   return useCallback(
     async (prDetail?: PrReviewDetail) => {
@@ -268,53 +278,49 @@ export function useFetchFileMetrics(repoRoot: string | null) {
       // Exclude lock files / generated files (tier 3) from risk scoring entirely
       const allFiles = pr.chapters.flatMap((c) => c.files).filter((f) => f.tier !== 3)
 
-      // Fetch raw metrics for all files in parallel
-      const results = await Promise.allSettled(
-        allFiles.map(async (file) => {
-          const result = await githubAPI.fileMetrics(repoRoot, file.path)
-          if ('error' in result) return null
-          const raw = result as {
-            churn90d: number
-            blastRadius: number
-            topImporters: string[]
-            importerCount: number
-            testFilePresent: boolean
-          }
-          const metrics: FileMetrics = {
-            path: file.path,
-            additions: file.additions,
-            deletions: file.deletions,
-            churn90d: raw.churn90d ?? null,
-            blastRadius: raw.blastRadius ?? null,
-            testFilePresent: raw.testFilePresent ?? false,
-            complexityDelta: null,
-            patchCoverage: raw.patchCoverage ?? null,
-            topImporters: raw.topImporters ?? [],
-            importerCount: raw.importerCount ?? 0,
-          }
-          return { file, metrics }
-        })
+      if (allFiles.length === 0) return
+      const response = await githubAPI.filesMetrics(
+        repoRoot,
+        allFiles.map((f) => f.path)
       )
+      if ('error' in response) return
+      const byPath = (response as { metrics: Record<string, RawFileMetrics> }).metrics
+
+      const results = allFiles.map((file) => {
+        const raw = byPath[file.path]
+        if (!raw) return null
+        const metrics: FileMetrics = {
+          path: file.path,
+          additions: file.additions,
+          deletions: file.deletions,
+          churn90d: raw.churn90d ?? null,
+          blastRadius: raw.blastRadius ?? null,
+          testFilePresent: raw.testFilePresent ?? false,
+          complexityDelta: null,
+          patchCoverage: raw.patchCoverage ?? null,
+          topImporters: raw.topImporters ?? [],
+          importerCount: raw.importerCount ?? 0,
+        }
+        return { file, metrics }
+      })
 
       const collected: Array<{ file: (typeof allFiles)[0]; metrics: FileMetrics }> = []
       for (const r of results) {
-        if (r.status === 'fulfilled' && r.value != null) collected.push(r.value)
+        if (r != null) collected.push(r)
       }
 
       if (collected.length === 0) return
 
       const allMetrics = collected.map((c) => c.metrics)
 
-      // Compute risk scores for each file and update the store
+      const scores: Record<string, RiskScore> = {}
       for (const { file, metrics } of collected) {
-        const chapter = pr.chapters.find((c) => c.files.some((f) => f.path === file.path))
-        if (!chapter) continue
-        const riskScore = computeRiskScore(metrics, allMetrics)
-        updateFileRiskScore(chapter.id, file.path, riskScore)
+        scores[file.path] = computeRiskScore(metrics, allMetrics)
       }
+      updateFileRiskScores(scores)
 
       // Weighted PR-level risk: high files always push to HIGH; medium files block LOW
-      const riskLevels = collected.map((c) => computeRiskScore(c.metrics, allMetrics).level)
+      const riskLevels = collected.map((c) => scores[c.file.path].level)
       const highCount = riskLevels.filter((l) => l === 'high').length
       const medCount = riskLevels.filter((l) => l === 'medium').length
       const n = riskLevels.length
@@ -377,7 +383,7 @@ export function useFetchFileMetrics(repoRoot: string | null) {
 
       updateQueuePrRisk(pr.number, prRiskLevel, signalDots)
     },
-    [repoRoot, activePr, updateFileRiskScore, updateQueuePrRisk]
+    [repoRoot, activePr, updateFileRiskScores, updateQueuePrRisk]
   )
 }
 
@@ -385,10 +391,12 @@ export function useFetchFileMetrics(repoRoot: string | null) {
 
 export function useLoadIssueComments(repoRoot: string | null) {
   const { activePr, setIssueComments } = usePrReviewStore()
+  // Depend on the number, not the object: every file open patches activePr.
+  const activeNumber = activePr?.number
 
   return useCallback(
     async (prNumberOverride?: number) => {
-      const prNumber = prNumberOverride ?? activePr?.number
+      const prNumber = prNumberOverride ?? activeNumber
       if (!repoRoot || !prNumber) return
       try {
         const result = await githubAPI.prIssueComments(repoRoot, prNumber)
@@ -398,7 +406,7 @@ export function useLoadIssueComments(repoRoot: string | null) {
         console.error('Failed to load issue comments', e)
       }
     },
-    [repoRoot, activePr, setIssueComments]
+    [repoRoot, activeNumber, setIssueComments]
   )
 }
 
@@ -406,11 +414,14 @@ export function useLoadIssueComments(repoRoot: string | null) {
 
 export function useLoadInlineComments(repoRoot: string | null) {
   const { activePr, setThreads } = usePrReviewStore()
+  // Depend on the number, not the object: every file open patches activePr.
+  const activeNumber = activePr?.number
 
   return useCallback(async () => {
-    if (!repoRoot || !activePr) return
+    const current = usePrReviewStore.getState().activePr
+    if (!repoRoot || !current) return
     try {
-      const result = await githubAPI.prInlineComments(repoRoot, activePr.number)
+      const result = await githubAPI.prInlineComments(repoRoot, current.number)
       if ('error' in result) return
       const { buildThreads } = await import('../github/pr-review-service-renderer')
       const comments = (result as { comments: unknown[]; resolvedCommentIds?: number[] }).comments
@@ -432,5 +443,7 @@ export function useLoadInlineComments(repoRoot: string | null) {
     } catch (e) {
       console.error('Failed to load inline comments', e)
     }
-  }, [repoRoot, activePr, setThreads])
+    // activeNumber is a deliberate dependency: consumers re-run the loader when the PR changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoRoot, activeNumber, setThreads])
 }

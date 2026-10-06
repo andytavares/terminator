@@ -3,7 +3,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useGitStore } from '../../src/stores/git.store'
 
-vi.mock('../../src/stores/git.store', () => ({ useGitStore: vi.fn() }))
+vi.mock('../../src/stores/git.store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/stores/git.store')>()),
+  useGitStore: vi.fn(),
+}))
 vi.mock('../../src/hooks/useGitStatus', () => ({ useGitStatus: vi.fn() }))
 vi.mock('../../src/components/StagingArea', () => ({
   StagingArea: ({ onFileSelect }: { onFileSelect: (path: string, staged: boolean) => void }) => (
@@ -53,16 +56,20 @@ const mockOn = vi.fn((channel: string, cb: (data: unknown) => void) => {
 })
 
 function setupStore(overrides: Record<string, unknown> = {}) {
-  vi.mocked(useGitStore).mockReturnValue({
-    status: { branch: 'feature', files: [] },
-    selectedFile: null,
-    diffCache: new Map(),
-    setSelectedFile: mockSetSelectedFile,
-    setDiff: mockSetDiff,
-    setLoading: mockSetLoading,
-    clearDiffCache: vi.fn(),
-    ...overrides,
-  } as unknown as ReturnType<typeof useGitStore>)
+  {
+    const state: Record<string, unknown> = {
+      status: { branch: 'feature', files: [] },
+      selectedFile: null,
+      diffCache: new Map(),
+      setSelectedFile: mockSetSelectedFile,
+      setDiff: mockSetDiff,
+      setLoading: mockSetLoading,
+      clearDiffCache: vi.fn(),
+      ...overrides,
+    }
+    vi.mocked(useGitStore).mockImplementation(((sel?: (s: unknown) => unknown) =>
+      sel ? sel(state) : state) as unknown as typeof useGitStore)
+  }
 }
 
 beforeEach(() => {
@@ -229,6 +236,27 @@ describe('GitFullView', () => {
         isUntracked: false,
       })
     )
+  })
+
+  it('caches the fetched diff under its staged/unstaged key', async () => {
+    await renderView()
+    fireEvent.click(screen.getByText('SelectFile'))
+    await waitFor(() =>
+      expect(mockSetDiff).toHaveBeenCalledWith('unstaged:src/foo.ts', { hunks: [] })
+    )
+  })
+
+  it('does not refetch when the same side of the file is already cached', async () => {
+    await renderView('/repo', { diffCache: new Map([['unstaged:src/foo.ts', { hunks: [] }]]) })
+    fireEvent.click(screen.getByText('SelectFile'))
+    await Promise.resolve()
+    expect(mockGitDiffFile).not.toHaveBeenCalled()
+  })
+
+  it('refetches when only the other side of the file is cached', async () => {
+    await renderView('/repo', { diffCache: new Map([['staged:src/foo.ts', { hunks: [] }]]) })
+    fireEvent.click(screen.getByText('SelectFile'))
+    await waitFor(() => expect(mockGitDiffFile).toHaveBeenCalledTimes(1))
   })
 
   it('shows hook output when commit fails due to hook failure', async () => {

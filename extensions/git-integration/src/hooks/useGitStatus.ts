@@ -4,7 +4,8 @@ import type { GitStatus } from '../schemas/git.schema'
 import { gitAPI } from '../api/git'
 
 export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000): void {
-  const { setStatus, setLoading } = useGitStore()
+  const setStatus = useGitStore((s) => s.setStatus)
+  const setLoading = useGitStore((s) => s.setLoading)
 
   useEffect(() => {
     if (!repoRoot) {
@@ -13,9 +14,11 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
     }
 
     let cancelled = false
+    let inFlight = false
 
     async function refresh(): Promise<void> {
-      if (cancelled) return
+      if (cancelled || inFlight) return
+      inFlight = true
       try {
         const result = (await gitAPI.status(repoRoot!)) as GitStatus | { error: string }
         if (!cancelled) {
@@ -25,6 +28,7 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
       } catch {
         if (!cancelled) setStatus(null)
       } finally {
+        inFlight = false
         if (!cancelled) setLoading(false)
       }
     }
@@ -33,12 +37,19 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
     void refresh()
 
     const unsubFs = window.electronAPI.fs.onChanged(() => void refresh())
-    const interval = setInterval(() => void refresh(), refreshIntervalMs)
+    const interval = setInterval(() => {
+      if (document.visibilityState !== 'hidden') void refresh()
+    }, refreshIntervalMs)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
       cancelled = true
       unsubFs()
       clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [repoRoot, refreshIntervalMs, setStatus, setLoading])
 }

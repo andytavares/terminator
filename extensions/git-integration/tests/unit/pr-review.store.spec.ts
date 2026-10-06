@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const sessionSet = vi.fn().mockResolvedValue({ ok: true })
 const fileViewedSet = vi.fn().mockResolvedValue({ ok: true })
+const filesViewedSet = vi.fn().mockResolvedValue({ ok: true })
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
     sessionSet: (...a: unknown[]) => sessionSet(...a),
     fileViewedSet: (...a: unknown[]) => fileViewedSet(...a),
+    filesViewedSet: (...a: unknown[]) => filesViewedSet(...a),
   },
 }))
 
@@ -43,6 +45,7 @@ describe('pr-review store — session v2', () => {
     usePrReviewStore.getState().reset()
     sessionSet.mockClear()
     fileViewedSet.mockClear()
+    filesViewedSet.mockClear()
   })
 
   it('keys a session by PR, not by head', () => {
@@ -87,7 +90,7 @@ describe('pr-review store — session v2', () => {
     expect(s.changedSince.has('scripts/e2e-shard.ts')).toBe(false)
     expect(s.viewedFiles.has('scripts/e2e-shard.ts')).toBe(true)
     expect(s.viewedAt['scripts/e2e-shard.ts']).toBe('bbb222')
-    expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'scripts/e2e-shard.ts', true)
+    expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'scripts/e2e-shard.ts', true, undefined)
     const [key, persisted] = sessionSet.mock.calls.at(-1)!
     expect(key).toBe(`${REPO}:::211`)
     expect((persisted as ReviewSession).viewedAt['scripts/e2e-shard.ts']).toBe('bbb222')
@@ -100,7 +103,7 @@ describe('pr-review store — session v2', () => {
     const s = usePrReviewStore.getState()
     expect(s.viewedFiles.has('playwright.config.ts')).toBe(false)
     expect(s.viewedAt['playwright.config.ts']).toBeUndefined()
-    expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'playwright.config.ts', false)
+    expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'playwright.config.ts', false, undefined)
   })
 
   it('drafts and notes persist with the session', () => {
@@ -139,5 +142,67 @@ describe('pr-review store — session v2', () => {
     store.addDraft(REPO, 211, 'aaa111', { ...persisted.drafts[0], id: 'd2' })
     store.clearDrafts(REPO, 211, 'aaa111')
     expect(usePrReviewStore.getState().drafts).toHaveLength(0)
+  })
+
+  describe('viewed marks and risk scores against an active PR', () => {
+    const riskScore = (composite: number) =>
+      ({
+        level: 'low',
+        composite,
+        dominantDriver: 'changeSize',
+        topImporters: [],
+        importerCount: 0,
+        metrics: {},
+      }) as never
+    const file = (path: string) => ({ path, riskScore: riskScore(0) })
+    const activePr = () =>
+      ({
+        number: 211,
+        headSHA: 'aaa111',
+        nodeId: 'PR_node_211',
+        chapters: [
+          { id: 'ch-1', files: [file('a.ts'), file('b.ts')] },
+          { id: 'ch-2', files: [file('c.ts')] },
+        ],
+      }) as never
+
+    it('passes the PR node id so a single mark costs one GitHub call', () => {
+      usePrReviewStore.getState().setActivePr(activePr())
+      usePrReviewStore.getState().markFileViewed(REPO, 211, 'aaa111', 'a.ts')
+      expect(fileViewedSet).toHaveBeenCalledWith(REPO, 211, 'a.ts', true, 'PR_node_211')
+    })
+
+    it('marks several files with one session write and one GitHub request', () => {
+      usePrReviewStore.getState().setActivePr(activePr())
+      usePrReviewStore.getState().markFilesViewed(REPO, 211, 'aaa111', ['a.ts', 'b.ts'])
+      const s = usePrReviewStore.getState()
+      expect([...s.viewedFiles].sort()).toEqual(['a.ts', 'b.ts'])
+      expect(s.viewedAt).toEqual({ 'a.ts': 'aaa111', 'b.ts': 'aaa111' })
+      expect(sessionSet).toHaveBeenCalledTimes(1)
+      expect(fileViewedSet).not.toHaveBeenCalled()
+      expect(filesViewedSet).toHaveBeenCalledTimes(1)
+      expect(filesViewedSet).toHaveBeenCalledWith(REPO, 211, 'PR_node_211', ['a.ts', 'b.ts'], true)
+    })
+
+    it('does nothing for an empty batch', () => {
+      usePrReviewStore.getState().markFilesViewed(REPO, 211, 'aaa111', [])
+      expect(sessionSet).not.toHaveBeenCalled()
+      expect(filesViewedSet).not.toHaveBeenCalled()
+    })
+
+    it('applies many risk scores across chapters in one store update', () => {
+      usePrReviewStore.getState().setActivePr(activePr())
+      let updates = 0
+      const unsub = usePrReviewStore.subscribe(() => updates++)
+      usePrReviewStore.getState().updateFileRiskScores({
+        'a.ts': riskScore(40),
+        'c.ts': riskScore(80),
+      })
+      unsub()
+      const chapters = usePrReviewStore.getState().activePr!.chapters
+      expect(updates).toBe(1)
+      expect(chapters[0].files.map((f) => f.riskScore.composite)).toEqual([40, 0])
+      expect(chapters[1].files[0].riskScore.composite).toBe(80)
+    })
   })
 })
