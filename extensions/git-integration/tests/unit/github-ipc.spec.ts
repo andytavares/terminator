@@ -658,6 +658,118 @@ describe('github:pr-file-diff', () => {
   })
 })
 
+describe('github:pr-file-content', () => {
+  let handlers: Record<string, Handler>
+  const payload = { repoRoot: '/repo', prNumber: 6, path: 'src/foo.ts', ref: 'abc123' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('reads the file at the commit with git show for a local repo', async () => {
+    mockGitSuccess('const x = 1')
+    const result = await handlers['github:pr-file-content'](payload)
+    expect(result).toEqual({ content: 'const x = 1' })
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+    expect(mockExecFile.mock.calls[0][0]).toBe('git')
+    expect(mockExecFile.mock.calls[0][1]).toEqual(['show', 'abc123:src/foo.ts'])
+  })
+
+  it('fetches the PR head and retries once when the commit is not local', async () => {
+    mockGitFailure('fatal: bad object abc123')
+    mockGitSuccess('') // git fetch
+    mockGitSuccess('const x = 1') // git show retry
+    const result = await handlers['github:pr-file-content'](payload)
+    expect(result).toEqual({ content: 'const x = 1' })
+    expect(mockExecFile.mock.calls[1][1]).toEqual([
+      'fetch',
+      '--force',
+      'origin',
+      'pull/6/head:refs/remotes/pull/6/head',
+    ])
+    expect(mockExecFile.mock.calls[2][1]).toEqual(['show', 'abc123:src/foo.ts'])
+  })
+
+  it('returns an error when the retry also fails', async () => {
+    mockGitFailure('fatal: bad object abc123')
+    mockGitSuccess('') // git fetch
+    mockGitFailure('fatal: path not in abc123')
+    const result = await handlers['github:pr-file-content'](payload)
+    expect(result).toMatchObject({ error: expect.stringContaining('path not in abc123') })
+    expect(mockExecFile).toHaveBeenCalledTimes(3)
+  })
+
+  it('asks GitHub for the raw file with an encoded path for a gh: root, never git', async () => {
+    mockGitSuccess('hello')
+    const result = await handlers['github:pr-file-content']({
+      ...payload,
+      repoRoot: 'gh:acme/widgets',
+      path: 'src/my dir/a#b.ts',
+    })
+    expect(result).toEqual({ content: 'hello' })
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+    expect(mockExecFile.mock.calls[0][0]).not.toBe('git')
+    const args: string[] = mockExecFile.mock.calls[0][1]
+    expect(args).toContain('Accept: application/vnd.github.raw+json')
+    expect(args).toContain('repos/{owner}/{repo}/contents/src/my%20dir/a%23b.ts?ref=abc123')
+  })
+
+  it('returns tooLarge instead of content past two megabytes', async () => {
+    mockGitSuccess('x'.repeat(2 * 1024 * 1024 + 1))
+    expect(await handlers['github:pr-file-content'](payload)).toEqual({ tooLarge: true })
+  })
+
+  it('returns the content at exactly two megabytes', async () => {
+    const content = 'x'.repeat(2 * 1024 * 1024)
+    mockGitSuccess(content)
+    expect(await handlers['github:pr-file-content'](payload)).toEqual({ content })
+  })
+
+  it('measures the limit in bytes, not characters', async () => {
+    mockGitSuccess('é'.repeat(1024 * 1024 + 1))
+    expect(await handlers['github:pr-file-content'](payload)).toEqual({ tooLarge: true })
+  })
+
+  it('keeps leading and trailing blank lines, which line numbers depend on', async () => {
+    mockGitSuccess('\n\nconst x = 1\n')
+    expect(await handlers['github:pr-file-content'](payload)).toEqual({
+      content: '\n\nconst x = 1\n',
+    })
+  })
+
+  it('bounds the read one byte past the limit on both paths', async () => {
+    mockGitSuccess('a')
+    await handlers['github:pr-file-content'](payload)
+    mockGitSuccess('b')
+    await handlers['github:pr-file-content']({ ...payload, repoRoot: 'gh:acme/widgets' })
+    for (const call of mockExecFile.mock.calls) {
+      expect(call[2]).toMatchObject({ maxBuffer: 2 * 1024 * 1024 + 1 })
+    }
+    expect(mockExecFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns tooLarge when the read overflows, without fetching and retrying', async () => {
+    mockExecFile.mockImplementationOnce(
+      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
+        cb(
+          Object.assign(new Error('stdout maxBuffer length exceeded'), {
+            code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
+          })
+        )
+    )
+    expect(await handlers['github:pr-file-content'](payload)).toEqual({ tooLarge: true })
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns VALIDATION_ERROR for a missing ref', async () => {
+    const { ref: _ref, ...rest } = payload
+    const result = (await handlers['github:pr-file-content'](rest)) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+    expect(mockExecFile).not.toHaveBeenCalled()
+  })
+})
+
 describe('github:list-open-prs', () => {
   let handlers: Record<string, Handler>
   const REPO_VIEW = { owner: { login: 'test-owner' }, name: 'test-repo' }

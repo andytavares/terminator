@@ -23,6 +23,9 @@ export const githubAPI = {
   prFileDiff: (repoRoot: string, prNumber: number, path: string) =>
     bridge().invoke('github:pr-file-diff', { repoRoot, prNumber, path }),
 
+  prFileContent: (repoRoot: string, prNumber: number, path: string, ref: string) =>
+    bridge().invoke('github:pr-file-content', { repoRoot, prNumber, path, ref }),
+
   fileMetrics: (repoRoot: string, path: string) =>
     bridge().invoke('github:file-metrics', { repoRoot, path }),
 

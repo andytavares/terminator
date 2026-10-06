@@ -43,6 +43,17 @@ describe('githubAPI bridge', () => {
     })
   })
 
+  it('prFileContent calls correct channel', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.prFileContent('/repo', 42, 'src/foo.ts', 'abc123')
+    expect(mockInvoke).toHaveBeenCalledWith('github:pr-file-content', {
+      repoRoot: '/repo',
+      prNumber: 42,
+      path: 'src/foo.ts',
+      ref: 'abc123',
+    })
+  })
+
   it('fileMetrics calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
     await githubAPI.fileMetrics('/repo', 'src/bar.ts')
