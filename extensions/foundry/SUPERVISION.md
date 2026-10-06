@@ -491,18 +491,12 @@ it touched (`runtime/review/risk-grader.ts`):
 The grade is always shown with **its trigger**. A grade with no reason is a
 number you learn to ignore.
 
-The unit of decision is the **hunk**, not the file: one file routinely holds both
-the change you asked for and the one you did not, and accepting a file wholesale
-is how the second one ships. A review cannot be finished with a hunk still
-undecided, and a fully rejected branch says so rather than offering a merge.
-
-**Finishing a review applies it.** The rejected hunks are reverted out of the
-working copy (`git apply --reverse` against a patch rebuilt from exactly those
-hunks) and the accepted ones stay. The button says which it is going to be
-before you press it — "revert 2 hunks" or "keep everything" — because this is
-not undoable from here. If git refuses the patch the review stays open with the
-reason, rather than closing over a rejection that never landed: a reject that
-changes nothing is worse than no review, because you believe the change is gone.
+**Foundry no longer reviews hunk by hunk itself.** The Floor's **Review** button
+runs the git extension's `review-pull-request` command for the draft pull
+request (and says **Open on GitHub** when that extension is off). The channels
+that decided and applied hunks, and the intent check against the request, were
+removed with their panel. What stays is the queue and its grading, which the
+backpressure gate below counts; `foundry:review-done` is what drains it.
 
 Checks are reported as `unavailable` rather than assumed passing — the extension
 does not poll a code host, and assuming green would let a change auto-merge on
@@ -527,11 +521,9 @@ section described the behaviour anyway.
 
 ## Review steps, and multi-repository cards
 
-A review is walked in four steps — **intent → risk → structure → tests**. Intent
-is first deliberately: it is the step that catches work which is defensible in
-isolation and was never asked for, and reading the diff first is how you end up
-justifying such work instead of questioning it. It reads what the card asked for
-against the agent's own account of what it did against what actually changed.
+A queued review carries a step — **intent → risk → structure → tests** — that
+`foundry:review-advance` moves on. Nothing in the Foundry surfaces walks it any
+more; the review itself happens in the git extension.
 
 ### Multi-repository cards
 

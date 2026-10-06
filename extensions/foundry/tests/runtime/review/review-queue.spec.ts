@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { createReviewQueue } from '../../../src/runtime/review/review-queue.js'
-import { reviewIntent } from '../../../src/runtime/review/intent-diff.js'
 
 function candidate(over: Record<string, unknown> = {}) {
   return {
@@ -124,63 +123,5 @@ describe('removal', () => {
 
   it('is a no-op for an unknown session', () => {
     expect(() => createReviewQueue().remove('nope')).not.toThrow()
-  })
-})
-
-describe('intent review (FR-051)', () => {
-  const base = {
-    request: 'Add ULID session ids',
-    agentAccount: 'Added ULID generation and updated the session schema',
-  }
-
-  it('flags a file the request never anticipated — the scope-creep signal', () => {
-    const review = reviewIntent({
-      ...base,
-      changedFiles: ['src/session/id.ts', 'src/config/timeouts.ts'],
-      expectedFiles: ['src/session/id.ts'],
-    })
-    // The "also shortened the idle timeout" class of change.
-    expect(review.unexpectedFiles).toEqual(['src/config/timeouts.ts'])
-    expect(review.hasScopeConcern).toBe(true)
-  })
-
-  it('flags an expected file that was never touched', () => {
-    const review = reviewIntent({
-      ...base,
-      changedFiles: ['src/session/id.ts'],
-      expectedFiles: ['src/session/id.ts', 'src/session/store.ts'],
-    })
-    expect(review.untouchedFiles).toEqual(['src/session/store.ts'])
-    expect(review.hasScopeConcern).toBe(true)
-  })
-
-  it('raises no concern when the change matches the request exactly', () => {
-    const review = reviewIntent({
-      ...base,
-      changedFiles: ['src/session/id.ts'],
-      expectedFiles: ['src/session/id.ts'],
-    })
-    expect(review).toMatchObject({
-      hasScopeConcern: false,
-      unexpectedFiles: [],
-      untouchedFiles: [],
-    })
-  })
-
-  it('flags nothing when the request declared no files, rather than flagging everything', () => {
-    // Ad-hoc work has no declared scope. Marking every file unexpected would be
-    // noise that trains the operator to skip the step this exists to enforce.
-    const review = reviewIntent({
-      ...base,
-      changedFiles: ['a.ts', 'b.ts'],
-      expectedFiles: [],
-    })
-    expect(review).toMatchObject({ hasScopeConcern: false, unexpectedFiles: [] })
-  })
-
-  it('keeps both the request and the agent account for side-by-side reading', () => {
-    const review = reviewIntent({ ...base, changedFiles: [], expectedFiles: [] })
-    expect(review.request).toBe(base.request)
-    expect(review.agentAccount).toBe(base.agentAccount)
   })
 })

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { isBlocking } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
+import type { Standing } from '../order/standing.js'
 import type { CompileResult, CheckId } from '../order/compile.js'
 import { coverageMatrix } from '../order/coverage-matrix.js'
 import { surfacedQuestions } from '../forge/interview.js'
@@ -265,6 +266,8 @@ function clockOf(iso: string): string {
 export interface ForgeProps {
   readonly orderId: string
   readonly onStarted?: (orderId: string) => void
+  /** Where the run stands, once there is one: the hand-off pill says whose move it is. */
+  readonly standing?: Standing
 }
 
 async function attachToSession(sessionId: string): Promise<string | null> {
@@ -319,7 +322,7 @@ const GROUP_META: Record<FindingGroup, { readonly heading: string; readonly cls:
   resolved: { heading: 'Resolved', cls: 'done' },
 }
 
-export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
+export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element {
   const [view, setView] = useState<OrderView | null>(null)
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
@@ -575,6 +578,7 @@ export function Forge({ orderId, onStarted }: ForgeProps): JSX.Element {
     turnEndedAt: view.turnEndedAt ?? null,
     shape: { name: shapeName, yours: shapeYours },
     offers,
+    turn: standing?.turn,
     clock: clockOf,
   })
 

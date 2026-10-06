@@ -104,8 +104,21 @@ describe('a row the operator can act on', () => {
   it('names the rule, the reason and what happens if it is ignored', async () => {
     mount({ gates: [gate()] })
     await waitFor(() => expect(screen.getByText(ruleInWords('risk.p0'))).toBeTruthy())
-    expect(screen.getByText(/session\.ts/)).toBeTruthy()
     expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
+    // The reason is a click away rather than printed on every row.
+    expect(screen.queryByText(/session\.ts/)).toBeNull()
+    fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
+    expect(screen.getByText(/session\.ts/)).toBeTruthy()
+  })
+
+  it('shows what the gate saw only once it is opened, and closed even then', async () => {
+    mount({
+      gates: [gate({ evidence: [{ kind: 'stdout', excerpt: 'Error: token refresh failed' }] })],
+    })
+    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
+    expect(screen.queryByText(/token refresh failed/)).toBeNull()
+    fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
+    expect((document.querySelector('details') as HTMLDetailsElement).open).toBe(false)
   })
 
   it('says how much work the decision unblocks', async () => {

@@ -22,7 +22,7 @@ export function GateEvidence({ evidence }: { evidence: readonly Evidence[] }) {
     <div className="fdry-gate-evidence">
       {evidence.map((piece, index) =>
         piece.excerpt ? (
-          <details key={`${piece.kind}-${index}`} open>
+          <details key={`${piece.kind}-${index}`}>
             <summary>Last lines of the output</summary>
             <pre className="fdry-gate-evidence-pre">{piece.excerpt}</pre>
             {piece.path ? <p className="fdry-note">Full log: {piece.path}</p> : null}

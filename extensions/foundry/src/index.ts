@@ -144,15 +144,6 @@ import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import { readTranscript } from './runtime/transcript-tailer.js'
 import { recordTools } from './factory/timeline-store.js'
-import type { HunkDecision } from './runtime/review/hunk-decisions.js'
-
-/** One hunk as a surface renders it: the change, and what was decided. */
-interface HunkView {
-  id: string
-  newStart: number
-  lines: string[]
-  decision: HunkDecision | null
-}
 import type { StallFiring } from './runtime/evaluate-stall.js'
 
 const disposables: Disposable[] = []
@@ -3729,79 +3720,6 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:review-advance', (payload: unknown) => {
     const { sessionId } = payload as { sessionId: string }
     return { step: supervision?.review.advance(sessionId) ?? null }
-  })
-
-  // The unit of review is the hunk, not the file: one file routinely holds both
-  // the change you asked for and the one you did not.
-  reg(api, 'foundry:review-hunks', async (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    if (supervision === null) {
-      // Distinguished from "changed nothing": a panel that cannot tell them
-      // apart shows an empty review for a runtime that never started.
-      return { files: null, complete: false, fullReject: false }
-    }
-    const set = await supervision.hunksFor(sessionId)
-    if (set === null) return { files: [], complete: false, fullReject: false }
-    // Grouped by file, with the hunk's own lines: a reviewer decides on what
-    // the change says, and a list of identifiers is not a diff.
-    const files = new Map<string, HunkView[]>()
-    for (const { hunk, decision } of set.list()) {
-      const entry = files.get(hunk.file) ?? []
-      entry.push({ id: hunk.id, newStart: hunk.newStart, lines: [...hunk.lines], decision })
-      files.set(hunk.file, entry)
-    }
-    return {
-      files: [...files]
-        .map(([file, hunks]) => ({ file, hunks }))
-        .sort((a, b) => a.file.localeCompare(b.file)),
-      complete: set.isComplete(),
-      fullReject: set.isFullReject(),
-    }
-  })
-
-  reg(api, 'foundry:review-decide-hunk', async (payload: unknown) => {
-    const { sessionId, hunkId, decision } = payload as {
-      sessionId: string
-      hunkId: string
-      decision: 'accept' | 'reject'
-    }
-    const ok = (await supervision?.decideHunk(sessionId, hunkId, decision)) ?? false
-    return { ok }
-  })
-
-  // The request set against the agent's own account of what it did. The step
-  // every diff viewer skips, and the one that catches work that is defensible
-  // in isolation and was never asked for.
-  reg(api, 'foundry:review-intent', async (payload: unknown) => {
-    const { sessionId, request, agentAccount } = payload as {
-      sessionId: string
-      request: string
-      agentAccount: string
-    }
-    const intent = await supervision?.intentFor(sessionId, request, agentAccount)
-    return { intent: intent ?? null }
-  })
-
-  // Applying the decisions is what makes a rejection mean anything: the
-  // rejected hunks come back out of the working copy, the accepted ones stay.
-  reg(api, 'foundry:review-apply', async (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    const result = (await supervision?.applyDecisions(sessionId)) ?? {
-      ok: false,
-      reverted: 0,
-      error: 'the supervision runtime is not running',
-    }
-    if (result.ok && result.reverted > 0) {
-      supervision?.feed.post({
-        at: Date.now(),
-        sessionId,
-        author: 'console',
-        summary: `reverted ${result.reverted} rejected ${result.reverted === 1 ? 'hunk' : 'hunks'}`,
-      })
-      // The diff changed under it, so the queue's summary is now wrong.
-      await supervision?.measure(sessionId)
-    }
-    return result
   })
 
   reg(api, 'foundry:review-done', async (payload: unknown) => {

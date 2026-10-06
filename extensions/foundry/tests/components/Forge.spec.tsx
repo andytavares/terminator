@@ -626,6 +626,35 @@ describe('drafting the plan', () => {
   })
 })
 
+describe('the hand-off pill on an order that has shipped', () => {
+  function mountShipped(standing: { turn: 'you' | 'foundry' } | undefined) {
+    const shipped = { ...order(), status: 'shipped' as const }
+    invoke = vi.fn(async (channel: string) => {
+      if (channel === 'foundry:order.compile') {
+        return { order: shipped, compile: compileOrder(shipped) }
+      }
+      return {}
+    })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    }
+    render(<Forge orderId="WO-1" standing={standing as never} />)
+  }
+
+  it('says it is waiting on you when the standing says it is your move', async () => {
+    mountShipped({ turn: 'you' })
+    await openStep('Hand off')
+    expect(await screen.findByText('Shipped · waiting on you')).toBeTruthy()
+  })
+
+  it('says only Shipped when nothing is waiting on you', async () => {
+    mountShipped({ turn: 'foundry' })
+    await openStep('Hand off')
+    expect(await screen.findByText('Shipped')).toBeTruthy()
+    expect(screen.queryByText(/waiting on you/)).toBeNull()
+  })
+})
+
 describe('only the parts affected are redrawn (FR-007)', () => {
   function withChanged(changed: string[]) {
     const current = {

@@ -262,6 +262,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
         ) : (
           <Forge
             orderId={open}
+            standing={rows.find((row) => row.id === open)?.standing}
             onStarted={(id) => {
               setStarted(id)
               void refresh()

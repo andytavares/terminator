@@ -1,4 +1,3 @@
-import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import {
@@ -10,18 +9,9 @@ import {
 import { createReviewQueue, type ReviewQueue } from './review/review-queue.js'
 import { createBackpressureGate, type BackpressureGate } from './review/backpressure.js'
 import { createFeedLog, type FeedLog } from './feed/feed-log.js'
-import {
-  readDiffSummary,
-  readChangedFiles,
-  readUntrackedFiles,
-  type RunCommand,
-} from './diff-metrics.js'
+import { readDiffSummary, readChangedFiles, type RunCommand } from './diff-metrics.js'
 import type { CheckState } from './review/risk-grader.js'
 import { gradeInWords } from './review/risk-grader.js'
-import { parseHunks } from './review/parse-hunks.js'
-import { createDecisionSet, type DecisionSet, type HunkDecision } from './review/hunk-decisions.js'
-import { reviewIntent, type IntentReview } from './review/intent-diff.js'
-import { revertRejected, type ApplyResult } from './review/apply-decisions.js'
 
 // The supervision layer: what is running, what it changed, what needs looking
 // at, and what must not start yet.
@@ -51,32 +41,6 @@ export interface Supervision {
   finishTurn(sessionId: string, turns: number, at: number): Promise<void>
   /** The run ended for good. */
   finish(sessionId: string, at: number): void
-  /**
-   * The hunks of a run's diff, with whatever has been decided about them.
-   *
-   * The unit of review is the hunk rather than the file: one file routinely
-   * holds both the change you asked for and the one you did not, and accepting
-   * a file wholesale is how the second one ships.
-   */
-  hunksFor(sessionId: string): Promise<DecisionSet | null>
-  decideHunk(sessionId: string, hunkId: string, decision: HunkDecision): Promise<boolean>
-  /**
-   * Makes the rejections real: the rejected hunks come back out of the working
-   * copy and the accepted ones stay.
-   *
-   * Without this the review was decision-only — you rejected a change, the
-   * queue recorded it, and every line the agent wrote stayed exactly where it
-   * was. A reject that changes nothing is worse than no review, because you
-   * believe the change is gone.
-   */
-  applyDecisions(sessionId: string): Promise<ApplyResult>
-  /**
-   * The request set against the agent's own account of what it did.
-   *
-   * The step every diff viewer skips, and the one that catches work that is
-   * defensible in isolation and was never asked for.
-   */
-  intentFor(sessionId: string, request: string, agentAccount: string): Promise<IntentReview | null>
   /** Everything a surface needs in one read. */
   snapshot(): {
     runs: Run[]
@@ -92,8 +56,6 @@ export interface SupervisionOptions {
   stateDir: string
   /** Injected so the whole layer can be exercised without a repository. */
   run?: RunCommand
-  /** Likewise for reverting a rejected hunk, which needs a patch on disk. */
-  applyReverse?: (worktreePath: string, patch: string) => Promise<{ ok: boolean; stderr: string }>
   /** How many unreviewed diffs before a new run is refused. */
   reviewLimit?: number
   /** The branch a card's work is measured against. */
@@ -133,78 +95,6 @@ export function createSupervision(options: SupervisionOptions): Supervision {
     countUnreviewed: () => review.count(),
     overrideLogPath: path.join(stateDir, 'backpressure-overrides.jsonl'),
   })
-
-  /**
-   * File paths named in a request.
-   *
-   * Deliberately conservative: a token has to look like a path with an
-   * extension before it counts, because a false expectation reads as "the agent
-   * missed something" and that is worse than saying nothing.
-   */
-  function pathsIn(text: string): string[] {
-    const matches = text.match(/[A-Za-z0-9_.@/-]+\.[A-Za-z0-9]{1,6}\b/g) ?? []
-    return [...new Set(matches.filter((token) => token.includes('/')))]
-  }
-
-  // Built on first read and kept while the run is being reviewed, so decisions
-  // survive scrolling away from it.
-  const decisions = new Map<string, DecisionSet>()
-
-  /**
-   * Hands a patch to git.
-   *
-   * Via a file, because the host's sandboxed shell has no stdin. Written beside
-   * the runtime's other state rather than in the worktree, so a review never
-   * shows up as a change of its own.
-   */
-  const applyReverse =
-    options.applyReverse ??
-    (async (worktreePath: string, patch: string): Promise<{ ok: boolean; stderr: string }> => {
-      const patchPath = path.join(stateDir, `revert-${Date.now()}.patch`)
-      try {
-        await fs.promises.mkdir(stateDir, { recursive: true })
-        await fs.promises.writeFile(patchPath, patch, 'utf8')
-        const result = await api.shell.exec({
-          command: 'git',
-          args: ['apply', '--reverse', '--recount', patchPath],
-          cwd: worktreePath,
-        })
-        return { ok: result.exitCode === 0, stderr: result.stderr }
-      } catch (error) {
-        return { ok: false, stderr: String(error) }
-      } finally {
-        await fs.promises.rm(patchPath, { force: true }).catch(() => {})
-      }
-    })
-
-  async function hunksFor(sessionId: string): Promise<DecisionSet | null> {
-    const held = decisions.get(sessionId)
-    if (held !== undefined) return held
-    const run = runs.get(sessionId)
-    if (run === null) return null
-    // Against the base, so the hunks are the same change the summary counted
-    // — including work the agent never committed.
-    // A separate `git diff --no-index` per untracked file, so a file git has
-    // never seen has hunks too. Without it a run that only added files queued
-    // a review with a non-empty summary and nothing in it to accept or
-    // reject.
-    const untracked = await readUntrackedFiles(run.worktreePath, runCommand)
-    const patch = await runCommand('git', ['diff', run.baseBranch ?? baseBranch], run.worktreePath)
-    const added = await Promise.all(
-      untracked.map((file) =>
-        runCommand('git', ['diff', '--no-index', '/dev/null', file], run.worktreePath)
-      )
-    )
-    const combined = [
-      patch.ok ? patch.stdout : '',
-      // `--no-index` exits non-zero precisely because the files differ, so
-      // its output is used regardless of the code.
-      ...added.map((result) => result.stdout),
-    ].join('\n')
-    const set = createDecisionSet(parseHunks(combined))
-    decisions.set(sessionId, set)
-    return set
-  }
 
   async function measure(sessionId: string): Promise<void> {
     const run = runs.get(sessionId)
@@ -283,58 +173,6 @@ export function createSupervision(options: SupervisionOptions): Supervision {
       // exactly what the review queue is about, and forgetting it here would
       // empty the queue the moment the agent exited.
       runs.setState(sessionId, run.diff.files > 0 ? 'ready' : 'finished', at)
-    },
-
-    hunksFor,
-
-    async decideHunk(sessionId, hunkId, decision): Promise<boolean> {
-      // `hunksFor`, not `this.hunksFor`: reaching through `this` from inside an
-      // object literal breaks the moment anyone destructures the interface.
-      const set = await hunksFor(sessionId)
-      if (set === null) return false
-      set.decide(hunkId, decision)
-      return true
-    },
-
-    async applyDecisions(sessionId): Promise<ApplyResult> {
-      const run = runs.get(sessionId)
-      const set = decisions.get(sessionId)
-      if (run === null || set === undefined) {
-        return { ok: false, reverted: 0, error: 'there is no open review for that run' }
-      }
-
-      const rejected = set
-        .list()
-        .filter((entry) => entry.decision === 'reject')
-        .map((entry) => entry.hunk)
-
-      const result = await revertRejected(rejected, {
-        applyReverse: (patch) => applyReverse(run.worktreePath, patch),
-      })
-      // Dropped once applied: the hunks describe a working copy that no longer
-      // exists, and re-applying them would revert the accepted changes too.
-      if (result.ok) decisions.delete(sessionId)
-      return result
-    },
-
-    async intentFor(sessionId, request, agentAccount): Promise<IntentReview | null> {
-      const run = runs.get(sessionId)
-      if (run === null) return null
-      const changedFiles = await readChangedFiles(
-        run.worktreePath,
-        run.baseBranch ?? baseBranch,
-        runCommand
-      )
-      return reviewIntent({
-        request,
-        agentAccount,
-        changedFiles,
-        // Taken from the request itself. A card's tasks name the files they
-        // touch, so the paths in the text are what the work was expected to
-        // cover — and with nothing named the step reports nothing rather than
-        // flagging every file, which would be noise that trains you to skip it.
-        expectedFiles: pathsIn(request),
-      })
     },
 
     snapshot() {

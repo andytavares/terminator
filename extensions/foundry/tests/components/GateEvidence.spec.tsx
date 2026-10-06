@@ -37,3 +37,12 @@ describe('GateEvidence', () => {
     expect(container.textContent).toBe('')
   })
 })
+
+describe('GateEvidence, until it is asked for', () => {
+  it('starts closed, so the output is a click away rather than a wall', () => {
+    const { container } = render(
+      <GateEvidence evidence={[{ kind: 'stdout', excerpt: 'Error: Process failed to launch!' }]} />
+    )
+    expect((container.querySelector('details') as HTMLDetailsElement).open).toBe(false)
+  })
+})

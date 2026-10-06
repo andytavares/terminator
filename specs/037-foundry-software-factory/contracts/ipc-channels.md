@@ -265,7 +265,9 @@ An agent's terminal is a child of the application process, so quitting kills eve
 - **`run.resume` reclaims before it schedules.** The scheduler offers only `waiting` and `ready` nodes, so without this a resumed run has nothing to start and reports success having done nothing. Reclaiming gives the attempt back — an interrupted attempt is not a failed one — and keeps the session id on the node, so the agent resumes its own conversation rather than starting cold.
 - **The `run.interrupted` gate is raised on first read of a records location**, by `foundry:attention` and `foundry:inbox.list`, and is live at every autonomy setting. The chrome polls `attention` from the moment the application opens, so a run the last session left behind is counted on the Inbox tab within one poll.
 
-`session.attach` refuses a session this process no longer has, rather than navigating to a terminal that does not exist.
+`session.attach` refuses a session this process no longer has, rather than navigating to a terminal that does not exist. The refusal names the step and says what happened: `<step> finished at 09:41; its agent has closed.` for a step that passed, failed or was skipped (its session is closed, ADR 076); `<step> is an automatic step with no agent.` for a gate or join; the resume advice only for a running step whose session is not live.
+
+**Where the work is.** `run.observe` carries `pulls: { repo, url, number, cwd }[]` — the draft pull requests from the order's `pulls.json`, `cwd` being the lane checkout a review opens against — and `source: { key, url } | null`, the ticket the order came from (`null` for a typed idea). The Floor links both and runs `terminator.git-integration.command.review-pull-request` with `{ repoRoot: cwd, number }`. **Removed:** `foundry:review-hunks`, `foundry:review-decide-hunk`, `foundry:review-apply` and `foundry:review-intent` — Foundry's own per-hunk review, replaced by that command.
 
 **CI on the drafts (ADR-064).** `run.observe` carries `ci: CiState | null` — `{ round, max, status: 'watching' | 'green' | 'red' | 'not_measured' | 'reworking', pulls: { url, checks: { name, bucket, link, workflow }[] }[], reason, at }`, read from the order's `ci.json`; `null` until a draft opens on a recipe that declares `ci`. Each `order.list` row carries `ci: { status, round, max } | null` from the same file. A run graph node carries `reworks: number` and `feedback: Feedback[]` (ADR-063), defaulted when an older graph is read.
 
@@ -544,14 +546,10 @@ Thirty channels serve the Floor: the live runs, their permissions, their transcr
 
 ### Review
 
-| Channel                      | Payload                                                                 | Response                                                                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `foundry:review-hunks`       | `{ sessionId: string }`                                                 | `{ files, complete, fullReject }`; `files: null` means the runtime never started, which is not the same as a change that touched nothing |
-| `foundry:review-decide-hunk` | `{ sessionId: string; hunkId: string; decision: 'accept' \| 'reject' }` | `{ ok: boolean }`                                                                                                                        |
-| `foundry:review-apply`       | `{ sessionId: string }`                                                 | `{ ok, reverted, error? }` — reverts the rejected hunks                                                                                  |
-| `foundry:review-advance`     | `{ sessionId: string }`                                                 | `{ step }`                                                                                                                               |
-| `foundry:review-done`        | `{ sessionId: string }`                                                 | `{ ok: true }` — reopens the backpressure gate                                                                                           |
-| `foundry:review-intent`      | `{ sessionId: string; request: string; agentAccount: string }`          | `{ intent }` — what the change does against what was asked for                                                                           |
+| Channel                  | Payload                 | Response                                       |
+| ------------------------ | ----------------------- | ---------------------------------------------- |
+| `foundry:review-advance` | `{ sessionId: string }` | `{ step }`                                     |
+| `foundry:review-done`    | `{ sessionId: string }` | `{ ok: true }` — reopens the backpressure gate |
 
 ### Permissions
 

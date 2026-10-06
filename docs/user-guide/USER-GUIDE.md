@@ -637,9 +637,14 @@ says:
 
 - **which rule raised it** — `risk.p0`, `budget.exceeded`, `destructive`,
   `ready-for-review`, and five more;
-- **why it fired**, and the evidence it looked at;
-- **what each option does**, on the button itself;
-- **what happens if you ignore it**, and whether it will wait for ever.
+- **what it asks**, on one line, with the risk, the pull request and ticket
+  links and **what happens if you ignore it** (and whether it will wait for
+  ever) under it;
+- **the answers**, on the same line — the first is the recommended one;
+- **why it fired**, and the evidence it looked at, when you click the row. The
+  reason is formatted text; the evidence starts closed.
+
+The same line is used for the gate holding an order on its Floor.
 
 When nothing has fired, it says "Nothing needs you" and tells you what is
 building, what is converging, and how many decisions were taken by rule while
@@ -850,9 +855,25 @@ what each one is doing: its last few tool calls and messages, newest last, with
 how long ago it last did anything. It refreshes every two seconds. An agent that
 has just started says **Starting — nothing yet.**
 
-**To review** opens finished work hunk by hunk. Each hunk is shown as a diff,
-with line numbers from the new file, added and removed lines tinted, and the
-code syntax-highlighted, in the same colours as the Git view.
+Under the title sit the **pull request** (`#233`) and the **ticket** (`TAV-15`)
+the order came from, once they exist; each opens in your browser. Next to them,
+**Review** opens that pull request in the Git extension's review. With the Git
+extension turned off the button says **Open on GitHub** and opens the pull
+request there instead. Foundry no longer draws a hunk-by-hunk review of its
+own.
+
+Once the draft pull request is open the **CI** card says where the checks
+stand in words (**First run · up to 2 fixes**, **Fix 1 of 2**, **Passed**), shows
+a spinner while it is still watching or sending failures back, counts the
+checks that have finished (**1 of 2 checks done**) as they arrive, and links
+the pull request and each check.
+
+Each step is a chip. A step that passed reads **done**; a skipped step says why
+when you hover it (**Skipped: runs only when risk triggers fire; this order has
+none**). The scroll icon (**Transcript**) opens that step's transcript directly
+under its row; the terminal icon appears only while the step is running, since
+a finished step's terminal is closed. If going to a terminal is refused, the
+reason shows next to that step.
 
 Two things you can do without leaving:
 

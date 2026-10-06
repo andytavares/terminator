@@ -56,6 +56,10 @@ export interface FloorView {
    * dead run and a working one are the same chips.
    */
   orphaned?: string[]
+  /** The pull requests the run opened. `cwd` is the checkout a review opens against. */
+  pulls?: { repo: string; url: string; number: number; cwd: string }[]
+  /** The ticket the order came from; null for an idea typed in. */
+  source?: { key: string; url: string } | null
   /** The draft's CI, from the ship tail's own file. Absent means no run has shipped yet. */
   ci?: CiState | null
   /** Skills each node gets, keyed by node id. Absent nodes have none. */

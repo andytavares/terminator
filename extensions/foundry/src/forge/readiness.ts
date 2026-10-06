@@ -51,14 +51,21 @@ export interface ReadinessInput {
   readonly shape: { readonly name: string | null; readonly yours: boolean }
   /** Which optional steps the Forge offers on this order. */
   readonly offers: { readonly shape: boolean; readonly tracker: boolean }
+  /** Whose move it is on a run already under way, from the order's standing. Absent on a draft. */
+  readonly turn?: 'you' | 'foundry'
   /** Formats an ISO time for display. Injected so specs do not depend on the time zone. */
   readonly clock: (iso: string) => string
 }
 
-export type RunState = 'Running' | 'Shipped' | 'Cancelled'
+export type RunState = 'Running' | 'Shipped' | 'Cancelled' | 'Shipped · waiting on you'
 
-function runStateOf(status: WorkOrder['status']): RunState {
+function runStateOf(status: WorkOrder['status']): Exclude<RunState, 'Shipped · waiting on you'> {
   return status === 'shipped' ? 'Shipped' : status === 'cancelled' ? 'Cancelled' : 'Running'
+}
+
+/** A shipped order can still be waiting on a person, and the pill says so. */
+function pillOf(status: WorkOrder['status'], turn: ReadinessInput['turn']): RunState {
+  return status === 'shipped' && turn === 'you' ? 'Shipped · waiting on you' : runStateOf(status)
 }
 
 export type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
@@ -972,7 +979,7 @@ export function readiness(input: ReadinessInput): Readiness {
     steps,
     findings,
     canHandOff,
-    runState: runStateOf(order.status),
+    runState: pillOf(order.status, input.turn),
     locks: { handOff, redraft, message: redraft },
     handOffWhy,
   }

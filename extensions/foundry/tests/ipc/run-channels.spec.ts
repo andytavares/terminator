@@ -224,6 +224,62 @@ describe('foundry:run.observe', () => {
     expect(r.ci).toEqual(state)
   })
 
+  it('reports each pull request the run opened, with its address', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    fs.writeFileSync(
+      path.join(dataRoot, 'orders', 'WO-1', 'pulls.json'),
+      JSON.stringify([
+        {
+          lane: 1,
+          repo: 'proto',
+          cwd: '/work/proto',
+          branch: 'foundry/wo-1',
+          url: 'https://github.com/x/proto/pull/233',
+          bodyPath: '/tmp/body.md',
+        },
+      ])
+    )
+    const r = (await channels().observe({ id: 'WO-1' })) as {
+      pulls: { repo: string; url: string; number: number; cwd: string }[]
+    }
+    expect(r.pulls).toEqual([
+      {
+        repo: 'proto',
+        url: 'https://github.com/x/proto/pull/233',
+        number: 233,
+        cwd: '/work/proto',
+      },
+    ])
+  })
+
+  it('reports no pull requests before one is opened', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const r = (await channels().observe({ id: 'WO-1' })) as { pulls: unknown[] }
+    expect(r.pulls).toEqual([])
+  })
+
+  it('reports the ticket the order came from, and null for a typed idea', async () => {
+    await store.save(order())
+    await channels().start({ id: 'WO-1' })
+    const typed = (await channels().observe({ id: 'WO-1' })) as { source: unknown }
+    expect(typed.source).toBeNull()
+
+    const running = (await store.load('WO-1')) as WorkOrder
+    await store.save({
+      ...running,
+      source: {
+        kind: 'tracker',
+        tracker: 'linear',
+        key: 'TAV-15',
+        url: 'https://linear.app/t/issue/TAV-15',
+      },
+    })
+    const ticket = (await channels().observe({ id: 'WO-1' })) as { source: unknown }
+    expect(ticket.source).toEqual({ key: 'TAV-15', url: 'https://linear.app/t/issue/TAV-15' })
+  })
+
   it('reports no CI when nothing has written one', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -652,6 +708,48 @@ describe('attaching to a running agent', () => {
       nodeId: started.graph.nodes[0].id,
     })) as { error: string }
     expect(r.error).toMatch(/no session yet/)
+  })
+
+  describe('what it says about a step that has no agent to go to', () => {
+    function setNode(over: Record<string, unknown>): string {
+      const graphPath = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+      const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8')) as {
+        nodes: Record<string, unknown>[]
+      }
+      Object.assign(graph.nodes[0], over)
+      fs.writeFileSync(graphPath, JSON.stringify(graph))
+      return graph.nodes[0].id as string
+    }
+
+    async function started(): Promise<void> {
+      await store.save(order())
+      await channels().start({ id: 'WO-1' })
+    }
+
+    it.each(['passed', 'failed', 'skipped'])(
+      'says a %s step finished, and when, instead of blaming a restart',
+      async (state) => {
+        await started()
+        const id = setNode({ state, sessionId: 'sess-9', endedAt: '2026-09-06T09:41:00.000Z' })
+        const r = (await channels().attach({ orderId: 'WO-1', nodeId: id })) as { error: string }
+        expect(r.error).toMatch(/ finished at \d\d:\d\d; its agent has closed\.$/)
+        expect(r.error).not.toContain('Resume the run')
+      }
+    )
+
+    it.each(['gate', 'join'])('says a %s step is automatic and has no agent', async (kind) => {
+      await started()
+      const id = setNode({ kind, state: 'passed', sessionId: null })
+      const r = (await channels().attach({ orderId: 'WO-1', nodeId: id })) as { error: string }
+      expect(r.error).toMatch(/ is an automatic step with no agent\.$/)
+    })
+
+    it('keeps the resume wording for a running step whose session is not live', async () => {
+      await started()
+      const id = setNode({ state: 'running', sessionId: 'sess-9' })
+      const r = (await channels().attach({ orderId: 'WO-1', nodeId: id })) as { error: string }
+      expect(r.error).toContain('Resume the run to start it again.')
+    })
   })
 
   it('reports a node that is not in the run', async () => {

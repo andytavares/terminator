@@ -1426,9 +1426,9 @@ App
   │    ├─ Forge  — steps (intent → hand off), five checks, at most three questions
   │    └─ Floor  — the standing band with each running agent's last few
   │                transcript lines, the run graph, the merge order, held tool
-  │                calls, review hunks as highlighted diffs (`HunkLines`,
-  │                highlight.js on the --tm-syntax-* tokens), and a way into
-  │                the terminal
+  │                calls, the pull request and ticket links, the CI card, a
+  │                Review button that runs the git extension's
+  │                `review-pull-request` command, and a way into the terminal
   ├─ Ledger  — every decision, filtered by order / actor / action; the one
   │            button that asks the curator
   └─ Settings — the model picker; everything else is registered through the

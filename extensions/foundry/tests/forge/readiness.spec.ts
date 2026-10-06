@@ -97,6 +97,7 @@ function baseInput(
     turnEndedAt: over.turnEndedAt ?? null,
     shape: over.shape ?? { name: 'Direct', yours: false },
     offers: over.offers ?? { shape: true, tracker: true },
+    turn: over.turn,
     clock,
   }
 }
@@ -148,6 +149,21 @@ describe('readiness — holder and strip', () => {
     const running = readiness(baseInput({ order: wo0928Order({ status: 'running' }) }))
     expect(running.strip.detail).toBe('Running with the Direct shape, 1 unit.')
     expect(running.runState).toBe('Running')
+  })
+
+  it('1. a shipped order that is waiting on you says so in the pill', () => {
+    const order = wo0928Order({ status: 'shipped', agreedAt: T1 })
+    const waiting = readiness(baseInput({ order, agreed: { at: T1, by: 'you' }, turn: 'you' }))
+    expect(waiting.runState).toBe('Shipped · waiting on you')
+    // The strip's sentence reads "Shipped with the ... shape" and keeps doing so.
+    expect(waiting.strip.detail).toBe('Shipped with the Direct shape, 1 unit.')
+    const foundry = readiness(baseInput({ order, agreed: { at: T1, by: 'you' }, turn: 'foundry' }))
+    expect(foundry.runState).toBe('Shipped')
+  })
+
+  it('1. a cancelled order is never described as waiting on you', () => {
+    const order = wo0928Order({ status: 'cancelled' })
+    expect(readiness(baseInput({ order, turn: 'you' })).runState).toBe('Cancelled')
   })
 
   it('1. handed off by you, uses agreed.at', () => {

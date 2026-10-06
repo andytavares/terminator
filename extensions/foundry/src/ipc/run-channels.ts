@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { z } from 'zod'
 import { orderDir, ensureWritable } from '../data-root.js'
 import { laneViews, mayMergeLane } from '../order/lanes.js'
-import { buildRunGraph, nodeLabels } from '../line/run-graph.js'
+import { buildRunGraph, nodeLabel, nodeLabels } from '../line/run-graph.js'
 import type { RunGraph, RunNode } from '../line/run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
 import { readyNodes, blockedReason, retry as retryNode } from '../line/scheduler.js'
@@ -21,6 +21,7 @@ import { skillsFor } from '../line/executor.js'
 import { gradeInWords } from '../runtime/review/risk-grader.js'
 import { createRoleRegistry } from '../line/roles.js'
 import { readCiState } from '../line/ci-state.js'
+import { readPulls } from '../line/integrate.js'
 import { queue } from '../line/refinery.js'
 import type { QueueEntry, QueuePosition } from '../line/refinery.js'
 import type { Gate } from '../gates/rules.js'
@@ -41,6 +42,20 @@ const StartPayload = z.object({
   /** The operator's "Start anyway", against a backpressure refusal (FR-054). */
   force: z.boolean().optional(),
 })
+/** Steps the line runs itself: there is no agent to attach to, ever. */
+const AUTOMATIC_KINDS: readonly RunNode['kind'][] = ['gate', 'join']
+
+/** "09:41", in the operator's own time zone. */
+function clockTime(iso: string): string {
+  const at = new Date(iso)
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+}
+
+/** The pull request number a GitHub address ends in. */
+function pullNumber(url: string): number {
+  return Number(/\/pull\/(\d+)/.exec(url)?.[1] ?? 0)
+}
+
 const ObservePayload = z.object({ id: z.string(), retry: z.array(z.string()).optional() })
 const AttachPayload = z.object({ orderId: z.string(), nodeId: z.string() })
 const ActivityPayload = z.object({ id: z.string() })
@@ -535,6 +550,18 @@ export function createRunChannels(deps: RunDeps): RunChannels {
       // re-derived here — a surface that only wants "where does CI stand"
       // reads one small file instead of walking nodes and feedback.
       ci: await readCiState(deps.dataRoot(), parsed.data.id),
+      // Where the pull requests are, and the ticket the order came from, so the
+      // Floor can link both. `cwd` is the checkout a review opens against.
+      pulls: (await readPulls(deps.dataRoot(), parsed.data.id)).map((pull) => ({
+        repo: pull.repo,
+        url: pull.url,
+        number: pullNumber(pull.url),
+        cwd: pull.cwd,
+      })),
+      source:
+        order?.source.key != null && order.source.url != null
+          ? { key: order.source.key, url: order.source.url }
+          : null,
       // What the operator called it. The surface's heading was the order id
       // and the recipe name — two identifiers nobody chose — so the screen
       // showing a run never said which piece of work it was.
@@ -752,6 +779,22 @@ export function createRunChannels(deps: RunDeps): RunChannels {
 
     const node = graph.nodes.find((n) => n.id === parsed.data.nodeId)
     if (node === undefined) return { error: `No step ${parsed.data.nodeId}.` }
+    const step = nodeLabel(await deps.store.load(parsed.data.orderId), node)
+    // A step that never has an agent, said as such rather than as "no session
+    // yet", which promises one is coming.
+    if (AUTOMATIC_KINDS.includes(node.kind)) {
+      return { error: `${step} is an automatic step with no agent.` }
+    }
+    // A finished step's session is closed (ADR 076); the resume advice below is
+    // for a run that died, and sent people to resume a step that had succeeded.
+    if (node.state === 'passed' || node.state === 'failed' || node.state === 'skipped') {
+      return {
+        error:
+          node.endedAt === null
+            ? `${step} has finished; its agent has closed.`
+            : `${step} finished at ${clockTime(node.endedAt)}; its agent has closed.`,
+      }
+    }
     if (node.sessionId === null) {
       return { error: `${node.id} has no session yet — it is ${node.state}.` }
     }

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { Markdown, MarkdownInline } from '../../src/components/Markdown.js'
 
@@ -116,5 +116,18 @@ describe('an inline span', () => {
     const { container } = render(<MarkdownInline text="<script>x</script>" />)
     expect(container.querySelector('script')).toBeNull()
     expect(screen.getByText('<script>x</script>')).toBeTruthy()
+  })
+})
+
+describe('a link in the text', () => {
+  it('opens outside the application, since a view cannot open a window of its own', () => {
+    const openExternal = vi.fn(async () => ({ ok: true }))
+    ;(window as unknown as Record<string, unknown>).electronAPI = { shell: { openExternal } }
+    render(<Markdown text="See [the ticket](https://linear.app/t/issue/TAV-15) first" />)
+    const link = screen.getByRole('link', { name: 'the ticket' })
+    expect(link.getAttribute('target')).toBeNull()
+    expect(link.getAttribute('href')).toBe('https://linear.app/t/issue/TAV-15')
+    fireEvent.click(link)
+    expect(openExternal).toHaveBeenCalledWith('https://linear.app/t/issue/TAV-15')
   })
 })
