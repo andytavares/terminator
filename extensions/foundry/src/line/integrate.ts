@@ -90,6 +90,11 @@ export interface Shipment {
    * answerable at review time rather than inferred from a directory listing.
    */
   readonly rulesInForce?: readonly string[]
+  /**
+   * Whether the inspector ran, and why not when it did not. Absent means not
+   * known, which reads as the older "no findings" rather than as a skip.
+   */
+  readonly inspection?: { readonly ran: boolean; readonly reason: string }
 }
 
 export interface LanePullRequest {
@@ -111,14 +116,37 @@ export interface ShipOutcome {
   readonly gate?: Gate
 }
 
-/** One line on how the criteria came out, for the gate's own reason. */
-function criteriaSummary(shipment: Shipment): string {
-  const results = shipment.verdicts.map((v) => v.result)
-  const failed = results.filter((r) => r === 'fail').length
-  const unmeasured = results.filter((r) => r === 'not_measured').length
-  if (failed > 0) return `${failed} criteria failed`
-  if (unmeasured > 0) return `${unmeasured} criteria not measured`
-  return 'every criterion passed'
+/** One bullet per criterion; a run that judged nothing says so instead of passing. */
+function acceptanceLines(order: WorkOrder, shipment: Shipment): string[] {
+  if (shipment.verdicts.length === 0) {
+    return ['- No verdicts were recorded. The criteria were not judged.']
+  }
+  return order.acceptance.map((criterion) => {
+    const found = shipment.verdicts.filter((v) => v.criterionId === criterion.id)
+    const worst =
+      found.find((v) => v.result === 'fail') ??
+      found.find((v) => v.result === 'not_measured') ??
+      found[0]
+    const outcome =
+      worst === undefined
+        ? 'not measured: nothing ran'
+        : worst.result === 'pass'
+          ? 'passed'
+          : `${worst.result === 'fail' ? 'failed' : 'not measured'}: ${worst.reason}`
+    return `- ${criterion.id}: ${criterion.statement} — ${outcome}`
+  })
+}
+
+/** What the inspection did, one bullet per fact. */
+function inspectionLines(shipment: Shipment): string[] {
+  if (shipment.inspection?.ran === false) return [`- Not run: ${shipment.inspection.reason}`]
+  if (shipment.findings.length === 0) return ['- Found nothing.']
+  return shipment.findings.map((finding) => `- ${finding}`)
+}
+
+/** "Tests come first (every unit)" becomes "Tests come first · every unit". */
+function ruleBullet(rule: string): string {
+  return `- ${rule.replace(/ \(([^()]*)\)$/, ' · $1')}`
 }
 
 /**
@@ -284,12 +312,7 @@ export function prBody(
     )
   }
 
-  lines.push('', '### Inspection', '')
-  if (shipment.findings.length === 0) {
-    lines.push('Nothing found.')
-  } else {
-    for (const finding of shipment.findings) lines.push(`- ${finding}`)
-  }
+  lines.push('', '### Inspection', '', ...inspectionLines(shipment))
 
   lines.push(...laneSection(order, lane, opened))
 
@@ -703,7 +726,7 @@ export async function finishShipping(
       rule: 'ci.red',
       orderId: order.id,
       summary: `CI is still red on ${names} for ${order.title}`,
-      why: `${ci.rounds} automatic rounds ran and CI is still red. ${tail}`,
+      why: `**${ci.rounds} automatic rounds ran and CI is still red.**\n\n\`\`\`\n${tail}\n\`\`\``,
       evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
       riskGrade: order.risk.grade,
       blockedUnits: 0,
@@ -733,18 +756,16 @@ export async function finishShipping(
     orderId: order.id,
     summary: `Mark ${pulls.length === 1 ? 'the draft' : `${pulls.length} drafts`} for ${order.title} ready?`,
     why: [
-      `${order.plan.units.length} units, ${criteriaSummary(shipment)}.`,
+      `**${order.plan.units.length} ${order.plan.units.length === 1 ? 'unit' : 'units'}.**${ciNote === '' ? '' : ` ${ciNote}`}`,
+      '### Acceptance\n\n' + acceptanceLines(order, shipment).join('\n'),
+      '### Inspection\n\n' + inspectionLines(shipment).join('\n'),
       unmeasured.length === 0
-        ? 'Everything this repository can check was checked.'
-        : `Not measured here: ${unmeasured.join(', ')}.`,
-      shipment.findings.length === 0
-        ? 'The inspection found nothing.'
-        : `The inspection found ${shipment.findings.length}.`,
-      rules.length === 0 ? '' : `Judged against: ${rules.join(', ')}.`,
-      ciNote,
+        ? ''
+        : '### Not measured here\n\n' + unmeasured.map((name) => `- ${name}`).join('\n'),
+      rules.length === 0 ? '' : '### Judged against\n\n' + rules.map(ruleBullet).join('\n'),
     ]
-      .filter((line) => line !== '')
-      .join(' '),
+      .filter((block) => block !== '')
+      .join('\n\n'),
     evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
     riskGrade: order.risk.grade,
     blockedUnits: 0,

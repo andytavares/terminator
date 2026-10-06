@@ -753,7 +753,12 @@ export async function execute(
                 node.id,
                 `${node.stepId} names "${step.command}", which nothing in this repository's toolchain resolves.`
               )
-              return { node, skipped: true as const }
+              const name = /toolchain\.(\w+)/.exec(step.command)?.[1] ?? node.stepId
+              return {
+                node,
+                skipped: true as const,
+                skipReason: `no ${name} command in this repository`,
+              }
             }
             const logPath = path.join(
               orderDir(deps.sources.dataRoot, order.id),
@@ -900,7 +905,13 @@ export async function execute(
       // — not a pass, and not a failure, which is why it does not go through
       // the pass/fail machinery below.
       if ('skipped' in run) {
-        await advance(withNode(current, run.node.id, { state: 'skipped', endedAt: deps.now() }))
+        await advance(
+          withNode(current, run.node.id, {
+            state: 'skipped',
+            endedAt: deps.now(),
+            skipReason: run.skipReason,
+          })
+        )
         continue
       }
       const { node, result, roleId, readOnly, outputPath, command, logPath } = run

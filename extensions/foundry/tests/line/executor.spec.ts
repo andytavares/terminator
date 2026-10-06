@@ -2339,6 +2339,9 @@ steps:
     })
     expect(runCommand).not.toHaveBeenCalled()
     expect(outcome.graph.nodes.find((n) => n.id === 'lint')?.state).toBe('skipped')
+    expect(outcome.graph.nodes.find((n) => n.id === 'lint')?.skipReason).toBe(
+      'no lint command in this repository'
+    )
     expect(record).toHaveBeenCalledWith(
       'step.not_measured',
       'lint',

@@ -1298,7 +1298,14 @@ passed" to the ready gate; no checks is "not measured", never green. Red with
 rounds left sends `gh run view --log-failed` back to the build step as `ci`
 feedback, runs the Line again and pushes the lanes (`pushLanes`). With the
 rounds spent, `ci.red` replaces the ready gate, and its "Another round" runs
-one more. The state is in the order's `ci.json`.
+one more. The state is in the order's `ci.json`, rewritten whenever the set of
+check buckets changes while a round is watched (and `ci.watching` is recorded as
+each round starts); `ciLabel` (`src/line/ci-state.ts`) is the words a surface
+shows for it. The ready gate's `why` is Markdown, one fact per line: units and CI,
+Acceptance (or "No verdicts were recorded"), Inspection ("Not run: <reason>"
+when it was skipped), Not measured here, Judged against. A skipped `RunNode`
+carries `skipReason` (from `whenSkipReason`, or "no <name> command in this
+repository" for an unresolved `run` step).
 
 **The refinery restacks, it never merges** (ADR-067, `src/line/refinery.ts`,
 `src/line/restack.ts`). Running and shipped orders in one repository and base

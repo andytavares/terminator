@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   selectOver,
   evaluateWhen,
+  whenSkipReason,
   checkExpect,
   resolveCommand,
 } from '../../src/recipe/step-kinds.js'
@@ -204,5 +205,51 @@ describe('checkExpect', () => {
     const [failure] = checkExpect({ exit_code: '== 0' }, { exit_code: 2 })
     expect(failure.expected).toBe('== 0')
     expect(failure.actual).toBe(2)
+  })
+})
+
+describe('whenSkipReason', () => {
+  it('says risk triggers did not fire', () => {
+    expect(whenSkipReason('risk.triggers is not empty', order())).toBe(
+      'runs only when risk triggers fire; this order has none'
+    )
+  })
+
+  it('says risk triggers fired when the step wanted none', () => {
+    const o = order()
+    o.risk.triggers = ['secrets']
+    expect(whenSkipReason('risk.triggers is empty', o)).toBe(
+      'runs only when no risk triggers fire; this order has 1'
+    )
+  })
+
+  it('names the toolchain command the repository lacks', () => {
+    expect(whenSkipReason('toolchain.lint is set', order())).toBe(
+      'runs only when the repository has a lint command; it has none'
+    )
+  })
+
+  it('names the toolchain command the repository has when the step wanted none', () => {
+    expect(whenSkipReason('toolchain.lint is not set', order())).toBe(
+      'runs only when the repository has no lint command; it has one'
+    )
+  })
+
+  it('states a collection count that did not hold', () => {
+    expect(whenSkipReason('plan.units count > 5', order())).toBe(
+      'runs only when plan.units count > 5; it has 2'
+    )
+  })
+
+  it('states an emptiness test on another collection', () => {
+    expect(whenSkipReason('plan.sharedFiles is not empty', order())).toBe(
+      'runs only when plan.sharedFiles is not empty; it is empty'
+    )
+  })
+
+  it('falls back to quoting the condition', () => {
+    expect(whenSkipReason('risk.grade is P0', order())).toBe(
+      'condition "risk.grade is P0" was false'
+    )
   })
 })

@@ -53,6 +53,32 @@ describe('ciRounds', () => {
     expect([...secondIgnored]).toEqual(['111'])
   })
 
+  it('writes the checks while they are watched, once per change in what is passing', async () => {
+    const h = harness([])
+    h.watch.mockImplementation(async (_pull, onPoll) => {
+      const pending = check({ bucket: 'pending' })
+      onPoll([pending])
+      onPoll([pending])
+      onPoll([check({ bucket: 'pass' })])
+      return { kind: 'green', checks: [check()] }
+    })
+    await ciRounds({ pulls: [PULL], rounds: 2, ...h })
+    const watching = h.states.filter((s) => s.status === 'watching')
+    expect(watching.map((s) => s.pulls[0].checks.map((c) => c.bucket))).toEqual([
+      [],
+      ['pending'],
+      ['pass'],
+    ])
+  })
+
+  it('records once that it started watching, naming the pull request', async () => {
+    const h = harness([{ kind: 'green', checks: [check()] }])
+    await ciRounds({ pulls: [PULL], rounds: 2, ...h })
+    const watching = h.record.mock.calls.filter((c) => c[0] === 'ci.watching')
+    expect(watching).toHaveLength(1)
+    expect(watching[0][1]).toBe(PULL.url)
+  })
+
   it('declares none when the recipe has no ci', async () => {
     const h = harness([])
     const outcome = await ciRounds({
@@ -119,9 +145,12 @@ describe('ciRounds', () => {
       state: h.state,
     })
     expect(outcome.kind).toBe('green')
-    expect(h.record).toHaveBeenCalledTimes(2)
-    expect(h.record.mock.calls[0][0]).toBe('ci.round')
-    expect(h.record.mock.calls[1][0]).toBe('ci.green')
+    expect(h.record.mock.calls.map((c) => c[0])).toEqual([
+      'ci.watching',
+      'ci.round',
+      'ci.watching',
+      'ci.green',
+    ])
     expect(h.sendBack).toHaveBeenCalledTimes(1)
     const feedback = h.sendBack.mock.calls[0][0] as Feedback
     expect(feedback.source).toBe('ci')

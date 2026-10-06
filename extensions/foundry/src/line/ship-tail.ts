@@ -80,6 +80,9 @@ export async function ciRounds(input: CiRoundsInput): Promise<CiOutcome> {
 
   for (let round = 0; ; ) {
     await input.state({ round, max: rounds, status: 'watching', pulls: snapshot(), reason: '' })
+    await input.record('ci.watching', subject, 'Watching CI')
+    let shown = JSON.stringify(snapshot().map((p) => p.checks.map((c) => c.bucket)))
+    const writes: Promise<void>[] = []
 
     const results: Result[] = await Promise.all(
       input.pulls.map(async (pull) => {
@@ -87,6 +90,15 @@ export async function ciRounds(input: CiRoundsInput): Promise<CiOutcome> {
           pull,
           (checks) => {
             latest.set(pull.url, checks)
+            // Written when what is passing changes, not on every poll.
+            const seen = JSON.stringify(snapshot().map((p) => p.checks.map((c) => c.bucket)))
+            if (seen === shown) return
+            shown = seen
+            writes.push(
+              input
+                .state({ round, max: rounds, status: 'watching', pulls: snapshot(), reason: '' })
+                .catch(() => undefined)
+            )
           },
           new Set(judged.get(pull.url))
         )
@@ -95,6 +107,8 @@ export async function ciRounds(input: CiRoundsInput): Promise<CiOutcome> {
       })
     )
 
+    // Settled before the result is written, so a late poll cannot overwrite it.
+    await Promise.all(writes)
     const combined = combine(results)
 
     if (combined.kind === 'green') {

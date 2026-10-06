@@ -161,6 +161,46 @@ export function evaluateWhen(expression: string | undefined, order: WorkOrder): 
   return false
 }
 
+/**
+ * The condition in words, for the record of a step that did not run.
+ *
+ * Meant for an expression `evaluateWhen` judged false; one it cannot read is
+ * quoted rather than guessed at.
+ */
+export function whenSkipReason(expression: string, order: WorkOrder): string {
+  const text = expression.trim()
+
+  const toolchainSet = /^toolchain\.(\w+)\s+is\s+(not\s+)?set$/.exec(text)
+  if (toolchainSet !== null) {
+    const [, check, negated] = toolchainSet
+    return negated === undefined
+      ? `runs only when the repository has a ${check} command; it has none`
+      : `runs only when the repository has no ${check} command; it has one`
+  }
+
+  const emptiness = /^([\w.]+)\s+is\s+(not\s+)?empty$/.exec(text)
+  if (emptiness !== null) {
+    const [, path, negated] = emptiness
+    const size = collectionAt(path, order)?.length ?? 0
+    if (path === 'risk.triggers') {
+      return negated === undefined
+        ? `runs only when no risk triggers fire; this order has ${size}`
+        : 'runs only when risk triggers fire; this order has none'
+    }
+    return negated === undefined
+      ? `runs only when ${path} is empty; it has ${size}`
+      : `runs only when ${path} is not empty; it is empty`
+  }
+
+  const count = /^([\w.]+)\s+count\s+(>=|<=|>|<|==|!=)\s+(\d+)$/.exec(text)
+  if (count !== null) {
+    const size = collectionAt(count[1], order)?.length ?? 0
+    return `runs only when ${text}; it has ${size}`
+  }
+
+  return `condition "${text}" was false`
+}
+
 function compareNumbers(left: number, operator: string, right: number): boolean {
   switch (operator) {
     case '>=':

@@ -1972,6 +1972,10 @@ async function executeRun(
   }): Shipment => ({
     verdicts: found.verdicts,
     findings: found.inspectionRequired ? [found.reason] : [],
+    inspection: {
+      ran: found.inspectionRequired,
+      reason: `graded ${shippedOrderRef.current.risk.grade} with no risk triggers`,
+    },
     ladder: found.ladder,
     // Grouped by rung, so the record says what was in force where rather
     // than listing every rule as though they all applied at once.

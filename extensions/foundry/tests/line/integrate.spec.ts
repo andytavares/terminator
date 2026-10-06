@@ -439,6 +439,16 @@ describe('the pull request body (FR-056)', () => {
     expect(body).toMatch(/inspection/i)
   })
 
+  it('says the inspection did not run, with the reason, when it did not', () => {
+    const body = prBody(order(), {
+      verdicts: [verdict()],
+      findings: [],
+      inspection: { ran: false, reason: 'graded P3 with no risk triggers' },
+    })
+    expect(body).toContain('Not run: graded P3 with no risk triggers')
+    expect(body).not.toContain('Nothing found.')
+  })
+
   it('names the order it came from', () => {
     expect(prBody(order(), { verdicts: [], findings: [] })).toContain('WO-1')
   })
@@ -779,16 +789,66 @@ describe('the decision the operator is finally offered (FR-057)', () => {
       },
       deps()
     )
-    expect(result.gate?.why).toContain('Not measured here: Lint, Repository gate')
+    expect(result.gate?.why).toContain('### Not measured here')
+    expect(result.gate?.why).toContain('- Lint')
+    expect(result.gate?.why).toContain('- Repository gate')
   })
 
-  it('says the inspection found nothing, rather than staying silent about it', async () => {
+  it('says the inspection found nothing only when it ran', async () => {
     const result = await shipOrder(
       order(),
-      { verdicts: [verdict()], findings: [], ladder: ladderOk },
+      {
+        verdicts: [verdict()],
+        findings: [],
+        ladder: ladderOk,
+        inspection: { ran: true, reason: '' },
+      },
       deps()
     )
-    expect(result.gate?.why).toContain('inspection found nothing')
+    expect(result.gate?.why).toContain('### Inspection\n\n- Found nothing.')
+  })
+
+  it('says why the inspection did not run, never that it found nothing', async () => {
+    const result = await shipOrder(
+      order(),
+      {
+        verdicts: [verdict()],
+        findings: [],
+        ladder: ladderOk,
+        inspection: { ran: false, reason: 'graded P3 with no risk triggers' },
+      },
+      deps()
+    )
+    expect(result.gate?.why).toContain('- Not run: graded P3 with no risk triggers')
+    expect(result.gate?.why).not.toContain('Found nothing')
+  })
+
+  it('writes the decision as Markdown with one fact per line', async () => {
+    const result = await shipOrder(
+      order(),
+      {
+        verdicts: [verdict()],
+        findings: [],
+        ladder: ladderOk,
+        rulesInForce: ['Tests come first (every unit)', 'No secrets (the whole order)'],
+      },
+      deps()
+    )
+    const why = result.gate?.why ?? ''
+    expect(why).toContain('**0 units.**')
+    expect(why).toContain('### Acceptance\n\n- AC-1: An expired token is refused — passed')
+    expect(why).toContain('### Judged against\n\n- Tests come first · every unit')
+    expect(why).toContain('- No secrets · the whole order')
+  })
+
+  it('does not call an order with no verdicts passed', async () => {
+    const result = await shipOrder(
+      order(),
+      { verdicts: [], findings: [], ladder: ladderOk },
+      deps()
+    )
+    expect(result.gate?.why).toContain('- No verdicts were recorded. The criteria were not judged.')
+    expect(result.gate?.why).not.toContain('every criterion passed')
   })
 
   it('points at the body, so the decision is taken on the evidence', async () => {
@@ -1036,7 +1096,8 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     expect(result.gate?.id).toBe('WO-1-ci-red')
     expect(result.gate?.summary).toContain('unit-tests')
     expect(result.gate?.summary).toContain(order().title)
-    expect(result.gate?.why).toContain('3 automatic rounds ran and CI is still red.')
+    expect(result.gate?.why).toContain('**3 automatic rounds ran and CI is still red.**')
+    expect(result.gate?.why).toContain('```\nline 10')
     expect(result.gate?.why).toContain('line 29')
     expect(result.gate?.why).not.toContain('line 9\n')
     expect(result.held).toBe(true)

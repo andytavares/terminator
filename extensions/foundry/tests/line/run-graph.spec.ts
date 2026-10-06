@@ -150,6 +150,16 @@ describe('buildRunGraph', () => {
     expect(nodeById(graph, 'inspect')?.state).toBe('skipped')
   })
 
+  it('records why a step was skipped, and nothing for one that will run', () => {
+    const graph = buildRunGraph(order(), recipe())
+    expect(nodeById(graph, 'inspect')?.skipReason).toBe(
+      'runs only when risk triggers fire; this order has none'
+    )
+    expect(
+      graph.nodes.filter((n) => n.state === 'waiting').every((n) => n.skipReason === null)
+    ).toBe(true)
+  })
+
   it('runs the same step once the condition holds', () => {
     const o = order()
     o.risk.triggers = ['secrets']
