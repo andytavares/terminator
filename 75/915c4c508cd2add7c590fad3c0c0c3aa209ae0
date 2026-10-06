@@ -1,0 +1,54 @@
+extensions/foundry/tests/recipe/step-kinds.spec.ts
+  s_f5ff94286b0398::t_d16822910b1d14 5,210-250,254
+  s_f5ff94286b0398::t_2b5cb1eb97b5cb 251-253
+  s_f5ff94286b0398::t_99987d06c11183 255
+extensions/foundry/src/line/integrate.ts
+  s_f5ff94286b0398::t_2a46e567b47e07 93-97,119-149,315,729,759-761,763-765,767-768
+extensions/foundry/src/line/run-graph.ts
+  s_f5ff94286b0398::t_351e34a4fd9f66 1,60-61,84,101,132,155
+extensions/foundry/src/recipe/step-kinds.ts
+  s_f5ff94286b0398::t_351e34a4fd9f66 164-203
+extensions/foundry/src/line/ci-state.ts
+  s_f5ff94286b0398::t_351e34a4fd9f66 43-60
+extensions/foundry/tests/line/ship-tail.spec.ts
+  s_f5ff94286b0398::t_86ca4d9d872548 148-153
+  s_f5ff94286b0398::t_ae44d852a6129d 56-81
+extensions/foundry/src/line/ship-tail.ts
+  s_f5ff94286b0398::t_42e4c41805e501 83-85,97-101,110-111
+  s_f5ff94286b0398::t_351e34a4fd9f66 93-96
+extensions/foundry/tests/line/executor.spec.ts
+  s_f5ff94286b0398::t_ae44d852a6129d 2342-2344
+extensions/foundry/tests/line/run-graph.spec.ts
+  s_f5ff94286b0398::t_2b5cb1eb97b5cb 158-160
+  s_f5ff94286b0398::t_ae44d852a6129d 153-157,161-162
+docs/ARCHITECTURE.md
+  s_f5ff94286b0398::t_86ca4d9d872548 1301-1308
+extensions/foundry/src/line/executor.ts
+  s_f5ff94286b0398::t_351e34a4fd9f66 756-761,910-912
+  s_f5ff94286b0398::t_2b5cb1eb97b5cb 908-909,913-914
+extensions/foundry/tests/line/ci-state.spec.ts
+  s_f5ff94286b0398::t_2b5cb1eb97b5cb 44-46
+  s_f5ff94286b0398::t_d16822910b1d14 5,41-43,47-69
+  s_f5ff94286b0398::t_d2125ce76c397a 70
+extensions/foundry/tests/line/integrate.spec.ts
+  s_f5ff94286b0398::t_2b5cb1eb97b5cb 850
+  s_f5ff94286b0398::t_d16822910b1d14 442-451,792-794,797,800-847,851,1099-1100
+extensions/foundry/src/index.ts
+  s_f5ff94286b0398::t_2a46e567b47e07 1975-1978
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "75915c4c508cd2add7c590fad3c0c0c3aa209ae0",
+  "prompts": {},
+  "sessions": {
+    "s_f5ff94286b0398": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ae147c9a-1299-42b3-a6cc-5d19c4b0ab13",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
