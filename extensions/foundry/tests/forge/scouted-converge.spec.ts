@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { convergeMaybeScouted, withScoutContext } from '../../src/forge/scouted-converge.js'
+import {
+  convergeMaybeScouted,
+  withScoutContext,
+  waitForScout,
+  SCOUT_WAIT_MS,
+} from '../../src/forge/scouted-converge.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
@@ -98,5 +103,50 @@ describe('withScoutContext', () => {
     const drafted = order()
     expect(withScoutContext(drafted, null)).toBe(drafted)
     expect(withScoutContext(drafted, order())).toBe(drafted)
+  })
+})
+
+describe('waitForScout', () => {
+  it('returns at once when no scout is running for the order', async () => {
+    await expect(waitForScout('WO-none')).resolves.toBe('none')
+  })
+
+  it('waits for a running scout to finish, then returns', async () => {
+    let finish: () => void = () => undefined
+    const startScout = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)))
+    const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'a' })
+    await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-w' }), 'draft')
+
+    let settled: string | null = null
+    const waiting = waitForScout('WO-w').then((r) => (settled = r))
+    await Promise.resolve()
+    expect(settled).toBeNull()
+
+    finish()
+    await waiting
+    expect(settled).toBe('finished')
+    await expect(waitForScout('WO-w')).resolves.toBe('none')
+  })
+
+  it('gives up after the time box and lets the red team start with what is stored', async () => {
+    vi.useFakeTimers()
+    try {
+      const startScout = vi.fn(() => new Promise<void>(() => undefined)) // never ends
+      const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'a' })
+      await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-t' }), 'draft')
+
+      const waiting = waitForScout('WO-t')
+      await vi.advanceTimersByTimeAsync(SCOUT_WAIT_MS)
+      await expect(waiting).resolves.toBe('timed_out')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('treats a scout that rejects as finished, not as an error', async () => {
+    const startScout = vi.fn(() => Promise.reject(new Error('crashed')))
+    const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'a' })
+    await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-x' }), 'draft')
+    await expect(waitForScout('WO-x')).resolves.toMatch(/^(finished|none)$/)
   })
 })

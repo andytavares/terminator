@@ -800,6 +800,10 @@ so the verifier has something to check.
 when work starts, when the draft opens, when it merges. Left alone, the tracker
 decides. It also says, for this order alone, what goes back to the issue: the
 agreed order as a comment, the workflow state, and the pull request links.
+The issue moves to In Progress when the work starts, to In Review as soon as the
+draft pull request opens (not after its checks finish), and to Done only once the
+pull request is merged. A team with a single "started" state has no review state,
+so its issue stays In Progress, and the order's history says why.
 
 **Hand off** also says when the repository has no command for a check — **"Not
 measurable here"**. Those report **"not measured"** rather than passing. A green

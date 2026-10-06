@@ -82,6 +82,7 @@ import {
 import type { AskModel } from './forge/converge.js'
 import {
   convergeMaybeScouted as scoutedConverge,
+  waitForScout,
   withScoutContext,
 } from './forge/scouted-converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from './ipc/forge-channels.js'
@@ -1284,6 +1285,14 @@ async function runRefineryTick(
       return waiting
     },
     resume,
+    // The issue's last move: Done only once the pull requests are merged.
+    onMerged: async (orderId) => {
+      const order = await store.load(orderId)
+      const port = issuesPortFor(api)
+      if (order !== null && port !== null) {
+        await writeBack(order, 'merged', writeBackDepsFor(api, root, order, port))
+      }
+    },
     now: () => new Date().toISOString(),
   }
 
@@ -2002,6 +2011,14 @@ async function executeRun(
       raiseGate: async (gate) => {
         await gates.save(gate)
       },
+      // The ticket moves to In Review when the draft opens, not when the CI
+      // watch that follows it ends.
+      onDraftOpened: async (pulls) => {
+        if (issuesPort === null) return
+        await writeBack(order, 'draft_opened', writeBackDepsFor(api, root, order, issuesPort), {
+          pulls: pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
+        })
+      },
       // A recipe with no `ci` never asks to watch anything (`rounds: null`
       // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
       watchCi: (pulls) =>
@@ -2024,11 +2041,6 @@ async function executeRun(
   if (shipped.held || shipped.pulls.length === 0) return
 
   await store.save({ ...order, status: 'shipped' })
-  if (issuesPort !== null) {
-    await writeBack(order, 'draft_opened', writeBackDepsFor(api, root, order, issuesPort), {
-      pulls: shipped.pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
-    })
-  }
 }
 
 /**
@@ -2693,6 +2705,7 @@ export function activate(api: ExtensionAPI): void {
     }
     // The scout runs beside the first draft, so what it found reaches the red
     // team from the store rather than from the draft it is attacking.
+    await waitForScout(order.id)
     const attacked = withScoutContext(order, (await createOrderStore(root).load(order.id)) ?? null)
     await readOnlyRound({
       api,
@@ -2881,46 +2894,50 @@ export function activate(api: ExtensionAPI): void {
     const root = dataRoot()
     return scoutedConverge(
       {
-        startScout: (scoutOrder) => {
-          void readOnlyRound({
-            api,
-            root,
-            order: scoutOrder,
-            roleId: 'scout',
-            nodeId: 'forge-scout',
-            prompt: (role) => {
-              const sources = resolveSources(api, root)
-              return brief({
-                order: scoutOrder,
-                role,
-                units: [],
-                rules: rulesFor(sources, {
-                  repoPaths: sources.repoPaths,
-                  houseDocs: [...scoutOrder.context.houseDocs],
-                }).rules,
-                outputPath: rungOutputPath(orderDir(root, scoutOrder.id), 'forge-scout'),
-              })
-            },
-            startedAction: 'scout.started',
-            startedReason: 'reading the repository beside the first draft',
-            onFinished: async (updated) => {
-              // A failure or an empty write was already recorded as
-              // `scout.refused`; the architect never waited on it.
-              if (updated === null) return
-              await createOrderStore(root).record({
-                at: new Date().toISOString(),
-                orderId: scoutOrder.id,
-                actor: 'role:scout',
-                action: 'scout.collected',
-                subject: scoutOrder.id,
-                reason: `found ${updated.context.entryPoints.length} entry point${
-                  updated.context.entryPoints.length === 1 ? '' : 's'
-                }`,
-                evidence: [],
-              })
-            },
-          })
-        },
+        // Settles when the scout's turn ends, so a red team that would start
+        // meanwhile can wait for what it found.
+        startScout: (scoutOrder) =>
+          new Promise<void>((settled) => {
+            void readOnlyRound({
+              api,
+              root,
+              order: scoutOrder,
+              roleId: 'scout',
+              nodeId: 'forge-scout',
+              prompt: (role) => {
+                const sources = resolveSources(api, root)
+                return brief({
+                  order: scoutOrder,
+                  role,
+                  units: [],
+                  rules: rulesFor(sources, {
+                    repoPaths: sources.repoPaths,
+                    houseDocs: [...scoutOrder.context.houseDocs],
+                  }).rules,
+                  outputPath: rungOutputPath(orderDir(root, scoutOrder.id), 'forge-scout'),
+                })
+              },
+              startedAction: 'scout.started',
+              startedReason: 'reading the repository beside the first draft',
+              onFinished: async (updated) => {
+                // A failure or an empty write was already recorded as
+                // `scout.refused`; the architect never waited on it.
+                if (updated === null) return settled()
+                await createOrderStore(root).record({
+                  at: new Date().toISOString(),
+                  orderId: scoutOrder.id,
+                  actor: 'role:scout',
+                  action: 'scout.collected',
+                  subject: scoutOrder.id,
+                  reason: `found ${updated.context.entryPoints.length} entry point${
+                    updated.context.entryPoints.length === 1 ? '' : 's'
+                  }`,
+                  evidence: [],
+                })
+                settled()
+              },
+            }).catch(settled)
+          }),
         startArchitect: (architectOrder, architectMessage) =>
           convergeWithFollowUps(architectOrder, architectMessage, 0),
       },
@@ -3251,13 +3268,6 @@ export function activate(api: ExtensionAPI): void {
         const deps = integrateDepsFor(api, dataRoot(), gate.orderId)
         for (const pull of await readPulls(dataRoot(), gate.orderId)) {
           await markReady(pull, deps)
-        }
-        // The issue's last move. Marking ready is as close to merged as
-        // Foundry gets — it never merges anything itself.
-        const order = await createOrderStore(dataRoot()).load(gate.orderId)
-        const port = issuesPortFor(api)
-        if (order !== null && port !== null) {
-          await writeBack(order, 'merged', writeBackDepsFor(api, dataRoot(), order, port))
         }
         return
       }

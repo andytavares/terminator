@@ -1310,6 +1310,17 @@ pull request links. A tracker write never affects the work: a failure is
 retried, an unsupported capability is recorded once at agreement and never
 asked about again.
 
+The state follows the work, at three moments: the run starting moves the issue
+to In Progress; opening the draft moves it to In Review (`shipOrder` calls
+`IntegrateDeps.onDraftOpened` once every lane's draft is open, before the CI
+watch, so the move no longer waits for CI); and the issue goes to Done only when
+the refinery tick first sees every lane's pull request merged
+(`RefineryTickDeps.onMerged`, once per order, guarded by `mergedAt`). Marking a
+draft ready writes nothing to the tracker. Each successful write records
+`writeback.ok` in the ledger beside the existing `writeback.failed`. A Linear
+team with a single started state has no review state: the In Review move fails
+and the ledger says the issue stays In Progress for that reason.
+
 ### Sensors and signals (`src/sensors/`, ADR-066)
 
 Sensors read the product's signals back into the factory and **propose** work;

@@ -273,3 +273,49 @@ describe('refineryTick', () => {
     })
   })
 })
+
+describe('refineryTick tells the tracker when an order is merged', () => {
+  const pulls = [{ url: 'u1' }, { url: 'u2' }]
+  const candidate = async () => [{ order: { id: 'WO-1', title: 'A' }, pulls }]
+
+  it('calls onMerged once, however many ticks see the merge', async () => {
+    const onMerged = vi.fn(async () => undefined)
+    const deps = baseDeps({
+      candidates: candidate,
+      viewPr: async () => ({ merged: true }),
+      onMerged,
+    })
+
+    await refineryTick(deps)
+    await refineryTick(deps)
+
+    expect(onMerged).toHaveBeenCalledTimes(1)
+    expect(onMerged).toHaveBeenCalledWith('WO-1')
+  })
+
+  it('waits for every lane before it says merged', async () => {
+    const onMerged = vi.fn(async () => undefined)
+    const deps = baseDeps({
+      candidates: candidate,
+      viewPr: async (url) => ({ merged: url === 'u1' }),
+      onMerged,
+    })
+
+    await refineryTick(deps)
+    expect(onMerged).not.toHaveBeenCalled()
+
+    deps.viewPr = async () => ({ merged: true })
+    await refineryTick(deps)
+    expect(onMerged).toHaveBeenCalledTimes(1)
+  })
+
+  it('carries on when the tracker write throws', async () => {
+    const deps = baseDeps({
+      candidates: candidate,
+      viewPr: async () => ({ merged: true }),
+      onMerged: async () => Promise.reject(new Error('tracker down')),
+    })
+    await refineryTick(deps)
+    expect(deps.states.get('WO-1')?.mergedAt).not.toBeNull()
+  })
+})

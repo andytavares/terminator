@@ -13,12 +13,48 @@ function isFirstDraft(order: WorkOrder): boolean {
   return order.provenance.decisions.length === 0 && order.context.entryPoints.length === 0
 }
 
+const runningScouts = new Map<string, Promise<void>>()
+
+/** How long the red team waits for a scout still reading the repository. */
+export const SCOUT_WAIT_MS = 30_000
+
+function trackScout(orderId: string, running: void | Promise<void>): void {
+  if (running === undefined) return
+  const tracked = running
+    .catch(() => undefined)
+    .finally(() => {
+      if (runningScouts.get(orderId) === tracked) runningScouts.delete(orderId)
+    })
+  runningScouts.set(orderId, tracked)
+}
+
+/**
+ * Let a scout that is still running finish before the red team reads what it
+ * stored, for at most `SCOUT_WAIT_MS`; then go on with whatever is stored.
+ */
+export async function waitForScout(
+  orderId: string,
+  ms: number = SCOUT_WAIT_MS
+): Promise<'none' | 'finished' | 'timed_out'> {
+  const running = runningScouts.get(orderId)
+  if (running === undefined) return 'none'
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<'timed_out'>((resolve) => {
+    timer = setTimeout(() => resolve('timed_out'), ms)
+  })
+  try {
+    return await Promise.race([running.then(() => 'finished' as const), timeout])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export interface ScoutedConvergeDeps {
   /**
    * Start the scout, read-only. It records what it found on the order when its
    * turn ends; nothing here waits for that.
    */
-  readonly startScout: (order: WorkOrder) => void
+  readonly startScout: (order: WorkOrder) => void | Promise<void>
   /** One architect turn (and the follow-ups it starts on its own). */
   readonly startArchitect: (order: WorkOrder, message: string) => Promise<ConvergeStarted>
 }
@@ -40,7 +76,7 @@ export function convergeMaybeScouted(
 ): Promise<ConvergeStarted> {
   if (isFirstDraft(order)) {
     try {
-      deps.startScout(order)
+      trackScout(order.id, deps.startScout(order))
     } catch {
       // A scout that cannot start must not cost the draft its architect.
     }

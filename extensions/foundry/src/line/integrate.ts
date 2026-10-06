@@ -63,6 +63,11 @@ export interface IntegrateDeps {
    * all — no watching, no note on the gate, nothing withheld.
    */
   readonly watchCi?: (pulls: readonly LanePullRequest[]) => Promise<CiOutcome>
+  /**
+   * Every lane's draft is open and `pulls.json` is written; the CI watch has
+   * not started. A failure here never affects shipping.
+   */
+  readonly onDraftOpened?: (pulls: readonly LanePullRequest[]) => Promise<void>
 }
 
 export interface Shipment {
@@ -555,6 +560,12 @@ export async function shipOrder(
     JSON.stringify(pulls, null, 2),
     'utf8'
   )
+
+  try {
+    await deps.onDraftOpened?.(pulls)
+  } catch {
+    // Telling a tracker is never worth the drafts that are already open.
+  }
 
   // Watched before the ready-for-review gate is raised (D2): a draft whose
   // CI has not been watched, or is still red, is not "ready for review" —

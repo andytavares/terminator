@@ -47,6 +47,24 @@ export const INTENT_FOR_EVENT: Record<WriteBackEvent, TransitionIntent | null> =
   merged: 'done',
 }
 
+const STATE_WORDS: Record<TransitionIntent, string> = {
+  started: 'In Progress',
+  in_review: 'In Review',
+  done: 'Done',
+}
+
+/**
+ * A team with a single "started" state has nowhere to put a review. Core says
+ * so with "No available … satisfies"; the operator needs to hear what that
+ * means for the ticket.
+ */
+function withNoReviewState(error: unknown, key: string): unknown {
+  if (!/No available .* satisfies/.test(messageOf(error))) return error
+  return new Error(
+    `${key} stays In Progress because the team has no review state (${messageOf(error)})`
+  )
+}
+
 /** One retry. A tracker refusing twice is a tracker with a problem. */
 export const MAX_ATTEMPTS = 2
 
@@ -146,11 +164,13 @@ async function attempt(
   write: WriteBackResult['write'],
   subject: string,
   work: () => Promise<void>,
-  deps: WriteBackDeps
+  deps: WriteBackDeps,
+  done: string
 ): Promise<WriteBackResult> {
   for (let n = 1; n <= MAX_ATTEMPTS; n++) {
     try {
       await work()
+      await deps.record('writeback.ok', subject, done)
       return { write, ok: true, unsupported: false, reason: '' }
     } catch (error) {
       if (isUnsupported(error)) {
@@ -208,7 +228,8 @@ export async function writeBack(
         'summary_comment',
         issue.key,
         () => deps.issues.comment(issue.tracker, issue.key, renderOrder(order)),
-        deps
+        deps,
+        `the agreed order was commented on ${issue.key}`
       )
     )
   }
@@ -226,8 +247,17 @@ export async function writeBack(
         await attempt(
           'status',
           issue.key,
-          () => deps.issues.transition(issue.tracker, issue.key, intent, deps.mapping?.[intent]),
-          deps
+          async () => {
+            try {
+              await deps.issues.transition(issue.tracker, issue.key, intent, deps.mapping?.[intent])
+            } catch (error) {
+              throw intent === 'in_review' && deps.mapping?.[intent] === undefined
+                ? withNoReviewState(error, issue.key)
+                : error
+            }
+          },
+          deps,
+          `${issue.key} moved to ${STATE_WORDS[intent]}`
         )
       )
     }
@@ -240,7 +270,8 @@ export async function writeBack(
         'pr_link',
         issue.key,
         () => deps.issues.comment(issue.tracker, issue.key, linkComment(order, pulls)),
-        deps
+        deps,
+        `${pulls.length} pull request link${pulls.length === 1 ? '' : 's'} commented on ${issue.key}`
       )
     )
   }

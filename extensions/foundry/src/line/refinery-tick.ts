@@ -47,6 +47,8 @@ export interface RefineryTickDeps {
   readonly titleOf: (orderId: string) => Promise<string>
   /** The orders whose refinery state waits on `mergedId` to merge. */
   readonly waitingOn: (mergedId: string) => Promise<readonly string[]>
+  /** An order's pulls were all seen merged for the first time. Never throws into the tick. */
+  readonly onMerged?: (orderId: string) => Promise<void>
   /** Carry on a run that was waiting: the same resume a gate's decision uses. */
   readonly resume: (orderId: string) => Promise<void>
   readonly now: () => string
@@ -86,6 +88,11 @@ export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
         state = { ...state, mergedAt: deps.now() }
         await deps.writeState(order.id, state)
         await deps.record(order.id, 'refinery.merged', order.id, `${order.title} merged`)
+        try {
+          await deps.onMerged?.(order.id)
+        } catch {
+          // The tracker being briefly wrong must not stop the restack of what queued behind.
+        }
       }
     }
 

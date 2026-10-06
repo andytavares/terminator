@@ -954,6 +954,36 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     expect(result.held).toBe(false)
   })
 
+  it('tells the caller the drafts are open before the CI watch starts', async () => {
+    const calls: string[] = []
+    const onDraftOpened = vi.fn(async () => {
+      calls.push('onDraftOpened')
+    })
+    const watchCi = vi.fn(async (): Promise<CiOutcome> => {
+      calls.push('watchCi')
+      return { kind: 'green', checks: [check()] }
+    })
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({ watchCi, onDraftOpened })
+    )
+    expect(calls).toEqual(['onDraftOpened', 'watchCi'])
+    expect(onDraftOpened).toHaveBeenCalledTimes(1)
+    expect(onDraftOpened).toHaveBeenCalledWith(result.pulls)
+  })
+
+  it('does not fail shipping when the draft-opened callback throws', async () => {
+    const result = await shipOrder(
+      order(),
+      { verdicts: [verdict()], findings: [] },
+      deps({
+        onDraftOpened: vi.fn(async () => Promise.reject(new Error('tracker down'))),
+      })
+    )
+    expect(result.held).toBe(false)
+  })
+
   it('adds "CI passed: N checks." to the ready gate when CI is green', async () => {
     const outcome: CiOutcome = { kind: 'green', checks: [check(), check({ name: 'lint' })] }
     const watchCi = vi.fn(async () => outcome)
