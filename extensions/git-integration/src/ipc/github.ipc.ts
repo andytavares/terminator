@@ -33,6 +33,7 @@ import {
 } from '../github/pr-review-service.js'
 import {
   type GhOptions,
+  type ExecOutput,
   isAuthError,
   runGh,
   runGit,
@@ -52,6 +53,13 @@ type RegisterFn = (
 
 const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessions' })
 const activeReviewStore = new Store<Record<string, unknown>>({ name: 'pr-active-reviews' })
+
+/** Files past this size are not sent to the renderer for context expansion. */
+const MAX_FILE_CONTENT_BYTES = 2 * 1024 * 1024
+// One byte over the limit, so an oversized file overflows the buffer instead of being read whole.
+const FILE_CONTENT_OUTPUT: ExecOutput = { raw: true, maxBuffer: MAX_FILE_CONTENT_BYTES + 1 }
+const isOverflow = (e: unknown) =>
+  (e as { code?: string } | null)?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -73,9 +81,10 @@ async function runGhForRemote(
   name: string,
   args: string[],
   opts: GhOptions,
-  timeoutMs?: number
+  timeoutMs?: number,
+  output?: ExecOutput
 ): Promise<string> {
-  return runGh(homedir(), args, opts, timeoutMs, { GH_REPO: `${owner}/${name}` })
+  return runGh(homedir(), args, opts, timeoutMs, { GH_REPO: `${owner}/${name}` }, output)
 }
 
 export function registerGithubHandlers(
@@ -423,6 +432,57 @@ export function registerGithubHandlers(
       const diff = parseDiff(diffRaw, path)
       return { diff }
     } catch (e) {
+      return { error: String(e) }
+    }
+  })
+
+  register('github:pr-file-content', async (payload) => {
+    const schema = z.object({
+      repoRoot: z.string().min(1),
+      prNumber: z.number().int().positive(),
+      path: z.string().min(1),
+      ref: z.string().min(1),
+    })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, prNumber, path, ref } = parsed.data
+    try {
+      let content: string
+      const remote = parseRemoteRepo(repoRoot)
+      if (remote) {
+        const encodedPath = path.split('/').map(encodeURIComponent).join('/')
+        content = await runGhForRemote(
+          remote.owner,
+          remote.name,
+          [
+            'api',
+            '-H',
+            'Accept: application/vnd.github.raw+json',
+            `repos/{owner}/{repo}/contents/${encodedPath}?ref=${ref}`,
+          ],
+          opts,
+          undefined,
+          FILE_CONTENT_OUTPUT
+        )
+      } else {
+        try {
+          content = await runGit(repoRoot, ['show', `${ref}:${path}`], FILE_CONTENT_OUTPUT)
+        } catch (e) {
+          if (isOverflow(e)) throw e
+          // The PR head may not be in the local object store yet.
+          await runGit(repoRoot, [
+            'fetch',
+            '--force',
+            'origin',
+            `pull/${prNumber}/head:refs/remotes/pull/${prNumber}/head`,
+          ])
+          content = await runGit(repoRoot, ['show', `${ref}:${path}`], FILE_CONTENT_OUTPUT)
+        }
+      }
+      if (Buffer.byteLength(content) > MAX_FILE_CONTENT_BYTES) return { tooLarge: true }
+      return { content }
+    } catch (e) {
+      if (isOverflow(e)) return { tooLarge: true }
       return { error: String(e) }
     }
   })

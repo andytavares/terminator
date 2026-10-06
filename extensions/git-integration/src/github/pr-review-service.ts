@@ -1147,7 +1147,10 @@ export function parseDiff(raw: string, filePath: string): FileDiff {
   const hunks: FileDiff['hunks'] = []
   let currentHunk: FileDiff['hunks'][0] | null = null
 
-  for (const line of raw.split('\n')) {
+  const rawLines = raw.split('\n')
+  for (const [i, line] of rawLines.entries()) {
+    if (line.startsWith('\\')) continue
+    if (line === '' && i === rawLines.length - 1) continue
     if (line.startsWith('@@ ')) {
       if (currentHunk) hunks.push(currentHunk)
       currentHunk = { header: line, lines: [] }

@@ -46,13 +46,20 @@ export function isAuthError(e: unknown): boolean {
   return msg.includes('gh auth login') || msg.includes('GH_TOKEN') || msg.includes('401')
 }
 
+/** Raw output keeps leading and trailing whitespace, which file content needs for its line numbers. */
+export interface ExecOutput {
+  readonly raw?: boolean
+  readonly maxBuffer?: number
+}
+
 export async function runGh(
   cwd: string,
   args: string[],
   opts: GhOptions,
   timeoutMs = 30_000,
   /** Per-call variables, e.g. GH_REPO; never written to the shared process env. */
-  extraEnv?: Record<string, string>
+  extraEnv?: Record<string, string>,
+  output: ExecOutput = {}
 ): Promise<string> {
   const gh = await resolveGh(opts.getGhPath())
   const token = opts.getToken()
@@ -61,9 +68,14 @@ export async function runGh(
       ? { ...process.env, ...(token ? { GH_TOKEN: token } : {}), ...extraEnv }
       : undefined
   try {
-    const { stdout, stderr } = await execFileAsync(gh, args, { cwd, timeout: timeoutMs, env })
+    const { stdout, stderr } = await execFileAsync(gh, args, {
+      cwd,
+      timeout: timeoutMs,
+      env,
+      ...(output.maxBuffer === undefined ? {} : { maxBuffer: output.maxBuffer }),
+    })
     if (stderr && !stdout) throw new Error(stderr)
-    return stdout.trim()
+    return output.raw ? stdout : stdout.trim()
   } catch (e) {
     // If an explicit token was set but auth failed, retry without it so the
     // system gh auth / GH_TOKEN env var gets a chance (token may be expired).
@@ -72,9 +84,10 @@ export async function runGh(
         cwd,
         timeout: timeoutMs,
         env: extraEnv ? { ...process.env, ...extraEnv } : undefined,
+        ...(output.maxBuffer === undefined ? {} : { maxBuffer: output.maxBuffer }),
       })
       if (stderr && !stdout) throw new Error(stderr)
-      return stdout.trim()
+      return output.raw ? stdout : stdout.trim()
     }
     throw e
   }
@@ -89,9 +102,17 @@ export async function getRepoOwnerAndName(
   return { owner: data.owner.login, repo: data.name }
 }
 
-export async function runGit(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, { cwd, timeout: 30_000 })
-  return stdout.trim()
+export async function runGit(
+  cwd: string,
+  args: string[],
+  output: ExecOutput = {}
+): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, {
+    cwd,
+    timeout: 30_000,
+    ...(output.maxBuffer === undefined ? {} : { maxBuffer: output.maxBuffer }),
+  })
+  return output.raw ? stdout : stdout.trim()
 }
 
 export const PR_JSON_FIELDS =
