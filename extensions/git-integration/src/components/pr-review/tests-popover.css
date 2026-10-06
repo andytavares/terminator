@@ -81,7 +81,7 @@
 }
 
 .rs-hunk-tests {
-  float: right;
+  flex-shrink: 0;
   background: transparent;
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-xs);
@@ -97,4 +97,19 @@
 
 .rs-hunk-anchor {
   position: relative;
+}
+
+.rs-hunk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.rs-hunk-bar__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
