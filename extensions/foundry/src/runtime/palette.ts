@@ -1,7 +1,5 @@
 import * as path from 'node:path'
 import type { Run } from './run-registry.js'
-import type { ReviewItem } from './review/review-queue.js'
-import { gradeInWords } from './review/risk-grader.js'
 
 // The palette over runs and cards.
 //
@@ -20,8 +18,8 @@ export interface PaletteEntry {
   readonly category: string
   /** What the entry acts on, which is all the handler needs. */
   readonly sessionId: string
-  readonly kind: 'run' | 'review'
-  /** Set for a run entry only — the label rule for the most urgent one keys on this. */
+  readonly kind: 'run'
+  /** The label rule for the most urgent entry keys on this. */
   readonly state?: Run['state']
 }
 
@@ -33,7 +31,7 @@ function cardName(featureDir: string): string {
 }
 
 /**
- * Runs first, worst state first; then the review queue, worst grade first.
+ * Worst state first.
  *
  * A palette sorted by name would be alphabetical noise: what belongs at the top
  * is what is blocked, and after that what is waiting on a decision.
@@ -46,11 +44,8 @@ const STATE_RANK: Record<Run['state'], number> = {
   finished: 4,
 }
 
-export function paletteEntries(
-  runs: readonly Run[],
-  review: readonly ReviewItem[]
-): PaletteEntry[] {
-  const runEntries = [...runs]
+export function paletteEntries(runs: readonly Run[]): PaletteEntry[] {
+  return [...runs]
     .filter((run) => run.state !== 'finished')
     .sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state] || a.branch.localeCompare(b.branch))
     .map<PaletteEntry>((run) => ({
@@ -63,17 +58,4 @@ export function paletteEntries(
       kind: 'run',
       state: run.state,
     }))
-
-  // Already worst-first — the queue is kept in that order, and re-sorting here
-  // would quietly disagree with the panel.
-  const reviewEntries = review.map<PaletteEntry>((item) => ({
-    id: `review.${item.sessionId}`,
-    label: `Review ${path.basename(item.repoPath)}`,
-    description: `${gradeInWords(item.grade)} · ${item.gradeTrigger} · ${item.diffSummary.files} file${item.diffSummary.files === 1 ? '' : 's'}`,
-    category: CATEGORY,
-    sessionId: item.sessionId,
-    kind: 'review',
-  }))
-
-  return [...runEntries, ...reviewEntries]
 }

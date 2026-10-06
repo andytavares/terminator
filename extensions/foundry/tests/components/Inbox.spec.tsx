@@ -11,6 +11,7 @@ import type { Signal } from '../../src/sensors/types.js'
 // click through without reading.
 
 let invoke: ReturnType<typeof vi.fn>
+const openExternal = vi.fn()
 
 function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
   return raiseGate({
@@ -91,6 +92,7 @@ function mount(over: Record<string, unknown> = {}) {
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    shell: { openExternal },
   }
   render(<Inbox />)
 }
@@ -119,6 +121,25 @@ describe('a row the operator can act on', () => {
     expect(screen.queryByText(/token refresh failed/)).toBeNull()
     fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
     expect((document.querySelector('details') as HTMLDetailsElement).open).toBe(false)
+  })
+
+  it('links the order\u2019s pull request and ticket from the gate', async () => {
+    const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
+    const ticketUrl = 'https://linear.app/team/issue/TAV-15'
+    mount({
+      gates: [
+        {
+          ...gate({ rule: 'ready-for-review' }),
+          orderTitle: 'Refuse an expired refresh token',
+          pulls: [{ number: 233, url: pullUrl }],
+          source: { key: 'TAV-15', url: ticketUrl },
+        },
+      ],
+    })
+    fireEvent.click(await screen.findByRole('link', { name: '#233' }))
+    fireEvent.click(screen.getByRole('link', { name: 'TAV-15' }))
+    expect(openExternal).toHaveBeenCalledWith(pullUrl)
+    expect(openExternal).toHaveBeenCalledWith(ticketUrl)
   })
 
   it('says how much work the decision unblocks', async () => {

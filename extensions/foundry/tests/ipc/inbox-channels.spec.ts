@@ -80,6 +80,49 @@ describe('foundry:inbox.list', () => {
     expect(r.gates[0].why).toContain('session.ts')
   })
 
+  it('carries the order\u2019s pull requests and ticket on each gate, so the row can link them', async () => {
+    const orders = createOrderStore(root)
+    await orders.save(
+      order({
+        source: {
+          kind: 'tracker',
+          tracker: 'linear',
+          key: 'TAV-15',
+          url: 'https://linear.app/team/issue/TAV-15',
+        },
+      })
+    )
+    await createGateStore(root).save(gate())
+    const url = 'https://github.com/andytavares/terminator/pull/233'
+    const c = createInboxChannels({
+      gates: createGateStore(root),
+      orders,
+      autonomy: () => 'standard',
+      now: () => '2026-09-06T12:00:00.000Z',
+      record: vi.fn(async () => undefined) as never,
+      readPulls: async (orderId) => (orderId === 'WO-1' ? [{ url }] : []),
+    })
+    const r = (await c.list()) as {
+      gates: {
+        pulls: { number: number; url: string }[]
+        source: { key: string; url: string } | null
+      }[]
+    }
+    expect(r.gates[0].pulls).toEqual([{ number: 233, url }])
+    expect(r.gates[0].source).toEqual({
+      key: 'TAV-15',
+      url: 'https://linear.app/team/issue/TAV-15',
+    })
+  })
+
+  it('says there is no ticket when the order came from typing', async () => {
+    await createOrderStore(root).save(order())
+    await createGateStore(root).save(gate())
+    const r = (await channels().list()) as { gates: { pulls: unknown[]; source: unknown }[] }
+    expect(r.gates[0].pulls).toEqual([])
+    expect(r.gates[0].source).toBeNull()
+  })
+
   it('ranks what unblocks the most work first', async () => {
     const store = createGateStore(root)
     await store.save(gate({ id: 'G-idle', blockedUnits: 0 }))

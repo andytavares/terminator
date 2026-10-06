@@ -63,9 +63,6 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
   invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:run.observe') return view
     if (channel === 'foundry:permissions-list') return { pending: live.pending ?? [] }
-    if (channel === 'foundry:supervision-snapshot') {
-      return { backpressure: live.backpressure }
-    }
     if (channel === 'foundry:stalls-list') {
       return { firings: live.stalls ?? [], shadowMode: live.shadowMode ?? true }
     }
@@ -723,18 +720,11 @@ describe('a mute you can find again', () => {
   })
 })
 
-describe('why a new run would be refused', () => {
-  it('says so, with the queue depth', async () => {
-    mount(reply(), {
-      backpressure: { allowed: false, unreviewed: 3, limit: 3, reason: '3 diffs are unreviewed' },
-    })
-    await waitFor(() => expect(screen.getByText(/3 diffs are unreviewed/)).toBeTruthy())
-    expect(screen.getByText(/A new run is refused/)).toBeTruthy()
-  })
-
-  it('says nothing while runs are allowed', async () => {
-    mount(reply(), { backpressure: { allowed: true, unreviewed: 0, limit: 3, reason: null } })
+describe('a finished run no longer holds a new one back', () => {
+  it('never asks for the review queue and says nothing about refusing a run', async () => {
+    mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
+    expect(invoke).not.toHaveBeenCalledWith('foundry:supervision-snapshot')
     expect(screen.queryByText(/A new run is refused/)).toBeNull()
   })
 })

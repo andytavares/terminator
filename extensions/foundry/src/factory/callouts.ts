@@ -1,7 +1,7 @@
 import { gateNodeId } from './events.js'
 import type { FactoryEvent } from './events.js'
 import { ordinal } from './format.js'
-import type { Gate, GateOption } from '../gates/rules.js'
+import type { Gate } from '../gates/rules.js'
 import type { NodeState, RunGraph } from '../line/run-graph.js'
 import { DISPATCH_NODE_ID } from './layout.js'
 import { tallyChecks, waitingOnChecks } from './ci-tally.js'
@@ -181,9 +181,8 @@ export type Interruption =
       readonly nodeId: string | null
       readonly title: string
       readonly detail: string
-      readonly options: readonly GateOption[]
-      /** A budget raise needs a number typed, which the Inbox's form does. */
-      readonly needsInbox: boolean
+      /** The gate itself, so a surface can draw it with its own answers. */
+      readonly gate: Gate
     }
   | {
       readonly kind: 'stranded'
@@ -220,8 +219,7 @@ export function interruptionsFor(input: InterruptionInput): Interruption[] {
     nodeId: gateNodeId(gate, input.graph),
     title: gate.summary,
     detail: gate.why,
-    options: gate.options,
-    needsInbox: gate.breach != null,
+    gate,
   }))
 
   // A held call already says its agent is stopped; saying it twice is noise.

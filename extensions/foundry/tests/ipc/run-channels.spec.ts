@@ -1178,80 +1178,31 @@ describe('what the Floor is told to call each node', () => {
   })
 })
 
-// The constraint is one person's capacity to review, and it does not scale
-// with the number of orders. The gate was built, the Floor showed its verdict,
-// and `run.start` never asked it — so runs began regardless and
-// `BackpressureGate.override` had nothing to override.
-describe('too much waiting to be reviewed (FR-053, FR-054)', () => {
+// Per-hunk review ended with the review queue, so nothing counts finished
+// turns and nothing refuses a run because of them. A deps object that still
+// carries the old gate must not be able to hold a start back.
+describe('a start is never refused for finished turns waiting on review', () => {
   const full = () => ({
     allowed: false,
     unreviewed: 3,
     limit: 3,
     reason: '3 finished sessions are waiting for review, and the limit is 3.',
   })
-  const room = () => ({ allowed: true, unreviewed: 0, limit: 3, reason: null })
 
-  function withGate(
-    backpressure: () => ReturnType<typeof full>,
-    noteOverride?: (orderId: string) => void
-  ) {
-    return createRunChannels({
+  it('starts even when a legacy gate says there is no room', async () => {
+    await store.save(order())
+    const legacy = createRunChannels({
       store,
       dataRoot: () => dataRoot,
       sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
       now: () => '2026-09-06T10:00:00.000Z',
-      backpressure,
-      noteOverride,
-    })
-  }
-
-  it('refuses the start, with the reason and the depth', async () => {
-    await store.save(order())
-    const r = (await withGate(full).start({ id: 'WO-1' })) as {
-      error: string
-      backpressure: { unreviewed: number; limit: number }
-    }
-    expect(r.error).toMatch(/waiting for review/)
-    expect(r.backpressure).toMatchObject({ unreviewed: 3, limit: 3 })
-  })
-
-  it('cuts nothing when it refuses', async () => {
-    await store.save(order())
-    await withGate(full).start({ id: 'WO-1' })
-    expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(false)
-    expect((await store.load('WO-1'))?.status).toBe('agreed')
-  })
-
-  it('starts anyway when the operator says so', async () => {
-    await store.save(order())
-    const r = (await withGate(full).start({ id: 'WO-1', force: true })) as { error?: string }
+      backpressure: full,
+    } as unknown as Parameters<typeof createRunChannels>[0])
+    const r = (await legacy.start({ id: 'WO-1' })) as { error?: string }
     expect(r.error).toBeUndefined()
     expect((await store.load('WO-1'))?.status).toBe('running')
-  })
-
-  it('records what the operator chose to ignore, at the moment they ignored it', async () => {
-    await store.save(order())
-    const overridden: string[] = []
-    await withGate(full, (id) => overridden.push(id)).start({ id: 'WO-1', force: true })
-    expect(overridden).toEqual(['WO-1'])
-    const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
-    expect(ledger).toContain('backpressure.overridden')
-    expect(ledger).toContain('3 waiting to be reviewed')
-  })
-
-  it('records nothing when there was nothing to override', async () => {
-    await store.save(order())
-    const overridden: string[] = []
-    await withGate(room, (id) => overridden.push(id)).start({ id: 'WO-1', force: true })
-    expect(overridden).toEqual([])
     const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
     expect(ledger).not.toContain('backpressure.overridden')
-  })
-
-  it('never refuses a run because there is no runtime to ask', async () => {
-    await store.save(order())
-    const r = (await channels().start({ id: 'WO-1' })) as { error?: string }
-    expect(r.error).toBeUndefined()
   })
 })
 

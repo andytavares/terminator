@@ -33,6 +33,8 @@ import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { MarkdownInline } from '../Markdown.js'
+import { GateCard } from '../GateCard.js'
+import { OrderLinks } from '../OrderLinks.js'
 import './hall.css'
 
 // One order, drawn as a hall instead of a list of chips.
@@ -519,9 +521,10 @@ export function FactoryHall({
       return r.ok === true ? null : (r.reason ?? 'That request is no longer waiting.')
     })
 
-  const decideGate = (gateId: string, option: string): void =>
+  const decideGate = (gateId: string, option: string, limit?: number | null): void =>
     void answer(gateId, async () => {
-      const r = (await invoke('foundry:inbox.decide', { gateId, option })) as { error?: string }
+      const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
+      const r = (await invoke('foundry:inbox.decide', payload)) as { error?: string }
       return r.error ?? null
     })
 
@@ -739,8 +742,9 @@ export function FactoryHall({
               problem={answerProblem[item.id] ?? null}
               onAllow={() => resolveAsk(item.id, 'allow')}
               onDeny={() => resolveAsk(item.id, 'deny')}
-              onDecide={(option) => decideGate(item.id, option)}
-              onOpenInbox={onOpenInbox}
+              onDecide={(option, limit) => decideGate(item.id, option, limit)}
+              pulls={view.pulls}
+              source={view.source}
               onTerminal={() => {
                 const sessionId =
                   item.kind === 'stranded'
@@ -912,6 +916,11 @@ function HallHud({
           <History aria-hidden="true" /> Replay
         </button>
       )}
+      {(view.pulls?.length ?? 0) > 0 || view.source != null ? (
+        <span className="fdry-hall-hud__links">
+          <OrderLinks pulls={view.pulls} source={view.source} />
+        </span>
+      ) : null}
       {note !== null ? <span className="fdry-hall-hud__note">{note}</span> : null}
       {!replaying && waitingCount > 0 ? (
         <span className="fdry-hall-hud__needs">{waitingCount} need you</span>
@@ -946,8 +955,9 @@ interface InterruptionCardProps {
   readonly problem: string | null
   readonly onAllow: () => void
   readonly onDeny: () => void
-  readonly onDecide: (option: string) => void
-  readonly onOpenInbox: () => void
+  readonly onDecide: (option: string, limit?: number | null) => void
+  readonly pulls?: readonly { readonly number: number; readonly url: string }[]
+  readonly source?: { readonly key: string; readonly url: string } | null
   readonly onTerminal: () => void
 }
 
@@ -962,10 +972,37 @@ function InterruptionCard({
   onAllow,
   onDeny,
   onDecide,
-  onOpenInbox,
+  pulls,
+  source,
   onTerminal,
 }: InterruptionCardProps): JSX.Element {
   const titleId = `fdry-card-${item.kind}-${item.id}`
+  if (item.kind === 'gate') {
+    // The same one-line gate the list views draw: collapsed, its answers on
+    // the line, the reason a click away and read as markdown. A replay shows
+    // it where it happened with every answer disabled.
+    return (
+      <div
+        role="group"
+        aria-label={item.title}
+        className={`fdry-card fdry-card--gate${flip ? ' is-below' : ''}`}
+        style={{
+          left: `${Math.min(Math.max(anchor.left, 16), 84)}%`,
+          top: `${flip ? anchor.bottom : anchor.top}%`,
+        }}
+      >
+        <GateCard
+          gate={item.gate}
+          busy={busy || readOnly}
+          pulls={pulls}
+          source={source}
+          onDecide={onDecide}
+        />
+        {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
+        {readOnly ? <p className="fdry-card__history">Waited on you here.</p> : null}
+      </div>
+    )
+  }
   return (
     <div
       role="group"
@@ -1005,25 +1042,6 @@ function InterruptionCard({
                 <Terminal aria-hidden="true" /> Terminal
               </button>
             </>
-          ) : item.kind === 'gate' ? (
-            item.needsInbox ? (
-              <button type="button" className="fdry-hall-btn is-primary" onClick={onOpenInbox}>
-                Open Inbox
-              </button>
-            ) : (
-              item.options.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  title={option.consequence}
-                  className="fdry-hall-btn is-primary"
-                  disabled={busy}
-                  onClick={() => onDecide(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))
-            )
           ) : (
             <button
               type="button"

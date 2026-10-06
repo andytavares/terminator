@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import type { RunNode } from '../line/run-graph.js'
 import { ciLabel } from '../line/ci-label.js'
+import { pullNumber } from '../line/pull-number.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
@@ -50,14 +51,6 @@ interface FeedEntry {
 interface MuteRule {
   sessionId?: string
   author?: string
-}
-
-/** Why a new run would be refused, and how deep the queue is. */
-interface Backpressure {
-  allowed: boolean
-  unreviewed: number
-  limit: number
-  reason: string | null
 }
 
 /** A run that stopped making progress without asking for anything. */
@@ -133,11 +126,6 @@ const STATE_LABEL: Record<RunNode['state'], string> = {
   skipped: 'skipped',
 }
 
-/** The number a GitHub pull request address ends in. */
-function pullNumber(url: string): string {
-  return /\/pull\/(\d+)/.exec(url)?.[1] ?? ''
-}
-
 /** The git extension's review of one pull request, by its full command id. */
 const REVIEW_COMMAND = 'terminator.git-integration.command.review-pull-request'
 
@@ -182,7 +170,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const [reviewable, setReviewable] = useState<boolean | null>(null)
   const [feed, setFeed] = useState<FeedEntry[]>([])
   const [mutes, setMutes] = useState<MuteRule[]>([])
-  const [backpressure, setBackpressure] = useState<Backpressure | null>(null)
   const [stalls, setStalls] = useState<StallFiring[]>([])
   const [shadowMode, setShadowMode] = useState(true)
 
@@ -193,10 +180,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   // of those — the agent is genuinely stopped, waiting on somebody who has
   // been told there is nothing to do.
   const pollLive = useCallback(async () => {
-    const snapshot = (await invoke('foundry:supervision-snapshot')) as {
-      backpressure?: Backpressure
-    }
-    setBackpressure(snapshot.backpressure ?? null)
     const stalled = (await invoke('foundry:stalls-list')) as {
       firings?: StallFiring[]
       shadowMode?: boolean
@@ -1071,16 +1054,6 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             </div>
           ))}
         </section>
-      ) : null}
-
-      {/* Why a new run would be refused. Overriding is one click and is
-          recorded with how deep the queue was at the time. */}
-      {backpressure !== null && !backpressure.allowed ? (
-        <p className="fdry-note fdry-scope">
-          {backpressure.reason ??
-            `${backpressure.unreviewed} diffs are unreviewed, and the limit is ${backpressure.limit}.`}{' '}
-          A new run is refused until one is reviewed.
-        </p>
       ) : null}
 
       {/* Work that stopped making progress without asking for anything — the

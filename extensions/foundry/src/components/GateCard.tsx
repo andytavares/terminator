@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
-import { ChevronRight, GitPullRequest, Ticket } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { defaultInWords } from '../gates/rules.js'
 import type { Gate } from '../gates/rules.js'
 import { gradeInWords } from '../runtime/review/risk-grader.js'
 import { GateEvidence } from './GateEvidence.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
-import { ExternalLink, Markdown } from './Markdown.js'
+import { Markdown } from './Markdown.js'
+import { OrderLinks } from './OrderLinks.js'
 
 // One gate, one line.
 //
@@ -27,6 +28,53 @@ export interface GateCardProps {
   /** Further facts for the line under the question: which order, how many units wait. */
   readonly meta?: React.ReactNode
   readonly className?: string
+}
+
+export interface GateAnswersProps {
+  readonly gate: Pick<Gate, 'options' | 'breach'>
+  readonly busy?: boolean
+  readonly onDecide: (option: string) => void
+  /**
+   * Called for a raise, which needs a limit typed in. A surface with no form
+   * for it leaves this off and the raise is not offered there at all.
+   */
+  readonly onRaise?: () => void
+}
+
+/**
+ * The gate's answers as buttons, shared by the gate card and by any row that
+ * carries a gate's answers inline.
+ *
+ * One recommended answer, not all of them: every rule lists the affirmative one
+ * first, and drawing the ways of stopping as loudly makes the operator read
+ * every button to find the one that keeps the work alive.
+ */
+export function GateAnswers({
+  gate,
+  busy = false,
+  onDecide,
+  onRaise,
+}: GateAnswersProps): JSX.Element {
+  return (
+    <div className="fdry-gate-actions">
+      {gate.options.map((option, index) => {
+        const raise = option.id === 'raise' && Boolean(gate.breach)
+        if (raise && onRaise === undefined) return null
+        return (
+          <button
+            key={option.id}
+            type="button"
+            title={option.consequence}
+            disabled={busy}
+            className={index === 0 ? 'is-primary' : undefined}
+            onClick={() => (raise ? onRaise?.() : onDecide(option.id))}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 export function GateCard({
@@ -76,17 +124,7 @@ export function GateCard({
           <div className="fdry-gate-meta">
             {meta}
             <span>{gradeInWords(gate.riskGrade)} risk</span>
-            {pulls.map((pull) => (
-              <ExternalLink key={pull.url} href={pull.url}>
-                <GitPullRequest aria-hidden="true" />#{pull.number}
-              </ExternalLink>
-            ))}
-            {source === null ? null : (
-              <ExternalLink href={source.url}>
-                <Ticket aria-hidden="true" />
-                {source.key}
-              </ExternalLink>
-            )}
+            <OrderLinks pulls={pulls} source={source} />
             <span className="fdry-gate-default">
               If nobody answers: {defaultInWords(gate)}
               {gate.deadline === null ? ' (it waits for you)' : ''}
@@ -94,26 +132,12 @@ export function GateCard({
           </div>
         </div>
         {raising ? null : (
-          <div className="fdry-gate-actions">
-            {/* One recommended answer, not all of them: every rule lists the
-                affirmative one first, and drawing the ways of stopping as loudly
-                makes the operator read every button to find the one that keeps
-                the work alive. */}
-            {gate.options.map((option, index) => (
-              <button
-                key={option.id}
-                type="button"
-                title={option.consequence}
-                disabled={busy}
-                className={index === 0 ? 'is-primary' : undefined}
-                onClick={() =>
-                  option.id === 'raise' && gate.breach ? setRaising(true) : decide(option.id)
-                }
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <GateAnswers
+            gate={gate}
+            busy={busy}
+            onDecide={(option) => decide(option)}
+            onRaise={() => setRaising(true)}
+          />
         )}
       </div>
 

@@ -24,7 +24,11 @@ import type { Signal } from '../sensors/types.js'
 // attribute is one they learn to click through without reading.
 
 interface InboxView {
-  gates: (Gate & { orderTitle: string | null })[]
+  gates: (Gate & {
+    orderTitle: string | null
+    pulls?: { number: number; url: string }[]
+    source?: { key: string; url: string } | null
+  })[]
   autonomy?: 'escorted' | 'standard' | 'lights-out'
   /** Rules this setting is not asking about. Shown, so quiet is explicable. */
   silenced?: GateRuleId[]
@@ -251,6 +255,8 @@ export function Inbox(): JSX.Element {
                 <GateCard
                   gate={gate}
                   busy={busy === gate.id}
+                  pulls={gate.pulls}
+                  source={gate.source}
                   onDecide={(option, limit) => void answer(gate.id, option, limit)}
                   lead={
                     <>

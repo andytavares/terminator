@@ -4,9 +4,9 @@
 
 All channels use the `foundry:` namespace, registered by the extension's main-process handler via `api.ipc.registerHandler`. Payloads are validated with zod before processing. Nothing in `src/` names any of these channels (Constitution II).
 
-**Forty-five channels**, of which the fifteen below carry the Forge, the Line and the record and are documented in full; the remaining thirty drive the supervision surface and are listed, with their payloads and responses, in [Supervision and settings channels](#supervision-and-settings-channels) at the end. Every one is renderer → main (invoke) unless stated.
+**Forty-three channels**, of which the fifteen below carry the Forge, the Line and the record and are documented in full; the remaining twenty-eight drive the supervision surface and are listed, with their payloads and responses, in [Supervision and settings channels](#supervision-and-settings-channels) at the end. Every one is renderer → main (invoke) unless stated.
 
-The count is worth stating plainly: an earlier draft of this contract said ten, which was the design's ambition rather than what shipped. Supervising a live agent — its permissions, its transcript, its review queue, its stalls — is where the other thirty went.
+The count is worth stating plainly: an earlier draft of this contract said ten, which was the design's ambition rather than what shipped. Supervising a live agent — its permissions, its transcript, its stalls — is where the others went.
 
 Entity shapes referenced below are defined in [data-model.md](../data-model.md) and are not repeated here.
 
@@ -324,7 +324,7 @@ Every outstanding gate across every order, ranked (FR-048).
 
 **Payload**: `{}`
 
-**Response**: `{ gates: Gate[]; summary: { building: number; converging: number; autoDecisions24h: number } }`
+**Response**: `{ gates: Gate[]; summary: { building: number; converging: number; autoDecisions24h: number } }`. Each gate also carries `pulls: { number, url }[]` and `source: { key, url } | null` from its order, so a gate can link the pull request and the ticket.
 
 Ordered by `rank` descending. The summary is what the surface shows when `gates` is empty — "nothing needs you" is a state worth rendering well.
 
@@ -526,7 +526,7 @@ The budgets and the critical-path list are read **when an order is seeded**, not
 
 ## Supervision and settings channels
 
-Thirty channels serve the Floor: the live runs, their permissions, their transcripts, the review queue and the model box. They take the same `foundry:` namespace and the same invoke shape. Grouped by what they are for.
+Twenty-eight channels serve the Floor: the live runs, their permissions, their transcripts and the model box. They take the same `foundry:` namespace and the same invoke shape. Grouped by what they are for.
 
 ### The run graph and the session
 
@@ -541,15 +541,8 @@ Thirty channels serve the Floor: the live runs, their permissions, their transcr
 | `foundry:run-stop`             | `{ sessionId: string; reason?: string }`  | `{ ok: boolean }` — archives the run before it leaves the live list                                                                                                                                                                                                                                               |
 | `foundry:run-terminal`         | `{ sessionId: string }`                   | `{ ok: boolean }` — focuses the window and navigates to the agent's terminal (FR-027)                                                                                                                                                                                                                             |
 | `foundry:run-transcript`       | `{ sessionId: string; limit?: number }`   | `{ lines: string[] }` — the tail, default 40                                                                                                                                                                                                                                                                      |
-| `foundry:supervision-snapshot` | `{}`                                      | `{ runs, review, backpressure: { allowed, unreviewed, limit } }`                                                                                                                                                                                                                                                  |
+| `foundry:supervision-snapshot` | `{}`                                      | `{ runs, history }` — what is running and what is over. There is no review queue and no backpressure: nothing counts finished turns, and `run.start` is never refused for them.                                                                                                                                   |
 | `foundry:stalls-list`          | `{}`                                      | `{ firings, shadowMode: boolean }`                                                                                                                                                                                                                                                                                |
-
-### Review
-
-| Channel                  | Payload                 | Response                                       |
-| ------------------------ | ----------------------- | ---------------------------------------------- |
-| `foundry:review-advance` | `{ sessionId: string }` | `{ step }`                                     |
-| `foundry:review-done`    | `{ sessionId: string }` | `{ ok: true }` — reopens the backpressure gate |
 
 ### Permissions
 
@@ -571,14 +564,14 @@ Thirty channels serve the Floor: the live runs, their permissions, their transcr
 
 ### The order, beyond compiling it
 
-| Channel                   | Payload                                                               | Response                                                                                                                                                         |
-| ------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `foundry:order.list`      | `{}`                                                                  | Every order, for the board                                                                                                                                       |
-| `foundry:order.converge`  | `{ id: string; message?: string; settle?: Settle }`                   | Runs the architect read-only and reads back its proposal (ADR-043). `settle` applies every answer and accept, then sends every ask and fix in one turn (ADR 069) |
-| `foundry:order.states`    | `{ id: string }`                                                      | The tracker's workflow positions, for the intent mapping (FR-060)                                                                                                |
-| `foundry:order.mapState`  | `{ id: string; intent; optionId }`                                    | `{ ok, mapping }`                                                                                                                                                |
-| `foundry:order.writeBack` | `{ id: string; events: string[] }`                                    | Which write-backs this order will make (FR-062)                                                                                                                  |
-| `foundry:order.budgets`   | `{ id: string; budgets: { agents; wallClockMinutes; filesTouched } }` | The order and its checks. Each limit is a whole number ≥ 1 or `null` for no limit. Drafts only: a running order's budget is raised at its budget gate (ADR 052)  |
+| Channel                   | Payload                                                               | Response                                                                                                                                                                                                                                                              |
+| ------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `foundry:order.list`      | `{}`                                                                  | Every order, for the board. A row carries `standing`, `ci: { status, round, max, reason, checks: { done, total } } \| null`, `pulls: { number, url }[]` and `gate: { id, options, breach } \| null` — the open gate when the move is yours, so the row can answer it. |
+| `foundry:order.converge`  | `{ id: string; message?: string; settle?: Settle }`                   | Runs the architect read-only and reads back its proposal (ADR-043). `settle` applies every answer and accept, then sends every ask and fix in one turn (ADR 069)                                                                                                      |
+| `foundry:order.states`    | `{ id: string }`                                                      | The tracker's workflow positions, for the intent mapping (FR-060)                                                                                                                                                                                                     |
+| `foundry:order.mapState`  | `{ id: string; intent; optionId }`                                    | `{ ok, mapping }`                                                                                                                                                                                                                                                     |
+| `foundry:order.writeBack` | `{ id: string; events: string[] }`                                    | Which write-backs this order will make (FR-062)                                                                                                                                                                                                                       |
+| `foundry:order.budgets`   | `{ id: string; budgets: { agents; wallClockMinutes; filesTouched } }` | The order and its checks. Each limit is a whole number ≥ 1 or `null` for no limit. Drafts only: a running order's budget is raised at its budget gate (ADR 052)                                                                                                       |
 
 ### The model
 

@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
+import { raiseGate } from '../../../src/gates/rules.js'
 
 // The Factory surface for one order: a hall drawn from the run graph, a
 // station per node, and the two moves this view keeps — attach, and opening
@@ -56,6 +57,7 @@ function view(over: Record<string, unknown> = {}) {
 }
 
 let invoke: ReturnType<typeof vi.fn>
+const openExternal = vi.fn()
 
 function mount(
   props: {
@@ -84,6 +86,7 @@ function mount(
   })
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    shell: { openExternal },
   }
   render(
     <FactoryHall
@@ -720,5 +723,100 @@ describe('FactoryHall labels what it draws', () => {
     expect(
       (screen.getByRole('button', { name: /Agent closed/i }) as HTMLButtonElement).disabled
     ).toBe(true)
+  })
+})
+
+// A gate is one line with its answers on it, the reason a click away and written
+// in markdown — the same card the list views draw, not a second rendering of it.
+describe('FactoryHall gates and links', () => {
+  const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
+  const ticketUrl = 'https://linear.app/team/issue/TAV-15'
+
+  function readyGate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
+    return raiseGate({
+      id: 'G-1',
+      rule: 'ready-for-review',
+      orderId: 'WO-1',
+      summary: 'Mark the pull request ready for review',
+      why: 'The work shipped as a draft:\n\n- the checks passed\n- nothing is blocked',
+      at: '2026-09-06T10:00:00.000Z',
+      ...over,
+    })
+  }
+
+  it('links the pull request and the ticket on the heads-up bar', async () => {
+    mount({
+      view: view({
+        pulls: [{ repo: 'terminator', url: pullUrl, number: 233, cwd: '/wt' }],
+        source: { key: 'TAV-15', url: ticketUrl },
+      }),
+    })
+    const bar = await waitFor(() => {
+      const found = document.querySelector('.fdry-hall-hud') as HTMLElement | null
+      if (found === null) throw new Error('the heads-up bar is not drawn yet')
+      return found
+    })
+    fireEvent.click(within(bar).getByRole('link', { name: '#233' }))
+    fireEvent.click(within(bar).getByRole('link', { name: 'TAV-15' }))
+    expect(openExternal).toHaveBeenCalledWith(pullUrl)
+    expect(openExternal).toHaveBeenCalledWith(ticketUrl)
+  })
+
+  it('draws a waiting gate collapsed, with its answers on the line, and reads the reason as markdown', async () => {
+    mount({ view: view({ waiting: [readyGate()] }) })
+    expect(await screen.findByRole('button', { name: 'Mark ready' })).toBeTruthy()
+    expect(document.querySelectorAll('.fdry-card li')).toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show the reason' }))
+    const items = document.querySelectorAll('.fdry-card li')
+    expect([...items].map((li) => li.textContent)).toContain('the checks passed')
+  })
+
+  it('lets a shipped order\u2019s open ready-for-review gate be answered in the hall', async () => {
+    mount({
+      view: view({
+        graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
+        waiting: [readyGate()],
+        standing: {
+          kind: 'halted',
+          turn: 'you',
+          label: 'Mark the pull request ready for review',
+          headline: 'Shipped \u2014 Mark the pull request ready for review',
+          detail: '',
+          done: 1,
+          total: 1,
+          gateId: 'G-1',
+        },
+      }),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark ready' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: 'G-1',
+        option: 'mark_ready',
+      })
+    )
+  })
+
+  it('asks for a new limit on the card itself, rather than sending the operator to the Inbox', async () => {
+    mount({
+      view: view({
+        waiting: [
+          raiseGate({
+            id: 'G-2',
+            rule: 'budget.exceeded',
+            orderId: 'WO-1',
+            summary: 'Past its time budget',
+            why: 'The order budgets 60 and is at 61.',
+            at: '2026-09-06T10:00:00.000Z',
+            breach: { kind: 'wall-clock', limit: 60, spent: 61 } as never,
+          }),
+        ],
+      }),
+    })
+    await screen.findByText('Past its time budget')
+    expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
+    const raise = screen.getAllByRole('button').find((b) => /raise/i.test(b.textContent ?? ''))
+    expect(raise).toBeTruthy()
   })
 })

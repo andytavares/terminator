@@ -92,42 +92,11 @@ describe('a turn that produced something', () => {
     expect(s.runs.get('session-1')?.diff).toEqual({ files: 1, added: 10, removed: 2 })
   })
 
-  it('offers it for review', async () => {
-    const s = build()
-    addRun(s)
-    await s.finishTurn('session-1', 1, 2_000)
-    expect(s.review.list().map((item) => item.sessionId)).toEqual(['session-1'])
-  })
-
   it('marks the run ready rather than over — the agent is still at its prompt', async () => {
     const s = build()
     addRun(s)
     await s.finishTurn('session-1', 1, 2_000)
     expect(s.runs.get('session-1')?.state).toBe('ready')
-  })
-
-  it('grades it, so the queue can be worst-first', async () => {
-    changedFiles = ['src/auth/token.ts']
-    const s = build()
-    addRun(s)
-    await s.finishTurn('session-1', 1, 2_000)
-    expect(s.review.list()[0].grade).toBe('P0')
-  })
-
-  it('carries the changed paths into the grade — without them everything is ordinary', async () => {
-    changedFiles = ['migrations/001_add_users.sql']
-    const s = build()
-    addRun(s)
-    await s.finishTurn('session-1', 1, 2_000)
-    expect(s.review.list()[0].grade).toBe('P0')
-  })
-
-  it('does not assume checks are passing on evidence nobody has', async () => {
-    const s = build()
-    addRun(s)
-    await s.finishTurn('session-1', 1, 2_000)
-    // Assuming passing is how a change auto-merges on a green nobody saw.
-    expect(s.review.list()[0].checkState).not.toBe('passing')
   })
 
   it('says so in the feed, with what changed', async () => {
@@ -144,20 +113,6 @@ describe('a turn that produced nothing', () => {
     changedFiles = []
   })
 
-  it('does not go to review — there is nothing to look at', async () => {
-    const s = build()
-    addRun(s)
-    await s.finishTurn('session-1', 1, 2_000)
-    expect(s.review.list()).toEqual([])
-  })
-
-  it('does not take a slot in the queue the gate counts', async () => {
-    const s = build()
-    addRun(s)
-    await s.finishTurn('session-1', 1, 2_000)
-    expect(s.backpressure.check().allowed).toBe(true)
-  })
-
   it('is left waiting, not finished: the session is still open at its prompt', async () => {
     const s = build()
     addRun(s)
@@ -168,52 +123,16 @@ describe('a turn that produced nothing', () => {
   })
 })
 
-describe('backpressure', () => {
-  async function fill(s: Supervision, count: number) {
-    for (let i = 0; i < count; i += 1) {
+describe('finished turns', () => {
+  it('never hold a new run back, however many have finished', async () => {
+    const s = build()
+    for (let i = 0; i < 5; i += 1) {
       addRun(s, `session-${i}`, `/repo/specs/02${i}-card`)
       await s.finishTurn(`session-${i}`, 1, 2_000)
     }
-  }
-
-  it('allows a run while the queue is short', async () => {
-    const s = build()
-    await fill(s, 2)
-    expect(s.backpressure.check().allowed).toBe(true)
-  })
-
-  it('refuses one when too many diffs are unreviewed', async () => {
-    // The constraint is one person's capacity to review, which does not scale
-    // with the number of cards.
-    const s = build()
-    await fill(s, 3)
-    expect(s.backpressure.check().allowed).toBe(false)
-  })
-
-  it('says why, rather than a greyed-out button', async () => {
-    const s = build()
-    await fill(s, 3)
-    expect(s.backpressure.check().reason).toBeTruthy()
-  })
-
-  it('counts across cards, because attention does not partition by card', async () => {
-    const s = build()
-    await fill(s, 3)
-    expect(s.backpressure.check().unreviewed).toBe(3)
-  })
-
-  it('lets the queue drain once something is reviewed', async () => {
-    const s = build()
-    await fill(s, 3)
-    s.review.remove('session-0')
-    expect(s.backpressure.check().allowed).toBe(true)
-  })
-
-  it('records an override with the depth at the moment it was ignored', async () => {
-    const s = build()
-    await fill(s, 3)
-    s.backpressure.override('session-new', 5_000)
-    expect(s.backpressure.overrides()).toHaveLength(1)
+    expect(Object.keys(s.snapshot()).sort()).toEqual(['history', 'runs'])
+    expect(s).not.toHaveProperty('backpressure')
+    expect(s).not.toHaveProperty('review')
   })
 })
 
@@ -245,14 +164,13 @@ describe('a run that ends outright', () => {
 })
 
 describe('the snapshot a surface reads', () => {
-  it('carries the runs, the queue and the gate in one read', async () => {
+  it('carries the runs and what is over in one read', async () => {
     const s = build()
     addRun(s)
     await s.finishTurn('session-1', 1, 2_000)
     const snapshot = s.snapshot()
     expect(snapshot.runs).toHaveLength(1)
-    expect(snapshot.review).toHaveLength(1)
-    expect(snapshot.backpressure.allowed).toBe(true)
+    expect(snapshot.history).toEqual([])
   })
 })
 
@@ -315,13 +233,6 @@ describe('how it reaches git', () => {
 
   it('ignores a measurement for a run it does not have', async () => {
     await expect(build().measure('nobody')).resolves.toBeUndefined()
-  })
-
-  it('refuses at the limit it was given rather than the default', async () => {
-    const s = build({ reviewLimit: 1 })
-    addRun(s)
-    await s.finishTurn('session-1', 1, 2_000)
-    expect(s.backpressure.check().allowed).toBe(false)
   })
 
   it('does nothing for a turn finished by a run it does not have', async () => {

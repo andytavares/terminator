@@ -836,13 +836,18 @@ work with the shape it names (**Hand off with Direct**). Beside it, **Hand off o
 its own when clean** is the same setting as Settings → Foundry. When it is on,
 an order whose red-team round finds nothing blocking hands itself off, and the
 status strip says so in advance. Afterwards it says **Handed off automatically
-at 13:07:53**, and the ledger records that Foundry agreed it, not you. If the
-run is held back because too much finished work is waiting for your review,
-**Start anyway** appears beside it.
+at 13:07:53**, and the ledger records that Foundry agreed it, not you.
 
 In the list of orders, a row that is waiting on an answer says **"N waiting on
 you"** where the others say what is blocking them — so the count on the Forge
 tab tells you which order to open.
+
+A row also carries what you would otherwise open the order to find: the pull
+request (**#233**) and the ticket (**TAV-15**), each opening in your browser;
+while CI is watching or fixing, a spinner with the same words the Floor uses
+(**First run · up to 2 fixes**) and **1 of 3 checks done**; and, when the move is
+yours, the gate's first two answers on the row itself (a shipped order waiting to
+be marked ready says **Mark ready** right there).
 
 ### Floor — watching a run
 
@@ -888,17 +893,6 @@ Two things you can do without leaving:
 - **Watch** a unit to read its transcript, and **Redirect**, **Interrupt** or
   **Stop** it. The terminal is always there as the backstop: the agent runs in
   a real terminal in its own worktree project, and you can go and type at it.
-
-### When it refuses to start another one
-
-Three finished pieces of work waiting for your review, and starting a fourth is
-refused — with the count and the limit, and **Start anyway** next to it. The
-constraint being modelled is your own capacity to read a diff, which does not
-grow with the number of orders.
-
-Overriding is one click, and what you chose to ignore is recorded with it: the
-order's ledger gets `backpressure.overridden` naming the depth at that moment.
-The debt is visible afterwards rather than only felt.
 
 ### Autonomy — how much it asks you
 

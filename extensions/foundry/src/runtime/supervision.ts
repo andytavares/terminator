@@ -6,15 +6,10 @@ import {
   type RunHistoryEntry,
   type RunRegistry,
 } from './run-registry.js'
-import { createReviewQueue, type ReviewQueue } from './review/review-queue.js'
-import { createBackpressureGate, type BackpressureGate } from './review/backpressure.js'
 import { createFeedLog, type FeedLog } from './feed/feed-log.js'
-import { readDiffSummary, readChangedFiles, type RunCommand } from './diff-metrics.js'
-import type { CheckState } from './review/risk-grader.js'
-import { gradeInWords } from './review/risk-grader.js'
+import { readDiffSummary, type RunCommand } from './diff-metrics.js'
 
-// The supervision layer: what is running, what it changed, what needs looking
-// at, and what must not start yet.
+// The supervision layer: what is running and what it changed.
 //
 // Assembled here rather than in the extension's entry point so it can be built
 // without an Electron host and exercised as one thing — the closed branch's
@@ -22,19 +17,16 @@ import { gradeInWords } from './review/risk-grader.js'
 
 export interface Supervision {
   readonly runs: RunRegistry
-  readonly review: ReviewQueue
-  readonly backpressure: BackpressureGate
   readonly feed: FeedLog
   /**
    * Reads what a run's working copy has changed and records it.
    *
    * Nothing reported this in the closed branch, so the diff stayed at zero for
-   * a run's whole life — which made `ready` unreachable, the review queue
-   * permanently empty, and the gate below a thing that counted nothing.
+   * a run's whole life — which made `ready` unreachable.
    */
   measure(sessionId: string): Promise<void>
   /**
-   * A run has finished a turn. With changes, that is something to review: in a
+   * A run has finished a turn. With changes, that is something to look at: in a
    * terminal the agent does not exit when it is done, it sits at its prompt, so
    * waiting for the conversation to end would mean work was never offered.
    */
@@ -44,8 +36,6 @@ export interface Supervision {
   /** Everything a surface needs in one read. */
   snapshot(): {
     runs: Run[]
-    review: ReturnType<ReviewQueue['list']>
-    backpressure: ReturnType<BackpressureGate['check']>
     /** What is over, so the live list does not have to be the record too. */
     history: RunHistoryEntry[]
   }
@@ -56,26 +46,15 @@ export interface SupervisionOptions {
   stateDir: string
   /** Injected so the whole layer can be exercised without a repository. */
   run?: RunCommand
-  /** How many unreviewed diffs before a new run is refused. */
-  reviewLimit?: number
   /** The branch a card's work is measured against. */
   baseBranch?: string
 }
-
-/**
- * Three unreviewed diffs.
- *
- * The constraint is one person's capacity to review, which does not scale with
- * the number of cards. Starting a fourth agent while three diffs are waiting is
- * how a backlog nobody can review gets built.
- */
-const DEFAULT_REVIEW_LIMIT = 3
 
 export function createSupervision(options: SupervisionOptions): Supervision {
   const { api, stateDir } = options
   // Whatever the card was actually branched from. Measuring against a fixed
   // `main` reported the difference between two branches rather than the work
-  // this run did, which then graded the risk and filled the review queue.
+  // this run did.
   const baseBranch = options.baseBranch ?? 'main'
   const runCommand: RunCommand =
     options.run ??
@@ -85,16 +64,7 @@ export function createSupervision(options: SupervisionOptions): Supervision {
     })
 
   const runs = createRunRegistry()
-  const review = createReviewQueue()
   const feed = createFeedLog(path.join(stateDir, 'feed.jsonl'))
-
-  const backpressure = createBackpressureGate({
-    limit: options.reviewLimit ?? DEFAULT_REVIEW_LIMIT,
-    // Counted across every card: the limit is the operator's attention, and
-    // that does not partition by card.
-    countUnreviewed: () => review.count(),
-    overrideLogPath: path.join(stateDir, 'backpressure-overrides.jsonl'),
-  })
 
   async function measure(sessionId: string): Promise<void> {
     const run = runs.get(sessionId)
@@ -107,8 +77,6 @@ export function createSupervision(options: SupervisionOptions): Supervision {
 
   return {
     runs,
-    review,
-    backpressure,
     feed,
     measure,
 
@@ -130,39 +98,11 @@ export function createSupervision(options: SupervisionOptions): Supervision {
 
       runs.setState(sessionId, 'ready', at)
 
-      // Without the file list the grader cannot see auth, payments, migrations
-      // or a critical path, so everything would grade as ordinary work.
-      const files = await readChangedFiles(
-        run.worktreePath,
-        run.baseBranch ?? baseBranch,
-        runCommand
-      )
-      const queued = review.enqueue({
-        sessionId,
-        repoPath: run.worktreePath,
-        branch: run.branch,
-        diffSummary: changed,
-        change: {
-          files,
-          linesChanged: changed.added + changed.removed,
-          // The extension does not poll a code host, so checks are unknown
-          // rather than assumed to be passing — assuming passing would let a
-          // change auto-merge on evidence nobody has.
-          checkState: 'unavailable' as CheckState,
-          sharedContractFiles: [],
-          criticalPaths: [],
-        },
-        queuedAt: at,
-      })
-
       feed.post({
         at,
         sessionId,
         author: 'agent',
-        summary:
-          queued === null
-            ? `finished a turn in ${path.basename(run.featureDir)}`
-            : `${path.basename(run.featureDir)} is ready to review — ${gradeInWords(queued.grade)}, ${changed.files} file${changed.files === 1 ? '' : 's'} +${changed.added} −${changed.removed}`,
+        summary: `${path.basename(run.featureDir)} is ready to review — ${changed.files} file${changed.files === 1 ? '' : 's'} +${changed.added} −${changed.removed}`,
       })
     },
 
@@ -170,16 +110,13 @@ export function createSupervision(options: SupervisionOptions): Supervision {
       const run = runs.get(sessionId)
       if (run === null) return
       // Left on the register rather than removed: a finished run with a diff is
-      // exactly what the review queue is about, and forgetting it here would
-      // empty the queue the moment the agent exited.
+      // still work somebody may open.
       runs.setState(sessionId, run.diff.files > 0 ? 'ready' : 'finished', at)
     },
 
     snapshot() {
       return {
         runs: runs.list(),
-        review: review.list(),
-        backpressure: backpressure.check(),
         history: runs.history(),
       }
     },

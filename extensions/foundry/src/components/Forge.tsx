@@ -327,7 +327,6 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
-  const [heldBack, setHeldBack] = useState<{ unreviewed: number; limit: number } | null>(null)
   const [states, setStates] = useState<StatesView | null>(null)
   const [moved, setMoved] = useState<string[]>([])
   const [questionChoices, setQuestionChoices] = useState<Record<string, number>>({})
@@ -511,43 +510,36 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
     void applySettle(toSend)
   }, [drafting, queuedSettle, applySettle])
 
-  const handOff = useCallback(
-    async (force = false) => {
-      setBusy(true)
-      setProblem(null)
-      try {
-        const next = (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
-          | OrderView
-          | { error: string }
-        if ('error' in next) {
-          setProblem(next.error)
-          return
-        }
-        setView(next)
-        if (next.order.status !== 'agreed') return
-
-        const started = (await invoke('foundry:run.start', {
-          id: orderId,
-          ...(recipes?.chosen != null ? { recipe: recipes.chosen } : {}),
-          ...(force ? { force: true } : {}),
-        })) as {
-          error?: string
-          order?: { status: string }
-          backpressure?: { unreviewed: number; limit: number }
-        }
-        if (started.error !== undefined) {
-          setProblem(`The order is agreed, but the run did not start: ${started.error}`)
-          setHeldBack(started.backpressure ?? null)
-          return
-        }
-        setHeldBack(null)
-        onStarted?.(orderId)
-      } finally {
-        setBusy(false)
+  const handOff = useCallback(async () => {
+    setBusy(true)
+    setProblem(null)
+    try {
+      const next = (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
+        | OrderView
+        | { error: string }
+      if ('error' in next) {
+        setProblem(next.error)
+        return
       }
-    },
-    [orderId, onStarted, recipes?.chosen]
-  )
+      setView(next)
+      if (next.order.status !== 'agreed') return
+
+      const started = (await invoke('foundry:run.start', {
+        id: orderId,
+        ...(recipes?.chosen != null ? { recipe: recipes.chosen } : {}),
+      })) as {
+        error?: string
+        order?: { status: string }
+      }
+      if (started.error !== undefined) {
+        setProblem(`The order is agreed, but the run did not start: ${started.error}`)
+        return
+      }
+      onStarted?.(orderId)
+    } finally {
+      setBusy(false)
+    }
+  }, [orderId, onStarted, recipes?.chosen])
 
   if (view === null) {
     return <div className="fdry-empty">Loading the order…</div>
@@ -1547,7 +1539,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
           </section>
         </div>
 
-        {isDraft || problem !== null || heldBack !== null || view.advisory != null ? (
+        {isDraft || problem !== null || view.advisory != null ? (
           <footer className="fdry-foot">
             {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
             {previous !== undefined ? (
@@ -1572,16 +1564,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
 
             {stepView.id === 'handOff' ? (
               <>
-                {heldBack !== null ? (
-                  <button
-                    type="button"
-                    className="fdry-btn fdry-btn--primary"
-                    onClick={() => void handOff(true)}
-                  >
-                    <Play aria-hidden="true" /> Start anyway — {heldBack.unreviewed} waiting for
-                    review
-                  </button>
-                ) : view.agreed !== undefined && !isDraft ? null : (
+                {view.agreed !== undefined && !isDraft ? null : (
                   <ReasonButton
                     className="fdry-btn fdry-btn--primary"
                     reason={r.locks.handOff}

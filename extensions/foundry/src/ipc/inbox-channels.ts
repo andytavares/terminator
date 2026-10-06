@@ -7,6 +7,7 @@ import type { Autonomy } from '../gates/autonomy.js'
 import type { Gate } from '../gates/rules.js'
 import type { GateStore } from '../gates/store.js'
 import type { OrderStore } from '../order/store.js'
+import { pullNumber } from '../line/pull-number.js'
 
 // The one surface the operator is required to visit.
 //
@@ -44,6 +45,11 @@ export interface InboxDeps {
    * unreachable is a separate problem with a separate fix.
    */
   readonly act?: (gate: Gate, option: string) => Promise<void>
+  /**
+   * The pull requests an order opened, so a gate can link them. Absent means
+   * none are known, which is what a host that has never shipped one is.
+   */
+  readonly readPulls?: (orderId: string) => Promise<readonly { readonly url: string }[]>
 }
 
 export interface InboxChannels {
@@ -89,10 +95,31 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
 
     const orders = await deps.orders.list()
     const titleFor = new Map(orders.map((order) => [order.id, order.title]))
+    const ticketFor = new Map(
+      orders.map((order) => [
+        order.id,
+        order.source.key != null && order.source.url != null
+          ? { key: order.source.key, url: order.source.url }
+          : null,
+      ])
+    )
+    // Once per order, not per gate: a queue of six gates on one order is one read.
+    const pullsFor = new Map<string, { number: number; url: string }[]>()
+    for (const orderId of new Set(settled.map((gate) => gate.orderId))) {
+      pullsFor.set(
+        orderId,
+        ((await deps.readPulls?.(orderId)) ?? []).map((pull) => ({
+          number: pullNumber(pull.url),
+          url: pull.url,
+        }))
+      )
+    }
     return {
       gates: rankInbox(settled).map((gate) => ({
         ...gate,
         orderTitle: titleFor.get(gate.orderId) ?? null,
+        pulls: pullsFor.get(gate.orderId) ?? [],
+        source: ticketFor.get(gate.orderId) ?? null,
       })),
       // What this setting is *not* asking about. "Nothing needs you" means
       // something different at each rung of the dial, and an operator who

@@ -1422,7 +1422,9 @@ App
   ├─ Inbox   — the one surface required to visit: one queue, ranked by how much
   │            work each decision unblocks, every row naming the rule that
   │            raised it and what happens if it is ignored
-  ├─ Orders  — the door
+  ├─ Orders  — the door; a row links its pull request and ticket, spins while
+  │            CI works, and answers an open gate in place. The factory hall
+  │            draws its waiting gates through the same one-line gate card
   │    ├─ Forge  — steps (intent → hand off), five checks, at most three questions
   │    └─ Floor  — the standing band with each running agent's last few
   │                transcript lines, the run graph, the merge order, held tool

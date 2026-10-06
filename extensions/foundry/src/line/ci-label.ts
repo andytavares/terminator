@@ -2,7 +2,7 @@ import type { CiState } from './ci-state.js'
 
 // Free of Node builtins: the Floor and the hall render it.
 /** The words a surface shows for where CI stands. */
-export function ciLabel(state: CiState): string {
+export function ciLabel(state: Pick<CiState, 'status' | 'round' | 'max' | 'reason'>): string {
   switch (state.status) {
     case 'watching':
       return state.round === 0

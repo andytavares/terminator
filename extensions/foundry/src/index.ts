@@ -1691,9 +1691,8 @@ async function buildExecutorDeps(
           // refuses, structurally — and neither is a role that is not the one
           // whose conversation this is.
           conversations.set(conversation(lane, input.role), run.sessionId)
-          // On the register, which is what the stall detector, the review
-          // queue and the backpressure gate all read from. Without this the
-          // agent is running and every one of them sees an idle factory —
+          // On the register, which is what the stall detector and the palette
+          // read from. Without this the agent is running and both see an idle factory —
           // the register was the seam the old phase dispatcher filled.
           supervision?.runs.add({
             sessionId: run.sessionId,
@@ -3250,12 +3249,6 @@ export function activate(api: ExtensionAPI): void {
     store: createLiveOrderStore(dataRoot),
     dataRoot,
     sources: () => resolveSources(api, dataRoot()),
-    // One person's capacity to review is the constraint, and it does not scale
-    // with the number of orders. No runtime means nobody to ask, which is not
-    // a reason to refuse a run.
-    backpressure: () =>
-      supervision?.backpressure.check() ?? { allowed: true, unreviewed: 0, limit: 0, reason: null },
-    noteOverride: (orderId) => supervision?.backpressure.override(orderId, Date.now()),
     now: () => new Date().toISOString(),
     // Marked while it runs, so nothing reclaims a node out from under an
     // executor that is part way through starting it.
@@ -3368,6 +3361,7 @@ export function activate(api: ExtensionAPI): void {
     gates: createLiveGateStore(dataRoot),
     orders: createLiveOrderStore(dataRoot),
     autonomy: () => autonomyFor(api),
+    readPulls: (orderId) => readPulls(dataRoot(), orderId),
     now: () => new Date().toISOString(),
     record: async (orderId, action, subject, reason) => {
       await createOrderStore(dataRoot()).record({
@@ -3661,12 +3655,9 @@ export function activate(api: ExtensionAPI): void {
     shadowMode: stallShadowMode(api),
   }))
 
-  // What is running, what is waiting to be reviewed, and whether a new run
-  // would be refused.
+  // What is running, and what is over.
   reg(api, 'foundry:supervision-snapshot', () =>
-    supervision === null
-      ? { runs: [], review: [], backpressure: { allowed: true, unreviewed: 0, limit: 0 } }
-      : supervision.snapshot()
+    supervision === null ? { runs: [], history: [] } : supervision.snapshot()
   )
 
   reg(api, 'foundry:feed-list', () => ({
@@ -3715,21 +3706,6 @@ export function activate(api: ExtensionAPI): void {
     const { from, to } = payload as { from: number; to?: number }
     const entries = supervision?.feed.list() ?? []
     return buildDigest(entries, from, to ?? Date.now())
-  })
-
-  reg(api, 'foundry:review-advance', (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    return { step: supervision?.review.advance(sessionId) ?? null }
-  })
-
-  reg(api, 'foundry:review-done', async (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    supervision?.review.remove(sessionId)
-    supervision?.runs.forget(sessionId)
-    // Reviewing one reopens the backpressure gate. What starts next is the
-    // scheduler's decision now, taken from the run graph rather than from a
-    // queue this channel had to remember to drain.
-    return { ok: true }
   })
 
   reg(api, 'foundry:permission-resolve', (payload: unknown) => {
@@ -4068,7 +4044,7 @@ export function activate(api: ExtensionAPI): void {
 }
 
 /**
- * Puts what is running, and what is waiting to be reviewed, one keystroke away.
+ * Puts what is running one keystroke away.
  *
  * Three surfaces answer the same question — what needs me, ranked — and this is
  * the one you reach without moving your hands.
@@ -4085,9 +4061,9 @@ export function activate(api: ExtensionAPI): void {
  * Shared by the command palette and by clicking a notification, because they
  * are the same request phrased twice, and two copies would drift.
  */
-function gotoRun(api: ExtensionAPI, kind: 'run' | 'review', sessionId: string): void {
+function gotoRun(api: ExtensionAPI, kind: 'run', sessionId: string): void {
   api.window.focusSelf()
-  const terminal = kind === 'run' ? (supervisedRunner?.terminalFor(sessionId) ?? null) : null
+  const terminal = supervisedRunner?.terminalFor(sessionId) ?? null
   if (terminal !== null) {
     // Through the core's own navigation: it selects the workspace, the project
     // and the tab, none of which this extension's separate renderer can do.
@@ -4102,7 +4078,7 @@ function gotoRun(api: ExtensionAPI, kind: 'run' | 'review', sessionId: string): 
 
 function refreshPalette(api: ExtensionAPI): void {
   const snapshot = supervision?.snapshot() ?? null
-  const entries = snapshot === null ? [] : paletteEntries(snapshot.runs, snapshot.review)
+  const entries = snapshot === null ? [] : paletteEntries(snapshot.runs)
   // Rebuilt only when it would read differently, so an open palette is not
   // re-registered under the cursor every tick.
   const signature = entries.map((e) => `${e.id}:${e.description}`).join('|')

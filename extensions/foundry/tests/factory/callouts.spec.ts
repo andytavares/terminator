@@ -235,7 +235,7 @@ describe('interruptionsFor', () => {
     expect(ask).toMatchObject({ kind: 'ask', prose: true })
   })
 
-  it('pins a gate to its node, with its options and whether it needs a number', () => {
+  it('pins a gate to its node, and carries the gate so its answers can be drawn', () => {
     const [g] = interruptionsFor({ graph, waiting: [gate()], stranded: [], pending: [] })
     expect(g).toMatchObject({
       kind: 'gate',
@@ -243,19 +243,8 @@ describe('interruptionsFor', () => {
       nodeId: 'ship',
       title: 'Merge the pull request?',
       detail: 'Every check passed.',
-      needsInbox: false,
     })
-    expect(g.kind === 'gate' && g.options.map((o) => o.id)).toEqual(['approve', 'hold'])
-  })
-
-  it('sends a budget raise to the Inbox, which is where the number is typed', () => {
-    const [g] = interruptionsFor({
-      graph,
-      waiting: [gate({ breach: { kind: 'wall-clock', limit: 60, spent: 61 } as never })],
-      stranded: [],
-      pending: [],
-    })
-    expect(g).toMatchObject({ kind: 'gate', needsInbox: true })
+    expect(g.kind === 'gate' && g.gate.options.map((o) => o.id)).toEqual(['approve', 'hold'])
   })
 
   it('pins an agent parked at its terminal, unless a held call already says so', () => {
