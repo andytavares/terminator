@@ -1,6 +1,7 @@
 import { runIdFrom } from './ci.js'
 import type { Check, CiVerdict } from './ci.js'
-import type { Feedback } from './run-graph.js'
+import { nodeById, withNode } from './run-graph.js'
+import type { Feedback, RunGraph } from './run-graph.js'
 import type { CiState } from './ci-state.js'
 import type { Recipe, Step } from '../recipe/parse.js'
 
@@ -197,4 +198,51 @@ export function ciReworkTarget(recipe: Recipe): string | null {
 export function shipNodeId(recipe: Recipe): string | null {
   const gate = recipe.steps.find((step) => step.kind === 'gate' && step.rule === 'ready-for-review')
   return gate?.id ?? null
+}
+
+/**
+ * The ship node once the tail has finished with it.
+ *
+ * The executor leaves it `running` when it reaches the recipe's terminal
+ * `ready-for-review` gate, because the final check and the CI watch still
+ * stand between there and the question. It passes when the question is raised
+ * and goes back to `waiting` when shipping stopped short of it, so a resume
+ * owes the tail again. A node in any other state is returned untouched.
+ */
+export function settleShip(graph: RunGraph, shipId: string, asked: boolean, at: string): RunGraph {
+  const node = nodeById(graph, shipId)
+  if (node === undefined) return graph
+  if (node.state !== 'running' && !(asked && node.state === 'waiting')) return graph
+  return withNode(graph, shipId, {
+    state: asked ? 'passed' : 'waiting',
+    endedAt: asked ? at : null,
+  })
+}
+
+/** A value settled exactly once; later calls to `settle` are ignored. */
+export function settledOnce<T>(): { settled: Promise<T>; settle: (value: T) => void } {
+  let resolve: (value: T) => void = () => {}
+  let done = false
+  const settled = new Promise<T>((r) => (resolve = r))
+  return {
+    settled,
+    settle: (value) => {
+      if (done) return
+      done = true
+      resolve(value)
+    },
+  }
+}
+
+/**
+ * A CI send-back that waits for the final check (ADR 085). The check climbs
+ * the same checkout a builder would edit, so a red round waits for it; when
+ * the check failed, its own gate is the operator's next move and the round
+ * sends nothing back.
+ */
+export function afterFinalCheck(
+  finalCheckPassed: Promise<boolean>,
+  sendBack: (feedback: Feedback) => Promise<boolean>
+): (feedback: Feedback) => Promise<boolean> {
+  return async (feedback) => ((await finalCheckPassed) ? sendBack(feedback) : false)
 }

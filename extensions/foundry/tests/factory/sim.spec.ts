@@ -387,19 +387,19 @@ describe('nearestRestSeat', () => {
 
     let next = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'scout', from: 'running', to: 'passed' }],
+      [{ kind: 'node-state', nodeId: 'document', from: 'running', to: 'passed' }],
       0
     )
-    const scoutSeat = next.crew.find((c) => c.nodeId === 'scout')!.restSeat
+    const documentSeat = next.crew.find((c) => c.nodeId === 'document')!.restSeat
     next = direct(
       next,
       [{ kind: 'node-state', nodeId: 'verify', from: 'running', to: 'passed' }],
       0
     )
     const verifySeat = next.crew.find((c) => c.nodeId === 'verify')!.restSeat
-    expect(scoutSeat).not.toBe(null)
+    expect(documentSeat).not.toBe(null)
     expect(verifySeat).not.toBe(null)
-    expect(scoutSeat).not.toBe(verifySeat)
+    expect(documentSeat).not.toBe(verifySeat)
   })
 })
 
@@ -482,15 +482,15 @@ describe('tick', () => {
     const world = createWorld(map, obs(g))
     const next = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'scout', from: 'running', to: 'passed' }],
+      [{ kind: 'node-state', nodeId: 'document', from: 'running', to: 'passed' }],
       0
     )
     let w = next
-    for (let elapsed = 0; elapsed < 30_000 && w.crew.find((c) => c.nodeId === 'scout')!.goal; ) {
+    for (let elapsed = 0; elapsed < 30_000 && w.crew.find((c) => c.nodeId === 'document')!.goal; ) {
       w = tick(w, 16)
       elapsed += 16
     }
-    const crew = w.crew.find((c) => c.nodeId === 'scout')!
+    const crew = w.crew.find((c) => c.nodeId === 'document')!
     expect(crew.goal).toBe(null)
     const seat = map.restSeats.find((s) => s.id === crew.restSeat)!
     expect(crew.facing).toBe(seat.facing)
@@ -503,21 +503,22 @@ describe('tick', () => {
 
     let w = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'scout', from: 'running', to: 'passed' }],
+      [{ kind: 'node-state', nodeId: 'document', from: 'running', to: 'passed' }],
       0
     )
-    const seatId = w.crew.find((c) => c.nodeId === 'scout')!.restSeat
+    const seatId = w.crew.find((c) => c.nodeId === 'document')!.restSeat
     expect(seatId).not.toBe(null)
 
-    w = direct(w, [{ kind: 'node-state', nodeId: 'scout', from: 'passed', to: 'running' }], 0)
-    expect(w.crew.find((c) => c.nodeId === 'scout')!.restSeat).toBe(null)
+    w = direct(w, [{ kind: 'node-state', nodeId: 'document', from: 'passed', to: 'running' }], 0)
+    expect(w.crew.find((c) => c.nodeId === 'document')!.restSeat).toBe(null)
 
-    // Nothing holds it any more, so the next crew member to look for a seat
-    // from beside it is given it.
+    // Nothing holds it any more, so a crew member looking for a seat is given
+    // it once every other seat is taken.
     const taken = new Set(w.crew.map((c) => c.restSeat).filter((id): id is number => id !== null))
     expect(taken.has(seatId!)).toBe(false)
     const freed = map.restSeats.find((s) => s.id === seatId)!
-    expect(nearestRestSeat(map, freed.tile, taken)?.id).toBe(seatId)
+    const everyOther = new Set(map.restSeats.filter((s) => s.id !== seatId).map((s) => s.id))
+    expect(nearestRestSeat(map, freed.tile, everyOther)?.id).toBe(seatId)
   })
 
   it('a crate bound for a started step advances and is consumed on arrival', () => {

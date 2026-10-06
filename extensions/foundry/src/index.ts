@@ -33,7 +33,15 @@ import { markReady, readPulls, shipOrder, finishShipping, pushLanes } from './li
 import type { ShellExec } from './line/integrate.js'
 import { watchChecks, failedLogs } from './line/ci.js'
 import type { Check, CiVerdict } from './line/ci.js'
-import { ciRounds, ciReworkTarget, shipNodeId } from './line/ship-tail.js'
+import {
+  afterFinalCheck,
+  ciRounds,
+  ciReworkTarget,
+  settledOnce,
+  shipNodeId,
+  settleShip,
+} from './line/ship-tail.js'
+import { createEarlyShip } from './line/early-ship.js'
 import { writeCiState } from './line/ci-state.js'
 import type { CiState } from './line/ci-state.js'
 import { rework, sendBack } from './line/scheduler.js'
@@ -114,7 +122,7 @@ import { brief } from './line/brief.js'
 import { decideTool } from './runtime/tool-decision.js'
 import { ensureTrusted } from './runtime/workspace-trust.js'
 import type { LedgerEntry } from './ledger/append.js'
-import type { IntegrateDeps } from './line/integrate.js'
+import type { IntegrateDeps, Shipment } from './line/integrate.js'
 import { checkCapability, writeBack } from './trackers/write-back.js'
 import type { IssuesPort, WriteBackDeps } from './trackers/write-back.js'
 import type { Budgets, WorkOrder, WriteBack } from './order/schema.js'
@@ -1174,7 +1182,7 @@ async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string
     sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
   })
   const gates = createLiveGateStore(() => root)
-  await finishShipping(
+  const finished = await finishShipping(
     order,
     { verdicts: [], findings: [] },
     pulls,
@@ -1187,6 +1195,7 @@ async function watchRestackedCi(api: ExtensionAPI, root: string, orderId: string
       },
     }
   )
+  await settleShipNode(root, recipe, graphRef, finished.gate?.rule === 'ready-for-review')
 }
 
 /**
@@ -1500,6 +1509,8 @@ async function buildExecutorDeps(
     effort: EffortLevel | null
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
+    /** The role writes documentation only; edits elsewhere are refused. */
+    docsOnly?: boolean
     /** The one file this rung may write, or null when it has no artefact. */
     outputPath?: string | null
     /** Where this node's skills were mounted, or null when it declared none. */
@@ -1573,6 +1584,7 @@ async function buildExecutorDeps(
               readOnly: input.readOnly,
               role: input.role,
               mayUseTool: input.mayUseTool,
+              docsOnly: input.docsOnly,
               isProbed: (name, given) => isProbedCommand(order, name, given),
               readOnlyTools: readOnlyTools(api),
               autonomy: autonomyFor(api),
@@ -1945,7 +1957,90 @@ async function executeRun(
     await writeBack(order, 'started', writeBackDepsFor(api, root, order, issuesPort))
   }
 
-  const outcome = await execute(order, recipe, graph, executorDeps)
+  const gates = createLiveGateStore(() => root)
+  const graphRef = { current: graph }
+  // Shipped against the grade the change turned out to deserve, not the one
+  // the plan predicted — which is the whole reason the executor regrades. The
+  // CI send-back reads it, so it follows the early drafts' regrade.
+  const shippedOrderRef = { current: order }
+
+  const shipmentFor = (found: {
+    verdicts: RunOutcome['verdicts']
+    ladder: RunOutcome['ladder']
+    inspectionRequired: boolean
+    reason: string
+  }): Shipment => ({
+    verdicts: found.verdicts,
+    findings: found.inspectionRequired ? [found.reason] : [],
+    ladder: found.ladder,
+    // Grouped by rung, so the record says what was in force where rather
+    // than listing every rule as though they all applied at once.
+    rulesInForce: RUNGS.flatMap((rung) =>
+      rulesAtRung(houseRules, rung).map(
+        (rule) => `${rule.asserts.trim()} (${rungLevelInWords(rung)})`
+      )
+    ),
+  })
+
+  // The CI watch can start before the final check ends (ADR 085). A red round
+  // sends work back only once the check has settled, so a builder never edits
+  // the checkout the check is climbing over.
+  const finalCheck = settledOnce<boolean>()
+  const shipDeps: IntegrateDeps = {
+    ...integrateDepsFor(api, root, order.id),
+    // The shipping decision, where the grade calls for one, is the operator's
+    // and reaches them through the inbox like every other.
+    decide: (gate) => askOnce(gates, gate),
+    raiseGate: async (gate) => {
+      await gates.save(gate)
+    },
+    // The ticket moves to In Review when the draft opens, not when the CI
+    // watch that follows it ends.
+    onDraftOpened: async (pulls) => {
+      if (issuesPort === null) return
+      await writeBack(order, 'draft_opened', writeBackDepsFor(api, root, order, issuesPort), {
+        pulls: pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
+      })
+    },
+    // A recipe with no `ci` never asks to watch anything (`rounds: null`
+    // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
+    watchCi: (pulls) =>
+      ciRounds({
+        pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
+        rounds: recipe.ci?.rounds ?? null,
+        ...ciRoundDepsFor(root, order.id, exec),
+        sendBack: afterFinalCheck(
+          finalCheck.settled,
+          ciSendBackFor(
+            root,
+            shippedOrderRef.current,
+            recipe,
+            executorDeps,
+            integrateDepsFor(api, root, order.id),
+            graphRef
+          )
+        ),
+      }),
+  }
+
+  // The draft opens before the final check, and the check runs while CI does
+  // (ADR 085) — unless the operator decides before anything is pushed.
+  const early = createEarlyShip({ order, deps: shipDeps, shipment: shipmentFor })
+  let outcome: Awaited<ReturnType<typeof execute>>
+  try {
+    outcome = await execute(order, recipe, graph, {
+      ...executorDeps,
+      beforeFinalCheck: async (found) => {
+        shippedOrderRef.current = { ...order, risk: found.risk }
+        return early.beforeFinalCheck(found)
+      },
+    })
+  } catch (error) {
+    finalCheck.settle(false)
+    throw error
+  }
+  finalCheck.settle(outcome.ladder?.ok ?? false)
+  graphRef.current = outcome.graph
 
   await writeRunGraph(root, outcome.graph)
   await store.record({
@@ -1980,67 +2075,55 @@ async function executeRun(
       reason: whyNotShipped(recipe, outcome),
       evidence: [],
     })
+    await settleShipNode(root, recipe, graphRef, false)
     return
   }
 
-  const gates = createLiveGateStore(() => root)
-  const shippedOrder = { ...order, risk: outcome.risk }
-  const graphRef = { current: outcome.graph }
+  shippedOrderRef.current = { ...order, risk: outcome.risk }
 
-  // Shipped against the grade the change turned out to deserve, not the one
-  // the plan predicted — which is the whole reason the executor regrades.
-  const shipped = await shipOrder(
-    shippedOrder,
-    {
-      verdicts: outcome.verdicts,
-      findings: outcome.inspection.required ? [outcome.inspection.reason] : [],
-      ladder: outcome.ladder,
-      // Grouped by rung, so the record says what was in force where rather
-      // than listing every rule as though they all applied at once.
-      rulesInForce: RUNGS.flatMap((rung) =>
-        rulesAtRung(houseRules, rung).map(
-          (rule) => `${rule.asserts.trim()} (${rungLevelInWords(rung)})`
-        )
-      ),
-    },
-    {
-      ...integrateDepsFor(api, root, order.id),
-      // The shipping decision, where the grade calls for one, is the operator's
-      // and reaches them through the inbox like every other.
-      decide: (gate) => askOnce(gates, gate),
-      raiseGate: async (gate) => {
-        await gates.save(gate)
-      },
-      // The ticket moves to In Review when the draft opens, not when the CI
-      // watch that follows it ends.
-      onDraftOpened: async (pulls) => {
-        if (issuesPort === null) return
-        await writeBack(order, 'draft_opened', writeBackDepsFor(api, root, order, issuesPort), {
-          pulls: pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
-        })
-      },
-      // A recipe with no `ci` never asks to watch anything (`rounds: null`
-      // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
-      watchCi: (pulls) =>
-        ciRounds({
-          pulls: pulls.map((pull) => ({ url: pull.url, cwd: pull.cwd })),
-          rounds: recipe.ci?.rounds ?? null,
-          ...ciRoundDepsFor(root, order.id, exec),
-          sendBack: ciSendBackFor(
-            root,
-            shippedOrder,
-            recipe,
-            executorDeps,
-            integrateDepsFor(api, root, order.id),
-            graphRef
-          ),
-        }),
-    }
-  )
+  const earlyShipped = early.opened ? await early.finish(outcome) : null
+  const shipped =
+    earlyShipped ??
+    (early.opened
+      ? null
+      : await shipOrder(
+          shippedOrderRef.current,
+          shipmentFor({
+            verdicts: outcome.verdicts,
+            ladder: outcome.ladder,
+            inspectionRequired: outcome.inspection.required,
+            reason: outcome.inspection.reason,
+          }),
+          shipDeps
+        ))
 
-  if (shipped.held || shipped.pulls.length === 0) return
+  // The ship node was left running when the executor reached it. It passes
+  // when the ready question is raised, and goes back to waiting when shipping
+  // stopped short of it, so a resume owes the tail again.
+  await settleShipNode(root, recipe, graphRef, shipped?.gate?.rule === 'ready-for-review')
+
+  if (shipped === null || shipped.held || shipped.pulls.length === 0) return
 
   await store.save({ ...order, status: 'shipped' })
+}
+
+/**
+ * Settle the recipe's ship node once the tail has finished: passed when the
+ * ready-for-review question was raised, waiting otherwise. A ship node that is
+ * neither running nor (when asked) waiting is left as it is.
+ */
+async function settleShipNode(
+  root: string,
+  recipe: Recipe,
+  graphRef: { current: RunGraph },
+  asked: boolean
+): Promise<void> {
+  const shipId = shipNodeId(recipe)
+  if (shipId === null) return
+  const settled = settleShip(graphRef.current, shipId, asked, new Date().toISOString())
+  if (settled === graphRef.current) return
+  graphRef.current = settled
+  await writeRunGraph(root, graphRef.current)
 }
 
 /**
@@ -3303,7 +3386,7 @@ export function activate(api: ExtensionAPI): void {
           sendBack: ciSendBackFor(root, order, recipe, executorDeps, integrateDeps, graphRef),
         })
         const gates = createLiveGateStore(dataRoot)
-        await finishShipping(
+        const finished = await finishShipping(
           order,
           { verdicts: [], findings: [] },
           pulls,
@@ -3316,6 +3399,7 @@ export function activate(api: ExtensionAPI): void {
             },
           }
         )
+        await settleShipNode(root, recipe, graphRef, finished.gate?.rule === 'ready-for-review')
         return
       }
 

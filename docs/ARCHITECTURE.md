@@ -1276,6 +1276,21 @@ it ready — never whether to create it. For the two highest risk grades the
 operator decides before anything reaches the remote; for everything lower the
 draft opens first, so review happens on a real change.
 
+**The draft opens before the final check** (ADR-085, `src/line/early-ship.ts`).
+`shipOrder` is `openDrafts` then `watchAndFinish`. For a run whose work is done,
+with no open gate and no inspection owed, and a grade below P1, the executor
+calls `beforeFinalCheck` just before the ladder climbs: the drafts open and the
+CI watch starts, and the ladder runs beside it. The ready gate is raised only
+when the ladder passed and CI is green. A failed ladder raises the executor's
+`verify.*` gates, records `ship.final_check_failed` and leaves the draft a
+draft. Files a check wrote are committed (`commitWorktree`), pushed and watched
+again. A lane already in `pulls.json` is reused, never created twice. The
+recipe's terminal `ready-for-review` node stays `running` through all of this;
+`settleShip` passes it when the ready gate is raised and returns it to
+`waiting` if shipping stopped short, and `reclaim` ignores a running gate. The
+ladder runs each distinct command once (`reusedFrom` on the step outcome), and
+a role that writes only `docs` is refused edits outside documentation paths.
+
 **CI is a check with rounds** (ADR-064, `src/line/ci.ts`, `src/line/ship-tail.ts`).
 Before the ready gate, a recipe with `ci: { rounds }` has every draft's checks
 polled through `gh pr checks --json` until nothing is pending. Green adds "CI

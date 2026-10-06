@@ -147,6 +147,8 @@ export interface StepOutcome {
   readonly exitCode: number | null
   /** The command this step ran, so a failure can be reported by name, not by rung code. */
   readonly command: string | null
+  /** The earlier step this one reused the result of: the same command string, run once. */
+  readonly reusedFrom?: string
 }
 
 export interface LadderOutcome {
@@ -171,6 +173,10 @@ export type RunStep = (step: LadderStep) => Promise<number | null>
 export async function climb(steps: readonly LadderStep[], run: RunStep): Promise<LadderOutcome> {
   const outcomes: StepOutcome[] = []
   let stoppedAt: Rung | null = null
+  // A command that passed in this climb. A repository whose `test` and
+  // `coverage` are both `vitest run --coverage` would otherwise run it twice
+  // on the same commit for the same answer.
+  const passed = new Map<string, string>()
 
   for (const step of steps) {
     if (stoppedAt !== null) break
@@ -216,6 +222,20 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
       continue
     }
 
+    const earlier = step.command === null ? undefined : passed.get(step.command)
+    if (earlier !== undefined) {
+      outcomes.push({
+        rung: step.rung,
+        name: step.name,
+        result: 'pass',
+        reason: `same command as ${earlier}; its result was reused, not run again`,
+        exitCode: 0,
+        command: step.command,
+        reusedFrom: earlier,
+      })
+      continue
+    }
+
     const exitCode = await run(step)
     if (exitCode === null) {
       outcomes.push({
@@ -229,16 +249,17 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
       continue
     }
 
-    const passed = exitCode === 0
+    const succeeded = exitCode === 0
+    if (succeeded && step.command !== null) passed.set(step.command, step.name)
     outcomes.push({
       rung: step.rung,
       name: step.name,
-      result: passed ? 'pass' : 'fail',
-      reason: passed ? '' : `exited ${exitCode}`,
+      result: succeeded ? 'pass' : 'fail',
+      reason: succeeded ? '' : `exited ${exitCode}`,
       exitCode,
       command: step.command,
     })
-    if (!passed) stoppedAt = step.rung
+    if (!succeeded) stoppedAt = step.rung
   }
 
   return {

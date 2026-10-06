@@ -66,6 +66,24 @@ export interface ToolRequest {
    * whose meaning is "ask me".
    */
   readonly letModeDecide: boolean
+  /**
+   * The role writes documentation and nothing else (`writes` is exactly
+   * `[docs]`). Its file edits are refused outside documentation paths.
+   */
+  readonly docsOnly?: boolean
+}
+
+/**
+ * Whether a path is documentation: any markdown file, a README or a CHANGELOG
+ * at any depth, or anything under `docs/` or `specs/` in the checkout.
+ */
+export function isDocumentationPath(target: string, worktreePath: string): boolean {
+  const relative = path.isAbsolute(target) ? path.relative(worktreePath, target) : target
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return false
+  const normal = path.normalize(relative).split(path.sep)
+  const name = normal[normal.length - 1] ?? ''
+  if (/\.md$/i.test(name) || /^(CHANGELOG|README)/i.test(name)) return true
+  return normal.length > 1 && (normal[0] === 'docs' || normal[0] === 'specs')
 }
 
 /**
@@ -174,6 +192,16 @@ export function decideTool(request: ToolRequest): PolicyDecision | 'mode' | null
     return {
       allow: false,
       reason: `the ${request.role} role does not use ${request.tool}; its role file lists what it does`,
+    }
+  }
+
+  if (request.docsOnly === true && WRITE_TOOLS.has(request.tool)) {
+    const target = pathOf(request.input)
+    if (target === null || !isDocumentationPath(target, request.worktreePath)) {
+      return {
+        allow: false,
+        reason: `the ${request.role ?? 'documentation'} role writes documentation only: markdown files, README, CHANGELOG, docs/ and specs/. ${target ?? 'This edit'} is code or configuration, and changing it is the builder's job, not yours.`,
+      }
     }
   }
 

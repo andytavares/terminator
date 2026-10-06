@@ -177,11 +177,14 @@ describe('execute', () => {
     const run = vi.fn(ok)
     const o = order()
     const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(run))
-    // Two units. The third passed node is the recipe's own checkpoint, which
-    // is raised rather than run — nothing was launched for it.
+    // Two units. The third node is the recipe's own ship gate, which is
+    // reached rather than run — nothing was launched for it, and it is left
+    // running because the tail has not shipped anything yet.
     expect(run).toHaveBeenCalledTimes(2)
     expect(run.mock.calls.every((c) => c[0].node.kind !== 'gate')).toBe(true)
-    expect(outcome.graph.nodes.filter((n) => n.state === 'passed')).toHaveLength(3)
+    expect(outcome.graph.nodes.filter((n) => n.state === 'passed')).toHaveLength(2)
+    expect(outcome.graph.nodes.find((n) => n.id === 'ship')?.state).toBe('running')
+    expect(outcome.complete).toBe(true)
   })
 
   it('honours the agent budget rather than starting everything at once', async () => {
@@ -2507,5 +2510,114 @@ steps:
       },
     })
     expect(recorded.some(([action]) => action === 'skills.mounted')).toBe(false)
+  })
+})
+
+describe('shipping order (ADR 085)', () => {
+  function log() {
+    const calls: string[] = []
+    return {
+      calls,
+      record: vi.fn(async (action: string, subject: string) => {
+        calls.push(`record:${action}:${subject}`)
+      }),
+      runStep: async (step: { name: string }, logPath: string) => {
+        calls.push(`step:${step.name}`)
+        fs.mkdirSync(path.dirname(logPath), { recursive: true })
+        fs.writeFileSync(logPath, 'ok\n')
+        return step.name === 'Lint' ? 1 : 0
+      },
+    }
+  }
+
+  it('opens the drafts before the final check climbs, for a change nobody has to inspect', async () => {
+    const seen = log()
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async (step, logPath) => (seen.runStep(step, logPath), 0),
+      beforeFinalCheck: async () => {
+        seen.calls.push('drafts')
+        return true
+      },
+    })
+    expect(seen.calls[0]).toBe('drafts')
+    expect(seen.calls.filter((c) => c.startsWith('step:')).length).toBeGreaterThan(0)
+  })
+
+  it('does not open anything first when an inspection is owed', async () => {
+    const beforeFinalCheck = vi.fn(async () => true)
+    const o = order([unit('U-1', { touches: ['src/auth/session.ts'] })])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      beforeFinalCheck,
+    })
+    expect(beforeFinalCheck).not.toHaveBeenCalled()
+  })
+
+  it('does not open anything first when the run halted at a gate', async () => {
+    const beforeFinalCheck = vi.fn(async () => true)
+    const o = order([unit('U-1')])
+    await execute(o, recipe(PAUSING), buildRunGraph(o, recipe(PAUSING)), {
+      ...deps(vi.fn(ok)),
+      beforeFinalCheck,
+    })
+    expect(beforeFinalCheck).not.toHaveBeenCalled()
+  })
+
+  it('records ship.final_check_failed and raises the executor gate when the draft is already open', async () => {
+    const seen = log()
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'standard',
+      record: seen.record,
+      runStep: seen.runStep,
+      beforeFinalCheck: async () => true,
+    })
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
+    expect(outcome.shippable).toBe(false)
+    expect(seen.calls.some((c) => c === 'record:ship.final_check_failed:Lint')).toBe(true)
+  })
+
+  it('records no ship.final_check_failed when nothing was opened first', async () => {
+    const seen = log()
+    const o = order([unit('U-1')])
+    await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'standard',
+      record: seen.record,
+      runStep: seen.runStep,
+    })
+    expect(seen.calls.some((c) => c.includes('ship.final_check_failed'))).toBe(false)
+  })
+
+  it('leaves the ship node running while the tail is owed, and still counts the work as done', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(outcome.graph.nodes.find((n) => n.id === 'ship')?.state).toBe('running')
+    expect(outcome.complete).toBe(true)
+    expect(outcome.shippable).toBe(true)
+  })
+
+  it('treats a ship node already running (a resume) as the tail owed, not as a stall', async () => {
+    const o = order([unit('U-1')])
+    const first = await execute(o, recipe(), buildRunGraph(o, recipe()), deps(vi.fn(ok)))
+    const run = vi.fn(ok)
+    const again = await execute(o, recipe(), first.graph, {
+      ...deps(run),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+    })
+    expect(run).not.toHaveBeenCalled()
+    expect(again.gates).toHaveLength(0)
+    expect(again.shippable).toBe(true)
   })
 })

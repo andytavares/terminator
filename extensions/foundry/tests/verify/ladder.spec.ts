@@ -146,7 +146,7 @@ describe('climb', () => {
     over.map((o, i) => ({
       rung: 'L0',
       name: `step-${i}`,
-      command: 'run',
+      command: `run-${i}`,
       status: 'runnable',
       reason: '',
       check: null,
@@ -298,5 +298,49 @@ describe('rulesAtRung', () => {
       { id: 'c', rung: 'L2' },
     ] as Parameters<typeof rulesAtRung>[0]
     expect(rulesAtRung(rules, 'L2').map((r) => r.id)).toEqual(['a', 'c'])
+  })
+})
+
+describe('climb with two steps that resolve to the same command', () => {
+  const step = (name: string, command: string): LadderStep => ({
+    rung: 'L1',
+    name,
+    command,
+    status: 'runnable',
+    reason: '',
+    check: null,
+  })
+
+  it('runs the command once and says the later step reused it', async () => {
+    const run = vi.fn(async () => 0)
+    const outcome = await climb(
+      [
+        step('The unit’s own tests', 'vitest run --coverage'),
+        step('Repository gate', 'vitest run --coverage'),
+      ],
+      run
+    )
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(outcome.ok).toBe(true)
+    expect(outcome.steps[1]).toMatchObject({
+      result: 'pass',
+      exitCode: 0,
+      reusedFrom: 'The unit’s own tests',
+    })
+    expect(outcome.steps[1].reason).toContain('same command as The unit’s own tests')
+  })
+
+  it('runs distinct commands each', async () => {
+    const run = vi.fn(async () => 0)
+    await climb([step('a', 'one'), step('b', 'two')], run)
+    expect(run).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not reuse a failure: the climb stopped at it', async () => {
+    const run = vi.fn(async () => 1)
+    const outcome = await climb([step('a', 'one'), step('b', 'one')], run)
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(outcome.steps).toHaveLength(1)
+    expect(outcome.ok).toBe(false)
   })
 })

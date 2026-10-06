@@ -142,3 +142,22 @@ describe('reclaim', () => {
     expect(reclaim(g, nothingLive).reclaimed).toEqual(['build:U-1', 'build:U-2'])
   })
 })
+
+describe('a running gate', () => {
+  it('is the tail owed, not an agent that died', () => {
+    const ship = {
+      id: 'ship',
+      stepId: 'ship',
+      kind: 'gate',
+      state: 'running',
+      sessionId: null,
+    } as const
+    const base = graph()
+    const withShip = {
+      ...base,
+      nodes: [...base.nodes, { ...base.nodes[0], ...ship, dependsOn: [] }],
+    } as RunGraph
+    expect(orphanedNodes(withShip, nothingLive)).toHaveLength(0)
+    expect(reclaim(withShip, nothingLive).reclaimed).toEqual([])
+  })
+})

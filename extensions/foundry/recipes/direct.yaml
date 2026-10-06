@@ -42,7 +42,11 @@ steps:
   - id: document
     kind: agent
     role: scribe
-    after: [verify]
+    # Beside the verifier, not after it: the scribe documents what the builder
+    # did and needs no verdict. A fresh session, never the builder's — a
+    # resumed session keeps its old role's identity.
+    context: fresh
+    after: [lint]
   - id: integrate
     kind: join
     order: lane.ord

@@ -922,6 +922,13 @@ For an order graded at either of the two highest risk levels, your decision is
 taken **before** anything reaches the remote. For everything lower the draft
 opens first, so review happens on a real change.
 
+For a change that needs no inspection and is graded below the two highest
+levels, the draft opens as soon as the work is done, and the final check runs
+while the draft's own checks do. "Mark it ready?" appears only when both are
+green; if the final check fails, the draft stays a draft and you are asked what
+to do about the failed check. The recipe's last step reads as running until
+then, because it is: shipping is still under way.
+
 ### Where Foundry keeps its things
 
 **It writes nothing into the repositories it works on** — no scaffolding, no

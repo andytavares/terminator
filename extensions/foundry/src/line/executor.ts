@@ -116,6 +116,11 @@ export interface ExecutorDeps {
     /** Whether this role declared the class of work a tool belongs to. */
     mayUseTool: (tool: string) => boolean
     /**
+     * The role writes documentation and nothing else, so the caller refuses
+     * its edits to anything that is not a documentation path.
+     */
+    docsOnly?: boolean
+    /**
      * Where this rung writes what it found, or null when it has no artefact.
      *
      * The caller lets exactly this path through the read-only policy, the way
@@ -258,6 +263,18 @@ export interface ExecutorDeps {
    * `waveOrBreach`.
    */
   readonly wait?: (ms: number) => Promise<void>
+
+  /**
+   * Called once the graph's work is done and before the final check climbs,
+   * but only when no inspection is owed. The caller opens the drafts here (and
+   * starts watching their CI) so the check runs while CI does. It decides for
+   * itself whether the shipping mode allows that; resolves true when drafts are
+   * open, in which case a failed climb is recorded as `ship.final_check_failed`.
+   */
+  readonly beforeFinalCheck?: (input: {
+    readonly risk: RiskAssessment
+    readonly verdicts: readonly Verdict[]
+  }) => Promise<boolean>
 
   /** How often to re-read the budget while a wave is running. */
   readonly budgetPollMs?: number
@@ -575,7 +592,7 @@ export async function execute(
     const observed = (await deps.observe?.()) ?? { elapsedMinutes: 0 }
     return budgetBreach(budgets, {
       ...observed,
-      agents: current.nodes.filter((n) => n.state === 'running').length,
+      agents: current.nodes.filter((n) => n.state === 'running' && n.kind !== 'gate').length,
     })
   }
 
@@ -674,9 +691,20 @@ export async function execute(
       // raised once the drafts exist, by whatever opens them, because "mark it
       // ready?" asked before there is anything to mark is a question with no
       // answer. So it passes, and the tail takes it from here.
+      //
+      // It is left `running`, not passed: the final check and the CI watch
+      // still stand between here and the question, and a graph that reads
+      // complete while minutes of work remain is a lie on the Floor. The tail
+      // marks it passed when the ready gate is raised.
       if (declared === 'ready-for-review') {
-        await advance(markPassed(current, blocking.id, deps.now()))
-        continue
+        await advance(
+          withNode(current, blocking.id, {
+            state: 'running',
+            startedAt: blocking.startedAt ?? deps.now(),
+            attempts: blocking.attempts + 1,
+          })
+        )
+        break
       }
 
       const rule: GateRuleId = isGateRule(declared) ? declared : 'unit.boundary'
@@ -833,6 +861,7 @@ export async function execute(
             effort:
               tier === 'fast' ? null : (stepFor(recipe, node)?.effort ?? recipe.effort ?? null),
             mayUseTool: (tool) => roleId === null || roles.mayUseTool(roleId, tool),
+            docsOnly: roleId !== null && roles.writesOnlyDocs(roleId),
             outputPath,
             // Reported as it happens rather than waited for: this is what puts
             // a session on a node while there is still an agent in it.
@@ -1086,6 +1115,14 @@ export async function execute(
   const seen = deps.observedChange === undefined ? null : await deps.observedChange()
   const touched = [...new Set([...declared, ...(seen?.changedFiles ?? [])])]
   const summary = summarise(verdicts)
+  // The graph's work is done when everything but the held ship node has passed.
+  // That node is the tail's to settle, so it is not waited for here.
+  const isShipNode = (n: RunNode) =>
+    n.kind === 'gate' && n.state === 'running' && stepFor(recipe, n)?.rule === 'ready-for-review'
+  const workDone =
+    isComplete(current) ||
+    (current.nodes.some(isShipNode) &&
+      current.nodes.every((n) => n.state === 'passed' || n.state === 'skipped' || isShipNode(n)))
   const observed = {
     changedFiles: touched,
     linesChanged: seen?.linesChanged ?? 0,
@@ -1133,6 +1170,11 @@ export async function execute(
       logs.set(step.name, logPath)
       return runner(step, logPath)
     })
+    // A step that reused another's result shows that step's log.
+    for (const reused of outcome.steps) {
+      const from = reused.reusedFrom === undefined ? undefined : logs.get(reused.reusedFrom)
+      if (from !== undefined) logs.set(reused.name, from)
+    }
     return { outcome, logs }
   }
 
@@ -1143,7 +1185,14 @@ export async function execute(
       : ''
   }
 
-  if (!halted && !stalled && isComplete(current)) {
+  // The drafts open first when nothing needs the operator before they exist:
+  // no inspection is owed, and the caller judges the shipping mode.
+  let draftsOpen = false
+  if (!halted && !stalled && workDone && !inspection.required && deps.beforeFinalCheck) {
+    draftsOpen = await deps.beforeFinalCheck({ risk, verdicts })
+  }
+
+  if (!halted && !stalled && workDone) {
     const first = await climbWith(ladderSteps, deps.runStep, '')
     ladder = first.outcome
     ladderLogs = first.logs
@@ -1263,7 +1312,18 @@ export async function execute(
     }
   }
 
-  const complete = isComplete(current)
+  if (draftsOpen && ladder !== null && !ladder.ok) {
+    const failedStep = ladder.steps.find((s) => s.result === 'fail')
+    await deps.record?.(
+      'ship.final_check_failed',
+      failedStep?.name ?? order.id,
+      failedStep === undefined
+        ? 'The final check could not be completed; the draft stays a draft.'
+        : `${failedStep.name} failed${failedStep.command === null ? '' : `: ${failedStep.command}`}; the draft stays a draft.`
+    )
+  }
+
+  const complete = workDone
   return {
     graph: current,
     verdicts,

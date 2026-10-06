@@ -9,8 +9,12 @@ import {
   shipOrder,
   pushLanes,
   markReady,
+  readPulls,
   PushRefusedError,
   finishShipping,
+  openDrafts,
+  watchAndFinish,
+  commitAndPushLanes,
 } from '../../src/line/integrate.js'
 import type { IntegrateDeps } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
@@ -1175,4 +1179,67 @@ describe('pushLanes (D2)', () => {
   function multiDepsForPush() {
     return deps()
   }
+})
+
+describe('opening drafts apart from watching them (ADR 085)', () => {
+  it('opens and records the drafts without watching CI or raising the ready question', async () => {
+    const watchCi = vi.fn(async () => ({ kind: 'none' }) as CiOutcome)
+    const raise = vi.fn(async () => undefined)
+    const d = deps({ watchCi, raiseGate: raise })
+    const opened = await openDrafts(order(), { verdicts: [verdict()], findings: [] }, d)
+    expect(opened.pulls).toHaveLength(1)
+    expect(opened.held).toBe(false)
+    expect(watchCi).not.toHaveBeenCalled()
+    expect(raise).not.toHaveBeenCalled()
+    expect((await readPulls(root, 'WO-1'))[0].url).toBe('https://github.com/tav/app/pull/7')
+  })
+
+  it('reuses a lane’s existing draft: pushes, creates nothing, and does not announce it again', async () => {
+    const onDraftOpened = vi.fn(async () => undefined)
+    const first = deps({ onDraftOpened })
+    await openDrafts(order(), { verdicts: [], findings: [] }, first)
+    expect(onDraftOpened).toHaveBeenCalledTimes(1)
+
+    const again = deps({ onDraftOpened })
+    const reopened = await openDrafts(order(), { verdicts: [], findings: [] }, again)
+    expect(callsTo(again.exec, 'gh', 'create')).toHaveLength(0)
+    expect(callsTo(again.exec, 'git').some((c) => c.args[0] === 'push')).toBe(true)
+    expect(reopened.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
+    expect(onDraftOpened).toHaveBeenCalledTimes(1)
+  })
+
+  it('shipOrder is still opening then watching, in that order', async () => {
+    const seen: string[] = []
+    const d = deps({
+      onDraftOpened: async () => void seen.push('opened'),
+      watchCi: async () => (seen.push('watched'), { kind: 'none' }) as CiOutcome,
+      raiseGate: async () => void seen.push('asked'),
+    })
+    await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
+    expect(seen).toEqual(['opened', 'watched', 'asked'])
+  })
+
+  it('watchAndFinish raises the ready question for drafts that are already open', async () => {
+    const raise = vi.fn(async () => undefined)
+    const d = deps({ raiseGate: raise })
+    const result = await watchAndFinish(order(), { verdicts: [verdict()], findings: [] }, [], [], d)
+    expect(result.gate?.rule).toBe('ready-for-review')
+    expect(raise).toHaveBeenCalledTimes(1)
+  })
+
+  it('commits and pushes a lane only when the check wrote something', async () => {
+    const dirty = deps()
+    dirty.exec.mockImplementation(async (options: { args: string[] }) => ({
+      exitCode: 0,
+      stdout: options.args[0] === 'status' ? ' M a.ts\n' : '',
+      stderr: '',
+      timedOut: false,
+    }))
+    expect(await commitAndPushLanes(order(), 'final check: format', dirty)).toBe(true)
+    expect(callsTo(dirty.exec, 'git').some((c) => c.args[0] === 'push')).toBe(true)
+
+    const clean = deps()
+    expect(await commitAndPushLanes(order(), 'final check: format', clean)).toBe(false)
+    expect(callsTo(clean.exec, 'git').some((c) => c.args[0] === 'push')).toBe(false)
+  })
 })

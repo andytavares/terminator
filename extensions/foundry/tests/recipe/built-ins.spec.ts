@@ -543,3 +543,25 @@ describe('the built-in ci-fix skill', () => {
     expect(text).toMatch(/^name:\s*ci-fix\s*$/m)
   })
 })
+
+describe('the shapes a one-lane order takes (ADR 085)', () => {
+  it('standard has no Line scout: the Forge scout already read the repository', () => {
+    const steps = recipe('standard.yaml').steps
+    expect(steps.some((s) => s.role === 'scout')).toBe(false)
+    expect(steps.find((s) => s.id === 'build')?.after ?? []).not.toContain('scout')
+  })
+
+  it.each(['standard.yaml', 'direct.yaml'])(
+    '%s documents beside the verifier, not after it',
+    (file) => {
+      const steps = recipe(file).steps
+      const document = steps.find((s) => s.id === 'document')
+      expect(document?.after).toEqual(['lint'])
+      expect(steps.find((s) => s.id === 'integrate')?.after).toContain('document')
+    }
+  )
+
+  it.each(['standard.yaml', 'direct.yaml'])('%s keeps the scribe in a fresh session', (file) => {
+    expect(recipe(file).steps.find((s) => s.id === 'document')?.context).toBe('fresh')
+  })
+})

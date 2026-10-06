@@ -141,9 +141,9 @@ describe('the shape WO-0907-3c1 would get now', () => {
   // The heavy shape still exists and is still heavy — what changed is that a
   // one-lane order is no longer sent to it, and that it no longer spends a
   // session per unit twice over when it is.
-  it('would cost five sessions rather than eighteen even under the standard shape', () => {
+  it('would cost four sessions rather than eighteen even under the standard shape', () => {
+    // The Forge's scout already read the repository, so the Line has none.
     expect(agents(allTextRed(), 'standard')).toEqual([
-      'scout',
       'build:lane-1',
       'verify',
       'inspect',
