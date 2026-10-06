@@ -127,6 +127,9 @@ function collectionAt(path: string, order: WorkOrder): unknown[] | null {
   }
 }
 
+/** `risk.grade is P3`, `risk.grade is not P3`. Only the four grades parse. */
+const GRADE_CONDITION = /^risk\.grade\s+is\s+(not\s+)?(P[0-3])$/
+
 /**
  * `risk.triggers is not empty`, `plan.lanes count > 1`.
  *
@@ -142,6 +145,12 @@ export function evaluateWhen(expression: string | undefined, order: WorkOrder): 
     if (!(CHECK_NAMES as readonly string[]).includes(check)) return false
     const measured = order.context.toolchain[check as CheckName] !== null
     return negated === undefined ? measured : !measured
+  }
+
+  const grade = GRADE_CONDITION.exec(expression.trim())
+  if (grade !== null) {
+    const matches = order.risk.grade === grade[2]
+    return grade[1] === undefined ? matches : !matches
   }
 
   const emptiness = /^([\w.]+)\s+is\s+(not\s+)?empty$/.exec(expression.trim())
@@ -176,6 +185,13 @@ export function whenSkipReason(expression: string, order: WorkOrder): string {
     return negated === undefined
       ? `runs only when the repository has a ${check} command; it has none`
       : `runs only when the repository has no ${check} command; it has one`
+  }
+
+  const grade = GRADE_CONDITION.exec(text)
+  if (grade !== null) {
+    return grade[1] === undefined
+      ? `runs only when the change is graded ${grade[2]}; it is graded ${order.risk.grade}`
+      : `runs only when the change is not graded ${grade[2]}; it is graded ${order.risk.grade}`
   }
 
   const emptiness = /^([\w.]+)\s+is\s+(not\s+)?empty$/.exec(text)

@@ -128,7 +128,10 @@ export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
      */
     writesOnlyDocs(id) {
       const role = get(id)
-      return role !== null && role.writes.length === 1 && role.writes[0] === 'docs'
+      if (role === null) return false
+      // `document` is what the role reports, not somewhere it edits.
+      const edited = role.writes.filter((target) => target !== 'document')
+      return edited.length === 1 && edited[0] === 'docs'
     },
 
     mayWrite(id) {

@@ -781,20 +781,33 @@ Your choice is saved to the order straight away, recorded in the ledger, and
 used by both your hand-off and the automatic one. The card shows **Your
 choice**, and **Use the proposal** goes back.
 
-Each shape also says how hard its agents think. `quick`, `spike`, `research`
-and `poc` run at `medium` effort; `direct`, `standard`, `bugfix`, `refactor`,
-`speckit` and `design-doc` run at `high`, because a second look, a root cause
-or a refactor that must prove behaviour unchanged is where deeper reasoning
-pays. A recipe of your own sets it with one line, `effort: high`, on the recipe
-or on a single step.
+There are six shapes. **Direct** is the one for a single lane: it builds,
+lints, checks the change with your project's own test command (or a fresh
+verifier when the repository has none), has the change inspected when
+something risky was touched, updates the documentation unless the change is
+the smallest grade, and ships. **Standard** is for work spanning more than one
+lane or graded above ordinary risk. **Bugfix** proves the bug first,
+**refactor** proves behaviour unchanged, and **speckit** runs the Spec Kit
+pipeline where it is installed.
 
-Three shapes are never proposed and are there to be picked: **research**
-(a question whose answer is a document), **design-doc** (the order is attacked
-first, then the document is written and checked by a fresh reader) and **poc**
-(the smallest thing that demonstrates a claim, with a note of what was
-learned). Each still ends in a draft pull request carrying the result. Write
-the acceptance criteria as statements about the document or the demonstration,
-so the verifier has something to check.
+**Research** is never proposed and is there to be picked: a question whose
+answer is a document. The author writes it where the order says. A document in
+the repository ends in a draft pull request. A document the order wants
+somewhere else, or in another repository, is written to the order's own
+outputs folder, or published and linked, and the run finishes on it with
+**Finished · document ready** and no pull request. Write the acceptance
+criteria as statements about the document, so the verifier has something to
+check.
+
+A change that only touches documentation (markdown, `docs/`, `specs/`, a
+readme or a changelog) gets a short final check: format and lint, and the
+rest is marked not run, "documentation only".
+
+Each shape also says how hard its agents think. `direct` and `research` run at
+`medium` effort; `standard`, `bugfix`, `refactor` and `speckit` run at `high`,
+because a second look, a root cause or a refactor that must prove behaviour
+unchanged is where deeper reasoning pays. A recipe of your own sets it with
+one line, `effort: high`, on the recipe or on a single step.
 
 **Tracker** lets you say which of _your_ workflow states each moment means —
 when work starts, when the draft opens, when it merges. Left alone, the tracker

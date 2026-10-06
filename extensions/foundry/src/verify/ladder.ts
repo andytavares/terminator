@@ -1,6 +1,7 @@
 import type { Toolchain } from './toolchain-probe.js'
 import type { CheckName } from './check-names.js'
 import type { RiskAssessment } from '../order/schema.js'
+import { isDocumentationRelative } from './documentation-path.js'
 
 // The verification ladder.
 //
@@ -69,6 +70,12 @@ export interface LadderInput {
   readonly risk: RiskAssessment
   /** True when the change alters something a person looks at. */
   readonly touchesUi: boolean
+  /**
+   * What the change touched. When every path is documentation the climb runs
+   * Format and Lint and nothing else. Absent or empty means nobody knows what
+   * changed, which is never a reason to run less.
+   */
+  readonly changedFiles?: readonly string[]
 }
 
 /**
@@ -79,7 +86,7 @@ export interface LadderInput {
  * people learn to skim security findings.
  */
 export function ladderFor(input: LadderInput): LadderStep[] {
-  const { toolchain, risk, touchesUi } = input
+  const { toolchain, risk, touchesUi, changedFiles = [] } = input
 
   const inspection: LadderStep =
     risk.triggers.length > 0
@@ -104,7 +111,7 @@ export function ladderFor(input: LadderInput): LadderStep[] {
     ? step('L5', 'Integration and a picture of the running application', toolchain.e2e, 'e2e')
     : step('L5', 'Integration', toolchain.e2e, 'e2e')
 
-  return [
+  const rungs: LadderStep[] = [
     step('L0', 'Format', toolchain.format, 'format'),
     step('L0', 'Lint', toolchain.lint, 'lint'),
     step('L1', "The unit's own tests", toolchain.test, 'test'),
@@ -137,6 +144,18 @@ export function ladderFor(input: LadderInput): LadderStep[] {
       check: null,
     },
   ]
+
+  // Words cannot break a build or a test, so a change that only touches them
+  // is held to Format and Lint. Said on each step rather than dropped, so the
+  // record shows what was not run and why.
+  if (changedFiles.length === 0 || !changedFiles.every(isDocumentationRelative)) {
+    return rungs
+  }
+  return rungs.map((rung) =>
+    rung.check === null || rung.check === 'format' || rung.check === 'lint'
+      ? rung
+      : { ...rung, command: null, status: 'not_triggered' as const, reason: 'documentation only' }
+  )
 }
 
 export interface StepOutcome {

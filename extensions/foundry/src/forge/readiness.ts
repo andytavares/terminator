@@ -120,7 +120,7 @@ export interface FindingView {
 export interface Readiness {
   readonly holder: Holder
   readonly strip: Strip
-  /** "Low risk · 1 unit · Shape: Quick (proposed) · Draft" */
+  /** "Low risk · 1 unit · Shape: Direct (proposed) · Draft" */
   readonly summary: string
   readonly rows: readonly Row[]
   readonly steps: readonly StepView[]

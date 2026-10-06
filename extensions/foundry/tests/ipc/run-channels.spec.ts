@@ -385,25 +385,25 @@ describe('proposeRecipe', () => {
     })
   })
 
-  it('proposes the quick shape for one lane at the lowest risk', () => {
+  it('proposes the direct shape for one lane at the lowest risk', () => {
     const proposal = proposeRecipe(graded('P3'))
-    expect(proposal.name).toBe('quick')
-    expect(proposal.why).toBe('one lane, graded low risk, nothing flagged')
+    expect(proposal.name).toBe('direct')
+    expect(proposal.why).toBe('one lane, graded low risk')
   })
 
   it('still proposes it when that lane holds several units', () => {
     const o = graded('P3')
     o.plan.units.push(unit(), unit({ id: 'U-3' }), unit({ id: 'U-4' }))
-    expect(proposeRecipe(o).name).toBe('quick')
+    expect(proposeRecipe(o).name).toBe('direct')
   })
 
-  it('steps up to direct once the order grades itself notable', () => {
+  it('proposes direct for an order graded notable', () => {
     const proposal = proposeRecipe(graded('P2'))
     expect(proposal.name).toBe('direct')
     expect(proposal.why).toContain('ordinary risk')
   })
 
-  it('steps up to direct when a trigger fired, however low the grade', () => {
+  it('proposes direct, naming the trigger, when one fired at the lowest grade', () => {
     const proposal = proposeRecipe(graded('P3', ['public_interface']))
     expect(proposal.name).toBe('direct')
     expect(proposal.why).toContain('public_interface')
@@ -458,21 +458,17 @@ describe('the reason a shape was chosen (FR-014)', () => {
     expect(view.proposedWhy).toBe('one lane, graded low risk')
   })
 
-  // The shape's requirements are about the repository and the proposal is
-  // about the order, so the two can disagree. `quick` has no verifier and no
-  // inspector — the suite is its only check — so a repository with no test
-  // command gets the next shape up rather than a refused run.
-  it('steps down to a shape this repository can run, rather than refusing', async () => {
+  it('proposes direct in a repository with no test command, because direct needs none', async () => {
     await store.save(order())
     const view = (await channels().recipes({ id: 'WO-1' })) as {
       recipes: { name: string; available: boolean }[]
       proposed: string
     }
-    expect(view.recipes.find((r) => r.name === 'quick')?.available).toBe(false)
+    expect(view.recipes.find((r) => r.name === 'direct')?.available).toBe(true)
     expect(view.proposed).toBe('direct')
   })
 
-  it('proposes the quick shape where the suite it needs exists', async () => {
+  it('proposes direct where a test command exists too', async () => {
     fs.writeFileSync(
       path.join(repo, 'package.json'),
       JSON.stringify({ scripts: { test: 'vitest run' } })
@@ -483,15 +479,15 @@ describe('the reason a shape was chosen (FR-014)', () => {
       context: { ...o.context, toolchain: probeToolchain(repo) },
     })
     const view = (await channels().recipes({ id: 'WO-1' })) as { proposed: string }
-    expect(view.proposed).toBe('quick')
+    expect(view.proposed).toBe('direct')
   })
 
   // Never quietly swapped: an operator who names a shape gets it or gets told
   // why not, because a silent substitution is a decision nobody made.
   it('refuses an operator choice this repository cannot run, rather than stepping down', async () => {
     await store.save(order())
-    const result = (await channels().start({ id: 'WO-1', recipe: 'quick' })) as { error?: string }
-    expect(result.error).toContain('quick')
+    const result = (await channels().start({ id: 'WO-1', recipe: 'bugfix' })) as { error?: string }
+    expect(result.error).toContain('bugfix')
     expect(result.error).toContain('no test command')
   })
 })

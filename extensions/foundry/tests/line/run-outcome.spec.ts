@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runFailure } from '../../src/line/run-outcome.js'
+import { runFailure, runDocumentReady } from '../../src/line/run-outcome.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
 // How the last run attempt ended, read back out of the ledger — the run-side
@@ -68,5 +68,51 @@ describe('runFailure', () => {
     expect(runFailure([entry({ action: 'run.started' })])).toBeNull()
     expect(runFailure([entry({ action: 'run.complete' })])).toBeNull()
     expect(runFailure([entry({ action: 'run.halted', reason: 'waiting on a gate' })])).toBeNull()
+  })
+})
+
+describe('runDocumentReady', () => {
+  it('is the reason when the latest attempt ended on a document', () => {
+    expect(
+      runDocumentReady([
+        entry({ action: 'run.started' }),
+        entry({ action: 'run.complete' }),
+        entry({ action: 'run.document_ready', reason: 'outputs: /o/answer.md' }),
+      ])
+    ).toBe('outputs: /o/answer.md')
+  })
+
+  it('is null for a run that did not end on one', () => {
+    expect(
+      runDocumentReady([entry({ action: 'run.started' }), entry({ action: 'run.complete' })])
+    ).toBeNull()
+    expect(runDocumentReady([])).toBeNull()
+  })
+
+  it('is null once a later attempt has started, because that attempt is not finished', () => {
+    expect(
+      runDocumentReady([
+        entry({ action: 'run.document_ready', reason: 'outputs: /o/answer.md' }),
+        entry({ action: 'run.resumed' }),
+      ])
+    ).toBeNull()
+  })
+
+  it('is not a failure, and a failure after it is', () => {
+    const ready = [
+      entry({ action: 'run.started' }),
+      entry({ action: 'run.document_ready', reason: 'outputs: /o/a.md' }),
+    ]
+    expect(runFailure(ready)).toBeNull()
+    expect(runFailure([...ready, entry({ action: 'run.failed', reason: 'boom' })])).toBe('boom')
+  })
+
+  it('does not let an earlier failure show through a later document', () => {
+    expect(
+      runFailure([
+        entry({ action: 'run.failed', reason: 'old' }),
+        entry({ action: 'run.document_ready', reason: 'outputs: a.md' }),
+      ])
+    ).toBeNull()
   })
 })

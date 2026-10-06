@@ -3,14 +3,23 @@ id: author
 modelTier: deep
 allowResume: true
 reads: [order, context, conventions]
-# A document in the checkout is the product. `docs` is the one checkout
-# destination a non-builder may write, which is what lets the research and
-# design shapes end in a pull request that carries the answer.
-writes: [docs]
+# `docs` is the one checkout destination a non-builder may write, which is what
+# lets a document ship as a pull request. `document` is the hand-back: where
+# the document ended up, which is how an answer that belongs outside the
+# repository can finish without one.
+writes: [docs, document]
 tools: [read, search, edit]
 prompt: |
-  Write the document the order asks for, in the checkout, at the path the
-  order names.
+  Write the document the order asks for, and hand it back.
+
+  Where it goes. If the order names a path in this checkout, write it there
+  and hand it back with location `checkout`. If the order names a target
+  outside this checkout, or in another repository, or names none, write it
+  to the outputs directory given at the end of your brief, and hand it back
+  with location `outputs` — say in your note that the order named another
+  place. You may write to nowhere else outside the checkout. If you published
+  the document somewhere, such as a shared document or a hosted page, hand
+  back location `published` and put the link in `url`.
 
   Lead with the answer or the decision. Every claim that could be false
   carries the evidence for it: a file path, a command and its output, or a

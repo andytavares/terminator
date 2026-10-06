@@ -95,7 +95,7 @@ function baseInput(
     loop: over.loop ?? baseLoop(),
     agreed: over.agreed ?? null,
     turnEndedAt: over.turnEndedAt ?? null,
-    shape: over.shape ?? { name: 'Quick', yours: false },
+    shape: over.shape ?? { name: 'Direct', yours: false },
     offers: over.offers ?? { shape: true, tracker: true },
     clock,
   }
@@ -122,31 +122,31 @@ describe('readiness — holder and strip', () => {
         order,
         agreed: { at: T1, by: 'automatic' },
         loop: baseLoop({ rounds: [{ round: 1, startedAt: T0, finishedAt: T1 }] }),
-        shape: { name: 'quick', yours: false },
+        shape: { name: 'direct', yours: false },
       })
     )
     expect(result.holder).toBe('nobody')
     expect(result.strip.tone).toBe('ready')
     expect(result.strip.icon).toBe('play')
     expect(result.strip.headline).toBe(`Handed off automatically at ${T1}`)
-    expect(result.strip.detail).toBe('Running with the Quick shape, 1 unit.')
+    expect(result.strip.detail).toBe('Running with the Direct shape, 1 unit.')
     expect(result.strip.actions).toEqual(['open-run'])
   })
 
   it('1. a shipped order is not described as running', () => {
     const order = wo0928Order({ status: 'shipped', agreedAt: T1 })
     const result = readiness(baseInput({ order, agreed: { at: T1, by: 'you' } }))
-    expect(result.strip.detail).toBe('Shipped with the Quick shape, 1 unit.')
+    expect(result.strip.detail).toBe('Shipped with the Direct shape, 1 unit.')
     expect(result.strip.detail).not.toContain('Running')
     expect(result.runState).toBe('Shipped')
   })
 
   it('1. a cancelled order says cancelled, a running one says running', () => {
     const cancelled = readiness(baseInput({ order: wo0928Order({ status: 'cancelled' }) }))
-    expect(cancelled.strip.detail).toBe('Cancelled with the Quick shape, 1 unit.')
+    expect(cancelled.strip.detail).toBe('Cancelled with the Direct shape, 1 unit.')
     expect(cancelled.runState).toBe('Cancelled')
     const running = readiness(baseInput({ order: wo0928Order({ status: 'running' }) }))
-    expect(running.strip.detail).toBe('Running with the Quick shape, 1 unit.')
+    expect(running.strip.detail).toBe('Running with the Direct shape, 1 unit.')
     expect(running.runState).toBe('Running')
   })
 
@@ -155,7 +155,7 @@ describe('readiness — holder and strip', () => {
     const result = readiness(baseInput({ order, agreed: { at: T2, by: 'you' } }))
     expect(result.holder).toBe('nobody')
     expect(result.strip.headline).toBe(`Handed off at ${T2}`)
-    expect(result.strip.detail).toBe('Running with the Quick shape, 1 unit.')
+    expect(result.strip.detail).toBe('Running with the Direct shape, 1 unit.')
     expect(result.strip.actions).toEqual(['open-run'])
   })
 
@@ -221,7 +221,7 @@ describe('readiness — holder and strip', () => {
             { round: 2, startedAt: T2, finishedAt: null },
           ],
         }),
-        shape: { name: 'quick', yours: true },
+        shape: { name: 'direct', yours: true },
       })
     )
     expect(result.holder).toBe('red team')
@@ -689,7 +689,7 @@ describe('readiness — steps and the not-yet rule', () => {
 
     expect(byId.shape.state).toBe('not-yet')
     expect(byId.shape.mark).toBe('number')
-    expect(byId.shape.word).toBe('Quick, proposed')
+    expect(byId.shape.word).toBe('Direct, proposed')
 
     expect(byId.tracker.state).toBe('not-yet')
     expect(byId.tracker.mark).toBe('number')
@@ -775,7 +775,7 @@ describe('readiness — steps and the not-yet rule', () => {
     expect(result.steps.every((s) => s.state === 'done' && s.mark === 'check')).toBe(true)
     const byId = Object.fromEntries(result.steps.map((s) => [s.id, s]))
     expect(byId.redTeam.word).toBe('Clean after round 1')
-    expect(byId.shape.word).toBe('Quick, proposed')
+    expect(byId.shape.word).toBe('Direct, proposed')
     expect(byId.handOff.word).toBe(`Handed off ${T1}`)
   })
 })
@@ -1050,8 +1050,8 @@ describe('readiness — locks and canHandOff', () => {
 
 describe('readiness — summary', () => {
   it('renders grade, unit count, shape and status', () => {
-    const result = readiness(baseInput({ shape: { name: 'quick', yours: true } }))
-    expect(result.summary).toBe('Low risk · 1 unit · Shape: Quick (your choice) · Draft')
+    const result = readiness(baseInput({ shape: { name: 'direct', yours: true } }))
+    expect(result.summary).toBe('Low risk · 1 unit · Shape: Direct (your choice) · Draft')
   })
 
   it('shape not chosen', () => {

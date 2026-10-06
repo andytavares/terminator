@@ -117,6 +117,14 @@ export interface StandingInput {
    * operator, which without this reads as an order that has been abandoned.
    */
   readonly waitingOn?: { readonly id: string; readonly title: string } | null
+  /**
+   * Where the document is, when the run ended on one. Running orders only.
+   *
+   * A document outside the checkout has no pull request, so the run finishes
+   * without shipping anything. That is the end of the work, not a refusal to
+   * ship it.
+   */
+  readonly documentReady?: string | null
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -286,6 +294,17 @@ export function standingOf(input: StandingInput): Standing {
     }
   }
 
+  if (input.documentReady !== undefined && input.documentReady !== null) {
+    return {
+      ...counts,
+      kind: 'done',
+      turn: 'foundry',
+      label: 'Finished · document ready',
+      headline: 'Finished · document ready',
+      detail: `The author handed back the document, and there is no pull request to open for it: ${input.documentReady}`,
+    }
+  }
+
   if (input.runFailure !== null) {
     const reason = input.runFailure.trim() === '' ? 'It recorded no reason.' : input.runFailure
     const finished = total > 0 && done === total
@@ -379,6 +398,8 @@ export interface StandingSources {
   readonly intakeRefusedFor?: (orderId: string) => Promise<string | null>
   /** Why this order's run last stopped on an error or refused to ship. */
   readonly runFailureFor?: (orderId: string) => Promise<string | null>
+  /** Where this order's run left its document, when it ended on one. */
+  readonly documentReadyFor?: (orderId: string) => Promise<string | null>
   /** The order whose merge this order is waiting for, when it is. */
   readonly waitingOnFor?: (
     orderId: string
@@ -413,6 +434,8 @@ export async function readStanding(order: WorkOrder, sources: StandingSources): 
     // nothing.
     runFailure:
       order.status === 'running' ? ((await sources.runFailureFor?.(order.id)) ?? null) : null,
+    documentReady:
+      order.status === 'running' ? ((await sources.documentReadyFor?.(order.id)) ?? null) : null,
     waitingOn:
       order.status === 'running' ? ((await sources.waitingOnFor?.(order.id)) ?? null) : null,
   })

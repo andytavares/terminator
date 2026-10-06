@@ -3,6 +3,7 @@ import type { PolicyDecision } from './read-only-policy.js'
 import { decideReadOnly } from './read-only-policy.js'
 import { decideByAutonomy, isDestructive, writesOutside } from './autonomy-policy.js'
 import type { Autonomy } from '../gates/autonomy.js'
+import { isDocumentationRelative } from '../verify/documentation-path.js'
 
 // What happens when an agent asks to use a tool.
 //
@@ -71,19 +72,24 @@ export interface ToolRequest {
    * `[docs]`). Its file edits are refused outside documentation paths.
    */
   readonly docsOnly?: boolean
+  /**
+   * The order's own `outputs/` directory, which a role that hands back a
+   * document may write into. Null or absent for every other node.
+   *
+   * It is outside the checkout, so it is allowed here by name rather than left
+   * to the rule that asks about writes outside the checkout.
+   */
+  readonly outputsDir?: string | null
 }
 
 /**
- * Whether a path is documentation: any markdown file, a README or a CHANGELOG
- * at any depth, or anything under `docs/` or `specs/` in the checkout.
+ * Whether a path is documentation, by `isDocumentationRelative`'s rule once it
+ * is made relative to the checkout. Outside the checkout it never is.
  */
 export function isDocumentationPath(target: string, worktreePath: string): boolean {
   const relative = path.isAbsolute(target) ? path.relative(worktreePath, target) : target
   if (relative.startsWith('..') || path.isAbsolute(relative)) return false
-  const normal = path.normalize(relative).split(path.sep)
-  const name = normal[normal.length - 1] ?? ''
-  if (/\.md$/i.test(name) || /^(CHANGELOG|README)/i.test(name)) return true
-  return normal.length > 1 && (normal[0] === 'docs' || normal[0] === 'specs')
+  return isDocumentationRelative(path.normalize(relative).split(path.sep).join('/'))
 }
 
 /**
@@ -197,6 +203,12 @@ export function decideTool(request: ToolRequest): PolicyDecision | 'mode' | null
 
   if (request.docsOnly === true && WRITE_TOOLS.has(request.tool)) {
     const target = pathOf(request.input)
+    if (target !== null && target === request.outputPath) {
+      return { allow: true, reason: 'this is where this node hands back what it produced' }
+    }
+    if (isInsideMount(target, request.outputsDir ?? null)) {
+      return { allow: true, reason: 'the order’s outputs directory, where a document may go' }
+    }
     if (target === null || !isDocumentationPath(target, request.worktreePath)) {
       return {
         allow: false,

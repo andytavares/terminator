@@ -72,6 +72,7 @@ export function draftOrder(input: DraftOrderInput): WorkOrder {
     redTeam: [],
     provenance: { forgeSession: null, decisions: [], amendments: [] },
     createdAt: input.now,
+    document: null,
     agreedAt: null,
   })
 }

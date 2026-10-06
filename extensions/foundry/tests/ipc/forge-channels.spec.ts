@@ -1666,19 +1666,19 @@ describe('foundry:order.recipe', () => {
   it('sets the recipe and records who chose it', async () => {
     const seed = await drafted()
     const c = channels()
-    const r = (await c.recipe({ id: seed.order.id, recipe: 'quick' })) as OrderView
-    expect(r.order.recipe).toBe('quick')
+    const r = (await c.recipe({ id: seed.order.id, recipe: 'direct' })) as OrderView
+    expect(r.order.recipe).toBe('direct')
 
     const entries = await store.entries(seed.order.id)
     const last = entries[entries.length - 1]
     expect(last.action).toBe('recipe.chosen')
-    expect(last.reason).toBe('quick')
+    expect(last.reason).toBe('direct')
   })
 
   it('records "the proposal" when the choice is cleared', async () => {
     const seed = await drafted()
     const c = channels()
-    await c.recipe({ id: seed.order.id, recipe: 'quick' })
+    await c.recipe({ id: seed.order.id, recipe: 'direct' })
     await c.recipe({ id: seed.order.id, recipe: null })
 
     const entries = await store.entries(seed.order.id)
@@ -1690,7 +1690,7 @@ describe('foundry:order.recipe', () => {
     const seed = await drafted()
     const c = channels()
     await store.save({ ...seed.order, status: 'agreed' })
-    const r = (await c.recipe({ id: seed.order.id, recipe: 'quick' })) as { error?: string }
+    const r = (await c.recipe({ id: seed.order.id, recipe: 'direct' })) as { error?: string }
     expect(r.error).toBe('Only a draft can have its shape chosen; this order is agreed.')
   })
 })

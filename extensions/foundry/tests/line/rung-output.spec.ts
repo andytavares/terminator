@@ -68,8 +68,82 @@ describe('collectableWrites', () => {
     // Guards the vocabulary against drift: a role file that starts writing
     // something this module has never heard of would silently lose it.
     expect(Object.keys(COLLECTABLE).sort()).toEqual(
-      ['acceptance', 'context', 'findings', 'plan'].sort()
+      ['acceptance', 'context', 'document', 'findings', 'plan'].sort()
     )
+  })
+})
+
+describe('a document hand-back', () => {
+  const AUTHOR = ['document'] as const
+
+  it('is collectable from a role that declared it', () => {
+    expect(collectableWrites(role({ writes: ['docs', 'document'] }))).toEqual(['document'])
+  })
+
+  it('tells the author where outputs go and that a published link is a url', () => {
+    const text = rungOutputContract('/data/orders/WO-1/rungs/write.json', AUTHOR, {
+      outputsDir: '/data/orders/WO-1/outputs',
+    })
+    expect(text).toContain('"document"')
+    expect(text).toContain('/data/orders/WO-1/outputs')
+    expect(text).toContain('"location"')
+    expect(text).toContain('url')
+  })
+
+  it('takes a document with a location', () => {
+    const parsed = parseRungOutput(
+      { document: { path: '/o/answer.md', location: 'outputs' }, note: 'written' },
+      [...AUTHOR]
+    )
+    expect(parsed.document).toEqual({ path: '/o/answer.md', location: 'outputs' })
+  })
+
+  it('keeps the published link', () => {
+    const parsed = parseRungOutput(
+      { document: { path: 'x', url: 'https://example.com/d/1', location: 'published' } },
+      [...AUTHOR]
+    )
+    expect(parsed.document?.url).toBe('https://example.com/d/1')
+  })
+
+  it('refuses a document with no location, or one in a fourth place', () => {
+    expect(() => parseRungOutput({ document: { path: 'a.md' } }, [...AUTHOR])).toThrow(
+      RungOutputRejected
+    )
+    expect(() =>
+      parseRungOutput({ document: { path: 'a.md', location: 'desktop' } }, [...AUTHOR])
+    ).toThrow(RungOutputRejected)
+  })
+
+  it('refuses a document from a role that did not declare it', () => {
+    expect(() =>
+      parseRungOutput({ document: { path: 'a.md', location: 'checkout' } }, ['context'])
+    ).toThrow(RungOutputRejected)
+  })
+
+  it("puts the document on the order and reports it as this turn's", () => {
+    const applied = applyRungOutput(order(), {
+      role: 'author',
+      output: { document: { path: 'docs/answer.md', location: 'checkout' }, note: 'done' },
+      writes: [...AUTHOR],
+      at: AT,
+    })
+    expect(applied.order.document).toEqual({ path: 'docs/answer.md', location: 'checkout' })
+    expect(applied.document).toEqual({ path: 'docs/answer.md', location: 'checkout' })
+    expect(applied.defect).toBeNull()
+    expect(applied.order.status).toBe('agreed')
+  })
+
+  it('reports no document for a turn that handed none back, and keeps an earlier one', () => {
+    const earlier = { path: 'docs/a.md', location: 'checkout' as const }
+    const applied = applyRungOutput(order({ document: earlier }), {
+      role: 'author',
+      output: { note: 'nothing new' },
+      writes: [...AUTHOR],
+      at: AT,
+    })
+    expect(applied.document).toBeNull()
+    expect(applied.order.document).toEqual(earlier)
   })
 })
 

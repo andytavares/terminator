@@ -97,6 +97,21 @@ describe('evaluateWhen', () => {
     expect(evaluateWhen('risk.triggers is empty', o)).toBe(false)
   })
 
+  it('tests the grade, with or without a negation', () => {
+    const o = order()
+    o.risk.grade = 'P3'
+    expect(evaluateWhen('risk.grade is P3', o)).toBe(true)
+    expect(evaluateWhen('risk.grade is not P3', o)).toBe(false)
+    o.risk.grade = 'P2'
+    expect(evaluateWhen('risk.grade is P3', o)).toBe(false)
+    expect(evaluateWhen('risk.grade is not P3', o)).toBe(true)
+  })
+
+  it('is false for a grade that does not exist', () => {
+    expect(evaluateWhen('risk.grade is P9', order())).toBe(false)
+    expect(evaluateWhen('risk.grade is not P9', order())).toBe(false)
+  })
+
   it('compares a collection count', () => {
     expect(evaluateWhen('plan.units count > 1', order())).toBe(true)
     expect(evaluateWhen('plan.units count > 5', order())).toBe(false)
@@ -248,8 +263,20 @@ describe('whenSkipReason', () => {
   })
 
   it('falls back to quoting the condition', () => {
-    expect(whenSkipReason('risk.grade is P0', order())).toBe(
-      'condition "risk.grade is P0" was false'
+    expect(whenSkipReason('risk.owner is nobody', order())).toBe(
+      'condition "risk.owner is nobody" was false'
+    )
+  })
+
+  it('names the grade a step wanted and the grade the order has', () => {
+    const o = order()
+    o.risk.grade = 'P3'
+    expect(whenSkipReason('risk.grade is not P3', o)).toBe(
+      'runs only when the change is not graded P3; it is graded P3'
+    )
+    o.risk.grade = 'P1'
+    expect(whenSkipReason('risk.grade is P3', o)).toBe(
+      'runs only when the change is graded P3; it is graded P1'
     )
   })
 })

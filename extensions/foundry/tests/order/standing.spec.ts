@@ -427,6 +427,48 @@ describe('an order waiting for a fix to merge', () => {
   })
 })
 
+describe('a run that finished on a document', () => {
+  const finished = graph([
+    node({ id: 'write', state: 'passed' }),
+    node({ id: 'ship', state: 'waiting' }),
+  ])
+
+  it('is done, with foundry holding the turn, and never says it was not shipped', () => {
+    const standing = standingOf(
+      input({ graph: finished, documentReady: 'outputs: /data/orders/WO-1/outputs/answer.md' })
+    )
+    expect(standing.kind).toBe('done')
+    expect(standing.turn).toBe('foundry')
+    expect(standing.label).toBe('Finished · document ready')
+    expect(standing.headline).toBe('Finished · document ready')
+    expect(standing.detail).toContain('/data/orders/WO-1/outputs/answer.md')
+    expect(standing.headline).not.toContain('not shipped')
+  })
+
+  it('still yields to an open gate, which stops the line first', () => {
+    const standing = standingOf(input({ graph: finished, gates: [gate()], documentReady: 'x' }))
+    expect(standing.kind).toBe('halted')
+  })
+
+  it('is not read for an order that is not running', async () => {
+    const sources = {
+      graphFor: async () => finished,
+      documentReadyFor: async () => 'outputs: a.md',
+    }
+    const running = await readStanding({ id: 'WO-1', status: 'running' } as WorkOrder, sources)
+    expect(running.kind).toBe('done')
+    const draft = await readStanding(
+      { id: 'WO-1', status: 'draft', openQuestions: [] } as unknown as WorkOrder,
+      sources
+    )
+    expect(draft.kind).toBe('shaping')
+  })
+
+  it('is working as before when no document is ready', () => {
+    expect(standingOf(input({ documentReady: null })).kind).toBe('working')
+  })
+})
+
 describe('readStanding', () => {
   // One assembly point for the inputs, so the order list and the Floor cannot
   // disagree about where the same order stands — which is the defect, stated

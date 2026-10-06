@@ -101,6 +101,8 @@ import type { RunOutcome, StartedRun, ExecutorDeps } from './line/executor.js'
 import type { RunGraph, RunNode, Feedback } from './line/run-graph.js'
 import type { EffortLevel, Recipe, Role } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
+import { commitWorktree } from './line/commit.js'
+import { documentOutcome } from './line/document-outcome.js'
 import { collectableWrites, readRungOutput, rungOutputPath } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
 import { agentTitle } from './runtime/agent-title.js'
@@ -1513,6 +1515,8 @@ async function buildExecutorDeps(
     docsOnly?: boolean
     /** The one file this rung may write, or null when it has no artefact. */
     outputPath?: string | null
+    /** The order's `outputs/` directory, for a role that hands back a document. */
+    outputsDir?: string | null
     /** Where this node's skills were mounted, or null when it declared none. */
     skillsMount: string | null
     /** Called as soon as the session exists, not when its turn ends. */
@@ -1592,6 +1596,7 @@ async function buildExecutorDeps(
                 api.settings?.get<boolean>('terminator.foundry.letAutoModeDecide') ?? true,
               worktreePath: checkout.path,
               outputPath: input.outputPath ?? null,
+              outputsDir: input.outputsDir ?? null,
               skillsMount: input.skillsMount,
             }),
           onPending: (pending) => {
@@ -1786,7 +1791,19 @@ async function buildExecutorDeps(
         }
 
         await store.save(result.order)
-        return { order: result.order, note: result.note, defect: result.defect }
+        return {
+          order: result.order,
+          note: result.note,
+          defect: result.defect,
+          document: result.document,
+        }
+      },
+      // Nothing else ever runs `git commit`: a branch the agents only edited
+      // has nothing to push, and a pull request opened on it fails with "No
+      // commits between".
+      commitNode: async ({ node, message }) => {
+        const checkout = checkouts.get(node.lane ?? 1)
+        return checkout === undefined ? false : commitWorktree(checkout.path, message, exec)
       },
       priorGates: await gates.list(),
       raise: async (gate) => {
@@ -2036,6 +2053,9 @@ async function executeRun(
       ...executorDeps,
       beforeFinalCheck: async (found) => {
         shippedOrderRef.current = { ...order, risk: found.risk }
+        // A document outside the checkout has no change to open a draft on.
+        const end = documentOutcome(recipe, (await store.load(order.id))?.document ?? null)
+        if (end.kind === 'ready' || end.kind === 'missing') return false
         return early.beforeFinalCheck(found)
       },
     })
@@ -2061,6 +2081,28 @@ async function executeRun(
 
   // ── The tail ───────────────────────────────────────────────────────────
   //
+  // A shape whose product is a document ends on where its author put it. In
+  // the checkout it ships as a pull request below; anywhere else there is no
+  // change to open one on, and an author that handed nothing back has not
+  // finished.
+  const latest = await store.load(order.id)
+  const documentEnd = outcome.shippable
+    ? documentOutcome(recipe, latest?.document ?? null)
+    : ({ kind: 'not-a-document-shape' } as const)
+  if (documentEnd.kind === 'missing' || documentEnd.kind === 'ready') {
+    await store.record({
+      at: new Date().toISOString(),
+      orderId: order.id,
+      actor: 'rule:line',
+      action: documentEnd.kind === 'missing' ? 'run.failed' : 'run.document_ready',
+      subject: order.id,
+      reason: documentEnd.kind === 'missing' ? documentEnd.reason : documentEnd.where,
+      evidence: [],
+    })
+    await settleShipNode(root, recipe, graphRef, documentEnd.kind === 'ready')
+    return
+  }
+
   // Work that is finished and waiting on nobody ships, without being asked
   // (FR-053). Work that is waiting on somebody does not — the run halts, the
   // inbox has the question, and answering it resumes from here.
@@ -2108,7 +2150,11 @@ async function executeRun(
 
   if (shipped === null || shipped.held || shipped.pulls.length === 0) return
 
-  await store.save({ ...order, status: 'shipped' })
+  await store.save({
+    ...order,
+    document: (await store.load(order.id))?.document ?? order.document,
+    status: 'shipped',
+  })
 }
 
 /**

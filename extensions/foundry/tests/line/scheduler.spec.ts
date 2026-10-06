@@ -493,7 +493,7 @@ describe('sendBack after the final check failed', () => {
   it('reopens the builder with the failure, and everything after it', () => {
     const g: RunGraph = {
       orderId: 'WO-1',
-      recipe: 'quick',
+      recipe: 'direct',
       nodes: [
         mk({ id: 'build:lane-1', stepId: 'build', role: 'builder' }),
         mk({ id: 'lint', stepId: 'lint', kind: 'run', dependsOn: ['build:lane-1'] }),

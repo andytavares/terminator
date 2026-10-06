@@ -1081,8 +1081,8 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   `scheduler.rework`: the target's node in the checked lane, everything between
   it and the check, and the check go back to `waiting`, and the target's
   `feedback` carries the command, exit status and the last 120 lines of output
-  into the builder's next brief. Ledger: `rework.started`. `quick`, `direct`,
-  `standard`, `bugfix` and `poc` lint in the lane right after the build when the
+  into the builder's next brief. Ledger: `rework.started`. `direct`,
+  `standard` and `bugfix` lint in the lane right after the build when the
   probe found a lint command. Before a node resumes a lane's conversation, its
   previous process is ended (`endSession` → `endAndWait`).
 - **Skills are mounted, never installed** (ADR-065). Roles and steps declare
@@ -1109,28 +1109,47 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   an order it may not change — `applyRungOutput` refuses a `plan` from a rung —
   so it could only end in silence or a halt. It cost 8.2 minutes doing neither.
 - **The shape is chosen from lanes and risk, never from unit count**
-  (`proposeRecipe`, `recipeLadder`): `quick` (one lane, P3, nothing flagged) →
-  `direct` (one lane, P2 or a trigger fired) → `standard` (more than one lane,
-  or above P2). A proposal walks the ladder to the first shape this repository
-  can run — `quick` needs a `test` command, being the only check it has — while
-  an operator's explicit choice is honoured or refused, never quietly swapped.
+  (`proposeRecipe`, `recipeLadder`): `direct` (one lane at P2 or P3,
+  flagged or not) → `standard` (more than one lane, or above P2). `direct`
+  needs nothing from the repository: it checks with the project's own test
+  command when there is one and with a fresh verifier when there is not (ADR
+  086). A proposal walks the ladder to the first shape this repository can
+  run, while an operator's explicit choice is honoured or refused, never
+  quietly swapped.
 - **Effort is a property of the shape** (ADR-050). A recipe declares
   `effort: low | medium | high | xhigh | max`, every agent step inherits it and
   a step may override it; the executor hands it to the launch beside the model
-  tier and `buildLaunchSpec` passes it as `--effort`. `quick`, `spike`,
-  `research` and `poc` run at `medium`, every other built-in at `high`. A recipe that declares none
+  tier and `buildLaunchSpec` passes it as `--effort`. `direct` and
+  `research` run at `medium`, every other built-in at `high`. A recipe that declares none
   passes no flag, and a fast-tier role is never passed one — the fast model
   does not take it.
-- **Three shapes produce a document or a demonstration, not a code change**:
-  `research` (scout, author, fresh verifier), `design-doc` (scout, author, fresh
-  verifier; the order was already attacked in the Forge) and `poc` (builders by lane, fresh
-  verifier, scribe). All three still end in a draft pull request — the
-  deliverable has to land somewhere a reviewer looks — and none is proposed by
-  the ladder; an operator picks them in the Forge. The **author** role is the
-  tenth: deep tier, writes `docs` in the checkout, edits nothing else. Two
-  universal rules ship with them, `scope-as-asked` (L3) and `outcome-first`
-  (L0), so every brief carries the scope discipline and the lead-with-the-
-  outcome instruction the model guidance calls for.
+- **Six shapes** (ADR 086): `direct`, `standard`, `bugfix`, `refactor`,
+  `speckit` and `research`. `direct` builds by lane, lints, checks (the test
+  command as a `check` step when the repository has one, a fresh `verify` agent
+  when it has not), inspects on a risk trigger, documents unless the change is
+  graded P3, and ships. `research` (scout, author, fresh verifier) is the one
+  shape whose product is a document, and it is never proposed: an operator
+  picks it in the Forge.
+- **Agents' work is committed by the line, and an empty change is a failure**
+  (ADR 086). After an agent whose role may write the checkout passes, the
+  executor commits its lane's worktree (`commitNode` → `commitWorktree`) with
+  `<step>: <unit titles>`. A builder or author that passed with nothing to
+  commit fails with `made no change to the checkout` (`step.no_change`); a
+  scribe with nothing to document does not, and neither does an author whose
+  document is outside the checkout.
+- **The author hands back a document** (ADR 086). `writes: [docs, document]`:
+  the author writes `{ path, url?, location }` to its rung file, collected
+  like the other artefacts onto `order.document` and recorded as
+  `document.handed_back`. It may write under `<order>/outputs/` (named in its
+  brief) as well as documentation in the checkout. `checkout` ships as a pull
+  request; `outputs` and `published` open none, and the run ends on
+  `run.document_ready`, which `standingOf` reads as done, "Finished · document
+  ready". An author that hands nothing back fails the run with "the author
+  handed back no document".
+- **A documentation-only change runs a short final check** (ADR 086). When every
+  changed path is documentation (`*.md`, `docs/`, `specs/`, `README*`,
+  `CHANGELOG*`), `ladderFor` leaves only Format and Lint runnable and marks the
+  other command steps not run, reason "documentation only".
 - **Roles** are YAML data too, with a write list. A role with none is run
   read-only, enforced by the `PreToolUse` hook rather than by its prompt.
   `verifier` carries `allowResume: false`, and `assertResumable` refuses to

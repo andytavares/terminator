@@ -16,7 +16,7 @@ import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
 import type { StandingSources } from '../order/standing.js'
-import { runFailure } from '../line/run-outcome.js'
+import { runDocumentReady, runFailure } from '../line/run-outcome.js'
 import { skillsFor } from '../line/executor.js'
 import { gradeInWords } from '../runtime/review/risk-grader.js'
 import { createRoleRegistry } from '../line/roles.js'
@@ -293,16 +293,6 @@ export function recipeLadder(order: WorkOrder): ProposedRecipe[] {
         : `one lane graded ${gradeInWords(grade)}, and ${triggers.join(', ')} fired`,
   }
 
-  if (grade === 'P3' && triggers.length === 0) {
-    // `quick` needs a test command and `direct` does not, so the fallback is
-    // not decoration: in a repository with no suite, `quick`'s only check does
-    // not exist, and proposing a shape that cannot run here would refuse the
-    // run rather than choose a shape that can.
-    return [
-      { name: 'quick', why: `one lane, graded ${gradeInWords('P3')}, nothing flagged` },
-      direct,
-    ]
-  }
   if (grade === 'P2' || grade === 'P3') return [direct]
   return [heaviest]
 }
@@ -567,6 +557,7 @@ export function createRunChannels(deps: RunDeps): RunChannels {
           strandedFor: deps.strandedFor,
           orphansFor: () => orphaned,
           runFailureFor: async (id) => runFailure(await deps.store.entries(id)),
+          documentReadyFor: async (id) => runDocumentReady(await deps.store.entries(id)),
         }
       ),
       // The agents waiting at a terminal prompt, so the band can offer the one

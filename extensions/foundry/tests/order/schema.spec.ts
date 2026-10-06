@@ -86,6 +86,30 @@ describe('parseWorkOrder', () => {
     expect(order.status).toBe('draft')
   })
 
+  it('has no document until an author hands one back', () => {
+    expect(parseWorkOrder(valid()).document).toBeNull()
+  })
+
+  it('keeps the document an author handed back', () => {
+    const order = parseWorkOrder({
+      ...(valid() as Record<string, unknown>),
+      document: { path: '/data/orders/WO-1/outputs/answer.md', location: 'outputs' },
+    })
+    expect(order.document).toEqual({
+      path: '/data/orders/WO-1/outputs/answer.md',
+      location: 'outputs',
+    })
+  })
+
+  it('refuses a document in a place that is not one of the three', () => {
+    expect(() =>
+      parseWorkOrder({
+        ...(valid() as Record<string, unknown>),
+        document: { path: 'a.md', location: 'desktop' },
+      })
+    ).toThrow()
+  })
+
   it('refuses a schema version newer than it knows, rather than reading what it recognises', () => {
     const future = { ...(valid() as Record<string, unknown>), schemaVersion: SCHEMA_VERSION + 1 }
     expect(() => parseWorkOrder(future)).toThrow(SchemaVersionTooNewError)

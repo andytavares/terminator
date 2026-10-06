@@ -16,7 +16,7 @@ import {
 } from '../forge/intake-outcome.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
 import type { LoopFacts, AgreedFacts } from '../forge/readiness.js'
-import { runFailure } from '../line/run-outcome.js'
+import { runDocumentReady, runFailure } from '../line/run-outcome.js'
 import { readCiState } from '../line/ci-state.js'
 import { queue, advisory as advisoryFor } from '../line/refinery.js'
 import type { QueueEntry } from '../line/refinery.js'
@@ -841,6 +841,8 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
             // the same files to answer it.
             intakeRefusedFor: async (orderId) => intakeRefusal(await deps.store.entries(orderId)),
             runFailureFor: async (orderId) => runFailure(await deps.store.entries(orderId)),
+            documentReadyFor: async (orderId) =>
+              runDocumentReady(await deps.store.entries(orderId)),
           }),
           // Absent when this host has never wired a records location for CI;
           // null once it has one and this order has not shipped a pull yet.
