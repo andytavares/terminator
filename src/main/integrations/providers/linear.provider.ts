@@ -29,6 +29,11 @@ import type {
 /** Comments beyond this are read in Linear; the drawer and the agent context both bound. */
 const MAX_COMMENTS = 5
 
+/** Filter to exclude completed and canceled issues from listMine results. */
+const OPEN_STATES_FILTER = {
+  state: { type: { nin: ['completed', 'canceled'] } },
+} as const
+
 interface LinearLike {
   viewer: Promise<{
     name: string
@@ -287,9 +292,12 @@ export function createLinearProvider(
         const connection = (await (email === null
           ? // No email configured: the key's own viewer is the answer, and it
             // is one fewer round trip than looking the user up first.
-            ((await client.viewer).assignedIssues?.({ first: limit }) ?? { nodes: [] })
+            ((await client.viewer).assignedIssues?.({
+              filter: OPEN_STATES_FILTER,
+              first: limit,
+            }) ?? { nodes: [] })
           : client.issues({
-              filter: { assignee: { email: { eq: email } } },
+              filter: { ...OPEN_STATES_FILTER, assignee: { email: { eq: email } } },
               first: limit,
               orderBy: 'updatedAt',
             }))) as { nodes?: RawIssue[] } | null

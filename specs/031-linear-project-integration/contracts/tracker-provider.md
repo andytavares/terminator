@@ -52,15 +52,15 @@ interface TrackerProvider {
 
 `@linear/sdk` pinned `91.0.0` (root `package.json`).
 
-| Operation   | Mechanism                                                                                                                                    |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verify`    | `client.viewer` — name and email                                                                                                             |
-| `listMine`  | `client.issues({ filter: { assignee: { email: { eq } } }, first, orderBy })`, or the viewer's `assignedIssues()` when no email is configured |
-| `search`    | `client.searchIssues({ term, first })`                                                                                                       |
-| `get`       | `issue(key)` — the shorthand key is **documented** as accepted here                                                                          |
-| `comment`   | resolve key → UUID via `issue(key)`, then `createComment({ issueId: <uuid>, body })`                                                         |
-| rate limits | `RatelimitedLinearError.retryAfter` (seconds)                                                                                                |
-| pagination  | `pageInfo.hasNextPage` / `endCursor`                                                                                                         |
+| Operation   | Mechanism                                                                                                                                                                                                                                                                                                                     |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verify`    | `client.viewer` — name and email                                                                                                                                                                                                                                                                                              |
+| `listMine`  | `client.issues({ filter: { state: { type: { nin: ['completed', 'canceled'] } }, assignee: { email: { eq } } }, first, orderBy })`, or the viewer's `assignedIssues({ filter: { state: { type: { nin: ['completed', 'canceled'] } } }, first })` when no email is configured. Excludes issues in completed or canceled states. |
+| `search`    | `client.searchIssues({ term, first })` with no state filter. Returns issues in any state.                                                                                                                                                                                                                                     |
+| `get`       | `issue(key)` — the shorthand key is **documented** as accepted here                                                                                                                                                                                                                                                           |
+| `comment`   | resolve key → UUID via `issue(key)`, then `createComment({ issueId: <uuid>, body })`                                                                                                                                                                                                                                          |
+| rate limits | `RatelimitedLinearError.retryAfter` (seconds)                                                                                                                                                                                                                                                                                 |
+| pagination  | `pageInfo.hasNextPage` / `endCursor`                                                                                                                                                                                                                                                                                          |
 
 **Why the key → UUID resolution**: Linear issues are addressed by **UUID, always** — not by the
 human key, even where Linear would accept one. One addressing mechanism means one thing to be right

@@ -35,23 +35,34 @@ describe('linear provider — verify', () => {
 })
 
 describe('linear provider — listMine', () => {
-  it('filters by assignee email when one is configured', async () => {
+  it('filters by assignee email and excludes completed/canceled states when one is configured', async () => {
     const issues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
     const provider = providerWith({ issues })
     const result = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 25)
 
     expect(issues).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: { assignee: { email: { eq: 'a@b.c' } } }, first: 25 })
+      expect.objectContaining({
+        filter: {
+          state: { type: { nin: ['completed', 'canceled'] } },
+          assignee: { email: { eq: 'a@b.c' } },
+        },
+        first: 25,
+      })
     )
     expect(result[0]).toMatchObject({ tracker: 'linear', key: 'TAV-42' })
   })
 
-  it("falls back to the viewer's own assigned issues when no email is configured", async () => {
+  it("falls back to the viewer's own assigned issues when no email is configured, with state filter", async () => {
     const assignedIssues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
     const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER, assignedIssues }) })
     const result = await provider.listMine(CRED, { kind: 'assignee', email: null }, 10)
 
-    expect(assignedIssues).toHaveBeenCalled()
+    expect(assignedIssues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filter: { state: { type: { nin: ['completed', 'canceled'] } } },
+        first: 10,
+      })
+    )
     expect(result).toHaveLength(1)
   })
 
@@ -92,15 +103,21 @@ describe('linear provider — listMine', () => {
 })
 
 describe('linear provider — search', () => {
-  it('uses full-text search and maps to summaries', async () => {
-    const searchIssues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
+  it('uses full-text search without state filter, returning completed issues', async () => {
+    const searchIssues = vi.fn().mockResolvedValue({ nodes: [DONE_ISSUE, makeIssue()] })
     const provider = providerWith({ searchIssues })
     const result = await provider.search(CRED, 'sidebar', 15)
 
+    // Search has no state filter, so it returns completed issues
+    expect(searchIssues).toHaveBeenCalledWith(
+      expect.not.objectContaining({ filter: expect.anything() })
+    )
     expect(searchIssues).toHaveBeenCalledWith(
       expect.objectContaining({ term: 'sidebar', first: 15 })
     )
-    expect(result[0].key).toBe('TAV-42')
+    // Both completed and open issues are returned
+    expect(result).toHaveLength(2)
+    expect(result[0].state.type).toBe('completed')
   })
 })
 
