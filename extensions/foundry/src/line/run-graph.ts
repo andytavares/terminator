@@ -59,6 +59,8 @@ export interface RunNode {
   readonly endedAt: string | null
   /** Why a skipped step did not run. Absent on graphs written before it existed. */
   readonly skipReason?: string | null
+  /** Why a failed step failed, in words. Absent on graphs written before it existed. */
+  readonly failReason?: string | null
 }
 
 export interface RunGraph {
@@ -82,6 +84,7 @@ function node(over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId' | 'kind'>):
     startedAt: null,
     endedAt: null,
     skipReason: null,
+    failReason: null,
     ...over,
   }
 }

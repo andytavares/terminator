@@ -361,6 +361,21 @@ describe('execute', () => {
     expect(outcome.complete).toBe(false)
   })
 
+  it('says on the stall gate which step failed, why, and what it holds up', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
+    )
+    const gate = outcome.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
+    const failed = outcome.graph.nodes.find((n) => n.id === 'build:U-1')
+    expect(failed?.failReason).toBe('exited 1')
+    expect(gate?.why).toMatch(/^\*\*builder · U-1 .+\*\* failed: exited 1\.\n\nHeld up behind it: /)
+    expect(gate?.why).not.toMatch(/or the plan has a cycle/)
+  })
+
   it('raises a gate rather than answering it, and stops', async () => {
     const run = vi.fn(ok)
     const o = order([unit('U-1')])
@@ -736,7 +751,7 @@ describe('a repeated failure becomes a decision', () => {
     // A second attempt is owed first, so nothing here is "attempt three is a
     // decision" — but the graph still cannot move on its own, and that gate
     // names the node the Inbox's "Send back" would have to retry.
-    const stalled = first.gates.find((g) => g.why.includes('blocked'))
+    const stalled = first.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
     expect(stalled?.nodeId).toBe('build:U-1')
   })
 })
@@ -1386,7 +1401,7 @@ describe('a graph that cannot move on its own', () => {
     const stalled = await execute(o, recipe(), graph, failing)
 
     expect(stalled.shippable).toBe(false)
-    const gate = stalled.gates.find((g) => g.why.includes('blocked'))
+    const gate = stalled.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
     expect(gate).toBeDefined()
     // Names the failed node, so the Inbox's "Send back" retries something
     // rather than nothing.
@@ -2383,7 +2398,9 @@ describe('the stalled gate names what it would retry', () => {
       buildRunGraph(o, recipe()),
       deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     )
-    const stalled = outcome.gates.find((g) => g.why.includes('blocked'))
+    const stalled = outcome.gates.find((g) =>
+      g.summary.endsWith('cannot go any further on its own')
+    )
     expect(stalled?.nodeId).toBe('build:U-1')
   })
 })
