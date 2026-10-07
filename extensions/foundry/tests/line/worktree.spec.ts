@@ -167,6 +167,56 @@ describe('preparing a checkout', () => {
   it('refuses a lane the order does not have', async () => {
     await expect(ensureCheckout(order(), 9, deps())).rejects.toThrow(/no such lane/)
   })
+
+  it('gives two callers asking at once the same checkout, not a second add', async () => {
+    // The scout and the architect's first turn both prepare lane 1 as an order
+    // starts. Real git lists no worktree to either, then fails the second add
+    // with "cannot lock ref … reference already exists".
+    const target = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app')
+    let added = false
+    let adding = false
+    const exec = vi.fn(async (options: { args: string[] }) => {
+      if (options.args[1] === 'list') {
+        const stdout = added ? `worktree ${target}\nHEAD abc\n` : ''
+        return { exitCode: 0, stdout, stderr: '', timedOut: false }
+      }
+      if (options.args[1] === 'add') {
+        if (adding || added)
+          return {
+            exitCode: 128,
+            stdout: '',
+            stderr: 'fatal: cannot lock ref: reference already exists',
+            timedOut: false,
+          }
+        adding = true
+        await new Promise((r) => setTimeout(r, 5))
+        added = true
+      }
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+    const d = deps({ exec: exec as never })
+
+    const [a, b] = await Promise.all([ensureCheckout(order(), 1, d), ensureCheckout(order(), 1, d)])
+
+    expect(a.path).toBe(target)
+    expect(b.path).toBe(target)
+    expect(calls(exec).filter((c) => c.args[1] === 'add')).toHaveLength(1)
+  })
+
+  it('tries again after a failed attempt rather than repeating its error', async () => {
+    let failNext = true
+    const exec = vi.fn(async (options: { args: string[] }) => {
+      if (options.args[1] === 'add' && failNext) {
+        failNext = false
+        return { exitCode: 1, stdout: '', stderr: 'fatal: transient', timedOut: false }
+      }
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+    const d = deps({ exec: exec as never })
+
+    await expect(ensureCheckout(order(), 1, d)).rejects.toThrow(/transient/)
+    await expect(ensureCheckout(order(), 1, d)).resolves.toMatchObject({ created: true })
+  })
 })
 
 describe('preparing every lane', () => {
