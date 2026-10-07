@@ -59,12 +59,17 @@ export function checkoutPath(root: string, order: WorkOrder, repo: string): stri
   return path.join(orderDir(root, order.id), 'worktrees', repo)
 }
 
+// The scout and the architect's first turn both prepare lane 1 as an order
+// starts. Each would see no worktree and run its own `worktree add`, and git
+// refuses the second with "cannot lock ref … reference already exists".
+const inFlight = new Map<string, Promise<Checkout>>()
+
 /**
  * Prepare one lane's checkout, or find the one already there.
  *
  * Idempotent on purpose: a run that is resumed, retried or observed must not
  * get a second worktree, and `git worktree add` onto an existing path fails
- * rather than reusing it.
+ * rather than reusing it. Callers asking at once share one preparation.
  */
 export async function ensureCheckout(
   order: WorkOrder,
@@ -75,8 +80,24 @@ export async function ensureCheckout(
   if (repo === undefined)
     throw new CheckoutFailedError(`lane ${lane}`, 'the order has no such lane')
 
-  const branch = branchFor(order, lane)
   const target = checkoutPath(deps.root, order, repo.name)
+  const pending = inFlight.get(target)
+  if (pending !== undefined) return pending
+  const preparing = prepareCheckout(order, lane, repo, target, deps).finally(() =>
+    inFlight.delete(target)
+  )
+  inFlight.set(target, preparing)
+  return preparing
+}
+
+async function prepareCheckout(
+  order: WorkOrder,
+  lane: number,
+  repo: WorkOrder['context']['repos'][number],
+  target: string,
+  deps: CheckoutDeps
+): Promise<Checkout> {
+  const branch = branchFor(order, lane)
 
   // Ask git, rather than the filesystem: a directory that exists but is not a
   // registered worktree is not a checkout, and reusing it would put the agent
