@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 
@@ -67,10 +67,10 @@ describe('review UI store', () => {
     expect(saved).toMatchObject({ agentNotesOn: false, diffRange: 'whole', fileListHidden: true })
   })
 
-  it('defaults both list sorts to oldest and remembers a change per list', () => {
+  it('defaults both list sorts to newest and remembers a change per list', () => {
     expect(useReviewUiStore.getState()).toMatchObject({
-      queueSort: 'oldest',
-      dashboardSort: 'oldest',
+      queueSort: 'newest',
+      dashboardSort: 'newest',
     })
     useReviewUiStore.getState().setQueueSort('closest')
     useReviewUiStore.getState().setDashboardSort('started')
@@ -78,6 +78,16 @@ describe('review UI store', () => {
     expect(saved).toMatchObject({ queueSort: 'closest', dashboardSort: 'started' })
     expect(useReviewUiStore.getState().queueSort).toBe('closest')
     expect(useReviewUiStore.getState().dashboardSort).toBe('started')
+  })
+
+  it('replaces a saved sort that no longer exists with newest', async () => {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({ queueSort: 'oldest', dashboardSort: 'closest' })
+    )
+    vi.resetModules()
+    const { useReviewUiStore: fresh } = await import('../../src/stores/review-ui.store')
+    expect(fresh.getState()).toMatchObject({ queueSort: 'newest', dashboardSort: 'closest' })
   })
 
   it('upserts agent runs newest first without duplicates', () => {

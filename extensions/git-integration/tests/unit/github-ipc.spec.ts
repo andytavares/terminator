@@ -916,7 +916,7 @@ describe('github:list-open-prs', () => {
     expect(result.nextCursor).toBe('cursor-xyz')
   })
 
-  it('always asks GraphQL for open PRs, oldest first, and ignores includeClosedPrs', async () => {
+  it('always asks GraphQL for open PRs, newest first, and ignores includeClosedPrs', async () => {
     mockGitSuccess(JSON.stringify(REPO_VIEW))
     mockGitSuccess(
       JSON.stringify({
@@ -938,8 +938,8 @@ describe('github:list-open-prs', () => {
     const query = args.find((a) => a.startsWith('query='))!
     expect(query).toContain('states:OPEN,')
     expect(query).not.toContain('MERGED')
-    expect(query).toContain('direction:ASC')
-    expect(query).not.toContain('direction:DESC')
+    expect(query).toContain('direction:DESC')
+    expect(query).not.toContain('direction:ASC')
     expect(query).toMatch(/nodes\{number title state isDraft/)
   })
 

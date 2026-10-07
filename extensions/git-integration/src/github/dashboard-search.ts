@@ -7,11 +7,11 @@ import { queueRiskLevel } from './pr-review-service'
 // is substituted with the viewer's login before the query is sent.
 
 export const DASHBOARD_QUERIES: Record<DashboardSection, string> = {
-  're-review': 'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-asc',
-  requested: 'is:pr is:open archived:false user-review-requested:@me sort:created-asc',
-  team: 'is:pr is:open archived:false team-review-requested-user:LOGIN sort:created-asc',
-  mine: 'is:pr is:open author:@me sort:created-asc',
-  involved: 'is:pr is:open involves:@me -author:@me sort:created-asc',
+  're-review': 'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-desc',
+  requested: 'is:pr is:open archived:false user-review-requested:@me sort:created-desc',
+  team: 'is:pr is:open archived:false team-review-requested-user:LOGIN sort:created-desc',
+  mine: 'is:pr is:open author:@me sort:created-desc',
+  involved: 'is:pr is:open involves:@me -author:@me sort:created-desc',
 }
 
 const SECTION_ALIASES: Record<DashboardSection, string> = {

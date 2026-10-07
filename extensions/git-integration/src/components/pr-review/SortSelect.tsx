@@ -2,7 +2,7 @@ import React from 'react'
 import type { SortMode } from '../../review/sort-prs'
 
 const OPTIONS: { value: SortMode; label: string }[] = [
-  { value: 'oldest', label: 'Oldest first' },
+  { value: 'newest', label: 'Newest first' },
   { value: 'closest', label: 'Closest to merging' },
   { value: 'started', label: 'Started by you' },
 ]

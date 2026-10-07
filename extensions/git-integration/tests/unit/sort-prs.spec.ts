@@ -47,11 +47,11 @@ describe('mergeReadiness', () => {
 })
 
 describe('sortPrs', () => {
-  it('oldest puts the earliest opened first', () => {
-    expect(ids(sortPrs([pr(3), pr(1), pr(2)], 'oldest'))).toEqual([1, 2, 3])
+  it('newest puts the latest opened first', () => {
+    expect(ids(sortPrs([pr(1), pr(3), pr(2)], 'newest'))).toEqual([3, 2, 1])
   })
 
-  it('closest orders by readiness, then age', () => {
+  it('closest orders by readiness, then newest', () => {
     const list = [
       pr(1, { isDraft: true }),
       pr(2, { reviewDecision: 'changes-requested' }),
@@ -60,10 +60,10 @@ describe('sortPrs', () => {
       pr(5, { reviewDecision: 'approved' }),
       pr(6, { reviewDecision: 'approved' }),
     ]
-    expect(ids(sortPrs(list, 'closest'))).toEqual([5, 6, 4, 3, 2, 1])
+    expect(ids(sortPrs(list, 'closest'))).toEqual([6, 5, 4, 3, 2, 1])
   })
 
-  it('started puts sessions first, then viewed fraction descending, then age', () => {
+  it('started puts sessions first, then viewed fraction descending, then newest', () => {
     const list = [
       pr(1),
       pr(2, { sessionStatus: 'in-progress', viewedFileCount: 2, fileCount: 10 }),
@@ -72,21 +72,21 @@ describe('sortPrs', () => {
       pr(5, { sessionStatus: 'paused', viewedFileCount: 1, fileCount: 2 }),
       pr(6, { sessionStatus: 'not-started' }),
     ]
-    expect(ids(sortPrs(list, 'started'))).toEqual([3, 4, 5, 2, 1, 6])
+    expect(ids(sortPrs(list, 'started'))).toEqual([3, 5, 4, 2, 6, 1])
   })
 
   it('started does not divide by zero for an empty PR', () => {
     const list = [
-      pr(2, { sessionStatus: 'in-progress', viewedFileCount: 0, fileCount: 0 }),
       pr(1, { sessionStatus: 'in-progress', viewedFileCount: 0, fileCount: 0 }),
+      pr(2, { sessionStatus: 'in-progress', viewedFileCount: 0, fileCount: 0 }),
     ]
-    expect(ids(sortPrs(list, 'started'))).toEqual([1, 2])
+    expect(ids(sortPrs(list, 'started'))).toEqual([2, 1])
   })
 
   it('never mutates the input', () => {
     const list = [pr(3), pr(1), pr(2)]
     const copy = [...list]
-    const sorted = sortPrs(list, 'oldest')
+    const sorted = sortPrs(list, 'newest')
     expect(list).toEqual(copy)
     expect(sorted).not.toBe(list)
   })
@@ -96,7 +96,7 @@ describe('sortPrs', () => {
       { id: 2, createdAt: '2026-02-01T00:00:00Z', ...pr(2) },
       { id: 1, createdAt: '2026-01-01T00:00:00Z', ...pr(1) },
     ].map(({ openedAt: _o, ...rest }) => rest)
-    const sorted = sortPrs(rows as never[], 'oldest', dashboardToSortable as never)
-    expect((sorted as Array<{ id: number }>).map((r) => r.id)).toEqual([1, 2])
+    const sorted = sortPrs(rows as never[], 'newest', dashboardToSortable as never)
+    expect((sorted as Array<{ id: number }>).map((r) => r.id)).toEqual([2, 1])
   })
 })
