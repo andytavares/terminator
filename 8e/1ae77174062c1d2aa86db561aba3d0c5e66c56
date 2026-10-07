@@ -1,0 +1,24 @@
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_f7320503bf1af7::t_c1f2c6e4f5fe4e 775-787
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_f7320503bf1af7::t_b93ebfd4b54684 992-1005
+extensions/foundry/src/components/foundry.css
+  s_f7320503bf1af7::t_6d71330d22f7df 3784-3785,3818-3819
+  s_f7320503bf1af7::t_cc1fc40d7c8837 3820-3821
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8e1ae77174062c1d2aa86db561aba3d0c5e66c56",
+  "prompts": {},
+  "sessions": {
+    "s_f7320503bf1af7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee8ed9e8-fc7c-4057-9b54-9d0e55e4298d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
