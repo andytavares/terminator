@@ -7,11 +7,11 @@ import { queueRiskLevel } from './pr-review-service'
 // is substituted with the viewer's login before the query is sent.
 
 export const DASHBOARD_QUERIES: Record<DashboardSection, string> = {
-  're-review': 'is:pr is:open archived:false reviewed-by:@me -author:@me',
-  requested: 'is:pr is:open archived:false user-review-requested:@me',
-  team: 'is:pr is:open archived:false team-review-requested-user:LOGIN',
-  mine: 'is:pr is:open author:@me',
-  involved: 'is:pr is:open involves:@me -author:@me',
+  're-review': 'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-asc',
+  requested: 'is:pr is:open archived:false user-review-requested:@me sort:created-asc',
+  team: 'is:pr is:open archived:false team-review-requested-user:LOGIN sort:created-asc',
+  mine: 'is:pr is:open author:@me sort:created-asc',
+  involved: 'is:pr is:open involves:@me -author:@me sort:created-asc',
 }
 
 const SECTION_ALIASES: Record<DashboardSection, string> = {
@@ -70,7 +70,7 @@ export function buildSectionQueries(
       return {
         section,
         query: `query {
-    ${SECTION_ALIASES[section]}: search(query: ${JSON.stringify(search)}, type: ISSUE, first: 50) { nodes { ...prFields } }
+    ${SECTION_ALIASES[section]}: search(query: ${JSON.stringify(search)}, type: ISSUE, first: 50) { issueCount nodes { ...prFields } }
   }
   ${PR_FIELDS}`,
       }
@@ -109,6 +109,7 @@ interface RawPrNode {
 }
 
 interface RawSearchResult {
+  issueCount?: number
   nodes?: unknown[]
 }
 
@@ -191,6 +192,8 @@ function mapNode(
     reviewerCount:
       node.reviewRequests.totalCount +
       new Set(node.latestReviews.nodes.map((r) => r.author?.login).filter(Boolean)).size,
+    sessionStatus: 'not-started',
+    viewedFileCount: 0,
   }
 }
 

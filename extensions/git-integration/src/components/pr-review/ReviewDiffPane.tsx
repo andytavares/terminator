@@ -1427,7 +1427,6 @@ export function ReviewDiffPane({
           {dirName && <span className="rs-p-dir">{dirName}</span>}
           {baseName}
         </span>
-        {file.changeType !== 'modified' && <span className="rs-note">{file.changeType}</span>}
         <button
           type="button"
           className={`rs-risk rs-risk--${file.riskScore.level}`}
@@ -1440,18 +1439,12 @@ export function ReviewDiffPane({
               ? 'Medium risk'
               : 'Low risk'}
         </button>
-        {readingStep && (
-          <span className="rs-note">{`Step ${readingStep.step} of ${pr.readingOrder.length}`}</span>
-        )}
         {isChangedSince && diffRange === 'since' && (
           <span className="rs-note rs-note--changed" title="Changed since you viewed">
             <span className="rs-long">Changed since you viewed</span>
             <span className="rs-short">Changed</span>
           </span>
         )}
-        <span className="rs-note">
-          +{file.additions}/−{file.deletions}
-        </span>
         <span className="rs-sp" />
         <UsesPopover
           uses={usesWithDef.map((u) => ({

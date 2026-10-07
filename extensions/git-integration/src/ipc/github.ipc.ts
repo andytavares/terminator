@@ -40,6 +40,7 @@ import {
   runGit,
   getRepoOwnerAndName,
   PR_JSON_FIELDS,
+  stateForSearch,
   computeCoChangeAffinityFromGit,
   withTiming,
   type RegisterFn,
@@ -177,11 +178,10 @@ export function registerGithubHandlers(
       repoRoot: z.string().min(1),
       cursor: z.string().optional(),
       search: z.string().optional(),
-      includeClosedPrs: z.boolean().optional(),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, cursor, search, includeClosedPrs } = parsed.data
+    const { repoRoot, cursor, search } = parsed.data
 
     try {
       // PR number lookup — always finds the PR regardless of state
@@ -191,15 +191,15 @@ export function registerGithubHandlers(
         return { prs: [pr], totalCount: 1, hasMore: false }
       }
 
-      // Text search — always searches all states so nothing is missed
+      // Text search — open PRs unless an is:merged / is:closed / is:all qualifier says otherwise
       if (search && search.trim()) {
+        const { state, text } = stateForSearch(search)
         const raw = await gh(repoRoot, [
           'pr',
           'list',
           '--state',
-          'all',
-          '--search',
-          search.trim(),
+          state,
+          ...(text ? ['--search', text] : []),
           '--limit',
           '50',
           '--json',
@@ -211,8 +211,7 @@ export function registerGithubHandlers(
 
       // Paginated load via GraphQL
       const { owner, repo } = await ownerAndName(repoRoot)
-      const gqlStates = includeClosedPrs ? '[OPEN,CLOSED,MERGED]' : 'OPEN'
-      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){totalCount pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles mergeStateStatus author{login avatarUrl}assignees(first:10){nodes{login}}latestReviews(first:20){nodes{author{login avatarUrl}state submittedAt}}reviewRequests(first:10){nodes{requestedReviewer{...on User{login avatarUrl}...on Team{name}}}}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
+      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:OPEN,after:$cursor,orderBy:{field:CREATED_AT,direction:ASC}){totalCount pageInfo{endCursor hasNextPage}nodes{number title state isDraft additions deletions createdAt headRefName baseRefName changedFiles mergeStateStatus author{login avatarUrl}assignees(first:10){nodes{login}}latestReviews(first:20){nodes{author{login avatarUrl}state submittedAt}}reviewRequests(first:10){nodes{requestedReviewer{...on User{login avatarUrl}...on Team{name}}}}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
       const args = [
         'api',
         'graphql',
@@ -947,24 +946,7 @@ export function registerGithubHandlers(
     const schema = z.object({ repoRoot: z.string().min(1) })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { sessions: [] }
-    const { repoRoot } = parsed.data
-    const all = sessionStore.store
-    const prefix = `${repoRoot}:::`
-    // v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha". When both exist
-    // for the same PR, the new key wins — it's the one v2 code keeps current.
-    const byPrNumber = new Map<number, { session: ReviewSession; isNewKey: boolean }>()
-    for (const [key, value] of Object.entries(all)) {
-      if (!key.startsWith(prefix)) continue
-      const result = ReviewSessionSchema.safeParse(value)
-      if (!result.success) continue
-      const rest = key.slice(prefix.length)
-      const isNewKey = !rest.includes(':::')
-      const existing = byPrNumber.get(result.data.prNumber)
-      if (!existing || (isNewKey && !existing.isNewKey)) {
-        byPrNumber.set(result.data.prNumber, { session: result.data, isNewKey })
-      }
-    }
-    return { sessions: Array.from(byPrNumber.values()).map((v) => v.session) }
+    return { sessions: sessionsForRepo(parsed.data.repoRoot) }
   })
 
   register('github:session-get', (payload) => {
@@ -1131,11 +1113,19 @@ export function registerGithubHandlers(
       const settled = await Promise.allSettled(
         requests.map(async ({ query }) => {
           const raw = await gh(cwd, ['api', 'graphql', '-f', `query=${query}`], 60_000)
-          return (JSON.parse(raw) as { data?: Record<string, { nodes?: unknown[] }> }).data ?? {}
+          return (
+            (
+              JSON.parse(raw) as {
+                data?: Record<string, { issueCount?: number; nodes?: unknown[] }>
+              }
+            ).data ?? {}
+          )
         })
       )
       const failed = new Map<DashboardSection, string>()
       const merged: Record<string, { nodes: unknown[] }> = {}
+      // A section is capped when GitHub matched more PRs than the first-50 page returned.
+      const matched = new Map<DashboardSection, { issueCount: number; returned: number }>()
       let firstFailure: unknown
       settled.forEach((outcome, i) => {
         if (outcome.status === 'rejected') {
@@ -1146,6 +1136,12 @@ export function registerGithubHandlers(
         for (const [alias, result] of Object.entries(outcome.value)) {
           merged[alias] ??= { nodes: [] }
           merged[alias].nodes.push(...(result?.nodes ?? []))
+          const section = requests[i].section
+          const prior = matched.get(section) ?? { issueCount: 0, returned: 0 }
+          matched.set(section, {
+            issueCount: prior.issueCount + (result?.issueCount ?? 0),
+            returned: prior.returned + (result?.nodes?.length ?? 0),
+          })
         }
       })
       if (failed.size === new Set(requests.map((r) => r.section)).size) {
@@ -1169,9 +1165,29 @@ export function registerGithubHandlers(
         )
       }
 
-      const prs = parseDashboard(data, login, localRoots)
+      const sessionsByRoot = new Map<string, Map<number, ReviewSession>>()
+      const prs = parseDashboard(data, login, localRoots).map((pr) => {
+        if (!pr.localRepoRoot) return pr
+        if (!sessionsByRoot.has(pr.localRepoRoot)) {
+          sessionsByRoot.set(
+            pr.localRepoRoot,
+            new Map(sessionsForRepo(pr.localRepoRoot).map((s) => [s.prNumber, s]))
+          )
+        }
+        const session = sessionsByRoot.get(pr.localRepoRoot)!.get(pr.number)
+        if (!session) return pr
+        return {
+          ...pr,
+          sessionStatus: session.pausedAt ? ('paused' as const) : ('in-progress' as const),
+          viewedFileCount: session.viewedFiles.length,
+        }
+      })
+      const capped = [...matched]
+        .filter(([, { issueCount, returned }]) => issueCount > returned)
+        .map(([section]) => section)
       return {
         prs,
+        capped,
         login,
         fetchedAt: new Date().toISOString(),
         failed: [...failed].map(([section, error]) => ({ section, error })),
@@ -1340,6 +1356,26 @@ export function registerGithubHandlers(
       return catchError(e)
     }
   })
+}
+
+/**
+ * One session per PR. v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha".
+ * When both exist for the same PR, the new key wins — it's the one v2 code keeps current.
+ */
+function sessionsForRepo(repoRoot: string): ReviewSession[] {
+  const prefix = `${repoRoot}:::`
+  const byPrNumber = new Map<number, { session: ReviewSession; isNewKey: boolean }>()
+  for (const [key, value] of Object.entries(sessionStore.store)) {
+    if (!key.startsWith(prefix)) continue
+    const result = ReviewSessionSchema.safeParse(value)
+    if (!result.success) continue
+    const isNewKey = !key.slice(prefix.length).includes(':::')
+    const existing = byPrNumber.get(result.data.prNumber)
+    if (!existing || (isNewKey && !existing.isNewKey)) {
+      byPrNumber.set(result.data.prNumber, { session: result.data, isNewKey })
+    }
+  }
+  return Array.from(byPrNumber.values()).map((v) => v.session)
 }
 
 // A remote URL is either https (https://github.com/owner/name(.git)) or ssh

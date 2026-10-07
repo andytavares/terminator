@@ -230,6 +230,7 @@ export const ReviewQueuePRSchema = z.object({
   openedAt: z.string(),
   headRefName: z.string(),
   baseRefName: z.string(),
+  state: z.enum(['open', 'closed', 'merged']).default('open'),
   isDraft: z.boolean(),
   ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
   fileCount: z.number(),
@@ -276,6 +277,8 @@ export const DashboardPRSchema = z.object({
   /** Re-review only: commits after your latest review. */
   commitsSinceMyReview: z.number(),
   reviewerCount: z.number(),
+  sessionStatus: z.enum(['not-started', 'in-progress', 'paused']).default('not-started'),
+  viewedFileCount: z.number().default(0),
 })
 
 // ─── PR issue (conversation) comments ────────────────────────────────────────

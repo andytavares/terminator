@@ -25,6 +25,7 @@ function renderFooter(props: Partial<React.ComponentProps<typeof ReviewFooter>> 
     onMarkViewed: vi.fn(),
     onFinishChapter: vi.fn(),
     onOpenSubmit: vi.fn(),
+    onOpenShortcuts: vi.fn(),
   }
   render(
     <ReviewFooter drafts={[]} isLastFile={false} isLastChapter={false} {...handlers} {...props} />
@@ -45,9 +46,9 @@ describe('ReviewFooter', () => {
     expect(handlers.onPrevFile).toHaveBeenCalledTimes(1)
   })
 
-  it('fires onMarkViewed when not on the last file', async () => {
+  it('fires onMarkViewed from "Mark viewed, next file" when not on the last file', async () => {
     const handlers = renderFooter({ isLastFile: false })
-    await userEvent.click(screen.getByRole('button', { name: 'Mark viewed, go to next' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Mark viewed, next file' }))
     expect(handlers.onMarkViewed).toHaveBeenCalledTimes(1)
   })
 
@@ -57,30 +58,43 @@ describe('ReviewFooter', () => {
     expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
   })
 
-  it('shows "Finish review" label when last file and last chapter', async () => {
+  it('labels the primary action "Submit review…" on the last file of the last chapter and finishes', async () => {
     const handlers = renderFooter({ isLastFile: true, isLastChapter: true })
-    await userEvent.click(screen.getByRole('button', { name: 'Finish review ↵' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Submit review…' }))
     expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
+    expect(handlers.onOpenSubmit).not.toHaveBeenCalled()
+    expect(screen.getByText('⌘↵')).toBeTruthy()
   })
 
-  it('has exactly one button named "Submit review" and it opens the submit panel', async () => {
+  it.each([
+    [false, false, 'Mark viewed, next file'],
+    [true, true, 'Submit review…'],
+    [true, false, 'Finish chapter ↵'],
+  ])(
+    'renders exactly one primary button (last file %s, last chapter %s)',
+    (isLastFile, isLastChapter, name) => {
+      renderFooter({ isLastFile, isLastChapter })
+      const primary = document.querySelectorAll('.rf-pri')
+      expect(primary).toHaveLength(1)
+      expect(screen.getByRole('button', { name })).toBe(primary[0])
+    }
+  )
+
+  it('has no separate "Submit review" button mid-review', () => {
+    renderFooter({ isLastFile: false })
+    expect(screen.queryByRole('button', { name: /^Submit review/ })).toBeNull()
+  })
+
+  it('opens the keyboard help from the "? Shortcuts" hint', async () => {
     const handlers = renderFooter()
-    const buttons = screen.getAllByRole('button', { name: 'Submit review' })
-    expect(buttons).toHaveLength(1)
-    await userEvent.click(buttons[0])
-    expect(handlers.onOpenSubmit).toHaveBeenCalledTimes(1)
+    await userEvent.click(screen.getByRole('button', { name: /Shortcuts/ }))
+    expect(handlers.onOpenShortcuts).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('all keys')).toBeNull()
   })
 
-  it('shows the key hint (mentioning "v" for viewed) when there are no drafts', () => {
-    renderFooter({ drafts: [] })
-    expect(screen.getByText('viewed')).toBeTruthy()
-    expect(screen.getByText('v')).toBeTruthy()
-    expect(screen.getByText('all keys')).toBeTruthy()
-  })
-
-  it('hides the key hint when there are drafts', () => {
+  it('hides the shortcuts hint when there are drafts', () => {
     renderFooter({ drafts: [makeDraft()] })
-    expect(screen.queryByText('viewed')).not.toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Shortcuts/ })).toBeNull()
   })
 
   it('shows singular draft/file label for one draft on one file', () => {

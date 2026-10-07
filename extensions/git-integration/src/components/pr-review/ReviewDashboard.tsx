@@ -3,7 +3,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { githubAPI } from '../../api/github'
 import { DashboardPRSchema, type DashboardPR } from '../../schemas/pr-review.schema'
-import { DiffSize } from './DiffSize'
+import { dashboardToSortable, sortPrs } from '../../review/sort-prs'
+import { useReviewUiStore } from '../../stores/review-ui.store'
+import { DiffSize, RowMeta, shortAge, type MetaPart } from './DiffSize'
+import { SortSelect } from './SortSelect'
 import { RepoPicker } from './RepoPicker'
 import './review-dashboard.css'
 
@@ -11,6 +14,7 @@ type Tab = 'needs' | 'mine' | 'involved'
 
 const FOCUS_REFRESH_MS = 2 * 60 * 1000
 const TICK_MS = 60 * 1000
+const CAPPED_COUNT = '50+'
 
 const SECTIONS = ['re-review', 'requested', 'team', 'mine', 'involved'] as const
 
@@ -30,6 +34,7 @@ const DashboardResultSchema = z.union([
     login: z.string(),
     fetchedAt: z.string(),
     failed: z.array(FailedSectionSchema).optional(),
+    capped: z.array(z.enum(SECTIONS)).optional(),
     scopedTo: z.number().optional(),
   }),
   z.object({ error: z.string() }),
@@ -76,31 +81,6 @@ function repoRootFor(pr: DashboardPR): string {
   return pr.localRepoRoot ?? `gh:${pr.repo}`
 }
 
-const REVIEW_CLOSENESS: Record<DashboardPR['reviewDecision'], number> = {
-  approved: 0,
-  'review-required': 1,
-  'changes-requested': 2,
-  none: 3,
-}
-
-function sortByCloseness(prs: DashboardPR[]): DashboardPR[] {
-  return [...prs].sort((a, b) => {
-    const closeness = REVIEW_CLOSENESS[a.reviewDecision] - REVIEW_CLOSENESS[b.reviewDecision]
-    if (closeness !== 0) return closeness
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  })
-}
-
-function sortByOldest(prs: DashboardPR[]): DashboardPR[] {
-  return [...prs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-}
-
-function daysAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  const days = Math.max(0, Math.floor(ms / 86400000))
-  return `${days} day${days === 1 ? '' : 's'} ago`
-}
-
 function formatMinutes(total: number): string {
   const h = Math.floor(total / 60)
   const m = total % 60
@@ -108,59 +88,38 @@ function formatMinutes(total: number): string {
 }
 
 function ciLabel(pr: DashboardPR): string {
-  return pr.ciStatus === 'none' ? 'CI pending' : `CI ${pr.ciStatus}`
+  if (pr.ciStatus === 'none') return 'no checks'
+  return `CI ${pr.ciStatus}`
 }
 
-function reReviewSubline(pr: DashboardPR): string {
-  const reviewers = pr.reviewerCount > 1 ? ` · you are 1 of ${pr.reviewerCount} reviewers` : ''
-  return `${pr.commitsSinceMyReview} commits since your review${reviewers}`
+function ciPart(pr: DashboardPR): MetaPart | null {
+  if (pr.ciStatus === 'passing') return null
+  return { text: ciLabel(pr), tone: pr.ciStatus === 'failing' ? 'danger' : undefined }
 }
 
-function requestedSubline(pr: DashboardPR): string {
-  const reviewers = pr.reviewerCount > 1 ? ` · you are 1 of ${pr.reviewerCount} reviewers` : ''
-  return `${ciLabel(pr)} · opened ${daysAgo(pr.createdAt)}${reviewers}`
+function reviewerPart(pr: DashboardPR): MetaPart | null {
+  return pr.reviewerCount > 1 ? { text: `you are 1 of ${pr.reviewerCount} reviewers` } : null
 }
 
-function mineSubline(pr: DashboardPR): string {
-  if (pr.reviewDecision === 'changes-requested') {
-    return `Changes requested · ${pr.unresolvedThreads} unresolved thread${pr.unresolvedThreads === 1 ? '' : 's'}`
-  }
-  if (pr.reviewDecision === 'approved') {
-    return 'Approved · ready to merge'
-  }
-  return `${ciLabel(pr)} · opened ${daysAgo(pr.createdAt)}`
+function riskPart(pr: DashboardPR): MetaPart | null {
+  return pr.riskLevel === 'high' ? { text: 'High risk', tone: 'danger' } : null
 }
 
-function involvedSubline(pr: DashboardPR): string {
-  return `${ciLabel(pr)} · opened ${daysAgo(pr.createdAt)}`
-}
-
-function riskChip(pr: DashboardPR): { text: string; cls: string } {
-  if (pr.riskLevel === 'high') return { text: 'High risk', cls: 'rd-hi' }
-  if (pr.riskLevel === 'medium') return { text: 'Medium risk', cls: 'rd-md' }
-  return { text: 'Low risk', cls: 'rd-lo' }
-}
-
-function blockerChip(pr: DashboardPR): { text: string; cls: string } {
-  if (pr.reviewDecision === 'changes-requested') return { text: 'Changes asked', cls: 'rd-md' }
-  if (pr.ciStatus === 'failing') return { text: 'CI failing', cls: 'rd-hi' }
-  if (pr.reviewDecision === 'approved') return { text: 'Approved', cls: 'rd-lo' }
-  return { text: 'Waiting', cls: '' }
+/** Where the review stands, in words; only the non-neutral ones are coloured. */
+function reviewWord(pr: DashboardPR): MetaPart {
+  if (pr.reviewDecision === 'changes-requested')
+    return { text: 'changes requested', tone: 'warning' }
+  if (pr.reviewDecision === 'approved') return { text: 'approved', tone: 'success' }
+  return { text: 'waiting for review' }
 }
 
 function repoName(repo: string): string {
   return repo.split('/').pop() ?? repo
 }
 
-function withClonedNote(subline: string, pr: DashboardPR): string {
-  return pr.localRepoRoot ? subline : `${subline} · Not cloned · diff only`
-}
-
 interface RowConfig {
   pr: DashboardPR
-  subline: string
-  chip: { text: string; cls: string }
-  estimate: string
+  parts: (MetaPart | null)[]
   buttonLabel: string
   primary: boolean
 }
@@ -172,47 +131,77 @@ interface CloneState {
 
 function Row({
   cfg,
+  showRepo,
   onOpen,
   cloneFolder,
   cloneState,
   onClone,
 }: {
   cfg: RowConfig
+  showRepo: boolean
   onOpen: (pr: DashboardPR) => void
   cloneFolder: string
   cloneState?: CloneState
   onClone: (pr: DashboardPR) => void
 }): JSX.Element {
-  const { pr, subline, chip, estimate, buttonLabel, primary } = cfg
+  const { pr, parts, buttonLabel, primary } = cfg
   const handle = () => onOpen(pr)
   const showClone = !pr.localRepoRoot && !!cloneFolder
+  const hasSession = pr.sessionStatus !== 'not-started'
+  const label = pr.sessionStatus === 'paused' ? 'Resume' : hasSession ? 'Continue' : buttonLabel
+  const lead: MetaPart[] = showRepo ? [{ text: repoName(pr.repo) }] : []
+  const sessionPart: MetaPart[] = hasSession
+    ? [{ text: `${pr.viewedFileCount} of ${pr.fileCount} viewed` }]
+    : []
   return (
     <div
-      className="rd-row"
+      className="rd-row rd-row--clickable"
       tabIndex={0}
       data-testid={`row-${pr.number}`}
+      onClick={handle}
       onKeyDown={(e) => {
         if (e.key === 'Enter') handle()
       }}
     >
-      <span className="rd-chip rd-repo">{repoName(pr.repo)}</span>
       <span className="rd-ti">
-        #{pr.number} {pr.title}
-        <small>{subline}</small>
+        <span className="rd-t1">
+          <span className="rd-no">#{pr.number}</span> <span>{pr.title}</span>
+        </span>
+        <RowMeta
+          parts={[
+            ...lead,
+            { text: pr.author },
+            { text: shortAge(pr.createdAt) },
+            ...parts,
+            ...sessionPart,
+            !pr.localRepoRoot && { text: 'Not cloned · diff only' },
+          ]}
+        />
       </span>
-      <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
-      <span>{chip.text && <span className={`rd-chip ${chip.cls}`}>{chip.text}</span>}</span>
-      <span className="rd-num">{estimate}</span>
+      <span className="rd-side">
+        <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
+        <span className="rd-num">~{pr.estimatedMinutes} min</span>
+      </span>
       <span className="rd-actions">
-        <button type="button" className={primary ? 'rd-btn rd-pri' : 'rd-btn'} onClick={handle}>
-          {buttonLabel}
+        <button
+          type="button"
+          className={hasSession ? 'rd-btn rd-pri rd-always' : primary ? 'rd-btn rd-pri' : 'rd-btn'}
+          onClick={(e) => {
+            e.stopPropagation()
+            handle()
+          }}
+        >
+          {label}
         </button>
         {showClone && (
           <button
             type="button"
             className="rd-btn"
             disabled={cloneState?.status === 'cloning'}
-            onClick={() => onClone(pr)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClone(pr)
+            }}
           >
             {cloneState?.status === 'cloning' ? 'Cloning…' : 'Clone and review'}
           </button>
@@ -229,34 +218,38 @@ function toNeedsRow(pr: DashboardPR): RowConfig {
   const isReReview = pr.section === 're-review'
   return {
     pr,
-    subline: withClonedNote(isReReview ? reReviewSubline(pr) : requestedSubline(pr), pr),
-    chip: riskChip(pr),
-    estimate: `~${pr.estimatedMinutes} min`,
+    parts: [
+      isReReview
+        ? {
+            text: `${pr.commitsSinceMyReview} commits since your review`,
+          }
+        : null,
+      reviewerPart(pr),
+      riskPart(pr),
+      ciPart(pr),
+    ],
     buttonLabel: isReReview ? 'Re-review' : 'Review',
     primary: isReReview,
   }
 }
 
 function toMineRow(pr: DashboardPR): RowConfig {
+  const threads =
+    pr.reviewDecision === 'changes-requested'
+      ? {
+          text: `${pr.unresolvedThreads} unresolved thread${pr.unresolvedThreads === 1 ? '' : 's'}`,
+        }
+      : null
   return {
     pr,
-    subline: withClonedNote(mineSubline(pr), pr),
-    chip: blockerChip(pr),
-    estimate: ciLabel(pr),
+    parts: [reviewWord(pr), threads, ciPart(pr)],
     buttonLabel: 'Open',
     primary: false,
   }
 }
 
 function toInvolvedRow(pr: DashboardPR): RowConfig {
-  return {
-    pr,
-    subline: withClonedNote(involvedSubline(pr), pr),
-    chip: riskChip(pr),
-    estimate: `~${pr.estimatedMinutes} min`,
-    buttonLabel: 'Open',
-    primary: false,
-  }
+  return { pr, parts: [riskPart(pr), ciPart(pr)], buttonLabel: 'Open', primary: false }
 }
 
 export function ReviewDashboard(): JSX.Element {
@@ -271,6 +264,8 @@ export function ReviewDashboard(): JSX.Element {
   const [selectedRepos, setSelectedRepos] = useState<string[]>([])
   const [scopedTo, setScopedTo] = useState(0)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [capped, setCapped] = useState<string[]>([])
+  const { dashboardSort, setDashboardSort } = useReviewUiStore()
   const [cloneStatus, setCloneStatus] = useState<Record<number, CloneState>>({})
   const lastFetchRef = useRef<number>(0)
 
@@ -288,6 +283,7 @@ export function ReviewDashboard(): JSX.Element {
         setPrs(result.prs)
         setFailed(result.failed ?? [])
         setScopedTo(result.scopedTo ?? 0)
+        setCapped(result.capped ?? [])
         setFetchedAt(new Date(result.fetchedAt))
       }
     } catch (err) {
@@ -361,18 +357,55 @@ export function ReviewDashboard(): JSX.Element {
     }
   }
 
-  const reReview = sortByCloseness(prs.filter((p) => p.section === 're-review'))
-  const requested = sortByCloseness(prs.filter((p) => p.section === 'requested'))
-  const team = sortByCloseness(prs.filter((p) => p.section === 'team'))
-  const mine = sortByOldest(prs.filter((p) => p.section === 'mine'))
-  const involved = sortByOldest(prs.filter((p) => p.section === 'involved'))
+  const sortSection = (section: DashboardPR['section']) =>
+    sortPrs(
+      prs.filter((p) => p.section === section),
+      dashboardSort,
+      dashboardToSortable
+    )
+  const reReview = sortSection('re-review')
+  const requested = sortSection('requested')
+  const team = sortSection('team')
+  const mine = sortSection('mine')
+  const involved = sortSection('involved')
 
   const needsYou = [...requested, ...reReview, ...team]
-  const needsYouCount = needsYou.length
-  const mineCount = mine.length
-  const involvedCount = involved.length
   const highRiskCount = needsYou.filter((p) => p.riskLevel === 'high').length
   const totalMinutes = needsYou.reduce((s, p) => s + p.estimatedMinutes, 0)
+  const showRepo = new Set(prs.map((p) => p.repo)).size > 1
+  const count = (rows: DashboardPR[], ...sections: DashboardPR['section'][]) =>
+    sections.some((section) => capped.includes(section)) ? CAPPED_COUNT : String(rows.length)
+  const needsYouCount = count(needsYou, 'requested', 're-review', 'team')
+  const mineCount = count(mine, 'mine')
+  const involvedCount = count(involved, 'involved')
+
+  const renderSection = (
+    title: string,
+    rows: DashboardPR[],
+    toRow: (pr: DashboardPR) => RowConfig,
+    ...sections: DashboardPR['section'][]
+  ) =>
+    rows.length > 0 && (
+      <section className="rd-sec">
+        <div className="rd-grp">
+          <span>{title}</span>
+          <span className="rd-ct">{count(rows, ...sections)}</span>
+        </div>
+        <div className="rd-rows">
+          {rows.map((pr) => (
+            <Row
+              key={`${pr.repo}#${pr.number}`}
+              cfg={toRow(pr)}
+              showRepo={showRepo}
+              onOpen={handleOpen}
+              cloneFolder={cloneFolder}
+              cloneState={cloneStatus[pr.number]}
+              onClone={handleClone}
+            />
+          ))}
+        </div>
+      </section>
+    )
 
   const scopeCount = selectedRepos.length || scopedTo
   const scopeLabel = scopeCount > 0 ? `${scopeCount} repositories` : 'All repositories'
@@ -399,7 +432,6 @@ export function ReviewDashboard(): JSX.Element {
     <div className="rd-app">
       <div className="rd-bar">
         <span className="rd-t">Reviews</span>
-        <span className="rd-chip">{needsYouCount} need you</span>
         <span className="rd-sp" />
         <span className="rd-note">{updatedText}</span>
         <button
@@ -422,28 +454,32 @@ export function ReviewDashboard(): JSX.Element {
           onSaved={handleSaved}
         />
       )}
-      <div className="rd-tabs" role="tablist" aria-label="Dashboard sections">
-        <button
-          role="tab"
-          aria-selected={activeTab === 'needs'}
-          onClick={() => setActiveTab('needs')}
-        >
-          Needs you<span className="rd-ct">{needsYouCount}</span>
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === 'mine'}
-          onClick={() => setActiveTab('mine')}
-        >
-          My PRs<span className="rd-ct">{mineCount}</span>
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === 'involved'}
-          onClick={() => setActiveTab('involved')}
-        >
-          Involved<span className="rd-ct">{involvedCount}</span>
-        </button>
+      <div className="rd-tabs">
+        <div className="rd-tablist" role="tablist" aria-label="Dashboard sections">
+          <button
+            role="tab"
+            aria-selected={activeTab === 'needs'}
+            onClick={() => setActiveTab('needs')}
+          >
+            Needs you<span className="rd-ct">{needsYouCount}</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'mine'}
+            onClick={() => setActiveTab('mine')}
+          >
+            My PRs<span className="rd-ct">{mineCount}</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'involved'}
+            onClick={() => setActiveTab('involved')}
+          >
+            Involved<span className="rd-ct">{involvedCount}</span>
+          </button>
+        </div>
+        <span className="rd-sp" />
+        <SortSelect value={dashboardSort} onChange={setDashboardSort} />
       </div>
 
       {loading && <div className="rd-note rd-loading">Loading reviews…</div>}
@@ -476,109 +512,30 @@ export function ReviewDashboard(): JSX.Element {
             <b>{needsYouCount} need you</b>
             <span>{highRiskCount} high risk</span>
             <span>About {formatMinutes(totalMinutes)} of reading</span>
-            <span className="rd-sp" />
-            <span className="rd-note">Sorted by closest to merging</span>
           </div>
-          {needsYouCount === 0 && <div className="rd-empty">Nothing needs you</div>}
-          {requested.length > 0 && (
-            <>
-              <div className="rd-grp">REQUESTED OF YOU</div>
-              <div className="rd-rows">
-                {requested.map((pr) => (
-                  <Row
-                    key={pr.number}
-                    cfg={toNeedsRow(pr)}
-                    onOpen={handleOpen}
-                    cloneFolder={cloneFolder}
-                    cloneState={cloneStatus[pr.number]}
-                    onClone={handleClone}
-                  />
-                ))}
-              </div>
-            </>
+          {needsYou.length === 0 && <div className="rd-empty">Nothing needs you</div>}
+          {renderSection('REQUESTED OF YOU', requested, toNeedsRow, 'requested')}
+          {renderSection(
+            'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED',
+            reReview,
+            toNeedsRow,
+            're-review'
           )}
-          {reReview.length > 0 && (
-            <>
-              <div className="rd-grp">{'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED'}</div>
-              <div className="rd-rows">
-                {reReview.map((pr) => (
-                  <Row
-                    key={pr.number}
-                    cfg={toNeedsRow(pr)}
-                    onOpen={handleOpen}
-                    cloneFolder={cloneFolder}
-                    cloneState={cloneStatus[pr.number]}
-                    onClone={handleClone}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-          {team.length > 0 && (
-            <>
-              <div className="rd-grp">REQUESTED OF YOUR TEAM</div>
-              <div className="rd-rows">
-                {team.map((pr) => (
-                  <Row
-                    key={pr.number}
-                    cfg={toNeedsRow(pr)}
-                    onOpen={handleOpen}
-                    cloneFolder={cloneFolder}
-                    cloneState={cloneStatus[pr.number]}
-                    onClone={handleClone}
-                  />
-                ))}
-              </div>
-            </>
-          )}
+          {renderSection('REQUESTED OF YOUR TEAM', team, toNeedsRow, 'team')}
         </div>
       )}
 
       {!loading && !error && activeTab === 'mine' && (
         <div role="tabpanel">
-          {mineCount === 0 ? (
-            <div className="rd-empty">Nothing needs you</div>
-          ) : (
-            <>
-              <div className="rd-grp">YOUR OPEN PRS</div>
-              <div className="rd-rows">
-                {mine.map((pr) => (
-                  <Row
-                    key={pr.number}
-                    cfg={toMineRow(pr)}
-                    onOpen={handleOpen}
-                    cloneFolder={cloneFolder}
-                    cloneState={cloneStatus[pr.number]}
-                    onClone={handleClone}
-                  />
-                ))}
-              </div>
-            </>
-          )}
+          {mine.length === 0 && <div className="rd-empty">Nothing needs you</div>}
+          {renderSection('YOUR OPEN PRS', mine, toMineRow, 'mine')}
         </div>
       )}
 
       {!loading && !error && activeTab === 'involved' && (
         <div role="tabpanel">
-          {involvedCount === 0 ? (
-            <div className="rd-empty">Nothing needs you</div>
-          ) : (
-            <>
-              <div className="rd-grp">MENTIONED, ASSIGNED OR COMMENTED</div>
-              <div className="rd-rows">
-                {involved.map((pr) => (
-                  <Row
-                    key={pr.number}
-                    cfg={toInvolvedRow(pr)}
-                    onOpen={handleOpen}
-                    cloneFolder={cloneFolder}
-                    cloneState={cloneStatus[pr.number]}
-                    onClone={handleClone}
-                  />
-                ))}
-              </div>
-            </>
-          )}
+          {involved.length === 0 && <div className="rd-empty">Nothing needs you</div>}
+          {renderSection('MENTIONED, ASSIGNED OR COMMENTED', involved, toInvolvedRow, 'involved')}
         </div>
       )}
     </div>

@@ -36,6 +36,7 @@ export const IMPACT_MAP = [
       'git-sidebar.spec.ts',
       'git-integration-smoke.spec.ts',
       'git-integration-contrast.spec.ts',
+      'git-integration-stacking.spec.ts',
       'merge-flow.spec.ts',
       ...EXTENSION_TRIO,
     ],

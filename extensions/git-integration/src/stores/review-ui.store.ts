@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { SortMode } from '../review/sort-prs'
 import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
 
 export type AgentRequest = 'review' | 'explain' | 'ask'
@@ -46,6 +47,8 @@ interface Prefs {
   fileListHidden: boolean
   diffViewMode: DiffViewMode
   hideFormattingHunks: boolean
+  queueSort: SortMode
+  dashboardSort: SortMode
 }
 
 const DEFAULT_PREFS: Prefs = {
@@ -55,6 +58,8 @@ const DEFAULT_PREFS: Prefs = {
   fileListHidden: false,
   diffViewMode: 'unified',
   hideFormattingHunks: true,
+  queueSort: 'oldest',
+  dashboardSort: 'oldest',
 }
 
 function loadPrefs(): Prefs {
@@ -94,6 +99,8 @@ interface ReviewUiStore extends Prefs {
   toggleFileList(): void
   setDiffViewMode(mode: DiffViewMode): void
   setHideFormattingHunks(on: boolean): void
+  setQueueSort(mode: SortMode): void
+  setDashboardSort(mode: SortMode): void
   setSelection(s: LineSelection | null): void
   requestComposer(r: ComposerRequest | null): void
   setAgentRuns(runs: AgentRun[]): void
@@ -117,6 +124,8 @@ export const useReviewUiStore = create<ReviewUiStore>((set, get) => {
       fileListHidden: s.fileListHidden,
       diffViewMode: s.diffViewMode,
       hideFormattingHunks: s.hideFormattingHunks,
+      queueSort: s.queueSort,
+      dashboardSort: s.dashboardSort,
     })
   }
   return {
@@ -140,6 +149,8 @@ export const useReviewUiStore = create<ReviewUiStore>((set, get) => {
     toggleFileList: () => persist({ fileListHidden: !get().fileListHidden }),
     setDiffViewMode: (mode) => persist({ diffViewMode: mode }),
     setHideFormattingHunks: (on) => persist({ hideFormattingHunks: on }),
+    setQueueSort: (mode) => persist({ queueSort: mode }),
+    setDashboardSort: (mode) => persist({ dashboardSort: mode }),
     setSelection: (s) => set({ selection: s }),
     requestComposer: (r) => set({ composerRequest: r }),
     setAgentRuns: (runs) => set({ agentRuns: runs }),

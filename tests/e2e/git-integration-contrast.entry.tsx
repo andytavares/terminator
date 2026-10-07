@@ -8,6 +8,8 @@ import { createRoot } from 'react-dom/client'
 import { FullFileList } from '../../extensions/git-integration/src/components/pr-review/FullFileList'
 import { ChapterNav } from '../../extensions/git-integration/src/components/pr-review/ChapterNav'
 import { ReviewDashboard } from '../../extensions/git-integration/src/components/pr-review/ReviewDashboard'
+import { ReviewFooter } from '../../extensions/git-integration/src/components/pr-review/ReviewFooter'
+import { ReviewQueue } from '../../extensions/git-integration/src/components/pr-review/ReviewQueue'
 import { RepoPicker } from '../../extensions/git-integration/src/components/pr-review/RepoPicker'
 import { GitFullView } from '../../extensions/git-integration/src/components/GitFullView'
 import { MergeFlowView } from '../../extensions/git-integration/src/components/merge-flow/MergeFlowView'
@@ -323,7 +325,61 @@ function GitView(): JSX.Element {
   )
 }
 
+function PausedQueue(): JSX.Element {
+  usePrReviewStore.setState({
+    prQueue: [
+      {
+        number: 301,
+        title: 'Resume the session wall review',
+        author: 'octocat',
+        authorAvatarUrl: '',
+        openedAt: ago(1),
+        headRefName: 'feat/wall',
+        baseRefName: 'main',
+        isDraft: false,
+        ciStatus: 'passing',
+        fileCount: 9,
+        additions: 120,
+        deletions: 40,
+        estimatedMinutes: 18,
+        riskLevel: 'medium',
+        signalDots: {},
+        sessionStatus: 'paused',
+        viewedFileCount: 3,
+        approvalCount: 0,
+        approvedBy: [],
+        requestedReviewers: [],
+        assigneeLogins: [],
+        mergeStateStatus: 'clean',
+      } as never,
+    ],
+  })
+  return (
+    <div style={{ height: 400, width: 1100, display: 'flex' }}>
+      <ReviewQueue
+        repoRoot={REPO}
+        onOpenPr={() => {}}
+        onRefresh={() => Promise.resolve()}
+        onDismissPr={() => Promise.resolve()}
+      />
+    </div>
+  )
+}
+
 const surfaces: Record<string, () => JSX.Element> = {
+  'review-footer': () => (
+    <ReviewFooter
+      drafts={[]}
+      isLastFile
+      isLastChapter
+      onPause={() => {}}
+      onPrevFile={() => {}}
+      onMarkViewed={() => {}}
+      onFinishChapter={() => {}}
+      onOpenSubmit={() => {}}
+    />
+  ),
+  'review-queue': PausedQueue,
   'pr-rail': PrRail,
   'git-view': GitView,
   'merge-flow': () => (

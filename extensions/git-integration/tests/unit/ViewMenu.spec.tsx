@@ -62,10 +62,13 @@ describe('ViewMenu', () => {
     expect(screen.getByRole('button', { name: 'View (changed)' })).toBeTruthy()
   })
 
-  it('shows "Comments hidden" text when commentVisibility is hidden', () => {
+  it('says comments are hidden in the button name, not as separate text', () => {
     useReviewUiStore.getState().setCommentVisibility('hidden')
-    render(<ViewMenu />)
-    expect(screen.getByText('Comments hidden')).toBeTruthy()
+    const { container } = render(<ViewMenu />)
+    expect(screen.queryByText('Comments hidden')).toBeNull()
+    const button = screen.getByRole('button', { name: 'View · comments hidden' })
+    expect(button.getAttribute('title')).toBe('View · comments hidden')
+    expect(container.querySelector('.vm-dot')).toBeTruthy()
   })
 
   it('toggles agent notes off via the Off button', async () => {

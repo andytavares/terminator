@@ -28,13 +28,6 @@ interface Props {
   onStartMergeFlow?: (worktreePath: string) => void
 }
 
-const CI_LABEL: Record<PrReviewDetail['ciStatus'], string> = {
-  passing: 'Passing',
-  failing: 'Failing',
-  pending: 'Pending',
-  none: 'No CI',
-}
-
 export function PrOverviewPanel({
   repoRoot,
   pr,
@@ -72,29 +65,20 @@ export function PrOverviewPanel({
     loadIssueComments(pr.number)
   }, [loadIssueComments, pr.number])
 
-  const allFiles = pr.chapters.flatMap((c) => c.files)
-  const totalFiles = allFiles.length
-  const totalAdditions = allFiles.reduce((s, f) => s + f.additions, 0)
-  const totalDeletions = allFiles.reduce((s, f) => s + f.deletions, 0)
-  const totalMinutes = pr.chapters.reduce((s, c) => s + c.estimatedMinutes, 0)
-
-  const highFiles = allFiles.filter((f) => f.riskScore.level === 'high')
-  const medFiles = allFiles.filter((f) => f.riskScore.level === 'medium')
-  const lowFiles = allFiles.filter((f) => f.riskScore.level === 'low')
-
-  const hotspots = [...allFiles]
-    .filter((f) => f.riskScore.composite != null && f.riskScore.level !== 'low')
-    .sort((a, b) => (b.riskScore.composite ?? 0) - (a.riskScore.composite ?? 0))
-    .slice(0, 6)
-
+  const totalFiles = pr.chapters.reduce((n, c) => n + c.files.length, 0)
   const viewedCount = viewedFiles.size
-  const reviewPct = totalFiles > 0 ? Math.round((viewedCount / totalFiles) * 100) : 0
   const isResume = sessionStatus === 'in-progress' || sessionStatus === 'paused'
+  const [discussionOpen, setDiscussionOpen] = useState(false)
   const [issueRefsExpanded, setIssueRefsExpanded] = useState(true)
 
   const age = formatAge(pr.openedAt)
+  const youAreRequested =
+    !!currentUserLogin &&
+    (pr.requestedReviewers?.includes(currentUserLogin) ||
+      pr.assigneeLogins?.includes(currentUserLogin))
   const startLabel =
-    sessionStatus === 'paused' ? 'Resume Review' : isResume ? 'Continue Review' : 'Start Review'
+    (sessionStatus === 'paused' ? 'Resume Review' : isResume ? 'Continue Review' : 'Start Review') +
+    (isResume && totalFiles > 0 ? ` · ${viewedCount} of ${totalFiles} viewed` : '')
 
   const handleMarkReady = async () => {
     setMarkingReady(true)
@@ -220,165 +204,55 @@ export function PrOverviewPanel({
         </div>
       </div>
 
-      <div className="pr-overview-meta">
-        <span className="pr-overview-meta-author">{pr.author}</span>
-        <span className="pr-overview-meta-sep">·</span>
-        <span>{age}</span>
-        <span className="pr-overview-meta-sep">·</span>
-        <span className="pr-overview-meta-branch">
-          {pr.headRefName} → {pr.baseRefName}
-        </span>
-        {currentUserLogin &&
-          (pr.requestedReviewers?.includes(currentUserLogin) ||
-            pr.assigneeLogins?.includes(currentUserLogin)) && (
-            <span
-              className="pr-overview-your-review-badge"
-              title="You have been requested to review this PR"
-            >
-              <Eye aria-hidden="true" />
-              Your review requested
-            </span>
-          )}
-        {pr.mergeStateStatus === 'behind' && (
-          <span className="pr-merge-state-badge pr-merge-state-badge--behind">
-            <ArrowDown aria-hidden="true" /> Behind {pr.baseRefName}
-          </span>
-        )}
-        {pr.mergeStateStatus === 'dirty' && (
-          <span className="pr-merge-state-badge pr-merge-state-badge--dirty">
-            <TriangleAlert aria-hidden="true" /> Conflicts
-          </span>
-        )}
-      </div>
-
-      <StatusChecksBar checks={pr.statusChecks ?? []} defaultExpanded={true} />
-
-      {((pr.approvals && pr.approvals.length > 0) ||
-        (pr.requestedReviewers && pr.requestedReviewers.length > 0)) && (
-        <div className="pr-overview-approvals-bar">
-          {pr.approvals && pr.approvals.length > 0 && (
-            <>
-              <span className="pr-overview-approvals-label">Approved by</span>
-              {pr.approvals.map((approval) => (
-                <span
-                  key={approval.author}
-                  className="pr-overview-approver"
-                  title={approval.author}
-                >
-                  <img
-                    src={approval.authorAvatarUrl}
-                    alt={approval.author}
-                    className="pr-overview-approver-avatar"
-                    width={16}
-                    height={16}
-                  />
-                  <span className="pr-overview-approver-name">{approval.author}</span>
-                </span>
-              ))}
-            </>
-          )}
-          {pr.requestedReviewers && pr.requestedReviewers.length > 0 && (
-            <>
-              <span className="pr-overview-approvals-label pr-overview-approvals-label--pending">
-                {pr.approvals && pr.approvals.length > 0 ? 'Awaiting' : 'Review requested from'}
-              </span>
-              {pr.requestedReviewers.map((reviewer) => (
-                <span
-                  key={reviewer}
-                  className="pr-overview-approver pr-overview-approver--pending"
-                  title={reviewer}
-                >
-                  <span className="pr-overview-approver-name">{reviewer}</span>
-                </span>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-
       <div className="pr-overview-body-scroll">
-        <InsightsPanel pr={pr} />
-
-        {/* Metrics row */}
-        <div className="pr-overview-metrics">
-          <div className="pr-overview-metric">
-            <span className="pr-overview-metric-value">{totalFiles}</span>
-            <span className="pr-overview-metric-label">Files</span>
-          </div>
-          <div className="pr-overview-metric">
-            <span className="pr-overview-metric-value pr-overview-metric-value--add">
-              +{totalAdditions}
-            </span>
-            <span className="pr-overview-metric-label">Additions</span>
-          </div>
-          <div className="pr-overview-metric">
-            <span className="pr-overview-metric-value pr-overview-metric-value--del">
-              −{totalDeletions}
-            </span>
-            <span className="pr-overview-metric-label">Deletions</span>
-          </div>
-          <div className="pr-overview-metric">
-            <span className="pr-overview-metric-value">{totalMinutes}m</span>
-            <span className="pr-overview-metric-label">Est. time</span>
-          </div>
-          <div className="pr-overview-metric">
-            <span className={`pr-overview-metric-value pr-overview-ci--${pr.ciStatus}`}>
-              {CI_LABEL[pr.ciStatus]}
-            </span>
-            <span className="pr-overview-metric-label">CI</span>
-          </div>
-        </div>
-
-        {/* Risk distribution */}
-        <div className="pr-overview-risk-row">
-          <div className="pr-overview-risk-dist">
-            <span className="pr-risk-chip pr-risk-chip--high">{highFiles.length} high</span>
-            <span className="pr-risk-chip pr-risk-chip--medium">{medFiles.length} med</span>
-            <span className="pr-risk-chip pr-risk-chip--low">{lowFiles.length} low</span>
-          </div>
-          {isResume && totalFiles > 0 && (
-            <div className="pr-overview-progress-inline">
-              <span className="pr-overview-progress-label">
-                {viewedCount}/{totalFiles} reviewed
+        <section className="pr-overview-block pr-overview-status" aria-label="Status">
+          <StatusChecksBar checks={pr.statusChecks ?? []} detailed />
+          <div className="pr-overview-meta">
+            {pr.approvals && pr.approvals.length > 0 && (
+              <span className="pr-overview-approvals-label">
+                Approved by {pr.approvals.map((a) => a.author).join(', ')}
               </span>
-              <div className="pr-overview-progress-track">
-                <div className="pr-overview-progress-fill" style={{ width: `${reviewPct}%` }} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Hotspots */}
-        {hotspots.length > 0 && (
-          <div className="pr-overview-section">
-            <h3 className="pr-overview-section-title">Hotspots — focus here first</h3>
-            <ul className="pr-overview-hotspot-list">
-              {hotspots.map((f) => (
-                <li
-                  key={f.path}
-                  className={`pr-overview-hotspot-item pr-overview-hotspot-item--${f.riskScore.level}`}
-                >
-                  <span className={`pr-risk-chip pr-risk-chip--${f.riskScore.level}`}>
-                    {f.riskScore.level === 'high' ? 'High' : 'Medium'}
-                  </span>
-                  <span className="pr-overview-hotspot-path" title={f.path}>
-                    {formatShortPath(f.path)}
-                  </span>
-                  <span className="pr-overview-hotspot-score">
-                    {f.riskScore.composite ?? '?'}/100
-                  </span>
-                  <span className="pr-overview-hotspot-driver" title={f.riskScore.dominantDriver}>
-                    {f.riskScore.dominantDriver}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            )}
+            {pr.requestedReviewers && pr.requestedReviewers.length > 0 && (
+              <span className="pr-overview-approvals-label pr-overview-approvals-label--pending">
+                {pr.approvals && pr.approvals.length > 0 ? 'Awaiting' : 'Review requested from'}{' '}
+                {pr.requestedReviewers.join(', ')}
+              </span>
+            )}
+            {youAreRequested && (
+              <span
+                className="pr-overview-your-review-badge"
+                title="You have been requested to review this PR"
+              >
+                <Eye aria-hidden="true" />
+                Your review requested
+              </span>
+            )}
+            <span className="pr-overview-meta-author">{pr.author}</span>
+            <span className="pr-overview-meta-branch">
+              {pr.headRefName} → {pr.baseRefName}
+            </span>
+            <span>{age}</span>
+            {pr.mergeStateStatus === 'behind' && (
+              <span className="pr-merge-state-badge pr-merge-state-badge--behind">
+                <ArrowDown aria-hidden="true" /> Behind {pr.baseRefName}
+              </span>
+            )}
+            {pr.mergeStateStatus === 'dirty' && (
+              <span className="pr-merge-state-badge pr-merge-state-badge--dirty">
+                <TriangleAlert aria-hidden="true" /> Conflicts
+              </span>
+            )}
           </div>
-        )}
+        </section>
+
+        <section className="pr-overview-block">
+          <InsightsPanel pr={pr} />
+        </section>
 
         {/* Issue context */}
         {pr.issueRefs && pr.issueRefs.length > 0 && (
-          <div className="pr-overview-section">
+          <div className="pr-overview-block">
             <h3
               className="pr-overview-section-title pr-overview-section-title--collapsible"
               onClick={() => setIssueRefsExpanded((v) => !v)}
@@ -429,26 +303,34 @@ export function PrOverviewPanel({
 
         {/* PR description */}
         {pr.body ? (
-          <div className="pr-overview-section">
+          <div className="pr-overview-block">
             <h3 className="pr-overview-section-title">Description</h3>
             <div className="pr-overview-description">
               <RichContent>{pr.body}</RichContent>
             </div>
           </div>
         ) : (
-          <div className="pr-overview-section pr-overview-no-desc">No description provided.</div>
+          <div className="pr-overview-block pr-overview-no-desc">No description provided.</div>
         )}
 
         {/* Discussion */}
-        <div className="pr-overview-section">
-          <h3 className="pr-overview-section-title">
-            Discussion
-            {issueComments.length > 0 && (
-              <span className="pr-overview-comment-count"> · {issueComments.length}</span>
-            )}
-          </h3>
+        <div className="pr-overview-block">
+          <button
+            className="pr-overview-section-title pr-overview-discussion-toggle"
+            onClick={() => setDiscussionOpen((v) => !v)}
+            aria-expanded={discussionOpen}
+          >
+            Discussion · {issueComments.length}
+            <span className="pr-overview-section-toggle">
+              {discussionOpen ? (
+                <ChevronDown aria-hidden="true" />
+              ) : (
+                <ChevronRight aria-hidden="true" />
+              )}
+            </span>
+          </button>
 
-          {issueComments.length > 0 && (
+          {discussionOpen && issueComments.length > 0 && (
             <div className="pr-issue-comment-list">
               {issueComments.map((comment) => (
                 <IssueCommentItem key={comment.id} comment={comment} onReply={handleReply} />
@@ -456,57 +338,59 @@ export function PrOverviewPanel({
             </div>
           )}
 
-          <div className="comment-composer pr-issue-composer">
-            <div className="comment-composer-tabs">
-              <button
-                className={`comment-composer-tab${commentTab === 'write' ? ' comment-composer-tab--active' : ''}`}
-                onClick={() => setCommentTab('write')}
-              >
-                Write
-              </button>
-              <button
-                className={`comment-composer-tab${commentTab === 'preview' ? ' comment-composer-tab--active' : ''}`}
-                onClick={() => setCommentTab('preview')}
-              >
-                Preview
-              </button>
-            </div>
-
-            {commentTab === 'write' ? (
-              <textarea
-                ref={composerRef}
-                className="comment-composer-textarea"
-                value={commentBody}
-                onChange={(e) => setCommentBody(e.target.value)}
-                placeholder="Leave a comment…"
-                rows={4}
-                disabled={submitting}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
-                }}
-              />
-            ) : (
-              <div className="comment-composer-preview">
-                {commentBody.trim() ? (
-                  <RichContent>{commentBody}</RichContent>
-                ) : (
-                  <em>Nothing to preview.</em>
-                )}
+          {discussionOpen && (
+            <div className="comment-composer pr-issue-composer">
+              <div className="comment-composer-tabs">
+                <button
+                  className={`comment-composer-tab${commentTab === 'write' ? ' comment-composer-tab--active' : ''}`}
+                  onClick={() => setCommentTab('write')}
+                >
+                  Write
+                </button>
+                <button
+                  className={`comment-composer-tab${commentTab === 'preview' ? ' comment-composer-tab--active' : ''}`}
+                  onClick={() => setCommentTab('preview')}
+                >
+                  Preview
+                </button>
               </div>
-            )}
 
-            {commentError && <p className="comment-composer-error">{commentError}</p>}
-            <div className="comment-composer-actions">
-              <span className="pr-issue-composer-hint">⌘↵ to submit</span>
-              <button
-                className="comment-composer-submit"
-                onClick={handleCommentSubmit}
-                disabled={submitting || !commentBody.trim()}
-              >
-                {submitting ? 'Submitting…' : 'Comment'}
-              </button>
+              {commentTab === 'write' ? (
+                <textarea
+                  ref={composerRef}
+                  className="comment-composer-textarea"
+                  value={commentBody}
+                  onChange={(e) => setCommentBody(e.target.value)}
+                  placeholder="Leave a comment…"
+                  rows={4}
+                  disabled={submitting}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
+                  }}
+                />
+              ) : (
+                <div className="comment-composer-preview">
+                  {commentBody.trim() ? (
+                    <RichContent>{commentBody}</RichContent>
+                  ) : (
+                    <em>Nothing to preview.</em>
+                  )}
+                </div>
+              )}
+
+              {commentError && <p className="comment-composer-error">{commentError}</p>}
+              <div className="comment-composer-actions">
+                <span className="pr-issue-composer-hint">⌘↵ to submit</span>
+                <button
+                  className="comment-composer-submit"
+                  onClick={handleCommentSubmit}
+                  disabled={submitting || !commentBody.trim()}
+                >
+                  {submitting ? 'Submitting…' : 'Comment'}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -616,10 +500,4 @@ function formatCommentTime(iso: string): string {
   } catch {
     return iso
   }
-}
-
-function formatShortPath(path: string): string {
-  const parts = path.split('/')
-  if (parts.length <= 2) return path
-  return `…/${parts.slice(-2).join('/')}`
 }

@@ -135,7 +135,22 @@ export async function runGit(
 }
 
 export const PR_JSON_FIELDS =
-  'number,title,author,createdAt,headRefName,baseRefName,isDraft,mergeStateStatus,statusCheckRollup,files,additions,deletions,reviews,assignees,latestReviews'
+  'number,title,state,author,createdAt,headRefName,baseRefName,isDraft,mergeStateStatus,statusCheckRollup,files,additions,deletions,reviews,assignees,latestReviews'
+
+export type SearchState = 'open' | 'closed' | 'merged' | 'all'
+
+/** Reads an `is:merged|closed|all` qualifier out of a search box; without one only open PRs match. */
+export function stateForSearch(query: string): { state: SearchState; text: string } {
+  let state: SearchState = 'open'
+  const text = query
+    .replace(/(^|\s)is:(merged|closed|all)(?=\s|$)/gi, (_m, _lead, kind: string) => {
+      state = kind.toLowerCase() as SearchState
+      return ' '
+    })
+    .replace(/\s+/g, ' ')
+    .trim()
+  return { state, text }
+}
 
 // ─── Co-change affinity (language-agnostic Signal 3) ─────────────────────────
 

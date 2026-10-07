@@ -84,7 +84,7 @@
 .rc-btn.rc-pri {
   background: var(--tm-accent);
   border-color: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
 .rc-btn.rc-ag {

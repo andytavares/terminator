@@ -336,6 +336,16 @@ describe('queueRiskLevel()', () => {
 // ─── parseReviewQueuePR branches ─────────────────────────────────────────────
 
 describe('parseReviewQueuePR()', () => {
+  it.each([
+    ['OPEN', 'open'],
+    ['MERGED', 'merged'],
+    ['closed', 'closed'],
+    [undefined, 'open'],
+    ['SOMETHING', 'open'],
+  ])('maps state %s to %s', (state, expected) => {
+    expect(parseReviewQueuePR({ number: 1, title: 't', state }).state).toBe(expected)
+  })
+
   it('flags a PR with thousands of lines changed as high risk', () => {
     const raw = {
       number: 100,

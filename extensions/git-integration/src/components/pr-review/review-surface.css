@@ -152,7 +152,7 @@
 .rs-btn--pri {
   background: var(--tm-accent);
   border-color: var(--tm-accent);
-  color: #fff;
+  color: var(--tm-on-accent);
 }
 
 .rs-btn--ag {

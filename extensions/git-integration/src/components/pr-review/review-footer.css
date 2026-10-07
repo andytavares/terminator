@@ -41,7 +41,7 @@
 .rf-btn.rf-pri {
   background: var(--tm-accent);
   border-color: var(--tm-accent);
-  color: var(--tm-bg-elevated);
+  color: var(--tm-on-accent);
 }
 
 .rf-btn.rf-icon {
@@ -57,29 +57,26 @@
 .rf-hint {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   min-width: 0;
   overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
   color: var(--tm-text-muted);
 }
 
-.rf-hint-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.rf-hint:hover {
+  color: var(--tm-text-secondary);
 }
 
 .rf-short {
   display: none;
 }
 
-/* The buttons never wrap; the key hints give way first, then the long label. */
-@container (max-width: 860px) {
-  .rf-hint-group--nav {
-    display: none;
-  }
-}
-
+/* The buttons never wrap; the shortcuts hint gives way first, then the long label. */
 @container (max-width: 520px) {
   .rf-hint {
     display: none;

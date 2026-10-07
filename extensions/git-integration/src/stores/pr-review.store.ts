@@ -26,7 +26,6 @@ interface PrReviewStore {
   /** Open PRs in the repository, not rows loaded. Null until the first load. */
   totalPrCount: number | null
   nextPrCursor: string | undefined
-  includeClosedPrs: boolean
 
   // Active review state
   activePr: PrReviewDetail | null
@@ -73,7 +72,6 @@ interface PrReviewStore {
   setHasMorePrs(hasMore: boolean): void
   setTotalPrCount(total: number | null): void
   setNextPrCursor(cursor: string | undefined): void
-  setIncludeClosedPrs(include: boolean): void
 
   setActivePr(pr: PrReviewDetail | null): void
   setCurrentChapter(chapterId: string | null): void
@@ -229,7 +227,6 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   hasMorePrs: false,
   totalPrCount: null,
   nextPrCursor: undefined,
-  includeClosedPrs: false,
   activePr: null,
   currentChapterId: null,
   currentFilePath: null,
@@ -258,7 +255,6 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   setHasMorePrs: (hasMore) => set({ hasMorePrs: hasMore }),
   setTotalPrCount: (total) => set({ totalPrCount: total }),
   setNextPrCursor: (cursor) => set({ nextPrCursor: cursor }),
-  setIncludeClosedPrs: (include) => set({ includeClosedPrs: include }),
 
   setActivePr: (pr) => set({ activePr: pr }),
   setCurrentChapter: (chapterId) => set({ currentChapterId: chapterId }),

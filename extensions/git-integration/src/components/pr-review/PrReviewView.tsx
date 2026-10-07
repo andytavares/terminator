@@ -464,6 +464,7 @@ export function PrReviewView({
             onMarkViewed={handleMarkViewed}
             onFinishChapter={handleFinishChapter}
             onOpenSubmit={() => setShowSubmit(true)}
+            onOpenShortcuts={() => setKeyboardHelpOpen(true)}
           />
         </main>
 

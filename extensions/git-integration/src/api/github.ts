@@ -6,10 +6,8 @@ const bridge = () => window.electronAPI.extensionBridge
 export const githubAPI = {
   currentUser: (repoRoot: string) => bridge().invoke('github:current-user', { repoRoot }),
 
-  listOpenPrs: (
-    repoRoot: string,
-    options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }
-  ) => bridge().invoke('github:list-open-prs', { repoRoot, ...options }),
+  listOpenPrs: (repoRoot: string, options?: { cursor?: string; search?: string }) =>
+    bridge().invoke('github:list-open-prs', { repoRoot, ...options }),
 
   prReviewDetail: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-review-detail', { repoRoot, prNumber }),

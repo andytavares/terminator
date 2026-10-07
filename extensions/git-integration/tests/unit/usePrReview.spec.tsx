@@ -146,7 +146,6 @@ beforeEach(() => {
     updateFileRiskScores: mockUpdateFileRiskScores,
     updateQueuePrRisk: mockUpdateQueuePrRisk,
     setCurrentUserLogin: mockSetCurrentUserLogin,
-    includeClosedPrs: false,
     activePr: null,
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
@@ -970,7 +969,6 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
     expect(mockListOpenPrs).toHaveBeenCalledWith('/repo', {
       cursor: 'cursor-123',
       search: 'fix bug',
-      includeClosedPrs: false,
     })
   })
 

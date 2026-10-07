@@ -121,32 +121,35 @@ const buildPr = (overrides: Partial<PrReviewDetail> = {}): PrReviewDetail => ({
 })
 
 describe('InsightsPanel', () => {
-  it('renders the header with PR number, overall risk chip and reading estimate', () => {
-    const pr = buildPr()
-    render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('Review brief · #211')).toBeTruthy()
+  it('puts risk, time and size on one header line', () => {
+    render(<InsightsPanel pr={buildPr()} />)
+    expect(screen.getByText('What to look at')).toBeTruthy()
     expect(screen.getByText('High risk')).toBeTruthy()
-    expect(screen.getByText('~18 min')).toBeTruthy()
+    expect(screen.getByText(/about 18 min · 2 files, \+20 −10/)).toBeTruthy()
   })
 
-  it('renders the complexity row with signed value, top-3 functions and meter width', () => {
-    const pr = buildPr()
-    render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('+23 branches')).toBeTruthy()
-    const text = screen.getByText(/Up in 6 functions\. Largest:/)
-    expect(text.textContent).toContain('selectSpecs')
-    expect(text.textContent).toContain('+9')
-    expect(text.textContent).toContain('shardByDuration')
-    expect(text.textContent).toContain('+6')
-    expect(text.textContent).toContain('loadTimings')
-    expect(text.textContent).toContain('+4')
-    expect(text.textContent).not.toContain('readBurnIn')
-    expect(screen.getByText('tree-sitter · base vs head')).toBeTruthy()
+  it('has no per-row bars and no provenance text', () => {
+    const { container } = render(<InsightsPanel pr={buildPr()} />)
+    expect(container.querySelector('.ib-meter')).toBeNull()
+    expect(container.querySelector('.ib-src')).toBeNull()
+    expect(screen.queryByText('tree-sitter · base vs head')).toBeNull()
+  })
 
-    const meter = document.querySelector('.ib-meter i') as HTMLElement
-    expect(meter).toBeTruthy()
-    // min(100, 23 * 100 / 40) = 57.5%
-    expect(meter.style.width).toBe('57.5%')
+  it('carries provenance as the row tooltip', () => {
+    render(<InsightsPanel pr={buildPr()} />)
+    expect(screen.getByTitle('tree-sitter · base vs head')).toBeTruthy()
+    expect(screen.getByTitle('CI check codecov/patch')).toBeTruthy()
+    expect(screen.getByTitle('computeRiskScore · git log, git grep')).toBeTruthy()
+  })
+
+  it('renders the complexity sentence with signed value and top-3 functions', () => {
+    render(<InsightsPanel pr={buildPr()} />)
+    const text = screen.getByText(/\+23 branches\./)
+    expect(text.textContent).toContain('Up in 6 functions. Largest:')
+    expect(text.textContent).toContain('selectSpecs +9')
+    expect(text.textContent).toContain('shardByDuration +6')
+    expect(text.textContent).toContain('loadTimings +4')
+    expect(text.textContent).not.toContain('readBurnIn')
   })
 
   it('renders "No change" when branch delta is zero', () => {
@@ -157,8 +160,7 @@ describe('InsightsPanel', () => {
       },
     })
     render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('No change')).toBeTruthy()
-    expect(screen.getByText('No function gained branches.')).toBeTruthy()
+    expect(screen.getByText('No change. No function gained branches.')).toBeTruthy()
   })
 
   it('describes test files, not functions, when no function changed', () => {
@@ -177,11 +179,11 @@ describe('InsightsPanel', () => {
       },
     })
     render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('No functions changed')).toBeTruthy()
     expect(
-      screen.getByText('1 of 3 changed source files have a changed test beside them.')
+      screen.getByText(
+        'No functions changed. 1 of 3 changed source files have a changed test beside them.'
+      )
     ).toBeTruthy()
-    expect(screen.queryByText('Every changed function has a test.')).toBeNull()
   })
 
   it('says no source files changed for a config-only PR', () => {
@@ -200,7 +202,7 @@ describe('InsightsPanel', () => {
       },
     })
     render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('No source files changed.')).toBeTruthy()
+    expect(screen.getByText('No functions changed. No source files changed.')).toBeTruthy()
   })
 
   it('uses a singular verb for one untested function', () => {
@@ -214,15 +216,30 @@ describe('InsightsPanel', () => {
     expect(screen.getByText(/1 changed function has/)).toBeTruthy()
   })
 
-  it('renders the risk row driven by the top two distinct file drivers', () => {
-    const pr = buildPr()
+  it('names hotspot files with their drivers in the risk row', () => {
+    render(<InsightsPanel pr={buildPr()} />)
+    const row = screen.getByText('Risk').closest('.ib-score') as HTMLElement
+    expect(row.textContent).toContain('Highest score 78 / 100.')
+    expect(row.textContent).toContain('playwright.config.ts (Wide blast radius — 41 importers)')
+    expect(row.textContent).toContain('scripts/e2e-shard.ts (High churn — 14 commits/90d)')
+  })
+
+  it('leaves low risk files out of the hotspots', () => {
+    const pr = buildPr({
+      chapters: [
+        {
+          id: 'ch1',
+          name: 'Sharding',
+          estimatedMinutes: 6,
+          status: 'not-started',
+          files: [makeFile('a/b/c/quiet.ts', 'low', 10, 'No dominant risk signal', 6)],
+        },
+      ],
+    })
     render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('78 / 100')).toBeTruthy()
-    const text = screen.getByText(/Driven by/)
-    expect(text.textContent).toContain('Wide blast radius — 41 importers')
-    expect(text.textContent).toContain('playwright.config.ts')
-    expect(text.textContent).toContain('High churn — 14 commits/90d')
-    expect(text.textContent).toContain('scripts/e2e-shard.ts')
+    const row = screen.getByText('Risk').closest('.ib-score') as HTMLElement
+    expect(row.textContent).toContain('No file stands out.')
+    expect(row.textContent).not.toContain('quiet.ts')
   })
 
   it('shows "Not measured" for risk when no file has a composite score', () => {
@@ -238,79 +255,41 @@ describe('InsightsPanel', () => {
       ],
     })
     render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('Not measured')).toBeTruthy()
+    expect(screen.getByText(/Not measured\./)).toBeTruthy()
   })
 
-  it('renders the test coverage row with untested functions and the CI percent aside', () => {
-    const pr = buildPr()
-    render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('5 of 7 functions tested')).toBeTruthy()
-    const text = screen.getByText(/changed functions have no test/)
-    expect(text.textContent).toContain('shardByDuration')
-    expect(text.textContent).toContain('readBurnIn')
+  it('renders the test coverage sentence with untested functions and the CI percent aside', () => {
+    render(<InsightsPanel pr={buildPr()} />)
+    const text = screen.getByText(/5 of 7 functions tested\./)
+    expect(text.textContent).toContain(
+      '2 changed functions have no test: shardByDuration, readBurnIn'
+    )
     expect(text.textContent).toContain('CI reports 84% of new lines covered.')
-
-    const label = screen.getByText('Test coverage')
-    const row = label.closest('.ib-score') as HTMLElement
-    const meter = row.querySelector('.ib-meter i') as HTMLElement
-    // 5 of 7 tested = 71.43%
-    expect(meter.style.width).toBe('71.42857142857143%')
   })
 
   it('renders "Every changed function has a test." when nothing is untested', () => {
     const pr = buildPr({
       insights: {
         ...baseInsights,
-        coverage: {
-          changedFunctions: 4,
-          testedFunctions: 4,
-          untestedFunctions: [],
-          patchPercent: null,
-          source: 'CI check codecov/patch',
-          changedSourceFiles: 5,
-          changedSourceFilesWithTests: 4,
-        },
+        coverage: { ...baseInsights.coverage, testedFunctions: 7, untestedFunctions: [] },
       },
     })
     render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('4 of 4 functions tested')).toBeTruthy()
-    expect(screen.getByText('Every changed function has a test.')).toBeTruthy()
-  })
-
-  it('renders "No functions changed" without a meter when nothing changed', () => {
-    const pr = buildPr({
-      insights: {
-        ...baseInsights,
-        coverage: {
-          changedFunctions: 0,
-          testedFunctions: 0,
-          untestedFunctions: [],
-          patchPercent: null,
-          source: 'CI check codecov/patch',
-          changedSourceFiles: 5,
-          changedSourceFilesWithTests: 4,
-        },
-      },
-    })
-    render(<InsightsPanel pr={pr} />)
-    const label = screen.getByText('Test coverage')
-    const row = label.closest('.ib-score') as HTMLElement
-    expect(row.querySelector('.ib-meter')).toBeNull()
-    expect(screen.getByText('No functions changed')).toBeTruthy()
+    expect(
+      screen.getByText(/7 of 7 functions tested\. Every changed function has a test\./)
+    ).toBeTruthy()
   })
 
   it('renders code health flags grouped by kind', () => {
-    const pr = buildPr()
-    render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('3 flags')).toBeTruthy()
+    render(<InsightsPanel pr={buildPr()} />)
     expect(
       screen.getByText(
-        '1 function over 80 lines, 1 new eslint-disable, 1 block duplicated in 2 files.'
+        '3 flags: 1 function over 80 lines, 1 new eslint-disable, 1 block duplicated in 2 files.'
       )
     ).toBeTruthy()
   })
 
-  it('renders "No flags" when there are none', () => {
+  it('renders "No flags raised." when there are none', () => {
     const pr = buildPr({
       insights: {
         ...baseInsights,
@@ -318,32 +297,23 @@ describe('InsightsPanel', () => {
       },
     })
     render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('No flags')).toBeTruthy()
+    expect(screen.getByText('No flags raised.')).toBeTruthy()
   })
 
-  it('renders the understandability row and its meter', () => {
-    const pr = buildPr()
-    render(<InsightsPanel pr={pr} />)
-    expect(screen.getByText('Moderate')).toBeTruthy()
+  it('renders the understandability sentence', () => {
+    render(<InsightsPanel pr={buildPr()} />)
     expect(
       screen.getByText(
-        '1,120 lines to read once formatting and lock files are set aside. 9 new exported symbols. Longest chain of definitions you must hold: 4.'
+        'Moderate. 1,120 lines to read once formatting and lock files are set aside. 9 new exported symbols. Longest chain of definitions you must hold: 4.'
       )
     ).toBeTruthy()
-    const label = screen.getByText('Understandability')
-    const row = label.closest('.ib-score') as HTMLElement
-    const meter = row.querySelector('.ib-meter i') as HTMLElement
-    expect(meter.style.width).toBe('48%')
   })
 
-  it('renders a single muted "Analysing this PR…" row when insights is null', () => {
-    const pr = buildPr({ insights: null })
-    render(<InsightsPanel pr={pr} />)
+  it('renders a muted "Analysing this PR…" row when insights is null, keeping risk', () => {
+    render(<InsightsPanel pr={buildPr({ insights: null })} />)
     expect(screen.getByText('Analysing this PR…')).toBeTruthy()
     expect(screen.queryByText('Complexity')).toBeNull()
-    expect(screen.queryByText('Risk')).toBeNull()
-    // Header chips (not fed by insights) still render.
+    expect(screen.getByText('Risk')).toBeTruthy()
     expect(screen.getByText('High risk')).toBeTruthy()
-    expect(screen.getByText('~18 min')).toBeTruthy()
   })
 })
