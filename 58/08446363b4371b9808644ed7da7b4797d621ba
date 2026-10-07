@@ -1,0 +1,39 @@
+tests/e2e/git-integration-contrast.entry.tsx
+  s_e6b0138361e070::t_4b18a2e8610e78 11,254-274,334-339
+  s_e6b0138361e070::t_6b7e0817162443 340
+extensions/git-integration/tests/unit/RepoPicker.spec.tsx
+  s_e6b0138361e070::t_5fe1b516790d7a 8-25
+  s_e6b0138361e070::t_bf8866a1067519 54
+  s_e6b0138361e070::t_9e1137e2d6aa9a 1-7,26-53,55-146
+extensions/git-integration/src/components/pr-review/review-dashboard.css
+  s_e6b0138361e070::t_18228e0593ae93 258-386
+extensions/git-integration/src/components/pr-review/ReviewDashboard.tsx
+  s_e6b0138361e070::t_18228e0593ae93 1,7,15-26,32-33,38-55,60,62-69,71,270-273,283-286,289-290,303-306,377-391,405-413,418-424,457-469
+  s_e6b0138361e070::t_c80bf881acd16a 101
+extensions/git-integration/src/components/pr-review/RepoPicker.tsx
+  s_e6b0138361e070::t_9e1137e2d6aa9a 1-21,26-28,32-234
+  s_e6b0138361e070::t_bf8866a1067519 22-25,29-31
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_e6b0138361e070::t_c80bf881acd16a 147-152
+  s_e6b0138361e070::t_5fe1b516790d7a 97-102,107-124,313-393
+tests/e2e/git-integration-contrast.spec.ts
+  s_e6b0138361e070::t_4b18a2e8610e78 114
+README.md
+  s_e6b0138361e070::t_ff4ce639e5a006 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5808446363b4371b9808644ed7da7b4797d621ba",
+  "prompts": {},
+  "sessions": {
+    "s_e6b0138361e070": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "974a24d0-f11c-4acf-8158-afff495d008a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
