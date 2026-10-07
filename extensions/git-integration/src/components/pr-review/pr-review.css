@@ -1825,77 +1825,74 @@
 .pr-overview-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 14px 6px;
+  gap: 4px 10px;
+  margin-top: 6px;
   font-size: 11px;
   color: var(--tm-text-muted);
-  border-bottom: 1px solid var(--tm-border);
-  flex-shrink: 0;
   flex-wrap: wrap;
 }
 
 .pr-overview-meta-author {
-  color: var(--tm-text-primary);
+  color: var(--tm-text-secondary);
   font-weight: 500;
-}
-
-.pr-overview-meta-sep {
-  color: var(--tm-text-muted);
 }
 
 .pr-overview-meta-branch {
-  font-family: monospace;
+  font-family: var(--tm-font-mono);
   font-size: 10px;
-  color: var(--tm-accent-text);
-}
-
-.pr-overview-approvals-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px 16px;
-  background: color-mix(in srgb, var(--tm-success) 6%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--tm-success) 20%, transparent);
-  flex-shrink: 0;
 }
 
 .pr-overview-approvals-label {
-  font-size: 11px;
-  font-weight: 600;
   color: var(--tm-success);
-  letter-spacing: 0.03em;
-}
-
-.pr-overview-approver {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px 2px 4px;
-  background: color-mix(in srgb, var(--tm-success) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tm-success) 25%, transparent);
-  border-radius: 12px;
-  font-size: 11px;
-  color: var(--tm-success);
-}
-
-.pr-overview-approver-avatar {
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.pr-overview-approver-name {
-  font-weight: 500;
 }
 
 .pr-overview-approvals-label--pending {
   color: var(--tm-warning);
 }
 
-.pr-overview-approver--pending {
-  background: color-mix(in srgb, var(--tm-warning) 10%, transparent);
-  border-color: color-mix(in srgb, var(--tm-warning) 25%, transparent);
-  color: var(--tm-warning);
+/* Each of the four blocks: Status, What to look at, Description, Discussion */
+
+.pr-overview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.pr-overview-block:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pr-overview-status .pr-checks-bar {
+  border-bottom: 0;
+}
+
+.pr-overview-status .pr-checks-summary {
+  padding: 0;
+  font-size: 13px;
+}
+
+.pr-overview-status .pr-checks-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.pr-overview-discussion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pr-overview-discussion-toggle:hover {
+  color: var(--tm-text-secondary);
 }
 
 .pr-overview-body-scroll {
@@ -1904,119 +1901,16 @@
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-}
-
-/* Metrics row */
-
-.pr-overview-metrics {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.pr-overview-metric {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 10px 14px;
-  background: var(--tm-overlay-subtle);
-  border: 1px solid var(--tm-border);
-  border-radius: 8px;
-  min-width: 72px;
-}
-
-.pr-overview-metric-value {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--tm-text-primary);
-}
-
-.pr-overview-metric-value--add {
-  color: var(--tm-success);
-}
-
-.pr-overview-metric-value--del {
-  color: var(--tm-danger);
-}
-
-.pr-overview-metric-label {
-  font-size: 10px;
-  color: var(--tm-text-muted);
-  margin-top: 3px;
-}
-
-.pr-overview-ci--passing {
-  color: var(--tm-success);
-}
-.pr-overview-ci--failing {
-  color: var(--tm-danger);
-}
-.pr-overview-ci--pending {
-  color: var(--tm-warning);
-}
-.pr-overview-ci--none {
-  color: var(--tm-text-muted);
-}
-
-/* Risk distribution + progress */
-
-.pr-overview-risk-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.pr-overview-risk-dist {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.pr-overview-progress-inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 140px;
-}
-
-.pr-overview-progress-label {
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.pr-overview-progress-track {
-  flex: 1;
-  height: 4px;
-  background: var(--tm-overlay);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.pr-overview-progress-fill {
-  height: 100%;
-  background: var(--tm-accent);
-  border-radius: 2px;
-  transition: width 0.3s ease;
-  min-width: 0;
+  gap: 14px;
 }
 
 /* Sections */
 
-.pr-overview-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .pr-overview-section-title {
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--tm-text-muted);
   margin: 0;
 }
@@ -2105,64 +1999,6 @@
   font-size: 12px;
   color: var(--tm-text-muted);
   font-style: italic;
-}
-
-/* Hotspots */
-
-.pr-overview-hotspot-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pr-overview-hotspot-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 6px;
-  background: var(--tm-overlay-subtle);
-  border: 1px solid var(--tm-border);
-}
-
-.pr-overview-hotspot-item--high {
-  border-color: color-mix(in srgb, var(--tm-danger) 18%, transparent);
-  background: color-mix(in srgb, var(--tm-danger) 4%, transparent);
-}
-
-.pr-overview-hotspot-item--medium {
-  border-color: color-mix(in srgb, var(--tm-warning) 18%, transparent);
-  background: color-mix(in srgb, var(--tm-warning) 4%, transparent);
-}
-
-.pr-overview-hotspot-path {
-  flex: 1;
-  font-family: monospace;
-  font-size: 11px;
-  color: var(--tm-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pr-overview-hotspot-score {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--tm-text-muted);
-  flex-shrink: 0;
-}
-
-.pr-overview-hotspot-driver {
-  font-size: 10px;
-  color: var(--tm-text-muted);
-  flex-shrink: 0;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Description */
@@ -2353,12 +2189,6 @@
 }
 
 /* ─── PR Overview Discussion (issue comments) ─────────────────────────────── */
-
-.pr-overview-comment-count {
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
-}
 
 .pr-issue-comment-list {
   display: flex;

@@ -5,6 +5,8 @@ import type { StatusCheck } from '../../schemas/pr-review.schema'
 interface Props {
   checks: StatusCheck[]
   defaultExpanded?: boolean
+  /** Name the failing checks and count against the total: "2 of 8 checks failing · Format, lint". */
+  detailed?: boolean
 }
 
 /**
@@ -23,7 +25,7 @@ const STATE_ICON: Record<StatusCheck['state'], LucideIcon> = {
   unknown: CircleHelp,
 }
 
-export function StatusChecksBar({ checks, defaultExpanded = false }: Props) {
+export function StatusChecksBar({ checks, defaultExpanded = false, detailed = false }: Props) {
   const [expanded, setExpanded] = useState(defaultExpanded)
 
   if (checks.length === 0) return null
@@ -42,6 +44,20 @@ export function StatusChecksBar({ checks, defaultExpanded = false }: Props) {
         ? `${pendingCount} pending`
         : `${passCount} passing`
 
+  const total = checks.length
+  const noun = `check${total === 1 ? '' : 's'}`
+  const detailedLabel =
+    failCount > 0
+      ? `${failCount} of ${total} ${noun} failing · ${checks
+          .filter((c) => c.state === 'fail')
+          .map((c) => c.name)
+          .join(', ')}`
+      : pendingCount > 0
+        ? `${pendingCount} of ${total} ${noun} pending`
+        : passCount > 0
+          ? `${passCount} ${passCount === 1 ? 'check' : 'checks'} passing`
+          : `${total} ${noun}`
+
   return (
     <div className="pr-checks-bar">
       <button
@@ -57,7 +73,7 @@ export function StatusChecksBar({ checks, defaultExpanded = false }: Props) {
           {React.createElement(STATE_ICON[summaryStatus], { 'aria-hidden': true })}
         </span>
         <span className="pr-checks-summary-label">
-          {summaryLabel} · {checks.length} check{checks.length !== 1 ? 's' : ''}
+          {detailed ? detailedLabel : `${summaryLabel} · ${total} ${noun}`}
         </span>
         <span className="pr-checks-chevron">{expanded ? '▲' : '▼'}</span>
       </button>

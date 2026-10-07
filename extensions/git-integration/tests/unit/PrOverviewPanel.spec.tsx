@@ -50,12 +50,6 @@ vi.mock('../../../../src/renderer/stores/toast.store', () => ({
   useToastStore: () => ({ addToast: vi.fn() }),
 }))
 
-vi.mock('../../src/components/pr-review/StatusChecksBar', () => ({
-  StatusChecksBar: ({ checks }: { checks: unknown[] }) => (
-    <div data-testid="status-checks-bar" data-count={checks.length} />
-  ),
-}))
-
 vi.mock('../../src/components/pr-review/RichContent', () => ({
   RichContent: ({ children }: { children: string }) => (
     <div data-testid="rich-content">{children}</div>
@@ -147,6 +141,19 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
+function renderPanel(overrides: Partial<PrReviewDetail> = {}, props = {}) {
+  return render(
+    <PrOverviewPanel
+      repoRoot="/repo"
+      pr={{ ...basePr, ...overrides }}
+      sessionStatus="not-started"
+      onStartReview={vi.fn()}
+      onClose={vi.fn()}
+      {...props}
+    />
+  )
+}
+
 describe('PrOverviewPanel', () => {
   it('renders PR title and number', () => {
     const onStartReview = vi.fn()
@@ -178,19 +185,38 @@ describe('PrOverviewPanel', () => {
     expect(screen.getByText('feature/x → main')).toBeTruthy()
   })
 
-  it('renders status checks bar', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    const bar = screen.getByTestId('status-checks-bar')
-    expect(bar).toBeTruthy()
-    expect(bar.getAttribute('data-count')).toBe('1')
+  it('summarises passing checks and keeps the list collapsed', () => {
+    renderPanel()
+    expect(screen.getByText('1 check passing')).toBeTruthy()
+    expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('names the failing checks in the summary and expands the full list on click', () => {
+    renderPanel({
+      statusChecks: [
+        { name: 'Format', state: 'fail' },
+        { name: 'codecov/patch', state: 'fail' },
+        { name: 'build', state: 'pass' },
+        { name: 'lint', state: 'pass' },
+      ],
+    })
+    const summary = screen.getByRole('button', {
+      name: /2 of 4 checks failing · Format, codecov\/patch/,
+    })
+    expect(screen.queryByRole('list')).toBeNull()
+    fireEvent.click(summary)
+    expect(screen.getByRole('list')).toBeTruthy()
+    expect(screen.getByText('build')).toBeTruthy()
+  })
+
+  it('says how many checks are pending', () => {
+    renderPanel({
+      statusChecks: [
+        { name: 'a', state: 'pending' },
+        { name: 'b', state: 'pass' },
+      ],
+    })
+    expect(screen.getByText('1 of 2 checks pending')).toBeTruthy()
   })
 
   it('shows Start Review for not-started PRs', () => {
@@ -216,7 +242,7 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Resume Review')).toBeTruthy()
+    expect(screen.getByText('Resume Review · 0 of 3 viewed')).toBeTruthy()
   })
 
   it('shows Continue Review for in-progress PRs', () => {
@@ -229,7 +255,7 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Continue Review')).toBeTruthy()
+    expect(screen.getByText('Continue Review · 0 of 3 viewed')).toBeTruthy()
   })
 
   it('calls onStartReview when start button is clicked', () => {
@@ -289,55 +315,76 @@ describe('PrOverviewPanel', () => {
     expect(screen.getByText('No description provided.')).toBeTruthy()
   })
 
-  it('renders hotspot files for high and medium risk', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('Hotspots — focus here first')).toBeTruthy()
-    // high.ts and medium.ts should appear; low.ts should not
+  it('folds hotspot files into the risk row, leaving out low risk files', () => {
+    renderPanel()
+    const risk = screen.getByText('Risk').closest('.ib-score') as HTMLElement
     expect(screen.getByTitle('src/high.ts')).toBeTruthy()
     expect(screen.getByTitle('src/medium.ts')).toBeTruthy()
+    expect(risk.textContent).toContain('Hotspots')
+    expect(screen.queryByTitle('src/low.ts')).toBeNull()
+    expect(screen.queryByText(/Hotspots — focus here first/)).toBeNull()
   })
 
-  it('shows progress bar for in-progress reviews', () => {
+  it('puts risk, time and size on one header line', () => {
+    renderPanel()
+    expect(screen.getByText('What to look at')).toBeTruthy()
+    expect(screen.getByText('High risk')).toBeTruthy()
+    expect(screen.getByText(/about 15 min · 3 files, \+85 −32/)).toBeTruthy()
+  })
+
+  it('has no metric tiles and no high/med/low chips', () => {
+    renderPanel()
+    for (const label of ['Additions', 'Deletions', 'Est. time', 'Files', 'CI']) {
+      expect(screen.queryByText(label)).toBeNull()
+    }
+    expect(screen.queryByText(/\d+ high$/)).toBeNull()
+    expect(screen.queryByText(/\d+ med$/)).toBeNull()
+    expect(screen.queryByText(/\d+ low$/)).toBeNull()
+    expect(screen.queryByText('Passing')).toBeNull()
+    expect(document.querySelector('.pr-overview-metric')).toBeNull()
+  })
+
+  it('shows analysis provenance as a tooltip, not as text', () => {
+    renderPanel({
+      insights: {
+        complexity: { branchDelta: 3, functions: [], source: 'tree-sitter · hunk base vs head' },
+        coverage: {
+          changedFunctions: 0,
+          testedFunctions: 0,
+          untestedFunctions: [],
+          patchPercent: null,
+          source: 'CI check codecov/patch',
+          changedSourceFiles: 0,
+          changedSourceFilesWithTests: 0,
+        },
+        health: { flags: [], source: 'tree-sitter · detectDryViolations' },
+        understandability: {
+          level: 'easy',
+          linesToRead: 10,
+          newExports: 0,
+          longestChain: 1,
+          crossChapterRefs: 0,
+          source: 'reading-order graph',
+        },
+      },
+    })
+    expect(screen.queryByText('tree-sitter · hunk base vs head')).toBeNull()
+    expect(screen.getByTitle('tree-sitter · hunk base vs head')).toBeTruthy()
+  })
+
+  it('puts viewed progress on the footer button for a review under way', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/high.ts']),
       issueComments: [],
     } as unknown as ReturnType<typeof usePrReviewStore>)
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="in-progress"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('1/3 reviewed')).toBeTruthy()
+    renderPanel({}, { sessionStatus: 'in-progress' })
+    expect(screen.getByRole('button', { name: 'Continue Review · 1 of 3 viewed' })).toBeTruthy()
+    expect(screen.queryByText('1/3 reviewed')).toBeNull()
   })
 
-  it('renders metric values', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    // 3 files, +85, −32, 15m, Passing CI
-    expect(screen.getByText('3')).toBeTruthy()
-    expect(screen.getByText('+85')).toBeTruthy()
-    expect(screen.getByText('−32')).toBeTruthy()
-    expect(screen.getByText('15m')).toBeTruthy()
-    expect(screen.getByText('Passing')).toBeTruthy()
+  it('shows no progress on the footer button before a review starts', () => {
+    renderPanel()
+    expect(screen.getByRole('button', { name: 'Start Review' })).toBeTruthy()
   })
 
   it('renders age as "2d ago"', () => {
@@ -400,9 +447,7 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Approved by')).toBeTruthy()
-    expect(screen.getByText('bob')).toBeTruthy()
-    expect(screen.getByText('carol')).toBeTruthy()
+    expect(screen.getByText('Approved by bob, carol')).toBeTruthy()
   })
 
   it('does not show approvals bar when PR has no approvals', () => {
@@ -415,7 +460,7 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.queryByText('Approved by')).toBeNull()
+    expect(screen.queryByText(/Approved by/)).toBeNull()
   })
 
   it('does not render pop out button when onPopOut is absent', () => {
@@ -431,34 +476,73 @@ describe('PrOverviewPanel', () => {
     expect(screen.queryByTitle('Open in focused window')).toBeNull()
   })
 
-  it('renders write/preview tabs in discussion composer', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
+  it('collapses the discussion behind a count, composer hidden', () => {
+    renderPanel()
+    const toggle = screen.getByRole('button', { name: /Discussion · 0/ })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
+    expect(screen.queryByText('Write')).toBeNull()
+  })
+
+  it('keeps comments collapsed and shows their count', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [
+        {
+          id: 1,
+          author: 'bob',
+          authorAvatarUrl: '',
+          body: 'Looks off',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      currentUserLogin: null,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    renderPanel()
+    expect(screen.getByRole('button', { name: /Discussion · 1/ })).toBeTruthy()
+    expect(screen.queryByText('Looks off')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Discussion · 1/ }))
+    expect(screen.getByText('Looks off')).toBeTruthy()
+  })
+
+  it('renders write/preview tabs in the discussion composer once expanded', () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: /Discussion/ }))
     expect(screen.getByText('Write')).toBeTruthy()
     expect(screen.getByText('Preview')).toBeTruthy()
     expect(screen.getByPlaceholderText('Leave a comment…')).toBeTruthy()
   })
 
-  it('shows preview pane when Preview tab is clicked', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
+  it('posts a comment from the expanded composer', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: /Discussion/ }))
+    fireEvent.change(screen.getByPlaceholderText('Leave a comment…'), {
+      target: { value: 'Ship it' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Comment' }))
+    await waitFor(() =>
+      expect(githubAPI.prIssueCommentAdd).toHaveBeenCalledWith({
+        repoRoot: '/repo',
+        prNumber: 42,
+        body: 'Ship it',
+      })
     )
+  })
+
+  it('shows preview pane when Preview tab is clicked', () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: /Discussion/ }))
     fireEvent.click(screen.getByText('Preview'))
     expect(screen.getByText('Nothing to preview.')).toBeTruthy()
     expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
+  })
+
+  it('marks a draft ready from the footer', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    renderPanel({ isDraft: true })
+    fireEvent.click(screen.getByText('Mark as Ready'))
+    await waitFor(() => expect(githubAPI.prMarkReady).toHaveBeenCalledWith('/repo', 42))
   })
 
   it('shows "behind" badge when mergeStateStatus is behind', () => {
@@ -625,9 +709,7 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Review requested from')).toBeTruthy()
-    expect(screen.getByText('dave')).toBeTruthy()
-    expect(screen.getByText('eve')).toBeTruthy()
+    expect(screen.getByText('Review requested from dave, eve')).toBeTruthy()
   })
 
   it('shows "Awaiting" label for pending reviewers when approvals already exist', () => {
@@ -646,9 +728,8 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Approved by')).toBeTruthy()
-    expect(screen.getByText('Awaiting')).toBeTruthy()
-    expect(screen.getByText('dave')).toBeTruthy()
+    expect(screen.getByText('Approved by bob')).toBeTruthy()
+    expect(screen.getByText('Awaiting dave')).toBeTruthy()
   })
 
   it('does not show reviewer bar when no approvals and no requested reviewers', () => {
@@ -661,8 +742,8 @@ describe('PrOverviewPanel', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.queryByText('Approved by')).toBeNull()
-    expect(screen.queryByText('Review requested from')).toBeNull()
+    expect(screen.queryByText(/Approved by/)).toBeNull()
+    expect(screen.queryByText(/Review requested from/)).toBeNull()
   })
 
   it('shows "Your review requested" badge when current user is a requested reviewer', () => {

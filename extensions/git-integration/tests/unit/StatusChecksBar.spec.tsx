@@ -111,4 +111,34 @@ describe('StatusChecksBar', () => {
     expect(btn.textContent).toMatch(/1 check[^s]*/)
     expect(btn.textContent).not.toMatch(/1 checks/)
   })
+
+  describe('detailed summary', () => {
+    it('names failing checks against the total', () => {
+      const checks: StatusCheck[] = [
+        { name: 'Format', state: 'fail' },
+        { name: 'codecov/patch', state: 'fail' },
+        { name: 'build', state: 'pass' },
+      ]
+      render(<StatusChecksBar checks={checks} detailed />)
+      expect(screen.getByText('2 of 3 checks failing · Format, codecov/patch')).toBeTruthy()
+    })
+
+    it('counts pending checks against the total', () => {
+      render(
+        <StatusChecksBar
+          checks={[
+            { name: 'a', state: 'pending' },
+            { name: 'b', state: 'pass' },
+          ]}
+          detailed
+        />
+      )
+      expect(screen.getByText('1 of 2 checks pending')).toBeTruthy()
+    })
+
+    it('says all checks are passing', () => {
+      render(<StatusChecksBar checks={passing} detailed />)
+      expect(screen.getByText('2 checks passing')).toBeTruthy()
+    })
+  })
 })
