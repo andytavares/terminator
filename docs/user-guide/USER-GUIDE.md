@@ -539,29 +539,33 @@ The **Git** tab above the terminal is where git lives. It lists the changed file
 ### The pull request queue
 
 The queue opens with one line of triage — how many are waiting on you, how many are high risk,
-and roughly how long the reading is — and then groups them: **Read these first**, **Quick wins**,
-**Larger reviews**, with anything already started pinned at the top.
+and roughly how long the reading is — and then lists the open and draft pull requests, oldest
+first. **Sort** switches to **Closest to merging** (approved with passing checks first, drafts last)
+or **Started by you** (reviews you have begun, most viewed first); ties always fall back to age.
 
-Each row names its own risk in words (**High risk**, **Medium risk**, **Low risk**) rather than an
-abbreviation that needs a key, and gives an estimate with its unit. The row's action is **Review**:
-clicking it opens the diff. Approving happens after you have read the change, never from the list.
+Search covers open pull requests. Add `is:merged`, `is:closed` or `is:all` to reach the rest, or type
+a number to open that pull request whatever its state; those rows say **Merged** or **Closed**.
+
+Each row is two lines: the title, then only what needs attention — Draft, Conflicts, **High risk**,
+CI failing, approvals, your progress. Medium and low risk say nothing. Clicking the row opens the
+diff. Approving happens after you have read the change, never from the list.
 
 The count is the repository's real count, not the number loaded so far, and further pages arrive on
 their own — there is no "load more" to press.
 
 ### The Reviews tab
 
-**Reviews** in the app band lists every open pull request that needs you, across all your repositories, from GitHub search. **Needs you** groups them into **Re-review** (new commits since you reviewed), **Requested of you** and **Requested of your team**. **My PRs** shows what blocks your own (changes asked, CI failing, approved), and **Involved** shows threads you are in. **Review** opens the PR in the review window. A repository you have not cloned opens diff-only. Set **Clone folder for reviews** in Git Integration's settings and **Clone and review** appears on those rows.
+**Reviews** in the app band lists every open pull request that needs you, across all your repositories, from GitHub search. **Needs you** groups them into **Re-review** (new commits since you reviewed), **Requested of you** and **Requested of your team**. **My PRs** shows what blocks your own (changes requested, CI failing, approved), and **Involved** shows threads you are in. Each list is oldest first, with the same **Sort** choices as the queue. A tab reads **50+** when GitHub returned its limit; the 50 shown are the oldest. Clicking a row opens the PR in the review window. A repository you have not cloned opens diff-only. Set **Clone folder for reviews** in Git Integration's settings and **Clone and review** appears on those rows.
 
 ### Reviewing a pull request
 
-The review screen has one header, one file header and one footer around the diff. The **header** carries the title, the status checks (click the pill for the list), a large-PR warning when there is one, your progress, **Ask agent** and a **⋯** menu with Focus mode, Overview, Hide file list (`t`), Refresh, Pop out and the keyboard sheet. The **footer** carries Pause review, your drafts, Prev, Mark viewed and **Submit review**; the verdict is chosen in the Submit dialog. The file list on the left switches between **Files** and **Chapters**. Clicking a file's risk opens the **File** tab of the side panel: its risk breakdown, its health signals (problems first) and its importers. The agent's findings are in the **Agent** tab beside it.
+The review screen has one header, one file header and one footer around the diff. The **header** carries the title, the status checks (click the pill for the list), a large-PR warning when there is one, your progress, **Ask agent** and a **⋯** menu with Focus mode, Overview, Hide file list (`t`), Refresh, Pop out and the keyboard sheet. The **file header** carries the path, the file's risk, **Uses**, **View** (its dot means a view setting is changed, such as comments hidden) and **Viewed**. The **footer** carries Pause review, your drafts, **? Shortcuts**, Prev and one primary button: **Mark viewed, next file**, and on the last file **Submit review…**, which marks the rest viewed and opens the Submit dialog where the verdict is chosen. The file list on the left switches between **Files** and **Chapters**. Clicking a file's risk opens the **File** tab of the side panel: its risk breakdown, its health signals (problems first) and its importers. The agent's findings are in the **Agent** tab beside it.
 
 - **Reading order.** Files come in the order you need them: a function before the code that calls it, a type before the code that uses it, a test right after what it tests. Each file says why it is where it is, and **Uses** in the file header lists what it uses and the step where you read it. **Peek definition** jumps there.
 - **Unchanged lines.** A file opens on its changed lines only. The bar between two hunks, and above the first or below the last, shows **20 more lines** up or down, or **all** of them. Expansion resets when you open another file. Revealed lines take notes and agent questions but not GitHub comments, because GitHub's API only accepts comments on lines in the diff. Files over 2 MB can't be expanded.
 - **Tests for a block.** **Tests** on a hunk header, or on the bar under a selection, lists every line of a test file that mentions what that block defines (or the function it sits inside), searched at the PR's head. A test in the PR opens in the review at that line; any other test opens in your editor.
 - **Comments.** **All**, **Unresolved** or **Hidden** in the file header's **View** menu (`c` cycles), next to **Agent notes**, **Unified**/**Split** and **Hide formatting-only hunks**. A dot on **View** means something is off its default. Hidden leaves a count in the gutter; click it to bring them back. **Agent notes** has its own switch (`Shift+C`).
-- **Review brief.** The Overview opens with complexity, risk, test coverage (does each changed function have a test), code health and understandability. Each figure names where it came from.
+- **Overview.** Four blocks: **Status** (a checks summary naming the failing checks — click it for the full list — then approvals, branch, age and merge state), **What to look at** (risk with its hotspot files, complexity, untested functions, code health and understandability; hover a row to see where it came from), **Description**, and **Discussion**, folded behind its count.
 - **Agent.** Drag across line numbers and a bar offers **Ask agent**, **Explain**, **Add note** and **Comment**. **Ask agent about this PR** reviews the whole PR. The agent reads the PR in a private worktree with read-only tools. Its findings stay on your machine, as dashed notes in the diff and in the side panel, until you choose **Post as comment**. Sonnet is the default model, and you can pick Opus per run.
 - **Since your review.** When the author pushes, files you viewed that did not change stay viewed. Changed ones show **Changed since you viewed** and open on just what changed since you looked (`s` toggles the whole PR). Viewed marks are mirrored to GitHub.
 - **Where you left off.** Come back after 15 minutes and a card shows your last position, your notes, unread agent findings, unsent drafts and what moved.
@@ -594,9 +598,8 @@ The Code Reviews tab is a **workspace-scoped tab** — hover over a workspace ca
 
 Features:
 
-- Paginated queue of open/closed PRs with search by title or PR number.
-- **Five filter pills:** All, High risk, Quick wins, In progress, Stale >3d. In the queue, a PR's risk is classified by total lines changed (≥400 = high, ≥150 = medium) so large diffs surface under **High risk** immediately; opening a PR refines its risk with per-file analysis (churn, blast radius, coverage, complexity).
-- **Stat cards:** awaiting count, high-risk count, total review time, in-progress count.
+- Paginated queue of open and draft PRs, oldest first, with **Sort** and search (see "The pull request queue").
+- In the queue, a PR's risk is classified by total lines changed (≥400 = high, ≥150 = medium); opening a PR refines its risk with per-file analysis (churn, blast radius, coverage, complexity).
 - PRs scored across six signals: tests, coverage, CI, lint, churn, and blast radius.
 - Chapter-by-chapter review surface with syntax-highlighted diffs and inline comment threading.
 - One-click review submission (Approve / Request Changes / Comment) via `gh` CLI.

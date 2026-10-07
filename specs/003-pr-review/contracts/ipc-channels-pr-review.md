@@ -12,7 +12,7 @@ All payloads validated with Zod schemas at both ends (`src/shared/schemas/pr-rev
 
 ## `github:list-open-prs`
 
-Lists all open PRs for the current repository via `gh pr list`.
+Lists open and draft PRs for the current repository, oldest first, a page at a time.
 
 **Direction**: renderer → main (invoke/handle)
 
@@ -21,16 +21,21 @@ Lists all open PRs for the current repository via `gh pr list`.
 ```typescript
 {
   repoRoot: string
+  cursor?: string
+  search?: string // is:merged | is:closed | is:all widen the state; a bare number finds any PR
 }
 ```
 
 **Response**:
 
 ```typescript
-{ prs: ReviewQueuePR[] } | { error: string } | { error: 'RATE_LIMITED', resetAt: number }
+{ prs: ReviewQueuePR[]; totalCount: number; hasMore: boolean; nextCursor?: string } // each row carries state: 'open' | 'closed' | 'merged'
+  | { error: string } | { error: 'RATE_LIMITED', resetAt: number }
 ```
 
-**gh command**: `gh pr list --state open --limit 500 --json number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files`
+**Without search**: GraphQL `pullRequests(states: OPEN, orderBy: {field: CREATED_AT, direction: ASC})`.
+**Text search**: `gh pr list --state <stateForSearch(query)> --search <text>`; the state is `open` unless the query carries a qualifier.
+**Number**: `gh pr view <n>` in any state.
 
 ---
 
