@@ -144,7 +144,7 @@ function mockInvoke(
 
 beforeEach(() => {
   vi.clearAllMocks()
-  useReviewUiStore.setState({ dashboardSort: 'oldest' })
+  useReviewUiStore.setState({ dashboardSort: 'newest' })
 })
 
 describe('ReviewDashboard', () => {
@@ -230,18 +230,18 @@ describe('ReviewDashboard', () => {
   })
 
   it('sorts each section with the chosen sort', async () => {
-    const old = makePr({
+    const waiting = makePr({
       number: 501,
-      title: 'Old waiting',
-      createdAt: new Date(Date.now() - 9 * 86400000).toISOString(),
+      title: 'New waiting',
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
     })
     const ready = makePr({
       number: 502,
       title: 'Ready one',
       reviewDecision: 'approved',
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
+      createdAt: new Date(Date.now() - 9 * 86400000).toISOString(),
     })
-    mockInvoke({ prs: [old, ready], login: 'a', fetchedAt: new Date().toISOString() })
+    mockInvoke({ prs: [ready, waiting], login: 'a', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     await screen.findByTestId('row-501')
     const order = () => screen.getAllByTestId(/^row-/).map((r) => r.getAttribute('data-testid'))

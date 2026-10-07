@@ -39,17 +39,17 @@ function prNode(overrides: Record<string, unknown> = {}) {
 describe('DASHBOARD_QUERIES', () => {
   it('defines a search query for every dashboard section', () => {
     expect(DASHBOARD_QUERIES['re-review']).toBe(
-      'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-asc'
+      'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-desc'
     )
     expect(DASHBOARD_QUERIES.requested).toBe(
-      'is:pr is:open archived:false user-review-requested:@me sort:created-asc'
+      'is:pr is:open archived:false user-review-requested:@me sort:created-desc'
     )
     expect(DASHBOARD_QUERIES.team).toBe(
-      'is:pr is:open archived:false team-review-requested-user:LOGIN sort:created-asc'
+      'is:pr is:open archived:false team-review-requested-user:LOGIN sort:created-desc'
     )
-    expect(DASHBOARD_QUERIES.mine).toBe('is:pr is:open author:@me sort:created-asc')
+    expect(DASHBOARD_QUERIES.mine).toBe('is:pr is:open author:@me sort:created-desc')
     expect(DASHBOARD_QUERIES.involved).toBe(
-      'is:pr is:open involves:@me -author:@me sort:created-asc'
+      'is:pr is:open involves:@me -author:@me sort:created-desc'
     )
   })
 })
@@ -96,9 +96,9 @@ describe('buildSectionQueries', () => {
     expect(first.query).toContain(`${DASHBOARD_QUERIES.mine} repo:acme/widgets repo:acme/gadgets"`)
   })
 
-  it('sorts every section oldest first and asks for the match count', () => {
+  it('sorts every section newest first and asks for the match count', () => {
     for (const { query } of buildSectionQueries('bob')) {
-      expect(query).toContain('sort:created-asc')
+      expect(query).toContain('sort:created-desc')
       expect(query).toContain('issueCount')
     }
   })

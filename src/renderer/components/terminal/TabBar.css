@@ -185,6 +185,7 @@
 
 /* ── Inline rename input ─────────────────────────────────────── */
 .tab-bar__rename-input {
+  height: auto;
   flex: 1;
   background: var(--bg-base);
   border: 1px solid var(--ws-color, var(--accent));
@@ -257,6 +258,7 @@
 
 /* The note is edited in place on the tab, the way it used to be on the row. */
 .tab-bar__note-input {
+  height: auto;
   flex: 1;
   min-width: 0;
   font: inherit;

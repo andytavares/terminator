@@ -1,4 +1,5 @@
-export type SortMode = 'oldest' | 'closest' | 'started'
+export const SORT_MODES = ['newest', 'closest', 'started'] as const
+export type SortMode = (typeof SORT_MODES)[number]
 
 export interface SortablePr {
   openedAt: string
@@ -35,13 +36,13 @@ export function dashboardToSortable<T extends { createdAt: string }>(
   return { ...row, openedAt: row.createdAt }
 }
 
-/** Returns a new array; ties always fall back to the oldest first. */
+/** Returns a new array; ties always fall back to the newest first. */
 export function sortPrs<T>(
   prs: T[],
   mode: SortMode,
   toSortable: (pr: T) => SortablePr = (pr) => pr as unknown as SortablePr
 ): T[] {
-  const byAge = (a: SortablePr, b: SortablePr) => a.openedAt.localeCompare(b.openedAt)
+  const byAge = (a: SortablePr, b: SortablePr) => b.openedAt.localeCompare(a.openedAt)
   const compare = (a: SortablePr, b: SortablePr): number => {
     if (mode === 'closest') return mergeReadiness(a) - mergeReadiness(b) || byAge(a, b)
     if (mode === 'started') {

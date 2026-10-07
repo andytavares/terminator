@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { SortMode } from '../review/sort-prs'
+import { SORT_MODES, type SortMode } from '../review/sort-prs'
 import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
 
 export type AgentRequest = 'review' | 'explain' | 'ask'
@@ -58,14 +58,21 @@ const DEFAULT_PREFS: Prefs = {
   fileListHidden: false,
   diffViewMode: 'unified',
   hideFormattingHunks: true,
-  queueSort: 'oldest',
-  dashboardSort: 'oldest',
+  queueSort: 'newest',
+  dashboardSort: 'newest',
 }
 
 function loadPrefs(): Prefs {
   try {
     const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(PREFS_KEY)
-    return raw ? { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<Prefs>) } : DEFAULT_PREFS
+    if (!raw) return DEFAULT_PREFS
+    const prefs = { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<Prefs>) }
+    const known = (mode: SortMode) => SORT_MODES.includes(mode)
+    return {
+      ...prefs,
+      queueSort: known(prefs.queueSort) ? prefs.queueSort : DEFAULT_PREFS.queueSort,
+      dashboardSort: known(prefs.dashboardSort) ? prefs.dashboardSort : DEFAULT_PREFS.dashboardSort,
+    }
   } catch {
     return DEFAULT_PREFS
   }

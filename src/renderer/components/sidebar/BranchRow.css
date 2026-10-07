@@ -131,6 +131,7 @@
 }
 
 .branch-row__rename {
+  height: auto;
   flex: 1;
   min-width: 0;
   margin-left: 4px;

@@ -30,6 +30,7 @@
 }
 
 .issue-picker__input {
+  height: auto;
   flex: 1;
   min-width: 0;
   background: transparent;

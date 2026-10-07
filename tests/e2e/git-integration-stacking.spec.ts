@@ -3,8 +3,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Stacking gates for the git-integration review surfaces. elementFromPoint
-// reports what a reader would actually hit, so it needs a rendered document.
+// Stacking and sizing gates for the git-integration review surfaces.
+// elementFromPoint and computed geometry need a rendered document.
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -111,6 +111,23 @@ test('the sticky owner heading in the repository picker stays above scrolled row
     })
     expect(hit.n, 'a row checkbox is scrolled under the heading').toBeGreaterThan(0)
     expect(hit.probes.every(Boolean), 'heading is topmost over scrolled checkboxes').toBe(true)
+  } finally {
+    await context.close()
+  }
+})
+
+test('a text field and a select beside it are the same height', async () => {
+  const { page, context } = await render(`
+    <div class="pr-search-row">
+      <input class="pr-search-input" type="search" placeholder="Search open PRs">
+      <select class="rd-sort"><option>Newest first</option></select>
+    </div>
+    <div><input type="text"><select><option>Plain</option></select></div>`)
+  try {
+    const heights = await page.evaluate(() =>
+      [...document.querySelectorAll('input, select')].map((e) => e.getBoundingClientRect().height)
+    )
+    expect(new Set(heights).size, `heights were ${heights.join(', ')}`).toBe(1)
   } finally {
     await context.close()
   }

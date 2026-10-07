@@ -57,7 +57,7 @@ const defaultStoreState = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  useReviewUiStore.setState({ queueSort: 'oldest' })
+  useReviewUiStore.setState({ queueSort: 'newest' })
   vi.mocked(usePrReviewStore).mockReturnValue(
     defaultStoreState as unknown as ReturnType<typeof usePrReviewStore>
   )
@@ -296,14 +296,14 @@ describe('ReviewQueue', () => {
       expect(screen.queryByText(/Open more than/)).toBeNull()
     })
 
-    it('sorts oldest first by default', () => {
+    it('sorts newest first by default', () => {
       const { container } = renderMany([
-        makePr({ number: 2, title: 'Newer', openedAt: days(1) }),
         makePr({ number: 1, title: 'Older', openedAt: days(9) }),
+        makePr({ number: 2, title: 'Newer', openedAt: days(1) }),
       ])
-      expect(titles(container)[0]).toContain('Older')
+      expect(titles(container)[0]).toContain('Newer')
       expect((screen.getByRole('combobox', { name: 'Sort' }) as HTMLSelectElement).value).toBe(
-        'oldest'
+        'newest'
       )
     })
 
@@ -311,7 +311,7 @@ describe('ReviewQueue', () => {
       renderMany([])
       const select = screen.getByRole('combobox', { name: 'Sort' })
       expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual([
-        'Oldest first',
+        'Newest first',
         'Closest to merging',
         'Started by you',
       ])

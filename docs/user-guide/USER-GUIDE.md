@@ -539,9 +539,9 @@ The **Git** tab above the terminal is where git lives. It lists the changed file
 ### The pull request queue
 
 The queue opens with one line of triage — how many are waiting on you, how many are high risk,
-and roughly how long the reading is — and then lists the open and draft pull requests, oldest
+and roughly how long the reading is — and then lists the open and draft pull requests, newest
 first. **Sort** switches to **Closest to merging** (approved with passing checks first, drafts last)
-or **Started by you** (reviews you have begun, most viewed first); ties always fall back to age.
+or **Started by you** (reviews you have begun, most viewed first); ties always fall back to newest first.
 
 Search covers open pull requests. Add `is:merged`, `is:closed` or `is:all` to reach the rest, or type
 a number to open that pull request whatever its state; those rows say **Merged** or **Closed**.
@@ -555,7 +555,7 @@ their own — there is no "load more" to press.
 
 ### The Reviews tab
 
-**Reviews** in the app band lists every open pull request that needs you, across all your repositories, from GitHub search. **Needs you** groups them into **Re-review** (new commits since you reviewed), **Requested of you** and **Requested of your team**. **My PRs** shows what blocks your own (changes requested, CI failing, approved), and **Involved** shows threads you are in. Each list is oldest first, with the same **Sort** choices as the queue. A tab reads **50+** when GitHub returned its limit; the 50 shown are the oldest. Clicking a row opens the PR in the review window. A repository you have not cloned opens diff-only. Set **Clone folder for reviews** in Git Integration's settings and **Clone and review** appears on those rows.
+**Reviews** in the app band lists every open pull request that needs you, across all your repositories, from GitHub search. **Needs you** groups them into **Re-review** (new commits since you reviewed), **Requested of you** and **Requested of your team**. **My PRs** shows what blocks your own (changes requested, CI failing, approved), and **Involved** shows threads you are in. Each list is newest first, with the same **Sort** choices as the queue. A tab reads **50+** when GitHub returned its limit; the 50 shown are the newest. Clicking a row opens the PR in the review window. A repository you have not cloned opens diff-only. Set **Clone folder for reviews** in Git Integration's settings and **Clone and review** appears on those rows.
 
 ### Reviewing a pull request
 
@@ -598,7 +598,7 @@ The Code Reviews tab is a **workspace-scoped tab** — hover over a workspace ca
 
 Features:
 
-- Paginated queue of open and draft PRs, oldest first, with **Sort** and search (see "The pull request queue").
+- Paginated queue of open and draft PRs, newest first, with **Sort** and search (see "The pull request queue").
 - In the queue, a PR's risk is classified by total lines changed (≥400 = high, ≥150 = medium); opening a PR refines its risk with per-file analysis (churn, blast radius, coverage, complexity).
 - PRs scored across six signals: tests, coverage, CI, lint, churn, and blast radius.
 - Chapter-by-chapter review surface with syntax-highlighted diffs and inline comment threading.

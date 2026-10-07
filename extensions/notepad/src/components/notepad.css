@@ -297,6 +297,7 @@
 }
 
 .notepad-search-input {
+  height: auto;
   flex: 1;
   background: transparent;
   border: none;
@@ -556,6 +557,7 @@
 }
 
 .notepad-folder-header__rename-input {
+  height: auto;
   flex: 1;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-accent);
@@ -1162,6 +1164,7 @@
 }
 
 .notepad-quick-create__tag-input {
+  height: auto;
   background: transparent;
   border: none;
   outline: none;
@@ -1253,6 +1256,7 @@
 }
 
 .notepad-tag-chip-input__field {
+  height: auto;
   flex: 1;
   min-width: 80px;
   background: transparent;
@@ -2305,6 +2309,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-search-overlay__input {
+  height: auto;
   flex: 1;
   background: transparent;
   border: none;
@@ -2627,6 +2632,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .diagram-view__title-input {
+  height: auto;
   flex: 1;
   background: var(--tm-overlay-soft);
   border: 1px solid var(--tm-accent);
