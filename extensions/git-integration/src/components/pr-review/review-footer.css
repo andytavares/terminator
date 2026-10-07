@@ -41,7 +41,7 @@
 .rf-btn.rf-pri {
   background: var(--tm-accent);
   border-color: var(--tm-accent);
-  color: var(--tm-bg-elevated);
+  color: var(--tm-on-accent);
 }
 
 .rf-btn.rf-icon {

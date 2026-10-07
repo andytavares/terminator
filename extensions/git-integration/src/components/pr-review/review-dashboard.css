@@ -339,6 +339,7 @@
 .rp-group-label {
   position: sticky;
   top: 0;
+  z-index: var(--tm-layer-panel);
   display: flex;
   align-items: center;
   gap: 8px;
