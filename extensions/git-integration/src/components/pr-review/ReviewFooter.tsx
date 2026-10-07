@@ -12,6 +12,7 @@ export interface ReviewFooterProps {
   onMarkViewed: () => void
   onFinishChapter: () => void
   onOpenSubmit: () => void
+  onOpenShortcuts: () => void
 }
 
 export function ReviewFooter({
@@ -23,6 +24,7 @@ export function ReviewFooter({
   onMarkViewed,
   onFinishChapter,
   onOpenSubmit,
+  onOpenShortcuts,
 }: ReviewFooterProps) {
   const fileCount = new Set(drafts.map((d) => d.path)).size
   const fromFindingCount = drafts.filter((d) => d.fromFindingId).length
@@ -45,26 +47,10 @@ export function ReviewFooter({
           {draftsLabel}
         </button>
       ) : (
-        <span className="rf-hint">
-          <span className="rf-hint-group rf-hint-group--nav">
-            <kbd className="rf-kbd">[</kbd>
-            <kbd className="rf-kbd">]</kbd>
-            <span>files</span>
-          </span>
-          <span className="rf-hint-group rf-hint-group--nav">
-            <kbd className="rf-kbd">j</kbd>
-            <kbd className="rf-kbd">k</kbd>
-            <span>hunks</span>
-          </span>
-          <span className="rf-hint-group rf-hint-group--nav">
-            <kbd className="rf-kbd">v</kbd>
-            <span>viewed</span>
-          </span>
-          <span className="rf-hint-group">
-            <kbd className="rf-kbd">?</kbd>
-            <span>all keys</span>
-          </span>
-        </span>
+        <button type="button" className="rf-hint" onClick={onOpenShortcuts}>
+          <kbd className="rf-kbd">?</kbd>
+          <span>Shortcuts</span>
+        </button>
       )}
 
       <span className="rf-sp" />
@@ -78,28 +64,33 @@ export function ReviewFooter({
         <ChevronLeft aria-hidden="true" />
       </button>
 
-      {isLastFile ? (
+      {isLastFile && isLastChapter ? (
+        <button
+          type="button"
+          className="rf-btn rf-pri"
+          onClick={onFinishChapter}
+          aria-label="Submit review…"
+        >
+          Submit review…{' '}
+          <kbd className="rf-kbd" aria-hidden="true">
+            ⌘↵
+          </kbd>
+        </button>
+      ) : isLastFile ? (
         <button type="button" className="rf-btn rf-pri" onClick={onFinishChapter}>
-          {isLastChapter ? 'Finish review ↵' : 'Finish chapter ↵'}
+          Finish chapter ↵
         </button>
       ) : (
         <button
           type="button"
           className="rf-btn rf-pri"
           onClick={onMarkViewed}
-          aria-label="Mark viewed, go to next"
+          aria-label="Mark viewed, next file"
         >
-          <span className="rf-long">Mark viewed, go to next</span>
+          <span className="rf-long">Mark viewed, next file</span>
           <span className="rf-short">Next</span>
         </button>
       )}
-
-      <button type="button" className="rf-btn" onClick={onOpenSubmit} aria-label="Submit review">
-        Submit review{' '}
-        <kbd className="rf-kbd" aria-hidden="true">
-          ⌘↵
-        </kbd>
-      </button>
     </div>
   )
 }

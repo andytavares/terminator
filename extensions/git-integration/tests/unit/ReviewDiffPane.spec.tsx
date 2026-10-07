@@ -228,9 +228,9 @@ describe('ReviewDiffPane', () => {
     expect(screen.getByTitle('src/foo.ts').textContent).toBe('src/foo.ts')
   })
 
-  it('shows additions and deletions', async () => {
+  it('leaves the additions and deletions to the file list', async () => {
     await renderPane()
-    expect(screen.getByText('+5/−2')).toBeTruthy()
+    expect(screen.queryByText('+5/−2')).toBeNull()
   })
 
   it('shows low-risk label for low risk file', async () => {
@@ -317,10 +317,10 @@ describe('ReviewDiffPane', () => {
     await waitFor(() => expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy())
   })
 
-  it('shows change badge for non-modified files', async () => {
+  it('does not repeat the change type in the file toolbar', async () => {
     const addedFile = { ...mockFile, changeType: 'added' as const }
     await renderPane({ file: addedFile })
-    expect(screen.getByText('added')).toBeTruthy()
+    expect(screen.queryByText('added')).toBeNull()
   })
 
   it('calls patchFileComplexity after diff load', async () => {
@@ -1356,7 +1356,7 @@ describe('ReviewDiffPane', () => {
         viewedFiles: new Set(['src/other.ts']),
       })
       await renderPane({ pr: prWithOrder })
-      expect(screen.getByText('Step 4 of 1')).toBeTruthy()
+      expect(screen.queryByText('Step 4 of 1')).toBeNull()
       expect(screen.getByText('computeRiskScore · step 2 · read')).toBeTruthy()
     })
 

@@ -258,7 +258,7 @@ describe('PrReviewView', () => {
     render(
       <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Finish review ↵' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Submit review…' }))
     expect(screen.getByTestId('submit-panel')).toBeTruthy()
   })
 
@@ -293,7 +293,7 @@ describe('PrReviewView', () => {
         onRefresh={mockRefresh}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Finish review ↵' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Submit review…' }))
     expect(mockMarkFilesViewed).toHaveBeenCalledTimes(1)
     expect(mockMarkFilesViewed).toHaveBeenCalledWith('/repo', 1, 'abc', [
       'src/foo.ts',

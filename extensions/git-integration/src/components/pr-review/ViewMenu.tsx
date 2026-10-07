@@ -27,6 +27,9 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
     diffViewMode !== 'unified' ||
     !hideFormattingHunks
 
+  const label =
+    commentVisibility === 'hidden' ? 'View · comments hidden' : changed ? 'View (changed)' : 'View'
+
   return (
     <div className="vm">
       <button
@@ -34,14 +37,16 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
         className="vm-btn"
         aria-haspopup="true"
         aria-expanded={open}
-        aria-label={changed ? 'View (changed)' : 'View'}
+        aria-label={label}
+        title={commentVisibility === 'hidden' ? label : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         View
-        {changed && <span className="vm-dot" aria-hidden="true" />}
+        {(changed || commentVisibility === 'hidden') && (
+          <span className="vm-dot" aria-hidden="true" />
+        )}
         <ChevronDown aria-hidden="true" className="tm-icon-sm" />
       </button>
-      {commentVisibility === 'hidden' && <span className="vm-note">Comments hidden</span>}
       {open && (
         <Popover label="View" onDismiss={() => setOpen(false)} className="vm-popover">
           <div className="vm-group">

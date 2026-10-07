@@ -1735,6 +1735,12 @@
   text-decoration: line-through;
   color: var(--tm-text-muted);
 }
+/* The status dot carries the state; the reading-order reason stays muted. */
+.full-file-row .rc-frow-reason,
+.full-file-row .rc-frow-reason--viewed {
+  color: var(--tm-text-muted);
+}
+
 /* The selected row is a solid accent fill with white text (WCAG 1.4.11, 1.4.3). */
 .full-file-row--active,
 .full-file-row--active:hover {
