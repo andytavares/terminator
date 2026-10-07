@@ -195,6 +195,15 @@ describe('what the architect is told', () => {
   // The contract showed a budget of 12 files as an example, the architect
   // wrote a budget of 10, and a run was halted at a limit the operator had
   // configured as 25. Budgets are the operator's now; the architect fits them.
+  // TAV-14: the contract showed a unit's `verify` only as `[]`, the architect
+  // wrote two command strings into it, and Zod refused the whole plan with
+  // "plan.units.0.verify.0: Expected object, received string".
+  it("shows a unit's verify as a list of the same check objects an acceptance uses", () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toMatch(/"verify": \[\{ "kind": "command"/)
+    expect(plan.prompt).toContain('never a bare command string')
+  })
+
   it('does not offer budgets, and says the plan has to fit the ones it has', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).not.toContain('"budgets"')
