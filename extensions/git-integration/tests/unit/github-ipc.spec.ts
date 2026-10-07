@@ -5,14 +5,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const { mockExecFile } = vi.hoisted(() => ({ mockExecFile: vi.fn() }))
 
 vi.mock('child_process', () => ({ execFile: mockExecFile }))
+const { sessionData } = vi.hoisted(() => ({ sessionData: {} as Record<string, unknown> }))
 vi.mock('electron-store', () => ({
   default: class {
+    constructor(opts?: { name?: string }) {
+      if (opts?.name === 'pr-review-sessions') this.store = sessionData
+    }
     get() {
       return undefined
     }
     set() {}
     delete() {}
-    store = {}
+    store: Record<string, unknown> = {}
   },
 }))
 vi.mock('fs/promises', () => ({
@@ -27,6 +31,7 @@ import { readFile } from 'fs/promises'
 import { homedir } from 'os'
 import ElectronStore from 'electron-store'
 import { registerGithubHandlers } from '../../src/ipc/github.ipc'
+import { stateForSearch } from '../../src/github/gh-cli'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -911,25 +916,80 @@ describe('github:list-open-prs', () => {
     expect(result.nextCursor).toBe('cursor-xyz')
   })
 
-  it('handles paginated load with includeClosedPrs=true', async () => {
-    mockGitSuccess(JSON.stringify(REPO_VIEW)) // repo view
-    const gqlResponse = {
-      data: {
-        repository: {
-          pullRequests: {
-            pageInfo: { endCursor: null, hasNextPage: false },
-            nodes: [],
+  it('always asks GraphQL for open PRs, oldest first, and ignores includeClosedPrs', async () => {
+    mockGitSuccess(JSON.stringify(REPO_VIEW))
+    mockGitSuccess(
+      JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: { endCursor: null, hasNextPage: false },
+              nodes: [],
+            },
           },
         },
-      },
-    }
-    mockGitSuccess(JSON.stringify(gqlResponse))
+      })
+    )
 
-    const result = (await handlers['github:list-open-prs']({
-      repoRoot: '/repo',
-      includeClosedPrs: true,
-    })) as { prs: unknown[]; hasMore: boolean }
-    expect(result.hasMore).toBe(false)
+    await handlers['github:list-open-prs']({ repoRoot: '/repo', includeClosedPrs: true })
+    const args = mockExecFile.mock.calls
+      .map((c) => c[1] as string[])
+      .find((a) => a[1] === 'graphql')!
+    const query = args.find((a) => a.startsWith('query='))!
+    expect(query).toContain('states:OPEN,')
+    expect(query).not.toContain('MERGED')
+    expect(query).toContain('direction:ASC')
+    expect(query).not.toContain('direction:DESC')
+    expect(query).toMatch(/nodes\{number title state isDraft/)
+  })
+
+  it('maps the PR state of a GraphQL node', async () => {
+    mockGitSuccess(JSON.stringify(REPO_VIEW))
+    mockGitSuccess(
+      JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: { endCursor: null, hasNextPage: false },
+              nodes: [{ number: 3, title: 't', state: 'OPEN', createdAt: '2026-01-01T00:00:00Z' }],
+            },
+          },
+        },
+      })
+    )
+    const result = (await handlers['github:list-open-prs']({ repoRoot: '/repo' })) as {
+      prs: Array<{ state: string }>
+    }
+    expect(result.prs[0].state).toBe('open')
+  })
+
+  it('searches open PRs only for plain text', async () => {
+    mockGitSuccess('[]')
+    await handlers['github:list-open-prs']({ repoRoot: '/repo', search: 'fix bug' })
+    const args = mockExecFile.mock.calls[0][1] as string[]
+    expect(args.slice(args.indexOf('--state'), args.indexOf('--state') + 4)).toEqual([
+      '--state',
+      'open',
+      '--search',
+      'fix bug',
+    ])
+    expect(args[args.indexOf('--json') + 1]).toContain('state')
+  })
+
+  it('searches merged PRs for is:merged and strips the qualifier', async () => {
+    mockGitSuccess('[]')
+    await handlers['github:list-open-prs']({ repoRoot: '/repo', search: 'Is:Merged  login' })
+    const args = mockExecFile.mock.calls[0][1] as string[]
+    expect(args[args.indexOf('--state') + 1]).toBe('merged')
+    expect(args[args.indexOf('--search') + 1]).toBe('login')
+  })
+
+  it('omits --search when only a state qualifier is typed', async () => {
+    mockGitSuccess('[]')
+    await handlers['github:list-open-prs']({ repoRoot: '/repo', search: 'is:closed' })
+    const args = mockExecFile.mock.calls[0][1] as string[]
+    expect(args[args.indexOf('--state') + 1]).toBe('closed')
+    expect(args).not.toContain('--search')
   })
 
   it('normalizes GQL nodes with optional fields when response contains PRs', async () => {
@@ -3185,5 +3245,112 @@ describe('viewed files', () => {
     })
 
     expect(spawns.at(-1)!.args).toContain('id=PR_looked_up')
+  })
+})
+
+describe('stateForSearch', () => {
+  it.each([
+    ['is:merged', 'merged', ''],
+    ['is:closed', 'closed', ''],
+    ['is:all', 'all', ''],
+    ['IS:Merged auth fix', 'merged', 'auth fix'],
+    ['auth  is:closed   fix', 'closed', 'auth fix'],
+    ['fix bug', 'open', 'fix bug'],
+    ['', 'open', ''],
+  ])('%j -> %s / %j', (query, state, text) => {
+    expect(stateForSearch(query)).toEqual({ state, text })
+  })
+})
+
+describe('github:dashboard-search sessions and cap', () => {
+  const node = {
+    number: 5,
+    title: 'Mine',
+    url: 'https://github.com/acme/widgets/pull/5',
+    isDraft: false,
+    additions: 1,
+    deletions: 1,
+    changedFiles: 4,
+    createdAt: '2026-01-01T00:00:00Z',
+    repository: { nameWithOwner: 'acme/widgets' },
+    author: { login: 'alice' },
+    reviewDecision: null,
+    reviewRequests: { totalCount: 0 },
+    reviewThreads: { nodes: [] },
+    commits: { nodes: [] },
+    latestReviews: { nodes: [] },
+  }
+  const session = (over: Record<string, unknown>) => ({
+    repoRoot: '/Users/me/repos/widgets',
+    prNumber: 5,
+    headSHA: 'a',
+    currentChapterId: null,
+    currentFilePath: null,
+    viewedFiles: ['a.ts', 'b.ts'],
+    fileOrderOverrides: {},
+    scrollPosition: null,
+    pausedAt: null,
+    lastAccessedAt: '2026-02-01T00:00:00Z',
+    ...over,
+  })
+  const run = async () => {
+    const handlers: Record<string, Handler> = {}
+    registerGithubHandlers(
+      (channel, handler) => {
+        handlers[channel] = handler as Handler
+      },
+      { getGhPath: () => '', getToken: () => '' },
+      undefined,
+      () => ['/Users/me/repos/widgets']
+    )
+    mockDashboardExec(
+      { mine: [node] },
+      { '/Users/me/repos/widgets': 'https://github.com/acme/widgets.git' }
+    )
+    return (await handlers['github:dashboard-search']({})) as {
+      prs: Array<{ sessionStatus: string; viewedFileCount: number }>
+      capped: string[]
+    }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    for (const k of Object.keys(sessionData)) delete sessionData[k]
+  })
+
+  it('fills the latest local session for a row with a checkout', async () => {
+    sessionData['/Users/me/repos/widgets:::5'] = session({})
+    sessionData['/Users/me/repos/widgets:::5:::old'] = session({ viewedFiles: [] })
+    const result = await run()
+    expect(result.prs[0]).toMatchObject({ sessionStatus: 'in-progress', viewedFileCount: 2 })
+  })
+
+  it('marks a paused session paused', async () => {
+    sessionData['/Users/me/repos/widgets:::5'] = session({ pausedAt: '2026-02-02T00:00:00Z' })
+    const result = await run()
+    expect(result.prs[0].sessionStatus).toBe('paused')
+  })
+
+  it('leaves a row with no session not-started', async () => {
+    const result = await run()
+    expect(result.prs[0]).toMatchObject({ sessionStatus: 'not-started', viewedFileCount: 0 })
+  })
+
+  it('reports sections whose search matched more than it returned', async () => {
+    const handlers = captureHandlers()
+    mockExecFile.mockImplementation(
+      (_cmd: string, args: string[], _o: unknown, cb: ExecCallback) => {
+        if (args[1] === 'user') return cb(null, { stdout: 'alice', stderr: '' })
+        const alias = /(\w+): search\(/.exec(args[3])![1]
+        const issueCount = alias === 'mine' ? 120 : 0
+        return cb(null, {
+          stdout: JSON.stringify({ data: { [alias]: { issueCount, nodes: [] } } }),
+          stderr: '',
+        })
+      }
+    )
+    const result = (await handlers['github:dashboard-search']({})) as { capped: string[] }
+    expect(result.capped).toEqual(['mine'])
   })
 })

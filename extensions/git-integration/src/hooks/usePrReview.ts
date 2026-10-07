@@ -117,7 +117,6 @@ export function useLoadPrQueue(repoRoot: string | null) {
     setHasMorePrs,
     setNextPrCursor,
     setTotalPrCount,
-    includeClosedPrs,
     setCurrentUserLogin,
   } = usePrReviewStore()
 
@@ -128,12 +127,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
   const latestRequestIdRef = useRef(0)
 
   return useCallback(
-    async (options?: {
-      cursor?: string
-      search?: string
-      append?: boolean
-      includeClosedPrs?: boolean
-    }) => {
+    async (options?: { cursor?: string; search?: string; append?: boolean }) => {
       if (!repoRoot) return
       const isAppend = Boolean(options?.append)
       const requestId = ++latestRequestIdRef.current
@@ -161,7 +155,6 @@ export function useLoadPrQueue(repoRoot: string | null) {
         const result = await githubAPI.listOpenPrs(repoRoot, {
           cursor: options?.cursor,
           search: options?.search,
-          includeClosedPrs: options?.includeClosedPrs ?? includeClosedPrs,
         })
         if (isStale()) return
         if ('error' in result) {
@@ -210,7 +203,6 @@ export function useLoadPrQueue(repoRoot: string | null) {
     },
     [
       repoRoot,
-      includeClosedPrs,
       appendQueue,
       setQueue,
       setQueueLoading,

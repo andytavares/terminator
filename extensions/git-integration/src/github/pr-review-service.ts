@@ -767,6 +767,12 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
     openedAt: String(obj.createdAt ?? ''),
     headRefName: String(obj.headRefName ?? ''),
     baseRefName: String(obj.baseRefName ?? ''),
+    state: (() => {
+      const s = String(obj.state ?? '').toUpperCase()
+      if (s === 'MERGED') return 'merged' as const
+      if (s === 'CLOSED') return 'closed' as const
+      return 'open' as const
+    })(),
     isDraft: Boolean(obj.isDraft),
     ciStatus,
     fileCount,

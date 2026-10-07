@@ -198,6 +198,7 @@ export const PrReviewDetailSchema = z.object({
   author: z.string(),
   authorAvatarUrl: z.string(),
   openedAt: z.string(),
+  state: z.enum(['open', 'closed', 'merged']).default('open'),
   headRefName: z.string(),
   baseRefName: z.string(),
   headSHA: z.string(),
@@ -276,6 +277,8 @@ export const DashboardPRSchema = z.object({
   /** Re-review only: commits after your latest review. */
   commitsSinceMyReview: z.number(),
   reviewerCount: z.number(),
+  sessionStatus: z.enum(['not-started', 'in-progress', 'paused']).default('not-started'),
+  viewedFileCount: z.number().default(0),
 })
 
 // ─── PR issue (conversation) comments ────────────────────────────────────────

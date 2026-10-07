@@ -970,7 +970,6 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
     expect(mockListOpenPrs).toHaveBeenCalledWith('/repo', {
       cursor: 'cursor-123',
       search: 'fix bug',
-      includeClosedPrs: false,
     })
   })
 

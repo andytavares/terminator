@@ -67,6 +67,19 @@ describe('review UI store', () => {
     expect(saved).toMatchObject({ agentNotesOn: false, diffRange: 'whole', fileListHidden: true })
   })
 
+  it('defaults both list sorts to oldest and remembers a change per list', () => {
+    expect(useReviewUiStore.getState()).toMatchObject({
+      queueSort: 'oldest',
+      dashboardSort: 'oldest',
+    })
+    useReviewUiStore.getState().setQueueSort('closest')
+    useReviewUiStore.getState().setDashboardSort('started')
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY)!)
+    expect(saved).toMatchObject({ queueSort: 'closest', dashboardSort: 'started' })
+    expect(useReviewUiStore.getState().queueSort).toBe('closest')
+    expect(useReviewUiStore.getState().dashboardSort).toBe('started')
+  })
+
   it('upserts agent runs newest first without duplicates', () => {
     const s = useReviewUiStore.getState()
     s.upsertAgentRun(run('a', 'running'))
