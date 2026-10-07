@@ -1,0 +1,21 @@
+extensions/git-integration/src/components/pr-review/review-dashboard.css
+  s_115008d71d174d::t_a95d1889dab5d3 342
+scripts/e2e-select.mjs
+  s_115008d71d174d::t_a95d1889dab5d3 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "41599d8dc41727f8522fb5e068f6eb6d4c71a102",
+  "prompts": {},
+  "sessions": {
+    "s_115008d71d174d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8fbfc58-31b4-4d0a-95ef-969ec54e9262",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
