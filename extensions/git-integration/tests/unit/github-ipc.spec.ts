@@ -33,13 +33,16 @@ import { registerGithubHandlers } from '../../src/ipc/github.ipc'
 type Handler = (payload: unknown) => Promise<unknown>
 type ExecCallback = (err: Error | null, result?: { stdout: string; stderr: string }) => void
 
-function captureHandlers(): Record<string, Handler> {
+function captureHandlers(getReviewRepos?: () => string[]): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
   registerGithubHandlers(
     (channel, handler) => {
       handlers[channel] = handler as Handler
     },
-    { getGhPath: () => '', getToken: () => '' }
+    { getGhPath: () => '', getToken: () => '' },
+    undefined,
+    undefined,
+    getReviewRepos
   )
   return handlers
 }
@@ -83,13 +86,15 @@ function mockGitFailure(message: string) {
 // routed by the alias in each query rather than queued in call order.
 function mockDashboardExec(
   sections: Record<string, unknown[]>,
-  remotes: Record<string, string | Error> = {}
+  remotes: Record<string, string | Error> = {},
+  failing: Record<string, Error> = {}
 ) {
   mockExecFile.mockImplementation(
     (_cmd: string, args: string[], opts: { cwd?: string }, cb: ExecCallback) => {
       if (args[0] === 'api' && args[1] === 'user') return cb(null, { stdout: 'alice', stderr: '' })
       if (args[0] === 'api' && args[1] === 'graphql') {
         const alias = /(\w+): search\(/.exec(args[3])![1]
+        if (failing[alias]) return cb(failing[alias])
         const data = { [alias]: { nodes: sections[alias] ?? [] } }
         return cb(null, { stdout: JSON.stringify({ data }), stderr: '' })
       }
@@ -2600,6 +2605,78 @@ describe('github:dashboard-search', () => {
     for (const q of queries) expect(q.match(/: search\(/g)).toHaveLength(1)
   })
 
+  it('scopes every section to the selected repositories', async () => {
+    const handlers = captureHandlers(() => ['acme/widgets', 'acme/gadgets'])
+    mockDashboardExec({})
+    const result = (await handlers['github:dashboard-search']({})) as { scopedTo: number }
+    const queries = mockExecFile.mock.calls
+      .map((c) => c[1] as string[])
+      .filter((args) => args[1] === 'graphql')
+      .map((args) => args[3])
+    expect(queries).toHaveLength(5)
+    for (const q of queries) expect(q).toContain(' repo:acme/widgets repo:acme/gadgets"')
+    expect(result.scopedTo).toBe(2)
+  })
+
+  it('reports no scope when no repositories are selected', async () => {
+    const handlers = captureHandlers(() => [])
+    mockDashboardExec({})
+    const result = (await handlers['github:dashboard-search']({})) as {
+      scopedTo: number
+      failed: unknown[]
+    }
+    expect(result.scopedTo).toBe(0)
+    expect(result.failed).toEqual([])
+  })
+
+  it('keeps the other sections when one fails, naming the failure briefly', async () => {
+    const handlers = captureHandlers()
+    const node = {
+      number: 7,
+      title: 'Mine',
+      url: 'https://github.com/acme/widgets/pull/7',
+      isDraft: false,
+      additions: 1,
+      deletions: 1,
+      changedFiles: 1,
+      createdAt: '2026-01-01T00:00:00Z',
+      repository: { nameWithOwner: 'acme/widgets' },
+      author: { login: 'alice' },
+      reviewDecision: null,
+      reviewRequests: { totalCount: 0 },
+      reviewThreads: { nodes: [] },
+      commits: { nodes: [] },
+      latestReviews: { nodes: [] },
+    }
+    mockDashboardExec(
+      { mine: [node] },
+      {},
+      {
+        team: new Error(
+          'Command failed: gh api graphql -f query=query { team: search(...) }\ngh: HTTP 502\n'
+        ),
+      }
+    )
+    const result = (await handlers['github:dashboard-search']({})) as {
+      prs: Array<{ number: number }>
+      failed: Array<{ section: string; error: string }>
+    }
+    expect(result.prs.map((p) => p.number)).toEqual([7])
+    expect(result.failed).toEqual([{ section: 'team', error: 'gh: HTTP 502' }])
+  })
+
+  it('returns the error when every section fails', async () => {
+    const handlers = captureHandlers()
+    const boom = new Error('Command failed: gh api graphql\ngh: HTTP 502')
+    mockDashboardExec(
+      {},
+      {},
+      { reReview: boom, requested: boom, team: boom, mine: boom, involved: boom }
+    )
+    const result = (await handlers['github:dashboard-search']({})) as { error: string }
+    expect(result.error).toContain('HTTP 502')
+  })
+
   it('returns catchError shape when the login lookup fails', async () => {
     const handlers: Record<string, Handler> = {}
     registerGithubHandlers(
@@ -2611,6 +2688,79 @@ describe('github:dashboard-search', () => {
     mockGitFailure('boom')
     const result = (await handlers['github:dashboard-search']({})) as { error: string }
     expect(result.error).toContain('boom')
+  })
+})
+
+describe('github:accessible-repos', () => {
+  const JSONL = [
+    {
+      fullName: 'acme/zeta',
+      owner: 'acme',
+      private: true,
+      archived: false,
+      pushedAt: '2026-01-02T00:00:00Z',
+    },
+    {
+      fullName: 'acme/old',
+      owner: 'acme',
+      private: false,
+      archived: true,
+      pushedAt: '2020-01-01T00:00:00Z',
+    },
+    {
+      fullName: 'Acme/alpha',
+      owner: 'Acme',
+      private: false,
+      archived: false,
+      pushedAt: '2026-02-02T00:00:00Z',
+    },
+  ]
+    .map((r) => JSON.stringify(r))
+    .join('\n')
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecFile.mockReset()
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
+        cb(null, { stdout: JSONL + '\n', stderr: '' })
+    )
+  })
+
+  it('drops archived repositories and sorts by name ignoring case', async () => {
+    const handlers = captureHandlers()
+    const result = await handlers['github:accessible-repos']({})
+    expect(result).toEqual({
+      repos: [
+        { fullName: 'Acme/alpha', owner: 'Acme', private: false, pushedAt: '2026-02-02T00:00:00Z' },
+        { fullName: 'acme/zeta', owner: 'acme', private: true, pushedAt: '2026-01-02T00:00:00Z' },
+      ],
+    })
+    const [, args, options] = mockExecFile.mock.calls[0]
+    expect(args.slice(0, 3)).toEqual([
+      'api',
+      'user/repos?affiliation=owner,collaborator,organization_member&per_page=100',
+      '--paginate',
+    ])
+    expect(options).toMatchObject({ cwd: homedir(), maxBuffer: 50 * 1024 * 1024, timeout: 60_000 })
+  })
+
+  it('serves a second call from the cache and re-runs on refresh', async () => {
+    const handlers = captureHandlers()
+    await handlers['github:accessible-repos']({})
+    await handlers['github:accessible-repos']({})
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+    await handlers['github:accessible-repos']({ refresh: true })
+    expect(mockExecFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not cache a failure', async () => {
+    const handlers = captureHandlers()
+    mockExecFile.mockImplementationOnce(
+      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) => cb(new Error('boom'))
+    )
+    expect(await handlers['github:accessible-repos']({})).toHaveProperty('error')
+    expect(await handlers['github:accessible-repos']({})).toHaveProperty('repos')
   })
 })
 

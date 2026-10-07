@@ -1,8 +1,10 @@
+import { AlertTriangle, ListFilter } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { githubAPI } from '../../api/github'
 import { DashboardPRSchema, type DashboardPR } from '../../schemas/pr-review.schema'
 import { DiffSize } from './DiffSize'
+import { RepoPicker } from './RepoPicker'
 import './review-dashboard.css'
 
 type Tab = 'needs' | 'mine' | 'involved'
@@ -10,29 +12,63 @@ type Tab = 'needs' | 'mine' | 'involved'
 const FOCUS_REFRESH_MS = 2 * 60 * 1000
 const TICK_MS = 60 * 1000
 
+const SECTIONS = ['re-review', 'requested', 'team', 'mine', 'involved'] as const
+
+const SECTION_LABEL: Record<(typeof SECTIONS)[number], string> = {
+  're-review': 'Re-review',
+  requested: 'Requested',
+  team: 'Team',
+  mine: 'My PRs',
+  involved: 'Involved',
+}
+
+const FailedSectionSchema = z.object({ section: z.enum(SECTIONS), error: z.string() })
+
 const DashboardResultSchema = z.union([
   z.object({
     prs: z.array(DashboardPRSchema),
     login: z.string(),
     fetchedAt: z.string(),
+    failed: z.array(FailedSectionSchema).optional(),
+    scopedTo: z.number().optional(),
   }),
   z.object({ error: z.string() }),
 ])
 
-async function fetchDashboard(): Promise<
-  { prs: DashboardPR[]; login: string; fetchedAt: string } | { error: string }
-> {
+type DashboardResult = z.infer<typeof DashboardResultSchema>
+type FailedSection = z.infer<typeof FailedSectionSchema>
+
+/** The command that failed carries the whole GraphQL query; the reader needs only gh's own line. */
+export function shortError(message: string): string {
+  const at = message.lastIndexOf('gh:')
+  if (at >= 0) return message.slice(at).split('\n')[0].trim()
+  const lines = message.split('\n').filter((l) => l.trim())
+  return (lines[lines.length - 1] ?? message).trim()
+}
+
+function failedSummary(failed: FailedSection[]): string {
+  const names = failed.map((f) => SECTION_LABEL[f.section]).join(', ')
+  const reasons = [...new Set(failed.map((f) => shortError(f.error)))].join('; ')
+  return `Couldn't load ${names}: ${reasons}.`
+}
+
+async function fetchDashboard(): Promise<DashboardResult> {
   const raw = await githubAPI.dashboardSearch()
   return DashboardResultSchema.parse(raw)
 }
 
-async function fetchCloneFolder(): Promise<string> {
+async function fetchSettings(): Promise<{ cloneFolder: string; repos: string[] }> {
   try {
-    const raw = await githubAPI.reviewSettings()
-    const cloneFolder = (raw as { cloneFolder?: unknown } | null)?.cloneFolder
-    return typeof cloneFolder === 'string' ? cloneFolder : ''
+    const raw = (await githubAPI.reviewSettings()) as {
+      cloneFolder?: unknown
+      repos?: unknown
+    } | null
+    return {
+      cloneFolder: typeof raw?.cloneFolder === 'string' ? raw.cloneFolder : '',
+      repos: Array.isArray(raw?.repos) ? (raw.repos as string[]) : [],
+    }
   } catch {
-    return ''
+    return { cloneFolder: '', repos: [] }
   }
 }
 
@@ -62,7 +98,7 @@ function sortByOldest(prs: DashboardPR[]): DashboardPR[] {
 function daysAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
   const days = Math.max(0, Math.floor(ms / 86400000))
-  return `${days} d ago`
+  return `${days} day${days === 1 ? '' : 's'} ago`
 }
 
 function formatMinutes(total: number): string {
@@ -231,6 +267,10 @@ export function ReviewDashboard(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('needs')
   const [, setTick] = useState(0)
   const [cloneFolder, setCloneFolder] = useState('')
+  const [failed, setFailed] = useState<FailedSection[]>([])
+  const [selectedRepos, setSelectedRepos] = useState<string[]>([])
+  const [scopedTo, setScopedTo] = useState(0)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [cloneStatus, setCloneStatus] = useState<Record<number, CloneState>>({})
   const lastFetchRef = useRef<number>(0)
 
@@ -240,9 +280,14 @@ export function ReviewDashboard(): JSX.Element {
     try {
       const result = await fetchDashboard()
       if ('error' in result) {
-        setError(result.error)
+        setError(shortError(result.error))
+      } else if ((result.failed?.length ?? 0) >= SECTIONS.length) {
+        setError(shortError(result.failed![0].error))
+        setFailed([])
       } else {
         setPrs(result.prs)
+        setFailed(result.failed ?? [])
+        setScopedTo(result.scopedTo ?? 0)
         setFetchedAt(new Date(result.fetchedAt))
       }
     } catch (err) {
@@ -255,7 +300,10 @@ export function ReviewDashboard(): JSX.Element {
 
   useEffect(() => {
     load()
-    fetchCloneFolder().then(setCloneFolder)
+    void fetchSettings().then((s) => {
+      setCloneFolder(s.cloneFolder)
+      setSelectedRepos(s.repos)
+    })
   }, [load])
 
   useEffect(() => {
@@ -326,6 +374,21 @@ export function ReviewDashboard(): JSX.Element {
   const highRiskCount = needsYou.filter((p) => p.riskLevel === 'high').length
   const totalMinutes = needsYou.reduce((s, p) => s + p.estimatedMinutes, 0)
 
+  const scopeCount = selectedRepos.length || scopedTo
+  const scopeLabel = scopeCount > 0 ? `${scopeCount} repositories` : 'All repositories'
+
+  const handleSaved = () => {
+    setPickerOpen(false)
+    void fetchSettings().then((s) => setSelectedRepos(s.repos))
+    void load()
+  }
+
+  const chooseButton = (
+    <button type="button" className="rd-btn" onClick={() => setPickerOpen(true)}>
+      Choose repositories
+    </button>
+  )
+
   const updatedText = (() => {
     if (!fetchedAt) return ''
     const minutes = Math.floor((Date.now() - fetchedAt.getTime()) / 60000)
@@ -339,10 +402,26 @@ export function ReviewDashboard(): JSX.Element {
         <span className="rd-chip">{needsYouCount} need you</span>
         <span className="rd-sp" />
         <span className="rd-note">{updatedText}</span>
+        <button
+          type="button"
+          className="rd-btn rd-scope"
+          onClick={() => setPickerOpen(true)}
+          aria-label={`${scopeLabel}, choose repositories`}
+        >
+          <ListFilter aria-hidden="true" className="tm-icon-sm" />
+          {scopeLabel}
+        </button>
         <button type="button" className="rd-btn" onClick={load} disabled={loading}>
           Refresh
         </button>
       </div>
+      {pickerOpen && (
+        <RepoPicker
+          initial={selectedRepos}
+          onClose={() => setPickerOpen(false)}
+          onSaved={handleSaved}
+        />
+      )}
       <div className="rd-tabs" role="tablist" aria-label="Dashboard sections">
         <button
           role="tab"
@@ -375,6 +454,19 @@ export function ReviewDashboard(): JSX.Element {
           <button type="button" className="rd-btn" onClick={load}>
             Retry
           </button>
+          {chooseButton}
+        </div>
+      )}
+
+      {!loading && !error && failed.length > 0 && (
+        <div className="rd-failed" role="alert">
+          <AlertTriangle aria-hidden="true" className="tm-icon" />
+          <span>{failedSummary(failed)}</span>
+          <span className="rd-sp" />
+          <button type="button" className="rd-btn" onClick={load}>
+            Retry
+          </button>
+          {chooseButton}
         </div>
       )}
 

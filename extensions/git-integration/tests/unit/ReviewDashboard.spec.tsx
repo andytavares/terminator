@@ -94,12 +94,34 @@ const pr213 = makePr({
 
 function mockInvoke(
   dashboardResult: unknown,
-  options: { cloneFolder?: string; cloneResult?: unknown; cloneError?: Error } = {}
+  options: {
+    cloneFolder?: string
+    cloneResult?: unknown
+    cloneError?: Error
+    repos?: string[]
+  } = {}
 ) {
   const invoke = vi.fn((channel: string) => {
     if (channel === 'github:dashboard-search') return Promise.resolve(dashboardResult)
     if (channel === 'github:review-settings')
-      return Promise.resolve({ cloneFolder: options.cloneFolder ?? '' })
+      return Promise.resolve({ cloneFolder: options.cloneFolder ?? '', repos: options.repos ?? [] })
+    if (channel === 'github:accessible-repos')
+      return Promise.resolve({
+        repos: [
+          {
+            fullName: 'acme/api',
+            owner: 'acme',
+            private: false,
+            pushedAt: new Date().toISOString(),
+          },
+          {
+            fullName: 'acme/web',
+            owner: 'acme',
+            private: true,
+            pushedAt: new Date().toISOString(),
+          },
+        ],
+      })
     if (channel === 'github:clone-repo') {
       if (options.cloneError) return Promise.reject(options.cloneError)
       return Promise.resolve(options.cloneResult ?? { repoRoot: '/cloned/terminator' })
@@ -122,6 +144,12 @@ beforeEach(() => {
 })
 
 describe('ReviewDashboard', () => {
+  it('says how long ago a pull request opened in words', async () => {
+    mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    expect(await screen.findByText(/opened 3 days ago/)).toBeTruthy()
+  })
+
   it('reloads when a review is submitted elsewhere', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     const bridge = (
@@ -281,5 +309,86 @@ describe('ReviewDashboard', () => {
     render(<ReviewDashboard />)
     expect(await screen.findByText(/network down/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+  it('labels the scope button from the saved selection', async () => {
+    mockInvoke(
+      { prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() },
+      { repos: ['acme/api', 'acme/web', 'octo/cli'] }
+    )
+    render(<ReviewDashboard />)
+    expect(await screen.findByRole('button', { name: /3 repositories/ })).toBeTruthy()
+  })
+
+  it('labels the scope button All repositories when nothing is selected', async () => {
+    mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    expect(await screen.findByRole('button', { name: /All repositories/ })).toBeTruthy()
+  })
+
+  it('falls back to scopedTo from the search for the label', async () => {
+    mockInvoke({
+      prs: [pr210],
+      login: 'andytavares',
+      fetchedAt: new Date().toISOString(),
+      scopedTo: 12,
+    })
+    render(<ReviewDashboard />)
+    expect(await screen.findByRole('button', { name: /12 repositories/ })).toBeTruthy()
+  })
+
+  it('saving the picker sends the selection and reloads the dashboard', async () => {
+    mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    await screen.findByText('REQUESTED OF YOU')
+    const invoke = window.electronAPI.extensionBridge.invoke as ReturnType<typeof vi.fn>
+    const searches = () =>
+      invoke.mock.calls.filter((c: unknown[]) => c[0] === 'github:dashboard-search').length
+    expect(searches()).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: /All repositories/ }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'acme/api' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(searches()).toBe(2))
+    expect(invoke).toHaveBeenCalledWith('github:review-repos-set', { repos: ['acme/api'] })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('names the sections that failed and keeps the ones that loaded', async () => {
+    mockInvoke({
+      prs: [pr210],
+      login: 'andytavares',
+      fetchedAt: new Date().toISOString(),
+      failed: [
+        { section: 'involved', error: 'Command failed: gh api graphql -f query=...\ngh: HTTP 502' },
+        { section: 'team', error: 'gh: HTTP 502' },
+      ],
+    })
+    render(<ReviewDashboard />)
+    const band = await screen.findByRole('alert')
+    expect(band.textContent).toContain("Couldn't load Involved, Team: gh: HTTP 502.")
+    expect(screen.getByText('REQUESTED OF YOU')).toBeTruthy()
+    expect(screen.getByTestId('row-210')).toBeTruthy()
+    expect(within(band).getByRole('button', { name: 'Choose repositories' })).toBeTruthy()
+    expect(within(band).getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+
+  it('shows only the short message when every section failed', async () => {
+    const query = 'query { search(query: "is:open is:pr") { nodes { number } } }'
+    const failed = ['re-review', 'requested', 'team', 'mine', 'involved'].map((section) => ({
+      section,
+      error: `Command failed: gh api graphql -f query='${query}'\ngh: HTTP 502`,
+    }))
+    mockInvoke({ prs: [], login: 'andytavares', fetchedAt: new Date().toISOString(), failed })
+    render(<ReviewDashboard />)
+    await screen.findByText(/gh: HTTP 502/)
+    expect(document.body.textContent).not.toContain('search(query')
+    expect(screen.getByRole('button', { name: 'Choose repositories' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+
+  it('trims an error result that carries the whole command', async () => {
+    mockInvoke({ error: 'Command failed: gh api graphql -f query=query { x }\ngh: HTTP 401' })
+    render(<ReviewDashboard />)
+    await screen.findByText(/gh: HTTP 401/)
+    expect(document.body.textContent).not.toContain('query { x }')
   })
 })

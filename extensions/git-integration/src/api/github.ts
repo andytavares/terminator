@@ -120,4 +120,9 @@ export const githubAPI = {
     bridge().invoke('github:clone-repo', { repo, folder }),
 
   reviewSettings: () => bridge().invoke('github:review-settings', {}),
+
+  accessibleRepos: (refresh?: boolean) =>
+    bridge().invoke('github:accessible-repos', refresh === undefined ? {} : { refresh }),
+
+  setReviewRepos: (repos: string[]) => bridge().invoke('github:review-repos-set', { repos }),
 }

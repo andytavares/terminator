@@ -53,20 +53,45 @@ describe('DASHBOARD_QUERIES', () => {
 })
 
 describe('buildSectionQueries', () => {
+  const sections = ['involved', 'mine', 're-review', 'requested', 'team']
+  const repoCount = (search: string) => search.match(/ repo:/g)?.length ?? 0
+
   // GitHub resolves aliased searches one after another inside a single request,
   // so one combined query took the sum of every section and hit the ~10 s cutoff.
   it('builds one query per section, each holding exactly one search', () => {
     const queries = buildSectionQueries('bob')
-    expect(Object.keys(queries).sort()).toEqual(
-      ['involved', 'mine', 're-review', 'requested', 'team'].sort()
-    )
-    for (const query of Object.values(queries)) {
+    expect(queries.map((q) => q.section).sort()).toEqual(sections)
+    for (const { query } of queries) {
       expect(query.match(/: search\(/g)).toHaveLength(1)
       expect(query).toContain('fragment prFields on PullRequest')
+      expect(query).not.toContain(' repo:')
     }
-    expect(queries['re-review']).toContain('reReview: search')
-    expect(queries.team).toContain('team-review-requested-user:bob')
-    expect(queries.team).not.toContain('LOGIN')
+    const byName = Object.fromEntries(queries.map((q) => [q.section, q.query]))
+    expect(byName['re-review']).toContain('reReview: search')
+    expect(byName.team).toContain('team-review-requested-user:bob')
+    expect(byName.team).not.toContain('LOGIN')
+  })
+
+  it('splits 450 repositories into chunks of at most 200 per section', () => {
+    const repos = Array.from({ length: 450 }, (_, i) => `acme/repo-${i}`)
+    const queries = buildSectionQueries('bob', repos)
+    expect(queries).toHaveLength(15)
+    for (const section of sections) {
+      const own = queries.filter((q) => q.section === section)
+      expect(own).toHaveLength(3)
+      const covered = own.flatMap((q) =>
+        [...q.query.matchAll(/ repo:(acme\/repo-\d+)/g)].map((m) => m[1])
+      )
+      expect(covered).toEqual(repos)
+      for (const { query } of own) expect(repoCount(query)).toBeLessThanOrEqual(200)
+    }
+  })
+
+  it('appends the qualifiers to the section query inside the search string', () => {
+    const [first] = buildSectionQueries('bob', ['acme/widgets', 'acme/gadgets']).filter(
+      (q) => q.section === 'mine'
+    )
+    expect(first.query).toContain(`${DASHBOARD_QUERIES.mine} repo:acme/widgets repo:acme/gadgets"`)
   })
 })
 

@@ -960,6 +960,56 @@ Sent by a review surface after an approval lands. The handler broadcasts `review
 
 ---
 
+### `github:dashboard-search`
+
+Runs the Reviews list's five searches (one GraphQL request per section, per chunk of 200 selected repositories, all in parallel).
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{}`
+
+**Response**: `{ prs: DashboardPR[]; login: string; fetchedAt: string; failed: Array<{ section: DashboardSection; error: string }>; scopedTo: number } | { error: string }`
+
+- `scopedTo` — number of repositories selected through `github:review-repos-set`; `0` means all repositories
+- `failed` — sections with at least one failed request (for example `{ section: 'team', error: 'gh: HTTP 502' }`, the last line of the gh error); `prs` still holds every other section
+- `{ error }` only when every request failed, mapped as for other GitHub channels
+
+---
+
+### `github:accessible-repos`
+
+Lists the repositories the viewer owns, collaborates on or reaches through an organization, for the Reviews repository picker. Archived repositories are excluded. The list is cached until `refresh` is set.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ refresh?: boolean }`
+
+**Response**: `{ repos: Array<{ fullName: string; owner: string; private: boolean; pushedAt: string }> } | { error: string }` — sorted by `fullName`, case-insensitive
+
+---
+
+### `github:review-settings`
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{}`
+
+**Response**: `{ cloneFolder: string; repos: string[] }` — `repos` is the stored selection for the Reviews list (`[]` means all repositories)
+
+---
+
+### `github:review-repos-set`
+
+Stores the repositories the Reviews list considers (setting `terminator.git-integration.review.repos`, not shown in the settings schema; the picker is its UI).
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repos: string[] }` — each `owner/name`; duplicates are removed; `[]` selects all repositories
+
+**Response**: `{ ok: true } | { error: 'VALIDATION_ERROR' }`
+
+---
+
 ### `reviews:changed`
 
 Push telling the Reviews list (`view=reviews`) to re-run `github:dashboard-search`.

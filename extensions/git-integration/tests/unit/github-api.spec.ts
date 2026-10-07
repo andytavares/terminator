@@ -199,6 +199,9 @@ describe('githubAPI bridge', () => {
     await githubAPI.prCompare('/repo', 'aaa111', 'bbb222')
     await githubAPI.cloneRepo('andytavares/terminator', '/Users/me/src')
     await githubAPI.reviewSettings()
+    await githubAPI.accessibleRepos()
+    await githubAPI.accessibleRepos(true)
+    await githubAPI.setReviewRepos(['acme/widgets'])
     await githubAPI.testsForBlock({ repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' })
     expect(mockInvoke.mock.calls).toEqual([
       ['github:dashboard-search', {}],
@@ -209,6 +212,9 @@ describe('githubAPI bridge', () => {
       ['github:pr-compare', { repoRoot: '/repo', fromSha: 'aaa111', toSha: 'bbb222' }],
       ['github:clone-repo', { repo: 'andytavares/terminator', folder: '/Users/me/src' }],
       ['github:review-settings', {}],
+      ['github:accessible-repos', {}],
+      ['github:accessible-repos', { refresh: true }],
+      ['github:review-repos-set', { repos: ['acme/widgets'] }],
       ['github:tests-for-block', { repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' }],
     ])
   })
