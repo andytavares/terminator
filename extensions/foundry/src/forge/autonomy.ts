@@ -83,6 +83,28 @@ export function dismissConfidentFindings(
   }
 }
 
+/**
+ * Send a refused proposal straight back to the architect, or null to stop.
+ *
+ * A refusal is mechanical — a field in the wrong shape — and the architect can
+ * read the field paths the operator cannot, so it shares the automatic turns a
+ * failing check gets rather than going to the operator first.
+ */
+/** The ledger reason for that turn, which the Forge reads to say what it is doing. */
+export const REWRITING_UNREADABLE = 'rewriting a plan it wrote in the wrong format'
+
+export function retryForRefusal(reason: string, autoTurnsSoFar: number): string | null {
+  if (autoTurnsSoFar >= MAX_AUTO_TURNS) return null
+  return [
+    'Your last proposal was refused. Nothing from it was saved:',
+    '',
+    reason,
+    '',
+    'Write the whole proposal again with each of those fields in the shape the',
+    'output contract shows.',
+  ].join('\n')
+}
+
 /** What to send the architect next without asking anyone, or null to stop. */
 export function followUpFor(
   failures: readonly CompileFailure[],

@@ -5,6 +5,8 @@ import {
   decideConfidentQuestions,
   dismissConfidentFindings,
   followUpFor,
+  retryForRefusal,
+  MAX_AUTO_TURNS,
 } from '../../src/forge/autonomy.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -186,5 +188,19 @@ describe('followUpFor', () => {
 
   it('has nothing to send when the order compiles', () => {
     expect(followUpFor([], 0)).toBeNull()
+  })
+})
+
+describe('retryForRefusal', () => {
+  const reason = 'The proposal was refused: plan.units.0.verify.0: Expected object, received string'
+
+  it('sends the refusal back to the architect, field by field, while turns remain', () => {
+    const message = retryForRefusal(reason, 0)
+    expect(message).toContain('plan.units.0.verify.0: Expected object, received string')
+    expect(message).toContain('Nothing from it was saved')
+  })
+
+  it('stops once the automatic turns are spent, so the operator hears about it', () => {
+    expect(retryForRefusal(reason, MAX_AUTO_TURNS)).toBeNull()
   })
 })

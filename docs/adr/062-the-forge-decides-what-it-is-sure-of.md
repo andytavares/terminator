@@ -26,7 +26,9 @@ of (spec 062).
 - `followUpFor` hands failing checks other than `questions` back to the
   architect, at most `MAX_AUTO_TURNS` (2) times per operator turn. The previous
   architect process is ended first (`endAndWait`), so two processes never share
-  one conversation.
+  one conversation. `retryForRefusal` shares those turns: a proposal Zod
+  refuses goes back with its field paths, and the operator sees it only once
+  they run out, named by part ("unit 1, check 2") through `refusedParts`.
 
 ## Alternatives
 

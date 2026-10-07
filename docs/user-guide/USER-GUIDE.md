@@ -726,7 +726,11 @@ architect** (or the red team, or the scout), which takes you into that
 terminal.
 
 **Foundry does most of the shaping on its own.** When a check fails that the
-architect can close, it gets up to two automatic turns to close it. While it
+architect can close, it gets up to two automatic turns to close it. A plan the
+architect wrote in the wrong format goes back to it the same way, and you see
+it only if those turns don't fix it: the strip then says which part was
+unreadable and offers **Start the turn over** or **Tell the architect what was
+wrong**. While it
 works, the step shows **Being revised** in blue rather than a red cross, because
 nothing is wrong yet. Once the plan passes, the red team reviews it. Blocking
 findings go straight back to the architect. The order then hands off unless the

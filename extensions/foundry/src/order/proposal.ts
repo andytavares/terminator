@@ -70,10 +70,48 @@ export const ProposalSchema = z
 
 export type Proposal = z.infer<typeof ProposalSchema>
 
+const REFUSED = 'The proposal was refused: '
+
+// The parts of a proposal an operator can find on the order, by the name the
+// Forge shows them under. Any other path segment is a field inside one of them.
+const PART_NAMES: Record<string, string> = {
+  acceptance: 'acceptance criterion',
+  units: 'unit',
+  lanes: 'lane',
+  verify: 'check',
+  assumptions: 'assumption',
+  openQuestions: 'question',
+  triggers: 'risk trigger',
+  evidence: 'evidence',
+}
+
+/**
+ * Where a refused proposal went wrong, in the Forge's own words, or null when
+ * the reason is not a schema refusal. `plan.units.0.verify.1` reads "unit 1,
+ * check 2".
+ */
+export function refusedParts(reason: string): string[] | null {
+  if (!reason.startsWith(REFUSED)) return null
+  const parts = reason
+    .slice(REFUSED.length)
+    .split('; ')
+    .map((issue) => {
+      const segments = issue.slice(0, issue.indexOf(':')).split('.')
+      const named = segments.flatMap((segment, i) => {
+        const name = PART_NAMES[segment]
+        if (name === undefined) return []
+        const index = Number(segments[i + 1])
+        return [Number.isInteger(index) ? `${name} ${index + 1}` : name]
+      })
+      return named.length === 0 ? 'the plan' : named.join(', ')
+    })
+  return [...new Set(parts)]
+}
+
 export class ProposalRejected extends Error {
   readonly code = 'PROPOSAL_REJECTED'
   constructor(reason: string) {
-    super(`The proposal was refused: ${reason}`)
+    super(`${REFUSED}${reason}`)
     this.name = 'ProposalRejected'
   }
 }
