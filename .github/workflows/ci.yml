@@ -288,8 +288,9 @@ jobs:
           ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 $SPECS)
           if [ -z "$ARGS" ]; then echo "Nothing selected for this shard."; exit 0; fi
           # remote-app.spec.ts drives the browser remote renderer in Chromium, and
-          # git-integration-contrast.spec.ts renders the extension views in it.
-          case "$ARGS" in *remote-app.spec.ts* | *git-integration-contrast.spec.ts*) npx playwright install chromium ;; esac
+          # git-integration-contrast.spec.ts and git-integration-stacking.spec.ts
+          # render the extension views in it.
+          case "$ARGS" in *remote-app.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts*) npx playwright install chromium ;; esac
           npx playwright test $ARGS --reporter=blob,dot
         timeout-minutes: 10
 
@@ -300,7 +301,7 @@ jobs:
         run: |
           ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 ${{ needs.e2e-select.outputs.changed }})
           if [ -z "$ARGS" ]; then echo "Nothing changed on this shard."; exit 0; fi
-          case "$ARGS" in *remote-app.spec.ts* | *git-integration-contrast.spec.ts*) npx playwright install chromium ;; esac
+          case "$ARGS" in *remote-app.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts*) npx playwright install chromium ;; esac
           npx playwright test $ARGS --repeat-each=2 --reporter=dot
         timeout-minutes: 10
 
