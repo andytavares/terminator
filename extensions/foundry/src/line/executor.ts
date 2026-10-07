@@ -8,11 +8,11 @@ import {
   isComplete,
   budgetBreach,
   hasStalled,
-  blockedNodes,
+  stalledWhy,
   rework,
 } from './scheduler.js'
 import type { BudgetBreach } from './scheduler.js'
-import { withNode, stepFor, unitsOf, wantsFreshContext } from './run-graph.js'
+import { withNode, stepFor, unitsOf, wantsFreshContext, nodeLabel, nodeById } from './run-graph.js'
 import { checkExpect, resolveCommand } from '../recipe/step-kinds.js'
 import type { RunGraph, RunNode, Feedback } from './run-graph.js'
 import { createRoleRegistry } from './roles.js'
@@ -698,7 +698,10 @@ export async function execute(
       if (hasStalled(current, budgets)) {
         halted = await raise('verify.repeat-fail', {
           summary: `${order.title} cannot go any further on its own`,
-          why: `${blockedNodes(current).length} units are blocked and nothing is runnable. Something they depend on failed, or the plan has a cycle.`,
+          why: stalledWhy(
+            current,
+            (id) => `**${nodeLabel(order, nodeById(current, id) as RunNode)}**`
+          ),
           // The node the Inbox's "Send back" should retry — not just that
           // *something* failed. Null only when nothing here is actually
           // failed, which a cycle can still produce.
@@ -1166,7 +1169,14 @@ export async function execute(
             `${node.stepId} exited ${result.exitCode ?? 'without a status'}; sending ${onFail.rework} back (round ${node.reworks + 1} of ${onFail.max})`
           )
         } else {
-          const failure = markFailed(current, node.id, deps.now())
+          const reason = madeNoChange
+            ? 'made no change to the checkout'
+            : unmet.length > 0
+              ? `did not meet what it promised: ${unmet.join('; ')}`
+              : `exited ${result.exitCode ?? 'without a status'}${
+                  command ? ` running \`${command}\`` : ''
+                }${logPath ? `. The output is in \`${logPath}\`` : ''}`
+          const failure = markFailed(current, node.id, deps.now(), reason)
           await advance(failure.graph)
           deps.onEvent?.({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
 

@@ -98,6 +98,36 @@ export function blockedReason(
   return null
 }
 
+/**
+ * Why a stalled graph cannot move, for the gate that says so: each failed step
+ * and why it failed, and what is held up behind it. With nothing failed, what
+ * each outstanding step is waiting on, which is how a cycle shows itself.
+ */
+export function stalledWhy(
+  graph: RunGraph,
+  name: (nodeId: string) => string = (nodeId) => nodeId
+): string {
+  const failed = graph.nodes.filter((n) => n.state === 'failed')
+  const outstanding = graph.nodes.filter(
+    (n) => n.state !== 'passed' && n.state !== 'skipped' && n.state !== 'failed'
+  )
+  if (failed.length === 0) {
+    const waits = outstanding
+      .map((n) => {
+        const reason = blockedReason(graph, n.id, name)
+        return reason === null ? null : `- ${name(n.id)} is ${reason}`
+      })
+      .filter((line): line is string => line !== null)
+    return `Nothing failed, but nothing can start. The plan has steps waiting on each other:\n\n${waits.join('\n')}`
+  }
+
+  const lines = failed.map((n) => `${name(n.id)} failed${n.failReason ? `: ${n.failReason}` : ''}.`)
+  const what = failed.length === 1 ? lines[0] : lines.map((line) => `- ${line}`).join('\n')
+  if (outstanding.length === 0) return what
+  const behind = failed.length === 1 ? 'it' : 'them'
+  return `${what}\n\nHeld up behind ${behind}: ${outstanding.map((n) => name(n.id)).join(', ')}.`
+}
+
 export interface StartResult {
   readonly graph: RunGraph
   readonly started: readonly string[]
@@ -132,12 +162,17 @@ export interface FailResult {
   readonly needsDecision: boolean
 }
 
-export function markFailed(graph: RunGraph, id: string, at: string): FailResult {
+export function markFailed(
+  graph: RunGraph,
+  id: string,
+  at: string,
+  reason: string | null = null
+): FailResult {
   const node = nodeById(graph, id)
   if (node === undefined) return { graph, needsDecision: false }
 
   const exhausted = node.attempts >= MAX_ATTEMPTS
-  let next = withNode(graph, id, { state: 'failed', endedAt: at })
+  let next = withNode(graph, id, { state: 'failed', endedAt: at, failReason: reason })
 
   // Everything downstream is blocked rather than left waiting for ever, so the
   // surface can say why nothing is happening instead of showing a stalled graph.
@@ -151,7 +186,7 @@ export function markFailed(graph: RunGraph, id: string, at: string): FailResult 
 
 /** Put a failed node back in the queue — after a decision, never automatically. */
 export function retry(graph: RunGraph, id: string): RunGraph {
-  let next = withNode(graph, id, { state: 'waiting', endedAt: null })
+  let next = withNode(graph, id, { state: 'waiting', endedAt: null, failReason: null })
   for (const dependent of next.nodes) {
     if (dependent.dependsOn.includes(id) && dependent.state === 'blocked') {
       next = withNode(next, dependent.id, { state: 'waiting' })

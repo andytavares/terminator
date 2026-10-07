@@ -11,6 +11,7 @@ import {
   hasStalled,
   blockedNodes,
   blockedReason,
+  stalledWhy,
   inFlight,
   budgetBreach,
   withLimit,
@@ -189,6 +190,14 @@ describe('retry', () => {
     expect(nodeById(g, 'build:U-1')?.state).toBe('waiting')
     expect(nodeById(g, 'integrate')?.state).toBe('waiting')
   })
+
+  it('forgets why the node failed', () => {
+    let g = graph([unit('U-1')])
+    g = markFailed(g, 'build:U-1', 'at', 'exited 1').graph
+    expect(nodeById(g, 'build:U-1')?.failReason).toBe('exited 1')
+    g = retry(g, 'build:U-1')
+    expect(nodeById(g, 'build:U-1')?.failReason).toBeNull()
+  })
 })
 
 describe('blockedNodes and blockedReason', () => {
@@ -213,6 +222,55 @@ describe('blockedNodes and blockedReason', () => {
   it('lists everything a failure has stopped', () => {
     const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at').graph
     expect(blockedNodes(g).map((n) => n.id)).toContain('integrate')
+  })
+})
+
+describe('stalledWhy', () => {
+  it('names the failed step, why it failed, and everything held up behind it', () => {
+    const g = markFailed(
+      graph([unit('U-1')]),
+      'build:U-1',
+      'at',
+      'exited 1 running `npm test`'
+    ).graph
+    expect(stalledWhy(g)).toBe(
+      'build:U-1 failed: exited 1 running `npm test`.\n\nHeld up behind it: integrate, ship.'
+    )
+  })
+
+  it('uses the names the surface uses', () => {
+    const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at', 'made no change').graph
+    expect(stalledWhy(g, (id) => `<${id}>`)).toMatch(/^<build:U-1> failed: made no change\./)
+  })
+
+  it('says only that a step failed when no reason was recorded', () => {
+    const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at').graph
+    expect(stalledWhy(g)).toMatch(/^build:U-1 failed\.\n/)
+  })
+
+  it('lists every failed step when more than one failed', () => {
+    let g = graph([unit('U-1'), unit('U-2')])
+    g = markFailed(g, 'build:U-1', 'at', 'exited 1').graph
+    g = markFailed(g, 'build:U-2', 'at', 'exited 2').graph
+    expect(stalledWhy(g)).toBe(
+      '- build:U-1 failed: exited 1.\n- build:U-2 failed: exited 2.\n\nHeld up behind them: integrate, ship.'
+    )
+  })
+
+  it('names nothing held up when the failed step was the last one', () => {
+    let g = graph([unit('U-1')])
+    for (const id of ['build:U-1', 'integrate']) g = markPassed(g, id, 'at')
+    g = markFailed(g, 'ship', 'at', 'exited 1').graph
+    expect(stalledWhy(g)).toBe('ship failed: exited 1.')
+  })
+
+  it('says what each step waits on when nothing failed', () => {
+    let g = graph([unit('U-1')])
+    g = withNode(g, 'build:U-1', { dependsOn: ['ship'] })
+    expect(stalledWhy(g)).toBe(
+      'Nothing failed, but nothing can start. The plan has steps waiting on each other:\n\n' +
+        '- build:U-1 is waiting on ship\n- integrate is waiting on build:U-1\n- ship is waiting on integrate'
+    )
   })
 })
 
