@@ -1,0 +1,49 @@
+extensions/git-integration/src/components/pr-review/ReviewQueue.tsx
+  s_115008d71d174d::t_0f679f89da364e 18
+  s_115008d71d174d::t_5b9d085b0fe835 4-6,8,14,28,57,114,119,131-144,159,164,174-177,190-220,225
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_115008d71d174d::t_511853d00b8168 6,29-30,147,151,154-232,238-253,338
+  s_115008d71d174d::t_0f679f89da364e 233-237
+extensions/git-integration/tests/unit/review-queue-ux.spec.tsx
+  s_115008d71d174d::t_f98531094b0118 21-24
+  s_115008d71d174d::t_511853d00b8168 133
+extensions/git-integration/tests/unit/github-api.spec.ts
+  s_115008d71d174d::t_19536e1a9a8ec2 20
+extensions/git-integration/tests/unit/ReviewQueue.spec.tsx
+  s_115008d71d174d::t_f98531094b0118 6,24-27,60,178-189,245-262,264-265,267,269-272,274-277,279-286,294-322,330-351,355-365,368-373,375-383,386-399,403,408-410
+  s_115008d71d174d::t_0f679f89da364e 266,287-293,323-329
+extensions/git-integration/src/components/pr-review/SortSelect.tsx
+  s_115008d71d174d::t_5b9d085b0fe835 1-31
+extensions/git-integration/src/components/pr-review/review-dashboard.css
+  s_115008d71d174d::t_19536e1a9a8ec2 159
+  s_115008d71d174d::t_18fb04d6a54c66 71-72,78-92,130-131,133-139,143,146-150,188,191-201,207-220,243-251
+  s_115008d71d174d::t_85670435f7028f 154-156
+  s_115008d71d174d::t_8b252d207f53f0 252
+extensions/git-integration/src/components/pr-review/ReviewDashboard.tsx
+  s_115008d71d174d::t_88006eafc9260b 7-9,37,91-92,95-97,100-101,104-105,108-109,112-113,122,134,141,147,150-155,158,161,167-183,186-194,201-204,221-230,237-242,245,252
+  s_115008d71d174d::t_0f679f89da364e 110-111
+  s_115008d71d174d::t_18fb04d6a54c66 6
+  s_115008d71d174d::t_0fa323dc885f0d 17,267-268,286,360-370,375-408,457-482,516-522,524,530-531,537-538
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_115008d71d174d::t_ec92046d1f55e6 233
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_115008d71d174d::t_ec92046d1f55e6 131-132,147
+extensions/git-integration/src/components/pr-review/DiffSize.tsx
+  s_115008d71d174d::t_5b9d085b0fe835 20-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0c6cf57fccafca9df0de8cb9a33052b955809d23",
+  "prompts": {},
+  "sessions": {
+    "s_115008d71d174d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b8fbfc58-31b4-4d0a-95ef-969ec54e9262",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
