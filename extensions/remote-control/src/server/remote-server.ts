@@ -20,6 +20,7 @@ import { ConnectedDeviceRegistry } from './connected-devices.js'
 // keep in sync if the design tokens change.
 const EXTENSION_BASE_CSS = `
 :root {
+  --tm-control-height: 28px;
   --tm-bg-base: #0c0c0f;
   --tm-bg-surface: #111116;
   --tm-bg-elevated: #18181f;
@@ -130,6 +131,13 @@ const EXTENSION_BASE_CSS = `
    shipped as a white pill on a dark panel. border:0 rather than a
    transparent border, so a button that wants an edge states the full
    shorthand — which every one of them already does. */
+/* One height for every single-line field and select, so controls that share a
+   row line up whatever padding and font size each class picks. :where() keeps
+   it at zero specificity: a class that sets its own height still wins. */
+:where(select:not([multiple], [size]), input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='hidden'])) {
+  height: var(--tm-control-height);
+}
+
 button {
   appearance: none;
   -webkit-appearance: none;

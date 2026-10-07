@@ -261,7 +261,7 @@ describe('no form control may drift back to a native or half-styled widget', () 
         if (!/checkbox|radio/i.test(selector)) continue
         // A rule that names the type — or explicitly excludes it — is strong
         // enough (or is not a control rule at all).
-        if (/input\[type=/.test(selector) || /:not\(\[type=/.test(selector)) continue
+        if (/input\[type=/.test(selector) || /:not\(\s*\[type=/.test(selector)) continue
         if (notAnInput.some((c) => selector.includes(c))) continue
         const props = ['width', 'height', 'margin', 'border-radius', 'background']
         const found = props.filter((p) => new RegExp(`(^|;|\\s)${p}\\s*:`).test(body))

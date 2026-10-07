@@ -167,3 +167,13 @@ Stacking comes from the published scale in `@terminator/extension-ui`:
 `layerValue()` / `nestedLayerValue()` in TypeScript, `var(--tm-layer-*)` in CSS.
 A raw `z-index` number is how 38 unmanaged values ended up deciding order by
 whoever picked the biggest.
+
+## 10. Control height
+
+Every single-line `<input>` and `<select>` is `var(--tm-control-height)` (28px),
+set by a zero-specificity base rule in both the core and the extension
+stylesheets, so a search box and the Sort beside it are always the same height
+whatever padding or font size each class picks. Do not size a control with
+padding. A field drawn borderless inside a container that is the visible box (the
+sidebar search, the Quick Actions search), or an inline rename in a dense row (a
+tab, a branch row), opts out with `height: auto` on its own selector.

@@ -90,6 +90,7 @@
 }
 
 .qa-search__input {
+  height: auto;
   flex: 1;
   background: none;
   border: none;

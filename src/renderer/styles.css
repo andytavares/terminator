@@ -2,6 +2,7 @@
 :root {
   --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
   --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --control-height: 28px;
 
   /* surfaces */
   --bg-base: #0c0c0f;
@@ -103,6 +104,7 @@
   --tm-bg-card: var(--bg-card);
   --tm-bg-card-hover: var(--bg-card-hover);
   --tm-bg-input: var(--bg-input);
+  --tm-control-height: var(--control-height);
   --tm-text-primary: var(--text-primary);
   --tm-text-secondary: var(--text-secondary);
   --tm-text-muted: var(--text-muted);
@@ -217,6 +219,23 @@ body,
 button {
   font-family: inherit;
   cursor: pointer;
+}
+
+/* One height for every single-line field and select, so controls that share a
+   row line up whatever padding and font size each class picks. :where() keeps
+   it at zero specificity: a class that sets its own height still wins. */
+:where(
+    select:not([multiple], [size]),
+    input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='range'],
+        [type='color'],
+        [type='file'],
+        [type='hidden']
+      )
+  ) {
+  height: var(--control-height);
 }
 
 /* ── Focus ───────────────────────────────────────────────────── */

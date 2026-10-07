@@ -170,6 +170,7 @@
 }
 
 .home__search input {
+  height: auto;
   flex: 1;
   min-width: 0;
   border: 0;

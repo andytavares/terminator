@@ -350,6 +350,7 @@
 
 .daily-log__link-picker input,
 .daily-log__migrate-picker input {
+  height: auto;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-xs, 4px);
@@ -536,6 +537,7 @@
 }
 
 .projects-browser__link-picker input {
+  height: auto;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-xs, 4px);
@@ -2941,6 +2943,7 @@
 }
 
 .file-to-picker__search {
+  height: auto;
   flex: 1;
   background: none;
   border: none;
@@ -3249,6 +3252,7 @@
 }
 
 .daily-log__subtask-edit input {
+  height: auto;
   flex: 1;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-accent);
@@ -5111,6 +5115,7 @@ h2.daily-log__date {
 }
 
 .projects-browser__task-edit input {
+  height: auto;
   flex: 1;
   font-size: 12px;
   padding: 2px 6px;
