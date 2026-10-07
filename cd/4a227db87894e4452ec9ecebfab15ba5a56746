@@ -1,0 +1,23 @@
+extensions/foundry/src/forge/converge.ts
+  s_ca39052178434f::t_717e6d2771086d 94
+  s_ca39052178434f::t_78fa20e7af95a8 67
+  s_ca39052178434f::t_501e89bc26dac4 93
+extensions/foundry/tests/forge/converge.spec.ts
+  s_ca39052178434f::t_e992366bf2911d 198-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cd4a227db87894e4452ec9ecebfab15ba5a56746",
+  "prompts": {},
+  "sessions": {
+    "s_ca39052178434f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b351f16-3a52-4145-b4d3-a0c40bbcf13a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
