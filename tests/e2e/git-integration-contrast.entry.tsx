@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client'
 import { FullFileList } from '../../extensions/git-integration/src/components/pr-review/FullFileList'
 import { ChapterNav } from '../../extensions/git-integration/src/components/pr-review/ChapterNav'
 import { ReviewDashboard } from '../../extensions/git-integration/src/components/pr-review/ReviewDashboard'
+import { RepoPicker } from '../../extensions/git-integration/src/components/pr-review/RepoPicker'
 import { GitFullView } from '../../extensions/git-integration/src/components/GitFullView'
 import { MergeFlowView } from '../../extensions/git-integration/src/components/merge-flow/MergeFlowView'
 import { usePrReviewStore } from '../../extensions/git-integration/src/stores/pr-review.store'
@@ -250,7 +251,27 @@ const channels: Record<string, unknown> = {
     login: 'andytavares',
     fetchedAt: new Date().toISOString(),
   },
-  'github:review-settings': { cloneFolder: '/work/clones' },
+  'github:review-settings': { cloneFolder: '/work/clones', repos: [] },
+  'github:accessible-repos': {
+    repos: [
+      { fullName: 'acme/api', owner: 'acme', private: true, pushedAt: ago(3) },
+      { fullName: 'acme/web', owner: 'acme', private: false, pushedAt: ago(40) },
+      { fullName: 'acme/infra', owner: 'acme', private: true, pushedAt: ago(200) },
+      {
+        fullName: 'andytavares/terminator',
+        owner: 'andytavares',
+        private: false,
+        pushedAt: ago(1),
+      },
+      {
+        fullName: 'andytavares/dotfiles',
+        owner: 'andytavares',
+        private: false,
+        pushedAt: ago(420),
+      },
+      { fullName: 'octo/cli', owner: 'octo', private: false, pushedAt: ago(9) },
+    ],
+  },
 }
 
 ;(window as unknown as { electronAPI: unknown }).electronAPI = {
@@ -309,6 +330,13 @@ const surfaces: Record<string, () => JSX.Element> = {
     <div style={{ height: 640, width: 1000, display: 'flex' }}>
       <MergeFlowView repoRoot={REPO} onExit={() => {}} />
     </div>
+  ),
+  'repo-picker': () => (
+    <RepoPicker
+      initial={['acme/api', 'andytavares/terminator', 'andytavares/dotfiles']}
+      onClose={() => {}}
+      onSaved={() => {}}
+    />
   ),
   reviews: () => (
     <div style={{ height: 640, width: 1100, display: 'flex' }}>
