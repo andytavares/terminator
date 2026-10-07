@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ReviewQueue } from '../../src/components/pr-review/ReviewQueue'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
+import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { ReviewQueuePR } from '../../src/schemas/pr-review.schema'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
@@ -20,6 +21,10 @@ function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
     additions: 20,
     deletions: 5,
     isDraft: false,
+    state: 'open',
+    ciStatus: 'passing',
+    headRefName: 'feat',
+    baseRefName: 'main',
     riskLevel: 'low',
     estimatedMinutes: 10,
     sessionStatus: 'not-started',
@@ -52,6 +57,7 @@ const defaultStoreState = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useReviewUiStore.setState({ queueSort: 'oldest' })
   vi.mocked(usePrReviewStore).mockReturnValue(
     defaultStoreState as unknown as ReturnType<typeof usePrReviewStore>
   )
@@ -62,8 +68,6 @@ const defaultProps = {
   onOpenPr: vi.fn(),
   onRefresh: vi.fn().mockResolvedValue(undefined),
   onDismissPr: vi.fn().mockResolvedValue(undefined),
-  includeClosedPrs: false,
-  onToggleClosedPrs: vi.fn().mockResolvedValue(undefined),
 }
 
 describe('ReviewQueue', () => {
@@ -134,37 +138,6 @@ describe('ReviewQueue', () => {
     expect(screen.getByRole('searchbox')).toBeTruthy()
   })
 
-  it('keeps only the filter the section headings cannot express', () => {
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('Open more than 3 days')).toBeTruthy()
-    // "High risk", "Quick wins" and "In progress" were each a heading in the
-    // list below, so the pill only hid the rest of the page to reach them.
-    expect(screen.queryByText('Quick wins')).toBeNull()
-  })
-
-  it('hides filter pills when searching', () => {
-    render(<ReviewQueue {...defaultProps} />)
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'feature' } })
-    expect(screen.queryByText('Open more than 3 days')).toBeNull()
-  })
-
-  it('shows "Open only" button by default', () => {
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('Open only')).toBeTruthy()
-  })
-
-  it('shows "Open + Closed" when includeClosedPrs is true', () => {
-    render(<ReviewQueue {...defaultProps} includeClosedPrs={true} />)
-    expect(screen.getByText('Open + Closed')).toBeTruthy()
-  })
-
-  it('calls onToggleClosedPrs when toggle button is clicked', () => {
-    const onToggleClosedPrs = vi.fn().mockResolvedValue(undefined)
-    render(<ReviewQueue {...defaultProps} onToggleClosedPrs={onToggleClosedPrs} />)
-    fireEvent.click(screen.getByText('Open only'))
-    expect(onToggleClosedPrs).toHaveBeenCalledWith(true)
-  })
-
   it('shows error state when queueError is set', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
@@ -202,7 +175,18 @@ describe('ReviewQueue', () => {
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('High risk')).toBeTruthy()
-    expect(screen.getByText('Read these first')).toBeTruthy()
+  })
+
+  it('says nothing about medium or low risk', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      prQueue: [
+        makePr({ riskLevel: 'medium', number: 1, title: 'Medium PR' }),
+        makePr({ riskLevel: 'low', number: 2, title: 'Low PR' }),
+      ],
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ReviewQueue {...defaultProps} />)
+    expect(screen.queryByText(/risk/i)).toBeNull()
   })
 
   it('shows Draft label for draft PRs', () => {
@@ -229,17 +213,6 @@ describe('ReviewQueue', () => {
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getAllByText('Resume').length).toBeGreaterThan(0)
-  })
-
-  it('applies active filter pill when clicked', () => {
-    render(<ReviewQueue {...defaultProps} />)
-    const staleBtn = screen.getByText('Open more than 3 days')
-    fireEvent.click(staleBtn)
-    expect(staleBtn.className).toContain('pr-filter-pill--active')
-    // Pressing it again returns to the whole queue, so there is no state the
-    // control cannot leave.
-    fireEvent.click(staleBtn)
-    expect(staleBtn.className).not.toContain('pr-filter-pill--active')
   })
 
   it('shows approval chip when PR has approvals', () => {
@@ -269,87 +242,172 @@ describe('ReviewQueue', () => {
     expect(screen.queryByText(/approved/)).toBeNull()
   })
 
-  it('shows Needs your review section when current user is a requested reviewer', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      currentUserLogin: 'me',
-      prQueue: [makePr({ number: 55, title: 'Review me', requestedReviewers: ['me', 'other'] })],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('Needs your review')).toBeTruthy()
-    expect(screen.getByText('Review me')).toBeTruthy()
-  })
-
-  it('shows Needs your review section when current user is an assignee', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      currentUserLogin: 'me',
-      prQueue: [makePr({ number: 58, title: 'Assigned to me', assigneeLogins: ['me'] })],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getByText('Needs your review')).toBeTruthy()
-    expect(screen.getByText('Assigned to me')).toBeTruthy()
-  })
-
-  it('does not show Needs your review section when current user is not a requested reviewer', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      currentUserLogin: 'me',
-      prQueue: [makePr({ number: 56, title: 'Not for me', requestedReviewers: ['other'] })],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.queryByText('Needs your review')).toBeNull()
-  })
-
-  it('does not show Needs your review section when currentUserLogin is null', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      currentUserLogin: null,
-      prQueue: [makePr({ number: 57, title: 'No user', requestedReviewers: ['anyone'] })],
-    } as unknown as ReturnType<typeof usePrReviewStore>)
-    render(<ReviewQueue {...defaultProps} />)
-    expect(screen.queryByText('Needs your review')).toBeNull()
-  })
-
-  describe('row format matches the all-repositories dashboard', () => {
-    function renderOne(overrides: Partial<ReviewQueuePR> = {}) {
+  describe('one list, two lines per row', () => {
+    function renderMany(prs: ReviewQueuePR[], extra: Record<string, unknown> = {}) {
       vi.mocked(usePrReviewStore).mockReturnValue({
         ...defaultStoreState,
-        prQueue: [
-          makePr({
-            number: 212,
-            title: 'ci: split shards',
-            additions: 1234,
-            deletions: 3,
-            fileCount: 1,
-            ...overrides,
-          }),
-        ],
+        prQueue: prs,
+        ...extra,
       } as unknown as ReturnType<typeof usePrReviewStore>)
       return render(<ReviewQueue {...defaultProps} />)
     }
+    const days = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
+    const titles = (container: HTMLElement) =>
+      [...container.querySelectorAll('.rd-ti')].map((t) => t.textContent ?? '')
 
-    it('lays a PR out as a dashboard row: title with a subline, size, risk, estimate, action', () => {
-      const { container } = renderOne()
+    it('has no open/closed toggle', () => {
+      renderMany([])
+      expect(screen.queryByRole('button', { name: /open only|open \+ closed/i })).toBeNull()
+      expect(screen.queryByText('Open only')).toBeNull()
+    })
+
+    it('tells the search how to find merged pull requests', () => {
+      renderMany([])
+      expect(screen.getByPlaceholderText('Search open PRs · is:merged for merged')).toBeTruthy()
+    })
+
+    it('shows Merged first on the second line of a merged row', () => {
+      const { container } = renderMany([makePr({ state: 'merged', title: 'Shipped' })])
+      expect(container.querySelector('.rd-ti small')!.textContent!.startsWith('Merged')).toBe(true)
+    })
+
+    it('shows Closed first on the second line of a closed row', () => {
+      const { container } = renderMany([makePr({ state: 'closed', title: 'Dropped' })])
+      expect(container.querySelector('.rd-ti small')!.textContent!.startsWith('Closed')).toBe(true)
+    })
+
+    it('has one heading with the total, and none of the old groups', () => {
+      renderMany([makePr({ number: 1 }), makePr({ number: 2, riskLevel: 'high' })], {
+        totalPrCount: 47,
+      })
+      const headings = screen.getAllByRole('heading', { level: 3 })
+      expect(headings).toHaveLength(1)
+      expect(headings[0].textContent).toContain('Open pull requests')
+      expect(headings[0].textContent).toContain('47')
+      for (const old of [
+        'In progress',
+        'Needs your review',
+        'Read these first',
+        'Quick wins',
+        'Larger reviews',
+      ]) {
+        expect(screen.queryByText(old)).toBeNull()
+      }
+      expect(screen.queryByText(/Open more than/)).toBeNull()
+    })
+
+    it('sorts oldest first by default', () => {
+      const { container } = renderMany([
+        makePr({ number: 2, title: 'Newer', openedAt: days(1) }),
+        makePr({ number: 1, title: 'Older', openedAt: days(9) }),
+      ])
+      expect(titles(container)[0]).toContain('Older')
+      expect((screen.getByRole('combobox', { name: 'Sort' }) as HTMLSelectElement).value).toBe(
+        'oldest'
+      )
+    })
+
+    it('offers the three sorts by name', () => {
+      renderMany([])
+      const select = screen.getByRole('combobox', { name: 'Sort' })
+      expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual([
+        'Oldest first',
+        'Closest to merging',
+        'Started by you',
+      ])
+    })
+
+    it('puts approved, passing pull requests first under Closest to merging', () => {
+      const { container } = renderMany([
+        makePr({ number: 1, title: 'Waiting', openedAt: days(9) }),
+        makePr({
+          number: 2,
+          title: 'Ready',
+          openedAt: days(1),
+          approvalCount: 1,
+          approvedBy: ['bo'],
+        }),
+      ])
+      fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
+        target: { value: 'closest' },
+      })
+      expect(titles(container)[0]).toContain('Ready')
+      expect(useReviewUiStore.getState().queueSort).toBe('closest')
+    })
+
+    it('puts a paused pull request first under Started by you', () => {
+      const { container } = renderMany([
+        makePr({ number: 1, title: 'Untouched', openedAt: days(9) }),
+        makePr({ number: 2, title: 'Paused one', openedAt: days(1), sessionStatus: 'paused' }),
+      ])
+      fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
+        target: { value: 'started' },
+      })
+      expect(titles(container)[0]).toContain('Paused one')
+    })
+
+    it('lays the second line out as attention states only', () => {
+      const { container } = renderMany(
+        [
+          makePr({
+            number: 212,
+            title: 'ci: split shards',
+            openedAt: days(139),
+            isDraft: true,
+            mergeStateStatus: 'dirty',
+            approvalCount: 2,
+            approvedBy: ['a', 'b'],
+            riskLevel: 'high',
+            ciStatus: 'failing',
+            requestedReviewers: ['me'],
+            sessionStatus: 'in-progress',
+            viewedFileCount: 1,
+            fileCount: 3,
+          }),
+        ],
+        { currentUserLogin: 'me' }
+      )
+      expect(container.querySelector('.rd-ti small')!.textContent).toBe(
+        'Draft · Conflicts · alice · 139d · 2 approved · High risk · CI failing · Your review requested · 1 of 3 viewed'
+      )
+    })
+
+    it('leaves a quiet row with only the author and age', () => {
+      const { container } = renderMany([makePr({ openedAt: days(2) })])
+      expect(container.querySelector('.rd-ti small')!.textContent).toBe('alice · 2d')
+    })
+
+    it('shows the size and the reading time in the right column, with no risk chip', () => {
+      const { container } = renderMany([
+        makePr({ additions: 1234, deletions: 3, fileCount: 1, estimatedMinutes: 7 }),
+      ])
       const row = container.querySelector('.rd-row')!
-      expect(row.querySelector('.rd-ti')!.textContent).toContain('#212')
-      expect(row.querySelector('.rd-ti small')!.textContent).toContain('alice')
       expect(row.querySelector('.rd-size')!.textContent).toBe('+1,234 −3 · 1 file')
-      expect(row.querySelector('.rd-chip.rd-lo')!.textContent).toBe('Low risk')
-      expect(row.querySelector('.rd-btn')!.textContent).toBe('Review')
-      expect(container.querySelector('.rd-grp')!.textContent).toBe('Larger reviews')
+      expect(row.querySelector('.rd-num:not(.rd-size)')!.textContent).toBe('~7 min')
+      expect(row.querySelector('.rd-chip')).toBeNull()
+    })
+
+    it('opens a row on Enter', () => {
+      const pr = makePr({ title: 'Keyboard' })
+      const onOpenPr = vi.fn()
+      vi.mocked(usePrReviewStore).mockReturnValue({
+        ...defaultStoreState,
+        prQueue: [pr],
+      } as unknown as ReturnType<typeof usePrReviewStore>)
+      const { container } = render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
+      fireEvent.keyDown(container.querySelector('.rd-row')!, { key: 'Enter' })
+      expect(onOpenPr).toHaveBeenCalledWith(pr)
     })
 
     it('colours additions green and removals red', () => {
-      renderOne()
+      renderMany([makePr({ additions: 1234, deletions: 3 })])
       expect(screen.getByText('+1,234').className).toBe('rd-add')
       expect(screen.getByText('−3').className).toBe('rd-del')
     })
 
-    it('names conflicts in the subline as text, with no icon', () => {
-      const { container } = renderOne({ mergeStateStatus: 'dirty' })
-      const conflicts = screen.getByText('Conflicts')
-      expect(conflicts.closest('small')).toBeTruthy()
+    it('names conflicts in the second line as text, with no icon', () => {
+      const { container } = renderMany([makePr({ mergeStateStatus: 'dirty' })])
+      expect(screen.getByText('Conflicts').closest('small')).toBeTruthy()
       expect(container.querySelector('.rd-row svg')).toBeNull()
     })
   })

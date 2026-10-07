@@ -91,7 +91,6 @@ function resetStore() {
     queueError: null,
     hasMorePrs: false,
     nextPrCursor: undefined,
-    includeClosedPrs: false,
     activePr: null,
     currentChapterId: null,
     currentFilePath: null,
@@ -150,11 +149,6 @@ describe('usePrReviewStore', () => {
     it('setNextPrCursor stores cursor', () => {
       usePrReviewStore.getState().setNextPrCursor('cursor-abc')
       expect(usePrReviewStore.getState().nextPrCursor).toBe('cursor-abc')
-    })
-
-    it('setIncludeClosedPrs toggles inclusion', () => {
-      usePrReviewStore.getState().setIncludeClosedPrs(true)
-      expect(usePrReviewStore.getState().includeClosedPrs).toBe(true)
     })
   })
 

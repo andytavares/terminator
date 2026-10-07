@@ -1,31 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { RefreshCw, X } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
+import { useReviewUiStore } from '../../stores/review-ui.store'
+import { sortPrs } from '../../review/sort-prs'
+import { SortSelect } from './SortSelect'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
-import { DiffSize } from './DiffSize'
+import { DiffSize, RowMeta, shortAge } from './DiffSize'
 import './review-dashboard.css'
-
-type Filter = 'all' | 'stale'
-
-const STALE_DAYS = 3
 
 interface Props {
   repoRoot: string
   onOpenPr: (pr: ReviewQueuePR) => void
-  onRefresh: (options?: { search?: string; includeClosedPrs?: boolean }) => Promise<void>
+  onRefresh: (options?: { search?: string }) => Promise<void>
   onDismissPr: (prNumber: number) => Promise<void>
-  includeClosedPrs: boolean
-  onToggleClosedPrs: (include: boolean) => Promise<void>
 }
 
-export function ReviewQueue({
-  repoRoot: _repoRoot,
-  onOpenPr,
-  onRefresh,
-  onDismissPr,
-  includeClosedPrs,
-  onToggleClosedPrs,
-}: Props) {
+export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh, onDismissPr }: Props) {
   const {
     prQueue,
     queueLoading,
@@ -35,7 +25,7 @@ export function ReviewQueue({
     totalPrCount,
     currentUserLogin,
   } = usePrReviewStore()
-  const [activeFilter, setActiveFilter] = useState<Filter>('all')
+  const { queueSort, setQueueSort } = useReviewUiStore()
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -64,56 +54,7 @@ export function ReviewQueue({
     }
   }
 
-  const now = Date.now()
-  const staleMs = STALE_DAYS * 24 * 60 * 60 * 1000
-
-  function matchesFilter(pr: (typeof prQueue)[number]): boolean {
-    switch (activeFilter) {
-      case 'stale':
-        return now - new Date(pr.openedAt).getTime() > staleMs
-      default:
-        return true
-    }
-  }
-
-  // In-progress PRs always appear at the top regardless of active filter.
-  const inProgress = prQueue.filter(
-    (p) => p.sessionStatus === 'in-progress' || p.sessionStatus === 'paused'
-  )
-  const inProgressNumbers = new Set(inProgress.map((p) => p.number))
-
-  // PRs where current user is a requested reviewer or assignee — filtered by active filter
-  // so pills actually affect this section too.
-  const needsMyReview = currentUserLogin
-    ? prQueue.filter(
-        (p) =>
-          !inProgressNumbers.has(p.number) &&
-          (p.requestedReviewers?.includes(currentUserLogin) ||
-            p.assigneeLogins?.includes(currentUserLogin)) &&
-          matchesFilter(p)
-      )
-    : []
-  const needsMyReviewNumbers = new Set(needsMyReview.map((p) => p.number))
-
-  const filtered = prQueue.filter((pr) => {
-    if (inProgressNumbers.has(pr.number)) return false
-    if (needsMyReviewNumbers.has(pr.number)) return false
-    // Exclude needsMyReview PRs that were hidden by the filter (they shouldn't fall through).
-    if (
-      currentUserLogin &&
-      (pr.requestedReviewers?.includes(currentUserLogin) ||
-        pr.assigneeLogins?.includes(currentUserLogin)) &&
-      !inProgressNumbers.has(pr.number)
-    )
-      return false
-    return matchesFilter(pr)
-  })
-
-  const readFirst = filtered.filter((p) => p.riskLevel === 'high')
-  const quickWins = filtered.filter(
-    (p) => p.riskLevel === 'low' && p.additions + p.deletions <= 100
-  )
-  const larger = filtered.filter((p) => !readFirst.includes(p) && !quickWins.includes(p))
+  const sorted = sortPrs(prQueue, queueSort)
 
   // Reading time is only knowable for the PRs actually loaded, so it is
   // stated as a floor rather than passed off as the total when more remain.
@@ -166,44 +107,16 @@ export function ReviewQueue({
         </button>
       </div>
 
-      {/* Search bar + state toggle */}
       <div className="pr-search-row">
         <input
           className="pr-search-input"
           type="search"
-          placeholder="Search by title or PR number…"
+          placeholder="Search open PRs · is:merged for merged"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           aria-label="Search pull requests"
         />
-        <button
-          className={`pr-state-toggle${includeClosedPrs ? ' pr-state-toggle--active' : ''}`}
-          onClick={() => onToggleClosedPrs(!includeClosedPrs)}
-          title={
-            includeClosedPrs
-              ? 'Showing open + closed — click for open only'
-              : 'Showing open only — click to include closed'
-          }
-          aria-pressed={includeClosedPrs}
-        >
-          {includeClosedPrs ? 'Open + Closed' : 'Open only'}
-        </button>
-        {/* Three of the five pills — High risk, Quick wins, In progress — named
-            a section that is already a heading in the list below, so pressing
-            one hid four fifths of the page to reach something visible by
-            scrolling. Age is the one axis the sections cannot express, so it is
-            the one control that survives, and it sits with the other two
-            controls that scope the list rather than owning a row of its own. */}
-        {!searchQuery && (
-          <button
-            type="button"
-            className={`pr-filter-pill${activeFilter === 'stale' ? ' pr-filter-pill--active' : ''}`}
-            aria-pressed={activeFilter === 'stale'}
-            onClick={() => setActiveFilter(activeFilter === 'stale' ? 'all' : 'stale')}
-          >
-            Open more than {STALE_DAYS} days
-          </button>
-        )}
+        <SortSelect value={queueSort} onChange={setQueueSort} />
       </div>
 
       {/* Sections */}
@@ -215,18 +128,20 @@ export function ReviewQueue({
             {searchQuery ? 'No matching pull requests.' : 'No open pull requests.'}
           </div>
         ) : (
-          // One grid for every section, so their columns line up.
-          <div className="rd-rows rd-rows--single-repo">
-            <PrSection
-              title="In progress"
-              prs={inProgress}
-              onOpen={onOpenPr}
-              onDismiss={onDismissPr}
-            />
-            <PrSection title="Needs your review" prs={needsMyReview} onOpen={onOpenPr} />
-            <PrSection title="Read these first" prs={readFirst} onOpen={onOpenPr} />
-            <PrSection title="Quick wins" prs={quickWins} onOpen={onOpenPr} />
-            <PrSection title="Larger reviews" prs={larger} onOpen={onOpenPr} />
+          <div className="rd-rows">
+            <h3 className="rd-grp">
+              <span>Open pull requests</span>
+              <span className="rd-ct">{totalPrCount ?? prQueue.length}</span>
+            </h3>
+            {sorted.map((pr) => (
+              <PrRow
+                key={pr.number}
+                pr={pr}
+                onOpen={onOpenPr}
+                onDismiss={onDismissPr}
+                currentUserLogin={currentUserLogin}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -237,42 +152,16 @@ export function ReviewQueue({
   )
 }
 
-function PrSection({
-  title,
-  prs,
-  onOpen,
-  onDismiss,
-}: {
-  title: string
-  prs: ReviewQueuePR[]
-  onOpen: (pr: ReviewQueuePR) => void
-  onDismiss?: (prNumber: number) => Promise<void>
-}) {
-  if (prs.length === 0) return null
-  return (
-    <>
-      <h3 className="rd-grp">{title}</h3>
-      {prs.map((pr) => (
-        <PrRow key={pr.number} pr={pr} onOpen={onOpen} onDismiss={onDismiss} />
-      ))}
-    </>
-  )
-}
-
-const RISK_CHIP: Record<ReviewQueuePR['riskLevel'], { text: string; cls: string }> = {
-  high: { text: 'High risk', cls: 'rd-hi' },
-  medium: { text: 'Medium risk', cls: 'rd-md' },
-  low: { text: 'Low risk', cls: 'rd-lo' },
-}
-
 function PrRow({
   pr,
   onOpen,
   onDismiss,
+  currentUserLogin,
 }: {
   pr: ReviewQueuePR
   onOpen: (pr: ReviewQueuePR) => void
   onDismiss?: (prNumber: number) => Promise<void>
+  currentUserLogin: string | null
 }) {
   const isSession = pr.sessionStatus === 'paused' || pr.sessionStatus === 'in-progress'
   // A control says what happens when it is used: every one of these opens the diff.
@@ -282,11 +171,10 @@ function PrRow({
       : pr.sessionStatus === 'in-progress'
         ? 'Continue'
         : 'Review'
-  const chip = RISK_CHIP[pr.riskLevel]
-  const fileProgress =
-    pr.sessionStatus !== 'not-started' && pr.fileCount > 0
-      ? Math.round((pr.viewedFileCount / pr.fileCount) * 100)
-      : null
+  const mine =
+    currentUserLogin !== null &&
+    (pr.requestedReviewers.includes(currentUserLogin) ||
+      pr.assigneeLogins.includes(currentUserLogin))
   const open = () => onOpen(pr)
 
   return (
@@ -299,41 +187,42 @@ function PrRow({
       }}
     >
       <span className="rd-ti">
-        <span>#{pr.number}</span> <span>{pr.title}</span>
-        <small>
-          {pr.isDraft && (
-            <>
-              <span>Draft</span>
-              {' · '}
-            </>
-          )}
-          {pr.mergeStateStatus === 'dirty' && (
-            <>
-              <span className="rd-warn" title="This PR has merge conflicts">
-                Conflicts
-              </span>
-              {' · '}
-            </>
-          )}
-          {pr.author} · opened {formatAge(pr.openedAt)}
-          {pr.approvalCount > 0 && (
-            <>
-              {' · '}
-              <span title={`Approved by: ${pr.approvedBy.join(', ')}`}>
-                {pr.approvalCount} approved
-              </span>
-            </>
-          )}
-          {fileProgress !== null && ` · ${fileProgress}% reviewed`}
-        </small>
+        <span className="rd-t1">
+          <span className="rd-no">#{pr.number}</span> <span>{pr.title}</span>
+        </span>
+        <RowMeta
+          parts={[
+            pr.state === 'merged' && { text: 'Merged' },
+            pr.state === 'closed' && { text: 'Closed' },
+            pr.isDraft && { text: 'Draft' },
+            pr.mergeStateStatus === 'dirty' && {
+              text: 'Conflicts',
+              tone: 'warning',
+              title: 'This PR has merge conflicts',
+            },
+            { text: pr.author },
+            { text: shortAge(pr.openedAt) },
+            pr.approvalCount > 0 && {
+              text: `${pr.approvalCount} approved`,
+              title: `Approved by: ${pr.approvedBy.join(', ')}`,
+            },
+            pr.riskLevel === 'high' && { text: 'High risk', tone: 'danger' },
+            pr.ciStatus === 'failing' && { text: 'CI failing', tone: 'danger' },
+            mine && { text: 'Your review requested' },
+            pr.sessionStatus !== 'not-started' && {
+              text: `${pr.viewedFileCount} of ${pr.fileCount} viewed`,
+            },
+          ]}
+        />
       </span>
-      <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
-      <span>{chip && <span className={`rd-chip ${chip.cls}`}>{chip.text}</span>}</span>
-      <span className="rd-num">~{pr.estimatedMinutes} min</span>
+      <span className="rd-side">
+        <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
+        <span className="rd-num">~{pr.estimatedMinutes} min</span>
+      </span>
       <span className="rd-actions">
         <button
           type="button"
-          className={isSession ? 'rd-btn rd-pri' : 'rd-btn'}
+          className={isSession ? 'rd-btn rd-pri rd-always' : 'rd-btn'}
           onClick={(e) => {
             e.stopPropagation()
             open()
@@ -358,12 +247,4 @@ function PrRow({
       </span>
     </div>
   )
-}
-
-function formatAge(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(ms / 86_400_000)
-  if (days === 0) return 'today'
-  if (days === 1) return '1d ago'
-  return `${days}d ago`
 }

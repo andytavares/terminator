@@ -36,18 +36,15 @@ vi.mock('../../src/components/pr-review/ReviewQueue', () => ({
     onOpenPr,
     onRefresh,
     onLoadMore,
-    onToggleClosedPrs,
   }: {
     onOpenPr: (pr: { number: number; title: string }) => void
     onRefresh: (opts: { search: string }) => void
     onLoadMore: () => void
-    onToggleClosedPrs: (v: boolean) => void
   }) => (
     <div data-testid="review-queue">
       <button onClick={() => onOpenPr({ number: 1, title: 'Test PR' })}>Open PR</button>
       <button onClick={() => onRefresh({ search: 'test' })}>Refresh</button>
       <button onClick={() => onLoadMore()}>Load More</button>
-      <button onClick={() => onToggleClosedPrs(true)}>Toggle Closed</button>
     </div>
   ),
 }))
@@ -96,7 +93,6 @@ vi.mock('../../src/components/pr-review/PrOverviewPanel', () => ({
 }))
 
 const mockSetActivePr = vi.fn()
-const mockSetIncludeClosedPrs = vi.fn()
 const mockInitSession = vi.fn()
 const mockReconcileHead = vi.fn()
 const mockReset = vi.fn()
@@ -112,8 +108,6 @@ const defaultStoreState = {
   markPrInProgress: mockMarkPrInProgress,
   dismissPr: mockDismissPr,
   nextPrCursor: null,
-  includeClosedPrs: false,
-  setIncludeClosedPrs: mockSetIncludeClosedPrs,
   viewedFiles: new Set<string>(),
   currentChapterId: null,
   currentFilePath: null,
@@ -286,12 +280,6 @@ describe('PrReviewTab', () => {
       expect(close).not.toHaveBeenCalled()
       close.mockRestore()
     })
-  })
-
-  it('calls setIncludeClosedPrs when toggle closed is clicked', () => {
-    render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByText('Toggle Closed'))
-    expect(mockSetIncludeClosedPrs).toHaveBeenCalledWith(true)
   })
 
   it('reads the v2 session key before falling back to the legacy key', async () => {

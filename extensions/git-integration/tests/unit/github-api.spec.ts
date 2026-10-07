@@ -17,7 +17,7 @@ afterEach(() => {
 describe('githubAPI bridge', () => {
   it('listOpenPrs calls correct channel', async () => {
     const { githubAPI } = await import('../../src/api/github')
-    await githubAPI.listOpenPrs('/repo', { cursor: 'abc', search: 'foo', includeClosedPrs: true })
+    await githubAPI.listOpenPrs('/repo', { cursor: 'abc', search: 'foo' })
     expect(mockInvoke).toHaveBeenCalledWith(
       'github:list-open-prs',
       expect.objectContaining({ repoRoot: '/repo' })

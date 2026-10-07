@@ -146,7 +146,6 @@ beforeEach(() => {
     updateFileRiskScores: mockUpdateFileRiskScores,
     updateQueuePrRisk: mockUpdateQueuePrRisk,
     setCurrentUserLogin: mockSetCurrentUserLogin,
-    includeClosedPrs: false,
     activePr: null,
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })

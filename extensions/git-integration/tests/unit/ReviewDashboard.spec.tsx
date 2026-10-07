@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { ReviewDashboard } from '../../src/components/pr-review/ReviewDashboard'
 import type { DashboardPR } from '../../src/schemas/pr-review.schema'
+import { useReviewUiStore } from '../../src/stores/review-ui.store'
 
 function makePr(overrides: Partial<DashboardPR> = {}): DashboardPR {
   return {
@@ -25,6 +26,8 @@ function makePr(overrides: Partial<DashboardPR> = {}): DashboardPR {
     unresolvedThreads: 0,
     commitsSinceMyReview: 0,
     reviewerCount: 1,
+    sessionStatus: 'not-started',
+    viewedFileCount: 0,
     ...overrides,
   }
 }
@@ -141,13 +144,113 @@ function mockInvoke(
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useReviewUiStore.setState({ dashboardSort: 'oldest' })
 })
 
 describe('ReviewDashboard', () => {
-  it('says how long ago a pull request opened in words', async () => {
+  it('says how old a pull request is in short form on the second line', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
-    expect(await screen.findByText(/opened 3 days ago/)).toBeTruthy()
+    const row = await screen.findByTestId('row-210')
+    expect(row.querySelector('.rd-ti small')!.textContent).toContain('alice · 3d')
+  })
+
+  it('opens a pull request when its row is clicked', async () => {
+    mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    fireEvent.click(await screen.findByText('Foundry: the red team argues before agreement'))
+    await waitFor(() => {
+      expect(window.electronAPI.extensionBridge.invoke).toHaveBeenCalledWith(
+        'window:open-pr-review',
+        { repoRoot: '/repo/terminator', prNumber: '210', showOverview: 'true' }
+      )
+    })
+  })
+
+  it('does not repeat the needs-you count in the top bar', async () => {
+    mockInvoke({ prs: [pr210, pr212], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    const { container } = render(<ReviewDashboard />)
+    await screen.findByTestId('row-210')
+    expect(container.querySelector('.rd-bar')!.textContent).not.toMatch(/need you/)
+  })
+
+  it('reads "no checks" for a pull request without checks and never names CI twice', async () => {
+    const noChecks = makePr({ number: 300, section: 'mine', ciStatus: 'none' })
+    const failing = makePr({ number: 301, section: 'mine', ciStatus: 'failing' })
+    mockInvoke({ prs: [noChecks, failing], login: 'a', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
+    const quiet = await screen.findByTestId('row-300')
+    expect(quiet.textContent).toContain('no checks')
+    expect(quiet.textContent).not.toContain('CI pending')
+    expect(quiet.textContent).toContain('~5 min')
+    for (const id of ['row-300', 'row-301']) {
+      const text = screen.getByTestId(id).textContent!
+      expect(text.match(/CI/g)?.length ?? 0).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('shows 50+ on the tab and heading of a capped section', async () => {
+    mockInvoke({
+      prs: [pr210, pr212],
+      capped: ['team'],
+      login: 'a',
+      fetchedAt: new Date().toISOString(),
+    })
+    render(<ReviewDashboard />)
+    await screen.findByTestId('row-210')
+    expect(within(screen.getByRole('tablist')).getByText('50+')).toBeTruthy()
+    const team = screen.getByText('REQUESTED OF YOUR TEAM').parentElement!
+    expect(within(team).getByText('50+')).toBeTruthy()
+    const requested = screen.getByText('REQUESTED OF YOU').parentElement!
+    expect(within(requested).queryByText('50+')).toBeNull()
+  })
+
+  it('names the repository on the second line only when more than one repository shows', async () => {
+    const other = makePr({ repo: 'acme/api', number: 400, title: 'Other repo PR' })
+    mockInvoke({ prs: [pr210, other], login: 'a', fetchedAt: new Date().toISOString() })
+    const { unmount } = render(<ReviewDashboard />)
+    const row = await screen.findByTestId('row-400')
+    expect(row.querySelector('.rd-ti small')!.textContent!.startsWith('api')).toBe(true)
+    expect(row.querySelector('.rd-repo')).toBeNull()
+    unmount()
+    mockInvoke({ prs: [pr210], login: 'a', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    const single = await screen.findByTestId('row-210')
+    expect(single.querySelector('.rd-ti small')!.textContent).not.toContain('terminator')
+  })
+
+  it('shows high risk in words and nothing for medium risk', async () => {
+    const medium = makePr({ number: 410, riskLevel: 'medium', title: 'Medium' })
+    mockInvoke({ prs: [pr210, medium], login: 'a', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    expect(await screen.findByTestId('row-210')).toBeTruthy()
+    expect(screen.getByTestId('row-210').textContent).toContain('High risk')
+    expect(screen.getByTestId('row-410').textContent).not.toMatch(/risk/i)
+  })
+
+  it('sorts each section with the chosen sort', async () => {
+    const old = makePr({
+      number: 501,
+      title: 'Old waiting',
+      createdAt: new Date(Date.now() - 9 * 86400000).toISOString(),
+    })
+    const ready = makePr({
+      number: 502,
+      title: 'Ready one',
+      reviewDecision: 'approved',
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
+    })
+    mockInvoke({ prs: [old, ready], login: 'a', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    await screen.findByTestId('row-501')
+    const order = () => screen.getAllByTestId(/^row-/).map((r) => r.getAttribute('data-testid'))
+    expect(order()).toEqual(['row-501', 'row-502'])
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
+      target: { value: 'closest' },
+    })
+    expect(order()).toEqual(['row-502', 'row-501'])
+    expect(screen.queryByText(/Sorted by closest/)).toBeNull()
   })
 
   it('reloads when a review is submitted elsewhere', async () => {
@@ -232,7 +335,7 @@ describe('ReviewDashboard', () => {
     expect(screen.getByText('+1,385').closest('.rd-size')!.textContent).toBe(
       '+1,385 −246 · 109 files'
     )
-    expect(screen.getByText('Changes asked')).toBeTruthy()
+    expect(screen.getByText('changes requested')).toBeTruthy()
   })
 
   it('keeps the "Open" label and notes "Not cloned" when localRepoRoot is null', async () => {

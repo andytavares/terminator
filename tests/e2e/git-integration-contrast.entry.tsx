@@ -361,8 +361,6 @@ function PausedQueue(): JSX.Element {
         onOpenPr={() => {}}
         onRefresh={() => Promise.resolve()}
         onDismissPr={() => Promise.resolve()}
-        includeClosedPrs={false}
-        onToggleClosedPrs={() => Promise.resolve()}
       />
     </div>
   )

@@ -86,8 +86,6 @@ export function PrReviewTab({ repoRoot }: Props) {
     hasMorePrs,
     queueLoading,
     loadingMorePrs,
-    includeClosedPrs,
-    setIncludeClosedPrs,
     viewedFiles,
     currentChapterId,
     currentFilePath,
@@ -130,16 +128,11 @@ export function PrReviewTab({ repoRoot }: Props) {
   }, [repoRoot, loadQueue])
 
   const handleRefreshQueue = useCallback(
-    async (options?: { search?: string; includeClosedPrs?: boolean }) => {
-      await loadQueue({ search: options?.search, includeClosedPrs: options?.includeClosedPrs })
+    async (options?: { search?: string }) => {
+      await loadQueue({ search: options?.search })
     },
     [loadQueue]
   )
-
-  const handleToggleClosed = async (include: boolean) => {
-    setIncludeClosedPrs(include)
-    await loadQueue({ includeClosedPrs: include })
-  }
 
   // The queue is meant to be worked top to bottom, and "Load more pull
   // requests" made finishing it a manual chore — while the summary above it
@@ -151,7 +144,7 @@ export function PrReviewTab({ repoRoot }: Props) {
   const autoPagesRef = useRef(0)
   useEffect(() => {
     autoPagesRef.current = 0
-  }, [repoRoot, includeClosedPrs])
+  }, [repoRoot])
   useEffect(() => {
     if (!hasMorePrs || !nextPrCursor) return
     if (queueLoading || loadingMorePrs) return
@@ -342,8 +335,6 @@ export function PrReviewTab({ repoRoot }: Props) {
         onOpenPr={handleOpenPr}
         onRefresh={handleRefreshQueue}
         onDismissPr={handleDismissPr}
-        includeClosedPrs={includeClosedPrs}
-        onToggleClosedPrs={handleToggleClosed}
       />
     </div>
   )

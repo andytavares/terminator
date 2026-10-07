@@ -18,6 +18,10 @@ function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
     additions: 20,
     deletions: 5,
     isDraft: false,
+    state: 'open',
+    ciStatus: 'passing',
+    headRefName: 'feat',
+    baseRefName: 'main',
     riskLevel: 'low',
     estimatedMinutes: 10,
     sessionStatus: 'not-started',
@@ -54,8 +58,6 @@ const props = {
   onRefresh: vi.fn().mockResolvedValue(undefined),
   onLoadMore: vi.fn().mockResolvedValue(undefined),
   onDismissPr: vi.fn().mockResolvedValue(undefined),
-  includeClosedPrs: false,
-  onToggleClosedPrs: vi.fn().mockResolvedValue(undefined),
 }
 
 function withQueue(prQueue: ReviewQueuePR[], extra: Record<string, unknown> = {}): void {
@@ -128,7 +130,7 @@ describe('the queue summary reports the real total', () => {
       hasMorePrs: true,
     })
     render(<ReviewQueue {...props} />)
-    expect(screen.getByText('47')).toBeTruthy()
+    expect(screen.getByText('47', { selector: 'b' })).toBeTruthy()
   })
 
   it('has no manual pagination button', () => {
