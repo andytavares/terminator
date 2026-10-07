@@ -69,7 +69,7 @@ import { restack } from './line/restack.js'
 import { issueOf, projectRemover, workspaceFor } from './line/order-project.js'
 import { resumableIn } from './runtime/claude-launch.js'
 import { fileTicket, ticketOffer } from './forge/ticket-offer.js'
-import { followUpFor } from './forge/autonomy.js'
+import { followUpFor, retryForRefusal, REWRITING_UNREADABLE } from './forge/autonomy.js'
 import {
   anotherPassWanted,
   loopFacts,
@@ -2703,8 +2703,39 @@ export function activate(api: ExtensionAPI): void {
     // Undefined for every operator- or auto-turn-started call, which is a
     // fresh chain: the next review the redraft earns starts at round 1.
     loopRound?: number
-  ): Promise<ConvergeStarted> =>
-    convergeOnce(
+  ): Promise<ConvergeStarted> => {
+    const continueAutomatically = async (
+      from: WorkOrder,
+      next: string,
+      why: string
+    ): Promise<void> => {
+      const store = createOrderStore(dataRoot())
+      // The finished turn's process is still at its prompt; the follow-up
+      // resumes the same conversation, so end it first.
+      const previous = intakeSessions.get(order.id)
+      if (previous !== undefined) {
+        await endAndWait(
+          {
+            stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
+            isLive: isLiveSession,
+          },
+          previous,
+          'continuing in a follow-up turn'
+        )
+      }
+      const started = await convergeWithFollowUps(from, next, autoTurns + 1, loopRound)
+      await store.record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'role:architect',
+        action: started.ok ? 'converge.followed_up' : 'converge.refused',
+        subject: started.ok ? started.sessionId : order.id,
+        reason: started.ok ? why : started.reason,
+        evidence: [],
+      })
+    }
+
+    return convergeOnce(
       api,
       dataRoot(),
       order,
@@ -2721,6 +2752,16 @@ export function activate(api: ExtensionAPI): void {
             reason: outcome.reason,
             evidence: [],
           })
+          // A proposal in the wrong shape is the architect's to fix, from the
+          // field paths it can read and the operator cannot.
+          const retry =
+            loopFacts(await store.entries(order.id)).heldAt === null
+              ? retryForRefusal(outcome.reason, autoTurns)
+              : null
+          if (retry !== null) {
+            await continueAutomatically(order, retry, REWRITING_UNREADABLE)
+            return
+          }
           // Out loud, once, because a refusal changes nothing and therefore
           // shows up nowhere the operator happens to be looking. The Forge
           // renders it whenever they open the order; this is for the minutes
@@ -2773,32 +2814,11 @@ export function activate(api: ExtensionAPI): void {
           }
           return
         }
-        // The finished turn's process is still at its prompt; the follow-up
-        // resumes the same conversation, so end it first.
-        const previous = intakeSessions.get(order.id)
-        if (previous !== undefined) {
-          await endAndWait(
-            {
-              stop: (id, reason) => supervisedRunner?.stop(id, reason) ?? false,
-              isLive: isLiveSession,
-            },
-            previous,
-            'continuing in a follow-up turn'
-          )
-        }
-        const started = await convergeWithFollowUps(drafted, next, autoTurns + 1, loopRound)
-        await store.record({
-          at: new Date().toISOString(),
-          orderId: order.id,
-          actor: 'role:architect',
-          action: started.ok ? 'converge.followed_up' : 'converge.refused',
-          subject: started.ok ? started.sessionId : order.id,
-          reason: started.ok ? 'closing the failing checks on its own' : started.reason,
-          evidence: [],
-        })
+        await continueAutomatically(drafted, next, 'closing the failing checks on its own')
       },
       loopRound !== undefined ? { loop: true } : undefined
     )
+  }
 
   /**
    * One red-team round, and what happens with what it finds.

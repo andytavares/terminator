@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { REWRITING_UNREADABLE } from '../../src/forge/autonomy.js'
 import { readiness } from '../../src/forge/readiness.js'
 import type { LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -193,6 +194,47 @@ describe('readiness — holder and strip', () => {
     )
     expect(result.strip.detail).toBe('Why: Invalid enum value.')
     expect(result.strip.actions).toEqual(['tell-architect', 'start-over'])
+  })
+
+  it('2b. intake refused for a malformed plan says where and what to do, not the schema error', () => {
+    const result = readiness(
+      baseInput({
+        intake: {
+          kind: 'refused',
+          at: T1,
+          reason:
+            'The proposal was refused: plan.units.0.verify.0: Expected object, received string; plan.units.0.verify.1: Expected object, received string',
+        },
+      })
+    )
+    expect(result.strip.headline).toBe(
+      "The architect's plan couldn't be read. Nothing on this order changed."
+    )
+    expect(result.strip.detail).toBe(
+      'It wrote unit 1, check 1 and unit 1, check 2 in the wrong format, and retrying on its own did not fix it. ' +
+        'Start the turn over to have it write the plan again, or tell it what to change.'
+    )
+    expect(result.strip.detail).not.toContain('Expected object')
+  })
+
+  it('3b. running: rewriting a plan it could not read says so, not which checks it closes', () => {
+    const result = readiness(
+      baseInput({
+        intake: {
+          kind: 'running',
+          at: T0,
+          sessionId: 's1',
+          asked: REWRITING_UNREADABLE,
+          actor: 'architect',
+          trigger: 'automatic',
+          round: null,
+          autoTurn: 1,
+        },
+      })
+    )
+    expect(result.strip.detail).toBe(
+      `Started ${T0}. Its last plan was in the wrong format, so it is writing it again. You don't need to do anything.`
+    )
   })
 
   it('3. running: scout', () => {

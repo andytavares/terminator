@@ -3,6 +3,8 @@ import type { AcceptanceCriterion, WorkOrder } from '../order/schema.js'
 import { statusInWords } from '../order/render.js'
 import { gradeInWords } from '../runtime/review/risk-grader.js'
 import type { CheckId, CompileResult } from '../order/compile.js'
+import { refusedParts } from '../order/proposal.js'
+import { REWRITING_UNREADABLE } from './autonomy.js'
 import type { IntakeOutcome } from './intake-outcome.js'
 import type { StepId } from './steps.js'
 
@@ -208,6 +210,16 @@ function failingChecksList(compile: CompileResult): string {
   return compile.failures.map((f) => CHECK_LABEL[f.check]).join(', ')
 }
 
+function listInWords(items: readonly string[]): string {
+  if (items.length <= 1) return items.join('')
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+}
+
+/** A refused proposal's schema paths mean nothing to an operator; name the parts instead. */
+function malformedInWords(parts: readonly string[]): string {
+  return `It wrote ${listInWords(parts)} in the wrong format, and retrying on its own did not fix it.`
+}
+
 function openBlockingFindings(order: WorkOrder): WorkOrder['redTeam'] {
   return order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
 }
@@ -264,6 +276,19 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
 
   // 2. Intake refused.
   if (intake.kind === 'refused') {
+    const parts = refusedParts(intake.reason)
+    if (parts !== null) {
+      return {
+        holder: 'you',
+        strip: {
+          tone: 'bad',
+          icon: 'alert',
+          headline: `The architect's plan couldn't be read. Nothing on this order changed.`,
+          detail: `${malformedInWords(parts)} Start the turn over to have it write the plan again, or tell it what to change.`,
+          actions: ['start-over', 'tell-architect'],
+        },
+      }
+    }
     return {
       holder: 'you',
       strip: {
@@ -330,7 +355,10 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
           tone: 'working',
           icon: 'load',
           headline: `The architect is revising the plan on its own · turn ${intake.autoTurn} of 2`,
-          detail: `Started ${t}. It is closing: ${failingChecksList(compile)}. You don't need to do anything.`,
+          detail:
+            intake.asked === REWRITING_UNREADABLE
+              ? `Started ${t}. Its last plan was in the wrong format, so it is writing it again. You don't need to do anything.`
+              : `Started ${t}. It is closing: ${failingChecksList(compile)}. You don't need to do anything.`,
           actions: ['hold'],
         },
       }
@@ -877,7 +905,11 @@ function buildHandOffLock(input: ReadinessInput): string | null {
       intake.trigger === 'automatic' &&
       intake.autoTurn !== null
     ) {
-      return `The architect is closing ${failingChecksList(compile)} on its own, automatic turn ${intake.autoTurn} of 2. Hand-off opens when it finishes.`
+      const doing =
+        intake.asked === REWRITING_UNREADABLE
+          ? 'rewriting a plan it wrote in the wrong format'
+          : `closing ${failingChecksList(compile)}`
+      return `The architect is ${doing} on its own, automatic turn ${intake.autoTurn} of 2. Hand-off opens when it finishes.`
     }
     if (intake.actor === 'architect') {
       return `The architect is working on your request (started ${t}). Hand-off opens when it finishes.`
@@ -886,6 +918,9 @@ function buildHandOffLock(input: ReadinessInput): string | null {
   }
 
   if (intake.kind === 'refused') {
+    const parts = refusedParts(intake.reason)
+    if (parts !== null)
+      return `The architect's last plan couldn't be read. ${malformedInWords(parts)}`
     return `The architect's last plan was refused: ${intake.reason}. Nothing changed.`
   }
 
