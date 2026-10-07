@@ -45,24 +45,37 @@ const PR_FIELDS = `fragment prFields on PullRequest {
     latestReviews(first: 20) { nodes { author { login } submittedAt commit { oid } } }
   }`
 
+/** GitHub's search accepts about 256 characters of query excluding `repo:` qualifiers; 300 qualifiers measured 2 s. */
+const REPOS_PER_QUERY = 200
+
 /**
- * One query per section. GitHub resolves aliased searches one after another
+ * One query per section, and with a repository selection one per section per
+ * chunk of REPOS_PER_QUERY. GitHub resolves aliased searches one after another
  * within a request, so a combined query costs the sum of every section and
  * returns HTTP 502 once that passes its ~10 s limit.
  */
-export function buildSectionQueries(login: string): Record<DashboardSection, string> {
-  const entries = (Object.keys(DASHBOARD_QUERIES) as DashboardSection[]).map((section) => {
-    const query = DASHBOARD_QUERIES[section].replace('LOGIN', login)
-    const alias = SECTION_ALIASES[section]
-    return [
-      section,
-      `query {
-    ${alias}: search(query: ${JSON.stringify(query)}, type: ISSUE, first: 50) { nodes { ...prFields } }
+export function buildSectionQueries(
+  login: string,
+  repos: string[] = []
+): Array<{ section: DashboardSection; query: string }> {
+  const chunks: string[][] = []
+  for (let i = 0; i < repos.length; i += REPOS_PER_QUERY) {
+    chunks.push(repos.slice(i, i + REPOS_PER_QUERY))
+  }
+  if (chunks.length === 0) chunks.push([])
+  return (Object.keys(DASHBOARD_QUERIES) as DashboardSection[]).flatMap((section) =>
+    chunks.map((chunk) => {
+      const base = DASHBOARD_QUERIES[section].replace('LOGIN', login)
+      const search = [base, ...chunk.map((repo) => `repo:${repo}`)].join(' ')
+      return {
+        section,
+        query: `query {
+    ${SECTION_ALIASES[section]}: search(query: ${JSON.stringify(search)}, type: ISSUE, first: 50) { nodes { ...prFields } }
   }
   ${PR_FIELDS}`,
-    ]
-  })
-  return Object.fromEntries(entries) as Record<DashboardSection, string>
+      }
+    })
+  )
 }
 
 // ─── Raw GraphQL node shapes ────────────────────────────────────────────────────

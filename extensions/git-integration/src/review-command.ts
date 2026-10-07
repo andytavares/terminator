@@ -43,3 +43,29 @@ export function registerReviewSubmittedRelay(api: ExtensionAPI): Disposable {
     return { ok: true }
   })
 }
+
+const REVIEW_REPOS_KEY = 'terminator.git-integration.review.repos'
+
+const ReviewReposArgs = z.object({
+  repos: z.array(z.string().regex(/^[^/\s]+\/[^/\s]+$/)).transform((repos) => [...new Set(repos)]),
+})
+
+/** The Reviews view reads the clone folder and the repository selection, and writes the selection. */
+export function registerReviewSettings(api: ExtensionAPI): Disposable[] {
+  return [
+    api.ipc.registerHandler('github:review-settings', () => {
+      const repos = api.settings.get<unknown>(REVIEW_REPOS_KEY)
+      return {
+        cloneFolder:
+          api.settings.get<string>('terminator.git-integration.review.cloneFolder') ?? '',
+        repos: Array.isArray(repos) ? repos : [],
+      }
+    }),
+    api.ipc.registerHandler('github:review-repos-set', (payload) => {
+      const parsed = ReviewReposArgs.safeParse(payload)
+      if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+      api.settings.set(REVIEW_REPOS_KEY, parsed.data.repos)
+      return { ok: true }
+    }),
+  ]
+}

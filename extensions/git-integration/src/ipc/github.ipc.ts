@@ -10,6 +10,7 @@ import type {
   InlineComment,
   IssueComment,
   ReviewSession,
+  DashboardSection,
 } from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
 import { buildSectionQueries, parseDashboard } from '../github/dashboard-search.js'
@@ -84,11 +85,41 @@ async function runGhForRemote(
   return runGh(homedir(), args, opts, timeoutMs, { GH_REPO: `${owner}/${name}` }, output)
 }
 
+interface AccessibleRepo {
+  fullName: string
+  owner: string
+  private: boolean
+  pushedAt: string
+}
+
+function parseAccessibleRepos(jsonLines: string): AccessibleRepo[] {
+  return jsonLines
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as AccessibleRepo & { archived: boolean })
+    .filter((repo) => !repo.archived)
+    .map(({ fullName, owner, private: isPrivate, pushedAt }) => ({
+      fullName,
+      owner,
+      private: isPrivate,
+      pushedAt,
+    }))
+    .sort((a, b) => a.fullName.toLowerCase().localeCompare(b.fullName.toLowerCase()))
+}
+
+/** The last line of a gh failure, e.g. "gh: HTTP 502"; the first lines echo the whole command. */
+function lastLine(error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error)
+  const lines = text.split('\n').filter((line) => line.trim())
+  return (lines.at(-1) ?? text).trim()
+}
+
 export function registerGithubHandlers(
   registerRaw: RegisterFn,
   opts: GhOptions,
   issues?: IssuesApi,
-  listProjectRoots?: () => string[]
+  listProjectRoots?: () => string[],
+  getReviewRepos?: () => string[]
 ): void {
   const register = withTiming(registerRaw)
   const gh = (cwd: string, args: string[], timeoutMs?: number) => {
@@ -1056,6 +1087,38 @@ export function registerGithubHandlers(
 
   // ─── Review dashboard (R1) ─────────────────────────────────────────────────
 
+  // One `gh api --paginate` over every repository the viewer can reach; kept until a refresh.
+  let accessibleRepos: Promise<AccessibleRepo[]> | undefined
+  register('github:accessible-repos', async (payload) => {
+    const parsed = z.object({ refresh: z.boolean().optional() }).safeParse(payload ?? {})
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    try {
+      if (parsed.data.refresh || !accessibleRepos) {
+        const lookup = runGh(
+          homedir(),
+          [
+            'api',
+            'user/repos?affiliation=owner,collaborator,organization_member&per_page=100',
+            '--paginate',
+            '--jq',
+            '.[] | {fullName: .full_name, owner: .owner.login, private: .private, archived: .archived, pushedAt: .pushed_at}',
+          ],
+          opts,
+          60_000,
+          undefined,
+          { maxBuffer: 50 * 1024 * 1024 }
+        ).then(parseAccessibleRepos)
+        accessibleRepos = lookup
+        lookup.catch(() => {
+          if (accessibleRepos === lookup) accessibleRepos = undefined
+        })
+      }
+      return { repos: await accessibleRepos }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
+
   register('github:dashboard-search', async (payload) => {
     const schema = z.object({})
     const parsed = schema.safeParse(payload ?? {})
@@ -1063,13 +1126,32 @@ export function registerGithubHandlers(
     try {
       const cwd = homedir()
       const login = await viewer(cwd)
-      const sections = await Promise.all(
-        Object.values(buildSectionQueries(login)).map(async (query) => {
+      const repos = getReviewRepos?.() ?? []
+      const requests = buildSectionQueries(login, repos)
+      const settled = await Promise.allSettled(
+        requests.map(async ({ query }) => {
           const raw = await gh(cwd, ['api', 'graphql', '-f', `query=${query}`], 60_000)
-          return (JSON.parse(raw) as { data?: Record<string, unknown> }).data
+          return (JSON.parse(raw) as { data?: Record<string, { nodes?: unknown[] }> }).data ?? {}
         })
       )
-      const data = { data: Object.assign({}, ...sections) }
+      const failed = new Map<DashboardSection, string>()
+      const merged: Record<string, { nodes: unknown[] }> = {}
+      let firstFailure: unknown
+      settled.forEach((outcome, i) => {
+        if (outcome.status === 'rejected') {
+          firstFailure ??= outcome.reason
+          failed.set(requests[i].section, lastLine(outcome.reason))
+          return
+        }
+        for (const [alias, result] of Object.entries(outcome.value)) {
+          merged[alias] ??= { nodes: [] }
+          merged[alias].nodes.push(...(result?.nodes ?? []))
+        }
+      })
+      if (failed.size === new Set(requests.map((r) => r.section)).size) {
+        return catchError(firstFailure)
+      }
+      const data = { data: merged }
 
       const localRoots = new Map<string, string>()
       if (listProjectRoots) {
@@ -1088,7 +1170,13 @@ export function registerGithubHandlers(
       }
 
       const prs = parseDashboard(data, login, localRoots)
-      return { prs, login, fetchedAt: new Date().toISOString() }
+      return {
+        prs,
+        login,
+        fetchedAt: new Date().toISOString(),
+        failed: [...failed].map(([section, error]) => ({ section, error })),
+        scopedTo: repos.length,
+      }
     } catch (e) {
       return catchError(e)
     }

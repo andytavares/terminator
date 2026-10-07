@@ -7,6 +7,7 @@ import {
   openPrReviewWindow,
   registerReviewPullRequestCommand,
   registerReviewSubmittedRelay,
+  registerReviewSettings,
   type PrReviewWindowParams,
 } from './review-command.js'
 
@@ -82,7 +83,10 @@ export function activate(api: ExtensionAPI): void {
     () =>
       api.workspace
         .list()
-        .flatMap((w) => api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath))
+        .flatMap((w) =>
+          api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath)
+        ),
+    () => api.settings.get<string[]>('terminator.git-integration.review.repos') ?? []
   )
 
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.
@@ -133,14 +137,10 @@ export function activate(api: ExtensionAPI): void {
     })
   )
 
+  disposables.push(...registerReviewSettings(api))
+
   // Bridges this extension's renderer (an isolated webview, no direct access to
   // api.notifications) to the shared notification dispatcher.
-  disposables.push(
-    api.ipc.registerHandler('github:review-settings', () => ({
-      cloneFolder: api.settings.get<string>('terminator.git-integration.review.cloneFolder') ?? '',
-    }))
-  )
-
   disposables.push(
     api.ipc.registerHandler('git:notify', (payload) => {
       const { type, title, key, message } = (payload ?? {}) as {

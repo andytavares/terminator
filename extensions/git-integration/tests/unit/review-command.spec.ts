@@ -3,6 +3,7 @@ import type { CommandContribution, CommandContext } from '../../../../src/main/e
 import {
   registerReviewPullRequestCommand,
   registerReviewSubmittedRelay,
+  registerReviewSettings,
   openPrReviewWindow,
 } from '../../src/review-command'
 
@@ -89,5 +90,69 @@ describe('window:review-submitted relay', () => {
     registerReviewSubmittedRelay(api as never)
     expect(handlers['window:review-submitted']()).toEqual({ ok: true })
     expect(broadcast).toHaveBeenCalledWith('reviews:changed', {})
+  })
+})
+
+describe('review settings', () => {
+  function setup(stored: Record<string, unknown>) {
+    const handlers: Record<string, (payload?: unknown) => unknown> = {}
+    const set = vi.fn()
+    const api = {
+      ipc: {
+        registerHandler: vi.fn((channel: string, handler: (payload?: unknown) => unknown) => {
+          handlers[channel] = handler
+          return { dispose: vi.fn() }
+        }),
+      },
+      settings: { get: (key: string) => stored[key], set },
+    }
+    const disposables = registerReviewSettings(api as never)
+    return { handlers, set, disposables }
+  }
+  const REPOS = 'terminator.git-integration.review.repos'
+
+  it('returns the clone folder and the selected repositories', () => {
+    const { handlers, disposables } = setup({
+      'terminator.git-integration.review.cloneFolder': '/src',
+      [REPOS]: ['acme/widgets'],
+    })
+    expect(handlers['github:review-settings']()).toEqual({
+      cloneFolder: '/src',
+      repos: ['acme/widgets'],
+    })
+    expect(disposables).toHaveLength(2)
+  })
+
+  it('treats a missing or non-array selection as all repositories', () => {
+    expect(setup({}).handlers['github:review-settings']()).toEqual({ cloneFolder: '', repos: [] })
+    expect(setup({ [REPOS]: 'acme/widgets' }).handlers['github:review-settings']()).toEqual({
+      cloneFolder: '',
+      repos: [],
+    })
+  })
+
+  it('stores a deduplicated selection', () => {
+    const { handlers, set } = setup({})
+    expect(
+      handlers['github:review-repos-set']({
+        repos: ['acme/widgets', 'acme/gadgets', 'acme/widgets'],
+      })
+    ).toEqual({ ok: true })
+    expect(set).toHaveBeenCalledWith(REPOS, ['acme/widgets', 'acme/gadgets'])
+  })
+
+  it('stores an empty selection', () => {
+    const { handlers, set } = setup({})
+    handlers['github:review-repos-set']({ repos: [] })
+    expect(set).toHaveBeenCalledWith(REPOS, [])
+  })
+
+  it('refuses a malformed selection without writing', () => {
+    const { handlers, set } = setup({})
+    expect(handlers['github:review-repos-set']({ repos: ['widgets'] })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    expect(handlers['github:review-repos-set']({})).toEqual({ error: 'VALIDATION_ERROR' })
+    expect(set).not.toHaveBeenCalled()
   })
 })
