@@ -1,0 +1,45 @@
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_ca39052178434f::t_e992366bf2911d 199-217
+  s_ca39052178434f::t_a6d0b2c1f25ee9 2,218-238
+  s_ca39052178434f::t_582e3c849739d1 239
+extensions/foundry/src/forge/autonomy.ts
+  s_ca39052178434f::t_78fa20e7af95a8 86-92,96-98,100-107
+  s_ca39052178434f::t_d9e96cd6054218 93-95
+  s_ca39052178434f::t_1ed2fa5d411002 99
+extensions/foundry/src/forge/readiness.ts
+  s_ca39052178434f::t_d9e96cd6054218 7,358-361,908-912
+  s_ca39052178434f::t_f6cf1ee4e2c502 6
+  s_ca39052178434f::t_2f1259005e8982 213-222
+  s_ca39052178434f::t_6107b49a2e9fc8 921
+  s_ca39052178434f::t_0be77f5b1cc695 279-291
+  s_ca39052178434f::t_501e89bc26dac4 922-923
+extensions/foundry/src/index.ts
+  s_ca39052178434f::t_70ad0c62081a8b 2706-2738,2821
+  s_ca39052178434f::t_d9e96cd6054218 72,2755-2764,2817
+docs/adr/062-the-forge-decides-what-it-is-sure-of.md
+  s_ca39052178434f::t_501e89bc26dac4 29-31
+docs/user-guide/USER-GUIDE.md
+  s_ca39052178434f::t_501e89bc26dac4 729-733
+extensions/foundry/tests/forge/autonomy.spec.ts
+  s_ca39052178434f::t_501e89bc26dac4 195
+  s_ca39052178434f::t_e992366bf2911d 8-9,193-194,196-205
+  s_ca39052178434f::t_abf58d5a3e659c 206
+extensions/foundry/src/order/proposal.ts
+  s_ca39052178434f::t_f6cf1ee4e2c502 73-110,114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d51997068a3e03dff67dab2222ea51af8790f9a7",
+  "prompts": {},
+  "sessions": {
+    "s_ca39052178434f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b351f16-3a52-4145-b4d3-a0c40bbcf13a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
