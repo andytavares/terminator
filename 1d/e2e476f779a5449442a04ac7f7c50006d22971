@@ -1,0 +1,36 @@
+extensions/foundry/src/line/executor.ts
+  s_f7320503bf1af7::t_ee62b4c813c0f3 701-704
+  s_f7320503bf1af7::t_d279cb5e401bab 11,15,1172-1179
+extensions/foundry/src/line/scheduler.ts
+  s_f7320503bf1af7::t_d1c9d92c35799b 101-123,125-130,165-170,175,189
+  s_f7320503bf1af7::t_ee62b4c813c0f3 124
+extensions/foundry/tests/line/scheduler.spec.ts
+  s_f7320503bf1af7::t_ee62b4c813c0f3 230-235
+  s_f7320503bf1af7::t_05101b560f4f85 14,193-200,228-229,236-259,267-273
+  s_f7320503bf1af7::t_1cbfe22344ab73 260-266,274
+  s_f7320503bf1af7::t_9cfb6bc0e5f6a5 275-276
+extensions/foundry/src/line/run-graph.ts
+  s_f7320503bf1af7::t_d1c9d92c35799b 62-63,87
+extensions/foundry/tests/line/executor.spec.ts
+  s_f7320503bf1af7::t_776ac8261dab8c 754,1404
+  s_f7320503bf1af7::t_9fca5e4b0d98ff 364-378
+  s_f7320503bf1af7::t_53ba9a20c81443 2401-2403
+docs/ARCHITECTURE.md
+  s_f7320503bf1af7::t_ee62b4c813c0f3 1327-1331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1de2e476f779a5449442a04ac7f7c50006d22971",
+  "prompts": {},
+  "sessions": {
+    "s_f7320503bf1af7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee8ed9e8-fc7c-4057-9b54-9d0e55e4298d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
