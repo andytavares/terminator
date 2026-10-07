@@ -1,0 +1,31 @@
+tests/unit/renderer/design-tokens-contrast.spec.ts
+  s_3cd98557a8c304::t_d6297a4a6e7619 36-48,81-88
+  s_3cd98557a8c304::t_85a0837da49dc8 89
+docs/EXTENSION-DEVELOPMENT.md
+  s_3cd98557a8c304::t_b8af0f2c95ac02 1042-1044
+extensions/remote-control/src/server/remote-server.ts
+  s_3cd98557a8c304::t_45a52c2ca13ac3 29-31,175,184-186
+tests/unit/renderer/extension-base-css.spec.ts
+  s_3cd98557a8c304::t_d6297a4a6e7619 2-3,25-46
+  s_3cd98557a8c304::t_0becb980865e43 47-49
+src/renderer/styles.css
+  s_3cd98557a8c304::t_5c17e9c4a6f2bb 14-15,17-19,160-164
+src/main/extensions/extension-view-host.ts
+  s_3cd98557a8c304::t_45a52c2ca13ac3 47-49,193,202-204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "78c916688067edd33560d8c38bad6c5aa33ffc33",
+  "prompts": {},
+  "sessions": {
+    "s_3cd98557a8c304": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a8102b8-ac47-4675-9bf1-df55ea32ee5f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
