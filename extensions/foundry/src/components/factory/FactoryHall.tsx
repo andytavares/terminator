@@ -989,12 +989,20 @@ function InterruptionCard({
         role="group"
         aria-label={item.title}
         className={`fdry-card fdry-card--gate${flip ? ' is-below' : ''}`}
-        style={{
-          // Centred on its anchor but kept whole inside the scene: the inset is
-          // half the card's own width (see .fdry-card--gate) plus a margin.
-          left: `clamp(${GATE_CARD_INSET}, ${anchor.left}%, calc(100% - ${GATE_CARD_INSET}))`,
-          top: `${flip ? anchor.bottom : anchor.top}%`,
-        }}
+        style={
+          {
+            // Centred on its anchor but kept whole inside the scene: the inset is
+            // half the card's own width (see .fdry-card--gate) plus a margin.
+            left: `clamp(${GATE_CARD_INSET}, ${anchor.left}%, calc(100% - ${GATE_CARD_INSET}))`,
+            top: `${flip ? anchor.bottom : anchor.top}%`,
+            // An opened reason grows the card toward the scene's edge; past this
+            // it scrolls instead of running off it. The offsets mirror the card's
+            // transform (34px above, 10px below) plus 16px of air.
+            '--fdry-card-room': flip
+              ? `calc(${100 - anchor.bottom}% - 26px)`
+              : `calc(${anchor.top}% - 50px)`,
+          } as React.CSSProperties
+        }
       >
         <GateCard
           gate={item.gate}

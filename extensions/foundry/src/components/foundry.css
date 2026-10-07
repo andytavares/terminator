@@ -3781,6 +3781,8 @@
 .fdry-card--gate {
   width: min(360px, 60%);
   max-width: calc(100% - 32px);
+  max-height: var(--fdry-card-room, none);
+  overflow-y: auto;
   padding: 2px 6px;
 }
 
@@ -3811,6 +3813,10 @@
 .fdry-card--gate .fdry-gate-consequences,
 .fdry-card--gate .fdry-gate-chevron {
   color: #98a2b1;
+}
+
+.fdry-card--gate .fdry-gate-consequences b {
+  color: #f5e6c8;
 }
 
 .fdry-card--gate .fdry-gate-meta a {

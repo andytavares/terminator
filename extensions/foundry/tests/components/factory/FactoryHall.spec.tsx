@@ -772,6 +772,19 @@ describe('FactoryHall gates and links', () => {
     expect([...items].map((li) => li.textContent)).toContain('the checks passed')
   })
 
+  it('bounds an open gate card by the room between its station and the edge it grows toward', async () => {
+    mount({ view: view({ waiting: [readyGate()] }) })
+    await screen.findByRole('button', { name: 'Mark ready' })
+    const card = document.querySelector('.fdry-card--gate') as HTMLElement
+    const top = Number.parseFloat(card.style.top)
+    const room = card.style.getPropertyValue('--fdry-card-room')
+    if (card.classList.contains('is-below')) {
+      expect(room).toBe(`calc(${100 - top}% - 26px)`)
+    } else {
+      expect(room).toBe(`calc(${top}% - 50px)`)
+    }
+  })
+
   it('lets a shipped order\u2019s open ready-for-review gate be answered in the hall', async () => {
     mount({
       view: view({
