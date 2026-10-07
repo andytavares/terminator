@@ -1,0 +1,21 @@
+extensions/foundry/tests/line/worktree.spec.ts
+  s_ca39052178434f::t_07201b1fa80d59 170-219
+extensions/foundry/src/line/worktree.ts
+  s_ca39052178434f::t_e3ab0b6c282d91 62-66,72,84-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "17a1624d8292e9041d5f6e255beb6c5b75f86da1",
+  "prompts": {},
+  "sessions": {
+    "s_ca39052178434f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b351f16-3a52-4145-b4d3-a0c40bbcf13a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
