@@ -1,0 +1,48 @@
+extensions/foundry/src/runtime/diff-metrics.ts
+  s_d603c6bf47d1a1::t_b89eaa7661cbea 23-24,26-29,48,143-144,152,161-163
+docs/adr/092-foundry-asks-a-risk-question-once.md
+  s_d603c6bf47d1a1::t_da005afcdbed72 1-62
+extensions/foundry/src/runtime/review/risk-grader.ts
+  s_d603c6bf47d1a1::t_add8bee4d533d1 47,53,111
+  s_d603c6bf47d1a1::t_b89eaa7661cbea 51-52,54-55
+extensions/foundry/src/line/executor.ts
+  s_d603c6bf47d1a1::t_c446473c962d6c 1397-1399,1406
+extensions/foundry/src/index.ts
+  s_d603c6bf47d1a1::t_b89eaa7661cbea 1441-1447
+  s_d603c6bf47d1a1::t_add8bee4d533d1 88
+extensions/foundry/src/line/integrate.ts
+  s_d603c6bf47d1a1::t_c446473c962d6c 636
+extensions/foundry/tests/verify/inspection-triggers.spec.ts
+  s_d603c6bf47d1a1::t_f53757223026e0 80-82,87-103
+  s_d603c6bf47d1a1::t_da005afcdbed72 83-86
+extensions/foundry/tests/gates/store.spec.ts
+  s_d603c6bf47d1a1::t_d9ff9307868aaa 51-99
+extensions/foundry/tests/line/integrate.spec.ts
+  s_d603c6bf47d1a1::t_d9ff9307868aaa 365-375
+extensions/foundry/tests/runtime/diff-metrics.spec.ts
+  s_d603c6bf47d1a1::t_7a64d6649e35f0 37-45
+extensions/foundry/tests/line/executor.spec.ts
+  s_d603c6bf47d1a1::t_f53757223026e0 1429-1450
+extensions/foundry/src/gates/store.ts
+  s_d603c6bf47d1a1::t_c446473c962d6c 97-105
+CHANGELOG.md
+  s_d603c6bf47d1a1::t_da005afcdbed72 68-69
+extensions/foundry/src/verify/inspection-triggers.ts
+  s_d603c6bf47d1a1::t_c446473c962d6c 4,44-45,84-85,88-90,100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0f8278ecb700bcb33d1740e099203cec2e17ff21",
+  "prompts": {},
+  "sessions": {
+    "s_d603c6bf47d1a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4b2752b6-b3ad-47dd-be68-83f2aa418e04",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
