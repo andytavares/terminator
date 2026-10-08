@@ -60,6 +60,7 @@ function mount(over: Record<string, unknown> = {}) {
     if (channel === 'foundry:inbox.list') {
       return {
         gates: over.gates ?? [],
+        waiting: over.waiting ?? [],
         autonomy: over.autonomy ?? 'standard',
         silenced: over.silenced ?? [],
         summary: {
@@ -94,8 +95,38 @@ function mount(over: Record<string, unknown> = {}) {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     shell: { openExternal },
   }
-  render(<Inbox />)
+  render(<Inbox onOpenOrder={over.onOpenOrder as ((id: string) => void) | undefined} />)
 }
+
+describe('an order waiting on you with no gate', () => {
+  // WO-1008-287 sat amended and ready while this surface said "Nothing needs
+  // you" — only a gate could reach it.
+  const waiting = [
+    {
+      orderId: 'WO-1008-287',
+      title: 'render html in comments',
+      headline: 'Ready to hand off',
+      detail: 'Every check passes. Read the plan and hand it off in the Forge to start the run.',
+    },
+  ]
+
+  it('names the order and exactly why it is waiting', async () => {
+    mount({ waiting })
+    await waitFor(() => screen.getByText('Ready to hand off'))
+    expect(screen.getByText('render html in comments')).toBeTruthy()
+    expect(screen.getByText(/hand it off in the Forge/)).toBeTruthy()
+    expect(screen.queryByText('Nothing needs you.')).toBeNull()
+  })
+
+  it('opens the order in the Forge', async () => {
+    const onOpenOrder = vi.fn()
+    mount({ waiting, onOpenOrder })
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Open render html in comments in the Forge' })
+    )
+    expect(onOpenOrder).toHaveBeenCalledWith('WO-1008-287')
+  })
+})
 
 beforeEach(() => {
   vi.clearAllMocks()

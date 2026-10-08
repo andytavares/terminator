@@ -25,7 +25,8 @@ import { askOnce, createLiveGateStore, createGateStore } from './gates/store.js'
 import { raiseGate, ruleInWords } from './gates/rules.js'
 import { orphanedNodes } from './line/reclaim.js'
 import type { StandingSources } from './order/standing.js'
-import { countAttention } from './gates/attention.js'
+import { countAttention, ordersWaiting, questionsByOrder } from './gates/attention.js'
+import type { WaitingOrder } from './gates/attention.js'
 import { createOrderStore, createLiveOrderStore } from './order/store.js'
 import { tearDownRun, deleteOrder } from './line/teardown.js'
 import { markReady, readPulls, shipOrder, finishShipping, pushLanes } from './line/integrate.js'
@@ -77,6 +78,9 @@ import {
   lastIntake,
   reviewedCurrentPlan,
 } from './forge/intake-outcome.js'
+import { readyToHandOff } from './forge/release-again.js'
+import { orderStandingSources } from './order/order-standing-sources.js'
+import { readStanding } from './order/standing.js'
 import { endAndWait } from './runtime/end-session.js'
 import { compileOrder } from './order/compile.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
@@ -2662,8 +2666,28 @@ export function activate(api: ExtensionAPI): void {
   // whatever it happened to hold, so the same order halted at an undecided
   // gate read "ready to hand off" in the list and drew `building` chips on
   // the Floor, and neither of them named the gate.
+  // Orders whose turn just ended and whose next step is still being chosen.
+  // The ledger cannot say so: between `order.redrafted` and whatever starts
+  // next there is no line, and a draft read in that gap looked idle.
+  const deciding = new Map<string, number>()
+  const whileDeciding = async (orderId: string, work: () => Promise<void>): Promise<void> => {
+    deciding.set(orderId, (deciding.get(orderId) ?? 0) + 1)
+    try {
+      await work()
+    } finally {
+      const left = (deciding.get(orderId) ?? 1) - 1
+      if (left === 0) deciding.delete(orderId)
+      else deciding.set(orderId, left)
+    }
+  }
+
   const standingSources: StandingSources = {
     graphFor: (orderId) => readRunGraph(dataRoot(), orderId),
+    shapingFor: async (orderId) => {
+      if (deciding.has(orderId)) return true
+      const last = lastIntake(await createOrderStore(dataRoot()).entries(orderId))
+      return last.kind === 'running' && isLiveSession(last.sessionId)
+    },
     gatesFor: async (orderId) =>
       (await createGateStore(dataRoot()).list()).filter((gate) => gate.orderId === orderId),
     // A run belongs to a card whose directory is named for the order, which is
@@ -2745,82 +2769,87 @@ export function activate(api: ExtensionAPI): void {
       dataRoot(),
       order,
       message,
-      async (outcome) => {
-        const store = createOrderStore(dataRoot())
-        if (!outcome.ok) {
+      (outcome) =>
+        whileDeciding(order.id, async () => {
+          const store = createOrderStore(dataRoot())
+          if (!outcome.ok) {
+            await store.record({
+              at: new Date().toISOString(),
+              orderId: order.id,
+              actor: 'role:architect',
+              action: 'converge.refused',
+              subject: order.id,
+              reason: outcome.reason,
+              evidence: [],
+            })
+            // A proposal in the wrong shape is the architect's to fix, from the
+            // field paths it can read and the operator cannot.
+            const retry =
+              loopFacts(await store.entries(order.id)).heldAt === null
+                ? retryForRefusal(outcome.reason, autoTurns)
+                : null
+            if (retry !== null) {
+              await continueAutomatically(order, retry, REWRITING_UNREADABLE)
+              return
+            }
+            // Out loud, once, because a refusal changes nothing and therefore
+            // shows up nowhere the operator happens to be looking. The Forge
+            // renders it whenever they open the order; this is for the minutes
+            // between the turn ending and them going back to look — which on
+            // the run that found this was the rest of the afternoon.
+            api.notifications.showToast(
+              'warning',
+              `${order.title}: the architect's plan was refused and nothing changed.`,
+              `foundry.converge.refused.${order.id}`
+            )
+            return
+          }
+          // The scout runs beside a first draft, so it may have stored its
+          // findings while this turn was still writing.
+          const drafted = withScoutContext(outcome.order, await store.load(order.id))
+          await store.save(drafted)
           await store.record({
             at: new Date().toISOString(),
             orderId: order.id,
             actor: 'role:architect',
-            action: 'converge.refused',
+            action: 'order.redrafted',
             subject: order.id,
-            reason: outcome.reason,
+            reason: outcome.note === '' ? 'redrafted the plan' : outcome.note,
             evidence: [],
           })
-          // A proposal in the wrong shape is the architect's to fix, from the
-          // field paths it can read and the operator cannot.
-          const retry =
-            loopFacts(await store.entries(order.id)).heldAt === null
-              ? retryForRefusal(outcome.reason, autoTurns)
-              : null
-          if (retry !== null) {
-            await continueAutomatically(order, retry, REWRITING_UNREADABLE)
+
+          // The operator's "Hold for me" stops every automatic continuation,
+          // this one included — a redraft that just landed still saves, but
+          // nothing starts on its own from here until the operator releases it.
+          if (loopFacts(await store.entries(order.id)).heldAt !== null) return
+
+          const next = followUpFor(compileOrder(drafted).failures, autoTurns)
+          if (next === null) {
+            // Nothing left the architect can close on its own by compiling again.
+            // If the order is otherwise ready, the red team gets a round before
+            // the operator ever sees it — the whole point of the loop.
+            if (shouldReview(drafted)) {
+              // A fix turn is ready for hand-off unless the red team asked to see the fix.
+              if (
+                loopRound !== undefined &&
+                afterFix({
+                  order: drafted,
+                  anotherPass: anotherPassWanted(await store.entries(order.id)),
+                }) === 'hand-off'
+              ) {
+                await handOffWhenReady(drafted)
+                return
+              }
+              await startReview(
+                drafted,
+                loopRound ?? (await nextReviewRound(order.id)),
+                outcome.note
+              )
+            }
             return
           }
-          // Out loud, once, because a refusal changes nothing and therefore
-          // shows up nowhere the operator happens to be looking. The Forge
-          // renders it whenever they open the order; this is for the minutes
-          // between the turn ending and them going back to look — which on
-          // the run that found this was the rest of the afternoon.
-          api.notifications.showToast(
-            'warning',
-            `${order.title}: the architect's plan was refused and nothing changed.`,
-            `foundry.converge.refused.${order.id}`
-          )
-          return
-        }
-        // The scout runs beside a first draft, so it may have stored its
-        // findings while this turn was still writing.
-        const drafted = withScoutContext(outcome.order, await store.load(order.id))
-        await store.save(drafted)
-        await store.record({
-          at: new Date().toISOString(),
-          orderId: order.id,
-          actor: 'role:architect',
-          action: 'order.redrafted',
-          subject: order.id,
-          reason: outcome.note === '' ? 'redrafted the plan' : outcome.note,
-          evidence: [],
-        })
-
-        // The operator's "Hold for me" stops every automatic continuation,
-        // this one included — a redraft that just landed still saves, but
-        // nothing starts on its own from here until the operator releases it.
-        if (loopFacts(await store.entries(order.id)).heldAt !== null) return
-
-        const next = followUpFor(compileOrder(drafted).failures, autoTurns)
-        if (next === null) {
-          // Nothing left the architect can close on its own by compiling again.
-          // If the order is otherwise ready, the red team gets a round before
-          // the operator ever sees it — the whole point of the loop.
-          if (shouldReview(drafted)) {
-            // A fix turn is ready for hand-off unless the red team asked to see the fix.
-            if (
-              loopRound !== undefined &&
-              afterFix({
-                order: drafted,
-                anotherPass: anotherPassWanted(await store.entries(order.id)),
-              }) === 'hand-off'
-            ) {
-              sayReady(drafted)
-              return
-            }
-            await startReview(drafted, loopRound ?? (await nextReviewRound(order.id)), outcome.note)
-          }
-          return
-        }
-        await continueAutomatically(drafted, next, 'closing the failing checks on its own')
-      },
+          await continueAutomatically(drafted, next, 'closing the failing checks on its own')
+        }),
       loopRound !== undefined ? { loop: true } : undefined
     )
   }
@@ -2848,7 +2877,7 @@ export function activate(api: ExtensionAPI): void {
         reason: skipReason,
         evidence: [],
       })
-      sayReady(order)
+      await handOffWhenReady(order)
       return
     }
     // The scout runs beside the first draft, so what it found reaches the red
@@ -2879,98 +2908,148 @@ export function activate(api: ExtensionAPI): void {
       },
       startedAction: 'review.started',
       startedReason: `round ${round}`,
-      onFinished: async (updated, anotherPass) => {
-        // A refusal was already recorded by readOnlyRound — nothing more to
-        // decide, and nowhere left for this round to go on its own.
-        if (updated === null) return
+      onFinished: (updated, anotherPass) =>
+        whileDeciding(order.id, async () => {
+          // A refusal was already recorded by readOnlyRound, where the standing
+          // reads it — nothing more to decide here.
+          if (updated === null) return
 
-        const store = createOrderStore(root)
-        // Only what is still open: a finding the architect already fixed or
-        // the operator already accepted this same round is not what the
-        // operator needs counted as still standing.
-        const fresh = updated.redTeam.filter((f) => f.round === round && f.status === 'open')
-        const blocking = fresh.filter(isBlocking).length
-        const notes = fresh.length - blocking
-        await store.record({
-          at: new Date().toISOString(),
-          orderId: order.id,
-          actor: 'role:red-team',
-          action: 'review.round',
-          subject: order.id,
-          reason: `round ${round}: ${blocking} blocking, ${notes} note${notes === 1 ? '' : 's'}`,
-          evidence: [],
-        })
-        if (anotherPass === true) {
+          const store = createOrderStore(root)
+          // Only what is still open: a finding the architect already fixed or
+          // the operator already accepted this same round is not what the
+          // operator needs counted as still standing.
+          const fresh = updated.redTeam.filter((f) => f.round === round && f.status === 'open')
+          const blocking = fresh.filter(isBlocking).length
+          const notes = fresh.length - blocking
           await store.record({
             at: new Date().toISOString(),
             orderId: order.id,
             actor: 'role:red-team',
-            action: 'review.another_pass',
+            action: 'review.round',
             subject: order.id,
-            reason: `round ${round} asked to review the fix`,
+            reason: `round ${round}: ${blocking} blocking, ${notes} note${notes === 1 ? '' : 's'}`,
             evidence: [],
           })
-        }
+          if (anotherPass === true) {
+            await store.record({
+              at: new Date().toISOString(),
+              orderId: order.id,
+              actor: 'role:red-team',
+              action: 'review.another_pass',
+              subject: order.id,
+              reason: `round ${round} asked to review the fix`,
+              evidence: [],
+            })
+          }
 
-        // The operator's hold stops every automatic continuation this round
-        // could lead to — the next round, "ready", or a fix turn — the same
-        // as it stops a redraft's own follow-up.
-        if (loopFacts(await store.entries(order.id)).heldAt !== null) return
+          // The operator's hold stops every automatic continuation this round
+          // could lead to — the next round, "ready", or a fix turn — the same
+          // as it stops a redraft's own follow-up.
+          if (loopFacts(await store.entries(order.id)).heldAt !== null) return
 
-        const next = reviewNext({ order: updated, round })
-        if (next.kind === 'clean') {
-          sayReady(updated)
-          return
-        }
-        if (next.kind === 'operator') {
-          const stillOpen = updated.redTeam.filter(
-            (f) => f.status === 'open' && isBlocking(f)
-          ).length
+          const next = reviewNext({ order: updated, round })
+          if (next.kind === 'clean') {
+            await handOffWhenReady(updated)
+            return
+          }
+          if (next.kind === 'operator') {
+            const stillOpen = updated.redTeam.filter(
+              (f) => f.status === 'open' && isBlocking(f)
+            ).length
+            await store.record({
+              at: new Date().toISOString(),
+              orderId: order.id,
+              actor: 'role:red-team',
+              action: 'review.exhausted',
+              subject: order.id,
+              reason: `still has ${stillOpen} blocking finding${stillOpen === 1 ? '' : 's'} after ${MAX_REVIEW_ROUNDS} rounds`,
+              evidence: [],
+            })
+            api.notifications.showToast(
+              'warning',
+              `${updated.title}: the red team still has ${stillOpen} blocking finding${stillOpen === 1 ? '' : 's'} after ${MAX_REVIEW_ROUNDS} rounds — it needs you.`,
+              `foundry.review.exhausted.${order.id}`
+            )
+            return
+          }
+          // Recorded here, and not left to `convergeWithFollowUps`'s own
+          // finish-time bookkeeping: the loop's fix turn is `converge.started`,
+          // not `review.started`, and nothing recorded it starting at all —
+          // the Forge read the ledger and saw no turn running while an
+          // architect was in fact fixing the findings.
+          const started = await convergeWithFollowUps(updated, next.message, 0, round + 1)
           await store.record({
             at: new Date().toISOString(),
             orderId: order.id,
-            actor: 'role:red-team',
-            action: 'review.exhausted',
-            subject: order.id,
-            reason: `still has ${stillOpen} blocking finding${stillOpen === 1 ? '' : 's'} after ${MAX_REVIEW_ROUNDS} rounds`,
+            actor: 'role:architect',
+            action: started.ok ? 'converge.started' : 'converge.refused',
+            subject: started.ok ? started.sessionId : order.id,
+            reason: started.ok ? `red team round ${round} fix` : started.reason,
             evidence: [],
           })
-          api.notifications.showToast(
-            'warning',
-            `${updated.title}: the red team still has ${stillOpen} blocking finding${stillOpen === 1 ? '' : 's'} after ${MAX_REVIEW_ROUNDS} rounds — it needs you.`,
-            `foundry.review.exhausted.${order.id}`
-          )
-          return
-        }
-        // Recorded here, and not left to `convergeWithFollowUps`'s own
-        // finish-time bookkeeping: the loop's fix turn is `converge.started`,
-        // not `review.started`, and nothing recorded it starting at all —
-        // the Forge read the ledger and saw no turn running while an
-        // architect was in fact fixing the findings.
-        const started = await convergeWithFollowUps(updated, next.message, 0, round + 1)
-        await store.record({
-          at: new Date().toISOString(),
-          orderId: order.id,
-          actor: 'role:architect',
-          action: started.ok ? 'converge.started' : 'converge.refused',
-          subject: started.ok ? started.sessionId : order.id,
-          reason: started.ok ? `red team round ${round} fix` : started.reason,
-          evidence: [],
-        })
-      },
+        }),
     })
   }
 
   /**
-   * A clean review round says the order is ready and stops there. Hand-off is
-   * the operator's: nothing agrees an order or starts the Line on its own.
+   * A draft that passes every check. One the operator never released waits
+   * for their Hand off; one they released that a defect sent back is agreed
+   * again and restarted (`forge/release-again.ts`).
    */
-  const sayReady = (order: WorkOrder): void => {
-    api.notifications.showToast(
-      'info',
-      `${order.title} is ready to hand off.`,
-      `foundry.review.ready.${order.id}`
-    )
+  const handOffWhenReady = async (order: WorkOrder): Promise<void> => {
+    const store = createOrderStore(dataRoot())
+    await readyToHandOff(order, {
+      entries: (orderId) => store.entries(orderId),
+      agree: async (o) => {
+        const r = (await forge.compile({ id: o.id, commit: true, automatic: true })) as {
+          error?: string
+          order?: WorkOrder
+          compile?: { failures: { detail: string }[] }
+        }
+        if (r.order?.status === 'agreed') return { ok: true }
+        return {
+          ok: false,
+          reason: r.error ?? r.compile?.failures[0]?.detail ?? 'the order could not be agreed',
+        }
+      },
+      start: async (o) => {
+        const r = (await runs.start({
+          id: o.id,
+          ...(o.recipeOverriddenBy === 'operator' && o.recipe !== null ? { recipe: o.recipe } : {}),
+        })) as { error?: string; started?: boolean; reason?: string }
+        if (r.error !== undefined) return { ok: false, reason: r.error }
+        if (r.started === false) return { ok: false, reason: r.reason ?? 'nothing started the run' }
+        return { ok: true }
+      },
+      refuse: async (o, reason) => {
+        await store.record({
+          at: new Date().toISOString(),
+          orderId: o.id,
+          actor: 'rule:forge',
+          action: 'run.refused',
+          subject: o.id,
+          reason,
+          evidence: [],
+        })
+        api.notifications.showToast(
+          'warning',
+          `${o.title} did not restart: ${reason}`,
+          `foundry.release.refused.${o.id}`
+        )
+      },
+      sayReady: (o) =>
+        api.notifications.showToast(
+          'info',
+          `${o.title} is ready to hand off.`,
+          `foundry.review.ready.${o.id}`
+        ),
+      sayRestarted: (o) =>
+        api.notifications.showToast(
+          'info',
+          `${o.title} was amended and is running again.`,
+          `foundry.release.restarted.${o.id}`
+        ),
+    })
   }
 
   /**
@@ -2997,7 +3076,7 @@ export function activate(api: ExtensionAPI): void {
       if (next.kind === 'review') {
         await startReview(order, next.round, '')
       } else if (next.kind === 'hand-off') {
-        sayReady(order)
+        await handOffWhenReady(order)
       } else if (next.kind === 'fix' || next.kind === 'follow-up') {
         const started = await convergeWithFollowUps(
           order,
@@ -3345,9 +3424,33 @@ export function activate(api: ExtensionAPI): void {
   // The one surface the operator is required to visit. Nothing reaches it that
   // a named rule did not raise, which is what makes "nothing needs you" a
   // state worth trusting rather than a state worth double-checking.
+  // Every live order's standing, read the way every surface reads it.
+  const liveStandings = async (): Promise<{ orders: WorkOrder[]; waiting: WaitingOrder[] }> => {
+    const orders = (await createLiveOrderStore(dataRoot).list()).filter(
+      (order) => order.status !== 'cancelled'
+    )
+    const sources = { ...standingSources, ...orderStandingSources(createOrderStore(dataRoot())) }
+    const waiting = await Promise.all(
+      orders.map(async (order) => ({
+        orderId: order.id,
+        standing: await readStanding(order, sources),
+      }))
+    )
+    return { orders, waiting }
+  }
+
   const inbox = createInboxChannels({
     gates: createLiveGateStore(dataRoot),
     orders: createLiveOrderStore(dataRoot),
+    waiting: async () => {
+      const { orders, waiting } = await liveStandings()
+      return ordersWaiting(waiting, questionsByOrder(orders)).map(({ orderId, standing }) => ({
+        orderId,
+        title: orders.find((order) => order.id === orderId)?.title ?? orderId,
+        headline: standing.headline,
+        detail: standing.detail,
+      }))
+    },
     autonomy: () => autonomyFor(api),
     readPulls: (orderId) => readPulls(dataRoot(), orderId),
     now: () => new Date().toISOString(),
@@ -3455,7 +3558,18 @@ export function activate(api: ExtensionAPI): void {
           gateRule: gate.rule,
         })
         if (decision.kind === 'converge' && order !== null) {
-          await convergeWithFollowUps(order, decision.message, 0, 1)
+          // Recorded, or the ledger shows no turn running while the architect
+          // amends the order and every surface reads it as idle.
+          const started = await convergeWithFollowUps(order, decision.message, 0, 1)
+          await createOrderStore(dataRoot()).record({
+            at: new Date().toISOString(),
+            orderId: order.id,
+            actor: 'role:architect',
+            action: started.ok ? 'converge.started' : 'converge.refused',
+            subject: started.ok ? started.sessionId : order.id,
+            reason: started.ok ? `answering ${ruleInWords(gate.rule)}` : started.reason,
+            evidence: [],
+          })
           return
         }
       }
@@ -3516,18 +3630,19 @@ export function activate(api: ExtensionAPI): void {
   // rail and a held tool call sat under a whole run graph, so the only way to
   // find either was to already be looking at it.
   const attentionGates = createLiveGateStore(dataRoot)
-  const attentionOrders = createLiveOrderStore(dataRoot)
   reg(api, 'foundry:attention', async () => {
     // The chrome polls this from the moment the application opens, which makes
     // it the earliest place a run the last one left behind can be noticed. A
     // dead run that announces itself in four seconds is the whole difference
     // between this and finding out hours later that nothing had moved.
     await adoptInterruptedRuns(dataRoot())
+    const { orders, waiting } = await liveStandings()
     return countAttention({
       gates: await attentionGates.list(),
       autonomy: autonomyFor(api),
-      orders: await attentionOrders.list(),
+      orders,
       pendingAsks: pendingPermissions.list().length,
+      waiting,
     })
   })
 

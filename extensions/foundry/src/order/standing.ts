@@ -114,6 +114,17 @@ export interface StandingInput {
    * ship it.
    */
   readonly documentReady?: string | null
+  /**
+   * Whether an architect or red-team turn is live on this draft, or Foundry is
+   * deciding what to start next. Draft orders only.
+   *
+   * Without it a draft that every turn had finished with read exactly like one
+   * being worked: WO-1008-287 was amended, passed every check, and sat for
+   * good under "It starts on its own" — nothing starts a draft on its own.
+   */
+  readonly shaping: boolean
+  /** The first check a draft has not cleared, in words. Draft orders only. */
+  readonly blocker: string | null
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -178,25 +189,50 @@ export function standingOf(input: StandingInput): Standing {
     }
 
     const open = input.openQuestions
-    return open > 0
+    if (open > 0) {
+      return {
+        ...counts,
+        kind: 'shaping',
+        turn: 'you',
+        label: `${open} to answer`,
+        headline: `${open} ${plural(open, 'question', 'questions')} to answer`,
+        detail: `${open} ${plural(open, 'question', 'questions')} to answer before this can start.`,
+      }
+    }
+
+    const left = `${input.failures} ${plural(input.failures, 'check has', 'checks have')} yet to clear`
+    if (input.shaping) {
+      return {
+        ...counts,
+        kind: 'shaping',
+        turn: 'foundry',
+        label: 'being shaped',
+        headline: 'Being shaped',
+        detail:
+          input.failures === 0
+            ? 'Foundry is finishing this off. Every check passes so far.'
+            : `Foundry is still shaping this — ${left}.`,
+      }
+    }
+
+    // Nothing is working on it, so whatever happens next is the operator's.
+    return input.failures === 0
       ? {
           ...counts,
           kind: 'shaping',
           turn: 'you',
-          label: `${open} to answer`,
-          headline: `${open} ${plural(open, 'question', 'questions')} to answer`,
-          detail: `${open} ${plural(open, 'question', 'questions')} to answer before this can start.`,
+          label: 'ready to hand off',
+          headline: 'Ready to hand off',
+          detail:
+            'Every check passes. Read the plan and hand it off in the Forge to start the run.',
         }
       : {
           ...counts,
           kind: 'shaping',
-          turn: 'foundry',
-          label: 'being shaped',
-          headline: 'Being shaped',
-          detail:
-            input.failures === 0
-              ? 'Foundry has shaped this and every check passes. It starts on its own.'
-              : `Foundry is still shaping this — ${input.failures} ${plural(input.failures, 'check has', 'checks have')} yet to clear.`,
+          turn: 'you',
+          label: 'shaping stopped',
+          headline: 'Shaping stopped',
+          detail: `Nothing is working on this and ${left}: ${(input.blocker ?? 'open it in the Forge to see which').replace(/\.$/, '')}. Open it in the Forge and ask for the gap to be closed.`,
         }
   }
 
@@ -286,8 +322,12 @@ export function standingOf(input: StandingInput): Standing {
       ...counts,
       kind: 'stopped',
       turn: 'you',
-      label: finished ? 'not shipped' : 'stopped',
-      headline: finished ? 'Finished, but not shipped' : 'The run stopped on an error',
+      label: finished ? 'not shipped' : total === 0 ? 'did not start' : 'stopped',
+      headline: finished
+        ? 'Finished, but not shipped'
+        : total === 0
+          ? 'The run did not start'
+          : 'The run stopped on an error',
       detail: reason,
     }
   }
@@ -374,6 +414,10 @@ export interface StandingSources {
   readonly runFailureFor?: (orderId: string) => Promise<string | null>
   /** Where this order's run left its document, when it ended on one. */
   readonly documentReadyFor?: (orderId: string) => Promise<string | null>
+  /** Whether anything is still shaping this draft. Unknown reads as yes. */
+  readonly shapingFor?: (orderId: string) => Promise<boolean>
+  /** The first check this order has not cleared, in words. */
+  readonly blockerFor?: (order: WorkOrder) => string | null
 }
 
 /**
@@ -399,12 +443,16 @@ export async function readStanding(order: WorkOrder, sources: StandingSources): 
     // running order to be told 'no' is a file read per row for nothing.
     intakeRefused:
       order.status === 'draft' ? ((await sources.intakeRefusedFor?.(order.id)) ?? null) : null,
-    // Only a running order can have a run to have failed, and reading the
-    // ledger of every other status to be told 'no' is a file read for
-    // nothing.
+    // Only an agreed or running order can have a run that failed or refused
+    // to start, and reading the ledger of every other status to be told 'no'
+    // is a file read for nothing.
     runFailure:
-      order.status === 'running' ? ((await sources.runFailureFor?.(order.id)) ?? null) : null,
+      order.status === 'running' || order.status === 'agreed'
+        ? ((await sources.runFailureFor?.(order.id)) ?? null)
+        : null,
     documentReady:
       order.status === 'running' ? ((await sources.documentReadyFor?.(order.id)) ?? null) : null,
+    shaping: order.status === 'draft' ? ((await sources.shapingFor?.(order.id)) ?? true) : false,
+    blocker: order.status === 'draft' ? (sources.blockerFor?.(order) ?? null) : null,
   })
 }

@@ -14,6 +14,7 @@ let pendingNewOrder = false
 let orderRows: unknown[] = []
 let currentView: 'list' | 'factory' = 'list'
 let observeStanding: unknown
+let inboxWaiting: unknown[] = []
 
 const mockBridgeInvoke = vi.fn(async (channel: string, payload?: unknown) => {
   if (channel === 'foundry:order.list') return { orders: orderRows }
@@ -26,6 +27,7 @@ const mockBridgeInvoke = vi.fn(async (channel: string, payload?: unknown) => {
   if (channel === 'foundry:inbox.list') {
     return {
       gates: [],
+      waiting: inboxWaiting,
       summary: { waiting: 0, orders: 0, automatic: 0, building: 0, converging: 0 },
     }
   }
@@ -92,6 +94,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   pendingNewOrder = false
   orderRows = []
+  inboxWaiting = []
   currentView = 'list'
   observeStanding = undefined
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -184,6 +187,49 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: /back/i })).toBeNull())
     expect(screen.getByRole('button', { name: 'Ledger' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  // The Inbox names an order waiting on you; its button has to land on that
+  // order, not on the Forge's list where it is one row of many.
+  it('opens a waiting order from the Inbox in the Forge', async () => {
+    orderRows = [
+      {
+        id: 'WO-1008-287',
+        title: 'render html in comments',
+        status: 'draft',
+        risk: 'low',
+        failures: 0,
+        source: { kind: 'typed', tracker: null, key: null },
+        standing: {
+          kind: 'shaping',
+          turn: 'you',
+          label: 'ready to hand off',
+          headline: 'Ready to hand off',
+          detail: '',
+          done: 0,
+          total: 0,
+          gateId: null,
+        },
+      },
+    ]
+    inboxWaiting = [
+      {
+        orderId: 'WO-1008-287',
+        title: 'render html in comments',
+        headline: 'Ready to hand off',
+        detail: 'Every check passes.',
+      },
+    ]
+    render(<App />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Open render html in comments in the Forge' })
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe(
+        'true'
+      )
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'All orders' })).toBeTruthy())
   })
 
   it('asks the inbox what needs the operator, on load', async () => {

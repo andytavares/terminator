@@ -13,6 +13,7 @@ import type { LedgerEntry } from '../ledger/append.js'
 
 const FAILED = 'run.failed'
 const SHIP_REFUSED = 'ship.refused'
+const RUN_REFUSED = 'run.refused'
 const STARTED = 'run.started'
 const RESUMED = 'run.resumed'
 const COMPLETE = 'run.complete'
@@ -32,7 +33,9 @@ const DOCUMENT_READY = 'run.document_ready'
 export function runFailure(entries: readonly LedgerEntry[]): string | null {
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const entry = entries[i]
-    if (entry.action === FAILED || entry.action === SHIP_REFUSED) return entry.reason
+    if (entry.action === FAILED || entry.action === SHIP_REFUSED || entry.action === RUN_REFUSED) {
+      return entry.reason
+    }
     if (
       entry.action === STARTED ||
       entry.action === RESUMED ||

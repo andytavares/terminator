@@ -2149,6 +2149,35 @@
   padding: 1px 7px;
 }
 
+/* An order waiting on you that no gate stands for: what, which, why, and the
+   one move — opening it. */
+.fdry-waiting {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.fdry-waiting-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.fdry-waiting-title {
+  font-size: 12px;
+  color: var(--tm-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.fdry-waiting-main p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .fdry-gate-default {
   border-style: dashed !important;
 }

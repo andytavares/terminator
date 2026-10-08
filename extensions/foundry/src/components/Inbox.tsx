@@ -11,6 +11,7 @@ import {
   Gauge,
   CheckCircle2,
   Unplug,
+  Hand,
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { ExternalLink, MarkdownInline } from './Markdown.js'
@@ -29,6 +30,8 @@ interface InboxView {
     pulls?: { number: number; url: string }[]
     source?: { key: string; url: string } | null
   })[]
+  /** Orders waiting on you that no gate stands for, with why. */
+  waiting?: { orderId: string; title: string; headline: string; detail: string }[]
   autonomy?: 'escorted' | 'standard' | 'lights-out'
   /** Rules this setting is not asking about. Shown, so quiet is explicable. */
   silenced?: GateRuleId[]
@@ -102,7 +105,11 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
 
 export const SIGNAL_POLL_MS = 4000
 
-export function Inbox(): JSX.Element {
+export function Inbox({
+  onOpenOrder,
+}: {
+  onOpenOrder?: (orderId: string) => void
+} = {}): JSX.Element {
   const [view, setView] = useState<InboxView | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
@@ -123,9 +130,12 @@ export function Inbox(): JSX.Element {
     setSensors(sen.sensors ?? [])
   }, [])
 
+  const refreshList = useCallback(async () => {
+    setView((await invoke('foundry:inbox.list')) as InboxView)
+  }, [])
+
   const refresh = useCallback(async () => {
-    const next = (await invoke('foundry:inbox.list')) as InboxView
-    setView(next)
+    await refreshList()
     await refreshSignals()
 
     // "Nothing needs you" is only reassuring if it also says what happened
@@ -145,18 +155,22 @@ export function Inbox(): JSX.Element {
     } catch {
       // Nothing here is worth failing the surface for.
     }
-  }, [refreshSignals])
+  }, [refreshList, refreshSignals])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
-  // Sensors record signals on their own tick, so the list is read again while
-  // the Inbox is open rather than only when it mounts.
+  // Sensors record signals on their own tick, and an order can start waiting
+  // on you at any moment, so both are read again while the Inbox is open
+  // rather than only when it mounts.
   useEffect(() => {
-    const timer = setInterval(() => void refreshSignals(), SIGNAL_POLL_MS)
+    const timer = setInterval(() => {
+      void refreshSignals()
+      void refreshList()
+    }, SIGNAL_POLL_MS)
     return () => clearInterval(timer)
-  }, [refreshSignals])
+  }, [refreshList, refreshSignals])
 
   const answer = useCallback(
     async (gateId: string, option: string, limit?: number | null) => {
@@ -219,10 +233,41 @@ export function Inbox(): JSX.Element {
 
   if (view === null) return <div className="fdry-empty">Loading…</div>
 
+  const waiting = view.waiting ?? []
+
   return (
     <div className="fdry-shell">
       {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
-      {view.gates.length === 0 ? (
+      {waiting.length > 0 ? (
+        <ul className="fdry-queue" aria-label="Orders waiting on you">
+          {waiting.map((row) => (
+            <li key={row.orderId} className="fdry-gate is-warn">
+              <span className="fdry-gate-stripe" aria-hidden="true" />
+              <div className="fdry-waiting">
+                <span className="fdry-gate-icon" aria-hidden="true">
+                  <Hand />
+                </span>
+                <div className="fdry-waiting-main">
+                  <b>{row.headline}</b>
+                  <span className="fdry-waiting-title">{row.title}</span>
+                  <p>{row.detail}</p>
+                </div>
+                <div className="fdry-gate-actions">
+                  <button
+                    type="button"
+                    className="is-primary"
+                    aria-label={`Open ${row.title} in the Forge`}
+                    onClick={() => onOpenOrder?.(row.orderId)}
+                  >
+                    Open
+                  </button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {view.gates.length === 0 && waiting.length > 0 ? null : view.gates.length === 0 ? (
         <div className="fdry-nothing">
           <CheckCircle2 aria-hidden="true" />
           <p>Nothing needs you.</p>
