@@ -32,13 +32,18 @@ markdown ─ remark-gfm ─ remark-rehype ─ rehype-raw ─ rehype-sanitize ─
   `href` and `src` keep only `http`, `https`, `mailto`, `irc`, `ircs` and
   `xmpp`. It keeps `className="language-*"` on `<code>`, so highlight.js still
   highlights fenced code.
-- `clobberPrefix` is set to `''`. The schema's default is `user-content-` on
-  `id` and `name`. `remark-rehype` already prefixes footnote ids, so a second
-  prefix would reach the ids but not the hrefs, and every footnote link would
-  point nowhere.
+- The schema's `clobberPrefix` stays `user-content-`, so a body's
+  `<img name="createElement">` or `id="activeElement"` cannot shadow a
+  `document` property. `remark-rehype` gets `clobberPrefix: ''` so footnote
+  ids are prefixed once, by the sanitizer, not twice.
+- The `a` override rewrites an in-page `#x` href to `#user-content-x`, as
+  GitHub's own page script does, so footnotes and anchors reach their target.
+  Every other non-http(s) href (relative, `mailto:`) has its click cancelled:
+  extension views have no `will-navigate` guard, so following it would
+  replace the view.
 
 Sanitize runs last, so nothing after it can reintroduce an attribute it
-removed. The existing `a` and `code` overrides are unchanged.
+removed. The `code` override is unchanged.
 
 `react-markdown`'s security section names `rehype-sanitize` as the safety net
 for `rehype-raw`, and its changelog orders them `rehypeRaw` then
@@ -72,9 +77,8 @@ Required by Constitution IV for each new dependency.
 - Every surface that renders through `RichContent` renders HTML, including
   agent notes, findings and the comment composer's preview. They share one
   renderer by design (ADR-011), and the same sanitizer covers them.
-- Raw-HTML `id` and `name` attributes are no longer prefixed. A body can set
-  an element id inside the extension's view; it cannot override a property
-  the page already defines, such as `window.electronAPI`.
+- Every `id` and `name` in a body, from HTML or footnotes, carries the
+  `user-content-` prefix in the DOM.
 - Images in private repositories point at `github.com/user-attachments/…`,
   which needs a signed-in session. The extension view has none, so those
   images show as broken. Public images load.

@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, fireEvent } from '@testing-library/react'
 import { RichContent } from '../../src/components/pr-review/RichContent'
 
 const FENCE = '```'
@@ -91,5 +91,40 @@ describe('RichContent HTML in markdown', () => {
     expect(container.textContent).toContain('bad link')
     expect(container.textContent).toContain('after')
     expect((window as unknown as { pwned?: boolean }).pwned).toBeUndefined()
+  })
+
+  it('prefixes HTML id and name so a body cannot clobber document properties', () => {
+    const body = [
+      '<img name="createElement" src="https://example.com/a.png">',
+      '',
+      '<img id="activeElement" src="https://example.com/b.png">',
+    ].join('\n')
+
+    const { container } = render(<RichContent>{body}</RichContent>)
+
+    const imgs = container.querySelectorAll('img')
+    expect(imgs).toHaveLength(2)
+    expect(imgs[0].getAttribute('name')).toBe('user-content-createElement')
+    expect(imgs[1].getAttribute('id')).toBe('user-content-activeElement')
+    expect(typeof document.createElement).toBe('function')
+    expect(document.activeElement?.tagName).not.toBe('IMG')
+  })
+
+  it('keeps in-page links in the view and stops other non-http links navigating it', () => {
+    const body = [
+      '[jump](#notes)',
+      '',
+      '[relative](docs/guide.md)',
+      '',
+      '[mail](mailto:a@example.com)',
+    ].join('\n')
+
+    const { getByText } = render(<RichContent>{body}</RichContent>)
+
+    const jump = getByText('jump')
+    expect(jump.getAttribute('href')).toBe('#user-content-notes')
+    expect(fireEvent.click(jump)).toBe(true)
+    expect(fireEvent.click(getByText('relative'))).toBe(false)
+    expect(fireEvent.click(getByText('mail'))).toBe(false)
   })
 })

@@ -2,12 +2,13 @@ import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
+import rehypeSanitize from 'rehype-sanitize'
 import hljs from '../../utils/hljs'
 
-// remark-rehype already prefixes footnote ids with 'user-content-'; a second
-// prefix here would break every footnote link.
-const sanitizeSchema = { ...defaultSchema, clobberPrefix: '' }
+// rehype-sanitize prefixes every id and name, so in-page hrefs must carry the
+// same prefix to reach their target. remark-rehype is told not to prefix
+// footnote ids itself, or they would be prefixed twice.
+const CLOBBER_PREFIX = 'user-content-'
 
 interface Props {
   children: string
@@ -19,17 +20,25 @@ export function RichContent({ children, className }: Props) {
     <div className={`rich-content${className ? ` ${className}` : ''}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
+        remarkRehypeOptions={{ clobberPrefix: '' }}
+        rehypePlugins={[rehypeRaw, rehypeSanitize]}
         components={{
           a({ href, children }) {
             const isAbsolute = href?.startsWith('http://') || href?.startsWith('https://')
+            const isInPage = href?.startsWith('#') ?? false
+            const target =
+              isInPage && !href!.startsWith(`#${CLOBBER_PREFIX}`)
+                ? `#${CLOBBER_PREFIX}${href!.slice(1)}`
+                : href
             return (
               <a
-                href={href}
+                href={target}
                 onClick={(e) => {
-                  if (!isAbsolute) return
+                  // The extension view has no navigation guard, so any other
+                  // href would replace the view itself.
+                  if (isInPage) return
                   e.preventDefault()
-                  window.electronAPI.shell.openExternal(href!).catch(() => {})
+                  if (isAbsolute) window.electronAPI.shell.openExternal(href!).catch(() => {})
                 }}
               >
                 {children}
