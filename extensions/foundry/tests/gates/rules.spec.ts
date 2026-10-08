@@ -46,7 +46,7 @@ describe('raiseGate', () => {
 
   it('offers to fix a check that already fails on the base branch', () => {
     const g = gate({ rule: 'verify.base-fail' })
-    expect(g.options.map((o) => o.id)).toEqual(['fix_first', 'accept_debt', 'hold'])
+    expect(g.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
     expect(g.defaultIfIgnored).toBe('hold')
     expect(ruleInWords('verify.base-fail')).toBe('a check that already fails on the base branch')
   })

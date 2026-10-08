@@ -6,11 +6,10 @@ import {
   readRefineryState,
   writeRefineryState,
   finalCheckSendBacks,
-  baseFixOrderText,
+  sendsBackFinalCheck,
 } from '../../src/line/refinery-state.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
-import { titleFrom } from '../../src/forge/intake-source.js'
 
 let root: string
 
@@ -27,7 +26,6 @@ describe('readRefineryState', () => {
     expect(await readRefineryState(root, 'WO-1')).toEqual({
       mergedAt: null,
       restackedFor: [],
-      waitingOn: null,
     })
   })
 
@@ -38,7 +36,6 @@ describe('readRefineryState', () => {
     expect(await readRefineryState(root, 'WO-1')).toEqual({
       mergedAt: null,
       restackedFor: [],
-      waitingOn: null,
     })
   })
 
@@ -46,12 +43,10 @@ describe('readRefineryState', () => {
     await writeRefineryState(root, 'WO-1', {
       mergedAt: '2026-09-06T10:00:00.000Z',
       restackedFor: ['WO-2'],
-      waitingOn: null,
     })
     expect(await readRefineryState(root, 'WO-1')).toEqual({
       mergedAt: '2026-09-06T10:00:00.000Z',
       restackedFor: ['WO-2'],
-      waitingOn: null,
     })
   })
 
@@ -63,7 +58,6 @@ describe('readRefineryState', () => {
     expect(await readRefineryState(root, 'WO-2')).toEqual({
       mergedAt: null,
       restackedFor: [],
-      waitingOn: null,
     })
   })
 
@@ -77,7 +71,6 @@ describe('readRefineryState', () => {
     expect(await readRefineryState(root, 'WO-1')).toEqual({
       mergedAt: null,
       restackedFor: ['WO-2'],
-      waitingOn: null,
     })
   })
 
@@ -88,7 +81,6 @@ describe('readRefineryState', () => {
     expect(await readRefineryState(root, 'WO-1')).toEqual({
       mergedAt: null,
       restackedFor: [],
-      waitingOn: null,
     })
   })
 
@@ -99,22 +91,7 @@ describe('readRefineryState', () => {
     expect(await readRefineryState(root, 'WO-1')).toEqual({
       mergedAt: null,
       restackedFor: [],
-      waitingOn: null,
     })
-  })
-
-  it('reads back the order it is waiting on', async () => {
-    await writeRefineryState(root, 'WO-1', { mergedAt: null, restackedFor: [], waitingOn: 'WO-9' })
-    expect((await readRefineryState(root, 'WO-1')).waitingOn).toBe('WO-9')
-  })
-
-  it('reads waitingOn as null when it is missing, empty or not a string', async () => {
-    const dir = path.join(root, 'orders', 'WO-1')
-    fs.mkdirSync(dir, { recursive: true })
-    for (const waitingOn of [undefined, '', 42]) {
-      fs.writeFileSync(path.join(dir, 'refinery.json'), JSON.stringify({ waitingOn }))
-      expect((await readRefineryState(root, 'WO-1')).waitingOn).toBeNull()
-    }
   })
 })
 
@@ -142,53 +119,25 @@ describe('finalCheckSendBacks', () => {
         gate({}, 'hold'),
         gate({}),
         gate({ nodeId: 'build' }, 'send_back'),
-        gate({ rule: 'verify.base-fail' }, 'fix_first'),
+        gate({ rule: 'verify.base-fail' }, 'send_back'),
+        gate({ rule: 'verify.base-fail' }, 'accept_debt'),
       ])
-    ).toBe(2)
+    ).toBe(3)
   })
 })
 
-describe('baseFixOrderText', () => {
-  const failing = gate({
-    rule: 'verify.base-fail',
-    // Worded so nothing could be recovered from it: the step and command come from the evidence.
-    why: 'It also fails without this change.',
-    evidence: [
-      { kind: 'stdout', exitCode: 1, path: '/logs/change.log', excerpt: 'change output' },
-      {
-        kind: 'stdout',
-        exitCode: 1,
-        step: 'Lint',
-        command: 'npm run lint',
-        path: '/logs/base.log',
-        excerpt: 'no-unused-vars in a.ts',
-      },
-    ],
-  })
-  const brief = baseFixOrderText(failing, { id: 'WO-1', title: 'Add search' }, 'main')
-
-  it('titles the order for the step and the base branch, and intake reads the same title', () => {
-    expect(brief.title).toBe('Fix Lint on main')
-    expect(brief.step).toBe('Lint')
-    expect(titleFrom(brief.text)).toBe('Fix Lint on main.')
+describe('sendsBackFinalCheck', () => {
+  // A failure already on the base branch is fixed inside this order: nothing
+  // opens a second order the operator did not start.
+  it('sends a base-branch failure back to this order the same way as its own', () => {
+    expect(sendsBackFinalCheck(gate({ rule: 'verify.base-fail' }), 'send_back')).toBe(true)
+    expect(sendsBackFinalCheck(gate(), 'send_back')).toBe(true)
   })
 
-  it('carries the command, that no order caused it, the base log, and where it was found', () => {
-    expect(brief.text).toContain('`npm run lint`')
-    expect(brief.text).toContain("without any order's change")
-    expect(brief.text).toContain('no-unused-vars in a.ts')
-    expect(brief.text).not.toContain('change output')
-    expect(brief.text).toContain('/logs/base.log')
-    expect(brief.text).toContain('Found while verifying Add search (WO-1)')
-  })
-
-  it('still says something when the gate carries no command or log', () => {
-    const bare = baseFixOrderText(
-      gate({ rule: 'verify.base-fail' }),
-      { id: 'WO-1', title: 'T' },
-      'main'
-    )
-    expect(bare.title).toBe('Fix the final check on main')
-    expect(bare.text).not.toContain('Log:')
+  it('leaves a node’s own retry, other answers and other rules alone', () => {
+    expect(sendsBackFinalCheck(gate({ nodeId: 'build' }), 'send_back')).toBe(false)
+    expect(sendsBackFinalCheck(gate({ rule: 'verify.base-fail' }), 'accept_debt')).toBe(false)
+    expect(sendsBackFinalCheck(gate({ rule: 'ci.red' }), 'send_back')).toBe(false)
+    expect(sendsBackFinalCheck(gate(), undefined)).toBe(false)
   })
 })

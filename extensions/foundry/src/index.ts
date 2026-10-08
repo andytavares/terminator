@@ -23,7 +23,6 @@ import { RUNGS, rungLevelInWords } from './verify/ladder.js'
 import type { ResolveSources } from './recipe/resolve.js'
 import { askOnce, createLiveGateStore, createGateStore } from './gates/store.js'
 import { raiseGate, ruleInWords } from './gates/rules.js'
-import type { Gate } from './gates/rules.js'
 import { orphanedNodes } from './line/reclaim.js'
 import type { StandingSources } from './order/standing.js'
 import { countAttention } from './gates/attention.js'
@@ -51,16 +50,18 @@ import {
   ensureCheckouts,
   ensureBaseCheckout,
   removeBaseCheckout,
+  unlinkBorrowedDependencies,
   branchFor,
   checkoutPath,
 } from './line/worktree.js'
 import type { Checkout } from './line/worktree.js'
+import { installCommandFor } from './verify/toolchain-probe.js'
 import { queueEntries } from './line/refinery-entries.js'
 import {
   readRefineryState,
   writeRefineryState,
   finalCheckSendBacks,
-  baseFixOrderText,
+  sendsBackFinalCheck,
 } from './line/refinery-state.js'
 import { refineryTick } from './line/refinery-tick.js'
 import type { RefineryTickDeps } from './line/refinery-tick.js'
@@ -1220,11 +1221,7 @@ async function raiseRefineryConflict(
  * recheck it. Built fresh on every tick so it always reads the workspace's
  * current data root, the same reason every other tick function does.
  */
-async function runRefineryTick(
-  api: ExtensionAPI,
-  root: string,
-  resume: (orderId: string) => Promise<void>
-): Promise<void> {
+async function runRefineryTick(api: ExtensionAPI, root: string): Promise<void> {
   const store = createOrderStore(root)
 
   const deps: RefineryTickDeps = {
@@ -1279,14 +1276,6 @@ async function runRefineryTick(
         evidence: [],
       }),
     titleOf: async (orderId) => (await store.load(orderId))?.title ?? orderId,
-    waitingOn: async (mergedId) => {
-      const waiting: string[] = []
-      for (const order of await store.list()) {
-        if ((await readRefineryState(root, order.id)).waitingOn === mergedId) waiting.push(order.id)
-      }
-      return waiting
-    },
-    resume,
     // The issue's last move: Done only once the pull requests are merged.
     onMerged: async (orderId) => {
       const order = await store.load(orderId)
@@ -1863,6 +1852,27 @@ async function buildExecutorDeps(
           issue: issueOf(order),
           title: `${step.name} on ${baseBranch}`,
           command: step.command,
+          logPath,
+        })
+      },
+      // A broken install, mended in place. The borrowed links go first, so the
+      // install lands in this checkout and never writes into the origin's.
+      reinstall: async (where, logPath) => {
+        const runner = supervisedRunner
+        if (runner === null) return null
+        const lane = [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
+        const checkout = where === 'base' ? baseCheckout : (checkouts.get(lane) ?? null)
+        if (checkout === null) return null
+        const command = installCommandFor(checkout.path)
+        if (command === null) return null
+        await unlinkBorrowedDependencies(checkout, { exec, root })
+        return runner.runCommand({
+          worktreePath: checkout.path,
+          workspaceId: workspaceOf(checkout),
+          branch: checkout.branch,
+          issue: issueOf(order),
+          title: 'Reinstall dependencies',
+          command,
           logPath,
         })
       },
@@ -2643,7 +2653,7 @@ export function activate(api: ExtensionAPI): void {
   }, 60_000)
   // R4: watch for merges, restack what queued behind, recheck it.
   refineryTimer = setInterval(() => {
-    void runRefineryTick(api, dataRoot(), (orderId) => resumeOrder(orderId))
+    void runRefineryTick(api, dataRoot())
   }, 60_000)
   // Where every surface's answer to "what is this order doing" comes from.
   //
@@ -2674,14 +2684,7 @@ export function activate(api: ExtensionAPI): void {
     // Not a record on disk: an agent's terminal is a child of this process, so
     // only this process can say whether one is still there.
     orphansFor: (orderId, graph) =>
-      executingOrders.has(orderId) ? [] : orphanedNodes(graph, isLiveSession).map((n) => n.id), // The order whose merge this one is waiting for, so a run left standing on
-    // purpose is not read as one nobody is running.
-    waitingOnFor: async (orderId) => {
-      const { waitingOn } = await readRefineryState(dataRoot(), orderId)
-      if (waitingOn === null) return null
-      const fix = await createOrderStore(dataRoot()).load(waitingOn)
-      return { id: waitingOn, title: fix?.title ?? waitingOn }
-    },
+      executingOrders.has(orderId) ? [] : orphanedNodes(graph, isLiveSession).map((n) => n.id),
   }
 
   const nextReviewRound = async (orderId: string): Promise<number> =>
@@ -3229,38 +3232,6 @@ export function activate(api: ExtensionAPI): void {
     return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
   })
 
-  // The final check fails on the base branch too: the operator asked for it to be
-  // fixed first. A separate order is opened for that and this one waits for it.
-  const waitForBaseFix = async (gate: Gate): Promise<void> => {
-    const root = dataRoot()
-    const store = createOrderStore(root)
-    const order = await store.load(gate.orderId)
-    if (order === null) throw new Error(`No order ${gate.orderId}.`)
-    const baseBranch = order.context.repos[0]?.baseBranch ?? 'the base branch'
-    const brief = baseFixOrderText(gate, order, baseBranch)
-    const created = (await forge.create({
-      source: { kind: 'typed', text: brief.text },
-      repoPaths: order.context.repos.map((repo) => repo.path),
-    })) as { error?: string; order?: { id: string } }
-    if (created.order === undefined) {
-      throw new Error(created.error ?? 'The order to fix it could not be created.')
-    }
-    const fixId = created.order.id
-    await writeRefineryState(root, order.id, {
-      ...(await readRefineryState(root, order.id)),
-      waitingOn: fixId,
-    })
-    await store.record({
-      at: new Date().toISOString(),
-      orderId: order.id,
-      actor: `rule:${gate.rule}`,
-      action: 'order.waiting',
-      subject: fixId,
-      reason: `Waiting for ${brief.title} to merge; ${brief.step} fails on ${baseBranch} without this change.`,
-      evidence: [],
-    })
-  }
-
   // ── The Line ───────────────────────────────────────────────────────────
   //
   // An agreed order plus a shape of work becomes a run graph. Everything that
@@ -3286,7 +3257,6 @@ export function activate(api: ExtensionAPI): void {
     executing: (orderId) => executingOrders.has(orderId),
     gatesFor: standingSources.gatesFor,
     asksFor: standingSources.asksFor,
-    waitingOnFor: standingSources.waitingOnFor,
     stallsFor: standingSources.stallsFor,
     strandedFor: standingSources.strandedFor,
     // The sessions themselves, so the band can offer the one thing that
@@ -3375,10 +3345,6 @@ export function activate(api: ExtensionAPI): void {
   // The one surface the operator is required to visit. Nothing reaches it that
   // a named rule did not raise, which is what makes "nothing needs you" a
   // state worth trusting rather than a state worth double-checking.
-  const resumeOrder = async (orderId: string): Promise<void> => {
-    const resumed = (await runs.resume({ id: orderId, retry: [] })) as { error?: string }
-    if (resumed.error !== undefined) throw new Error(resumed.error)
-  }
   const inbox = createInboxChannels({
     gates: createLiveGateStore(dataRoot),
     orders: createLiveOrderStore(dataRoot),
@@ -3460,14 +3426,6 @@ export function activate(api: ExtensionAPI): void {
         return
       }
 
-      // The base branch fails a check this order did not cause. It waits for
-      // an order that fixes it rather than resuming into the same failure; the
-      // refinery resumes it once that order has merged.
-      if (gate.rule === 'verify.base-fail' && option === 'fix_first') {
-        await waitForBaseFix(gate)
-        return
-      }
-
       // `stop` now stops. Every gate offering it promised the order would be
       // cancelled and nothing did it — the run stayed `running` for ever, and
       // `order.cancel` refuses a running order and points back at this gate.
@@ -3506,7 +3464,7 @@ export function activate(api: ExtensionAPI): void {
       // to retry: "Send back" gives the failure to the nodes that wrote the
       // work and reruns everything after them. Retrying nothing only re-ran the
       // same failing check.
-      if (gate.rule === 'verify.repeat-fail' && gate.nodeId === null && option === 'send_back') {
+      if (sendsBackFinalCheck(gate, option)) {
         const root = dataRoot()
         const graph = await readRunGraph(root, gate.orderId)
         if (graph !== null) {

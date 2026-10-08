@@ -1553,7 +1553,6 @@ describe('a gate on the Floor', () => {
           done: 0,
           total: 0,
           gateId: 'G-1',
-          waitingOn: null,
         },
       })
     )

@@ -31,6 +31,7 @@ import type { Evidence } from '../verify/verdict.js'
 import type { Verdict } from '../verify/verdict.js'
 import { inspectionFor, regrade } from '../verify/inspection-triggers.js'
 import { ladderFor, climb } from '../verify/ladder.js'
+import { brokenInstall } from '../verify/broken-install.js'
 import type { LadderOutcome, LadderStep, StepOutcome } from '../verify/ladder.js'
 import { raiseGate } from '../gates/rules.js'
 import type { Gate, GateRuleId } from '../gates/rules.js'
@@ -244,6 +245,13 @@ export interface ExecutorDeps {
    * `finally`, after any base run, so a throwing rung cannot leave it behind.
    */
   readonly releaseBase?: () => Promise<void>
+
+  /**
+   * Install the dependencies afresh in the order's own checkout or the base
+   * checkout, returning the install's exit status. Null means it could not run.
+   * Absent means a broken install is reported, never mended.
+   */
+  readonly reinstall?: (where: 'change' | 'base', logPath: string) => Promise<number | null>
 
   /** Minutes elapsed, for the wall-clock budget. */
   readonly observe?: () => { elapsedMinutes: number } | Promise<{ elapsedMinutes: number }>
@@ -1253,11 +1261,7 @@ export async function execute(
     const logs = new Map<string, string>()
     const outcome = await climb(steps, async (step) => {
       if (runner === undefined) return null
-      const logPath = path.join(
-        orderDir(deps.sources.dataRoot, order.id),
-        'runs',
-        `final-${safeFilename(step.name.toLowerCase())}.${climbedAt}${suffix}.log`
-      )
+      const logPath = finalLogPath(step.name, suffix)
       logs.set(step.name, logPath)
       return runner(step, logPath)
     })
@@ -1267,6 +1271,22 @@ export async function execute(
       if (from !== undefined) logs.set(reused.name, from)
     }
     return { outcome, logs }
+  }
+
+  function finalLogPath(name: string, suffix: string): string {
+    return path.join(
+      orderDir(deps.sources.dataRoot, order.id),
+      'runs',
+      `final-${safeFilename(name.toLowerCase())}.${climbedAt}${suffix}.log`
+    )
+  }
+
+  /** What is wrong with the installed dependencies, read from a failed step's log. */
+  function installFaultIn(outcome: LadderOutcome, logs: Map<string, string>): string | null {
+    const failed = outcome.steps.find((s) => s.result === 'fail')
+    const logPath = failed === undefined ? undefined : logs.get(failed.name)
+    if (logPath === undefined || !fs.existsSync(logPath)) return null
+    return brokenInstall(fs.readFileSync(logPath, 'utf8'))
   }
 
   /** The last lines of a step's log, or nothing when it never wrote one. */
@@ -1283,6 +1303,7 @@ export async function execute(
     draftsOpen = await deps.beforeFinalCheck({ risk, verdicts })
   }
 
+  let installFault: string | null = null
   if (!halted && !stalled && workDone) {
     const first = await climbWith(ladderSteps, deps.runStep, '')
     ladder = first.outcome
@@ -1304,6 +1325,26 @@ export async function execute(
           firstFailed.name,
           `${firstFailed.name} failed once and passed on a re-run: ${first.logs.get(firstFailed.name) ?? 'no log'} then ${retry.logs.get(firstFailed.name) ?? 'no log'}`
         )
+      }
+    }
+
+    // A missing package or a half-downloaded binary is mended here rather than
+    // asked about: reinstalling is the whole answer, and the code is not at fault.
+    installFault = ladder.ok ? null : installFaultIn(ladder, ladderLogs)
+    if (installFault !== null && deps.reinstall !== undefined) {
+      const failedName = ladder.steps.find((s) => s.result === 'fail')?.name ?? order.id
+      const installed = await deps.reinstall('change', finalLogPath('reinstall', ''))
+      await deps.record?.(
+        'verify.reinstalled',
+        failedName,
+        `${failedName} failed because ${installFault}; reinstalled the dependencies (exit ${installed ?? 'not run'}).`
+      )
+      if (installed === 0) {
+        const healed = await climbWith(ladderSteps, deps.runStep, '.reinstalled')
+        ladder = healed.outcome
+        ladderLogs = healed.logs
+        deps.onEvent?.({ type: 'ladder', outcome: ladder })
+        installFault = ladder.ok ? null : installFaultIn(ladder, ladderLogs)
       }
     }
   }
@@ -1348,15 +1389,32 @@ export async function execute(
       let onBase: 'fails' | 'passes' | 'unknown' = 'unknown'
       let baseFailed: StepOutcome | null = null
       let baseLogs = new Map<string, string>()
+      let baseFault: string | null = null
       const baseBranch = order.context.repos[0]?.baseBranch ?? 'the base branch'
-      if (failedStep !== null && deps.runStepOnBase !== undefined) {
+      if (failedStep !== null && installFault === null && deps.runStepOnBase !== undefined) {
         const upTo = ladderSteps.findIndex((s) => s.name === failedStep.name)
+        const baseSteps = ladderSteps.slice(0, upTo + 1)
         try {
-          const base = await climbWith(ladderSteps.slice(0, upTo + 1), deps.runStepOnBase, '.base')
+          let base = await climbWith(baseSteps, deps.runStepOnBase, '.base')
+          baseFault = installFaultIn(base.outcome, base.logs)
+          if (baseFault !== null && deps.reinstall !== undefined) {
+            const installed = await deps.reinstall('base', finalLogPath('reinstall', '.base'))
+            if (installed === 0) {
+              base = await climbWith(baseSteps, deps.runStepOnBase, '.base.reinstalled')
+              baseFault = installFaultIn(base.outcome, base.logs)
+            }
+          }
           baseLogs = base.logs
           baseFailed = base.outcome.steps.find((s) => s.result === 'fail') ?? null
           const atStep = base.outcome.steps.find((s) => s.name === failedStep.name)
-          onBase = baseFailed !== null ? 'fails' : atStep?.result === 'pass' ? 'passes' : 'unknown'
+          onBase =
+            baseFault !== null
+              ? 'unknown'
+              : baseFailed !== null
+                ? 'fails'
+                : atStep?.result === 'pass'
+                  ? 'passes'
+                  : 'unknown'
         } finally {
           await deps.releaseBase?.()
         }
@@ -1390,9 +1448,13 @@ export async function execute(
         const baseNote =
           failedStep === null
             ? ''
-            : onBase === 'passes'
-              ? ` It passes on ${baseBranch} without this change.`
-              : ` ${baseBranch} could not be checked to see whether it fails there too.`
+            : installFault !== null
+              ? ` The installed dependencies are broken: ${installFault}${deps.reinstall === undefined ? '' : ', and reinstalling did not fix it'}.`
+              : onBase === 'passes'
+                ? ` It passes on ${baseBranch} without this change.`
+                : baseFault !== null
+                  ? ` ${baseBranch} could not be checked: ${baseFault}.`
+                  : ` ${baseBranch} could not be checked to see whether it fails there too.`
         halted = await raise('verify.repeat-fail', {
           evidence: changeEvidence,
           summary: `${order.title} did not pass verification`,

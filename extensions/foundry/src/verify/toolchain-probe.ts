@@ -211,3 +211,11 @@ export function probeToolchain(repoPath: string): Toolchain {
 export function unavailableChecks(toolchain: Toolchain): CheckName[] {
   return CHECK_NAMES.filter((name) => toolchain[name] === null)
 }
+
+/** How to install exactly what the lockfile pins, or null when there is no lockfile. */
+export function installCommandFor(repo: string): string | null {
+  if (exists(repo, 'pnpm-lock.yaml')) return 'pnpm install --frozen-lockfile'
+  if (exists(repo, 'yarn.lock')) return 'yarn install --frozen-lockfile'
+  if (exists(repo, 'package-lock.json')) return 'npm ci'
+  return null
+}

@@ -388,45 +388,6 @@ describe('standingOf', () => {
   })
 })
 
-describe('an order waiting for a fix to merge', () => {
-  const waitingOn = { id: 'WO-2', title: 'Fix lint on main' }
-
-  it('says so, points at the order it waits on, and is not the operator\u2019s move', () => {
-    const standing = standingOf(input({ waitingOn, orphaned: ['build'] }))
-    expect(standing).toMatchObject({
-      kind: 'waiting',
-      turn: 'foundry',
-      waitingOn: 'WO-2',
-      headline: 'Waiting for Fix lint on main to merge',
-    })
-    expect(standing.detail).toContain('Fix lint on main')
-  })
-
-  it('still yields to an undecided gate, which stops the line first', () => {
-    expect(standingOf(input({ waitingOn, gates: [gate()] })).kind).toBe('halted')
-  })
-
-  it('does not point anywhere when it is not waiting', () => {
-    expect(standingOf(input()).waitingOn).toBeNull()
-    expect(standingOf(input({ waitingOn: null })).kind).not.toBe('waiting')
-  })
-
-  it('is read from the source, for a running order only', async () => {
-    const waitingOnFor = async () => waitingOn
-    const sources = {
-      graphFor: async () => graph([node({ id: 'a', state: 'passed' })]),
-      waitingOnFor,
-    }
-    const running = await readStanding({ id: 'WO-1', status: 'running' } as WorkOrder, sources)
-    expect(running.waitingOn).toBe('WO-2')
-    const draft = await readStanding(
-      { id: 'WO-1', status: 'draft', openQuestions: [] } as unknown as WorkOrder,
-      sources
-    )
-    expect(draft.waitingOn).toBeNull()
-  })
-})
-
 describe('a run that finished on a document', () => {
   const finished = graph([
     node({ id: 'write', state: 'passed' }),

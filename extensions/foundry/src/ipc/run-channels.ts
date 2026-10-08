@@ -15,7 +15,6 @@ import { checkRequirements } from '../recipe/requirements.js'
 import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
-import type { StandingSources } from '../order/standing.js'
 import { runDocumentReady, runFailure } from '../line/run-outcome.js'
 import { skillsFor } from '../line/executor.js'
 import { gradeInWords } from '../runtime/review/risk-grader.js'
@@ -104,7 +103,6 @@ export interface RunDeps {
   readonly gatesFor?: (orderId: string) => Promise<readonly Gate[]>
   /** Tool calls this order's agents are holding. No runtime means none. */
   readonly asksFor?: (orderId: string) => number
-  readonly waitingOnFor?: StandingSources['waitingOnFor']
   /**
    * Runs of this order the stall detector has fired on and acted on.
    *
@@ -533,7 +531,6 @@ export function createRunChannels(deps: RunDeps): RunChannels {
           graphFor: async () => graph,
           gatesFor: async () => gates,
           asksFor: deps.asksFor,
-          waitingOnFor: deps.waitingOnFor,
           stallsFor: deps.stallsFor,
           strandedFor: deps.strandedFor,
           orphansFor: () => orphaned,

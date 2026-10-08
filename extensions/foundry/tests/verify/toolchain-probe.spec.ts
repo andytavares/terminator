@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { probeToolchain } from '../../src/verify/toolchain-probe.js'
+import { probeToolchain, installCommandFor } from '../../src/verify/toolchain-probe.js'
 import { CHECK_NAMES } from '../../src/verify/check-names.js'
 
 // The probe is what makes "works in any repository, with nothing installed"
@@ -128,5 +128,27 @@ describe('probeToolchain', () => {
     const before = fs.readdirSync(repo).sort()
     probeToolchain(repo)
     expect(fs.readdirSync(repo).sort()).toEqual(before)
+  })
+})
+
+// Read from the lockfile, like every other command here: a reinstall that
+// ignores the lockfile installs something other than what the project pinned.
+describe('installCommandFor', () => {
+  it('installs from each lockfile with the tool that wrote it', () => {
+    write('package-lock.json', '{}')
+    expect(installCommandFor(repo)).toBe('npm ci')
+  })
+
+  it('prefers pnpm and yarn lockfiles to a stray npm one', () => {
+    write('pnpm-lock.yaml', '')
+    expect(installCommandFor(repo)).toBe('pnpm install --frozen-lockfile')
+    fs.rmSync(path.join(repo, 'pnpm-lock.yaml'))
+    write('yarn.lock', '')
+    expect(installCommandFor(repo)).toBe('yarn install --frozen-lockfile')
+  })
+
+  it('has nothing to offer without a lockfile', () => {
+    write('package.json', '{}')
+    expect(installCommandFor(repo)).toBeNull()
   })
 })
