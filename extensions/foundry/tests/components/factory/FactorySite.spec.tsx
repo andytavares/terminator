@@ -75,17 +75,91 @@ describe('FactorySite', () => {
     await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
   })
 
-  it('lists a card per order, in a stable order', async () => {
+  it('lists a card per order, newest first', async () => {
     mount([
-      { id: 'WO-2', title: 'Second', status: 'running' },
-      { id: 'WO-1', title: 'First', status: 'running' },
+      { id: 'WO-1', title: 'Older', status: 'running', createdAt: '2026-10-01T00:00:00.000Z' },
+      { id: 'WO-2', title: 'Newer', status: 'running', createdAt: '2026-10-07T00:00:00.000Z' },
     ])
-    await waitFor(() => screen.getByText('First'))
+    await waitFor(() => screen.getByText('Older'))
     const cards = Array.from(document.querySelectorAll('.fdry-hall-card'))
     expect(cards.map((c) => c.textContent)).toEqual([
-      expect.stringContaining('First'),
-      expect.stringContaining('Second'),
+      expect.stringContaining('Newer'),
+      expect.stringContaining('Older'),
     ])
+  })
+
+  it('puts finished orders in their own section, marked done, newest first', async () => {
+    const done = (label: string) => ({
+      kind: 'done' as const,
+      turn: 'foundry' as const,
+      label,
+      headline: '',
+      detail: '',
+      done: 1,
+      total: 1,
+      gateId: null,
+    })
+    mount([
+      {
+        id: 'WO-1',
+        title: 'Shipped early',
+        status: 'shipped',
+        standing: done('shipped'),
+        createdAt: '2026-10-01T00:00:00.000Z',
+      },
+      { id: 'WO-2', title: 'Building', status: 'running', createdAt: '2026-10-02T00:00:00.000Z' },
+      {
+        id: 'WO-3',
+        title: 'Shipped late',
+        status: 'shipped',
+        standing: done('shipped'),
+        createdAt: '2026-10-05T00:00:00.000Z',
+      },
+    ])
+    await waitFor(() => screen.getByText('Building'))
+
+    const active = screen.getByRole('region', { name: 'Active' })
+    const completed = screen.getByRole('region', { name: 'Completed' })
+    expect(active.textContent).toContain('Building')
+    expect(active.textContent).not.toContain('Shipped')
+    const finished = Array.from(completed.querySelectorAll('.fdry-hall-card'))
+    expect(finished.map((c) => c.textContent)).toEqual([
+      expect.stringContaining('Shipped late'),
+      expect.stringContaining('Shipped early'),
+    ])
+    expect(finished.every((c) => c.classList.contains('is-done'))).toBe(true)
+    expect(active.querySelector('.fdry-hall-card.is-done')).toBeNull()
+  })
+
+  it('shows no Completed section until an order finishes', async () => {
+    mount([{ id: 'WO-1', title: 'Building', status: 'running' }])
+    await waitFor(() => screen.getByText('Building'))
+    expect(screen.queryByRole('region', { name: 'Completed' })).toBeNull()
+  })
+
+  // A shipped order still holding the ready-for-review gate is the operator's
+  // move, so it stays with the active work.
+  it('keeps a shipped order that is still waiting on you with the active ones', async () => {
+    mount([
+      {
+        id: 'WO-1',
+        title: 'Awaiting review',
+        status: 'shipped',
+        standing: {
+          kind: 'halted',
+          turn: 'you',
+          label: 'ready for review?',
+          headline: '',
+          detail: '',
+          done: 1,
+          total: 1,
+          gateId: 'g-1',
+        },
+      },
+    ])
+    await waitFor(() => screen.getByText('Awaiting review'))
+    expect(screen.getByRole('region', { name: 'Active' }).textContent).toContain('Awaiting review')
+    expect(screen.queryByRole('region', { name: 'Completed' })).toBeNull()
   })
 
   it('beacons a card whose standing says the operator’s move', async () => {

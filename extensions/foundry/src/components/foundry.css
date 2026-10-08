@@ -3287,6 +3287,26 @@
   background: var(--tm-bg-card-hover);
 }
 
+/* A finished order: tinted the colour every other surface gives "done", so it
+   reads as over at a glance. */
+.fdry-hall-card.is-done {
+  border-color: var(--tm-success);
+  background: color-mix(in srgb, var(--tm-success) 8%, var(--tm-bg-elevated));
+}
+
+.fdry-hall-card.is-done:hover {
+  background: color-mix(in srgb, var(--tm-success) 14%, var(--tm-bg-elevated));
+}
+
+.fdry-hall-card.is-done .fdry-hall-card-state {
+  color: var(--tm-success);
+}
+
+/* Active and Completed: each heads its own grid. */
+.fdry-hall-section > .fdry-panel-h {
+  padding: 14px 14px 0;
+}
+
 /* The picture at the top of the card: a fixed aspect ratio so cards line up
    whatever shape the order's own hall turns out to be. */
 .fdry-hall-card-pic {

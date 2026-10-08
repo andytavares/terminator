@@ -436,6 +436,15 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].openQuestions).toBe(1)
   })
 
+  // The Factory sorts its cards newest first, and only the row reaches it.
+  it('carries when each order was made', async () => {
+    const c = createForgeChannels({ store, now: () => NOW })
+    await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
+
+    const r = (await c.list()) as { orders: { createdAt: string }[] }
+    expect(r.orders[0].createdAt).toBe(NOW)
+  })
+
   it('counts the checks that have finished, and links the pull requests', async () => {
     const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
     const seeded = (await c.create({
