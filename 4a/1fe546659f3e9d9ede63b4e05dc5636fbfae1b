@@ -1,0 +1,25 @@
+README.md
+  s_721a2e4957ed0b::t_010e3cd5449d08 254
+extensions/git-integration/README.md
+  s_721a2e4957ed0b::t_86eda535e3d575 11
+docs/adr/091-sanitised-html-in-pr-comments.md
+  s_721a2e4957ed0b::t_e4e9f170c8ab58 23
+CHANGELOG.md
+  s_721a2e4957ed0b::t_38ea71c5f8acee 68-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4a1fe546659f3e9d9ede63b4e05dc5636fbfae1b",
+  "prompts": {},
+  "sessions": {
+    "s_721a2e4957ed0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c08c230c-177e-4da9-a44e-44075ac56be9",
+        "model": "claude-haiku-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
