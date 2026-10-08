@@ -74,6 +74,27 @@ function launchScriptBody(): string {
   return readFileSync(match[1], 'utf8')
 }
 
+/**
+ * A tool call the runner has put in front of the operator.
+ *
+ * Tests wait on this rather than on a timer: a held call never answers, so
+ * nothing else says the request has crossed loopback, and a fixed sleep lost
+ * that race on a loaded CI runner.
+ */
+function held() {
+  const seen: PendingPermission[] = []
+  let arrive: () => void = () => {}
+  const arrived = new Promise<void>((resolve) => (arrive = resolve))
+  return {
+    seen,
+    arrived,
+    onPending: (p: PendingPermission) => {
+      seen.push(p)
+      arrive()
+    },
+  }
+}
+
 const start = {
   featureDir: '/repo/specs/021-thing',
   worktreePath: '/wt/feat-thing',
@@ -211,44 +232,44 @@ describe('a tool call the agent may not make on its own', () => {
     pending.catch(() => {})
     return pending
   }
-  const settle = (): Promise<unknown> => new Promise((r) => setTimeout(r, 40))
 
   it('reaches the operator instead of being approved for them', async () => {
-    const seen: PendingPermission[] = []
+    const call = held()
     const r = runner()
-    const run = await r.start({ ...start, onPending: (p) => seen.push(p) })
+    const run = await r.start({ ...start, onPending: call.onPending })
     void ask(run?.sessionId ?? '')
-    await settle()
-    expect(seen[0]).toMatchObject({ toolName: 'Bash', summary: 'rm -rf /' })
+    await call.arrived
+    expect(call.seen[0]).toMatchObject({ toolName: 'Bash', summary: 'rm -rf /' })
   })
 
   it('waits, rather than proceeding while nobody has answered', async () => {
+    const call = held()
     const r = runner()
-    const run = await r.start(start)
+    const run = await r.start({ ...start, onPending: call.onPending })
     const pending = ask(run?.sessionId ?? '')
     let settled = false
     void pending.then(() => (settled = true)).catch(() => {})
-    await settle()
+    await call.arrived
     expect(settled).toBe(false)
   })
 
   it('proceeds once the operator allows it', async () => {
-    const seen: PendingPermission[] = []
+    const call = held()
     const r = runner()
-    const run = await r.start({ ...start, onPending: (p) => seen.push(p) })
+    const run = await r.start({ ...start, onPending: call.onPending })
     const pending = ask(run?.sessionId ?? '')
-    await settle()
-    r.resolve(run?.sessionId ?? '', seen[0].requestId, { allow: true })
+    await call.arrived
+    r.resolve(run?.sessionId ?? '', call.seen[0].requestId, { allow: true })
     expect(await pending).toMatchObject({ permissionDecision: 'allow' })
   })
 
   it('carries a real answer back, since the reason is the only channel for words', async () => {
-    const seen: PendingPermission[] = []
+    const call = held()
     const r = runner()
-    const run = await r.start({ ...start, onPending: (p) => seen.push(p) })
+    const run = await r.start({ ...start, onPending: call.onPending })
     const pending = ask(run?.sessionId ?? '')
-    await settle()
-    r.resolve(run?.sessionId ?? '', seen[0].requestId, {
+    await call.arrived
+    r.resolve(run?.sessionId ?? '', call.seen[0].requestId, {
       allow: false,
       answer: 'use the staging host',
     })
@@ -278,7 +299,6 @@ describe('taking a run over, or ending it', () => {
       headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId, kind }),
     })
-    await new Promise((r) => setTimeout(r, 25))
   }
 
   it('sends a message by typing it, exactly as the operator would', async () => {
@@ -350,15 +370,16 @@ describe('taking a run over, or ending it', () => {
   })
 
   it('stops answering the agent once disposed, rather than holding a call open', async () => {
+    const call = held()
     const r = runner()
-    const run = await r.start(start)
+    const run = await r.start({ ...start, onPending: call.onPending })
     const pending = fetch(control.url, {
       method: 'POST',
       headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId: run?.sessionId, toolName: 'Bash', input: {} }),
     }).then((res) => res.json())
     pending.catch(() => {})
-    await new Promise((res) => setTimeout(res, 30))
+    await call.arrived
     r.dispose()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
   })
@@ -411,14 +432,15 @@ describe('when the terminal itself goes', () => {
       stateDir: join(dir, 'state'),
       now: () => 1_000,
     })
-    const run = await r.start(start)
+    const call = held()
+    const run = await r.start({ ...start, onPending: call.onPending })
     const pending = fetch(control.url, {
       method: 'POST',
       headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId: run?.sessionId, toolName: 'Bash', input: {} }),
     }).then((res) => res.json())
     pending.catch(() => {})
-    await new Promise((res) => setTimeout(res, 30))
+    await call.arrived
     expect(() => exitListener?.(0)).not.toThrow()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
   })
@@ -438,23 +460,23 @@ describe('when the terminal itself goes', () => {
   })
 })
 
+// Awaiting the response is enough: the control server runs an event's
+// handler synchronously in the tick it answers, before the answer can be read.
 async function reportEvent(sessionId: string, kind: string): Promise<void> {
   await fetch(control.eventUrl, {
     method: 'POST',
     headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ sessionId, kind }),
   })
-  await new Promise((r) => setTimeout(r, 25))
 }
 
-async function askPermission(sessionId: string): Promise<void> {
+function askPermission(sessionId: string): void {
   const pending = fetch(control.url, {
     method: 'POST',
     headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ sessionId, toolName: 'Bash', input: { command: 'ls' } }),
   })
   pending.catch(() => {})
-  await new Promise((r) => setTimeout(r, 40))
 }
 
 describe('running the next phase in the conversation that is already open', () => {
@@ -541,6 +563,7 @@ describe('running the next phase in the conversation that is already open', () =
   it('reports the new phase’s permission asks, not the one that just finished', async () => {
     const supervised = runner()
     const seen: string[] = []
+    const plan = held()
     const run = await supervised.start({
       ...start,
       onPending: () => seen.push('specify'),
@@ -548,10 +571,14 @@ describe('running the next phase in the conversation that is already open', () =
     supervised.continueRun(run!.sessionId, {
       prompt: '/speckit-plan',
       phase: 'plan' as never,
-      onPending: () => seen.push('plan'),
+      onPending: (p) => {
+        seen.push('plan')
+        plan.onPending(p)
+      },
       onResolved: () => {},
     })
-    await askPermission(run!.sessionId)
+    askPermission(run!.sessionId)
+    await plan.arrived
     expect(seen).toEqual(['plan'])
   })
 
