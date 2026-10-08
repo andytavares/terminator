@@ -1,0 +1,63 @@
+extensions/foundry/tests/line/executor.spec.ts
+  s_d928b9e790b233::t_f37a2d486f0493 1050-1051
+  s_d928b9e790b233::t_c8f31949523e70 954,1048-1049,1052-1151
+  s_d928b9e790b233::t_44689338e4903c 1152
+extensions/foundry/tests/line/refinery-state.spec.ts
+  s_d928b9e790b233::t_fc125f343a80a7 9,122-123,125,129-134,137-141
+extensions/foundry/src/gates/rules.ts
+  s_d928b9e790b233::t_223a2268025a99 163-164,166
+extensions/foundry/src/verify/toolchain-probe.ts
+  s_d928b9e790b233::t_ab2069a44f5922 214-221
+extensions/foundry/tests/line/refinery-tick.spec.ts
+  s_d928b9e790b233::t_5c4aa586ae0483 132
+  s_d928b9e790b233::t_f37a2d486f0493 37
+  s_d928b9e790b233::t_ccefb3fbb5679a 59
+extensions/foundry/tests/line/worktree.spec.ts
+  s_d928b9e790b233::t_937182b9432368 12,356-372
+  s_d928b9e790b233::t_006e4e748acc6b 373-374
+docs/adr/080-a-final-check-asks-whose-failure-it-is.md
+  s_d928b9e790b233::t_9d4590f617a098 3
+extensions/foundry/src/line/worktree.ts
+  s_d928b9e790b233::t_ab2069a44f5922 212-248
+  s_d928b9e790b233::t_84ab3f7a15140a 211
+docs/adr/088-foundry-mends-installs-and-never-opens-orders.md
+  s_d928b9e790b233::t_9d4590f617a098 1-29,31-52
+  s_d928b9e790b233::t_f37a2d486f0493 30
+extensions/foundry/src/verify/broken-install.ts
+  s_d928b9e790b233::t_e42d0847584ee9 1-16
+extensions/foundry/src/line/executor.ts
+  s_d928b9e790b233::t_c1bcccd1ce7ac6 34,249-255,1264,1276-1291,1306,1330-1349,1392,1394,1396,1398-1406,1410-1417,1451-1457
+extensions/foundry/src/order/standing.ts
+  s_d928b9e790b233::t_b0cb72446695e2 137
+extensions/foundry/src/line/refinery-state.ts
+  s_d928b9e790b233::t_b0cb72446695e2 19,30,57,61-63,65-70
+extensions/foundry/src/index.ts
+  s_d928b9e790b233::t_17ac0afd67ca59 64
+  s_d928b9e790b233::t_936f64b3c65ac2 2687,3467
+  s_d928b9e790b233::t_d6ba36714f7dea 53,58,1858-1875
+  s_d928b9e790b233::t_b52afee12f1868 1224,2656
+  s_d928b9e790b233::t_b79535d2042195 1876-1878
+extensions/foundry/tests/gates/rules.spec.ts
+  s_d928b9e790b233::t_c8f31949523e70 49
+extensions/foundry/tests/verify/toolchain-probe.spec.ts
+  s_d928b9e790b233::t_937182b9432368 5,133-153
+  s_d928b9e790b233::t_a2d05b80f4b384 154
+extensions/foundry/tests/verify/broken-install.spec.ts
+  s_d928b9e790b233::t_e42d0847584ee9 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6d4a15d4a04cfb17a54b898523d632a56e0f3aeb",
+  "prompts": {},
+  "sessions": {
+    "s_d928b9e790b233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8becd4d9-5c90-4748-84bf-39a38ed49a0a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
