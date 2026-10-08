@@ -1,0 +1,39 @@
+extensions/foundry/src/factory/director.ts
+  s_17d550c4e3a5ab::t_e98ad5f5c5d174 3-4,42,58-68,98-99,286-291,294-304,306-331
+extensions/foundry/tests/factory/beats.spec.ts
+  s_17d550c4e3a5ab::t_acbf736b072ba3 9
+  s_17d550c4e3a5ab::t_326f46ae11ef29 166-168,175,182-187
+  s_17d550c4e3a5ab::t_241a844879ba0b 169-174,176-181
+extensions/foundry/tests/factory/art/crew.spec.ts
+  s_17d550c4e3a5ab::t_326f46ae11ef29 92-117
+  s_17d550c4e3a5ab::t_acbf736b072ba3 5
+extensions/foundry/src/factory/art/crew.ts
+  s_17d550c4e3a5ab::t_241a844879ba0b 6,163-165,174-184
+extensions/foundry/src/factory/beats.ts
+  s_17d550c4e3a5ab::t_241a844879ba0b 5,26-34,116
+extensions/foundry/src/factory/sim.ts
+  s_17d550c4e3a5ab::t_56e07dcd570c80 44-59,113,192-214,607-649,655,658-661,663-668
+extensions/foundry/tests/factory/sim.spec.ts
+  s_17d550c4e3a5ab::t_241a844879ba0b 956,958,967,976-978,983-985
+  s_17d550c4e3a5ab::t_326f46ae11ef29 949-955,957,959-966,970,979-982,986-995,1002-1004,1006-1017
+  s_17d550c4e3a5ab::t_52ccde64ecf5a6 971-975,996-1001
+  s_17d550c4e3a5ab::t_f41c33080f242a 968-969,1005
+extensions/foundry/tests/factory/director.spec.ts
+  s_17d550c4e3a5ab::t_4d34ff099174d0 2,597-617,620-634,642
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5d8b94ca3af3ed427714d0abafbd38b84c944bcd",
+  "prompts": {},
+  "sessions": {
+    "s_17d550c4e3a5ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec6ab84-fcff-45a9-9e10-49ecc5e8064b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
