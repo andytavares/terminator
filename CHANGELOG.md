@@ -65,6 +65,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Branch Exclude Patterns work again.** Settings → Git → Branch Exclude Patterns had done nothing since the sidebar's branch switcher was removed, its only reader. Branch lists now leave matching branches out: the New branch picker and the Git extension's pull-request base branch. A workspace's own patterns replace the global ones. `*` matches across slashes, so `gh-readonly-queue/*` hides `gh-readonly-queue/main/pr-248-…`, and `trunk-merge/*` hides `trunk-merge/…`. The checked-out branch always shows
+
 - **Foundry adopts a pull request already open on its branch.** An order halted at the last step with "a pull request for branch … already exists", and Try again repeated the same refused call. Shipping now asks GitHub for an open pull request on the branch first, retitles it, writes the body, takes it back to draft, and carries on. The cause is closed too: no agent may `git push` or run a `gh pr` command that changes anything, and the scribe's brief no longer asks for a pull-request narrative
 - **The factory hall.** People are solid and walk around each other; belt crossings are two tiles wide and sit clear of stations and junctions; the breakroom wall is drawn behind the people in front of it and stops at its side walls; the vending machine stands on the wall instead of hanging over the floor; both belt junctions are a plain grey hub instead of an orange block and a funnel; and work sent back to an earlier station is carried there by hand
 - **The Forge's seed row.** The Idea/Ticket toggle, the field and the New order button share one height again, after fields alone were given a fixed height

@@ -97,6 +97,7 @@ export const SMOKE_SPECS = ['extension-smoke.spec.ts', 'terminal.spec.ts', 'work
 // selects everything, so these run only then; the list exists so a new spec
 // has to be placed somewhere deliberately.
 export const CORE_SPECS = [
+  'branch-exclude-patterns.spec.ts',
   'branch-name.spec.ts',
   'close-session.spec.ts',
   'extension.spec.ts',
