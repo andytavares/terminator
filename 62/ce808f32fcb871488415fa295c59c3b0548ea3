@@ -1,0 +1,32 @@
+tests/e2e/branch-exclude-patterns.spec.ts
+  s_17d550c4e3a5ab::t_7d3ff01b623c9f 1-75
+src/main/git/branch-exclude.ts
+  s_17d550c4e3a5ab::t_ff44de5fd94242 1-26
+tests/unit/ipc/git.ipc.spec.ts
+  s_17d550c4e3a5ab::t_2fc634826d9a3c 25-39,51-54,106-164
+src/main/ipc/git.ipc.ts
+  s_17d550c4e3a5ab::t_a7a2c23917b258 1,18-20,23-47,81-83
+src/renderer/components/settings/GlobalSettings.tsx
+  s_17d550c4e3a5ab::t_08ec49dd379f55 208
+  s_17d550c4e3a5ab::t_f061d4c43aafd4 206-207
+tests/unit/git/branch-exclude.spec.ts
+  s_17d550c4e3a5ab::t_1a5c42af4c7391 1-61
+scripts/e2e-select.mjs
+  s_17d550c4e3a5ab::t_127fce1b370478 100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "62ce808f32fcb871488415fa295c59c3b0548ea3",
+  "prompts": {},
+  "sessions": {
+    "s_17d550c4e3a5ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec6ab84-fcff-45a9-9e10-49ecc5e8064b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
