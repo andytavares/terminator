@@ -1,0 +1,22 @@
+extensions/foundry/src/components/foundry.css
+  s_17d550c4e3a5ab::t_b280c9e645415d 1541
+  s_17d550c4e3a5ab::t_4d78895ac91e37 1519,1536,1637,1657-1658,1663,1688-1689,1701-1702
+tests/e2e/foundry-typography.spec.ts
+  s_17d550c4e3a5ab::t_56987fc9f614d2 182-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "14e39bffb96ccfded299a1b077a7043193c65424",
+  "prompts": {},
+  "sessions": {
+    "s_17d550c4e3a5ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec6ab84-fcff-45a9-9e10-49ecc5e8064b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
