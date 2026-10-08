@@ -1,0 +1,25 @@
+docs/adr/088-comment-bodies-render-sanitised-html.md
+  s_5a504e0c13ab31::t_ad1e0d9d74cee8 1-46
+specs/003-pr-review/contracts/adrs/011-react-markdown-for-comments.md
+  s_5a504e0c13ab31::t_edd68ef12e3867 4
+CHANGELOG.md
+  s_5a504e0c13ab31::t_b2375692154f0e 55
+docs/adr/011-react-markdown-for-comments.md
+  s_5a504e0c13ab31::t_aa36c02da16be8 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "420e1d8847f89d144cbb9982680911511d38c939",
+  "prompts": {},
+  "sessions": {
+    "s_5a504e0c13ab31": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c71b9370-4d27-41ec-b264-319c9ff9e545",
+        "model": "claude-haiku-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
