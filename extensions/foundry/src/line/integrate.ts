@@ -472,6 +472,89 @@ async function openDraft(
   }
 }
 
+/**
+ * A pull request already open for this lane's branch, if there is one.
+ *
+ * An agent can open one before shipping runs, and `gh pr create` refuses a
+ * second for the same branch on every retry. A failed or unreadable lookup is
+ * "none": creating is still the right next move, and it reports its own error.
+ */
+async function findOpenPull(
+  repo: { path: string; baseBranch: string; headBranch: string },
+  deps: IntegrateDeps
+): Promise<{ url: string; isDraft: boolean } | null> {
+  const result = await deps.exec({
+    command: 'gh',
+    args: [
+      'pr',
+      'list',
+      '--head',
+      repo.headBranch,
+      '--base',
+      repo.baseBranch,
+      '--state',
+      'open',
+      '--json',
+      'url,number,isDraft',
+    ],
+    cwd: repo.path,
+    timeoutMs: 60_000,
+  })
+  if (result.exitCode !== 0) return null
+  try {
+    const listed: unknown = JSON.parse(result.stdout)
+    if (!Array.isArray(listed)) return null
+    const first = listed[0] as { url?: unknown; isDraft?: unknown } | undefined
+    if (typeof first?.url !== 'string' || first.url === '') return null
+    return { url: first.url, isDraft: first.isDraft === true }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Take over a pull request somebody else opened on the lane's branch: give it
+ * Foundry's title and body, and return it to draft. Neither step stops
+ * shipping — the pull request exists either way, and conversion to draft
+ * depends on the GitHub plan.
+ */
+async function adoptPull(
+  order: WorkOrder,
+  repo: { name: string; path: string; headBranch: string; lane: number },
+  open: { url: string; isDraft: boolean },
+  bodyPath: string,
+  deps: IntegrateDeps
+): Promise<LanePullRequest> {
+  const edited = await deps.exec({
+    command: 'gh',
+    args: ['pr', 'edit', open.url, '--title', order.title, '--body-file', bodyPath],
+    cwd: repo.path,
+    timeoutMs: 60_000,
+  })
+  if (edited.exitCode !== 0) {
+    await deps.record('ship.adopt_edit_failed', open.url, detailFor(edited))
+  }
+  if (!open.isDraft) {
+    const undone = await deps.exec({
+      command: 'gh',
+      args: ['pr', 'ready', '--undo', open.url],
+      cwd: repo.path,
+      timeoutMs: 60_000,
+    })
+    if (undone.exitCode !== 0) {
+      await deps.record('ship.undraft_failed', open.url, detailFor(undone))
+    }
+  }
+  return {
+    lane: repo.lane,
+    repo: repo.name,
+    cwd: repo.path,
+    branch: repo.headBranch,
+    url: open.url,
+    bodyPath,
+  }
+}
+
 /** Turn a draft into a review request. The operator's decision, never ours. */
 export async function markReady(
   pull: { url: string; cwd: string },
@@ -496,7 +579,11 @@ export async function markReady(
  * A lane that already has a draft in `pulls.json` — the order came back round
  * after a send-back, or a resumed run reached the tail again — is pushed to
  * and left as it is: a second `gh pr create` for the same branch is refused.
- * `onDraftOpened` fires only when a draft was actually created here.
+ * `onDraftOpened` fires only when a draft was actually created or adopted here.
+ *
+ * A lane not in `pulls.json` may still have a pull request open on its branch
+ * — an agent can open one before shipping runs, and `gh pr create` refuses a
+ * second. That one is adopted: retitled, given the body, returned to draft.
  *
  * The body is written whatever happens, including when the operator has turned
  * pushing off — what would have shipped is worth reading even when it did not.
@@ -575,6 +662,18 @@ export async function openDrafts(
     await writeBody(file, prBody(order, shipment, repo.lane, pulls))
 
     await pushLane(repo, deps)
+    const open = await findOpenPull(repo, deps)
+    if (open !== null) {
+      const adopted = await adoptPull(order, repo, open, file, deps)
+      pulls.push(adopted)
+      created += 1
+      await deps.record(
+        'ship.draft_adopted',
+        adopted.url,
+        `A pull request was already open on ${repo.headBranch}; Foundry adopted it instead of opening another.`
+      )
+      continue
+    }
     const pull = await openDraft(order, repo, file, deps)
     pulls.push(pull)
     created += 1
