@@ -951,7 +951,7 @@ describe('a failed final climb', () => {
     expect(gate?.summary).toBe('x is blocked by a check that already fails on main')
     expect(gate?.why).toContain('Lint fails on main with exit code 2')
     expect(gate?.why).toContain('also fails without this change')
-    expect(gate?.options.map((o) => o.id)).toEqual(['fix_first', 'accept_debt', 'hold'])
+    expect(gate?.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
     expect(gate?.evidence).toHaveLength(2)
     expect(gate?.evidence[0]).toMatchObject({ exitCode: 1 })
     expect(gate?.evidence[0].excerpt).toContain('.retry.log')
@@ -1043,6 +1043,111 @@ describe('a failed final climb', () => {
       )
     ).rejects.toThrow('checkout gone')
     expect(releaseBase).toHaveBeenCalledTimes(1)
+  })
+
+  // Logs as WO-1008-6fe wrote them: neither failure was the code's.
+  const MISSING = "Error: Cannot find package '@axe-core/playwright' imported from /w/a.spec.ts"
+  const TRUNCATED =
+    'dyld[1]: Library not loaded: @rpath/Electron Framework.framework/Electron Framework'
+
+  function logRunner(log: (n: number) => { code: number; text: string }) {
+    let n = 0
+    return async (step: { name: string }, logPath: string) => {
+      fs.mkdirSync(path.dirname(logPath), { recursive: true })
+      const { code, text } = step.name === 'Lint' ? log((n += 1)) : { code: 0, text: '' }
+      fs.writeFileSync(logPath, `${text}\n`)
+      return code
+    }
+  }
+
+  it('reinstalls a broken install in its own checkout and checks again without asking', async () => {
+    const o = order([unit('U-1')])
+    let healed = false
+    const reinstall = vi.fn(async () => {
+      healed = true
+      return 0
+    })
+    const record = vi.fn(async () => undefined)
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({
+        runStep: logRunner(() => (healed ? { code: 0, text: 'ok' } : { code: 1, text: TRUNCATED })),
+        reinstall,
+        record,
+      })
+    )
+    expect(reinstall).toHaveBeenCalledTimes(1)
+    expect(reinstall).toHaveBeenCalledWith('change', expect.stringMatching(/\.log$/))
+    expect(outcome.gates).toEqual([])
+    expect(outcome.ladder?.ok).toBe(true)
+    expect(record).toHaveBeenCalledWith(
+      'verify.reinstalled',
+      'Lint',
+      expect.stringContaining('Electron Framework could not be loaded')
+    )
+  })
+
+  it('says the install is broken when reinstalling did not mend it', async () => {
+    const o = order([unit('U-1')])
+    const reinstall = vi.fn(async () => 1)
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({ runStep: logRunner(() => ({ code: 1, text: MISSING })), reinstall })
+    )
+    expect(reinstall).toHaveBeenCalledTimes(1)
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toContain(
+      'the package @axe-core/playwright is not installed, and reinstalling did not fix it'
+    )
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.base-fail')
+  })
+
+  it('never blames the base branch for a broken install in the base checkout', async () => {
+    const o = order([unit('U-1')])
+    const reinstall = vi.fn(async () => 1)
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({
+        runStep: lintRunner(() => 1),
+        runStepOnBase: logRunner(() => ({ code: 1, text: MISSING })),
+        reinstall,
+      })
+    )
+    expect(reinstall).toHaveBeenCalledWith('base', expect.stringMatching(/\.log$/))
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.base-fail')
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toContain(
+      'main could not be checked: the package @axe-core/playwright is not installed'
+    )
+  })
+
+  it('checks the base again once its install is mended', async () => {
+    const o = order([unit('U-1')])
+    let healed = false
+    const reinstall = vi.fn(async () => {
+      healed = true
+      return 0
+    })
+    const outcome = await execute(
+      o,
+      recipe(),
+      buildRunGraph(o, recipe()),
+      base({
+        runStep: lintRunner(() => 1),
+        runStepOnBase: logRunner(() =>
+          healed ? { code: 0, text: 'ok' } : { code: 1, text: MISSING }
+        ),
+        reinstall,
+      })
+    )
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toMatch(/It passes on main without this change\.$/)
   })
 
   it('does not touch the base when the ladder passes', async () => {

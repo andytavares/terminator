@@ -209,6 +209,44 @@ export async function provisionDependencies(
 }
 
 /**
+ * Take back the `node_modules` links `provisionDependencies` lent a checkout.
+ *
+ * Only links: an install the checkout made itself stays. Run before a
+ * reinstall, which would otherwise write through the link into the origin's
+ * own install. Never throws.
+ */
+export async function unlinkBorrowedDependencies(
+  checkout: Checkout,
+  deps: CheckoutDeps
+): Promise<string[]> {
+  const unlinked: string[] = []
+  try {
+    const listed = await deps.exec({
+      command: 'git',
+      args: ['ls-files', '-z', '--', 'package.json', '*/package.json'],
+      cwd: checkout.path,
+      timeoutMs: 30_000,
+    })
+    if (listed.exitCode !== 0) return unlinked
+    for (const manifest of listed.stdout.split('\0')) {
+      if (manifest === '' || manifest.includes('node_modules')) continue
+      const rel = path.join(path.dirname(manifest), 'node_modules')
+      const target = path.join(checkout.path, rel)
+      try {
+        if (!fs.lstatSync(target).isSymbolicLink()) continue
+        fs.unlinkSync(target)
+        unlinked.push(rel)
+      } catch {
+        // absent, or not ours to remove
+      }
+    }
+  } catch {
+    return unlinked
+  }
+  return unlinked
+}
+
+/**
  * Every lane's checkout, in lane order.
  *
  * All of them before any agent starts: a run that provisions lane 2 half way

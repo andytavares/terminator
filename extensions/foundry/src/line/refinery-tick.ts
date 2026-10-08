@@ -45,12 +45,8 @@ export interface RefineryTickDeps {
     reason: string
   ) => Promise<void>
   readonly titleOf: (orderId: string) => Promise<string>
-  /** The orders whose refinery state waits on `mergedId` to merge. */
-  readonly waitingOn: (mergedId: string) => Promise<readonly string[]>
   /** An order's pulls were all seen merged for the first time. Never throws into the tick. */
   readonly onMerged?: (orderId: string) => Promise<void>
-  /** Carry on a run that was waiting: the same resume a gate's decision uses. */
-  readonly resume: (orderId: string) => Promise<void>
   readonly now: () => string
 }
 
@@ -105,8 +101,6 @@ export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
 
   for (const mergedId of mergedIds) {
     const mergedTitle = await deps.titleOf(mergedId)
-    await resumeWaiting(deps, mergedId, mergedTitle)
-
     const overlapping = laterOverlapping(entries, mergedId)
     if (overlapping.length === 0) continue
 
@@ -141,43 +135,5 @@ export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
       )
       await deps.watchCi(orderId)
     }
-  }
-}
-
-/**
- * Orders that stopped because the base branch was broken wait for the order
- * fixing it. Once it has merged they are rebased onto that fix and carried on,
- * and the resumed run climbs its final check again.
- */
-async function resumeWaiting(
-  deps: RefineryTickDeps,
-  mergedId: string,
-  mergedTitle: string
-): Promise<void> {
-  for (const orderId of await deps.waitingOn(mergedId)) {
-    const { conflictFiles, failedReason } = await restackLanes(deps, orderId)
-
-    if (conflictFiles !== null) {
-      const title = await deps.titleOf(orderId)
-      const why = `${title} no longer rebases onto its base after ${mergedTitle} merged`
-      await deps.raiseConflict(orderId, why, conflictFiles)
-      await deps.record(orderId, 'refinery.conflict', orderId, why)
-      continue
-    }
-
-    // Left waiting, so the next tick tries the rebase again.
-    if (failedReason !== null) {
-      await deps.record(orderId, 'refinery.failed', orderId, failedReason)
-      continue
-    }
-
-    await deps.writeState(orderId, { ...(await deps.readState(orderId)), waitingOn: null })
-    await deps.record(
-      orderId,
-      'refinery.resumed',
-      orderId,
-      `${mergedTitle} merged; checking again.`
-    )
-    await deps.resume(orderId)
   }
 }

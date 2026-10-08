@@ -160,10 +160,10 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
   'verify.base-fail': {
     options: [
       {
-        id: 'fix_first',
-        label: 'Fix it first',
+        id: 'send_back',
+        label: 'Fix it in this order',
         consequence:
-          'A new order to fix it on the base branch opens in the Forge. This order waits, and checks again when that one merges.',
+          'It goes back to the builder with the failure output, fixed on this branch, and the checks run again.',
       },
       {
         id: 'accept_debt',

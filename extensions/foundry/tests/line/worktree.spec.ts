@@ -9,6 +9,7 @@ import {
   removeBaseCheckout,
   removeCheckout,
   provisionDependencies,
+  unlinkBorrowedDependencies,
   branchFor,
   checkoutPath,
   CheckoutFailedError,
@@ -350,6 +351,25 @@ describe('provisioning dependencies', () => {
     expect(fs.lstatSync(path.join(wt, 'packages', 'foo', 'node_modules')).isSymbolicLink()).toBe(
       true
     )
+  })
+
+  // A reinstall into a borrowed node_modules would write through the link
+  // into the origin's install, so the link goes first and only the link.
+  it('unlinks borrowed node_modules and leaves the origin and real installs alone', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules', 'left-pad'), { recursive: true })
+    fs.mkdirSync(path.join(wt, 'packages', 'foo', 'node_modules'), { recursive: true })
+    fs.symlinkSync(path.join(origin, 'node_modules'), path.join(wt, 'node_modules'), 'dir')
+    const exec = lsFilesAnd('package.json', 'packages/foo/package.json')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const unlinked = await unlinkBorrowedDependencies(checkout, deps({ exec: exec as never }))
+
+    expect(unlinked).toEqual(['node_modules'])
+    expect(fs.existsSync(path.join(wt, 'node_modules'))).toBe(false)
+    expect(fs.existsSync(path.join(origin, 'node_modules', 'left-pad'))).toBe(true)
+    expect(fs.existsSync(path.join(wt, 'packages', 'foo', 'node_modules'))).toBe(true)
   })
 
   it('does not link when the origin has no node_modules', async () => {
