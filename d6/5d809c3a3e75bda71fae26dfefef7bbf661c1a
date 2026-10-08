@@ -1,0 +1,23 @@
+CHANGELOG.md
+  s_8cc6577492fd02::t_54957484a91a0f 55
+README.md
+  s_8cc6577492fd02::t_b79bc29a078622 255
+docs/adr/011-react-markdown-for-comments.md
+  s_8cc6577492fd02::t_f2feef5d70e9ef 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d65d809c3a3e75bda71fae26dfefef7bbf661c1a",
+  "prompts": {},
+  "sessions": {
+    "s_8cc6577492fd02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20103a01-73a9-435f-94c2-822d3495f602",
+        "model": "claude-haiku-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
