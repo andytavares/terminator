@@ -1,0 +1,25 @@
+CHANGELOG.md
+  s_4c015e1cd1a2d7::t_64f565695aa7f4 68
+docs/adr/091-render-sanitized-html-in-comments.md
+  s_4c015e1cd1a2d7::t_31e4321000aa1e 35-38
+  s_4c015e1cd1a2d7::t_8cdd120dc36e58 43-59
+  s_4c015e1cd1a2d7::t_b0be213678910c 29-33
+README.md
+  s_4c015e1cd1a2d7::t_e7f8897e045c3f 255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1972b8bb24f8da667c67e81be1828b21d4753d6c",
+  "prompts": {},
+  "sessions": {
+    "s_4c015e1cd1a2d7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ddc5a0aa-3ce0-4880-8ea1-05f468d31ef6",
+        "model": "claude-haiku-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
