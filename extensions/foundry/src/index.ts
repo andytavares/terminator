@@ -101,7 +101,7 @@ import type { RunOutcome, StartedRun, ExecutorDeps } from './line/executor.js'
 import type { RunGraph, RunNode, Feedback } from './line/run-graph.js'
 import type { EffortLevel, Recipe, Role } from './recipe/parse.js'
 import { decideReadOnly } from './runtime/read-only-policy.js'
-import { commitWorktree } from './line/commit.js'
+import { commitWorktree, committedSince } from './line/commit.js'
 import { documentOutcome } from './line/document-outcome.js'
 import { collectableWrites, readRungOutput, rungOutputPath } from './line/rung-output.js'
 import { readShell } from './runtime/shell-split.js'
@@ -1788,12 +1788,14 @@ async function buildExecutorDeps(
           document: result.document,
         }
       },
-      // Nothing else ever runs `git commit`: a branch the agents only edited
-      // has nothing to push, and a pull request opened on it fails with "No
-      // commits between".
+      // An agent that only edited leaves nothing to push, and a pull request
+      // opened on it fails with "No commits between". One that committed its
+      // own work leaves a clean tree, which is a change all the same.
       commitNode: async ({ node, message }) => {
         const checkout = checkouts.get(node.lane ?? 1)
-        return checkout === undefined ? false : commitWorktree(checkout.path, message, exec)
+        if (checkout === undefined) return false
+        if (await commitWorktree(checkout.path, message, exec)) return true
+        return node.startedAt !== null && committedSince(checkout.path, node.startedAt, exec)
       },
       priorGates: await gates.list(),
       raise: async (gate) => {

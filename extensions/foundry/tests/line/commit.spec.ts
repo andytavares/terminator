@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { commitWorktree } from '../../src/line/commit.js'
+import { commitWorktree, committedSince } from '../../src/line/commit.js'
 import type { ShellExec } from '../../src/line/integrate.js'
 
 // A format step that writes leaves the checkout ahead of what CI will see, and
@@ -39,5 +39,32 @@ describe('commitWorktree', () => {
     expect(await commitWorktree('/work', 'm', committed.run)).toBe(false)
     const unreadable = exec({ status: { exitCode: 128 } })
     expect(await commitWorktree('/work', 'm', unreadable.run)).toBe(false)
+  })
+})
+
+// A builder that commits its own work leaves a clean tree; that is a change,
+// and reading it as "made no change" halted WO-1008-6fe on finished work.
+describe('committedSince', () => {
+  const started = '2026-10-08T00:33:55.960Z'
+
+  it('counts a commit made after the step started', async () => {
+    const { run, calls } = exec({ log: { exitCode: 0, stdout: '1791420115\n' } })
+    expect(await committedSince('/work', started, run)).toBe(true)
+    expect(calls).toEqual([['log', '-1', '--format=%ct']])
+  })
+
+  it('does not count the commit the checkout started on', async () => {
+    const { run } = exec({ log: { exitCode: 0, stdout: '1791419000\n' } })
+    expect(await committedSince('/work', started, run)).toBe(false)
+  })
+
+  it('counts a commit in the same second the step started', async () => {
+    const { run } = exec({ log: { exitCode: 0, stdout: '1791419635\n' } })
+    expect(await committedSince('/work', started, run)).toBe(true)
+  })
+
+  it('reports false when git cannot read the head', async () => {
+    const { run } = exec({ log: { exitCode: 128, stdout: '' } })
+    expect(await committedSince('/work', started, run)).toBe(false)
   })
 })
