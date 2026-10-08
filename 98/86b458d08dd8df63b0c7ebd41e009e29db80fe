@@ -1,0 +1,19 @@
+CHANGELOG.md
+  s_17d550c4e3a5ab::t_d10fb775450657 68-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9886b458d08dd8df63b0c7ebd41e009e29db80fe",
+  "prompts": {},
+  "sessions": {
+    "s_17d550c4e3a5ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec6ab84-fcff-45a9-9e10-49ecc5e8064b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
