@@ -1786,9 +1786,13 @@ async function buildExecutorDeps(
       // own work leaves a clean tree, which is a change all the same.
       commitNode: async ({ node, message }) => {
         const checkout = checkouts.get(node.lane ?? 1)
-        if (checkout === undefined) return false
-        if (await commitWorktree(checkout.path, message, exec)) return true
-        return node.startedAt !== null && committedSince(checkout.path, node.startedAt, exec)
+        if (checkout === undefined) return { kind: 'clean' }
+        const outcome = await commitWorktree(checkout.path, message, exec)
+        if (outcome.kind !== 'clean') return outcome
+        return node.startedAt !== null &&
+          (await committedSince(checkout.path, node.startedAt, exec))
+          ? { kind: 'committed' }
+          : outcome
       },
       priorGates: await gates.list(),
       raise: async (gate) => {

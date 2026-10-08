@@ -15,6 +15,7 @@ import type { BudgetBreach } from './scheduler.js'
 import { withNode, stepFor, unitsOf, wantsFreshContext, nodeLabel, nodeById } from './run-graph.js'
 import { checkExpect, resolveCommand } from '../recipe/step-kinds.js'
 import type { RunGraph, RunNode, Feedback } from './run-graph.js'
+import type { CommitOutcome } from './commit.js'
 import { createRoleRegistry } from './roles.js'
 import type { RoleRegistry } from './roles.js'
 import { brief } from './brief.js'
@@ -179,13 +180,13 @@ export interface ExecutorDeps {
    * Commit what a node's agent left in its lane's checkout.
    *
    * Nothing else ever runs `git commit`, so without it a branch has no commits
-   * to push and a pull request has nothing to open on. Resolves whether a
-   * commit was made: false for a clean tree, which is how an agent that passed
-   * having changed nothing is told from one that did the work. Absent means the
+   * to push and a pull request has nothing to open on. A clean tree is how an
+   * agent that passed having changed nothing is told from one that did the
+   * work, and a refusal from both. Absent means the
    * caller commits nothing here and no node is judged on whether it changed
    * anything.
    */
-  readonly commitNode?: (input: { node: RunNode; message: string }) => Promise<boolean>
+  readonly commitNode?: (input: { node: RunNode; message: string }) => Promise<CommitOutcome>
 
   /**
    * End a lane's live session before it is resumed.
@@ -444,6 +445,10 @@ export function skillsFor(recipe: Recipe, node: RunNode, roles: RoleRegistry): s
 function commitMessage(node: RunNode, order: WorkOrder): string {
   const titles = unitsOf(order, node).map((unit) => unit.title)
   return `${node.stepId}: ${titles.length === 0 ? node.stepId : titles.join(', ')}`
+}
+
+function refusedReason(refusal: Extract<CommitOutcome, { kind: 'refused' }>): string {
+  return `changed the checkout, but \`${refusal.command}\` ${refusal.exitCode === null ? 'did not finish' : `exited ${refusal.exitCode}`}`
 }
 
 /** The tail of a log, for a feedback excerpt — never the whole thing. */
@@ -1112,16 +1117,39 @@ export async function execute(
       // ever documents may have nothing to document, and an author whose
       // document is outside the checkout changes nothing in it.
       let madeNoChange = false
+      let refusal: Extract<CommitOutcome, { kind: 'refused' }> | null = null
       if (passed && roleId !== null && roles.mayWrite(roleId) && deps.commitNode !== undefined) {
-        const committed = await deps.commitNode({ node, message: commitMessage(node, order) })
+        const commit = await deps.commitNode({ node, message: commitMessage(node, order) })
         const mayChangeNothing =
           (handedBack !== null && handedBack.location !== 'checkout') ||
           (roles.writesOnlyDocs(roleId) &&
             !collectableWrites(roles.get(roleId)).includes('document'))
-        if (!committed && !mayChangeNothing) {
-          madeNoChange = true
+        if (commit.kind !== 'committed' && !mayChangeNothing) {
           passed = false
-          await deps.record?.('step.no_change', node.id, 'made no change to the checkout')
+          if (commit.kind === 'refused') {
+            refusal = commit
+            await deps.record?.('step.commit_refused', node.id, refusedReason(commit))
+            // The builder's next attempt is told what refused its work.
+            await advance(
+              withNode(current, node.id, {
+                feedback: [
+                  ...node.feedback,
+                  {
+                    from: node.id,
+                    attempt: node.attempts,
+                    source: 'check',
+                    command: commit.command,
+                    exitCode: commit.exitCode,
+                    excerpt: lastLines(commit.output, 120),
+                    logPath: null,
+                  },
+                ],
+              })
+            )
+          } else {
+            madeNoChange = true
+            await deps.record?.('step.no_change', node.id, 'made no change to the checkout')
+          }
         }
       }
 
@@ -1177,13 +1205,15 @@ export async function execute(
             `${node.stepId} exited ${result.exitCode ?? 'without a status'}; sending ${onFail.rework} back (round ${node.reworks + 1} of ${onFail.max})`
           )
         } else {
-          const reason = madeNoChange
-            ? 'made no change to the checkout'
-            : unmet.length > 0
-              ? `did not meet what it promised: ${unmet.join('; ')}`
-              : `exited ${result.exitCode ?? 'without a status'}${
-                  command ? ` running \`${command}\`` : ''
-                }${logPath ? `. The output is in \`${logPath}\`` : ''}`
+          const reason = refusal
+            ? refusedReason(refusal)
+            : madeNoChange
+              ? 'made no change to the checkout'
+              : unmet.length > 0
+                ? `did not meet what it promised: ${unmet.join('; ')}`
+                : `exited ${result.exitCode ?? 'without a status'}${
+                    command ? ` running \`${command}\`` : ''
+                  }${logPath ? `. The output is in \`${logPath}\`` : ''}`
           const failure = markFailed(current, node.id, deps.now(), reason)
           await advance(failure.graph)
           deps.onEvent?.({ type: 'failed', nodeId: node.id, needsDecision: failure.needsDecision })
@@ -1195,8 +1225,19 @@ export async function execute(
             halted =
               (await raise('verify.repeat-fail', {
                 summary: `${node.unitIds.join(', ') || node.id} failed twice`,
-                why: `Attempt ${node.attempts + 1} of ${node.id} ${madeNoChange ? 'made no change to the checkout' : `exited ${result.exitCode ?? 'without a status'}`}. A third try is a decision, not a retry.`,
+                why: `Attempt ${node.attempts + 1} of ${node.id} ${refusal ? refusedReason(refusal) : madeNoChange ? 'made no change to the checkout' : `exited ${result.exitCode ?? 'without a status'}`}. A third try is a decision, not a retry.`,
                 nodeId: node.id,
+                evidence: refusal
+                  ? [
+                      {
+                        kind: 'stdout',
+                        step: node.id,
+                        command: refusal.command,
+                        exitCode: refusal.exitCode ?? undefined,
+                        excerpt: lastLines(refusal.output, 40),
+                      },
+                    ]
+                  : undefined,
               })) || halted
           }
         }

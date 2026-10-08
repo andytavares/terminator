@@ -7,6 +7,7 @@ import { execute, opensPullRequest, skillsFor } from '../../src/line/executor.js
 import type { ExecutorEvent, StartedRun } from '../../src/line/executor.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
 import { retry } from '../../src/line/scheduler.js'
+import type { CommitOutcome } from '../../src/line/commit.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -2775,11 +2776,20 @@ steps:
   const o = () =>
     order([unit('U-1', { title: 'refuse an expired token' }), unit('U-2', { title: 'log it' })])
 
-  function committing(committed: (nodeId: string) => boolean) {
-    const commitNode = vi.fn(async (input: { node: { id: string }; message: string }) =>
-      committed(input.node.id)
-    )
+  function committing(committed: (nodeId: string) => boolean | CommitOutcome) {
+    const commitNode = vi.fn(async (input: { node: { id: string }; message: string }) => {
+      const answer = committed(input.node.id)
+      if (typeof answer !== 'boolean') return answer
+      return answer ? ({ kind: 'committed' } as const) : ({ kind: 'clean' } as const)
+    })
     return { commitNode }
+  }
+
+  const HOOK_FAILED: CommitOutcome = {
+    kind: 'refused',
+    command: 'git commit',
+    exitCode: 1,
+    output: '✖ vitest related --run:\n  FAIL  Markdown renders exactly as before > gfm table',
   }
 
   it('commits the builder once it passes, naming the step and its units', async () => {
@@ -2851,6 +2861,73 @@ steps:
     expect(outcome.graph.nodes.find((n) => n.id === 'document')?.state).not.toBe('passed')
   })
 
+  // TAV-19: the pre-commit hook rejected the line's commit and the gate said
+  // "made no change", so nobody could tell why it kept failing.
+  it('fails a builder whose commit was refused, naming the refusal rather than no change', async () => {
+    const { commitNode } = committing((id) => (id === 'build:lane-1' ? HOOK_FAILED : true))
+    const record = vi.fn(async () => undefined)
+    const order1 = o()
+    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+      commitNode,
+      record,
+    })
+    const built = outcome.graph.nodes.find((n) => n.id === 'build:lane-1')
+    expect(built?.state).toBe('failed')
+    expect(built?.failReason).toBe('changed the checkout, but `git commit` exited 1')
+    expect(record).toHaveBeenCalledWith(
+      'step.commit_refused',
+      'build:lane-1',
+      'changed the checkout, but `git commit` exited 1'
+    )
+    expect(record).not.toHaveBeenCalledWith('step.no_change', expect.anything(), expect.anything())
+  })
+
+  it('hands the refused commit\u2019s output to the builder\u2019s next attempt', async () => {
+    const { commitNode } = committing((id) => (id === 'build:lane-1' ? HOOK_FAILED : true))
+    const order1 = o()
+    const outcome = await execute(order1, recipe(WRITING), buildRunGraph(order1, recipe(WRITING)), {
+      ...deps(vi.fn(ok)),
+      runCommand: async () => 0,
+      commitNode,
+    })
+    expect(outcome.graph.nodes.find((n) => n.id === 'build:lane-1')?.feedback).toEqual([
+      expect.objectContaining({
+        command: 'git commit',
+        exitCode: 1,
+        excerpt: expect.stringContaining('gfm table'),
+      }),
+    ])
+  })
+
+  it('puts the refusal and its output on the gate a second refusal raises', async () => {
+    const { commitNode } = committing((id) => (id === 'build:lane-1' ? HOOK_FAILED : true))
+    const order1 = o()
+    const run = () => ({
+      ...deps(vi.fn(ok)),
+      autonomy: 'standard' as const,
+      runCommand: async () => 0,
+      commitNode,
+    })
+    let graph = buildRunGraph(order1, recipe(WRITING))
+    graph = (await execute(order1, recipe(WRITING), graph, run())).graph
+    graph = retry(graph, 'build:lane-1')
+    const second = await execute(order1, recipe(WRITING), graph, run())
+
+    const gate = second.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toContain('changed the checkout, but `git commit` exited 1')
+    expect(gate?.why).not.toContain('made no change')
+    expect(gate?.evidence).toEqual([
+      expect.objectContaining({
+        kind: 'stdout',
+        command: 'git commit',
+        exitCode: 1,
+        excerpt: expect.stringContaining('gfm table'),
+      }),
+    ])
+  })
+
   it('lets a scribe with nothing to document pass', async () => {
     const { commitNode } = committing((id) => id !== 'document')
     const order1 = o()
@@ -2917,7 +2994,7 @@ steps:
         url: 'https://example.com/d/1',
         location: 'published',
       }),
-      commitNode: async () => false,
+      commitNode: async () => ({ kind: 'clean' }) as const,
       record,
     })
     expect(record).toHaveBeenCalledWith(
@@ -2936,7 +3013,7 @@ steps:
       {
         ...deps(vi.fn(ok)),
         collect: collecting({ path: '/o/answer.md', location: 'outputs' }),
-        commitNode: async () => false,
+        commitNode: async () => ({ kind: 'clean' }) as const,
       }
     )
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('passed')
@@ -2951,7 +3028,7 @@ steps:
       {
         ...deps(vi.fn(ok)),
         collect: collecting({ path: 'docs/answer.md', location: 'checkout' }),
-        commitNode: async () => false,
+        commitNode: async () => ({ kind: 'clean' }) as const,
       }
     )
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('failed')
@@ -2966,7 +3043,7 @@ steps:
       {
         ...deps(vi.fn(ok)),
         collect: collecting(null),
-        commitNode: async () => false,
+        commitNode: async () => ({ kind: 'clean' }) as const,
       }
     )
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('failed')
@@ -2981,7 +3058,7 @@ steps:
       {
         ...deps(vi.fn(ok)),
         collect: collecting(null),
-        commitNode: async () => true,
+        commitNode: async () => ({ kind: 'committed' }) as const,
       }
     )
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('passed')
