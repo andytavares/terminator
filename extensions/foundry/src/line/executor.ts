@@ -1098,9 +1098,9 @@ export async function execute(
       // pass a reproduction that reproduces nothing.
       let passed = promised ? unmet.length === 0 : result.exitCode === 0
 
-      // An agent that may write has to have written something, and what it
-      // wrote is committed here: nothing else ever runs `git commit`, so a
-      // branch the agent only edited has nothing to push. A role that only
+      // An agent that may write has to have written something: committed by
+      // the agent itself, or committed here, since a branch the agent only
+      // edited has nothing to push. A role that only
       // ever documents may have nothing to document, and an author whose
       // document is outside the checkout changes nothing in it.
       let madeNoChange = false
