@@ -1,0 +1,25 @@
+extensions/git-integration/src/components/pr-review/RichContent.tsx
+  s_59ab8f7bd49112::t_78a8cbf4e70d1b 8,14-21,32,39
+extensions/git-integration/tests/unit/RichContent.html.spec.tsx
+  s_59ab8f7bd49112::t_4a6e5f13529ad8 91-115
+docs/adr/091-sanitised-html-in-pr-comments.md
+  s_59ab8f7bd49112::t_d547e701b6b635 9,26,28-30
+extensions/git-integration/tests/unit/RichContent.spec.tsx
+  s_59ab8f7bd49112::t_4a6e5f13529ad8 90-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dd2d72b35a77c8757064511ce2091dc2e72271db",
+  "prompts": {},
+  "sessions": {
+    "s_59ab8f7bd49112": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2bb43c5c-4348-451e-a0cc-3361b4dc651e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
