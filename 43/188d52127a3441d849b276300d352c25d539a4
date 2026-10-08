@@ -1,0 +1,39 @@
+extensions/foundry/src/index.ts
+  s_62547f77255d13::t_673425fdfceb8c 1792-1793
+  s_62547f77255d13::t_4f25084e2f4322 1789-1791,1794-1795
+extensions/foundry/tests/line/executor.spec.ts
+  s_62547f77255d13::t_5e56a80bac616c 2779-2784,2788-2789,2791-2794,2864-2929
+  s_62547f77255d13::t_beff3f411bc7db 10,2790
+  s_62547f77255d13::t_7a908b45c42b8b 2997,3016,3031,3046,3061
+  s_62547f77255d13::t_1a881bcd4ec6a7 2930
+extensions/foundry/src/line/commit.ts
+  s_62547f77255d13::t_836b23c2910739 1,21-31,45-46,49,52
+  s_62547f77255d13::t_4f25084e2f4322 4-20,36-37,43,53
+  s_62547f77255d13::t_b5f3ef868dc6f8 2-3
+extensions/foundry/tests/line/commit.spec.ts
+  s_62547f77255d13::t_673425fdfceb8c 51-55
+  s_62547f77255d13::t_5e56a80bac616c 8,13-18,26,36,40,42,44-50,56-62
+extensions/foundry/src/line/integrate.ts
+  s_62547f77255d13::t_4f25084e2f4322 408
+extensions/foundry/src/line/executor.ts
+  s_62547f77255d13::t_673425fdfceb8c 18,1213-1216
+  s_62547f77255d13::t_5269aa2de32847 183-185,189,450-453,1120,1122,1127,1129-1152,1208-1212,1228,1230-1240
+docs/ARCHITECTURE.md
+  s_62547f77255d13::t_6d7d7daf49e152 1139-1144,1343-1344
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "43188d52127a3441d849b276300d352c25d539a4",
+  "prompts": {},
+  "sessions": {
+    "s_62547f77255d13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8581bcf5-5b3c-434d-9a4e-349f1661c023",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
