@@ -38,7 +38,10 @@ import { stateForSearch } from '../../src/github/gh-cli'
 type Handler = (payload: unknown) => Promise<unknown>
 type ExecCallback = (err: Error | null, result?: { stdout: string; stderr: string }) => void
 
-function captureHandlers(getReviewRepos?: () => string[]): Record<string, Handler> {
+function captureHandlers(
+  getReviewRepos?: () => string[],
+  isBranchExcluded?: (branch: string, repoPath?: string) => boolean
+): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
   registerGithubHandlers(
     (channel, handler) => {
@@ -47,7 +50,8 @@ function captureHandlers(getReviewRepos?: () => string[]): Record<string, Handle
     { getGhPath: () => '', getToken: () => '' },
     undefined,
     undefined,
-    getReviewRepos
+    getReviewRepos,
+    isBranchExcluded
   )
   return handlers
 }
@@ -892,6 +896,52 @@ describe('github:list-open-prs', () => {
     })) as { prs: unknown[]; hasMore: boolean }
     expect(result.prs).toHaveLength(1)
     expect(result.hasMore).toBe(false)
+  })
+
+  // Settings → Git → Branch Exclude Patterns: the queue leaves out pull
+  // requests opened from an excluded branch, and does not count them.
+  it('leaves out pull requests opened from an excluded branch', async () => {
+    handlers = captureHandlers(undefined, (branch, repoPath) =>
+      repoPath === '/repo' ? branch.startsWith('renovate/') : false
+    )
+    mockGitSuccess(JSON.stringify(REPO_VIEW))
+    mockGitSuccess(
+      JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              totalCount: 2,
+              pageInfo: { endCursor: null, hasNextPage: false },
+              nodes: [
+                { number: 1, title: 'bump', state: 'OPEN', headRefName: 'renovate/vitest-4' },
+                { number: 2, title: 'login', state: 'OPEN', headRefName: 'feat/login' },
+              ],
+            },
+          },
+        },
+      })
+    )
+    const result = (await handlers['github:list-open-prs']({ repoRoot: '/repo' })) as {
+      prs: { number: number }[]
+      totalCount: number
+    }
+    expect(result.prs.map((pr) => pr.number)).toEqual([2])
+    expect(result.totalCount).toBe(1)
+  })
+
+  it('leaves excluded branches out of a text search too', async () => {
+    handlers = captureHandlers(undefined, (branch) => branch.startsWith('renovate/'))
+    mockGitSuccess(
+      JSON.stringify([
+        { number: 1, title: 'bump', headRefName: 'renovate/x', author: { login: 'bot' } },
+        { number: 2, title: 'fix', headRefName: 'fix/y', author: { login: 'bob' } },
+      ])
+    )
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+      search: 'bump',
+    })) as { prs: { number: number }[] }
+    expect(result.prs.map((pr) => pr.number)).toEqual([2])
   })
 
   it('handles paginated GraphQL load with cursor', async () => {

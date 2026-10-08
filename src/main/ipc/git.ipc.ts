@@ -1,4 +1,3 @@
-import { isAbsolute, relative } from 'node:path'
 import { z } from 'zod'
 import { registerInvokeTable, invokeSpec } from './invoke-table.js'
 import {
@@ -16,35 +15,10 @@ import {
   getChangeStats,
 } from '../git/git-service.js'
 import { excludeBranches } from '../git/branch-exclude.js'
-import { getGlobalSettings, getWorkspaceSettings } from '../storage/settings-store.js'
-import { listProjects, listWorkspaces } from '../storage/workspace-store.js'
+import { branchExcludePatternsFor } from '../git/branch-exclude-settings.js'
 
 const PathSchema = z.object({ path: z.string().min(1) })
 
-function isWithin(target: string, folder: string): boolean {
-  const rel = relative(folder, target)
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
-}
-
-/**
- * Settings → Git → Branch Exclude Patterns for the workspace that owns `path`,
- * else the global list. A worktree under a custom base directory sits outside
- * its workspace's folder, so a project's own worktree path also counts.
- */
-function branchExcludePatternsFor(path: string): string[] {
-  const owner = listWorkspaces().find(
-    (ws) =>
-      isWithin(path, ws.folderPath) ||
-      listProjects(ws.id).some(
-        (p) => p.worktreePath !== undefined && isWithin(path, p.worktreePath)
-      )
-  )
-  const override =
-    owner === undefined
-      ? undefined
-      : getWorkspaceSettings(owner.id).overrides?.git?.branchExcludePatterns
-  return override ?? getGlobalSettings().git?.branchExcludePatterns ?? []
-}
 const PathAndBranchSchema = z.object({ path: z.string().min(1), branch: z.string().min(1) })
 
 export function registerGitHandlers(): void {

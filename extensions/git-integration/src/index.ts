@@ -86,7 +86,9 @@ export function activate(api: ExtensionAPI): void {
         .flatMap((w) =>
           api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath)
         ),
-    () => api.settings.get<string[]>('terminator.git-integration.review.repos') ?? []
+    () => api.settings.get<string[]>('terminator.git-integration.review.repos') ?? [],
+    // Settings → Git → Branch Exclude Patterns, matched by the core.
+    (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath)
   )
 
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.

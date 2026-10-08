@@ -165,6 +165,8 @@ import type {
   TrackerTeam,
   TransitionIntent,
 } from '../integrations/providers/provider.js'
+import { matchesBranchPattern } from '../git/branch-exclude.js'
+import { branchExcludePatternsFor } from '../git/branch-exclude-settings.js'
 export type { Issue, IssueLink, IssueListResult, IssueSummary, TrackerConnection, TrackerId }
 export type { NewIssueInput, TrackerStateOption, TrackerTeam, TransitionIntent }
 
@@ -290,6 +292,12 @@ export interface ExtensionAPI {
      * `<workspacePath>/.worktrees`. Always returns an absolute-style path.
      */
     resolveWorktreeBaseDir(workspacePath: string): string
+    /**
+     * Whether a branch matches Settings → Git → Branch Exclude Patterns: the
+     * override of the workspace that owns `repoPath`, else the global list.
+     * `*` matches anything, slashes included. Since 2.8.0.
+     */
+    isBranchExcluded(branch: string, repoPath?: string): boolean
   }
   sidebar: {
     registerItem(item: SidebarContribution): Disposable
@@ -860,6 +868,9 @@ export function createExtensionAPI(
           : ''
         const base = (overrideDir || globalDir).trim()
         return base.length > 0 ? base : join(workspacePath, '.worktrees')
+      },
+      isBranchExcluded(branch: string, repoPath?: string): boolean {
+        return branchExcludePatternsFor(repoPath).some((p) => matchesBranchPattern(p, branch))
       },
     },
     sidebar: {

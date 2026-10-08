@@ -16,6 +16,7 @@ function prNode(overrides: Record<string, unknown> = {}) {
     changedFiles: 2,
     createdAt: '2026-01-01T00:00:00Z',
     repository: { nameWithOwner: 'acme/widgets' },
+    headRefName: 'fix/bug',
     author: { login: 'alice' },
     reviewDecision: 'REVIEW_REQUIRED',
     reviewRequests: { totalCount: 1 },
@@ -125,6 +126,35 @@ describe('parseDashboard', () => {
     expect(pr.reviewDecision).toBe('review-required')
     expect(pr.unresolvedThreads).toBe(1)
     expect(pr.localRepoRoot).toBeNull()
+  })
+
+  // Settings → Git → Branch Exclude Patterns: a pull request opened from an
+  // excluded branch (a bot's renovate/*, a merge queue's gh-readonly-queue/*)
+  // is not one to review, in any section.
+  it('leaves out pull requests whose source branch is excluded', () => {
+    const raw = {
+      data: {
+        requested: {
+          nodes: [
+            prNode({ number: 1, headRefName: 'renovate/vitest-4' }),
+            prNode({ number: 2, headRefName: 'feat/login' }),
+          ],
+        },
+        mine: { nodes: [prNode({ number: 3, headRefName: 'renovate/eslint' })] },
+      },
+    }
+    const localRoots = new Map([['acme/widgets', '/Users/me/repos/widgets']])
+    const asked: Array<[string, string | undefined]> = []
+    const prs = parseDashboard(raw, 'alice', localRoots, (branch, repoPath) => {
+      asked.push([branch, repoPath])
+      return branch.startsWith('renovate/')
+    })
+    expect(prs.map((pr) => pr.number)).toEqual([2])
+    expect(asked).toContainEqual(['renovate/vitest-4', '/Users/me/repos/widgets'])
+  })
+
+  it('asks for the source branch in the search query', () => {
+    expect(buildSectionQueries('alice')[0].query).toContain('headRefName')
   })
 
   it('resolves localRepoRoot from the provided map', () => {

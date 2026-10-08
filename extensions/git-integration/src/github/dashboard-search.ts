@@ -37,6 +37,7 @@ const PR_FIELDS = `fragment prFields on PullRequest {
     changedFiles
     createdAt
     repository { nameWithOwner }
+    headRefName
     author { login }
     reviewDecision
     reviewRequests(first: 10) { totalCount }
@@ -90,6 +91,7 @@ interface RawPrNode {
   changedFiles: number
   createdAt: string
   repository: { nameWithOwner: string }
+  headRefName?: string
   author: { login: string } | null
   reviewDecision: string | null
   reviewRequests: { totalCount: number }
@@ -197,17 +199,29 @@ function mapNode(
   }
 }
 
-/** Pure: turns the raw GraphQL response into deduped, section-tagged rows. */
+/**
+ * Whether a source branch matches Settings → Git → Branch Exclude Patterns,
+ * for the local checkout of its repository when there is one.
+ */
+export type BranchExcluded = (branch: string, repoPath?: string) => boolean
+
+/**
+ * Pure: turns the raw GraphQL response into deduped, section-tagged rows,
+ * leaving out pull requests opened from an excluded branch.
+ */
 export function parseDashboard(
   raw: unknown,
   login: string,
-  localRoots: Map<string, string>
+  localRoots: Map<string, string>,
+  isBranchExcluded: BranchExcluded = () => false
 ): DashboardPR[] {
   const response = raw as RawDashboardResponse
   const data = response.data ?? {}
 
   const nodesFor = (result: RawSearchResult | undefined): RawPrNode[] =>
-    (result?.nodes ?? []).filter((n): n is RawPrNode => n != null) as RawPrNode[]
+    ((result?.nodes ?? []).filter((n): n is RawPrNode => n != null) as RawPrNode[]).filter(
+      (n) => !isBranchExcluded(n.headRefName ?? '', localRoots.get(n.repository.nameWithOwner))
+    )
 
   const bySection: Record<DashboardSection, RawPrNode[]> = {
     're-review': nodesFor(data.reReview),
