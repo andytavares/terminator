@@ -3,6 +3,7 @@ import type { Paint } from './kit.js'
 import { rect, bevel } from './kit.js'
 import { roleStyle } from './palette.js'
 import { HALL } from './palette.js'
+import { drawCrate } from './props.js'
 
 // A crew member is drawn as a small layered silhouette: legs, torso, arms,
 // head, then a role's hat or vest — one exhaustive switch per axis (facing,
@@ -159,6 +160,9 @@ export function drawCrew(paint: Paint, crew: Crew, tMs: number): void {
   }
 
   const torsoY = top + 8
+  const boxY = torsoY + 10
+  // Facing away, the box is held in front of a body the viewer sees from behind.
+  if (crew.carrying === true && crew.facing === 'N') drawCrate(paint, x, boxY)
   rect(paint, x - 4, torsoY, 8, 8, style.shirt)
   bevel(paint, x - 4, torsoY, 8, 8, 'rgba(255,255,255,.18)', '#1c1f26')
   rect(paint, x + 2, torsoY, 2, 8, style.shirtDark)
@@ -167,7 +171,17 @@ export function drawCrew(paint: Paint, crew: Crew, tMs: number): void {
     rect(paint, x - 4, torsoY + 4, 8, 1, '#f4f4f0')
   }
 
-  drawArms(paint, x, torsoY, crew.anim, style.skin, style.shirtDark, tMs)
+  if (crew.carrying === true) {
+    if (crew.facing !== 'N') {
+      drawCrate(paint, x, boxY)
+      rect(paint, x - 6, torsoY + 2, 2, 5, style.shirtDark)
+      rect(paint, x + 4, torsoY + 2, 2, 5, style.shirtDark)
+      rect(paint, x - 6, torsoY + 6, 2, 2, style.skin)
+      rect(paint, x + 4, torsoY + 6, 2, 2, style.skin)
+    }
+  } else {
+    drawArms(paint, x, torsoY, crew.anim, style.skin, style.shirtDark, tMs)
+  }
   drawHead(paint, x, top, crew.facing, style.skin, style.hair, style.visor)
 
   if (style.hat !== null) {

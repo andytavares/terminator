@@ -946,3 +946,72 @@ describe('crew are solid', () => {
     expect(a).toEqual(b)
   })
 })
+
+describe('tick: a box carried back to an earlier station', () => {
+  const realGraph = (): RunGraph =>
+    JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')
+    ) as RunGraph
+  const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
+  const settled = (): World => {
+    const g = realGraph()
+    return createWorld(layoutHall(g), {
+      graph: g,
+      orphaned: [],
+      stranded: [],
+      waiting: [],
+      activity: {},
+      ci: null,
+      queue: null,
+    })
+  }
+  const sendBack = (toNodeId: string): World =>
+    direct(settled(), [{ kind: 'rework', fromNodeId: 'verify', toNodeId, round: 1 }], 0)
+
+  it.each([
+    ['build:lane-1', 0],
+    ['lint', 1],
+  ])('carries the box to %s and walks home without overlap (%i crate parked)', (target, parked) => {
+    let world = sendBack(target)
+    const at = crewOf(settled(), 'verify')
+    const home = tileOf(at.x, at.y)
+    const homeAnim = at.anim
+    let carriedWhileWalking = false
+    for (let i = 0; i < 4000 && crewOf(world, 'verify').errand !== undefined; i++) {
+      world = tick(world, 50)
+      carriedWhileWalking ||= crewOf(world, 'verify').carrying === true
+      const tiles = world.crew
+        .filter((c) => c.present)
+        .map((c) => `${tileOf(c.x, c.y).x},${tileOf(c.x, c.y).y}`)
+      expect(new Set(tiles).size).toBe(tiles.length)
+    }
+    for (let i = 0; i < 400; i++) world = tick(world, 50)
+    const verifier = crewOf(world, 'verify')
+    expect(carriedWhileWalking).toBe(true)
+    expect(verifier.errand).toBeUndefined()
+    expect(verifier.carrying).toBe(false)
+    expect(tileOf(verifier.x, verifier.y)).toEqual(home)
+    expect(verifier.anim).toBe(homeAnim)
+    const dropped = world.crates.filter((c) => c.id.endsWith(':carried'))
+    expect(dropped).toHaveLength(parked)
+    for (const crate of dropped) {
+      const into = world.map.belts.find((b) => b.id === crate.beltId)!
+      expect(into.toNodeId).toBe(target)
+      expect(crate).toMatchObject({ progress: 1, parks: true })
+    }
+  })
+
+  it('cancels the errand when a real event sends the walker elsewhere', () => {
+    let world = sendBack('build:lane-1')
+    for (let i = 0; i < 5; i++) world = tick(world, 50)
+    expect(crewOf(world, 'verify').carrying).toBe(true)
+    world = direct(
+      world,
+      [{ kind: 'node-state', nodeId: 'verify', from: 'failed', to: 'running' }],
+      world.clockMs
+    )
+    const verifier = crewOf(world, 'verify')
+    expect(verifier.errand).toBeUndefined()
+    expect(verifier.carrying).toBe(false)
+  })
+})

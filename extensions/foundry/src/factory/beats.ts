@@ -2,7 +2,7 @@ import { hasStarted } from './events.js'
 import type { FactoryEvent } from './events.js'
 import type { NodeState } from '../line/run-graph.js'
 import type { StepKind } from '../recipe/parse.js'
-import { VERDICT_MS } from './sim.js'
+import { VERDICT_MS, WALK_PX_PER_S } from './sim.js'
 
 // The hall's own clock for its animations.
 //
@@ -22,6 +22,15 @@ export const MIN_DWELL_MS = CRATE_RIDE_MS + VERDICT_MS
 
 /** No event waits longer than this behind the beats ahead of it; past it the rest catch up together. */
 export const MAX_LAG_MS = 10_000
+
+/**
+ * How long a sent-back box takes to be carried to the earlier station.
+ *
+ * The scheduler sees graph nodes, not the hall map, so it cannot measure the
+ * walk. This is a conservative stand-in: 30 tiles of 16px at the 46px/s walking
+ * speed in `sim.ts`, a generous crossing of a laid-out hall.
+ */
+export const REWORK_WALK_MS = Math.round(((30 * 16) / WALK_PX_PER_S) * 1000)
 
 /** One press stroke, for a join step that passes without ever being seen running. */
 export const STROKE_MS = 700
@@ -104,7 +113,7 @@ export function schedule(
     // Lag is capped, but never so far that a step lands before the one feeding it.
     due = Math.max(Math.min(due, nowMs + MAX_LAG_MS), floor)
     held.push({ event, due })
-    lastAt[subject] = due
+    lastAt[subject] = event.kind === 'rework' ? due + REWORK_WALK_MS : due
     if (animates(event)) lastBeat[subject] = due
     return due
   }
