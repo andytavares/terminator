@@ -2,7 +2,8 @@
 
 **Date**: 2026-05-07
 **Status**: Accepted
-**Branch**: `003-pr-review`
+**Branch**: `003-pr-review`  
+**Superseded in part by:** [ADR 091](091-render-sanitized-html-in-comments.md) — HTML in a body is now rendered through `rehype-raw` and `rehype-sanitize` (GitHub's allowlist) instead of dropped. The rest of this decision stands.
 
 ## Decision
 

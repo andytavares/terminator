@@ -1,7 +1,13 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import hljs from '../../utils/hljs'
+
+// remark-rehype already prefixes footnote ids with 'user-content-'; a second
+// prefix here would break every footnote link.
+const sanitizeSchema = { ...defaultSchema, clobberPrefix: '' }
 
 interface Props {
   children: string
@@ -13,6 +19,7 @@ export function RichContent({ children, className }: Props) {
     <div className={`rich-content${className ? ` ${className}` : ''}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
         components={{
           a({ href, children }) {
             const isAbsolute = href?.startsWith('http://') || href?.startsWith('https://')

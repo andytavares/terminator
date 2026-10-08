@@ -1557,6 +1557,15 @@
 .rich-content li {
   margin-bottom: 3px;
 }
+.rich-content img {
+  max-width: 100%;
+  height: auto;
+}
+.rich-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
 
 /* ─── FullFileList ────────────────────────────────────────────────────────── */
 
