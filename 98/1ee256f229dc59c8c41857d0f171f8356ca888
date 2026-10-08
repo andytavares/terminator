@@ -1,0 +1,27 @@
+extensions/foundry/tests/factory/art/props.spec.ts
+  s_17d550c4e3a5ab::t_44bbc164cb5439 526,533-536,539-550,552-555,557-572
+  s_17d550c4e3a5ab::t_bbb38f957d22c6 556
+extensions/foundry/src/factory/art/props.ts
+  s_17d550c4e3a5ab::t_b42540e864f30d 211-212,214-215,290,432,434-435,438,467,1240-1247,1251-1257
+extensions/foundry/tests/components/factory/HallScene.spec.tsx
+  s_17d550c4e3a5ab::t_44bbc164cb5439 4-5,122-146
+  s_17d550c4e3a5ab::t_ccf94562df04ec 147-148
+extensions/foundry/src/components/factory/HallScene.tsx
+  s_17d550c4e3a5ab::t_b42540e864f30d 2,49-57,180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "981ee256f229dc59c8c41857d0f171f8356ca888",
+  "prompts": {},
+  "sessions": {
+    "s_17d550c4e3a5ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec6ab84-fcff-45a9-9e10-49ecc5e8064b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
