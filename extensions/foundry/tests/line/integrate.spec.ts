@@ -1269,6 +1269,87 @@ describe('opening drafts apart from watching them (ADR 085)', () => {
     expect(onDraftOpened).toHaveBeenCalledTimes(1)
   })
 
+  describe('a pull request that is already open on the branch', () => {
+    const OPEN = 'https://github.com/andytavares/terminator/pull/248'
+
+    function withOpenPull(list: { exitCode: number; stdout: string }) {
+      const d = deps()
+      d.exec.mockImplementation(async (options: { command: string; args: string[] }) => {
+        if (options.command === 'gh' && options.args[1] === 'list') {
+          return { ...list, stderr: '', timedOut: false }
+        }
+        return {
+          exitCode: 0,
+          stdout: 'https://github.com/tav/app/pull/7\n',
+          stderr: '',
+          timedOut: false,
+        }
+      })
+      return d
+    }
+
+    const listing = (isDraft: boolean) => ({
+      exitCode: 0,
+      stdout: JSON.stringify([{ url: OPEN, number: 248, isDraft }]),
+    })
+
+    it('adopts it: retitles it, takes it back to draft, and opens no second one', async () => {
+      const d = withOpenPull(listing(false))
+      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+      expect(result.pulls[0].url).toBe(OPEN)
+      const edit = callsTo(d.exec, 'gh', 'edit')
+      expect(edit).toHaveLength(1)
+      expect(edit[0].args).toEqual(
+        expect.arrayContaining([OPEN, '--title', order().title, '--body-file'])
+      )
+      expect(callsTo(d.exec, 'gh', 'ready').map((c) => c.args)).toEqual([
+        ['pr', 'ready', '--undo', OPEN],
+      ])
+      expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(0)
+      expect((await readPulls(root, 'WO-1'))[0].url).toBe(OPEN)
+      expect(d.record).toHaveBeenCalledWith('ship.draft_adopted', OPEN, expect.any(String))
+    })
+
+    it('leaves an adopted draft as a draft', async () => {
+      const d = withOpenPull(listing(true))
+      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+      expect(result.pulls[0].url).toBe(OPEN)
+      expect(callsTo(d.exec, 'gh', 'ready')).toHaveLength(0)
+      expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(0)
+    })
+
+    it('keeps shipping when the retitle or the return to draft fails', async () => {
+      const d = deps()
+      d.exec.mockImplementation(async (options: { command: string; args: string[] }) => {
+        const verb = options.command === 'gh' ? options.args[1] : ''
+        if (verb === 'list') return { ...listing(false), stderr: '', timedOut: false }
+        if (verb === 'edit' || verb === 'ready') {
+          return { exitCode: 1, stdout: '', stderr: 'nope', timedOut: false }
+        }
+        return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+      })
+      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+      expect(result.pulls[0].url).toBe(OPEN)
+      expect(d.record).toHaveBeenCalledWith('ship.adopt_edit_failed', OPEN, expect.any(String))
+      expect(d.record).toHaveBeenCalledWith('ship.undraft_failed', OPEN, expect.any(String))
+      expect(d.record).toHaveBeenCalledWith('ship.draft_adopted', OPEN, expect.any(String))
+    })
+
+    it('creates one when nothing is open', async () => {
+      const d = withOpenPull({ exitCode: 0, stdout: '[]' })
+      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+      expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
+      expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
+    })
+
+    it('creates one when the lookup fails', async () => {
+      const d = withOpenPull({ exitCode: 1, stdout: '' })
+      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+      expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
+      expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
+    })
+  })
+
   it('shipOrder is still opening then watching, in that order', async () => {
     const seen: string[] = []
     const d = deps({

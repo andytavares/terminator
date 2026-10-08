@@ -373,4 +373,66 @@ describe('after the architect amends an answered defect', () => {
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('draft')
     expect(ledger()).not.toContain('run.started')
   })
+
+  // Recording which conversation wrote the plan loads the whole order and
+  // saves it back. Unordered, that save could land after the amendment's and
+  // put the old plan back: the answered finding open again, and the restart
+  // refused with "the adversarial pass left 1 blocking finding unresolved".
+  // Seen in CI as the test above timing out.
+  it('never puts the order from before the amendment back', async () => {
+    await seed(true)
+    const orderFile = path.join(dataDir, 'orders', 'WO-1', 'order.json')
+    const readFile = fs.promises.readFile
+    let holdNextRead = false
+    // The read that starts the conversation record returns late, holding the
+    // order as it was before the amendment.
+    const spy = vi.spyOn(fs.promises, 'readFile').mockImplementation((async (
+      file: fs.PathLike,
+      options?: unknown
+    ) => {
+      const contents = await readFile(file, options as BufferEncoding)
+      if (holdNextRead && String(file) === orderFile) {
+        holdNextRead = false
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      return contents
+    }) as typeof fs.promises.readFile)
+    runner.start.mockImplementation(
+      async (input: {
+        phase: string
+        onRegistered?: (run: { sessionId: string }) => void
+        onTurnEnd?: () => void
+      }) => {
+        const sessionId = `${input.phase}-session`
+        if (input.phase === 'architect') {
+          fs.writeFileSync(
+            path.join(dataDir, 'orders', 'WO-1', 'proposal.json'),
+            JSON.stringify({
+              note: 'Added AC-5 so footnote links survive the sanitizer',
+              resolveFindings: [{ id: 'RT-inspector-6', how: 'prefix #… hrefs in the a override' }],
+            })
+          )
+          holdNextRead = true
+        }
+        input.onRegistered?.({ sessionId })
+        if (input.phase === 'architect') input.onTurnEnd?.()
+        return { sessionId }
+      }
+    )
+
+    try {
+      await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+      await vi.waitFor(() => expect(ledger()).toMatch(/"action":"run\.(started|refused)"/), {
+        timeout: 2000,
+      })
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    } finally {
+      spy.mockRestore()
+    }
+
+    expect(ledger()).not.toContain('run.refused')
+    expect(ledger()).toContain('"action":"run.started"')
+    const saved = await createOrderStore(dataDir).load('WO-1')
+    expect(saved?.redTeam.find((f) => f.id === 'RT-inspector-6')?.status).toBe('resolved')
+  })
 })

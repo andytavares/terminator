@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'fs'
+import { mkdtempSync, rmSync, writeFileSync, appendFileSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { direct } from '../../src/factory/director.js'
@@ -594,18 +594,44 @@ describe('direct: handoff', () => {
 })
 
 describe('direct: rework', () => {
-  it('adds a parked crate on the belt between the check and the node it sent back', () => {
-    const g = graph()
-    const world = worldFor(g)
-    expect(world.crates).toEqual([])
-    const next = direct(world, [{ kind: 'rework', fromNodeId: 'b', toNodeId: 'a', round: 1 }], 0)
-    expect(next.crates).toHaveLength(1)
-    expect(next.crates[0].beltId).toBe('a->b')
-    expect(next.crates[0].progress).toBe(0)
-    expect(next.crates[0].parks).toBe(true)
+  const realGraph = (): RunGraph =>
+    JSON.parse(
+      readFileSync(join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')
+    ) as RunGraph
+  const realWorld = (): World => worldFor(realGraph())
+  const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
+  const adjacent = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
+    Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1
+
+  it('has the check carry the box to the node it sent back, with no crate on a belt', () => {
+    const world = realWorld()
+    const next = direct(
+      world,
+      [{ kind: 'rework', fromNodeId: 'verify', toNodeId: 'build:lane-1', round: 1 }],
+      0
+    )
+    const verifier = crewOf(next, 'verify')
+    expect(verifier.carrying).toBe(true)
+    expect(adjacent(verifier.goal!, seatOf(world.map, 'build:lane-1')!)).toBe(true)
+    expect(next.map.walk[verifier.goal!.y][verifier.goal!.x]).toBe(false)
+    expect(next.crates).toEqual(world.crates)
   })
 
-  it('does nothing for a rework with no matching belt', () => {
+  it('has the target walk to a check with no crew and bring the box back', () => {
+    const world = realWorld()
+    const next = direct(
+      world,
+      [{ kind: 'rework', fromNodeId: 'ship', toNodeId: 'inspect', round: 1 }],
+      0
+    )
+    const inspector = crewOf(next, 'inspect')
+    expect(inspector.carrying).toBeFalsy()
+    expect(adjacent(inspector.goal!, seatOf(world.map, 'ship')!)).toBe(true)
+    expect(inspector.errand!.map((s) => s.act)).toEqual(['pickup', 'drop', 'home'])
+    expect(next.crates).toEqual(world.crates)
+  })
+
+  it('draws nothing when neither side has crew', () => {
     const g = graph()
     const world = worldFor(g)
     const next = direct(
@@ -613,7 +639,7 @@ describe('direct: rework', () => {
       [{ kind: 'rework', fromNodeId: 'ghost', toNodeId: 'nowhere', round: 1 }],
       0
     )
-    expect(next.crates).toEqual([])
+    expect(next).toEqual(world)
   })
 })
 

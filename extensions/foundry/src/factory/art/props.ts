@@ -208,9 +208,11 @@ export function vendingDecorX(map: Pick<HallMap, 'width' | 'props'>): number {
   return preferred.find(fits) ?? preferred[0]
 }
 
+const VENDING_H = 33
+
 function drawVendingMachine(paint: Paint, x: number, y: number): void {
-  rect(paint, x, y, 14, 33, '#8a2f2a')
-  bevel(paint, x, y, 14, 33, '#b04a3c', '#4a1512')
+  rect(paint, x, y, 14, VENDING_H, '#8a2f2a')
+  bevel(paint, x, y, 14, VENDING_H, '#b04a3c', '#4a1512')
   rect(paint, x + 2, y + 3, 7, 18, '#10151a')
   const rowColors = [HALL.amber, HALL.cyan, HALL.green, '#e9ecef']
   for (let r = 0; r < 4; r++) {
@@ -285,7 +287,7 @@ export function bakeHall(map: HallMap, paint: Paint): void {
   // whiteboard, a vending machine and an extinguisher/sign, spread across
   // the wall independent of the interactive fixtures.
   drawWhiteboard(paint, Math.round(w * 0.08), TILE_PX + 4)
-  drawVendingMachine(paint, vendingDecorX(map), TILE_PX + 16)
+  drawVendingMachine(paint, vendingDecorX(map), TOP_WALL_ROWS * TILE_PX - VENDING_H)
   drawExtinguisherSign(paint, Math.round(w * 0.94), TILE_PX + 20)
 
   for (let y = TOP_WALL_ROWS; y < map.height - 1; y++) {
@@ -425,48 +427,16 @@ function treads(paint: Paint, x: number, y: number, d: Side, offset: number): vo
 }
 
 /** One belt tile: its bed, rails, direction chevron and — on a crossing — the raised deck. */
-const ARM: Record<Side, [number, number, number, number]> = {
-  E: [11, 7, 4, 2],
-  W: [1, 7, 4, 2],
-  N: [7, 1, 2, 4],
-  S: [7, 11, 2, 4],
-}
 const CHEVRON_AT: Record<Side, [number, number]> = { E: [5, 0], W: [-5, 0], N: [0, -5], S: [0, 5] }
 
-/** A split: a hub with an arm pointing down each belt that leaves it. */
+/** A split or merge: the corner tile's grey hub, with a dim chevron down each belt that leaves it. */
 function drawDiverter(paint: Paint, x: number, y: number, outs: readonly Side[]): void {
-  rect(paint, x + 5, y + 5, 6, 6, HALL.amber)
-  rect(paint, x + 6, y + 6, 4, 4, HALL.amberDim)
+  rect(paint, x + 6, y + 6, 4, 4, '#20252c')
+  rect(paint, x + 7, y + 7, 2, 2, HALL.steelDark)
   for (const d of outs) {
-    const [ax, ay, aw, ah] = ARM[d]
-    rect(paint, x + ax, y + ay, aw, ah, HALL.amber)
     const [ox, oy] = CHEVRON_AT[d]
-    chevron(paint, x + 8 + ox, y + 8 + oy, d, HALL.amber)
+    chevron(paint, x + 8 + ox, y + 8 + oy, d, HALL.amberDim)
   }
-}
-
-/** A merge: a steel funnel whose mouth is the whole tile, narrowing into the belt that leaves. */
-function drawFunnel(paint: Paint, x: number, y: number, out: Side): void {
-  const column = (p: number, thickness: number, color: string): void => {
-    const half = Math.floor(thickness / 2)
-    switch (out) {
-      case 'E':
-        return rect(paint, x + p, y + 8 - half, 1, thickness, color)
-      case 'W':
-        return rect(paint, x + 15 - p, y + 8 - half, 1, thickness, color)
-      case 'S':
-        return rect(paint, x + 8 - half, y + p, thickness, 1, color)
-      case 'N':
-        return rect(paint, x + 8 - half, y + 15 - p, thickness, 1, color)
-    }
-  }
-  for (let p = 1; p <= 14; p++) {
-    const thickness = Math.max(4, 12 - p)
-    column(p, thickness, HALL.steel)
-    column(p, thickness - 2, HALL.steelDark)
-  }
-  const [ox, oy] = CHEVRON_AT[out]
-  chevron(paint, x + 8 + ox, y + 8 + oy, out, HALL.amber)
 }
 
 function drawBeltTile(
@@ -494,7 +464,7 @@ function drawBeltTile(
   } else {
     rails(paint, x, y, sides)
     if (tile.kind === 'split') drawDiverter(paint, x, y, tile.outs)
-    else drawFunnel(paint, x, y, out)
+    else drawDiverter(paint, x, y, [out])
   }
   if (tile.kind === 'cross' && tile.over !== null) {
     // The crossing belt rides over on a raised deck.
@@ -1267,16 +1237,24 @@ function partition(paint: Paint, prop: HallProp): void {
     bevel(paint, sx, y0 - 6, 6, h + 6, HALL.wallTrim, '#1a1e25')
   }
   // Top: a half wall with glazing, broken by the door.
+  // Each tile's segment is clipped to the span between the side walls.
+  const spanL = x0 + 10
+  const spanR = x0 + w - 10
+  const clipped = (x: number, y: number, rw: number, rh: number, color: string): void => {
+    const l = Math.max(x, spanL)
+    const r = Math.min(x + rw, spanR)
+    if (r > l) rect(paint, l, y, r - l, rh, color)
+  }
   for (let i = 0; i < prop.w; i++) {
     const x = x0 + i * TILE_PX
     if (doors.has(prop.x + i)) continue
-    rect(paint, x, y0 + 4, 16, 10, HALL.wallFace)
-    rect(paint, x, y0 + 4, 16, 1, HALL.wallTrim)
-    rect(paint, x, y0 + 13, 16, 1, '#1a1e25')
-    rect(paint, x, y0 - 12, 16, 16, 'rgba(114,216,242,.16)')
-    rect(paint, x, y0 - 13, 16, 1, HALL.wallTrim)
-    rect(paint, x + 3, y0 - 10, 1, 6, 'rgba(255,255,255,.25)')
-    if (i % 2 === 0) rect(paint, x + 15, y0 - 12, 1, 16, HALL.wallTrim)
+    clipped(x, y0 + 4, 16, 10, HALL.wallFace)
+    clipped(x, y0 + 4, 16, 1, HALL.wallTrim)
+    clipped(x, y0 + 13, 16, 1, '#1a1e25')
+    clipped(x, y0 - 12, 16, 16, 'rgba(114,216,242,.16)')
+    clipped(x, y0 - 13, 16, 1, HALL.wallTrim)
+    clipped(x + 3, y0 - 10, 1, 6, 'rgba(255,255,255,.25)')
+    if (i % 2 === 0) clipped(x + 15, y0 - 12, 1, 16, HALL.wallTrim)
   }
   const dx = doorCol0 * TILE_PX
   rect(paint, dx - 2, y0 - 16, 2, 30, HALL.steel)

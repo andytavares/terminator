@@ -179,3 +179,30 @@ test('no text on any Foundry surface renders at the browser default size', async
   console.log(JSON.stringify(found, null, 1))
   expect(found, 'these render at the untouched 16px default').toEqual([])
 })
+
+test('controls that share a row in the Forge share one height', async () => {
+  // Fields got one height in the shared stylesheet and buttons did not, so a
+  // flex row that stretched its buttons left the field beside them shorter:
+  // 28px between two 34px buttons, found by looking at the screen.
+  await expect.poll(() => clickByName('Forge')).toBe(true)
+  await expect
+    .poll(() => inFoundry<number>(`document.querySelectorAll('.fdry-seed > *').length`))
+    .toBeGreaterThan(2)
+  const rows = await inFoundry<Record<string, number[]>>(`(function () {
+    var out = {}
+    var rows = document.querySelectorAll('.fdry-seed, .fdry-input')
+    for (var i = 0; i < rows.length; i++) {
+      var heights = []
+      for (var j = 0; j < rows[i].children.length; j++) {
+        heights.push(Math.round(rows[i].children[j].getBoundingClientRect().height * 100) / 100)
+      }
+      out[rows[i].className + ' ' + i] = heights
+    }
+    return out
+  })()`)
+  // eslint-disable-next-line no-console
+  console.log(JSON.stringify(rows))
+  for (const [row, heights] of Object.entries(rows)) {
+    expect(new Set(heights).size, `${row}: ${heights.join(', ')}`).toBe(1)
+  }
+})

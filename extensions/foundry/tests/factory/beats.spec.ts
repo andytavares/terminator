@@ -6,6 +6,7 @@ import {
   MIN_DWELL_MS,
   MAX_LAG_MS,
   STROKE_MS,
+  REWORK_WALK_MS,
 } from '../../src/factory/beats.js'
 import type { BeatNode } from '../../src/factory/beats.js'
 import type { FactoryEvent } from '../../src/factory/events.js'
@@ -160,5 +161,27 @@ describe('beat scheduler', () => {
     expect(a.held).toHaveLength(1)
     const b = schedule(settled(), [passed('doc', 'waiting')], nodes, 0)
     expect(b.held).toHaveLength(1)
+  })
+})
+
+describe('beat scheduler: rework', () => {
+  it('holds the next event for the sent-back node until the box could have been carried', () => {
+    const rework: FactoryEvent = {
+      kind: 'rework',
+      fromNodeId: 'integrate',
+      toNodeId: 'doc',
+      round: 1,
+    }
+    const back: FactoryEvent = { kind: 'node-state', nodeId: 'doc', from: 'passed', to: 'waiting' }
+    const beats = schedule(
+      createBeats({ doc: 'passed', integrate: 'failed', ship: 'waiting' }),
+      [rework, back],
+      nodes,
+      1000
+    )
+    const first = release(beats, 1000)
+    expect(first.events).toEqual([rework])
+    expect(release(first.beats, 1000 + REWORK_WALK_MS - 1).events).toEqual([])
+    expect(release(first.beats, 1000 + REWORK_WALK_MS).events).toEqual([back])
   })
 })

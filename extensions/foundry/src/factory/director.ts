@@ -1,7 +1,7 @@
 import { hasStarted } from './events.js'
 import type { FactoryEvent } from './events.js'
-import { seatOf, nearestRestSeat, tileOf, workAnimFor } from './sim.js'
-import type { World, Crew, Crate, OpenCall, Verdict } from './sim.js'
+import { seatOf, nearestRestSeat, tileOf, workAnimFor, besideSeat } from './sim.js'
+import type { World, Crew, Crate, ErrandStop, OpenCall, Verdict } from './sim.js'
 
 // Turns events into motion.
 //
@@ -39,6 +39,7 @@ const OPEN_CALL_STALE_MS = 4 * 60_000
  */
 function returnToWork(world: World, nodeId: string, crew: Crew): Crew {
   if (crew.restSeat !== null || crew.then === 'couch' || crew.then === 'slump') return crew
+  if (crew.errand !== undefined) return crew
   const seat = seatOf(world.map, nodeId)
   return seat === null ? crew : sendTo(crew, seat, workAnimFor(world.map, nodeId))
 }
@@ -54,7 +55,17 @@ function withCrew(world: World, nodeId: string, update: (crew: Crew) => Crew): W
 }
 
 function sendTo(crew: Crew, goal: Crew['goal'], then: Crew['then']): Crew {
-  return { ...crew, goal, then, restSeat: null, settle: null, wander: null, idleAt: null }
+  return {
+    ...crew,
+    goal,
+    then,
+    restSeat: null,
+    settle: null,
+    wander: null,
+    idleAt: null,
+    carrying: false,
+    errand: undefined,
+  }
 }
 
 /**
@@ -84,6 +95,8 @@ function sendToRest(world: World, nodeId: string): World {
     restSeat: seat.id,
     wander: null,
     idleAt: null,
+    carrying: false,
+    errand: undefined,
   }))
 }
 
@@ -270,23 +283,52 @@ function applyHandoff(world: World, event: Extract<FactoryEvent, { kind: 'handof
 }
 
 /**
- * A check sending work back: the crate rides the same belt a hand-off would
- * use between the target and the check, but the other way — starting at the
- * check's station and parking at the target's, since the target's own
- * `node-state` event (back to `waiting`) is what actually seats its crew.
+ * A check sending work back: a person carries the box to the node's station.
+ * The check's own crew member does it when there is one; a gate, join or CI
+ * check has none, so the node's crew member fetches the box from the check's
+ * station first. The crate then parks on a belt into the node, set down by
+ * hand — the node's own `node-state` event (back to `waiting`) is what seats
+ * its crew afterwards.
  */
 function applyRework(world: World, event: Extract<FactoryEvent, { kind: 'rework' }>): World {
-  const belt = world.map.belts.find(
-    (b) => b.fromNodeId === event.toNodeId && b.toNodeId === event.fromNodeId
-  )
-  if (belt === undefined) return world
-  const crate: Crate = {
-    id: `${belt.id}@${world.clockMs}:rework${event.round}`,
-    beltId: belt.id,
-    progress: 0,
-    parks: true,
+  const sender = world.crew.find((c) => c.nodeId === event.fromNodeId)
+  const target = world.crew.find((c) => c.nodeId === event.toNodeId)
+  const walker = sender ?? target
+  if (walker === undefined) return world
+
+  const from = tileOf(walker.x, walker.y)
+  const homeStop: ErrandStop = {
+    tile: walker.goal ?? from,
+    act: 'home',
+    then: walker.then,
+    settle: walker.settle,
   }
-  return { ...world, crates: [...world.crates, crate] }
+  let stops: ErrandStop[]
+  if (sender !== undefined) {
+    const drop = besideSeat(world.map, event.toNodeId, from)
+    if (drop === null) return world
+    stops = [{ tile: drop, act: 'drop', nodeId: event.toNodeId }, homeStop]
+  } else {
+    const pickup = besideSeat(world.map, event.fromNodeId, from)
+    const drop = pickup === null ? null : besideSeat(world.map, event.toNodeId, pickup)
+    if (pickup === null || drop === null) return world
+    stops = [
+      { tile: pickup, act: 'pickup' },
+      { tile: drop, act: 'drop', nodeId: event.toNodeId },
+      homeStop,
+    ]
+  }
+  return withCrew(world, walker.nodeId, (c) => ({
+    ...c,
+    goal: stops[0].tile,
+    then: 'idle',
+    settle: null,
+    wander: null,
+    idleAt: null,
+    carrying: sender !== undefined,
+    errand: stops,
+    path: [],
+  }))
 }
 
 function applyGate(world: World, event: Extract<FactoryEvent, { kind: 'gate' }>): World {

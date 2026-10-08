@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
-import { HallScene, sceneActivity } from '../../../src/components/factory/HallScene.js'
-import type { HallMap } from '../../../src/factory/layout.js'
+import { HallScene, sceneActivity, drawOrderY } from '../../../src/components/factory/HallScene.js'
+import type { HallMap, HallProp } from '../../../src/factory/layout.js'
 import type { Crew, World } from '../../../src/factory/sim.js'
 
 // jsdom has no canvas at all, so every 2D context here is a fake this spec
@@ -117,6 +117,33 @@ describe('components/factory/HallScene', () => {
     expect(canvas?.getAttribute('aria-hidden')).toBe('true')
     expect(canvas?.width).toBe(map.width * 16)
     expect(canvas?.height).toBe(map.height * 16)
+  })
+
+  describe('drawOrderY', () => {
+    const roomRow = 19
+    const room: HallProp = {
+      id: 'room-partition',
+      kind: 'partition',
+      x: 7,
+      y: roomRow,
+      w: 15,
+      h: 5,
+      solid: false,
+      nodeId: null,
+      seat: null,
+      sign: null,
+    }
+    const standingOn = (row: number): number => row * 16 + 12
+
+    it('sorts the breakroom partition by its wall row, so crew on the room first row draw over it', () => {
+      expect(drawOrderY(room)).toBeLessThan(standingOn(roomRow + 1))
+      expect(drawOrderY(room)).toBeGreaterThan(standingOn(roomRow - 1))
+    })
+
+    it('sorts other props by their floor edge, and seating furniture by its top', () => {
+      expect(drawOrderY({ ...room, kind: 'desk', y: 5, h: 2 })).toBe(7 * 16)
+      expect(drawOrderY({ ...room, kind: 'sofa', y: 5, h: 2 })).toBe(5 * 16)
+    })
   })
 
   describe('sceneActivity', () => {

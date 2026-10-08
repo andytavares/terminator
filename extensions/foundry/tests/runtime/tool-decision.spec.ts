@@ -613,3 +613,45 @@ describe('where an author may put a document', () => {
     ).not.toMatchObject({ allow: true })
   })
 })
+
+describe('pushing and opening pull requests', () => {
+  const REASON =
+    'Foundry pushes the branch and opens the pull request itself; leave both to the line.'
+  const refused = { allow: false, reason: REASON }
+
+  it("refuses the scribe's own pull request", () => {
+    const command =
+      'gh pr create --draft --base main --head foundry/wo-1008-1de --title "git integration: render sanitized HTML in comments and PR descriptions" --body-file "$S/pr-body.md" 2>&1 | tail -3'
+    expect(
+      decideTool(
+        request({ role: 'scribe', docsOnly: true, letModeDecide: true, input: { command } })
+      )
+    ).toEqual(refused)
+  })
+
+  it('refuses a push by a builder', () => {
+    expect(
+      decideTool(request({ input: { command: 'git push --set-upstream origin HEAD:foundry/x' } }))
+    ).toEqual(refused)
+  })
+
+  it('refuses a pull request opened in the second segment', () => {
+    expect(decideTool(request({ input: { command: 'cd x && gh pr create --draft' } }))).toEqual(
+      refused
+    )
+  })
+
+  it('refuses a pull request from a role that may not write', () => {
+    expect(
+      decideTool(request({ readOnly: true, role: 'verifier', input: { command: 'gh pr create' } }))
+    ).toEqual(refused)
+  })
+
+  it.each(['gh pr view 248', 'gh pr checks 248', 'git status', 'echo "gh pr create"'])(
+    'does not refuse %s by this rule',
+    (command) => {
+      const decision = decideTool(request({ input: { command } }))
+      expect(decision).not.toEqual(refused)
+    }
+  )
+})

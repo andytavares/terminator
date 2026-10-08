@@ -77,7 +77,7 @@ const DISCARDS = /(?:\d?>>?|&>)\s*\/dev\/null(?=[\s;|&)]|$)|2>&1/g
 /** The tools that name a path, and the field each names it in. */
 const PATH_FIELDS = ['file_path', 'path', 'notebook_path'] as const
 
-function commandOf(input: unknown): string {
+export function commandOf(input: unknown): string {
   if (typeof input !== 'object' || input === null) return ''
   const command = (input as { command?: unknown }).command
   return typeof command === 'string' ? command : ''
@@ -121,7 +121,7 @@ export function isDestructive(toolName: string, input: unknown): boolean {
 }
 
 /** `FOO=bar cmd` is `cmd`; without this the binary reads as the assignment. */
-const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
+export const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 
 /** One command, with nothing joined to it. */
 function destructiveSegment(segment: string): boolean {

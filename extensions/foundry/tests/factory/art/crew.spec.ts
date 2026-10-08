@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { drawCrew } from '../../../src/factory/art/crew.js'
 import type { Crew, CrewAnim, Facing } from '../../../src/factory/sim.js'
 import { createRecordingPaint } from './paint-fake.js'
+import { roleStyle } from '../../../src/factory/art/palette.js'
 
 const ALL_ANIMS: readonly CrewAnim[] = [
   'walk',
@@ -86,5 +87,31 @@ describe('factory/art/crew drawCrew', () => {
     const b = createRecordingPaint()
     drawCrew(b, crew({ anim: 'type' }), 100)
     expect(a.calls).not.toEqual(b.calls)
+  })
+})
+
+describe('factory/art/crew carrying', () => {
+  const CRATE_BODY = '#b07a3c'
+  const paints = (c: Partial<Crew>): string[] => {
+    const paint = createRecordingPaint()
+    drawCrew(paint, crew(c), 0)
+    return paint.calls.flatMap((call) => (call.op === 'fillRect' ? [String(call.style)] : []))
+  }
+
+  it('paints the crate in every facing when carrying, and not otherwise', () => {
+    for (const facing of ALL_FACINGS) {
+      expect(paints({ facing, carrying: true })).toContain(CRATE_BODY)
+      expect(paints({ facing, carrying: false })).not.toContain(CRATE_BODY)
+      expect(paints({ facing })).not.toContain(CRATE_BODY)
+    }
+  })
+
+  it('draws the crate before the body when facing away, after it otherwise', () => {
+    const order = (facing: Facing): number => {
+      const styles = paints({ facing, carrying: true })
+      return styles.indexOf(CRATE_BODY) - styles.indexOf(roleStyle('builder').shirt)
+    }
+    expect(order('N')).toBeLessThan(0)
+    expect(order('S')).toBeGreaterThan(0)
   })
 })

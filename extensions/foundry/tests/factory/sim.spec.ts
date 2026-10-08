@@ -13,7 +13,8 @@ import {
   loiterPoints,
   VERDICT_MS,
 } from '../../src/factory/sim.js'
-import type { World } from '../../src/factory/sim.js'
+import type { Crew, World } from '../../src/factory/sim.js'
+import { tileOf } from '../../src/factory/sim.js'
 import { direct } from '../../src/factory/director.js'
 import { layoutHall } from '../../src/factory/layout.js'
 import type { HallMap, RestSeat } from '../../src/factory/layout.js'
@@ -788,5 +789,229 @@ describe('idle crew wander', () => {
     const later = run(w, 60_000).crew.find((c) => c.nodeId === id)!
     expect(later.wander ?? null).toBeNull()
     expect(later.anim).not.toBe('couch')
+  })
+})
+
+describe('crew are solid', () => {
+  // One-tile corridor along row 1 with a bay under x=3 and x=7 where someone
+  // can stand aside. Only `walk` is read by the crew's movement.
+  const ROWS = ['#########', '.........', '###.###.#', '#########']
+  const walk = ROWS.map((row) => row.split('').map((ch) => ch === '#'))
+  const corridor = { walk, solid: walk, restSeats: [], props: [] } as unknown as HallMap
+
+  function member(
+    nodeId: string,
+    from: { x: number; y: number },
+    goal: { x: number; y: number },
+    then: Crew['then']
+  ): Crew {
+    const c = tileCenter(from)
+    return {
+      nodeId,
+      role: null,
+      x: c.x,
+      y: c.y,
+      facing: 'E',
+      anim: 'idle',
+      path: [],
+      goal,
+      then,
+      present: true,
+      restSeat: null,
+      settle: null,
+    }
+  }
+
+  function world(crew: Crew[]): World {
+    return {
+      map: corridor,
+      crew,
+      crates: [],
+      gatesWaiting: [],
+      openCalls: [],
+      verdicts: [],
+      clockMs: 0,
+      ci: null,
+      queue: null,
+    }
+  }
+
+  function atGoal(c: Crew): boolean {
+    const t = tileOf(c.x, c.y)
+    return c.goal === null && c.path.length === 0 && t.x >= 0
+  }
+
+  function run(start: World, ticks: number, onTick?: (w: World) => void): World {
+    let w = start
+    for (let i = 0; i < ticks && !w.crew.every(atGoal); i++) {
+      w = tick(w, 16)
+      onTick?.(w)
+    }
+    return w
+  }
+
+  function sharedTile(w: World): string | null {
+    const seen = new Set<string>()
+    for (const c of w.crew.filter((m) => m.present)) {
+      const t = tileOf(c.x, c.y)
+      const k = `${t.x},${t.y}`
+      if (seen.has(k)) return k
+      seen.add(k)
+    }
+    return null
+  }
+
+  it('two crew sent head-on never share a tile and both arrive', () => {
+    const start = world([
+      member('a', { x: 0, y: 1 }, { x: 8, y: 1 }, 'type'),
+      member('b', { x: 8, y: 1 }, { x: 0, y: 1 }, 'couch'),
+    ])
+    const shared: string[] = []
+    const end = run(start, 3000, (w) => {
+      const k = sharedTile(w)
+      if (k !== null) shared.push(k)
+    })
+    expect(shared).toEqual([])
+    expect(end.crew.map((c) => [c.goal, tileOf(c.x, c.y)])).toEqual([
+      [null, { x: 8, y: 1 }],
+      [null, { x: 0, y: 1 }],
+    ])
+  })
+
+  it('four crew sent both ways through one passing place all arrive', () => {
+    // A corridor with a 3x3 room in the middle to pass in. All four end in the
+    // room, so nobody ends up parked in the corridor itself.
+    const ROOM = [
+      '#############',
+      '#####...#####',
+      '.............',
+      '#####...#####',
+      '#############',
+    ].map((row) => row.split('').map((ch) => ch === '#'))
+    const start = {
+      ...world([
+        member('a', { x: 0, y: 2 }, { x: 7, y: 3 }, 'type'),
+        member('b', { x: 12, y: 2 }, { x: 5, y: 1 }, 'type'),
+        member('c', { x: 1, y: 2 }, { x: 6, y: 3 }, 'couch'),
+        member('d', { x: 11, y: 2 }, { x: 6, y: 1 }, 'couch'),
+      ]),
+      map: { walk: ROOM, solid: ROOM, restSeats: [], props: [] } as unknown as HallMap,
+    }
+    const shared: string[] = []
+    const end = run(start, 3000, (w) => {
+      const k = sharedTile(w)
+      if (k !== null) shared.push(k)
+    })
+    expect(shared).toEqual([])
+    expect(end.crew.map((c) => [c.goal, c.path.length])).toEqual([
+      [null, 0],
+      [null, 0],
+      [null, 0],
+      [null, 0],
+    ])
+    expect(end.crew.map((c) => tileOf(c.x, c.y))).toEqual([
+      { x: 7, y: 3 },
+      { x: 5, y: 1 },
+      { x: 6, y: 3 },
+      { x: 6, y: 1 },
+    ])
+  })
+
+  it('a crew member who is not present does not block anyone', () => {
+    const away = {
+      ...member('away', { x: 4, y: 1 }, { x: 4, y: 1 }, 'idle'),
+      goal: null,
+      present: false,
+    }
+    const end = run(world([member('a', { x: 0, y: 1 }, { x: 8, y: 1 }, 'type'), away]), 1000)
+    expect(tileOf(end.crew[0].x, end.crew[0].y)).toEqual({ x: 8, y: 1 })
+  })
+
+  it('ticks twice to identical worlds', () => {
+    const make = (): World =>
+      world([
+        member('a', { x: 0, y: 1 }, { x: 8, y: 1 }, 'type'),
+        member('b', { x: 8, y: 1 }, { x: 0, y: 1 }, 'couch'),
+      ])
+    const a: World[] = []
+    const b: World[] = []
+    let wa = make()
+    let wb = make()
+    for (let i = 0; i < 600; i++) {
+      wa = tick(wa, 16)
+      wb = tick(wb, 16)
+      a.push(wa)
+      b.push(wb)
+    }
+    expect(a).toEqual(b)
+  })
+})
+
+describe('tick: a box carried back to an earlier station', () => {
+  const realGraph = (): RunGraph =>
+    JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')
+    ) as RunGraph
+  const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
+  const settled = (): World => {
+    const g = realGraph()
+    return createWorld(layoutHall(g), {
+      graph: g,
+      orphaned: [],
+      stranded: [],
+      waiting: [],
+      activity: {},
+      ci: null,
+      queue: null,
+    })
+  }
+  const sendBack = (toNodeId: string): World =>
+    direct(settled(), [{ kind: 'rework', fromNodeId: 'verify', toNodeId, round: 1 }], 0)
+
+  it.each([
+    ['build:lane-1', 0],
+    ['lint', 1],
+  ])('carries the box to %s and walks home without overlap (%i crate parked)', (target, parked) => {
+    let world = sendBack(target)
+    const at = crewOf(settled(), 'verify')
+    const home = tileOf(at.x, at.y)
+    const homeAnim = at.anim
+    let carriedWhileWalking = false
+    for (let i = 0; i < 4000 && crewOf(world, 'verify').errand !== undefined; i++) {
+      world = tick(world, 50)
+      carriedWhileWalking ||= crewOf(world, 'verify').carrying === true
+      const tiles = world.crew
+        .filter((c) => c.present)
+        .map((c) => `${tileOf(c.x, c.y).x},${tileOf(c.x, c.y).y}`)
+      expect(new Set(tiles).size).toBe(tiles.length)
+    }
+    for (let i = 0; i < 400; i++) world = tick(world, 50)
+    const verifier = crewOf(world, 'verify')
+    expect(carriedWhileWalking).toBe(true)
+    expect(verifier.errand).toBeUndefined()
+    expect(verifier.carrying).toBe(false)
+    expect(tileOf(verifier.x, verifier.y)).toEqual(home)
+    expect(verifier.anim).toBe(homeAnim)
+    const dropped = world.crates.filter((c) => c.id.endsWith(':carried'))
+    expect(dropped).toHaveLength(parked)
+    for (const crate of dropped) {
+      const into = world.map.belts.find((b) => b.id === crate.beltId)!
+      expect(into.toNodeId).toBe(target)
+      expect(crate).toMatchObject({ progress: 1, parks: true })
+    }
+  })
+
+  it('cancels the errand when a real event sends the walker elsewhere', () => {
+    let world = sendBack('build:lane-1')
+    for (let i = 0; i < 5; i++) world = tick(world, 50)
+    expect(crewOf(world, 'verify').carrying).toBe(true)
+    world = direct(
+      world,
+      [{ kind: 'node-state', nodeId: 'verify', from: 'failed', to: 'running' }],
+      world.clockMs
+    )
+    const verifier = crewOf(world, 'verify')
+    expect(verifier.errand).toBeUndefined()
+    expect(verifier.carrying).toBe(false)
   })
 })

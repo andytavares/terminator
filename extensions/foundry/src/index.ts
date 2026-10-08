@@ -2274,11 +2274,15 @@ async function convergeOnce(
    * "Attach" — the way back into the conversation that wrote the plan — had
    * nothing to attach to and was never rendered.
    */
+  // The record loads the whole order and saves it back, so the turn's outcome
+  // waits for it: a save that landed after the amendment's put the old plan
+  // back, with the answered finding open again.
+  let remembering: Promise<void> = Promise.resolve()
   const rememberSession = (sessionId: string): void => {
     intakeSessions.set(order.id, sessionId)
-    void createOrderStore(root)
-      .load(order.id)
-      .then(async (current) => {
+    remembering = remembering
+      .then(async () => {
+        const current = await createOrderStore(root).load(order.id)
         if (current === null || current.provenance.forgeSession === sessionId) return
         await createOrderStore(root).save({
           ...current,
@@ -2321,11 +2325,11 @@ async function convergeOnce(
       // on one the runtime has forgotten silently starts a fresh agent that
       // believes it is continuing.
       if (deadline) intakeSessions.delete(order.id)
-      void onFinished(
+      const outcome =
         !deadline || code !== null
           ? readProposal(order, plan.proposalPath, new Date().toISOString())
-          : { ok: false, reason: 'The architect could not be started.' }
-      )
+          : { ok: false as const, reason: 'The architect could not be started.' }
+      void remembering.then(() => onFinished(outcome))
       answer({ ok: false, reason: 'The architect ended before it started.' })
     }
 
