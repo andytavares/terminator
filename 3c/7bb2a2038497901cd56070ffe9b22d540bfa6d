@@ -1,0 +1,32 @@
+extensions/git-integration/src/components/pr-review/RichContent.tsx
+  s_81672e80f423f9::t_684773e88f3fab 3-4,18-19
+extensions/git-integration/package.json
+  s_81672e80f423f9::t_adf74a42fcd51c 22-23
+docs/adr/089-git-review-renders-sanitized-html.md
+  s_81672e80f423f9::t_5d7a68b28f5aff 1-40,43,45-56
+  s_81672e80f423f9::t_e31d40000b10e6 41-42,44
+extensions/git-integration/tests/unit/RichContent.html.spec.tsx
+  s_81672e80f423f9::t_3ca680886c2e98 101-104,108-111
+  s_81672e80f423f9::t_8b09d5c3c4a69a 1-95,97-99,119-141
+  s_81672e80f423f9::t_e31d40000b10e6 96
+  s_81672e80f423f9::t_ca4a2aebb9b849 100,112-118
+  s_81672e80f423f9::t_a6432abc4177ba 105-107
+package-lock.json
+  s_81672e80f423f9::t_8a866ab824caa5 124-125,8540-8636,8664-8682,8696-8712,8785-8794,12683-12711,14683-14696,15394-15403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3c7bb2a2038497901cd56070ffe9b22d540bfa6d",
+  "prompts": {},
+  "sessions": {
+    "s_81672e80f423f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e92d2d7b-59b9-4bda-896e-7e2d02d00b43",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
