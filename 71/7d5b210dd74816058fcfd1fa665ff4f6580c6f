@@ -1,0 +1,39 @@
+docs/adr/011-react-markdown-for-comments.md
+  s_a98de3a237bad5::t_c06b1bf081c969 4
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_a98de3a237bad5::t_4e2d0c13ebc920 1560-1568
+extensions/git-integration/package.json
+  s_a98de3a237bad5::t_51622ed3cf1ab2 22-23
+extensions/git-integration/tests/unit/RichContent.html.spec.tsx
+  s_a98de3a237bad5::t_429fb3d5cff760 71
+  s_a98de3a237bad5::t_ce93d08f6feb33 1-2,4-43,45-64,66-70,72-79,81-100
+  s_a98de3a237bad5::t_af2b349ae9e45d 44
+  s_a98de3a237bad5::t_09ea9fa0273f1c 3
+  s_a98de3a237bad5::t_c06b1bf081c969 65,80
+docs/adr/091-sanitised-html-in-pr-comments.md
+  s_a98de3a237bad5::t_c06b1bf081c969 1-8,10-22,24-27,29-42
+  s_a98de3a237bad5::t_8944f39792bcd5 9,23,28
+extensions/git-integration/README.md
+  s_a98de3a237bad5::t_c06b1bf081c969 11
+extensions/git-integration/src/components/pr-review/RichContent.tsx
+  s_a98de3a237bad5::t_0f281595fc3073 4-5,8,16,27
+  s_a98de3a237bad5::t_aa1d01970121d6 9-15
+package-lock.json
+  s_a98de3a237bad5::t_1dcfb9a7a14d06 124-125,8540-8636,8664-8682,8696-8712,8785-8794,12683-12711,14683-14696,15394-15403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "717d5b210dd74816058fcfd1fa665ff4f6580c6f",
+  "prompts": {},
+  "sessions": {
+    "s_a98de3a237bad5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9849c51f-53da-44a7-92e5-620e254907a3",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
