@@ -1,0 +1,46 @@
+src/main/git/branch-exclude-settings.ts
+  s_72932a1c7b7903::t_7eff1bd1a429a2 1-32
+tests/unit/extensions/api.spec.ts
+  s_72932a1c7b7903::t_7d837c16786ba6 143-177
+extensions/git-integration/src/index.ts
+  s_72932a1c7b7903::t_67dca8945fed91 89-91
+extensions/git-integration/tests/unit/dashboard-search.spec.ts
+  s_72932a1c7b7903::t_77890abb32b3b3 19,131-158
+  s_72932a1c7b7903::t_5aa9e55a9ce085 159
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_72932a1c7b7903::t_77890abb32b3b3 41-44,53-54,901-945
+  s_72932a1c7b7903::t_df84120d8a3122 946
+src/renderer/components/settings/GlobalSettings.tsx
+  s_72932a1c7b7903::t_ceadac7ae10d50 207-209
+src/main/ipc/git.ipc.ts
+  s_72932a1c7b7903::t_7eff1bd1a429a2 18
+src/main/extensions/api.ts
+  s_72932a1c7b7903::t_7eff1bd1a429a2 168-169,295-300,872-873
+  s_72932a1c7b7903::t_1a5c07c90e24e7 874
+CHANGELOG.md
+  s_72932a1c7b7903::t_ceadac7ae10d50 68-69
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_72932a1c7b7903::t_d09e82fd38a865 17,124-125,210-212,245-246,251-253,1175
+extensions/git-integration/src/github/dashboard-search.ts
+  s_72932a1c7b7903::t_67dca8945fed91 223
+  s_72932a1c7b7903::t_d09e82fd38a865 40,94,202-211,215-216,222,224
+docs/EXTENSION-DEVELOPMENT.md
+  s_72932a1c7b7903::t_ceadac7ae10d50 5,186-194
+  s_72932a1c7b7903::t_47f1960f9e8f7e 195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1b38fabaeb4ca4cfae78eb300788e3a7aab4ce22",
+  "prompts": {},
+  "sessions": {
+    "s_72932a1c7b7903": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "200f3f9e-09fe-4bb6-a58d-16f833d45312",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
