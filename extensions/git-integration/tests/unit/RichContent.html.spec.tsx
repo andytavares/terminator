@@ -88,6 +88,31 @@ describe('RichContent raw HTML', () => {
       expect(hrefs.some((h) => h?.toLowerCase().includes('javascript:'))).toBe(false)
     })
 
+    it('prefixes every id and name so a body cannot clobber document members', () => {
+      const el = renderBody(
+        '<img name="createElement" src="https://example.com/a.png">\n\n<div id="getElementById">x</div>\n\ntext[^1]\n\n[^1]: note'
+      )
+      document.body.appendChild(el)
+      const values = [
+        ...Array.from(el.querySelectorAll('[name]')).map((n) => n.getAttribute('name')),
+        ...Array.from(el.querySelectorAll('[id]')).map((n) => n.getAttribute('id')),
+      ]
+      expect(values).toContain('user-content-createElement')
+      expect(values).toContain('user-content-getElementById')
+      expect(values.every((v) => v?.startsWith('user-content-'))).toBe(true)
+      expect(values.some((v) => v?.startsWith('user-content-user-content-'))).toBe(false)
+      expect(typeof document.createElement).toBe('function')
+      expect(typeof document.getElementById).toBe('function')
+      el.remove()
+    })
+
+    it('points an in-page HTML anchor at the prefixed id', () => {
+      const el = renderBody('<a href="#notes">jump</a>\n\n<h3 id="notes">Notes</h3>')
+      const href = el.querySelector('a')?.getAttribute('href') ?? ''
+      expect(href).toBe('#user-content-notes')
+      expect(el.querySelector(`[id="${href.slice(1)}"]`)?.textContent).toBe('Notes')
+    })
+
     it('opens an HTML <a href="https://…"> via shell.openExternal', () => {
       const el = renderBody('<a href="https://example.com/pr">PR</a>')
       const link = el.querySelector('a')!

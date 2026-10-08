@@ -87,6 +87,16 @@ describe('RichContent', () => {
       expect(mockOpenExternal).not.toHaveBeenCalled()
     })
 
+    it('prefixes an in-page hash href to match the sanitised id', () => {
+      render(<RichContent>{'#section'}</RichContent>)
+      expect(screen.getByRole('link').getAttribute('href')).toBe('#user-content-section')
+    })
+
+    it('leaves an already-prefixed hash href alone', () => {
+      render(<RichContent>{'#user-content-section'}</RichContent>)
+      expect(screen.getByRole('link').getAttribute('href')).toBe('#user-content-section')
+    })
+
     it('does not call openExternal for relative hrefs', () => {
       render(<RichContent>{'./relative/path'}</RichContent>)
       const link = screen.getByRole('link')

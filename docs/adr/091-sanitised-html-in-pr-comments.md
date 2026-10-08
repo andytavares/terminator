@@ -6,7 +6,7 @@
 
 ## Decision
 
-`RichContent.tsx` parses HTML embedded in markdown with `rehype-raw@7` and then runs `rehype-sanitize@6` with its default schema, the one derived from GitHub's own sanitiser, changed in two places: `clobberPrefix` is `''`, and `style` joins `script` in `strip`.
+`RichContent.tsx` parses HTML embedded in markdown with `rehype-raw@7` and then runs `rehype-sanitize@6` with its default schema, the one derived from GitHub's own sanitiser, with `style` added to `strip`. `remark-rehype` runs with `clobberPrefix: ''` so the sanitiser is the only thing that prefixes ids.
 
 ```
 markdown ─ remark-gfm ─ remark-rehype ─ rehype-raw ─ rehype-sanitize ─ React elements
@@ -23,9 +23,11 @@ ADR-011 chose `react-markdown` because it never writes untrusted text through `i
 - `rehype-sanitize` runs last, after the only untrusted step (`rehype-raw`). Elements outside the allowlist are unwrapped, keeping only their text (`<iframe>`). `<script>` and `<style>` are removed together with their contents, so neither code nor CSS shows up as text. `on*` attributes are never allowed, and `href`/`src` are limited to safe protocols, so `javascript:` URLs go.
 - The `a` override still sends only `http:`/`https:` links to `shell.openExternal`, and that now covers HTML `<a>` as well as markdown links.
 
-## Why `clobberPrefix: ''`
+## Why every id and name is prefixed
 
-`remark-rehype` already prefixes footnote ids and hrefs with `user-content-`. Leaving the sanitiser's default prefix on adds a second `user-content-` to the ids but not to the hrefs, so in-page footnote links break. The cost is that ids and names written in raw HTML are not prefixed, so a body can put an element with an `id` or `name` of its choosing into the extension view (DOM clobbering). It can only shadow a global that isn't already defined, and the sanitiser has already removed every way to run script.
+An `id` or `name` in the page becomes a property of `document` or `window`, and it can replace a real one: `<img name="createElement">` makes `document.createElement` the image, not the function, and breaks any code that calls it. So the sanitiser keeps its default `clobberPrefix`, `user-content-`, and every `id` and `name` from a body comes out as `user-content-…`, as on GitHub.
+
+`remark-rehype` would add the same prefix to footnote ids itself, giving `user-content-user-content-fn-1` once the sanitiser has run. Its own prefix is turned off instead, and the `a` override rewrites in-page hrefs (`#fn-1`, or `#notes` in raw HTML) to `#user-content-…` so they still reach their target. An href that already carries the prefix, as one copied from GitHub does, is left alone.
 
 ## Alternatives considered
 
