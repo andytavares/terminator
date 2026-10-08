@@ -26,22 +26,37 @@ markdown ─ remark-gfm ─ remark-rehype ─ rehype-raw ─ rehype-sanitize ─
 
 - **`rehype-raw@7.0.0`** parses the HTML nodes into real elements, so tags
   nest with the markdown around them.
-- **`rehype-sanitize@6.0.0`** with `defaultSchema`, which is GitHub's own
-  allowlist. It removes `<script>`, `<iframe>`, `<style>`, every `on*`
-  attribute and every URL whose protocol is not `http`, `https`, `mailto`,
-  etc. It keeps `className="language-*"` on `<code>`, so highlight.js still
+- **`rehype-sanitize@6.0.0`** with `defaultSchema`, which "follows GitHub
+  style sanitation". Only the tags and attributes on that list survive, so
+  `<script>` and `<iframe>` are dropped, every `on*` attribute is removed, and
+  `href` and `src` keep only `http`, `https`, `mailto`, `irc`, `ircs` and
+  `xmpp`. It keeps `className="language-*"` on `<code>`, so highlight.js still
   highlights fenced code.
-- `clobberPrefix` is set to `''`. `remark-rehype` already prefixes footnote
-  ids with `user-content-`; the schema's default prefix would add a second
-  one to the ids but not to the hrefs, and every footnote link would point
-  nowhere.
+- `clobberPrefix` is set to `''`. The schema's default is `user-content-` on
+  `id` and `name`. `remark-rehype` already prefixes footnote ids, so a second
+  prefix would reach the ids but not the hrefs, and every footnote link would
+  point nowhere.
 
 Sanitize runs last, so nothing after it can reintroduce an attribute it
 removed. The existing `a` and `code` overrides are unchanged.
 
-Both packages are maintained by the unified collective alongside
-`react-markdown`, are the pairing `react-markdown` documents for HTML, and
-add no renderer: the output is still React elements, never `innerHTML`.
+`react-markdown`'s security section names `rehype-sanitize` as the safety net
+for `rehype-raw`, and its changelog orders them `rehypeRaw` then
+`rehypeSanitize`, as this change does. Neither package adds a renderer: the
+output is still React elements, never `innerHTML`.
+
+## Dependency health
+
+Required by Constitution IV for each new dependency.
+
+- **Official docs:** [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize),
+  [rehype-raw](https://github.com/rehypejs/rehype-raw),
+  [react-markdown security](https://github.com/remarkjs/react-markdown#security).
+- **Community:** both live in the `rehypejs` organisation, part of the unified
+  collective that also maintains `react-markdown` and `remark-gfm` (already
+  in use). Maintainer count and last-release date: [UNVERIFIED], not measured
+  for this record.
+- **Pinned exactly** (`7.0.0`, `6.0.0`), no caret.
 
 ## Alternatives considered
 
