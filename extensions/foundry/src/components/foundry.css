@@ -4379,7 +4379,8 @@
   color: var(--tm-text-secondary);
 }
 
-/* The factory site: the hall cards, with the status wall beside them. */
+/* The factory site: the hall cards, with the status wall beside them. The
+   cards share one column, so a tall wall cannot stretch the row they sit in. */
 .fdry-site {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;
@@ -4390,6 +4391,19 @@
 .fdry-site > .fdry-status-wall {
   grid-column: 2;
   grid-row: 1;
+}
+
+.fdry-site-main {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  padding-top: 26px;
+}
+
+/* A line of text in place of a grid lines up with the heading above it. */
+.fdry-site-main > .fdry-note,
+.fdry-hall-section > .fdry-note {
+  padding: 0 14px 14px;
 }
 
 .fdry-status-wall {
@@ -4426,7 +4440,8 @@
     grid-template-columns: 1fr;
   }
 
-  .fdry-site > .fdry-status-wall {
+  .fdry-site > .fdry-status-wall,
+  .fdry-site-main {
     grid-column: 1;
     grid-row: auto;
   }
