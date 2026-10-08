@@ -20,7 +20,7 @@ ADR-011 chose `react-markdown` because it never writes untrusted text through `i
 ## Why this keeps ADR-011's safety
 
 - Output is still React elements; nothing new reaches `innerHTML`.
-- `rehype-sanitize` runs last, after the only untrusted step (`rehype-raw`), which is what its docs require. Elements outside the allowlist are unwrapped, keeping only their text (`<iframe>`). `<script>` and `<style>` are removed together with their contents, so neither code nor CSS shows up as text. `on*` attributes are never allowed, and `href`/`src` are limited to safe protocols, so `javascript:` URLs go.
+- `rehype-sanitize` runs last, after the only untrusted step (`rehype-raw`). Elements outside the allowlist are unwrapped, keeping only their text (`<iframe>`). `<script>` and `<style>` are removed together with their contents, so neither code nor CSS shows up as text. `on*` attributes are never allowed, and `href`/`src` are limited to safe protocols, so `javascript:` URLs go.
 - The `a` override still sends only `http:`/`https:` links to `shell.openExternal`, and that now covers HTML `<a>` as well as markdown links.
 
 ## Why `clobberPrefix: ''`

@@ -65,6 +65,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **PR descriptions and comments render the HTML in them.** `<details>`/`<summary>` disclosures, `<br>`, `<sub>`, `<img>` and `<a>` in PR bodies, PR comments, inline review comments, agent notes and the composer preview now render as elements instead of literal tag text, through a sanitising allowlist (`rehype-raw` + `rehype-sanitize`): scripts, frames, styles, `on*` handlers and `javascript:` links are removed. Core issue rendering is unchanged. See ADR-091, which supersedes ADR-011
+
 - **Excluded branches stay out of the review lists.** A pull request opened from a branch that matches Settings → Git → Branch Exclude Patterns (for example `renovate/*`) no longer shows in the Reviews dashboard or in a repository's review queue, and isn't counted there. Looking a pull request up by its number still finds it. The Git extension asks the core through `api.settings.isBranchExcluded` (Extension API 2.8.0)
 
 - **Branch Exclude Patterns work again.** Settings → Git → Branch Exclude Patterns had done nothing since the sidebar's branch switcher was removed, its only reader. Branch lists now leave matching branches out: the New branch picker and the Git extension's pull-request base branch. A workspace's own patterns replace the global ones. `*` matches across slashes, so `gh-readonly-queue/*` hides `gh-readonly-queue/main/pr-248-…`, and `trunk-merge/*` hides `trunk-merge/…`. The checked-out branch always shows

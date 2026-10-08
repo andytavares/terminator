@@ -251,7 +251,7 @@ See [docs/EXTENSION-DEVELOPMENT.md](docs/EXTENSION-DEVELOPMENT.md) for the full 
 | Extensions compile to CommonJS with esbuild            | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)        |
 | `gh` CLI for all GitHub PR review operations           | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                 |
 | Heuristic file ordering for code review (v1)           | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)            |
-| `react-markdown` + `remark-gfm` for comment rendering  | [ADR-011](docs/adr/011-react-markdown-for-comments.md)           |
+| Sanitised HTML in PR comments                          | [ADR-091](docs/adr/091-sanitised-html-in-pr-comments.md)         |
 | ExtensionAPI v1.2.0 additions                          | [ADR-012](docs/adr/012-extension-api-v1.2.0.md)                  |
 | MCP stdio sidecar for Task Vault agent access          | [ADR-013](docs/adr/013-mcp-stdio-sidecar.md)                     |
 | Line-based task IDs (session-scoped, rebuild-on-write) | [ADR-014](docs/adr/014-line-based-task-ids.md)                   |
