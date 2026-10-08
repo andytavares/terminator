@@ -1,7 +1,14 @@
 import * as path from 'node:path'
 import type { PolicyDecision } from './read-only-policy.js'
 import { decideReadOnly } from './read-only-policy.js'
-import { decideByAutonomy, isDestructive, writesOutside } from './autonomy-policy.js'
+import {
+  ASSIGNMENT,
+  commandOf,
+  decideByAutonomy,
+  isDestructive,
+  writesOutside,
+} from './autonomy-policy.js'
+import { readShell } from './shell-split.js'
 import type { Autonomy } from '../gates/autonomy.js'
 import { isDocumentationRelative } from '../verify/documentation-path.js'
 
@@ -138,6 +145,20 @@ function isInsideMount(target: string | null, mount: string | null): boolean {
   )
 }
 
+/** The `gh pr` subcommands that only look. */
+const PR_READS = new Set(['view', 'list', 'diff', 'checks', 'status'])
+
+/** Whether any command in a Bash call pushes a branch or changes a pull request. */
+function shipsTheBranch(command: string): boolean {
+  return readShell(command).segments.some((segment) => {
+    const words = segment.trim().split(/\s+/)
+    while (words.length > 0 && ASSIGNMENT.test(words[0])) words.shift()
+    const binary = path.basename(words[0] ?? '')
+    if (binary === 'git') return words[1] === 'push'
+    return binary === 'gh' && words[1] === 'pr' && !PR_READS.has(words[2] ?? '')
+  })
+}
+
 export function decideTool(request: ToolRequest): PolicyDecision | 'mode' | null {
   // A node's skills, mounted read-only outside the repository and handed to
   // the agent with `--add-dir`. Anything `decideTool` does not decide is held
@@ -151,6 +172,14 @@ export function decideTool(request: ToolRequest): PolicyDecision | 'mode' | null
     return {
       allow: false,
       reason: 'skills are mounted read-only; they are the factory’s, not the run’s',
+    }
+  }
+
+  if (request.tool === 'Bash' && shipsTheBranch(commandOf(request.input))) {
+    return {
+      allow: false,
+      reason:
+        'Foundry pushes the branch and opens the pull request itself; leave both to the line.',
     }
   }
 
