@@ -87,6 +87,38 @@ describe('RichContent', () => {
       expect(mockOpenExternal).not.toHaveBeenCalled()
     })
 
+    it('prefixes an in-page hash href to match the sanitised id', () => {
+      render(<RichContent>{'#section'}</RichContent>)
+      expect(screen.getByRole('link').getAttribute('href')).toBe('#user-content-section')
+    })
+
+    it('leaves an already-prefixed hash href alone', () => {
+      render(<RichContent>{'#user-content-section'}</RichContent>)
+      expect(screen.getByRole('link').getAttribute('href')).toBe('#user-content-section')
+    })
+
+    it('keeps a relative href from navigating the view', () => {
+      render(<RichContent>{'./relative/path'}</RichContent>)
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+      screen.getByRole('link').dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+    })
+
+    it('keeps a protocol-relative href from navigating the view', () => {
+      render(<RichContent>{'//evil.example/x'}</RichContent>)
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+      screen.getByRole('link').dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+      expect(mockOpenExternal).not.toHaveBeenCalled()
+    })
+
+    it('lets an in-page hash link scroll the view', () => {
+      render(<RichContent>{'#section'}</RichContent>)
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+      screen.getByRole('link').dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(false)
+    })
+
     it('does not call openExternal for relative hrefs', () => {
       render(<RichContent>{'./relative/path'}</RichContent>)
       const link = screen.getByRole('link')

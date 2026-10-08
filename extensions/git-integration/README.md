@@ -8,6 +8,7 @@ A first-party Terminator extension that adds a Git tab with a staging area, comm
 - **File diff viewer** — click any file to see a syntax-highlighted unified diff with line numbers.
 - **Commit** — write a commit message and commit directly. Optionally add `--signoff` via settings.
 - **Pull Request** — click **Open Pull Request** to create or view a PR via the `gh` CLI. Supports draft PRs.
+- **Rich PR text** — PR descriptions, PR comments, inline review comments and the composer preview render markdown and any HTML embedded in it (`<details>`, `<br>`, `<sub>`, `<img>`, `<a>`…) through a sanitizing allowlist: scripts, frames, styles, `on*` handlers and `javascript:` links are dropped. Remote images load from their host, whether written as markdown or HTML; nothing proxies or blocks them.
 - **Auto-refresh** — the Git tab refreshes automatically when files change (via `fs.watch`).
 - **Settings** — all behaviour is configurable globally and per-workspace (see below).
 
