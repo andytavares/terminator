@@ -1,0 +1,22 @@
+extensions/foundry/src/line/integrate.ts
+  s_17d550c4e3a5ab::t_3fa707a3b9c247 475-557,582-586,665-676
+extensions/foundry/tests/line/integrate.spec.ts
+  s_17d550c4e3a5ab::t_3cb15e684c86c0 1281-1286,1305-1307
+  s_17d550c4e3a5ab::t_3fa707a3b9c247 1272-1280,1287-1304,1308-1352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e152cb23995e4ffe5d36d306225c51a3c4d8c22b",
+  "prompts": {},
+  "sessions": {
+    "s_17d550c4e3a5ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec6ab84-fcff-45a9-9e10-49ecc5e8064b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
