@@ -37,6 +37,10 @@ export interface Crew {
   readonly idleAt?: number | null
   /** Where an idle stroll has got to. Null while seated, or on any errand a real event sent. */
   readonly wander?: 'out' | 'there' | 'back' | null
+  /** How long it has stood still behind another crew member; 0 or absent while it moves. */
+  readonly blockedMs?: number
+  /** The tile it last left, which is where it backs off to when nobody can step aside. */
+  readonly prev?: Tile | null
 }
 
 export interface Crate {
@@ -334,7 +338,105 @@ function facingFor(dx: number, dy: number, prior: Facing): Facing {
   return dy > 0 ? 'S' : 'N'
 }
 
-function tickCrew(map: HallMap, crew: Crew, dtSec: number): Crew {
+/** Crew heading to work outrank crew heading to rest or stroll. */
+const WORK_ANIMS: readonly CrewAnim[] = ['type', 'scan', 'slump', 'wave', 'reach']
+/** After this long behind someone, a crew member looks for another way round. */
+const REPLAN_AFTER_MS = 800
+
+function rankOf(crew: Crew): number {
+  return WORK_ANIMS.includes(crew.then) ? 0 : 1
+}
+
+/** True when `a` keeps going and `b` gives way: work before rest, then the lower node id. */
+function outranks(a: Crew, b: Crew): boolean {
+  const ra = rankOf(a)
+  const rb = rankOf(b)
+  return ra !== rb ? ra < rb : a.nodeId < b.nodeId
+}
+
+function nextKey(crew: Crew): string | null {
+  return crew.path.length > 0 ? key(crew.path[0]) : null
+}
+
+function withPrev(from: Crew, to: Crew): Crew {
+  const before = tileOf(from.x, from.y)
+  const after = tileOf(to.x, to.y)
+  return before.x === after.x && before.y === after.y ? to : { ...to, prev: before }
+}
+
+function moving(from: Crew, to: Crew): Crew {
+  const stepped = withPrev(from, to)
+  return from.blockedMs === undefined || from.blockedMs === 0
+    ? stepped
+    : { ...stepped, blockedMs: 0 }
+}
+
+/**
+ * What a crew member does when the tile it is heading for is taken. Nobody
+ * ever moves into a tile another present crew member stands on or is about to
+ * enter, so people are solid. Face to face, the one with the lower claim steps
+ * aside, or back, to let the other through.
+ */
+function tickBlocked(map: HallMap, crew: Crew, others: readonly Crew[], dtMs: number): Crew {
+  const here = tileOf(crew.x, crew.y)
+  const goal = crew.goal
+  const blockedMs = (crew.blockedMs ?? 0) + dtMs
+  const waiting: Crew = { ...crew, anim: 'idle', blockedMs }
+  const occupant = others.find((o) => key(tileOf(o.x, o.y)) === key(crew.path[0]))
+  if (goal === null) return waiting
+
+  const claimed = new Set<string>()
+  for (const o of others) {
+    claimed.add(key(tileOf(o.x, o.y)))
+    const n = nextKey(o)
+    if (n !== null) claimed.add(n)
+  }
+  const reroute = (path: readonly Tile[]): Crew => ({ ...waiting, path, blockedMs: 0 })
+
+  // A tile to step to, then on to the goal: aside first, then back where it came
+  // from, then back along the other's own way so the other can still pass.
+  const stepAway = (other: Crew): Crew | null => {
+    const theirs = new Set([key(tileOf(other.x, other.y)), ...other.path.map(key)])
+    const open = NEIGHBOUR_STEPS.map((d) => ({ x: here.x + d.x, y: here.y + d.y })).filter(
+      (t) => map.walk[t.y]?.[t.x] === false && !claimed.has(key(t))
+    )
+    const back = crew.prev != null && !claimed.has(key(crew.prev)) ? [crew.prev] : []
+    const options = [
+      ...open.filter((t) => !theirs.has(key(t))),
+      ...back,
+      ...open.filter((t) => theirs.has(key(t))),
+    ]
+    for (const t of options) {
+      const onward = key(t) === key(goal) ? [] : findPath(map.walk, t, goal)
+      if (onward.length > 0 || key(t) === key(goal)) return reroute([t, ...onward])
+    }
+    return null
+  }
+
+  if (occupant !== undefined && nextKey(occupant) === key(here) && outranks(occupant, crew)) {
+    const around = findPath(
+      map.walk,
+      here,
+      goal,
+      new Set([key(tileOf(occupant.x, occupant.y)), ...occupant.path.slice(0, 1).map(key)])
+    )
+    if (around.length > 0 && !claimed.has(key(around[0]))) return reroute(around)
+    return stepAway(occupant) ?? waiting
+  }
+
+  if (blockedMs > REPLAN_AFTER_MS) {
+    const around = findPath(map.walk, here, goal, claimed)
+    if (around.length > 0) return reroute(around)
+    // Stuck behind someone who is stuck too: make room rather than wait for ever.
+    if (occupant !== undefined && occupant.anim === 'idle' && occupant.path.length > 0) {
+      return stepAway(occupant) ?? { ...waiting, blockedMs: 0 }
+    }
+    return { ...waiting, blockedMs: 0 }
+  }
+  return waiting
+}
+
+function tickCrew(map: HallMap, crew: Crew, others: readonly Crew[], dtSec: number): Crew {
   if (crew.goal === null && crew.path.length === 0) return crew
 
   let path = crew.path
@@ -344,6 +446,14 @@ function tickCrew(map: HallMap, crew: Crew, dtSec: number): Crew {
       // Already there, or nothing found: arrival either way.
       return { ...crew, goal: null, anim: crew.then, facing: crew.settle ?? crew.facing }
     }
+  }
+
+  const here = key(tileOf(crew.x, crew.y))
+  const wanted = key(path[0])
+  if (wanted !== here) {
+    const taken = others.some((o) => key(tileOf(o.x, o.y)) === wanted)
+    const beaten = others.some((o) => nextKey(o) === wanted && outranks(o, crew))
+    if (taken || beaten) return tickBlocked(map, { ...crew, path }, others, dtSec * 1000)
   }
 
   const target = tileCenter(path[0])
@@ -356,7 +466,7 @@ function tickCrew(map: HallMap, crew: Crew, dtSec: number): Crew {
   if (remaining <= step) {
     const rest = path.slice(1)
     if (rest.length === 0) {
-      return {
+      return moving(crew, {
         ...crew,
         x: target.x,
         y: target.y,
@@ -364,14 +474,14 @@ function tickCrew(map: HallMap, crew: Crew, dtSec: number): Crew {
         path: [],
         goal: null,
         anim: crew.then,
-      }
+      })
     }
-    return { ...crew, x: target.x, y: target.y, facing, path: rest, anim: 'walk' }
+    return moving(crew, { ...crew, x: target.x, y: target.y, facing, path: rest, anim: 'walk' })
   }
 
   const x = crew.x + (dx / remaining) * step
   const y = crew.y + (dy / remaining) * step
-  return { ...crew, x, y, facing, path, anim: 'walk' }
+  return moving(crew, { ...crew, x, y, facing, path, anim: 'walk' })
 }
 
 const STROLL_EVERY_MS = { min: 20_000, max: 40_000 }
@@ -459,7 +569,12 @@ function idle(map: HallMap, crew: Crew, clockMs: number): Crew {
 export function tick(world: World, dtMs: number): World {
   const dtSec = dtMs / 1000
   const clock = world.clockMs + dtMs
-  const crew = world.crew.map((c) => idle(world.map, tickCrew(world.map, c, dtSec), clock))
+  // In array order, so each crew member sees where the ones before it have just moved.
+  const crew = [...world.crew]
+  for (let i = 0; i < crew.length; i++) {
+    const others = crew.filter((o, j) => j !== i && o.present)
+    crew[i] = idle(world.map, tickCrew(world.map, crew[i], others, dtSec), clock)
+  }
   const crates = world.crates
     .map((crate) => tickCrate(world, crate, dtSec))
     .filter((crate): crate is Crate => crate !== null)

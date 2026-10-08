@@ -661,6 +661,61 @@ export function layoutHall(
     walk[t.y][t.x] = false
     crossovers.push(t)
   }
+  // A crossover is a pair of neighbouring straight tiles of one belt, opened
+  // together so two people can pass. It must also sit clear of every station,
+  // seat and belt junction, so nobody crosses a belt while standing at a terminal.
+  const stationKeys = new Set<string>()
+  for (const p of props.filter((q) => q.nodeId !== null)) {
+    for (let x = p.x; x < p.x + p.w; x++) {
+      for (let y = p.y; y < p.y + p.h; y++) stationKeys.add(key({ x, y }))
+    }
+  }
+  const nearAny = (t: Tile, near: (k: string) => boolean): boolean => {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) if (near(key({ x: t.x + dx, y: t.y + dy }))) return true
+    }
+    return false
+  }
+  const isClear = (t: Tile): boolean =>
+    !nearAny(
+      t,
+      (k) =>
+        stationKeys.has(k) ||
+        seatKeys.has(k) ||
+        ['split', 'merge', 'corner'].includes(beltTileAt.get(k)?.kind ?? '')
+    )
+  const isHorizontal = (t: Tile): boolean => {
+    const outs = (beltTileAt.get(key(t)) as BeltTile).outs
+    return outs.includes('E') || outs.includes('W')
+  }
+  const sidesOpen = (t: Tile): readonly [Tile, Tile] | null => {
+    const [p, q] = isHorizontal(t)
+      ? [
+          { x: t.x, y: t.y - 1 },
+          { x: t.x, y: t.y + 1 },
+        ]
+      : [
+          { x: t.x - 1, y: t.y },
+          { x: t.x + 1, y: t.y },
+        ]
+    const isOpen = (u: Tile): boolean => walk[u.y]?.[u.x] !== true
+    return isOpen(p) && isOpen(q) ? [p, q] : null
+  }
+  // The tile after `t` along its belt's own axis, when it can be opened with it.
+  const partnerOf = (t: Tile): Tile | null => {
+    if (!isOpenableStraight(t)) return null
+    const next = isHorizontal(t) ? { x: t.x + 1, y: t.y } : { x: t.x, y: t.y + 1 }
+    if (!isOpenableStraight(next) || isHorizontal(next) !== isHorizontal(t)) return null
+    if (walk[next.y][next.x] !== true) return null
+    return sidesOpen(t) !== null && sidesOpen(next) !== null ? next : null
+  }
+  const openPair = (t: Tile): boolean => {
+    const partner = partnerOf(t)
+    if (partner === null || !isClear(t) || !isClear(partner)) return false
+    open(t)
+    open(partner)
+    return true
+  }
   const requiredKeys = [...seatKeys, key(wait), key(exit)]
   const required: Tile[] = requiredKeys.map((k) => {
     const [x, y] = k.split(',').map(Number)
@@ -695,7 +750,12 @@ export function layoutHall(
       })
       .sort((a, b) => a.y - b.y || a.x - b.x)
     if (candidates.length === 0) break
-    open(candidates[0])
+    const pair = candidates.find((t) => {
+      const partner = partnerOf(t)
+      return partner !== null && isClear(t) && isClear(partner)
+    })
+    if (pair !== undefined) openPair(pair)
+    else open(candidates[0])
   }
 
   // The archive and the rack stand at the wall in a column nobody has to
@@ -732,9 +792,17 @@ export function layoutHall(
       const blockedLength = findPath(walk, p.seat as Tile, door[0]).length
       const freePath = findPath(free, p.seat as Tile, door[0])
       if (blockedLength > 0 && blockedLength <= freePath.length + 8) break
-      const t = freePath.find((u) => walk[u.y][u.x] && isOpenableStraight(u))
-      if (t === undefined) break
-      open(t)
+      const onWay = freePath.filter((u) => walk[u.y][u.x] && isOpenableStraight(u))
+      const clear = onWay.find((u) => {
+        const partner = partnerOf(u)
+        return partner !== null && isClear(u) && isClear(partner)
+      })
+      if (clear !== undefined) {
+        openPair(clear)
+        continue
+      }
+      if (onWay.length === 0) break
+      open(onWay[0])
     }
   }
 

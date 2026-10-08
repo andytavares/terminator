@@ -84,3 +84,25 @@ describe('distancesFrom', () => {
     expect(d.get('0,0')).toBe(0)
   })
 })
+
+describe('findPath with extra blocked tiles', () => {
+  it('walks around a blocked tile without altering the grid', () => {
+    const solid = grid(['.....', '.....', '.....'])
+    const path = findPath(solid, { x: 0, y: 1 }, { x: 4, y: 1 }, new Set(['2,1']))
+    expect(path.length).toBeGreaterThan(0)
+    expect(path.some((t) => t.x === 2 && t.y === 1)).toBe(false)
+    expect(path[path.length - 1]).toEqual({ x: 4, y: 1 })
+    expect(solid[1][2]).toBe(false)
+  })
+
+  it('finds no path when the blocked tile closes a one-tile corridor', () => {
+    const solid = grid(['#####', '.....', '#####'])
+    expect(findPath(solid, { x: 0, y: 1 }, { x: 4, y: 1 }, new Set(['2,1']))).toEqual([])
+  })
+
+  it('still enters the goal when the goal is blocked', () => {
+    const solid = grid(['.....'])
+    const path = findPath(solid, { x: 0, y: 0 }, { x: 3, y: 0 }, new Set(['3,0']))
+    expect(path[path.length - 1]).toEqual({ x: 3, y: 0 })
+  })
+})

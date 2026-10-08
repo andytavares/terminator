@@ -684,3 +684,88 @@ describe('layoutHall — station signs', () => {
     expect(laid.props.find((p) => p.nodeId === 'fix:U-1')?.sign).toBe('BUILDER U-1')
   })
 })
+
+describe('layoutHall — crossovers sit clear of stations', () => {
+  const k = (t: Tile): string => `${t.x},${t.y}`
+  const realGraph: RunGraph = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')
+  )
+  const recipeFiles = fs
+    .readdirSync(path.join(__dirname, '..', '..', 'recipes'))
+    .filter((f) => f.endsWith('.yaml'))
+  const cases: { name: string; graph: RunGraph }[] = [
+    { name: 'a real run graph', graph: realGraph },
+    ...recipeFiles.map((file) => ({ name: file, graph: graphFor(file, [1, 2, 3]) })),
+  ]
+
+  function clearOf(map: HallMap, t: Tile): boolean {
+    const blocked = new Set<string>()
+    for (const p of map.props.filter((q) => q.nodeId !== null)) {
+      for (let x = p.x; x < p.x + p.w; x++) {
+        for (let y = p.y; y < p.y + p.h; y++) blocked.add(k({ x, y }))
+      }
+      if (p.seat !== null) blocked.add(k(p.seat))
+    }
+    for (const b of map.beltTiles) {
+      if (b.kind === 'split' || b.kind === 'merge' || b.kind === 'corner') blocked.add(k(b))
+    }
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++)
+        if (blocked.has(k({ x: t.x + dx, y: t.y + dy }))) return false
+    }
+    return true
+  }
+
+  function pairedAlongBelt(map: HallMap, t: Tile): boolean {
+    const open = new Set(map.crossovers.map(k))
+    const outs = map.beltTiles.find((b) => k(b) === k(t))?.outs ?? []
+    const horizontal = outs.includes('E') || outs.includes('W')
+    const mates = horizontal
+      ? [
+          { x: t.x - 1, y: t.y },
+          { x: t.x + 1, y: t.y },
+        ]
+      : [
+          { x: t.x, y: t.y - 1 },
+          { x: t.x, y: t.y + 1 },
+        ]
+    return mates.some((m) => open.has(k(m)))
+  }
+
+  it('the real run graph opens at least one crossover', () => {
+    expect(layoutHall(realGraph).crossovers.length).toBeGreaterThan(0)
+  })
+
+  for (const { name, graph: g } of cases) {
+    // Only the real graph is asserted for pairing and clearance: on the shipped
+    // recipes a belt may leave no clear pair, and the single-tile fallback keeps the floor whole.
+    describe(name, () => {
+      const map = layoutHall(g)
+
+      if (name === 'a real run graph') {
+        it('opens crossovers as pairs of neighbouring tiles on one belt', () => {
+          for (const t of map.crossovers) expect(pairedAlongBelt(map, t)).toBe(true)
+        })
+
+        it('keeps every crossover clear of stations, seats and belt junctions', () => {
+          for (const t of map.crossovers) expect(clearOf(map, t)).toBe(true)
+        })
+      }
+
+      it('still reaches every seat from the intake', () => {
+        const seen = distancesFrom(map.walk, map.anchors.intake)
+        for (const p of map.props.filter((q) => q.seat !== null)) {
+          const s = p.seat as Tile
+          const near = [
+            s,
+            { x: s.x + 1, y: s.y },
+            { x: s.x - 1, y: s.y },
+            { x: s.x, y: s.y + 1 },
+            { x: s.x, y: s.y - 1 },
+          ]
+          expect(near.some((t) => seen.has(k(t)))).toBe(true)
+        }
+      })
+    })
+  }
+})

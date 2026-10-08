@@ -11,12 +11,17 @@ function key(tile: Tile): string {
   return `${tile.x},${tile.y}`
 }
 
-function passable(solid: HallMap['solid'], tile: Tile, to: Tile): boolean {
+function passable(
+  solid: HallMap['solid'],
+  tile: Tile,
+  to: Tile,
+  blocked: ReadonlySet<string>
+): boolean {
   if (tile.y < 0 || tile.y >= solid.length) return false
   const row = solid[tile.y]
   if (tile.x < 0 || tile.x >= row.length) return false
   if (tile.x === to.x && tile.y === to.y) return true
-  return !row[tile.x]
+  return !row[tile.x] && !blocked.has(key(tile))
 }
 
 /**
@@ -48,7 +53,17 @@ export function distancesFrom(grid: HallMap['solid'], from: Tile): Map<string, n
   return distances
 }
 
-export function findPath(solid: HallMap['solid'], from: Tile, to: Tile): Tile[] {
+/**
+ * `blocked` holds extra `"x,y"` tiles to treat as solid for this search only —
+ * where other people stand — so the grid itself stays immutable. The goal is
+ * enterable even when it is listed there.
+ */
+export function findPath(
+  solid: HallMap['solid'],
+  from: Tile,
+  to: Tile,
+  blocked: ReadonlySet<string> = new Set()
+): Tile[] {
   if (from.x === to.x && from.y === to.y) return []
 
   const cameFrom = new Map<string, Tile>()
@@ -67,7 +82,7 @@ export function findPath(solid: HallMap['solid'], from: Tile, to: Tile): Tile[] 
     for (const next of neighbours) {
       const k = key(next)
       if (visited.has(k)) continue
-      if (!passable(solid, next, to)) continue
+      if (!passable(solid, next, to, blocked)) continue
       visited.add(k)
       cameFrom.set(k, current)
       if (next.x === to.x && next.y === to.y) {
