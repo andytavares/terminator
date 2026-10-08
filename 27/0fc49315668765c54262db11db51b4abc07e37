@@ -1,0 +1,23 @@
+extensions/foundry/src/index.ts
+  s_17d550c4e3a5ab::t_dd463307ecba93 2277-2280,2283-2285,2328,2331-2332
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_17d550c4e3a5ab::t_f7396ef7b34d95 376,382,384-386,389-392,394-397,399-405,420-424,429-432,435,437
+  s_17d550c4e3a5ab::t_5daaed7408a945 377-381,383,387-388,406-419,425-428,433-434,436
+  s_17d550c4e3a5ab::t_984cd7a346633b 393,398
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "270fc49315668765c54262db11db51b4abc07e37",
+  "prompts": {},
+  "sessions": {
+    "s_17d550c4e3a5ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec6ab84-fcff-45a9-9e10-49ecc5e8064b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
