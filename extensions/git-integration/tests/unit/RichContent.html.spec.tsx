@@ -1,6 +1,6 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { render, waitFor } from '@testing-library/react'
 import { RichContent } from '../../src/components/pr-review/RichContent'
 
 const mockOpenExternal = vi.fn().mockResolvedValue({ ok: true })
@@ -14,7 +14,27 @@ function renderBody(body: string) {
   return render(<RichContent>{body}</RichContent>).container
 }
 
+describe('RichContent before its HTML renderer has loaded', () => {
+  it('shows no tag text and no unsafe element, then renders the HTML', async () => {
+    vi.resetModules()
+    const { RichContent: Fresh } = await import('../../src/components/pr-review/RichContent')
+    const el = render(
+      <Fresh>{'<details><summary>Logs</summary>body</details>\n\n<script>alert(1)</script>'}</Fresh>
+    ).container
+    expect(el.textContent).not.toContain('<details>')
+    expect(el.textContent).not.toContain('alert(1)')
+    expect(el.querySelector('script')).toBeNull()
+    await waitFor(() => expect(el.querySelector('details > summary')?.textContent).toBe('Logs'))
+    expect(el.querySelector('script')).toBeNull()
+  })
+})
+
 describe('RichContent raw HTML', () => {
+  beforeAll(async () => {
+    const el = renderBody('<sub>x</sub>')
+    await waitFor(() => expect(el.querySelector('sub')).not.toBeNull())
+  })
+
   beforeEach(() => {
     mockOpenExternal.mockClear()
   })

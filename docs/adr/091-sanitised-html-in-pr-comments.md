@@ -21,7 +21,8 @@ ADR-011 chose `react-markdown` because it never writes untrusted text through `i
 
 - Output is still React elements; nothing new reaches `innerHTML`.
 - `rehype-sanitize` runs last, after the only untrusted step (`rehype-raw`). Elements outside the allowlist are unwrapped, keeping only their text (`<iframe>`). `<script>` and `<style>` are removed together with their contents, so neither code nor CSS shows up as text. `on*` attributes are never allowed, and `href`/`src` are limited to safe protocols, so `javascript:` URLs go.
-- The `a` override still sends only `http:`/`https:` links to `shell.openExternal`, and that now covers HTML `<a>` as well as markdown links.
+- The `a` override still sends only `http:`/`https:` links to `shell.openExternal`, and that now covers HTML `<a>` as well as markdown links. A relative or protocol-relative href (`./x`, `//host/x`) is stopped on click: extension views have no navigation guard, so following it would replace the review screen itself.
+- Until the two plugins have loaded (see Consequences), the body renders with `skipHtml`, so raw HTML is dropped, never shown as text or as elements.
 
 ## Why every id and name is prefixed
 
@@ -40,5 +41,6 @@ An `id` or `name` in the page becomes a property of `document` or `window`, and 
 ## Consequences
 
 - Two new pinned dependencies in `extensions/git-integration/package.json`, from the same unified collective as `react-markdown`.
+- `rehype-raw` brings an HTML parser (parse5) of about 170 kB, which would push the review UI's single chunk (1,184 kB) past its 1,200 kB budget in `vite.renderer.config.ts`. `RichContent` imports both plugins dynamically on first render, so they build into their own chunk; the first body to render shows without its HTML for the moment the chunk takes to load from disk.
 - Allowed `<img src>` fetches from its host, just as markdown `![](…)` already did. There is no content-security policy on the extension view; adding one is a separate decision.
 - Core `IssueMarkdown.tsx` keeps `skipHtml`, and `PrDialog`'s `marked` preview is unchanged. Both are out of scope here.
