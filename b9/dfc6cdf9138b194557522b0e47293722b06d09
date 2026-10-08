@@ -1,0 +1,27 @@
+extensions/foundry/src/runtime/tool-decision.ts
+  s_17d550c4e3a5ab::t_b280c9e645415d 4-11,148-161,178-182
+  s_17d550c4e3a5ab::t_ccecfb2e9cb4cb 183-185
+extensions/foundry/src/runtime/autonomy-policy.ts
+  s_17d550c4e3a5ab::t_b280c9e645415d 80,124
+extensions/foundry/roles/scribe.yaml
+  s_17d550c4e3a5ab::t_b280c9e645415d 12-14
+extensions/foundry/tests/runtime/tool-decision.spec.ts
+  s_17d550c4e3a5ab::t_9083fb69f13b68 616-617,620-633,635-657
+  s_17d550c4e3a5ab::t_b280c9e645415d 618-619,634
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b9dfc6cdf9138b194557522b0e47293722b06d09",
+  "prompts": {},
+  "sessions": {
+    "s_17d550c4e3a5ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ec6ab84-fcff-45a9-9e10-49ecc5e8064b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
