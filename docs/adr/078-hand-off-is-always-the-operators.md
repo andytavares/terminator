@@ -1,6 +1,6 @@
 # ADR 078: Hand-off is always the operator's
 
-**Status**: Accepted
+**Status**: Accepted — amended by ADR 090 (a released order sent back by a defect restarts after its amendment)
 
 **Date**: 2026-09-28
 

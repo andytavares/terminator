@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { countAttention } from '../../src/gates/attention.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { draftOrder } from '../../src/order/draft.js'
+import { standingOf } from '../../src/order/standing.js'
+import type { StandingInput } from '../../src/order/standing.js'
 import type { Gate, GateRuleId } from '../../src/gates/rules.js'
 import type { OpenQuestion, WorkOrder } from '../../src/order/schema.js'
 
@@ -51,6 +53,7 @@ describe('countAttention', () => {
       autonomy: 'escorted',
       orders: [],
       pendingAsks: 0,
+      waiting: [],
     })
     expect(counts.inbox).toBe(2)
   })
@@ -61,7 +64,13 @@ describe('countAttention', () => {
       decision: { option: 'approve', by: 'operator', note: '', at: '2026-09-06T11:00:00.000Z' },
     }
     expect(
-      countAttention({ gates: [decided], autonomy: 'escorted', orders: [], pendingAsks: 0 })
+      countAttention({
+        gates: [decided],
+        autonomy: 'escorted',
+        orders: [],
+        pendingAsks: 0,
+        waiting: [],
+      })
     ).toMatchObject({ inbox: 0 })
   })
 
@@ -74,6 +83,7 @@ describe('countAttention', () => {
       autonomy: 'lights-out',
       orders: [],
       pendingAsks: 0,
+      waiting: [],
     })
     expect(counts.inbox).toBe(0)
   })
@@ -84,6 +94,7 @@ describe('countAttention', () => {
       autonomy: 'standard',
       orders: [order('WO-1', [question('q1'), question('q2')]), order('WO-2', [question('q3')])],
       pendingAsks: 0,
+      waiting: [],
     })
     expect(counts.forge).toBe(3)
     expect(counts.byOrder).toEqual({ 'WO-1': 2, 'WO-2': 1 })
@@ -96,6 +107,7 @@ describe('countAttention', () => {
       autonomy: 'standard',
       orders: [order('WO-1', [answered])],
       pendingAsks: 0,
+      waiting: [],
     })
     expect(counts.forge).toBe(0)
     expect(counts.byOrder).toEqual({})
@@ -111,6 +123,7 @@ describe('countAttention', () => {
         autonomy: 'standard',
         orders: [order('WO-1', [question('q1')], status)],
         pendingAsks: 0,
+        waiting: [],
       })
       expect(counts.forge, status).toBe(0)
     }
@@ -124,6 +137,7 @@ describe('countAttention', () => {
       autonomy: 'standard',
       orders: [order('WO-1', [question('q1')])],
       pendingAsks: 2,
+      waiting: [],
     })
     expect(counts.forge).toBe(3)
   })
@@ -141,17 +155,128 @@ describe('countAttention', () => {
       autonomy: 'standard',
       orders: [fromASignal],
       pendingAsks: 0,
+      waiting: [],
     })
     expect(counts).toEqual({ inbox: 0, forge: 0, byOrder: {} })
   })
 
   it('is zero across the board when nothing is waiting', () => {
-    expect(countAttention({ gates: [], autonomy: 'standard', orders: [], pendingAsks: 0 })).toEqual(
-      {
-        inbox: 0,
-        forge: 0,
-        byOrder: {},
-      }
-    )
+    expect(
+      countAttention({
+        gates: [],
+        autonomy: 'standard',
+        orders: [],
+        pendingAsks: 0,
+        waiting: [],
+      })
+    ).toEqual({
+      inbox: 0,
+      forge: 0,
+      byOrder: {},
+    })
+  })
+
+  // WO-1008-287 sat amended and ready with both badges at zero and the Inbox
+  // saying "Nothing needs you". Anything whose turn is the operator's, and
+  // that no gate or question already counts, is counted here.
+  it('counts an order waiting on you that no gate or question covers', () => {
+    const counts = countAttention({
+      gates: [],
+      autonomy: 'standard',
+      orders: [order('WO-1', [])],
+      pendingAsks: 0,
+      waiting: [
+        { orderId: 'WO-1', standing: standingOf(standing({ status: 'draft', shaping: false })) },
+      ],
+    })
+    expect(counts.inbox).toBe(1)
+  })
+
+  it('does not count an order twice when a gate is already holding it', () => {
+    const held = gate({ orderId: 'WO-1' })
+    const counts = countAttention({
+      gates: [held],
+      autonomy: 'escorted',
+      orders: [],
+      pendingAsks: 0,
+      waiting: [{ orderId: 'WO-1', standing: standingOf(standing({ gates: [held] })) }],
+    })
+    expect(counts.inbox).toBe(1)
+  })
+
+  it('does not count an order twice when its questions are already counted', () => {
+    const counts = countAttention({
+      gates: [],
+      autonomy: 'standard',
+      orders: [order('WO-1', [question('q1')])],
+      pendingAsks: 0,
+      waiting: [
+        { orderId: 'WO-1', standing: standingOf(standing({ status: 'draft', openQuestions: 1 })) },
+      ],
+    })
+    expect(counts).toMatchObject({ inbox: 0, forge: 1 })
+  })
+
+  it('does not count held tool calls twice', () => {
+    const counts = countAttention({
+      gates: [],
+      autonomy: 'standard',
+      orders: [],
+      pendingAsks: 1,
+      waiting: [{ orderId: 'WO-1', standing: standingOf(standing({ asks: 1 })) }],
+    })
+    expect(counts).toMatchObject({ inbox: 0, forge: 1 })
+  })
+
+  it('leaves out an order that is Foundry\u2019s move', () => {
+    const counts = countAttention({
+      gates: [],
+      autonomy: 'standard',
+      orders: [],
+      pendingAsks: 0,
+      waiting: [{ orderId: 'WO-1', standing: standingOf(standing({})) }],
+    })
+    expect(counts.inbox).toBe(0)
   })
 })
+
+function standing(over: Partial<StandingInput>): StandingInput {
+  return {
+    status: 'running',
+    graph: {
+      orderId: 'WO-1',
+      recipe: 'direct',
+      nodes: [
+        {
+          id: 'build',
+          stepId: 'build',
+          kind: 'agent',
+          state: 'running',
+          unitIds: [],
+          lane: null,
+          role: null,
+          dependsOn: [],
+          attempts: 0,
+          reworks: 0,
+          feedback: [],
+          sessionId: null,
+          worktreePath: null,
+          startedAt: null,
+          endedAt: null,
+        },
+      ],
+    },
+    gates: [],
+    asks: 0,
+    orphaned: [],
+    stalls: 0,
+    openQuestions: 0,
+    failures: 0,
+    stranded: 0,
+    intakeRefused: null,
+    runFailure: null,
+    shaping: true,
+    blocker: null,
+    ...over,
+  }
+}

@@ -649,7 +649,13 @@ says:
 
 The same line is used for the gate holding an order on its Floor.
 
-When nothing has fired, it says "Nothing needs you" and tells you what is
+Above the gates, the Inbox lists every order that is waiting on you without a
+gate: a draft **Ready to hand off**, a draft whose **Shaping stopped** (it
+names the check that still fails), or a run that **did not start** (it says
+why). Each row has an **Open** button that takes you to that order in the
+Forge. These rows count toward the Inbox badge.
+
+When nothing has fired and nothing is waiting, it says "Nothing needs you" and tells you what is
 building, what is converging, and how many decisions were taken by rule while
 you were away.
 
@@ -677,7 +683,10 @@ Inside the frame the order is **walked in steps**. The box has four parts:
 - **The status strip** at the top says who holds the order right now and what
   happens when they finish, for example **The red team is reviewing the plan ·
   round 2 of 3 — When it finishes clean, you can hand off.** Foundry never
-  starts the work on its own: nothing builds until you press **Hand off**. Blue means Foundry is working and you don't need to do
+  starts new work on its own: nothing builds until you press **Hand off**. The
+  one exception is an order you already handed off: if a defect sends it back
+  and you press **Answer**, the amended order starts again by itself as soon as
+  it passes every check. Blue means Foundry is working and you don't need to do
   anything. Orange means only you can decide something. Red means something
   failed and needs a fix. Green means you can hand off, or the order has been
   handed off.

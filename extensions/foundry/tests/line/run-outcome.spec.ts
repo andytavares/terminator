@@ -23,6 +23,25 @@ function entry(over: Partial<LedgerEntry> & Pick<LedgerEntry, 'action'>): Ledger
 }
 
 describe('runFailure', () => {
+  // An agreed order whose run refused to start never reached `running`, so
+  // the refusal is the only record of why nothing is building.
+  it('is the reason when the run refused to start', () => {
+    const reason = runFailure([
+      entry({ action: 'order.agreed', actor: 'rule:forge' }),
+      entry({ action: 'run.refused', reason: 'Unknown skill "ci-fix".' }),
+    ])
+    expect(reason).toBe('Unknown skill "ci-fix".')
+  })
+
+  it('forgets a refusal once a later start succeeded', () => {
+    expect(
+      runFailure([
+        entry({ action: 'run.refused', reason: 'no runtime' }),
+        entry({ action: 'run.started', at: '2026-09-13T10:01:00Z' }),
+      ])
+    ).toBeNull()
+  })
+
   // The exact WO-0913-0bd tail: a run that finished its graph and then failed
   // trying to ship it.
   it('is the reason when the run finished and then failed to ship', () => {

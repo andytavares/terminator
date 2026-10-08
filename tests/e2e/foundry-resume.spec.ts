@@ -332,11 +332,22 @@ test('the run is noticed on opening, without anybody going to look', async () =>
     .poll(async () => ((await foundry('foundry:attention')) as { inbox: number }).inbox, {
       timeout: 30_000,
     })
-    .toBe(1)
+    .toBe(2)
 
+  // Two things wait on you: the interrupted run's gate, and the run that
+  // finished but failed to open its pull request — which has no gate, and so
+  // until ADR 090 was counted and listed nowhere.
   const listed = (await foundry('foundry:inbox.list')) as {
     gates: { rule: string; why: string; options: { id: string }[] }[]
+    waiting: { orderId: string; headline: string; detail: string }[]
   }
+  expect(listed.waiting).toEqual([
+    expect.objectContaining({
+      orderId: UNSHIPPED_ID,
+      headline: 'Finished, but not shipped',
+      detail: 'Opening the pull request for fixture failed: exit code 1',
+    }),
+  ])
   expect(listed.gates.map((g) => g.rule)).toEqual(['run.interrupted'])
   expect(listed.gates[0].why).toContain('builder · U-1 refresh the token on a 401')
   expect(listed.gates[0].options.map((o) => o.id)).toEqual(['resume', 'stop', 'hold'])

@@ -7,8 +7,8 @@ import { applyFindings, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
 import { readStanding } from '../order/standing.js'
+import { orderStandingSources } from '../order/order-standing-sources.js'
 import {
-  intakeRefusal,
   lastIntake,
   loopFacts,
   agreedFacts,
@@ -16,7 +16,6 @@ import {
 } from '../forge/intake-outcome.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
 import type { LoopFacts, AgreedFacts } from '../forge/readiness.js'
-import { runDocumentReady, runFailure } from '../line/run-outcome.js'
 import { readCiState } from '../line/ci-state.js'
 import { readPulls } from '../line/integrate.js'
 import { pullNumber } from '../line/pull-number.js'
@@ -120,6 +119,8 @@ const TurnPayload = z.object({
 const CompilePayload = z.object({
   id: z.string(),
   commit: z.boolean().default(false),
+  /** Foundry agreeing an order the operator already released, after an amendment. */
+  automatic: z.boolean().default(false),
 })
 
 const RecipePayload = z.object({ id: z.string(), recipe: z.string().nullable() })
@@ -657,7 +658,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
   async function compile(raw: unknown): Promise<unknown> {
     const parsed = CompilePayload.safeParse(raw)
     if (!parsed.success) return { error: 'Malformed request.' }
-    const { id, commit } = parsed.data
+    const { id, commit, automatic } = parsed.data
 
     const order = await deps.store.load(id)
     if (order === null) return { error: `No order ${id}.` }
@@ -679,10 +680,12 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     await deps.store.record({
       at: deps.now(),
       orderId: id,
-      actor: 'operator',
+      actor: automatic ? 'rule:forge' : 'operator',
       action: 'order.agreed',
       subject: id,
-      reason: 'all checks pass',
+      reason: automatic
+        ? 'you released this order before, and the amended plan passes every check'
+        : 'all checks pass',
       evidence: [],
     })
 
@@ -822,17 +825,8 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
           const gates = (await deps.standingSources?.gatesFor?.(order.id)) ?? []
           const standing = await readStanding(order, {
             ...deps.standingSources,
+            ...orderStandingSources(deps.store),
             gatesFor: async () => gates,
-            openQuestionsFor: (o) =>
-              o.status === 'draft' ? surfacedQuestions(o.openQuestions).length : 0,
-            failuresFor: (o) => compileOrder(o).failures.length,
-            // Supplied here rather than by the host: the ledger is this
-            // store's, and the host would have to build a second reader over
-            // the same files to answer it.
-            intakeRefusedFor: async (orderId) => intakeRefusal(await deps.store.entries(orderId)),
-            runFailureFor: async (orderId) => runFailure(await deps.store.entries(orderId)),
-            documentReadyFor: async (orderId) =>
-              runDocumentReady(await deps.store.entries(orderId)),
           })
           const holding =
             standing.turn === 'you' && standing.gateId !== null

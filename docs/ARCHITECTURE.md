@@ -1176,6 +1176,15 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   flight. Either kind of disagreement raises `forge-defect` — the rule for an
   order that contradicts itself, which was declared, rendered in the Inbox, and
   until now raised by nothing.
+  Answering it sends the order to the architect. Once the amended plan passes
+  every check, `forge/release-again.ts` agrees it again and restarts the run,
+  because the operator already released it. If either step fails, it records
+  `run.refused` (ADR 090).
+- **Nothing stops silently** (ADR 090). Every order whose standing says it is
+  the operator's turn, and that no gate, question or held call already
+  accounts for, is counted on the Inbox badge (`ordersWaiting`) and listed
+  there with its reason. A draft that no live session or pending decision is
+  shaping is the operator's turn.
 - **A run can be taken away again** (`line/teardown.ts`). `removeCheckout`
   shipped with the feature that cuts worktrees, was exported, was tested, and
   was called by nothing — so every run ever done left its checkout registered

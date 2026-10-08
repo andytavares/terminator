@@ -241,3 +241,136 @@ describe('answering a forge-defect gate', () => {
     expect(runner.start).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * WO-1008-287, end to end: the operator handed the order off, the inspector
+ * sent it back with a defect, the operator answered, and the architect amended
+ * the plan. The amended order must run again — and an order nobody released
+ * must say so on the Inbox rather than sit there.
+ */
+describe('after the architect amends an answered defect', () => {
+  function cleanOrder(): WorkOrder {
+    const base = order()
+    return {
+      ...base,
+      recipe: null,
+      intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
+      risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+      acceptance: [
+        {
+          id: 'AC-1',
+          statement: 'a full-width row renders its final glyph',
+          priority: 'P1',
+          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+          unverifiable: null,
+        },
+      ],
+      plan: {
+        ...base.plan,
+        units: [
+          {
+            id: 'U-1',
+            title: 'widen',
+            role: 'builder',
+            lane: 1,
+            dependsOn: [],
+            satisfies: ['AC-1'],
+            touches: ['src/a.ts'],
+            verify: [],
+          },
+        ],
+      },
+      redTeam: [
+        {
+          id: 'RT-inspector-6',
+          severity: 'high',
+          text: 'footnote links stop working',
+          status: 'open',
+          reason: '',
+          category: 'regression',
+          round: 1,
+        },
+      ],
+    }
+  }
+
+  function architectAmends(): void {
+    runner.start.mockImplementation(
+      async (input: {
+        phase: string
+        onRegistered?: (run: { sessionId: string }) => void
+        onTurnEnd?: () => void
+      }) => {
+        const sessionId = `${input.phase}-session`
+        input.onRegistered?.({ sessionId })
+        if (input.phase === 'architect') {
+          fs.writeFileSync(
+            path.join(dataDir, 'orders', 'WO-1', 'proposal.json'),
+            JSON.stringify({
+              note: 'Added AC-5 so footnote links survive the sanitizer',
+              resolveFindings: [{ id: 'RT-inspector-6', how: 'prefix #… hrefs in the a override' }],
+            })
+          )
+          setTimeout(() => input.onTurnEnd?.(), 0)
+        }
+        return { sessionId }
+      }
+    )
+  }
+
+  async function seed(released: boolean): Promise<void> {
+    dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-amended-'))
+    const store = createOrderStore(dataDir)
+    await store.save(cleanOrder())
+    if (released) {
+      await store.record({
+        at: '2026-10-08T01:55:24.000Z',
+        orderId: 'WO-1',
+        actor: 'operator',
+        action: 'order.agreed',
+        subject: 'WO-1',
+        reason: 'all checks pass',
+        evidence: [],
+      })
+    }
+    saveGate(forgeDefectGate())
+    architectAmends()
+  }
+
+  it('agrees the released order again and starts its run', async () => {
+    await seed(true)
+    await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+
+    await vi.waitFor(() => expect(ledger()).toContain('"action":"run.started"'), {
+      timeout: 5000,
+    })
+    const lines = ledger()
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l) as { action: string; actor: string })
+    expect(lines.filter((l) => l.action === 'order.agreed').at(-1)?.actor).toBe('rule:forge')
+    expect(lines.some((l) => l.action === 'converge.started')).toBe(true)
+    expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
+  })
+
+  it('lists an order nobody released on the Inbox, and counts it on the badge', async () => {
+    await seed(false)
+    await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+
+    await vi.waitFor(() => expect(ledger()).toContain('order.redrafted'), { timeout: 5000 })
+    await vi.waitFor(
+      async () => {
+        const inbox = (await call('foundry:inbox.list')) as {
+          waiting: { orderId: string; headline: string }[]
+        }
+        expect(inbox.waiting).toEqual([
+          expect.objectContaining({ orderId: 'WO-1', headline: 'Ready to hand off' }),
+        ])
+      },
+      { timeout: 5000 }
+    )
+    expect(((await call('foundry:attention')) as { inbox: number }).inbox).toBe(1)
+    expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('draft')
+    expect(ledger()).not.toContain('run.started')
+  })
+})

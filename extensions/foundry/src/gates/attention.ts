@@ -3,6 +3,7 @@ import { surfacedQuestions } from '../forge/interview.js'
 import type { Autonomy } from './autonomy.js'
 import type { Gate } from './rules.js'
 import type { WorkOrder } from '../order/schema.js'
+import type { Standing } from '../order/standing.js'
 
 // How much is waiting for the operator, and on which surface.
 //
@@ -19,10 +20,39 @@ export interface AttentionInput {
   readonly orders: readonly WorkOrder[]
   /** Tool calls held at a PreToolUse hook, waiting to be allowed or denied. */
   readonly pendingAsks: number
+  /** Every live order's standing. */
+  readonly waiting: readonly WaitingOrder[]
+}
+
+export interface WaitingOrder {
+  readonly orderId: string
+  readonly standing: Standing
+}
+
+/**
+ * The orders waiting on the operator that no gate, question or held tool
+ * call already accounts for.
+ *
+ * Those three are counted where they are answered. Everything else whose turn
+ * is the operator's — a draft ready to hand off, shaping that stopped, a run
+ * that did not start, nothing running a step — had no count anywhere, which
+ * is how an order sat ready for good under "Nothing needs you".
+ */
+export function ordersWaiting(
+  waiting: readonly WaitingOrder[],
+  questionsByOrder: Record<string, number>
+): WaitingOrder[] {
+  return waiting.filter(
+    ({ orderId, standing }) =>
+      standing.turn === 'you' &&
+      standing.gateId === null &&
+      standing.kind !== 'asking' &&
+      questionsByOrder[orderId] === undefined
+  )
 }
 
 export interface AttentionCounts {
-  /** Undecided gates this autonomy setting still asks about. */
+  /** Undecided gates this autonomy setting still asks about, and `ordersWaiting`. */
   readonly inbox: number
   /** Open questions across draft orders, plus every held tool call. */
   readonly forge: number
@@ -47,13 +77,22 @@ export function countAttention(input: AttentionInput): AttentionCounts {
     (gate) => gate.decision === null && isLive(gate.rule, input.autonomy)
   ).length
 
+  const byOrder = questionsByOrder(input.orders)
+  const questions = Object.values(byOrder).reduce((sum, n) => sum + n, 0)
+  return {
+    inbox: inbox + ordersWaiting(input.waiting, byOrder).length,
+    forge: questions + input.pendingAsks,
+    byOrder,
+  }
+}
+
+/** Open questions per draft order, leaving out orders with none. */
+export function questionsByOrder(orders: readonly WorkOrder[]): Record<string, number> {
   const byOrder: Record<string, number> = {}
-  for (const order of input.orders) {
+  for (const order of orders) {
     if (order.status !== 'draft') continue
     const open = surfacedQuestions(order.openQuestions).length
     if (open > 0) byOrder[order.id] = open
   }
-
-  const questions = Object.values(byOrder).reduce((sum, n) => sum + n, 0)
-  return { inbox, forge: questions + input.pendingAsks, byOrder }
+  return byOrder
 }

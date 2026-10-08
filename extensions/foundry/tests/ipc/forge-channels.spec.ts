@@ -247,6 +247,21 @@ describe('foundry:order.compile', () => {
     )
   })
 
+  // A released order agreed again after an amendment was Foundry's doing, and
+  // the ledger has to say so rather than credit the operator with a click.
+  it('records an automatic agreement as Foundry\u2019s, with why', async () => {
+    const order = await completeOrder()
+    await channels().compile({ id: order.id, commit: true, automatic: true })
+    const agreed = fs
+      .readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { action: string; actor: string; reason: string })
+      .find((e) => e.action === 'order.agreed')
+    expect(agreed?.actor).toBe('rule:forge')
+    expect(agreed?.reason).toMatch(/released/)
+  })
+
   it('reports an order it cannot find', async () => {
     expect(await channels().compile({ id: 'WO-nope', commit: true })).toEqual({
       error: 'No order WO-nope.',

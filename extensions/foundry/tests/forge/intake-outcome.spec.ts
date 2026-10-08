@@ -239,9 +239,19 @@ describe('lastIntake, for the review loop', () => {
     })
   })
 
-  it('is refused when a review round was refused', () => {
+  // `readOnlyRound` writes `${roleId}.refused`, so a red-team round that
+  // could not run leaves `red-team.refused`. Read as anything else, the round
+  // it closes stays `running` and the Forge says the red team is working for
+  // ever.
+  it('is refused when a red-team round was refused', () => {
     const out = lastIntake([
-      entry({ action: 'review.refused', at: '2026-09-09T19:41:00Z', reason: 'no output written' }),
+      entry({ action: 'review.started', subject: 'rt-session', reason: 'round 1' }),
+      entry({
+        action: 'red-team.refused',
+        actor: 'role:red-team',
+        at: '2026-09-09T19:41:00Z',
+        reason: 'no output written',
+      }),
     ])
     expect(out).toEqual({
       kind: 'refused',

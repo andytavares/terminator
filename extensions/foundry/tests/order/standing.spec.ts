@@ -64,6 +64,8 @@ function input(over: Partial<StandingInput> = {}): StandingInput {
     stranded: 0,
     intakeRefused: null,
     runFailure: null,
+    shaping: true,
+    blocker: null,
     ...over,
   }
 }
@@ -308,6 +310,62 @@ describe('standingOf', () => {
     expect(standing.headline).toMatch(/refused/i)
   })
 
+  // WO-1008-287: the architect amended the order, every check passed, and
+  // nothing ran after it. The standing said "It starts on its own" — nothing
+  // starts a draft on its own — so the order sat there with every surface
+  // saying Foundry had it.
+  it('is your move when a draft passes every check and nothing is shaping it', () => {
+    const standing = standingOf(input({ status: 'draft', graph: null, shaping: false }))
+    expect(standing.kind).toBe('shaping')
+    expect(standing.turn).toBe('you')
+    expect(standing.headline).toBe('Ready to hand off')
+    expect(standing.detail).toMatch(/hand it off in the Forge/i)
+    expect(standing.detail).not.toMatch(/on its own/i)
+  })
+
+  // The architect is done and the order still fails a check: nothing will
+  // close it until somebody asks. Saying "still shaping" here is the lie.
+  it('names the check a draft is stuck on when nothing is shaping it', () => {
+    const standing = standingOf(
+      input({
+        status: 'draft',
+        graph: null,
+        shaping: false,
+        failures: 2,
+        blocker: 'redTeam — RT-6 is open and blocks hand-off',
+      })
+    )
+    expect(standing.turn).toBe('you')
+    expect(standing.headline).toBe('Shaping stopped')
+    expect(standing.detail).toContain('RT-6 is open and blocks hand-off')
+    expect(standing.detail).toContain('2 checks')
+  })
+
+  it('ends the blocker sentence once when the check\u2019s own text ends in a full stop', () => {
+    const standing = standingOf(
+      input({ status: 'draft', graph: null, shaping: false, failures: 1, blocker: 'Resolve each.' })
+    )
+    expect(standing.detail).not.toContain('..')
+  })
+
+  it('stays Foundry\u2019s move while an architect or red team is working on it', () => {
+    const standing = standingOf(input({ status: 'draft', graph: null, shaping: true }))
+    expect(standing.turn).toBe('foundry')
+    expect(standing.detail).not.toMatch(/on its own/i)
+  })
+
+  // The other half of the same gap: an agreed order whose run refused to
+  // start never becomes `running`, and the reason lived only in the Forge's
+  // local error line.
+  it('is your move when an agreed order\u2019s run refused to start', () => {
+    const standing = standingOf(
+      input({ status: 'agreed', graph: null, runFailure: 'Unknown skill "ci-fix".' })
+    )
+    expect(standing.turn).toBe('you')
+    expect(standing.headline).toBe('The run did not start')
+    expect(standing.detail).toBe('Unknown skill "ci-fix".')
+  })
+
   it('is ready when an order is agreed and no graph exists yet', () => {
     const standing = standingOf(input({ status: 'agreed', graph: null }))
     expect(standing.kind).toBe('ready')
@@ -467,5 +525,22 @@ describe('readStanding', () => {
       }
     )
     expect(standing.kind).toBe('adrift')
+  })
+
+  it('asks the caller whether anything is still shaping a draft', async () => {
+    const standing = await readStanding(
+      { id: 'WO-1', status: 'draft', openQuestions: [] } as unknown as WorkOrder,
+      { shapingFor: async () => false, blockerFor: () => 'plan — no units', failuresFor: () => 1 }
+    )
+    expect(standing.turn).toBe('you')
+    expect(standing.detail).toContain('plan — no units')
+  })
+
+  it('reads why the run refused to start for an agreed order', async () => {
+    const standing = await readStanding(
+      { id: 'WO-1', status: 'agreed', openQuestions: [] } as unknown as WorkOrder,
+      { runFailureFor: async () => 'no runtime' }
+    )
+    expect(standing.headline).toBe('The run did not start')
   })
 })

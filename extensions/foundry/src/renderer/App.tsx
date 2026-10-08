@@ -240,7 +240,14 @@ export function App(): JSX.Element {
             <SettingsView />
           </div>
         ) : surface === 'inbox' ? (
-          <Inbox />
+          <Inbox
+            onOpenOrder={(orderId) => {
+              setFactoryOrder(null)
+              setFactoryView('list')
+              setListOpenOrderId(orderId)
+              setSurface('forge')
+            }}
+          />
         ) : surface === 'ledger' ? (
           <Ledger />
         ) : factoryView === 'factory' ? (

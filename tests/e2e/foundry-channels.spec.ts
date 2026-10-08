@@ -56,8 +56,11 @@ test('the chrome says how much is waiting, from whichever surface you are on', a
   expect(typeof counts.forge).toBe('number')
   expect(typeof counts.byOrder).toBe('object')
 
-  const gates = (await foundryChannel(handle, 'foundry:inbox.list')) as { gates: unknown[] }
-  expect(counts.inbox).toBe(gates.gates.length)
+  const inbox = (await foundryChannel(handle, 'foundry:inbox.list')) as {
+    gates: unknown[]
+    waiting: unknown[]
+  }
+  expect(counts.inbox).toBe(inbox.gates.length + inbox.waiting.length)
 
   // And the badge is drawn from it, or not drawn when there is nothing to say.
   const badges = await inFoundry<number>(

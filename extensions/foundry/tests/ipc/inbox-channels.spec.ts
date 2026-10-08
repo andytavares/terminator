@@ -72,6 +72,33 @@ describe('foundry:inbox.list', () => {
     expect(r.gates).toEqual([])
   })
 
+  // "Nothing needs you" was on screen while WO-1008-287 sat ready with
+  // nobody working on it, because only a gate could reach this list.
+  it('lists every order waiting on you that no gate covers, with why', async () => {
+    const waiting = [
+      {
+        orderId: 'WO-1',
+        title: 'render html in comments',
+        headline: 'Ready to hand off',
+        detail: 'Every check passes.',
+      },
+    ]
+    const r = (await createInboxChannels({
+      gates: createGateStore(root),
+      orders: createOrderStore(root),
+      autonomy: () => 'standard',
+      now: () => '2026-09-06T12:00:00.000Z',
+      record: vi.fn() as never,
+      waiting: async () => waiting,
+    }).list()) as { waiting: typeof waiting }
+    expect(r.waiting).toEqual(waiting)
+  })
+
+  it('lists no waiting orders when the host has none to report', async () => {
+    const r = (await channels().list()) as { waiting: unknown[] }
+    expect(r.waiting).toEqual([])
+  })
+
   it('lists a raised gate with the rule that produced it', async () => {
     await createGateStore(root).save(gate())
     const r = (await channels().list()) as { gates: Gate[] }

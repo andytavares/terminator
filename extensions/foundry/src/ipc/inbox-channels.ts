@@ -50,6 +50,19 @@ export interface InboxDeps {
    * none are known, which is what a host that has never shipped one is.
    */
   readonly readPulls?: (orderId: string) => Promise<readonly { readonly url: string }[]>
+  /**
+   * Orders waiting on the operator that no gate stands for — a draft ready to
+   * hand off, shaping that stopped, a run that did not start. Without them
+   * this list said "Nothing needs you" over an order nothing would move.
+   */
+  readonly waiting?: () => Promise<readonly WaitingRow[]>
+}
+
+export interface WaitingRow {
+  readonly orderId: string
+  readonly title: string
+  readonly headline: string
+  readonly detail: string
 }
 
 export interface InboxChannels {
@@ -125,6 +138,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
       // something different at each rung of the dial, and an operator who
       // cannot see which rules are silenced cannot tell a quiet factory from
       // a deaf one.
+      waiting: (await deps.waiting?.()) ?? [],
       autonomy,
       silenced: silencedRules(autonomy),
       summary: {
