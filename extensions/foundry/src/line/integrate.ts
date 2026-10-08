@@ -405,7 +405,7 @@ export async function commitAndPushLanes(
 ): Promise<boolean> {
   let any = false
   for (const repo of resolvedRepos(order, deps)) {
-    if (await commitWorktree(repo.path, message, deps.exec)) {
+    if ((await commitWorktree(repo.path, message, deps.exec)).kind === 'committed') {
       any = true
       await pushLane(repo, deps)
     }

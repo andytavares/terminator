@@ -1136,7 +1136,12 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   `<step>: <unit titles>`. A builder or author that passed with nothing to
   commit fails with `made no change to the checkout` (`step.no_change`); a
   scribe with nothing to document does not, and neither does an author whose
-  document is outside the checkout.
+  document is outside the checkout. A commit git refuses — a pre-commit hook
+  failing, most often — is not "no change": `commitWorktree` returns
+  `refused` with what git printed, the step fails with "changed the checkout,
+  but `git commit` exited 1" (`step.commit_refused`), that output is added to
+  the node's `feedback` for its next attempt, and the repeat-fail gate carries
+  it as evidence.
 - **The author hands back a document** (ADR 086). `writes: [docs, document]`:
   the author writes `{ path, url?, location }` to its rung file, collected
   like the other artefacts onto `order.document` and recorded as
@@ -1335,7 +1340,8 @@ when it was skipped), Not measured here, Judged against. A skipped `RunNode`
 carries `skipReason` (from `whenSkipReason`, or "no <name> command in this
 repository" for an unresolved `run` step). A failed one carries `failReason`
 ("exited 1 running `<command>`. The output is in `<log>`", "made no change to
-the checkout", or the unmet expectations), and the stall gate's `why` comes from
+the checkout", "changed the checkout, but `git commit` exited 1", or the unmet
+expectations), and the stall gate's `why` comes from
 `stalledWhy`: each failed step and its reason, then what is held up behind it,
 or, with nothing failed, what each outstanding step waits on.
 

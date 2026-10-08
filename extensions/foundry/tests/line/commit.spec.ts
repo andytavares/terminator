@@ -5,12 +5,17 @@ import type { ShellExec } from '../../src/line/integrate.js'
 // A format step that writes leaves the checkout ahead of what CI will see, and
 // the push that follows is only honest when a commit was actually made.
 
-function exec(responses: Record<string, { exitCode: number; stdout?: string }>) {
+function exec(responses: Record<string, { exitCode: number; stdout?: string; stderr?: string }>) {
   const calls: string[][] = []
   const run = vi.fn(async (options: { args: string[] }) => {
     calls.push(options.args)
     const found = responses[options.args[0]] ?? { exitCode: 0 }
-    return { exitCode: found.exitCode, stdout: found.stdout ?? '', stderr: '', timedOut: false }
+    return {
+      exitCode: found.exitCode,
+      stdout: found.stdout ?? '',
+      stderr: found.stderr ?? '',
+      timedOut: false,
+    }
   })
   return { run: run as unknown as ShellExec, calls }
 }
@@ -18,7 +23,7 @@ function exec(responses: Record<string, { exitCode: number; stdout?: string }>) 
 describe('commitWorktree', () => {
   it('commits what is dirty and says so', async () => {
     const { run, calls } = exec({ status: { exitCode: 0, stdout: ' M src/a.ts\n' } })
-    expect(await commitWorktree('/work', 'final check: format', run)).toBe(true)
+    expect(await commitWorktree('/work', 'final check: format', run)).toEqual({ kind: 'committed' })
     expect(calls).toEqual([
       ['status', '--porcelain'],
       ['add', '-A'],
@@ -28,17 +33,33 @@ describe('commitWorktree', () => {
 
   it('makes no commit for a clean tree', async () => {
     const { run, calls } = exec({ status: { exitCode: 0, stdout: '' } })
-    expect(await commitWorktree('/work', 'm', run)).toBe(false)
+    expect(await commitWorktree('/work', 'm', run)).toEqual({ kind: 'clean' })
     expect(calls).toHaveLength(1)
   })
 
-  it('reports false when git could not stage or commit, so nothing is pushed as if it had', async () => {
+  it('reports a refusal when git could not stage or commit, so nothing is pushed as if it had', async () => {
     const staged = exec({ status: { exitCode: 0, stdout: 'M a' }, add: { exitCode: 1 } })
-    expect(await commitWorktree('/work', 'm', staged.run)).toBe(false)
-    const committed = exec({ status: { exitCode: 0, stdout: 'M a' }, commit: { exitCode: 1 } })
-    expect(await commitWorktree('/work', 'm', committed.run)).toBe(false)
+    expect((await commitWorktree('/work', 'm', staged.run)).kind).toBe('refused')
     const unreadable = exec({ status: { exitCode: 128 } })
-    expect(await commitWorktree('/work', 'm', unreadable.run)).toBe(false)
+    expect((await commitWorktree('/work', 'm', unreadable.run)).kind).toBe('refused')
+  })
+
+  // A pre-commit hook rejecting the commit was read as "made no change".
+  it('carries what git said when the commit is refused', async () => {
+    const { run } = exec({
+      status: { exitCode: 0, stdout: 'M a' },
+      commit: {
+        exitCode: 1,
+        stdout: '[STARTED] vitest related --run',
+        stderr: '✖ 2 tests failed',
+      },
+    })
+    expect(await commitWorktree('/work', 'm', run)).toEqual({
+      kind: 'refused',
+      command: 'git commit',
+      exitCode: 1,
+      output: '[STARTED] vitest related --run\n✖ 2 tests failed',
+    })
   })
 })
 
