@@ -1426,6 +1426,28 @@ describe('the grade the change turned out to deserve', () => {
     expect(outcome.risk.triggers).toContain('authentication')
   })
 
+  it('does not stop for a trigger the agreed plan already declared', async () => {
+    const o = order([unit('U-1', { touches: ['src/package.json'] })], {
+      risk: { grade: 'P3', triggers: ['new_dependency'], blastRadius: ['src/'], criticalPaths: [] },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+    })
+    expect(outcome.gates.filter((g) => g.rule === 'risk.p0')).toEqual([])
+  })
+
+  it('still stops for a trigger the plan did not declare', async () => {
+    const o = order([unit('U-1', { touches: ['src/package.json'] })], {
+      risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    })
+    const outcome = await execute(o, recipe(), buildRunGraph(o, recipe()), {
+      ...deps(vi.fn(ok)),
+      runStep: async () => 0,
+    })
+    expect(outcome.gates.find((g) => g.rule === 'risk.p0')?.why).toContain('new_dependency')
+  })
+
   it('says it was planned as something else, when it was', async () => {
     const o = order([unit('U-1', { touches: ['src/main/auth/session.ts'] })], {
       risk: { grade: 'P3', triggers: [], blastRadius: ['src/'], criticalPaths: [] },

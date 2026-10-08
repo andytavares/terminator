@@ -94,8 +94,15 @@ export function createGateStore(root: string): GateStore {
  * fresh question, and the operator answered it for ever.
  */
 export async function askOnce(store: GateStore, gate: Gate): Promise<'approve' | 'hold'> {
-  const prior = await store.get(gate.id)
-  if (prior?.decision?.option === 'approve') return 'approve'
+  // The same rule already approved on this order answers it too: the push
+  // decision after an approved "riskier than planned" was asked twice.
+  const answered = (await store.list()).some(
+    (prior) =>
+      prior.orderId === gate.orderId &&
+      prior.rule === gate.rule &&
+      prior.decision?.option === 'approve'
+  )
+  if (answered) return 'approve'
   await store.save(gate)
   return 'hold'
 }

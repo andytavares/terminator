@@ -1394,14 +1394,16 @@ export async function execute(
   // on what the plan said it would be. Raised after the work, because that is
   // when the answer exists.
   if (!halted && ladder !== null) {
-    if (inspection.required) {
+    // A trigger the agreed plan declared was the operator's to weigh when they
+    // released it; asking again after the work is the same question twice.
+    if (inspection.unplanned.length > 0) {
       halted = await raise('risk.p0', {
         summary: `${order.title} graded ${gradeInWords(risk.grade)} once it was done${
           risk.grade === order.risk.grade
             ? ''
             : ` — it was planned as ${gradeInWords(order.risk.grade)}`
         }`,
-        why: `${inspection.reason} Triggered by ${inspection.triggers.join(', ')}.`,
+        why: `${inspection.reason} Triggered by ${inspection.unplanned.join(', ')}.`,
       })
     }
     if (!halted && !ladder.ok) {

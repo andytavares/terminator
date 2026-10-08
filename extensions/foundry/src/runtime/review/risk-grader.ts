@@ -44,10 +44,14 @@ const P0_PATTERNS: ReadonlyArray<{ label: string; pattern: RegExp }> = [
 ]
 
 const SCHEMA_PATTERN = /\.schema\.[jt]s$|(^|\/)schemas?\//i
-const TRIVIAL_PATTERN =
-  /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$|^\.?[\w.]*(prettier|editorconfig|eslintignore|prettierignore)/i
+const FORMATTING_PATTERN = /^\.?[\w.]*(prettier|editorconfig|eslintignore|prettierignore)/i
 
 const LARGE_CHANGE_LINES = 300
+
+/** A generated lockfile: hundreds of lines nobody reviews line by line. */
+export function isLockfile(file: string): boolean {
+  return /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/i.test(file)
+}
 
 /**
  * Minimal glob matching for the two forms an operator writes in a
@@ -104,7 +108,7 @@ export function gradeRisk(change: ChangeSummary): GradedChange {
   if (
     change.files.length > 0 &&
     change.checkState === 'passing' &&
-    change.files.every((file) => TRIVIAL_PATTERN.test(file))
+    change.files.every((file) => isLockfile(file) || FORMATTING_PATTERN.test(file))
   ) {
     return { grade: 'P3', trigger: 'lockfile, formatting or dependency bump with green checks' }
   }

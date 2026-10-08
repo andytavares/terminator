@@ -633,7 +633,7 @@ export async function openDrafts(
     })
     const chosen = await deps.decide(gate)
     if (chosen !== 'approve') {
-      const reason = `The ${gradeInWords(order.risk.grade)} shipping decision was answered "${chosen}", so nothing was pushed.`
+      const reason = `The ${gradeInWords(order.risk.grade)} shipping decision is waiting on you, so nothing was pushed yet.`
       await deps.record('ship.held', order.id, reason)
       return { pulls: [], bodyPaths, held: true, reason }
     }

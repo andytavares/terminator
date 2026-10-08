@@ -85,6 +85,7 @@ import { endAndWait } from './runtime/end-session.js'
 import { compileOrder } from './order/compile.js'
 import { readChangedFiles, readDiffSummary } from './runtime/diff-metrics.js'
 import type { RunCommand } from './runtime/diff-metrics.js'
+import { isLockfile } from './runtime/review/risk-grader.js'
 import {
   architectModel,
   ASK_MODELS,
@@ -1437,7 +1438,13 @@ async function buildExecutorDeps(
       const declared = order.context.repos.find((repo) => repo.name === checkout.repo)?.baseBranch
       const against = declared === undefined || declared === '' ? 'main' : declared
       changedFiles.push(...(await readChangedFiles(checkout.path, against, diffCommand)))
-      const summary = await readDiffSummary(checkout.path, against, diffCommand)
+      // A lockfile's lines would turn every new dependency into a "large change".
+      const summary = await readDiffSummary(
+        checkout.path,
+        against,
+        diffCommand,
+        (file) => !isLockfile(file)
+      )
       linesChanged += summary.added + summary.removed
     }
     return { changedFiles, linesChanged }
