@@ -836,6 +836,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
             id: order.id,
             title: order.title,
             status: order.status,
+            createdAt: order.createdAt,
             risk: order.risk.grade,
             source: order.source,
             failures: compileOrder(order).failures.length,

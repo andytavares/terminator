@@ -21,6 +21,8 @@ export interface FactoryOrderRow {
   readonly id: string
   readonly title: string
   readonly status: string
+  /** Absent, like `standing`, from a host part way through an upgrade. */
+  readonly createdAt?: string
   /**
    * Where the order stands, and whose move it is.
    *
@@ -129,6 +131,47 @@ function refineryChains(rows: readonly FactoryOrderRow[]): QueueChain[] {
   return chains
 }
 
+/** Finished, with nothing left for anyone to do. A shipped order still
+ *  holding a gate is the operator's move, and stays with the active ones. */
+function isCompleted(row: FactoryOrderRow): boolean {
+  return row.standing === undefined ? row.status === 'shipped' : row.standing.kind === 'done'
+}
+
+function HallGrid({
+  rows,
+  onOpen,
+}: {
+  readonly rows: readonly FactoryOrderRow[]
+  readonly onOpen: (order: FactoryOrderRow) => void
+}): JSX.Element {
+  return (
+    <div className="fdry-hall-grid">
+      {rows.map((row) => (
+        <button
+          key={row.id}
+          type="button"
+          className={isCompleted(row) ? 'fdry-hall-card is-done' : 'fdry-hall-card'}
+          onClick={() => onOpen(row)}
+        >
+          {row.standing?.turn === 'you' ? (
+            <span className="fdry-hall-card-beacon" aria-hidden="true" />
+          ) : null}
+          <HallThumbnail
+            orderId={row.id}
+            title={row.title}
+            refreshKey={`${row.status}:${row.standing?.kind ?? ''}:${row.ci?.status ?? ''}:${row.ci?.round ?? ''}`}
+          />
+          <b>{row.title}</b>
+          {row.standing === undefined ? null : (
+            <span className="fdry-hall-card-state">{row.standing.label}</span>
+          )}
+          {row.ci ? <span className="fdry-hall-card-ci">{ciLine(row.ci)}</span> : null}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export interface FactorySiteProps {
   readonly repoRoot: string | null
   readonly onOpen: (order: FactoryOrderRow) => void
@@ -142,6 +185,11 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
  *  carries no reason, so an unmeasured CI says only that. */
 function ciLine(ci: NonNullable<FactoryOrderRow['ci']>): string {
   return `CI · ${ci.status === 'not_measured' ? 'not measured yet' : ciLabel({ ...ci, reason: '' })}`
+}
+
+function newestFirst(a: FactoryOrderRow, b: FactoryOrderRow): number {
+  const byTime = (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
+  return byTime !== 0 ? byTime : b.id.localeCompare(a.id)
 }
 
 /** How often the grid is refetched. Slower than a live run's own poll: this
@@ -161,9 +209,9 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
 
   const refresh = useCallback(async () => {
     const r = (await invoke('foundry:order.list')) as { orders?: FactoryOrderRow[] }
-    // Sorted by id rather than left in whatever order the store returned it:
-    // a grid that reshuffles itself between polls is unreadable.
-    setRows([...(r.orders ?? [])].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)))
+    // Newest first, with the id breaking ties rather than whatever order the
+    // store returned: a grid that reshuffles itself between polls is unreadable.
+    setRows([...(r.orders ?? [])].sort(newestFirst))
   }, [])
 
   useEffect(() => {
@@ -231,6 +279,8 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
   )
 
   const chains = refineryChains(rows)
+  const completed = rows.filter(isCompleted)
+  const active = rows.filter((row) => !isCompleted(row))
 
   return (
     <div className="fdry-site">
@@ -291,30 +341,22 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
       {rows.length === 0 ? (
         <p className="fdry-note">No orders yet. Start one from the List view.</p>
       ) : (
-        <div className="fdry-hall-grid">
-          {rows.map((row) => (
-            <button
-              key={row.id}
-              type="button"
-              className="fdry-hall-card"
-              onClick={() => onOpen(row)}
-            >
-              {row.standing?.turn === 'you' ? (
-                <span className="fdry-hall-card-beacon" aria-hidden="true" />
-              ) : null}
-              <HallThumbnail
-                orderId={row.id}
-                title={row.title}
-                refreshKey={`${row.status}:${row.standing?.kind ?? ''}:${row.ci?.status ?? ''}:${row.ci?.round ?? ''}`}
-              />
-              <b>{row.title}</b>
-              {row.standing === undefined ? null : (
-                <span className="fdry-hall-card-state">{row.standing.label}</span>
-              )}
-              {row.ci ? <span className="fdry-hall-card-ci">{ciLine(row.ci)}</span> : null}
-            </button>
-          ))}
-        </div>
+        <>
+          <section className="fdry-hall-section" aria-label="Active">
+            <h3 className="fdry-panel-h">Active</h3>
+            {active.length === 0 ? (
+              <p className="fdry-note">Nothing running.</p>
+            ) : (
+              <HallGrid rows={active} onOpen={onOpen} />
+            )}
+          </section>
+          {completed.length > 0 ? (
+            <section className="fdry-hall-section" aria-label="Completed">
+              <h3 className="fdry-panel-h fdry-group-h--done">Completed</h3>
+              <HallGrid rows={completed} onOpen={onOpen} />
+            </section>
+          ) : null}
+        </>
       )}
       {/* The refinery: which orders sit behind which on disk. Nothing here
           when no order is queued behind another (R5). */}
