@@ -523,30 +523,53 @@ describe('factory/art/props drawBelts', () => {
     expect(hasRect(paint.calls, x + 2, y + 13, 12, 1, HALL.steelLight)).toBe(true)
   })
 
-  it('paints a split junction as an amber diverter with an arm into each outgoing belt', () => {
+  it('paints a split junction as the small grey hub with a dim chevron down each outgoing belt', () => {
     const tile: BeltTile = { x: 12, y: 7, ins: ['N'], outs: ['E', 'S'], kind: 'split', over: null }
     const map = baseMap({ beltTiles: [tile] })
     const paint = createRecordingPaint()
     drawBelts(paint, map, new Set(), 0)
     const x = tile.x * TILE_PX
     const y = tile.y * TILE_PX
-    expect(hasRect(paint.calls, x + 5, y + 5, 6, 6, HALL.amber)).toBe(true)
-    expect(hasRect(paint.calls, x + 11, y + 7, 4, 2, HALL.amber)).toBe(true)
-    expect(hasRect(paint.calls, x + 7, y + 11, 2, 4, HALL.amber)).toBe(true)
-    expect(hasRect(paint.calls, x + 7, y + 1, 2, 4, HALL.amber)).toBe(false)
+    expect(hasRect(paint.calls, x + 6, y + 6, 4, 4, '#20252c')).toBe(true)
+    expect(hasRect(paint.calls, x + 7, y + 7, 2, 2, HALL.steelDark)).toBe(true)
+    expect(containsColor(paint.calls, HALL.amber)).toBe(false)
+    expect(containsColor(paint.calls, HALL.amberDim)).toBe(true)
   })
 
-  it('paints a merge junction as a steel funnel narrowing into the outgoing belt, with no hub', () => {
-    const tile: BeltTile = { x: 17, y: 7, ins: ['W', 'S'], outs: ['N'], kind: 'merge', over: null }
-    const map = baseMap({ beltTiles: [tile] })
+  it('paints a merge junction exactly like a split with one out', () => {
+    const merge: BeltTile = { x: 17, y: 7, ins: ['W', 'S'], outs: ['N'], kind: 'merge', over: null }
+    const split: BeltTile = { ...merge, kind: 'split' }
+    const mergePaint = createRecordingPaint()
+    drawBelts(mergePaint, baseMap({ beltTiles: [merge] }), new Set(), 0)
+    const splitPaint = createRecordingPaint()
+    drawBelts(splitPaint, baseMap({ beltTiles: [split] }), new Set(), 0)
+    expect(containsColor(mergePaint.calls, HALL.amber)).toBe(false)
+    expect(mergePaint.calls).toEqual(splitPaint.calls)
+  })
+
+  it('hangs the vending machine on the wall face instead of over the floor', () => {
     const paint = createRecordingPaint()
-    drawBelts(paint, map, new Set(), 0)
-    const x = tile.x * TILE_PX
-    const y = tile.y * TILE_PX
-    // The mouth is wide at the tile's far edge and the neck is four wide at the belt.
-    expect(hasRect(paint.calls, x + 3, y + 14, 11, 1, HALL.steel)).toBe(true)
-    expect(hasRect(paint.calls, x + 6, y + 1, 4, 1, HALL.steel)).toBe(true)
-    expect(hasRect(paint.calls, x + 5, y + 5, 6, 6, HALL.amber)).toBe(false)
+    bakeHall(baseMap(), paint)
+    const body = paint.calls.filter((c) => c.op === 'fillRect' && c.style === '#8a2f2a')
+    expect(body.length).toBeGreaterThan(0)
+    for (const c of body) {
+      if (c.op === 'fillRect') expect(c.y + c.h).toBeLessThanOrEqual(3 * TILE_PX)
+    }
+  })
+
+  it('keeps every partition rect between its side walls, so the glazing does not overhang them', () => {
+    const paint = createRecordingPaint()
+    const p = prop('partition')
+    drawProp(paint, p, context(), 0)
+    const left = p.x * TILE_PX + 10
+    const right = (p.x + p.w) * TILE_PX - 10
+    const rects = paint.calls.filter((c) => c.op === 'fillRect')
+    expect(rects.length).toBeGreaterThan(0)
+    for (const c of rects) {
+      if (c.op !== 'fillRect') continue
+      expect(c.x).toBeGreaterThanOrEqual(left)
+      expect(c.x + c.w).toBeLessThanOrEqual(right)
+    }
   })
 
   it('paints the over deck for a cross tile', () => {

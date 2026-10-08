@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import type { HallMap, PropKind } from '../../factory/layout.js'
+import type { HallMap, HallProp, PropKind } from '../../factory/layout.js'
 import { TILE_PX } from '../../factory/layout.js'
 import { cratePosition, tick, tileOf } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
@@ -46,6 +46,15 @@ const MAX_FRAME_MS = 50
 // stands there — sorted behind them, since its low silhouette (not its tall
 // backrest) is what should tie-break against a seat one row down.
 const SEAT_FURNITURE: ReadonlySet<PropKind> = new Set(['restbench', 'sofa', 'plant'])
+// The breakroom partition spans the whole room, but only its top row is a
+// wall: sorted at its floor it would be drawn over everyone inside.
+const WALL_KINDS: ReadonlySet<PropKind> = new Set(['partition'])
+
+/** The y a prop sorts at against crew and crates: its top, its first row, or its floor edge. */
+export function drawOrderY(prop: HallProp): number {
+  if (WALL_KINDS.has(prop.kind)) return (prop.y + 1) * TILE_PX
+  return SEAT_FURNITURE.has(prop.kind) ? prop.y * TILE_PX : (prop.y + prop.h) * TILE_PX
+}
 
 /**
  * What the world is doing at the fixtures, in the terms the art draws it:
@@ -168,8 +177,7 @@ function draw(
   type Drawable = { readonly y: number; readonly draw: () => void }
   const drawables: Drawable[] = []
   for (const prop of map.props) {
-    const sortY = SEAT_FURNITURE.has(prop.kind) ? prop.y * TILE_PX : (prop.y + prop.h) * TILE_PX
-    drawables.push({ y: sortY, draw: () => drawProp(paint, prop, context, tMs) })
+    drawables.push({ y: drawOrderY(prop), draw: () => drawProp(paint, prop, context, tMs) })
   }
   for (const crew of world.crew) {
     drawables.push({ y: crew.y, draw: () => drawCrew(paint, crew, tMs) })
