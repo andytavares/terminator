@@ -14,6 +14,7 @@ import type {
 } from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
 import { buildSectionQueries, parseDashboard } from '../github/dashboard-search.js'
+import type { BranchExcluded } from '../github/dashboard-search.js'
 import {
   buildChapters,
   parseReviewQueuePR,
@@ -120,7 +121,8 @@ export function registerGithubHandlers(
   opts: GhOptions,
   issues?: IssuesApi,
   listProjectRoots?: () => string[],
-  getReviewRepos?: () => string[]
+  getReviewRepos?: () => string[],
+  isBranchExcluded: BranchExcluded = () => false
 ): void {
   const register = withTiming(registerRaw)
   const gh = (cwd: string, args: string[], timeoutMs?: number) => {
@@ -205,7 +207,9 @@ export function registerGithubHandlers(
           '--json',
           PR_JSON_FIELDS,
         ])
-        const prs: ReviewQueuePR[] = (JSON.parse(raw) as unknown[]).map(parseReviewQueuePR)
+        const prs: ReviewQueuePR[] = (JSON.parse(raw) as unknown[])
+          .map(parseReviewQueuePR)
+          .filter((pr) => !isBranchExcluded(pr.headRefName, repoRoot))
         return { prs, totalCount: prs.length, hasMore: false }
       }
 
@@ -238,13 +242,15 @@ export function registerGithubHandlers(
       }
       const data = JSON.parse(raw) as GQLResponse
       const { nodes, pageInfo, totalCount } = data.data.repository.pullRequests
-      const prs: ReviewQueuePR[] = nodes.map((n) => parseReviewQueuePR(normalizeGraphQLNode(n)))
+      const page = nodes.map((n) => parseReviewQueuePR(normalizeGraphQLNode(n)))
+      const prs = page.filter((pr) => !isBranchExcluded(pr.headRefName, repoRoot))
       return {
         prs,
         // The count the summary line reports. Without it the view can only
         // count the rows it happens to hold, which is the page size — so a
-        // repository with 47 open PRs said "20 waiting on you".
-        totalCount,
+        // repository with 47 open PRs said "20 waiting on you". Excluded
+        // branches are only known page by page, so this page's are taken off.
+        totalCount: totalCount - (page.length - prs.length),
         hasMore: pageInfo.hasNextPage,
         nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : undefined,
       }
@@ -1166,7 +1172,7 @@ export function registerGithubHandlers(
       }
 
       const sessionsByRoot = new Map<string, Map<number, ReviewSession>>()
-      const prs = parseDashboard(data, login, localRoots).map((pr) => {
+      const prs = parseDashboard(data, login, localRoots, isBranchExcluded).map((pr) => {
         if (!pr.localRepoRoot) return pr
         if (!sessionsByRoot.has(pr.localRepoRoot)) {
           sessionsByRoot.set(

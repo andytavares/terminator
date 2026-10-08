@@ -204,8 +204,9 @@ export function GlobalSettings(): JSX.Element {
           />
           <span className="settings-section__hint">
             One pattern per line. <code>*</code> matches anything, including <code>/</code> (e.g.{' '}
-            <code>gh-readonly-queue/*</code>). Matching branches are left out of every branch list:
-            New branch and a pull request&apos;s base branch. The checked-out branch always shows.
+            <code>gh-readonly-queue/*</code>). Matching branches are left out of every branch list
+            (New branch, a pull request&apos;s base branch), and pull requests opened from them are
+            left out of the review lists. The checked-out branch always shows.
           </span>
         </div>
 

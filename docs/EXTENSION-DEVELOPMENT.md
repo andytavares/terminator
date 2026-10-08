@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 2.7.0 (`api.commands.register` takes an optional `args` schema and the handler an `args` argument; extension views gain `electronAPI.extension.runCommand` and `hasCommand` — see [Commands that take arguments](#commands-that-take-arguments-v270), [ADR-083](adr/083-extension-commands-take-arguments.md); 2.6.0: `pty.closeTerminalTab` closes a tab `openTerminalTab` opened — see [`closeTerminalTab`](#closeterminaltab--closing-a-tab-you-opened-v260); 2.5.0: `api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
+**Current API version**: 2.8.0 (`api.settings.isBranchExcluded` matches a branch against Settings → Git → Branch Exclude Patterns — see [Excluded branches](#excluded-branches-v280); 2.7.0: `api.commands.register` takes an optional `args` schema and the handler an `args` argument; extension views gain `electronAPI.extension.runCommand` and `hasCommand` — see [Commands that take arguments](#commands-that-take-arguments-v270), [ADR-083](adr/083-extension-commands-take-arguments.md); 2.6.0: `pty.closeTerminalTab` closes a tab `openTerminalTab` opened — see [`closeTerminalTab`](#closeterminaltab--closing-a-tab-you-opened-v260); 2.5.0: `api.issues` gains `teams`, `create` and `supportsCreate`; `workspace.listProjects` reports `worktreePath` and `workspace.deleteProject` tells the sidebar — see [Creating an issue](#creating-an-issue-v250); 2.4.0: `api.commands` gains `mnemonic`, `requires` and a `CommandContext` handler argument, plus `api.commands.setEnabled` and `api.window.showSelf`; `api.keyboard.register` is removed — see [Deleted: `api.keyboard.register`](#deleted-apikeyboardregister-removed-in-v240); an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
 
 ---
 
@@ -182,6 +182,16 @@ const url = api.settings.get<string>('myext.apiUrl')
 ```
 
 **Naming**: prefix all setting keys with your extension ID to avoid collisions. The host enforces this at registration time.
+
+#### Excluded branches _(v2.8.0)_
+
+`api.settings.isBranchExcluded(branch, repoPath?)` says whether a branch matches Settings → Git → Branch Exclude Patterns. The patterns come from the workspace that owns `repoPath` when it has its own, and from the global list otherwise. `*` matches anything, slashes included. The core owns the patterns and the matching, so a list your extension shows hides the same branches the core's pickers do.
+
+```typescript
+const visible = pulls.filter((pr) => !api.settings.isBranchExcluded(pr.headRefName, repoRoot))
+```
+
+The Git extension uses this to leave pull requests opened from an excluded branch out of its review lists.
 
 ---
 

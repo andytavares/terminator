@@ -140,6 +140,41 @@ describe('api.settings.resolveWorktreeBaseDir', () => {
   })
 })
 
+// The Git extension's review lists leave out pull requests whose source
+// branch matches Settings → Git → Branch Exclude Patterns. Core owns the
+// patterns and how they match; the extension only asks.
+describe('api.settings.isBranchExcluded', () => {
+  beforeEach(() => {
+    mockGetGlobalSettings.mockReturnValue({ git: { branchExcludePatterns: ['renovate/*'] } })
+    mockGetWorkspaceSettings.mockReturnValue({ workspaceId: 'w1', overrides: {}, extensions: {} })
+    mockListWorkspaces.mockReturnValue([{ id: 'w1', name: 'WS', folderPath: '/repo' }])
+  })
+
+  it('matches the global patterns, across slashes', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.settings.isBranchExcluded('renovate/npm/vitest-4')).toBe(true)
+    expect(api.settings.isBranchExcluded('feature/login')).toBe(false)
+  })
+
+  it('uses the override of the workspace that owns the repository', () => {
+    mockGetWorkspaceSettings.mockReturnValue({
+      workspaceId: 'w1',
+      overrides: { git: { branchExcludePatterns: ['dependabot/*'] } },
+      extensions: {},
+    })
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.settings.isBranchExcluded('dependabot/npm/x', '/repo')).toBe(true)
+    expect(api.settings.isBranchExcluded('renovate/x', '/repo')).toBe(false)
+    expect(api.settings.isBranchExcluded('renovate/x', '/elsewhere')).toBe(true)
+  })
+
+  it('excludes nothing when no pattern is set', () => {
+    mockGetGlobalSettings.mockReturnValue({ git: {} })
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.settings.isBranchExcluded('renovate/x')).toBe(false)
+  })
+})
+
 describe('api.notifications.showToast', () => {
   it('routes through notificationManager, resolving targets from settings like createNotification', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
