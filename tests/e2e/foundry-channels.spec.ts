@@ -63,28 +63,28 @@ test('the chrome says how much is waiting, from whichever surface you are on', a
   expect(counts.inbox).toBe(inbox.gates.length + inbox.waiting.length)
 
   // And the badge is drawn from it, or not drawn when there is nothing to say.
+  // The queue sits above the Forge, so both counts land on the Forge's tab.
   const badges = await inFoundry<number>(
     handle,
     `document.querySelectorAll('.fdry-tab-count').length`
   )
-  expect(badges).toBe((counts.inbox === 0 ? 0 : 1) + ((counts.forge as number) === 0 ? 0 : 1))
+  expect(badges).toBe(counts.inbox === 0 && counts.forge === 0 ? 0 : 1)
 })
 
 test('every surface is reachable by its accessible name and renders', async () => {
-  // The inbox is home: it is what is on screen before anything is clicked.
-  await expect.poll(() => bodyText(handle), { timeout: 15_000 }).toContain('Nothing needs you')
+  // The Forge is home: it is what is on screen before anything is clicked.
+  await expect.poll(() => bodyText(handle), { timeout: 15_000 }).toContain('New order')
   expect(
     await inFoundry<string | null>(
       handle,
       `(document.querySelector('button[aria-pressed="true"]') || {}).textContent || null`
     )
-  ).toBe('Inbox')
+  ).toBe('Forge')
 
   // Identified by something the surface always shows, not by its empty state.
   for (const [tab, expected] of [
-    ['Forge', 'New order'],
     ['Ledger', 'What do I keep rejecting?'],
-    ['Inbox', 'Nothing needs you'],
+    ['Forge', 'New order'],
   ] as const) {
     expect(await clickByName(handle, 'button', tab), `no control named "${tab}"`).toBe(true)
     await expect.poll(() => bodyText(handle), { timeout: 15_000 }).toContain(expected)

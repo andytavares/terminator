@@ -1059,13 +1059,6 @@
 /* Only the two that warrant stopping take colour. A list where every row is
    coloured is a list where none of them stand out. */
 
-/* Quiet has to be explicable: which rules this setting is not asking about. */
-.fdry-silenced {
-  font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
-  color: var(--tm-text-muted);
-}
-
 /* A mute you cannot find is a mute you never undo, so each one is a control. */
 .fdry-unmute {
   appearance: none;
@@ -2057,6 +2050,19 @@
    Severity reads as a stripe and a position, never as a coloured
    icon — icons stay flat and inherit currentColor. */
 
+/* The band across the top of the Forge. It holds decisions, so it comes
+   before the Forge rather than beside it; capped so a long queue scrolls
+   inside itself instead of pushing the Forge off the screen. */
+.fdry-inbox {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 12px;
+  max-height: 45vh;
+  overflow-y: auto;
+  padding: 16px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
 .fdry-nothing {
   display: grid;
   justify-items: center;
@@ -2326,10 +2332,6 @@
    A signal never starts anything by itself, so its row reads lighter than
    a gate: no stripe, no risk grade — just what a heuristic saw and the two
    moves the operator has over it. */
-
-.fdry-signals {
-  margin-top: 18px;
-}
 
 .fdry-signal-list {
   list-style: none;

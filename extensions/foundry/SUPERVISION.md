@@ -566,7 +566,7 @@ that lets a dead run look busy until somebody checks. The gate id is derived
 from the order rather than sequenced, so reopening five times leaves one row.
 It is raised from `foundry:attention` and `foundry:inbox.list` — the chrome
 polls `attention` every four seconds from the moment the application opens, so
-the Inbox badge says so within one poll rather than hours later.
+the Forge badge says so within one poll rather than hours later.
 
 Its options are **Pick it back up**, **Stop here** and **Hold**, and the default
 if nobody answers is `hold`. No deadline, ever: every other default here

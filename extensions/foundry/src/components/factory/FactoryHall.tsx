@@ -53,7 +53,6 @@ const GATE_CARD_INSET = 'calc(min(180px, 30%) + 16px)'
 
 export interface FactoryHallProps {
   readonly orderId: string
-  readonly onOpenInbox: () => void
   /** Where an order's own controls live — resume, stop, a held call. */
   readonly onOpenInList: () => void
   readonly onBack: () => void
@@ -143,12 +142,7 @@ function stationStyle(map: HallMap, prop: HallProp): React.CSSProperties {
   }
 }
 
-export function FactoryHall({
-  orderId,
-  onOpenInbox,
-  onOpenInList,
-  onBack,
-}: FactoryHallProps): JSX.Element {
+export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps): JSX.Element {
   const { view, problem, pending, refresh } = useRunObservation(orderId)
   const [activity, setActivity] = useState<Readonly<Record<string, readonly ToolActivity[]>>>({})
   const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
@@ -635,7 +629,6 @@ export function FactoryHall({
         note={replayNote}
         onBack={onBack}
         onReplay={() => void startReplay()}
-        onOpenInbox={onOpenInbox}
         onOpenInList={onOpenInList}
       />
       <div
@@ -878,7 +871,6 @@ interface HallHudProps {
   readonly note: string | null
   readonly onBack: () => void
   readonly onReplay: () => void
-  readonly onOpenInbox: () => void
   readonly onOpenInList: () => void
 }
 
@@ -891,7 +883,6 @@ function HallHud({
   note,
   onBack,
   onReplay,
-  onOpenInbox,
   onOpenInList,
 }: HallHudProps): JSX.Element {
   const standing = replaying ? undefined : view.standing
@@ -929,15 +920,11 @@ function HallHud({
         <span className="fdry-hall-hud__needs">{waitingCount} need you</span>
       ) : null}
       {/* A move no card owns — a run nothing is running, say — still names
-          its place. Only a gate is decided in the Inbox. */}
+          its place. A gate is decided in the queue above the hall. */}
       {standing !== undefined && standing.turn === 'you' && waitingCount === 0 ? (
         <div className="fdry-hall-hud__alert">
           <span>{standing.headline}</span>
-          {standing.gateId !== null ? (
-            <button type="button" className="fdry-hall-btn is-primary" onClick={onOpenInbox}>
-              Open Inbox
-            </button>
-          ) : (
+          {standing.gateId !== null ? null : (
             <button type="button" className="fdry-hall-btn is-primary" onClick={onOpenInList}>
               Open in List view
             </button>

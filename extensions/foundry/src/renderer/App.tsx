@@ -8,22 +8,22 @@ import { FactorySite } from '../components/factory/FactorySite.js'
 import { FactoryHall } from '../components/factory/FactoryHall.js'
 import type { FactoryOrderRow } from '../components/factory/FactorySite.js'
 
-// Three surfaces, and a way into settings.
+// Two surfaces, and a way into settings.
 //
-// The inbox is home because it is the one surface the operator is required to
-// visit: everything a rule raises reaches them there, ranked by how much work
-// it unblocks. The Forge is where an idea becomes an agreed order, and where
-// an order that is already running is watched. The Ledger is the record, and
-// the only place the factory ever argues back — on request.
+// The Forge is home: it is where an idea becomes an agreed order, and where an
+// order that is already running is watched. Everything a rule raises sits in a
+// band across its top, ranked by how much work it unblocks, and the band is
+// gone when nothing is waiting — the Inbox used to be a tab of its own, and
+// between runs that tab was an empty page you landed on. The Ledger is the
+// record, and the only place the factory ever argues back — on request.
 //
 // What used to be here — a board, a card drawer, a phase rail, a new-card
 // dialog and a ticket importer — went with the pipeline underneath it. A board
 // is a place to notice things; an inbox is a place things come to.
 
-type Surface = 'inbox' | 'forge' | 'ledger'
+type Surface = 'forge' | 'ledger'
 
 const SURFACES: readonly { id: Surface; label: string }[] = [
-  { id: 'inbox', label: 'Inbox' },
   { id: 'forge', label: 'Forge' },
   { id: 'ledger', label: 'Ledger' },
 ]
@@ -41,14 +41,14 @@ export function App(): JSX.Element {
   const [repoRoot, setRepoRoot] = useState<string | null>(
     new URLSearchParams(window.location.search).get('repoRoot')
   )
-  const [surface, setSurface] = useState<Surface>('inbox')
+  const [surface, setSurface] = useState<Surface>('forge')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [waiting, setWaiting] = useState<Attention>({ inbox: 0, forge: 0 })
   const [focusIdeaSignal, setFocusIdeaSignal] = useState(0)
 
   // The Forge's own view: a list of orders, or a hall drawn from the run
   // graph. Per-operator (`terminator.foundry.view`), never per-order — the
-  // Inbox, Ledger and Settings are unaffected either way.
+  // Ledger and Settings are unaffected either way.
   const [factoryView, setFactoryView] = useState<'list' | 'factory'>('list')
   // The hall currently open, or null for the site (the grid of every hall).
   const [factoryOrder, setFactoryOrder] = useState<FactoryOrderRow | null>(null)
@@ -122,7 +122,7 @@ export function App(): JSX.Element {
 
   // The counts, on the one piece of chrome that is on screen whatever surface
   // you are looking at. Everything Foundry holds for a person lives behind one
-  // of these three tabs, and until this existed a tab said nothing until you
+  // of these tabs, and until this existed a tab said nothing until you
   // clicked it — so an open question or a held tool call was only ever found
   // by somebody who went looking for it on the off chance.
   useEffect(() => {
@@ -164,8 +164,9 @@ export function App(): JSX.Element {
         <span className="sk-appbar__title">Foundry</span>
         <nav className="fdry-tabs" aria-label="Foundry surfaces">
           {SURFACES.map((tab) => {
-            const count =
-              tab.id === 'inbox' ? waiting.inbox : tab.id === 'forge' ? waiting.forge : 0
+            // The queue above the Forge and the Forge's own questions are one
+            // screen, so they are one count.
+            const count = tab.id === 'forge' ? waiting.inbox + waiting.forge : 0
             return (
               <button
                 key={tab.id}
@@ -231,7 +232,7 @@ export function App(): JSX.Element {
         </button>
       </header>
 
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {settingsOpen ? (
           <div className="sk-settings-wrap">
             <button aria-label="Back" className="sk-btn" onClick={() => setSettingsOpen(false)}>
@@ -239,38 +240,41 @@ export function App(): JSX.Element {
             </button>
             <SettingsView />
           </div>
-        ) : surface === 'inbox' ? (
-          <Inbox
-            onOpenOrder={(orderId) => {
-              setFactoryOrder(null)
-              setFactoryView('list')
-              setListOpenOrderId(orderId)
-              setSurface('forge')
-            }}
-          />
         ) : surface === 'ledger' ? (
           <Ledger />
-        ) : factoryView === 'factory' ? (
-          factoryOrder === null ? (
-            <FactorySite repoRoot={repoRoot} onOpen={openFromSite} />
-          ) : (
-            <FactoryHall
-              orderId={factoryOrder.id}
-              onOpenInbox={() => setSurface('inbox')}
-              onOpenInList={() => {
-                setListOpenOrderId(factoryOrder.id)
+        ) : (
+          <>
+            <Inbox
+              onOpenOrder={(orderId) => {
                 setFactoryOrder(null)
                 setFactoryView('list')
+                setListOpenOrderId(orderId)
               }}
-              onBack={() => setFactoryOrder(null)}
             />
-          )
-        ) : (
-          <Orders
-            repoRoot={repoRoot}
-            focusIdeaSignal={focusIdeaSignal}
-            openOrderId={listOpenOrderId}
-          />
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              {factoryView === 'factory' ? (
+                factoryOrder === null ? (
+                  <FactorySite repoRoot={repoRoot} onOpen={openFromSite} />
+                ) : (
+                  <FactoryHall
+                    orderId={factoryOrder.id}
+                    onOpenInList={() => {
+                      setListOpenOrderId(factoryOrder.id)
+                      setFactoryOrder(null)
+                      setFactoryView('list')
+                    }}
+                    onBack={() => setFactoryOrder(null)}
+                  />
+                )
+              ) : (
+                <Orders
+                  repoRoot={repoRoot}
+                  focusIdeaSignal={focusIdeaSignal}
+                  openOrderId={listOpenOrderId}
+                />
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>

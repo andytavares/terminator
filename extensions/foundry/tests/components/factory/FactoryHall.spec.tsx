@@ -66,12 +66,10 @@ function mount(
     activity?: Record<string, unknown>
     lines?: unknown[]
     metrics?: Record<string, unknown>[]
-    onOpenInbox?: () => void
     onBack?: () => void
     onOpenInList?: () => void
   } = {}
 ) {
-  const onOpenInbox = props.onOpenInbox ?? vi.fn()
   const onBack = props.onBack ?? vi.fn()
   const onOpenInList = props.onOpenInList ?? vi.fn()
   invoke = vi.fn(async (channel: string) => {
@@ -88,15 +86,8 @@ function mount(
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     shell: { openExternal },
   }
-  render(
-    <FactoryHall
-      orderId="WO-1"
-      onOpenInbox={onOpenInbox}
-      onOpenInList={onOpenInList}
-      onBack={onBack}
-    />
-  )
-  return { onOpenInbox, onOpenInList, onBack }
+  render(<FactoryHall orderId="WO-1" onOpenInList={onOpenInList} onBack={onBack} />)
+  return { onOpenInList, onBack }
 }
 
 beforeEach(() => {
@@ -185,8 +176,10 @@ describe('FactoryHall', () => {
     expect(screen.queryByText('Building')).toBeNull()
   })
 
-  it('opens the inbox from the standing band when it is the operator’s move', async () => {
-    const { onOpenInbox } = mount({
+  // The gate itself is in the queue above the hall; the band names the move and
+  // sends nobody to a surface that no longer exists.
+  it('names a gated move without a button to somewhere else', async () => {
+    mount({
       view: view({
         standing: {
           kind: 'halted',
@@ -201,12 +194,12 @@ describe('FactoryHall', () => {
       }),
     })
     await waitFor(() => screen.getByText('Halted — your move'))
-    fireEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
-    expect(onOpenInbox).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open in List view' })).toBeNull()
   })
 
-  it('sends a move with no gate behind it to the List view, never to an empty Inbox', async () => {
-    const { onOpenInbox, onOpenInList } = mount({
+  it('sends a move with no gate behind it to the List view', async () => {
+    const { onOpenInList } = mount({
       view: view({
         standing: {
           kind: 'adrift',
@@ -224,7 +217,6 @@ describe('FactoryHall', () => {
     expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Open in List view' }))
     expect(onOpenInList).toHaveBeenCalled()
-    expect(onOpenInbox).not.toHaveBeenCalled()
   })
 
   it('opens a station’s monitor and attaches to it', async () => {
@@ -300,9 +292,7 @@ describe('FactoryHall', () => {
     ;(window as unknown as Record<string, unknown>).electronAPI = {
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     }
-    render(
-      <FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onOpenInList={vi.fn()} onBack={vi.fn()} />
-    )
+    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
     await screen.findByRole('button', { name: /Build the other/ })
     current = two('passed')
     await waitFor(
@@ -326,9 +316,7 @@ describe('FactoryHall', () => {
     ;(window as unknown as Record<string, unknown>).electronAPI = {
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     }
-    render(
-      <FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onOpenInList={vi.fn()} onBack={vi.fn()} />
-    )
+    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     current = view({
       graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
@@ -468,9 +456,7 @@ describe('FactoryHall', () => {
     ;(window as unknown as Record<string, unknown>).electronAPI = {
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     }
-    render(
-      <FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onOpenInList={vi.fn()} onBack={vi.fn()} />
-    )
+    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
   }
 
   const plateText = () =>
@@ -568,7 +554,7 @@ describe('FactoryHall', () => {
     ;(window as unknown as Record<string, unknown>).electronAPI = {
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     }
-    render(<FactoryHall orderId="WO-1" onOpenInbox={vi.fn()} onBack={vi.fn()} />)
+    render(<FactoryHall orderId="WO-1" onBack={vi.fn()} />)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))
     await waitFor(() => screen.getByRole('button', { name: /ATTACH/ }))

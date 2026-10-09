@@ -284,35 +284,30 @@ function mountApp(attention: { inbox: number; forge: number }) {
 }
 
 describe('the tab strip says how much is waiting', () => {
-  it('counts each surface separately', async () => {
+  // The queue above the Forge and the Forge's own questions share one screen,
+  // so they share one count.
+  it('counts the queue and the Forge together, on the Forge', async () => {
     const { container } = mountApp({ inbox: 3, forge: 2 })
-    await waitFor(() => expect(container.querySelectorAll('.fdry-tab-count')).toHaveLength(2))
-    const counts = [...container.querySelectorAll('.fdry-tab-count')].map((n) => n.textContent)
-    expect(counts).toEqual(['3', '2'])
+    await waitFor(() => expect(container.querySelectorAll('.fdry-tab-count')).toHaveLength(1))
+    expect(container.querySelector('.fdry-tab-count')?.textContent).toBe('5')
   })
 
   it('says what the number means, rather than reading out a bare digit', async () => {
     mountApp({ inbox: 3, forge: 0 })
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Inbox, 3 waiting on you' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Forge, 3 waiting on you' })).toBeTruthy()
     )
-  })
-
-  it('leaves an unbadged tab addressable by its plain name', async () => {
-    mountApp({ inbox: 3, forge: 0 })
-    await waitFor(() => screen.getByRole('button', { name: 'Inbox, 3 waiting on you' }))
-    expect(screen.getByRole('button', { name: 'Forge' })).toBeTruthy()
   })
 
   it('shows no badge at all when nothing is waiting', async () => {
     const { container } = mountApp({ inbox: 0, forge: 0 })
-    await waitFor(() => screen.getByRole('button', { name: 'Inbox' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Forge' }))
     expect(container.querySelectorAll('.fdry-tab-count')).toHaveLength(0)
   })
 
   it('never puts a count on the Ledger, which holds nothing for anybody', async () => {
     mountApp({ inbox: 3, forge: 2 })
-    await waitFor(() => screen.getByRole('button', { name: 'Inbox, 3 waiting on you' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Forge, 5 waiting on you' }))
     expect(screen.getByRole('button', { name: 'Ledger' })).toBeTruthy()
   })
 })
