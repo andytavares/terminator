@@ -1557,6 +1557,15 @@
 .rich-content li {
   margin-bottom: 3px;
 }
+.rich-content details {
+  margin: 0 0 8px;
+}
+.rich-content summary {
+  cursor: pointer;
+}
+.rich-content img {
+  max-width: 100%;
+}
 
 /* ─── FullFileList ────────────────────────────────────────────────────────── */
 

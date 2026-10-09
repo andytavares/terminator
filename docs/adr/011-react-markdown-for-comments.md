@@ -1,7 +1,7 @@
 # ADR-011: `react-markdown` + `remark-gfm` for Comment Body Rendering
 
 **Date**: 2026-05-07
-**Status**: Accepted
+**Status**: Superseded by ADR-091
 **Branch**: `003-pr-review`
 
 ## Decision
