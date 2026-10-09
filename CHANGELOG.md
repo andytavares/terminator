@@ -65,6 +65,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Foundry's Factory view lines up.** The Active section no longer shares a row with the status wall, which had left a large empty gap above Completed, and "Nothing running." is indented to match its heading.
+- **Foundry asks a risk question once.** It used to stop after the work for triggers the agreed plan had already declared (such as a planned new dependency), for the README and CHANGELOG the scribe always writes, and for lockfile lines counted as a "large change". It then asked again before pushing, after you had already approved. Now only a trigger the plan did not declare stops the run, an approval covers the push, and a waiting push says it is waiting on you instead of claiming you chose "hold". See ADR-092
 - **PR descriptions and comments render the HTML in them.** `<details>`/`<summary>` disclosures, `<br>`, `<sub>`, `<img>` and `<a>` in PR bodies, PR comments, inline review comments, agent notes and the composer preview now render as elements instead of literal tag text, through a sanitising allowlist (`rehype-raw` + `rehype-sanitize`): scripts, frames, styles, `on*` handlers and `javascript:` links are removed. Core issue rendering is unchanged. See ADR-091, which supersedes ADR-011
 
 - **Excluded branches stay out of the review lists.** A pull request opened from a branch that matches Settings → Git → Branch Exclude Patterns (for example `renovate/*`) no longer shows in the Reviews dashboard or in a repository's review queue, and isn't counted there. Looking a pull request up by its number still finds it. The Git extension asks the core through `api.settings.isBranchExcluded` (Extension API 2.8.0)

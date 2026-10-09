@@ -293,93 +293,99 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
           <MetricsTiles metrics={metrics} />
         )}
       </aside>
-      {signals.length > 0 ? (
-        <div className="fdry-dock" aria-label="Dock">
-          <h3 className="fdry-panel-h">Dock</h3>
-          {dockProblem !== null ? <p className="fdry-problem">{dockProblem}</p> : null}
-          {promoted !== null ? <p className="fdry-note">{promoted}</p> : null}
-          <div className="fdry-dock-crates">
-            {signals.map((signal) => (
-              <div key={signal.id} className="fdry-crate">
-                <b>{signal.title}</b>
-                <span className="fdry-crate-meta">
-                  ×{signal.occurrences} · {signal.severity}
-                </span>
-                {promoting === signal.id ? (
-                  <div className="fdry-crate-promote">
-                    <label>
-                      Repository
-                      <input
-                        type="text"
-                        value={repoDraft}
-                        placeholder="/path/to/repo"
-                        onChange={(event) => setRepoDraft(event.target.value)}
-                      />
-                    </label>
+      <div className="fdry-site-main">
+        {signals.length > 0 ? (
+          <div className="fdry-dock" aria-label="Dock">
+            <h3 className="fdry-panel-h">Dock</h3>
+            {dockProblem !== null ? <p className="fdry-problem">{dockProblem}</p> : null}
+            {promoted !== null ? <p className="fdry-note">{promoted}</p> : null}
+            <div className="fdry-dock-crates">
+              {signals.map((signal) => (
+                <div key={signal.id} className="fdry-crate">
+                  <b>{signal.title}</b>
+                  <span className="fdry-crate-meta">
+                    ×{signal.occurrences} · {signal.severity}
+                  </span>
+                  {promoting === signal.id ? (
+                    <div className="fdry-crate-promote">
+                      <label>
+                        Repository
+                        <input
+                          type="text"
+                          value={repoDraft}
+                          placeholder="/path/to/repo"
+                          onChange={(event) => setRepoDraft(event.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="is-primary"
+                        disabled={repoDraft.trim() === ''}
+                        onClick={() => void confirmPromote(signal.id)}
+                      >
+                        Confirm promote
+                      </button>
+                      <button type="button" onClick={() => setPromoting(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
                     <button
                       type="button"
                       className="is-primary"
-                      disabled={repoDraft.trim() === ''}
-                      onClick={() => void confirmPromote(signal.id)}
+                      onClick={() => startPromote(signal)}
                     >
-                      Confirm promote
+                      Promote
                     </button>
-                    <button type="button" onClick={() => setPromoting(null)}>
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button type="button" className="is-primary" onClick={() => startPromote(signal)}>
-                    Promote
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {rows.length === 0 ? (
-        <p className="fdry-note">No orders yet. Start one from the List view.</p>
-      ) : (
-        <>
-          <section className="fdry-hall-section" aria-label="Active">
-            <h3 className="fdry-panel-h">Active</h3>
-            {active.length === 0 ? (
-              <p className="fdry-note">Nothing running.</p>
-            ) : (
-              <HallGrid rows={active} onOpen={onOpen} />
-            )}
-          </section>
-          {completed.length > 0 ? (
-            <section className="fdry-hall-section" aria-label="Completed">
-              <h3 className="fdry-panel-h fdry-group-h--done">Completed</h3>
-              <HallGrid rows={completed} onOpen={onOpen} />
-            </section>
-          ) : null}
-        </>
-      )}
-      {/* The refinery: which orders sit behind which on disk. Nothing here
-          when no order is queued behind another (R5). */}
-      {chains.length > 0 ? (
-        <section className="fdry-refinery" aria-label="Refinery">
-          <h3 className="fdry-panel-h">Refinery</h3>
-          {chains.map((chain) => (
-            <div key={chain.tokens[0].id} className="fdry-refinery-track">
-              {chain.tokens.map((token, index) => (
-                <React.Fragment key={token.id}>
-                  {index > 0 ? (
-                    <span className="fdry-refinery-join">
-                      {chain.joins[index - 1]}{' '}
-                      {chain.joins[index - 1] === 1 ? 'shared file' : 'shared files'}
-                    </span>
-                  ) : null}
-                  <span className="fdry-refinery-token">{token.title}</span>
-                </React.Fragment>
+                  )}
+                </div>
               ))}
             </div>
-          ))}
-        </section>
-      ) : null}
+          </div>
+        ) : null}
+        {rows.length === 0 ? (
+          <p className="fdry-note">No orders yet. Start one from the List view.</p>
+        ) : (
+          <>
+            <section className="fdry-hall-section" aria-label="Active">
+              <h3 className="fdry-panel-h">Active</h3>
+              {active.length === 0 ? (
+                <p className="fdry-note">Nothing running.</p>
+              ) : (
+                <HallGrid rows={active} onOpen={onOpen} />
+              )}
+            </section>
+            {completed.length > 0 ? (
+              <section className="fdry-hall-section" aria-label="Completed">
+                <h3 className="fdry-panel-h fdry-group-h--done">Completed</h3>
+                <HallGrid rows={completed} onOpen={onOpen} />
+              </section>
+            ) : null}
+          </>
+        )}
+        {/* The refinery: which orders sit behind which on disk. Nothing here
+          when no order is queued behind another (R5). */}
+        {chains.length > 0 ? (
+          <section className="fdry-refinery" aria-label="Refinery">
+            <h3 className="fdry-panel-h">Refinery</h3>
+            {chains.map((chain) => (
+              <div key={chain.tokens[0].id} className="fdry-refinery-track">
+                {chain.tokens.map((token, index) => (
+                  <React.Fragment key={token.id}>
+                    {index > 0 ? (
+                      <span className="fdry-refinery-join">
+                        {chain.joins[index - 1]}{' '}
+                        {chain.joins[index - 1] === 1 ? 'shared file' : 'shared files'}
+                      </span>
+                    ) : null}
+                    <span className="fdry-refinery-token">{token.title}</span>
+                  </React.Fragment>
+                ))}
+              </div>
+            ))}
+          </section>
+        ) : null}
+      </div>
     </div>
   )
 }

@@ -20,9 +20,13 @@ const EMPTY: DiffSummary = { files: 0, added: 0, removed: 0 }
 
 /**
  * Parses `git diff --numstat` output: `<added>\t<removed>\t<path>` per file,
- * with `-` in both count columns for binary files.
+ * with `-` in both count columns for binary files. A file `weighLines` rejects
+ * still counts as changed, but its lines do not.
  */
-export function parseDiffStat(stdout: string): DiffSummary {
+export function parseDiffStat(
+  stdout: string,
+  weighLines: (path: string) => boolean = () => true
+): DiffSummary {
   let files = 0
   let added = 0
   let removed = 0
@@ -41,7 +45,7 @@ export function parseDiffStat(stdout: string): DiffSummary {
     if (!isBinary && (Number.isNaN(addedCount) || Number.isNaN(removedCount))) continue
 
     files += 1
-    if (!isBinary) {
+    if (!isBinary && weighLines(rest.join('\t'))) {
       added += addedCount
       removed += removedCount
     }
@@ -136,7 +140,8 @@ export async function readChangedFiles(
 export async function readDiffSummary(
   worktreePath: string,
   baseBranch: string,
-  run: RunCommand
+  run: RunCommand,
+  weighLines: (path: string) => boolean = () => true
 ): Promise<DiffSummary> {
   try {
     // Against the base itself, not `base...HEAD`: the three-dot form sees only
@@ -144,7 +149,7 @@ export async function readDiffSummary(
     // is most of them — would report having changed nothing at all. Nothing
     // changed means nothing to review, so the review queue could never fill.
     const result = await run('git', ['diff', '--numstat', baseBranch], worktreePath)
-    const tracked = result.ok ? parseDiffStat(result.stdout) : EMPTY
+    const tracked = result.ok ? parseDiffStat(result.stdout, weighLines) : EMPTY
 
     // Plus the files git has never seen, which `git diff` does not report at
     // all — and which are most of what an agent produces.
@@ -153,7 +158,9 @@ export async function readDiffSummary(
       files: tracked.files + untracked.length,
       added:
         tracked.added +
-        untracked.reduce((total, path) => total + addedLinesIn(worktreePath, path), 0),
+        untracked
+          .filter(weighLines)
+          .reduce((total, path) => total + addedLinesIn(worktreePath, path), 0),
       removed: tracked.removed,
     }
   } catch {

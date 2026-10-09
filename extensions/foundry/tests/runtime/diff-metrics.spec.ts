@@ -34,6 +34,15 @@ describe('parseDiffStat', () => {
     })
   })
 
+  it('counts a file it is told not to weigh as changed, but not its lines', () => {
+    const notLockfile = (path: string): boolean => path !== 'package-lock.json'
+    expect(parseDiffStat('198\t3\tpackage-lock.json\n10\t2\tsrc/a.ts\n', notLockfile)).toEqual({
+      files: 2,
+      added: 10,
+      removed: 2,
+    })
+  })
+
   it('handles a file with only additions', () => {
     expect(parseDiffStat('9\t0\tsrc/new.ts\n')).toEqual({ files: 1, added: 9, removed: 0 })
   })

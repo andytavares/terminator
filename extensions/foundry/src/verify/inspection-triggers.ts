@@ -1,6 +1,7 @@
 import { gradeRisk, matchesGlob } from '../runtime/review/risk-grader.js'
 import type { CheckState } from '../runtime/review/risk-grader.js'
 import type { RiskAssessment, WorkOrder } from '../order/schema.js'
+import { isDocumentationRelative } from './documentation-path.js'
 
 // What makes a security inspection run.
 //
@@ -40,6 +41,8 @@ export interface Inspection {
   /** The grader's own words, kept so a gate can show the specific reason. */
   readonly reason: string
   readonly required: boolean
+  /** The triggers the agreed plan did not declare: only these stop for the operator. */
+  readonly unplanned: RiskAssessment['triggers']
 }
 
 /**
@@ -78,9 +81,13 @@ export function inspectionFor(order: WorkOrder, input: InspectionInput): Inspect
 
   // Writing outside what the order declared is itself a trigger: a plan that
   // has quietly grown past what was assessed is the case worth catching.
+  // Documentation is not growth: the scribe writes the README and CHANGELOG
+  // every order owes, wherever the plan's code lives.
   if (order.risk.blastRadius.length > 0) {
     const outside = input.changedFiles.some(
-      (file) => !order.risk.blastRadius.some((prefix) => file === prefix || file.startsWith(prefix))
+      (file) =>
+        !isDocumentationRelative(file) &&
+        !order.risk.blastRadius.some((prefix) => file === prefix || file.startsWith(prefix))
     )
     if (outside) triggers.add('outside_blast_radius')
   }
@@ -90,6 +97,7 @@ export function inspectionFor(order: WorkOrder, input: InspectionInput): Inspect
     triggers: [...triggers],
     reason: graded.trigger,
     required: triggers.size > 0,
+    unplanned: [...triggers].filter((trigger) => !order.risk.triggers.includes(trigger)),
   }
 }
 

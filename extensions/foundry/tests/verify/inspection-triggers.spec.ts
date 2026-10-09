@@ -77,6 +77,30 @@ describe('inspectionFor', () => {
     expect(i.triggers).toContain('outside_blast_radius')
   })
 
+  it('does not count documentation as outside the blast radius', () => {
+    const o = order()
+    o.risk.blastRadius = ['src/renderer/']
+    const i = inspectionFor(
+      o,
+      input(['src/renderer/a.ts', 'CHANGELOG.md', 'README.md', 'docs/adr/1.md'])
+    )
+    expect(i.triggers).not.toContain('outside_blast_radius')
+  })
+
+  it('names as unplanned only the triggers the agreed plan did not declare', () => {
+    const o = order()
+    o.risk.triggers = ['new_dependency']
+    const i = inspectionFor(o, input(['package.json', 'src/auth/session.ts']))
+    expect(i.triggers).toEqual(expect.arrayContaining(['new_dependency', 'authentication']))
+    expect(i.unplanned).toEqual(['authentication'])
+  })
+
+  it('has nothing unplanned when every trigger was declared', () => {
+    const o = order()
+    o.risk.triggers = ['new_dependency']
+    expect(inspectionFor(o, input(['package.json'])).unplanned).toEqual([])
+  })
+
   it('does not trigger while the change stays inside the blast radius', () => {
     const o = order()
     o.risk.blastRadius = ['src/renderer/']

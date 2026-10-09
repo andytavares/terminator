@@ -362,6 +362,17 @@ describe('risk-ordered shipping (FR-055)', () => {
     expect(result.held).toBe(true)
   })
 
+  it('says a held shipping decision waits on the operator, not that they chose to hold', async () => {
+    const result = await shipOrder(
+      order({ risk: { ...order().risk, grade: 'P1' } }),
+      { verdicts: [verdict()], findings: [] },
+      deps({ decide: vi.fn(async () => 'hold') })
+    )
+    expect(result.reason).toBe(
+      'The elevated risk shipping decision is waiting on you, so nothing was pushed yet.'
+    )
+  })
+
   it('asks nobody before pushing at P2', async () => {
     const d = deps({ risk: undefined })
     await shipOrder(
