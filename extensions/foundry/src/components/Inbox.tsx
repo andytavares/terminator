@@ -14,10 +14,10 @@ import {
   Hand,
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
-import { ExternalLink, MarkdownInline } from './Markdown.js'
+import { ExternalLink } from './Markdown.js'
 import type { Signal } from '../sensors/types.js'
 
-// The one surface the operator is required to visit.
+// Everything waiting on the operator, as a band above the Forge.
 //
 // One queue, always sorted by how much work the decision unblocks. Every row
 // names the rule that raised it, shows what it looked at, and says what
@@ -32,27 +32,7 @@ interface InboxView {
   })[]
   /** Orders waiting on you that no gate stands for, with why. */
   waiting?: { orderId: string; title: string; headline: string; detail: string }[]
-  autonomy?: 'escorted' | 'standard' | 'lights-out'
-  /** Rules this setting is not asking about. Shown, so quiet is explicable. */
-  silenced?: GateRuleId[]
-  summary: {
-    waiting: number
-    orders: number
-    automatic: number
-    building: number
-    converging: number
-  }
 }
-
-/** What happened since the operator last looked, rolled up. */
-interface Digest {
-  entryCount: number
-  sessionCount: number
-  bySession: { sessionId: string; entries: { summary: string }[] }[]
-}
-
-/** Where "since you last looked" is remembered. Per viewer, not per run. */
-const LAST_READ_KEY = 'foundry.inbox.lastRead'
 
 /** A sensor as `sensors.list` answers it — just enough to label a signal
  *  and offer its own repository as the default a promotion asks for. */
@@ -109,11 +89,10 @@ export function Inbox({
   onOpenOrder,
 }: {
   onOpenOrder?: (orderId: string) => void
-} = {}): JSX.Element {
+} = {}): JSX.Element | null {
   const [view, setView] = useState<InboxView | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
-  const [digest, setDigest] = useState<Digest | null>(null)
   const [signals, setSignals] = useState<Signal[]>([])
   const [sensors, setSensors] = useState<SensorRow[]>([])
   const [promoting, setPromoting] = useState<string | null>(null)
@@ -137,24 +116,6 @@ export function Inbox({
   const refresh = useCallback(async () => {
     await refreshList()
     await refreshSignals()
-
-    // "Nothing needs you" is only reassuring if it also says what happened
-    // while you were not looking. When it was is a property of the person
-    // reading, not of the runs, so it lives in their own browser.
-    let since = Date.now() - 24 * 60 * 60 * 1000
-    try {
-      const stored = window.localStorage.getItem(LAST_READ_KEY)
-      if (stored !== null) since = Number(stored)
-    } catch {
-      // A private window, or storage turned off. A day is a fine default.
-    }
-    const rolled = (await invoke('foundry:feed-digest', { from: since })) as Digest
-    setDigest(rolled)
-    try {
-      window.localStorage.setItem(LAST_READ_KEY, String(Date.now()))
-    } catch {
-      // Nothing here is worth failing the surface for.
-    }
   }, [refreshList, refreshSignals])
 
   useEffect(() => {
@@ -162,7 +123,7 @@ export function Inbox({
   }, [refresh])
 
   // Sensors record signals on their own tick, and an order can start waiting
-  // on you at any moment, so both are read again while the Inbox is open
+  // on you at any moment, so both are read again while the band is mounted
   // rather than only when it mounts.
   useEffect(() => {
     const timer = setInterval(() => {
@@ -231,12 +192,19 @@ export function Inbox({
     [refreshSignals]
   )
 
-  if (view === null) return <div className="fdry-empty">Loading…</div>
+  if (view === null) return null
 
   const waiting = view.waiting ?? []
+  const quiet =
+    waiting.length === 0 &&
+    view.gates.length === 0 &&
+    signals.length === 0 &&
+    problem === null &&
+    promoted === null
+  if (quiet) return null
 
   return (
-    <div className="fdry-shell">
+    <section className="fdry-inbox" aria-label="Waiting on you">
       {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
       {waiting.length > 0 ? (
         <ul className="fdry-queue" aria-label="Orders waiting on you">
@@ -267,30 +235,7 @@ export function Inbox({
           ))}
         </ul>
       ) : null}
-      {view.gates.length === 0 && waiting.length > 0 ? null : view.gates.length === 0 ? (
-        <div className="fdry-nothing">
-          <CheckCircle2 aria-hidden="true" />
-          <p>Nothing needs you.</p>
-          {(view.silenced?.length ?? 0) > 0 ? (
-            <small className="fdry-silenced">
-              On <b>{view.autonomy}</b> it decides these for you:{' '}
-              {view.silenced?.map((rule) => ruleInWords(rule)).join('; ')}.
-            </small>
-          ) : null}
-          {digest !== null && digest.entryCount > 0 ? (
-            <small>
-              {digest.entryCount} things happened across {digest.sessionCount}{' '}
-              {digest.sessionCount === 1 ? 'run' : 'runs'} since you last looked
-              {digest.bySession[0]?.entries[0] !== undefined ? (
-                <>
-                  {' — most recently: '}
-                  <MarkdownInline text={digest.bySession[0].entries[0].summary} />
-                </>
-              ) : null}
-            </small>
-          ) : null}
-        </div>
-      ) : (
+      {view.gates.length === 0 ? null : (
         <ul className="fdry-queue">
           {view.gates.map((gate) => {
             const Icon = RULE_ICON[gate.rule]
@@ -394,18 +339,6 @@ export function Inbox({
           </ul>
         </section>
       ) : null}
-
-      <footer className="fdry-queue-foot">
-        <span>
-          <b>{view.summary.building}</b> orders building
-        </span>
-        <span>
-          <b>{view.summary.converging}</b> converging
-        </span>
-        <span>
-          <b>{view.summary.automatic}</b> decisions taken by rule
-        </span>
-      </footer>
-    </div>
+    </section>
   )
 }

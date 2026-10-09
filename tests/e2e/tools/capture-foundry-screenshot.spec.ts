@@ -226,7 +226,7 @@ test('capture the Foundry surfaces', async () => {
   )
 
   // Back out to the list and in again, so the surface re-reads the order.
-  await openSurface('Inbox')
+  await openSurface('Ledger')
   await openSurface('Forge')
   await handle.app.evaluate(async ({ webContents }) => {
     const view = webContents

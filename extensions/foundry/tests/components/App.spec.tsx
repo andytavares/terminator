@@ -5,7 +5,7 @@ import { App } from '../../src/renderer/App.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 
-// Three surfaces and a way into settings. The board, the card drawer, the phase
+// Two surfaces and a way into settings. The board, the card drawer, the phase
 // rail and the ticket importer are gone with the pipeline underneath them, so
 // what is left to assert here is small — which is the point.
 
@@ -119,31 +119,71 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/?repoRoot=/repo')
 })
 
+const waitingRow = {
+  orderId: 'WO-1008-287',
+  title: 'render html in comments',
+  headline: 'Ready to hand off',
+  detail: 'Every check passes.',
+}
+
 describe('App', () => {
-  it('renders the inbox as the home surface', async () => {
+  it('opens on the Forge', async () => {
     render(<App />)
     expect(screen.getByText('Foundry')).toBeTruthy()
-    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
-  })
-
-  it('reaches the Forge from its own tab', async () => {
-    render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
+    expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
     await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
   })
 
-  it('comes back to the inbox', async () => {
+  // The Inbox was a tab of its own, and with nothing waiting it was a page with
+  // nothing on it — the page the operator landed on.
+  it('has no Inbox tab', () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
+    expect(screen.queryByRole('button', { name: /^Inbox/ })).toBeNull()
+  })
+
+  it('shows nothing above the Forge when nothing is waiting', async () => {
+    render(<App />)
     await waitFor(() => screen.getByText(/no orders yet/i))
-    fireEvent.click(screen.getByRole('button', { name: 'Inbox' }))
-    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+    await waitFor(() => expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:inbox.list', {}))
+    expect(screen.queryByRole('region', { name: 'Waiting on you' })).toBeNull()
+  })
+
+  it('puts what is waiting above the Forge, before anything else on it', async () => {
+    inboxWaiting = [waitingRow]
+    render(<App />)
+    const band = await screen.findByRole('region', { name: 'Waiting on you' })
+    const forge = await screen.findByText(/no orders yet/i)
+    expect(band.textContent).toContain('render html in comments')
+    expect(band.compareDocumentPosition(forge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps what is waiting above the factory view too', async () => {
+    inboxWaiting = [waitingRow]
+    currentView = 'factory'
+    render(<App />)
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Factory view' }).getAttribute('aria-pressed')
+      ).toBe('true')
+    )
+    expect(await screen.findByRole('region', { name: 'Waiting on you' })).toBeTruthy()
+  })
+
+  it('does not put it over the Ledger', async () => {
+    inboxWaiting = [waitingRow]
+    render(<App />)
+    await screen.findByRole('region', { name: 'Waiting on you' })
+    fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
+    await waitFor(() => screen.getByText('Nothing recorded yet.'))
+    expect(screen.queryByRole('region', { name: 'Waiting on you' })).toBeNull()
   })
 
   it('marks which surface is showing, for anything reading state rather than colour', () => {
     render(<App />)
-    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Ledger' }).getAttribute('aria-pressed')).toBe(
+      'false'
+    )
   })
 
   it('opens settings and comes back', async () => {
@@ -151,7 +191,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     await waitFor(() => expect(screen.getByRole('button', { name: /back/i })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
-    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
   })
 
   // Settings covers the surfaces rather than sitting beside them, so while it
@@ -161,7 +201,7 @@ describe('App', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     await waitFor(() => screen.getByRole('button', { name: /back/i }))
-    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByRole('button', { name: 'Ledger' }).getAttribute('aria-pressed')).toBe(
       'false'
     )
@@ -189,9 +229,9 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Ledger' }).getAttribute('aria-pressed')).toBe('true')
   })
 
-  // The Inbox names an order waiting on you; its button has to land on that
-  // order, not on the Forge's list where it is one row of many.
-  it('opens a waiting order from the Inbox in the Forge', async () => {
+  // A waiting row names an order; its button has to land on that order, not on
+  // the Forge's list where it is one row of many.
+  it('opens a waiting order in the Forge', async () => {
     orderRows = [
       {
         id: 'WO-1008-287',
@@ -212,29 +252,12 @@ describe('App', () => {
         },
       },
     ]
-    inboxWaiting = [
-      {
-        orderId: 'WO-1008-287',
-        title: 'render html in comments',
-        headline: 'Ready to hand off',
-        detail: 'Every check passes.',
-      },
-    ]
+    inboxWaiting = [waitingRow]
     render(<App />)
     fireEvent.click(
       await screen.findByRole('button', { name: 'Open render html in comments in the Forge' })
     )
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe(
-        'true'
-      )
-    )
     await waitFor(() => expect(screen.getByRole('button', { name: 'All orders' })).toBeTruthy())
-  })
-
-  it('asks the inbox what needs the operator, on load', async () => {
-    render(<App />)
-    await waitFor(() => expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:inbox.list', {}))
   })
 
   it('closes settings when the workspace changes underneath it', async () => {
@@ -242,7 +265,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     await waitFor(() => screen.getByRole('button', { name: /back/i }))
     bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
-    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
   })
 })
 
@@ -253,25 +276,20 @@ describe('the Ledger surface', () => {
     await waitFor(() => expect(screen.getByText('Nothing recorded yet.')).toBeTruthy())
   })
 
-  it('is not home — the inbox is', async () => {
-    render(<App />)
-    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
-    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-pressed')).toBe('true')
-  })
-
-  it('comes back to the inbox', async () => {
+  it('comes back to the Forge', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
     await waitFor(() => screen.getByText('Nothing recorded yet.'))
-    fireEvent.click(screen.getByRole('button', { name: 'Inbox' }))
-    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
+    await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
   })
 })
 
 describe('the New work order quick action', () => {
   it('brings the Forge forward and focuses the idea box when the extension asks', async () => {
     render(<App />)
-    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
+    await waitFor(() => screen.getByText('Nothing recorded yet.'))
     bridgeHandlers['foundry:ui.open-new-order']({})
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe(
@@ -310,12 +328,13 @@ describe('the New work order quick action', () => {
   })
 })
 
-// The toggle only exists on the Forge surface — Inbox, Ledger and Settings
-// draw exactly as they did before this feature.
+// The toggle only exists on the Forge surface — the Ledger and Settings draw
+// exactly as they did before this feature.
 describe('the Factory view toggle', () => {
   it('is not offered outside the Forge', async () => {
     render(<App />)
-    await waitFor(() => expect(screen.getByText(/nothing needs you/i)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
+    await waitFor(() => screen.getByText('Nothing recorded yet.'))
     expect(screen.queryByRole('button', { name: 'Factory view' })).toBeNull()
   })
 
@@ -425,7 +444,10 @@ describe('the Factory view toggle', () => {
     expect(screen.getByText(/no orders yet/i)).toBeTruthy()
   })
 
-  it('opens the inbox from a hall band', async () => {
+  // The gate is in the queue above the hall, so the hall's own band no longer
+  // sends you anywhere to find it.
+  it('keeps a gated hall under the queue that answers it', async () => {
+    inboxWaiting = [waitingRow]
     orderRows = [
       {
         id: 'WO-1',
@@ -463,12 +485,8 @@ describe('the Factory view toggle', () => {
     await waitFor(() => screen.getByText('Working order'))
     fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
     await waitFor(() => screen.getByText('Halted — your move'))
-    fireEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-pressed')).toBe(
-        'true'
-      )
-    )
+    expect(screen.getByRole('region', { name: 'Waiting on you' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
   })
 
   it('opens a hall band with no gate behind it in the List view', async () => {

@@ -124,7 +124,8 @@ function clickByName(name: string): Promise<boolean> {
     var all = document.querySelectorAll('button')
     for (var i = 0; i < all.length; i++) {
       var label = (all[i].getAttribute('aria-label') || all[i].textContent || '').trim()
-      if (label === ${'' + JSON.stringify(name) + ''}) { all[i].click(); return true }
+      // A tab with something waiting is named "Forge, 1 waiting on you".
+      if (label === ${'' + JSON.stringify(name) + ''} || label.indexOf(${'' + JSON.stringify(name + ',') + ''}) === 0) { all[i].click(); return true }
     }
     return false
   })()`)
@@ -162,7 +163,7 @@ test('an order fits the view it is shown in', async () => {
 
 test('no text on any Foundry surface renders at the browser default size', async () => {
   const found: Oversized[] = []
-  for (const surface of ['Forge', 'Floor', 'Inbox', 'Ledger']) {
+  for (const surface of ['Forge', 'Floor', 'Ledger']) {
     await clickByName(surface)
     // Not every surface is necessarily selectable in this fixture (`Floor`
     // has nothing running to show), so what is waited for is the view

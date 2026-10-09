@@ -611,7 +611,7 @@ Features:
 
 ## 16. Extension: Foundry
 
-![The Foundry inbox](screenshots/08-foundry-tab.png)
+![Foundry](screenshots/08-foundry-tab.png)
 
 Foundry is a **software factory**. You give it an idea — typed in, or a Linear
 or Jira issue — and it converges that into a **work order** you can read and
@@ -625,18 +625,20 @@ because nothing stops unless a **named rule** fires.
 
 ### Opening Foundry
 
-Click the **Foundry** tab in the content area tab bar. Three surfaces, and the
-one you land on is the inbox.
+Click the **Foundry** tab in the content area tab bar. Two surfaces — the
+Forge and the Ledger — and the one you land on is the Forge.
 
-**A tab carries a count when something behind it is waiting on you** — gates on
-the inbox, open questions and held tool calls on the Forge. The tab strip is
-above the scroll area, so the count is on screen whichever surface you are
-looking at, and it is the same number the surface itself will show you.
+**The Forge tab carries a count when something is waiting on you** — gates and
+waiting orders in the queue across its top, open questions and held tool calls
+in the Forge itself. The tab strip is above the scroll area, so the count is on
+screen whichever surface you are looking at.
 
-### Inbox — the only surface you have to visit
+### Waiting on you — the band across the top of the Forge
 
-One queue, always sorted by how much work each decision unblocks. Every row
-says:
+When a rule fires or an order is waiting on you, a band appears across the top
+of the Forge, above the list, the factory view or an open order. When nothing
+is waiting, there is no band. One queue, always sorted by how much work each
+decision unblocks. Every row says:
 
 - **which rule raised it** — `risk.p0`, `budget.exceeded`, `destructive`,
   `ready-for-review`, and five more;
@@ -649,15 +651,11 @@ says:
 
 The same line is used for the gate holding an order on its Floor.
 
-Above the gates, the Inbox lists every order that is waiting on you without a
+Above the gates, the band lists every order that is waiting on you without a
 gate: a draft **Ready to hand off**, a draft whose **Shaping stopped** (it
 names the check that still fails), or a run that **did not start** (it says
-why). Each row has an **Open** button that takes you to that order in the
-Forge. These rows count toward the Inbox badge.
-
-When nothing has fired and nothing is waiting, it says "Nothing needs you" and tells you what is
-building, what is converging, and how many decisions were taken by rule while
-you were away.
+why). Each row has an **Open** button that opens that order below. These rows
+count toward the Forge badge.
 
 **The autonomy dial** (Settings → Foundry) decides which rules are live.
 Four are live at every setting — the highest risk grade, an exceeded budget,

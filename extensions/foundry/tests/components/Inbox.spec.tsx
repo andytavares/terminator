@@ -73,9 +73,6 @@ function mount(over: Record<string, unknown> = {}) {
         },
       }
     }
-    if (channel === 'foundry:feed-digest') {
-      return over.digest ?? { entryCount: 0, sessionCount: 0, bySession: [] }
-    }
     if (channel === 'foundry:inbox.decide') return over.decide ?? { ok: true }
     if (channel === 'foundry:signals.list') {
       return { signals: liveSignals, counts: { open: liveSignals.length } }
@@ -95,7 +92,7 @@ function mount(over: Record<string, unknown> = {}) {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     shell: { openExternal },
   }
-  render(<Inbox onOpenOrder={over.onOpenOrder as ((id: string) => void) | undefined} />)
+  return render(<Inbox onOpenOrder={over.onOpenOrder as ((id: string) => void) | undefined} />)
 }
 
 describe('an order waiting on you with no gate', () => {
@@ -115,7 +112,6 @@ describe('an order waiting on you with no gate', () => {
     await waitFor(() => screen.getByText('Ready to hand off'))
     expect(screen.getByText('render html in comments')).toBeTruthy()
     expect(screen.getByText(/hand it off in the Forge/)).toBeTruthy()
-    expect(screen.queryByText('Nothing needs you.')).toBeNull()
   })
 
   it('opens the order in the Forge', async () => {
@@ -247,110 +243,38 @@ describe('raising a budget from the inbox', () => {
   })
 })
 
-describe('nothing needs you', () => {
-  it('says so', async () => {
-    mount()
-    await waitFor(() => expect(screen.getByText('Nothing needs you.')).toBeTruthy())
+// The queue sits above the Forge, so with nothing in it there is nothing to
+// show: an empty page was where the operator landed between runs.
+describe('nothing waiting', () => {
+  it('renders nothing at all', async () => {
+    const { container } = mount()
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:signals.list', {}))
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:inbox.list', {}))
+    expect(container.innerHTML).toBe('')
   })
 
-  it('says what happened while you were not looking', async () => {
-    mount({
-      digest: {
-        entryCount: 7,
-        sessionCount: 2,
-        bySession: [{ sessionId: 's-1', entries: [{ summary: 'ran the tests' }] }],
-      },
+  it('keeps a promotion note up after the last signal goes', async () => {
+    mount({ signals: [signal()] })
+    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    fireEvent.change(screen.getByRole('textbox', { name: /repository/i }), {
+      target: { value: '/repos/app' },
     })
-    await waitFor(() => expect(screen.getByText(/7 things happened across 2 runs/)).toBeTruthy())
-    expect(screen.getByText(/ran the tests/)).toBeTruthy()
-  })
-
-  it('renders the most recent line as markdown', async () => {
-    mount({
-      digest: {
-        entryCount: 1,
-        sessionCount: 1,
-        bySession: [{ sessionId: 's-1', entries: [{ summary: 'edited `a.ts`' }] }],
-      },
-    })
-    await waitFor(() => screen.getByText('a.ts'))
-    expect(screen.getByText('a.ts').tagName).toBe('CODE')
-  })
-
-  it('stays quiet when nothing happened', async () => {
-    mount()
-    await waitFor(() => screen.getByText('Nothing needs you.'))
-    expect(screen.queryByText(/things happened/)).toBeNull()
-  })
-
-  it('asks from when it last looked, and remembers that it looked', async () => {
-    window.localStorage.setItem('foundry.inbox.lastRead', '1700000000000')
-    mount()
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:feed-digest', { from: 1700000000000 })
-    )
-    await waitFor(() =>
-      expect(Number(window.localStorage.getItem('foundry.inbox.lastRead'))).toBeGreaterThan(
-        1700000000000
-      )
-    )
-  })
-
-  it('falls back to a day when nothing was remembered', async () => {
-    mount()
-    await waitFor(() => screen.getByText('Nothing needs you.'))
-    const from = (
-      invoke.mock.calls.find((c) => c[0] === 'foundry:feed-digest')?.[1] as {
-        from: number
+    invoke.mockImplementation(async (channel: string) => {
+      if (channel === 'foundry:signals.promote') return { order: { id: 'WO-9' } }
+      if (channel === 'foundry:inbox.list') {
+        return {
+          gates: [],
+          waiting: [],
+          summary: { waiting: 0, orders: 0, automatic: 0, building: 0, converging: 0 },
+        }
       }
-    ).from
-    expect(Date.now() - from).toBeGreaterThan(23 * 60 * 60 * 1000)
-  })
-
-  it('still renders when storage refuses to answer', async () => {
-    const original = window.localStorage.getItem
-    // A private window, or site data turned off. Neither is a reason to show
-    // nothing.
-    window.localStorage.getItem = () => {
-      throw new Error('denied')
-    }
-    mount()
-    await waitFor(() => expect(screen.getByText('Nothing needs you.')).toBeTruthy())
-    window.localStorage.getItem = original
-  })
-
-  it('counts what is building and what was decided without anybody', async () => {
-    mount({ summary: { building: 2, converging: 1, automatic: 4 } })
-    await waitFor(() => screen.getByText('Nothing needs you.'))
-    expect(screen.getByText('2')).toBeTruthy()
-    expect(screen.getByText('4')).toBeTruthy()
-  })
-})
-
-describe('quiet has to be explicable', () => {
-  // In words, not ids. This read "not asking about: unit.boundary" — a
-  // sentence about this extension's internals, shown to the person using it,
-  // on the screen whose whole job is to be reassuring when there is nothing
-  // to do. The test asserted the ids, so it held the jargon in place.
-  it('says what this setting decides for you, in words', async () => {
-    mount({ autonomy: 'lights-out', silenced: ['unit.boundary', 'new-dependency'] })
-    await waitFor(() => expect(screen.getByText(/decides these for you/)).toBeTruthy())
-    expect(screen.getByText(/each unit of work as it finishes/)).toBeTruthy()
-    expect(screen.getByText(/a new third-party dependency/)).toBeTruthy()
-    expect(screen.getByText('lights-out')).toBeTruthy()
-  })
-
-  it('never shows a rule id to the operator', async () => {
-    mount({ autonomy: 'lights-out', silenced: ['unit.boundary', 'new-dependency'] })
-    await waitFor(() => screen.getByText('Nothing needs you.'))
-    expect(document.body.textContent).not.toContain('unit.boundary')
-    expect(document.body.textContent).not.toContain('new-dependency')
-  })
-
-  it('says nothing when every rule is live', async () => {
-    mount({ autonomy: 'escorted', silenced: [] })
-    await waitFor(() => screen.getByText('Nothing needs you.'))
-    expect(screen.queryByText(/decides these for you/)).toBeNull()
+      if (channel === 'foundry:signals.list') return { signals: [] }
+      if (channel === 'foundry:sensors.list') return { sensors: [] }
+      return { ok: true }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
+    expect(await screen.findByText(/Draft WO-9 created/)).toBeTruthy()
   })
 })
 
@@ -502,7 +426,7 @@ describe("from the factory's sensors", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       mount({ signals: [] })
-      await waitFor(() => screen.getByText('Nothing needs you.'))
+      await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:signals.list', {}))
       const before = invoke.getMockImplementation() as (c: string, p?: unknown) => Promise<unknown>
       invoke.mockImplementation(async (channel: string, payload?: unknown) =>
         channel === 'foundry:signals.list'
@@ -519,8 +443,11 @@ describe("from the factory's sensors", () => {
   })
 
   it('does not show the section when there are no open signals', async () => {
-    mount({ signals: [] })
-    await waitFor(() => screen.getByText('Nothing needs you.'))
+    mount({
+      signals: [],
+      waiting: [{ orderId: 'WO-1', title: 'an order', headline: 'Ready to hand off', detail: '' }],
+    })
+    await waitFor(() => screen.getByText('Ready to hand off'))
     expect(screen.queryByText("From the factory's sensors")).toBeNull()
   })
 

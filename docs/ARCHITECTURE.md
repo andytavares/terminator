@@ -1179,7 +1179,7 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   `acceptance` are **reported and never applied**: the graph was compiled from
   the agreed order before the rung ran, so replacing it would orphan work in
   flight. Either kind of disagreement raises `forge-defect` — the rule for an
-  order that contradicts itself, which was declared, rendered in the Inbox, and
+  order that contradicts itself, which was declared, rendered in the queue above the Forge, and
   until now raised by nothing.
   Answering it sends the order to the architect. Once the amended plan passes
   every check, `forge/release-again.ts` agrees it again and restarts the run,
@@ -1187,7 +1187,7 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   `run.refused` (ADR 090).
 - **Nothing stops silently** (ADR 090). Every order whose standing says it is
   the operator's turn, and that no gate, question or held call already
-  accounts for, is counted on the Inbox badge (`ordersWaiting`) and listed
+  accounts for, is counted on the Forge badge (`ordersWaiting`) and listed
   there with its reason. A draft that no live session or pending decision is
   shaping is the operator's turn.
 - **A run can be taken away again** (`line/teardown.ts`). `removeCheckout`
@@ -1395,7 +1395,7 @@ Collectors use `gh` and the core's issues API only. Items cluster by key
 (workflow name; label and a normalised title) into signals in
 `<dataRoot>/signals/signals.jsonl` (append-only; the latest line per signal
 wins) with each sensor's state in `state.json`. Impact is occurrences × severity
-(1, 3, 9). The Inbox lists open signals below the gates, and the tab badge
+(1, 3, 9). The queue above the Forge lists open signals below the gates, and the tab badge
 counts gates only. Dismissing hides a signal until it grows by half again.
 Promoting seeds a draft order whose `source.kind` is `signal`; it still has to
 converge in the Forge and be agreed by a person.
@@ -1438,9 +1438,9 @@ rounds.
 
 ```
 App
-  ├─ Inbox   — the one surface required to visit: one queue, ranked by how much
-  │            work each decision unblocks, every row naming the rule that
-  │            raised it and what happens if it is ignored
+  ├─ Inbox   — a band across the top of the Forge, absent when empty: one
+  │            queue, ranked by how much work each decision unblocks, every row
+  │            naming the rule that raised it and what happens if it is ignored
   ├─ Orders  — the door; a row links its pull request and ticket, spins while
   │            CI works, and answers an open gate in place. The factory hall
   │            draws its waiting gates through the same one-line gate card

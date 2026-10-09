@@ -482,7 +482,7 @@ test('an order’s budgets are set on the Plan step, and raised at the gate that
   }
   writeFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), JSON.stringify([gate]))
 
-  expect(await clickByName(handle, 'button', 'Inbox')).toBe(true)
+  // The gate is in the band above the Forge, read again on its own poll.
   await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain(gate.summary)
   expect(await clickByName(handle, 'button', 'Raise the budget')).toBe(true)
   await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain('At least 6.')
