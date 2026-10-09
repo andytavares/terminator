@@ -1,0 +1,25 @@
+extensions/foundry/SUPERVISION.md
+  s_70ae0658d91832::t_410f41c9c6d5f6 855-859
+  s_70ae0658d91832::t_6bd02ac07506e2 341-347,860
+extensions/foundry/src/runtime/claude-launch.ts
+  s_70ae0658d91832::t_f53fed763d9f68 228-230
+extensions/foundry/tests/runtime/claude-launch.spec.ts
+  s_70ae0658d91832::t_2426fb0f046f58 246-247
+  s_70ae0658d91832::t_f94b05410e0606 276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "20c4d2f16ec8281a48d7c84b90edfd2ebc950045",
+  "prompts": {},
+  "sessions": {
+    "s_70ae0658d91832": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "98822014-aa0b-4156-a6ce-3cbc6144bd21",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
