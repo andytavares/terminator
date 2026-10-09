@@ -338,6 +338,13 @@ visible. The launch script now unsets the rest before `exec`.
 Identity and transport only. A preference such as `CLAUDE_EFFORT` is the
 operator's and is left alone.
 
+One variable goes the other way: every launch sets `FOUNDRY_RUN=1`. The
+operator's own Claude Code configuration (user-level hooks, plugins, `CLAUDE.md`)
+loads in every agent this runtime starts, because `--settings` adds to it rather
+than replacing it. The variable lets those hooks tell a Foundry agent from the
+operator's own sessions, for example to keep agent sessions out of a personal
+record of where the operator's time went.
+
 ## The launch is a file, not a typed line
 
 A terminal in canonical mode silently drops or corrupts anything past
@@ -845,12 +852,12 @@ something you did not read.
 Four checks, run as separate steps rather than an `&&` chain: for a gate you
 want all four answers, not the first failure. Each records its own exit code.
 
-| Check  | Command                                     | What the gate shows                             |
-| ------ | ------------------------------------------- | ----------------------------------------------- |
-| Format | the repository's `format:check`             | pass/fail — **never** `format`, which writes    |
-| Lint   | `lint -- --format json --output-file`       | errors and warnings, totalled from the report   |
-| Tests  | `vitest --coverage.reporter=json-summary`   | line coverage from `coverage-summary.json`      |
-| Review | `/google-review` under the read-only policy | pass/fail; it writes prose, so no blocker count |
+| Check  | Command                                        | What the gate shows                             |
+| ------ | ---------------------------------------------- | ----------------------------------------------- |
+| Format | the repository's `format:check`                | pass/fail — **never** `format`, which writes    |
+| Lint   | `lint -- --format json --output-file`          | errors and warnings, totalled from the report   |
+| Tests  | `vitest --coverage.reporter=json-summary`      | line coverage from `coverage-summary.json`      |
+| Review | `/at:google-review` under the read-only policy | pass/fail; it writes prose, so no blocker count |
 
 Every number comes from a tool's own machine-readable report. Anything a tool
 did not report reads as **not measured**, never as zero — a review that says "0

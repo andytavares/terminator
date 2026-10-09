@@ -243,8 +243,8 @@ describe('buildLaunchSpec', () => {
     expect(buildLaunchSpec(options()).cwd).toBe('/tmp/wt/FLU-220-fluent')
   })
 
-  it('starts with the claude binary, because the terminal is what runs it', () => {
-    expect(buildLaunchSpec(options()).command.startsWith('claude ')).toBe(true)
+  it('marks the session as Foundry’s, then starts the claude binary the terminal runs', () => {
+    expect(buildLaunchSpec(options()).command.startsWith('FOUNDRY_RUN=1 claude ')).toBe(true)
   })
 })
 
@@ -273,7 +273,7 @@ describe('buildLaunchSpec — what it falls back to', () => {
 
   it('finds claude on PATH, when no path to it is named', () => {
     const { claudePath: _unused, ...rest } = options()
-    expect(buildLaunchSpec(rest).command.startsWith('claude ')).toBe(true)
+    expect(buildLaunchSpec(rest).command.startsWith('FOUNDRY_RUN=1 claude ')).toBe(true)
   })
 })
 

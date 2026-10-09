@@ -225,6 +225,9 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
   )
 
   const command = [
+    // Lets the operator's own Claude Code hooks tell a Foundry agent from the
+    // operator's sessions; their settings load in every session we start.
+    'FOUNDRY_RUN=1',
     claudePath,
     // `--resume` for a conversation that already exists, `--session-id` only
     // for one being created. The runtime refuses a `--session-id` it has seen
