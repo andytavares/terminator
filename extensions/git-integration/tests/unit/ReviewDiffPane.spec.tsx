@@ -1956,6 +1956,10 @@ describe('ReviewDiffPane — fetch and render cost', () => {
     expect(rowRenderSpy).not.toHaveBeenCalled()
   })
 
+  // Every row mounted beyond the viewport is render work a jump through a long file pays
+  // for: the viewport (800 px) plus at most half of it again.
+  const MOUNTED_ROWS_CAP = (800 / ROW_PX) * 1.5
+
   it('mounts only the rows near the viewport of a 2,000-line file', async () => {
     layOut(800)
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
@@ -1964,7 +1968,7 @@ describe('ReviewDiffPane — fetch and render cost', () => {
 
     const mounted = container.querySelectorAll('tr.diff-line').length
     expect(mounted).toBeGreaterThan(800 / ROW_PX - 1)
-    expect(mounted).toBeLessThan(100)
+    expect(mounted).toBeLessThan(MOUNTED_ROWS_CAP)
     expect(container.querySelector('[data-new-line="1500"]')).toBeNull()
   })
 
@@ -1983,6 +1987,6 @@ describe('ReviewDiffPane — fetch and render cost', () => {
         Number(row.dataset.newLine)
       )
     await waitFor(() => expect(Math.min(...mountedLines())).toBeGreaterThan(1000))
-    expect(mountedLines().length).toBeLessThan(100)
+    expect(mountedLines().length).toBeLessThan(MOUNTED_ROWS_CAP)
   })
 })
