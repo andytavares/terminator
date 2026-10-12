@@ -184,6 +184,18 @@ describe('importLegacyDatabase', () => {
     ).not.toContain('retired_column')
   })
 
+  it('imports a database whose last session ended uncleanly', async () => {
+    await createLegacyDatabase()
+    // What PGlite leaves behind when the app is killed mid-session.
+    writeFileSync(join(userData, 'app.pglite', 'postmaster.pid'), '-42\n/tmp/pglite/base\n')
+    const db = await newDatabaseWithExtensionTables()
+
+    await importLegacyDatabase(userData, db)
+
+    expect(await db.query('SELECT id FROM notes')).toHaveLength(2)
+    expect(mockLogger.error).not.toHaveBeenCalled()
+  })
+
   it('leaves app.pglite in place', async () => {
     await createLegacyDatabase()
     const db = await newDatabaseWithExtensionTables()
