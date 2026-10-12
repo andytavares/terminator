@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../src/main/db/index'
 import { applyTaskVaultSchema } from '../../src/vault/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
@@ -14,39 +14,11 @@ import {
   type WeeklyReviewDetail,
 } from '../../src/vault/weekly-review-repository'
 
-let pg: PGlite
 let db: ExtensionDB
 
-let tables: string
-
-beforeAll(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-  db = wrapDb(pg)
+beforeEach(async () => {
+  db = wrapDb(new DatabaseSync(':memory:'))
   await applyTaskVaultSchema(db)
-  const { rows } = await pg.query<{ names: string }>(
-    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
-  )
-  tables = rows[0].names
-})
-
-afterAll(async () => {
-  await pg.close()
-})
-
-afterEach(async () => {
-  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
-})
-
-describe('schema', () => {
-  it('creates the weekly review tables', async () => {
-    const rows = await db.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema='public'`
-    )
-    const tables = rows.map((r) => r.table_name)
-    expect(tables).toContain('weekly_reviews')
-    expect(tables).toContain('weekly_review_actions')
-  })
 })
 
 describe('startOrResumeReview', () => {

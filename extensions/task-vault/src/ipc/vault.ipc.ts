@@ -647,7 +647,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       delete meta.migration_twin_id
     }
     await db.run(
-      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=(metadata::jsonb - 'migration_twin_id')::text, updated_at=? WHERE parent_id=? AND status='migrated'`,
+      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`,
       [now, taskId]
     )
     const todayDate = today()
@@ -1211,7 +1211,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       delete meta.migration_twin_id
     }
     await db.run(
-      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=(metadata::jsonb - 'migration_twin_id')::text, updated_at=? WHERE parent_id=? AND status='migrated'`,
+      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`,
       [now, taskId]
     )
     await db.run(
@@ -1420,7 +1420,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     const { days } = payload as { days: number }
     if (typeof days !== 'number' || days < 1) return { error: 'VALIDATION_ERROR' }
     await db.run(
-      `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = EXCLUDED.value`,
+      `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = excluded.value`,
       [String(days)]
     )
     return { success: true }

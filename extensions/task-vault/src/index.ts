@@ -7,7 +7,7 @@ import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
-import { applyTaskVaultSchema, applyTaskVaultMigrations } from './vault/db.js'
+import { applyTaskVaultSchema } from './vault/db.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
 import { openInVault, popPendingNavigation } from './navigation.js'
@@ -140,7 +140,6 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   const disposeDbReinit = api.ipc.registerHandler('task-vault:db.reinit', async () => {
     try {
       await applyTaskVaultSchema(db)
-      await applyTaskVaultMigrations(db)
       await backfillRecurringTasks(db)
       maybeStartScheduler(db)
       return { data: { ok: true } }
@@ -153,7 +152,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     async () => {
       try {
         // Delete rows in FK-safe order; do not drop tables — the settings table is
-        // shared with other extensions in the unified PGlite database, so only this
+        // shared with other extensions in the unified app database, so only this
         // extension's own rows go.
         await db.exec(`
         DELETE FROM tasks;
@@ -162,7 +161,6 @@ export async function activate(api: ExtensionAPI): Promise<void> {
         DELETE FROM settings WHERE extension_id = 'task-vault';
       `)
         await applyTaskVaultSchema(db)
-        await applyTaskVaultMigrations(db)
         maybeStartScheduler(db)
         return { data: { ok: true } }
       } catch (err) {
@@ -188,7 +186,6 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
   try {
     await applyTaskVaultSchema(db)
-    await applyTaskVaultMigrations(db)
     await backfillRecurringTasks(db)
     maybeStartScheduler(db)
   } catch (err) {

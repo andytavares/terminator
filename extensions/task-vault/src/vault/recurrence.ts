@@ -89,10 +89,9 @@ export interface RecurrenceEndMeta {
 /**
  * Decodes recurrence end-conditions from a legacy metadata JSON blob. This is
  * the ONE place that knows the metadata key names and coercions: SQL columns
- * are authoritative (writers populate them; applyTaskVaultMigrations backfills
- * legacy rows), and this fallback exists only for databases that predate the
- * columns and have not run the migration. Returns null when the blob carries
- * no end-conditions (or is malformed).
+ * are authoritative (writers populate them), and this fallback exists only for
+ * rows that predate the columns. Returns null when the blob carries no
+ * end-conditions (or is malformed).
  */
 export function parseRecurrenceEndMeta(
   metadata: string | null | undefined

@@ -21,7 +21,6 @@ vi.mock('../src/ipc/weekly-review.ipc.js', () => ({
 }))
 vi.mock('../src/vault/db.js', () => ({
   applyTaskVaultSchema: vi.fn().mockResolvedValue(undefined),
-  applyTaskVaultMigrations: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('../src/vault/ensure-next-occurrence.js', () => ({
   backfillRecurringTasks: vi.fn().mockResolvedValue(undefined),

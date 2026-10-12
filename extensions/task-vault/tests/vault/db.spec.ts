@@ -1,43 +1,29 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../src/main/db/index'
-import { applyTaskVaultSchema, applyTaskVaultMigrations, hasColumn } from '../../src/vault/db'
+import { applyTaskVaultSchema } from '../../src/vault/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
 
-let pg: PGlite
 let db: ExtensionDB
 
-let template: PGlite
-
-beforeAll(async () => {
-  template = new PGlite()
-  await template.waitReady
-})
-
-afterAll(async () => {
-  await template.close()
-})
-
-beforeEach(async () => {
-  pg = await template.clone()
-  db = wrapDb(pg)
-})
-
-afterEach(async () => {
-  await pg.close()
+beforeEach(() => {
+  db = wrapDb(new DatabaseSync(':memory:'))
 })
 
 describe('applyTaskVaultSchema', () => {
   it('creates all required tables', async () => {
     await applyTaskVaultSchema(db)
-    const rows = await db.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`
+    const rows = await db.query<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
     )
-    const tables = rows.map((r) => r.table_name)
-    expect(tables).toContain('settings')
-    expect(tables).toContain('areas')
-    expect(tables).toContain('projects')
-    expect(tables).toContain('tasks')
+    expect(rows.map((r) => r.name).sort()).toEqual([
+      'areas',
+      'projects',
+      'settings',
+      'tasks',
+      'weekly_review_actions',
+      'weekly_reviews',
+    ])
   })
 
   it('is idempotent — safe to call twice', async () => {
@@ -49,11 +35,6 @@ describe('applyTaskVaultSchema', () => {
 describe('settings composite PK (extension_id, key)', () => {
   beforeEach(async () => {
     await applyTaskVaultSchema(db)
-    await applyTaskVaultMigrations(db)
-  })
-
-  it('settings table has extension_id column after migration', async () => {
-    expect(await hasColumn(db, 'settings', 'extension_id')).toBe(true)
   })
 
   it('two different extension_ids can hold the same key independently', async () => {

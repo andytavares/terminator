@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
-import { wrapDb } from '../../../src/main/db/index'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { wrapDb, type ExtensionDB } from '../../../src/main/db/index'
 import type { ExtensionAPI } from '../../../src/main/extensions/api'
 
 vi.mock('electron', () => ({
@@ -25,21 +25,16 @@ vi.mock('../src/notifications/task-scheduler.js', () => ({
 
 type Handler = () => Promise<unknown>
 
-let pg: PGlite
+let db: ExtensionDB
 
-beforeEach(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-})
-
-afterEach(async () => {
-  await pg.close()
+beforeEach(() => {
+  db = wrapDb(new DatabaseSync(':memory:'))
 })
 
 async function activateAndGetResetHandler(): Promise<Handler> {
   const handlers = new Map<string, Handler>()
   const api = {
-    db: wrapDb(pg),
+    db,
     ipc: {
       registerHandler: vi.fn((channel: string, handler: Handler) => {
         handlers.set(channel, handler)
@@ -61,7 +56,7 @@ async function activateAndGetResetHandler(): Promise<Handler> {
 describe('task-vault reset', () => {
   it('removes its own settings and leaves another extension settings alone', async () => {
     const reset = await activateAndGetResetHandler()
-    await pg.query(
+    await db.exec(
       `INSERT INTO settings (extension_id, key, value) VALUES
          ('task-vault', 'stale_days_threshold', '9'),
          ('notepad', 'font_size', '14')`
@@ -70,9 +65,9 @@ describe('task-vault reset', () => {
     const result = await reset()
 
     expect(result).toEqual({ data: { ok: true } })
-    const rows = await pg.query<{ extension_id: string; key: string }>(
+    const rows = await db.query<{ extension_id: string; key: string }>(
       `SELECT extension_id, key FROM settings ORDER BY extension_id`
     )
-    expect(rows.rows).toEqual([{ extension_id: 'notepad', key: 'font_size' }])
+    expect(rows).toEqual([{ extension_id: 'notepad', key: 'font_size' }])
   })
 })
