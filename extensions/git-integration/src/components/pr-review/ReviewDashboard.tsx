@@ -52,7 +52,7 @@ type DashboardResult = z.infer<typeof DashboardResultSchema>
 type FailedSection = z.infer<typeof FailedSectionSchema>
 
 /** The command that failed carries the whole GraphQL query; the reader needs only gh's own line. */
-export function shortError(message: string): string {
+function shortError(message: string): string {
   const at = message.lastIndexOf('gh:')
   if (at >= 0) return message.slice(at).split('\n')[0].trim()
   const lines = message.split('\n').filter((l) => l.trim())

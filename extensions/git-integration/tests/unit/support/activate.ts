@@ -2,7 +2,7 @@ import { vi } from 'vitest'
 import type { ChannelSpec, ExtensionAPI } from '@terminator/extension-sdk'
 import { activate, deactivate } from '../../../src/index.ts'
 
-export interface RegisteredChannel {
+interface RegisteredChannel {
   spec: ChannelSpec
   remoteAccessible: boolean
 }

@@ -16,7 +16,7 @@ const RunsPayload = z.object({
   headSHA: z.string().min(1),
 })
 
-export interface OpenTerminalInput {
+interface OpenTerminalInput {
   repoRoot: string
   cwd: string
   title: string
