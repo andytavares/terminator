@@ -57,6 +57,44 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
+/** A reply that was an error is `null`, and leaves what is on screen as it was. */
+function whenRead<T>(show: (value: T) => void): (value: T | null) => void {
+  return (value) => {
+    if (value !== null) show(value)
+  }
+}
+
+async function readRules(): Promise<RulesView | null> {
+  const next = (await invoke('foundry:rules.inForce', {})) as Partial<RulesView> & {
+    error?: string
+  }
+  if (next.error !== undefined) return null
+  // Normalised on arrival rather than guarded at every read: a reply missing
+  // an array is the same thing to this panel as an empty one.
+  return { rules: next.rules ?? [], declined: next.declined ?? [], skills: next.skills ?? [] }
+}
+
+async function readLedger(
+  orderId: string,
+  actor: string,
+  action: string
+): Promise<LedgerView | null> {
+  const next = (await invoke('foundry:ledger.query', {
+    orderId: orderId === '' ? undefined : orderId,
+    actor: actor === '' ? undefined : actor,
+    action: action === '' ? undefined : action,
+    limit: PAGE,
+  })) as LedgerView | { error: string }
+  return 'error' in next ? null : next
+}
+
+async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics | null> {
+  const next = (await invoke('foundry:factory.metrics', { window })) as
+    | FactoryMetrics
+    | { error: string }
+  return 'error' in next ? null : next
+}
+
 /** `operator`, `rule:budget.exceeded`, `role:verifier` — the kind, for the eye. */
 function actorKind(actor: string): string {
   if (actor.startsWith('rule:')) return 'rule'
@@ -78,49 +116,22 @@ export function Ledger(): JSX.Element {
   const [metricsWindow, setMetricsWindow] = useState<'30d' | 'all'>('30d')
   const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
 
-  const refreshRules = useCallback(async () => {
-    const next = (await invoke('foundry:rules.inForce', {})) as Partial<RulesView> & {
-      error?: string
-    }
-    if (next.error !== undefined) return
-    // Normalised on arrival rather than guarded at every read: a reply missing
-    // an array is the same thing to this panel as an empty one.
-    setRules({ rules: next.rules ?? [], declined: next.declined ?? [], skills: next.skills ?? [] })
-  }, [])
+  const refreshRules = useCallback(() => readRules().then(whenRead(setRules)), [])
 
-  const refresh = useCallback(async () => {
-    const next = (await invoke('foundry:ledger.query', {
-      orderId: orderId === '' ? undefined : orderId,
-      actor: actor === '' ? undefined : actor,
-      action: action === '' ? undefined : action,
-      limit: PAGE,
-    })) as LedgerView | { error: string }
-    if ('error' in next) return
-    setView(next)
+  useEffect(() => {
+    void readLedger(orderId, actor, action).then(whenRead(setView))
   }, [orderId, actor, action])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  useEffect(() => {
-    void refreshRules()
-  }, [refreshRules])
-
-  const refreshMetrics = useCallback(async () => {
-    const next = (await invoke('foundry:factory.metrics', { window: metricsWindow })) as
-      | FactoryMetrics
-      | { error: string }
-    if ('error' in next) return
-    setMetrics(next)
-  }, [metricsWindow])
+    void readRules().then(whenRead(setRules))
+  }, [])
 
   // Fetched only once the operator asks for the Factory view — the same
   // discipline as the proposals panel: a surface that fetches before it is
   // looked at is a surface whose numbers go stale unnoticed.
   useEffect(() => {
-    if (tab === 'factory') void refreshMetrics()
-  }, [tab, refreshMetrics])
+    if (tab === 'factory') void readMetrics(metricsWindow).then(whenRead(setMetrics))
+  }, [tab, metricsWindow])
 
   const ask = useCallback(async () => {
     const next = (await invoke('foundry:rules.propose', {})) as { proposals?: Proposal[] }

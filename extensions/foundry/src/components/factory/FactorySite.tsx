@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import type { Standing } from '../../order/standing.js'
 import type { FactoryMetrics } from '../../factory/metrics.js'
 import { MetricsTiles, WindowToggle } from '../MetricsTiles.js'
@@ -6,6 +6,7 @@ import type { Signal } from '../../sensors/types.js'
 import type { CiState } from '../../line/ci-state.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
+import { usePolled } from '../../renderer/use-polled.js'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
@@ -196,6 +197,33 @@ function newestFirst(a: FactoryOrderRow, b: FactoryOrderRow): number {
  *  is a door, not a dashboard. */
 const POLL_MS = 4000
 
+interface SignalsRead {
+  readonly signals: Signal[]
+  readonly sensors: SensorRow[]
+}
+
+async function readOrders(): Promise<FactoryOrderRow[]> {
+  const r = (await invoke('foundry:order.list')) as { orders?: FactoryOrderRow[] }
+  // Newest first, with the id breaking ties rather than whatever order the
+  // store returned: a grid that reshuffles itself between polls is unreadable.
+  return [...(r.orders ?? [])].sort(newestFirst)
+}
+
+async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics | null> {
+  const r = (await invoke('foundry:factory.metrics', { window })) as
+    | FactoryMetrics
+    | { error: string }
+  return 'error' in r ? null : r
+}
+
+async function readSignals(): Promise<SignalsRead> {
+  const [sig, sen] = await Promise.all([
+    invoke('foundry:signals.list') as Promise<{ signals?: Signal[] }>,
+    invoke('foundry:sensors.list') as Promise<{ sensors?: SensorRow[] }>,
+  ])
+  return { signals: sig.signals ?? [], sensors: sen.sensors ?? [] }
+}
+
 export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
   const [rows, setRows] = useState<FactoryOrderRow[]>([])
   const [window_, setWindow] = useState<'30d' | 'all'>('30d')
@@ -207,47 +235,20 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
   const [dockProblem, setDockProblem] = useState<string | null>(null)
   const [promoted, setPromoted] = useState<string | null>(null)
 
-  const refresh = useCallback(async () => {
-    const r = (await invoke('foundry:order.list')) as { orders?: FactoryOrderRow[] }
-    // Newest first, with the id breaking ties rather than whatever order the
-    // store returned: a grid that reshuffles itself between polls is unreadable.
-    setRows([...(r.orders ?? [])].sort(newestFirst))
+  const readMetricsFor = useCallback(() => readMetrics(window_), [window_])
+  const showMetrics = useCallback((read: FactoryMetrics | null): void => {
+    if (read !== null) setMetrics(read)
+  }, [])
+  const showSignals = useCallback((read: SignalsRead): void => {
+    setSignals(read.signals)
+    setSensors(read.sensors)
   }, [])
 
-  useEffect(() => {
-    void refresh()
-    const timer = setInterval(() => void refresh(), POLL_MS)
-    return () => clearInterval(timer)
-  }, [refresh])
+  const refreshSignals = useCallback(() => readSignals().then(showSignals), [showSignals])
 
-  const refreshMetrics = useCallback(async () => {
-    const r = (await invoke('foundry:factory.metrics', { window: window_ })) as
-      | FactoryMetrics
-      | { error: string }
-    if ('error' in r) return
-    setMetrics(r)
-  }, [window_])
-
-  useEffect(() => {
-    void refreshMetrics()
-    const timer = setInterval(() => void refreshMetrics(), POLL_MS)
-    return () => clearInterval(timer)
-  }, [refreshMetrics])
-
-  const refreshSignals = useCallback(async () => {
-    const [sig, sen] = await Promise.all([
-      invoke('foundry:signals.list') as Promise<{ signals?: Signal[] }>,
-      invoke('foundry:sensors.list') as Promise<{ sensors?: SensorRow[] }>,
-    ])
-    setSignals(sig.signals ?? [])
-    setSensors(sen.sensors ?? [])
-  }, [])
-
-  useEffect(() => {
-    void refreshSignals()
-    const timer = setInterval(() => void refreshSignals(), POLL_MS)
-    return () => clearInterval(timer)
-  }, [refreshSignals])
+  usePolled(readOrders, setRows, POLL_MS)
+  usePolled(readMetricsFor, showMetrics, POLL_MS)
+  usePolled(readSignals, showSignals, POLL_MS)
 
   const startPromote = useCallback(
     (signal: Signal) => {

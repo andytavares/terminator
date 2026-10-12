@@ -42,6 +42,11 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
+async function readSensors(): Promise<SensorRow[]> {
+  const answer = (await invoke('foundry:sensors.list')) as { sensors?: SensorRow[] }
+  return answer.sensors ?? []
+}
+
 export function SettingsView(): JSX.Element {
   const [models, setModels] = useState<ModelChoiceView[]>([])
   const [selected, setSelected] = useState<string>('')
@@ -54,9 +59,7 @@ export function SettingsView(): JSX.Element {
   const [sensorProblems, setSensorProblems] = useState<Record<string, string>>({})
   const [runNotes, setRunNotes] = useState<Record<string, string>>({})
 
-  const refreshSensors = useCallback(async () => {
-    const answer = (await invoke('foundry:sensors.list')) as { sensors?: SensorRow[] }
-    const rows = answer.sensors ?? []
+  const showSensors = useCallback((rows: SensorRow[]): void => {
     setSensors(rows)
     setRepoDrafts((current) => {
       const next = { ...current }
@@ -67,9 +70,11 @@ export function SettingsView(): JSX.Element {
     })
   }, [])
 
+  const refreshSensors = useCallback(() => readSensors().then(showSensors), [showSensors])
+
   useEffect(() => {
-    void refreshSensors()
-  }, [refreshSensors])
+    void readSensors().then(showSensors)
+  }, [showSensors])
 
   const setSensor = useCallback(
     async (id: string, patch: { enabled?: boolean; repoPath?: string | null }) => {
