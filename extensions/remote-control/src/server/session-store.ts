@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 
-export interface SessionStoreOptions {
+interface SessionStoreOptions {
   /** Cookie carrying the session token, e.g. 'app-session'. */
   cookieName: string
   /** Path scope for the issued cookie, e.g. '/app'. */
