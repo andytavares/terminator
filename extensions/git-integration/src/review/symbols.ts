@@ -327,8 +327,16 @@ function collectFunctions(root: Node): SnippetFunction[] {
 
 const parserCache = new Map<Language, Parser>()
 
-/** Parses `code` as `path`'s language and extracts definitions, references and branch counts. Null when there is no grammar for `path`. */
-export async function analyseSnippet(path: string, code: string): Promise<SnippetAnalysis | null> {
+/**
+ * Parses `code` as `path`'s language, hands the root to `read`, then frees the tree:
+ * web-tree-sitter trees live in WASM memory that the JS garbage collector never reclaims.
+ * Null when there is no grammar for `path`.
+ */
+export async function withSyntaxTree<T>(
+  path: string,
+  code: string,
+  read: (root: Node) => T
+): Promise<T | null> {
   const language = await loadLanguageFor(path)
   if (!language) return null
 
@@ -341,20 +349,27 @@ export async function analyseSnippet(path: string, code: string): Promise<Snippe
 
   const tree = parser.parse(code)
   if (!tree) return null
-  const root = tree.rootNode
+  try {
+    return read(tree.rootNode)
+  } finally {
+    tree.delete()
+  }
+}
 
+function analyseRoot(root: Node): SnippetAnalysis {
   const definitions = collectDefinitions(root)
   const boundNames = collectBoundNames(root, definitions)
-  const references = collectReferences(root, boundNames)
-  const functions = collectFunctions(root)
-  const branches = countBranchesInWholeTree(root)
-
   return {
     definitions: [...definitions],
-    references: [...references],
-    branches,
-    functions,
+    references: [...collectReferences(root, boundNames)],
+    branches: countBranchesInWholeTree(root),
+    functions: collectFunctions(root),
   }
+}
+
+/** Parses `code` as `path`'s language and extracts definitions, references and branch counts. Null when there is no grammar for `path`. */
+export function analyseSnippet(path: string, code: string): Promise<SnippetAnalysis | null> {
+  return withSyntaxTree(path, code, analyseRoot)
 }
 
 function countBranchesInWholeTree(node: Node): number {

@@ -9,6 +9,8 @@ import { CommentComposer } from './CommentComposer'
 import { AgentNote } from './AgentNote'
 import { SelectionBar } from './SelectionBar'
 import { MovedRow } from './MovedRow'
+import { SplitLineRow, UnifiedLineRow, type GutterChip, type Side } from './DiffLineRows'
+import { VirtualDiffList, type VirtualDiffListHandle } from './VirtualDiffList'
 import { useShallow } from 'zustand/react/shallow'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../../stores/review-ui.store'
@@ -18,13 +20,14 @@ import {
   classifyHunk,
   parseDiff,
 } from '../../github/pr-review-service'
-import { detectLanguage, highlight, buildSplitRows } from '../FileDiffView'
+import { detectLanguage, buildSplitRows } from '../FileDiffView'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import type { PrChangedFile, PrReviewDetail, Chapter, Thread } from '../../schemas/pr-review.schema'
-import type { DiffLine, FileDiff } from '../../schemas/git.schema'
+import type { DiffHunk, DiffLine, FileDiff } from '../../schemas/git.schema'
 import { FileDiffSchema } from '../../schemas/git.schema'
 import { githubAPI } from '../../api/github'
 import { EXPAND_STEP, gapsFor, reveal, splitLines, type Expansion } from '../../review/expand-gaps'
+import { buildDiffItems, type DiffItem, type MovedMark } from '../../review/diff-items'
 import './review-surface.css'
 
 interface Props {
@@ -57,20 +60,9 @@ interface CachedDiff {
   note: string | null
 }
 
-const HIGHLIGHT_CACHE_CAP = 20_000
-const highlightCache = new Map<string, string>()
-
-/** Highlighting is pure in (language, line); the pane re-renders on every hover and drag. */
-function highlightLine(content: string, lang: ReturnType<typeof detectLanguage>): string {
-  const key = `${lang}\u0000${content}`
-  let html = highlightCache.get(key)
-  if (html === undefined) {
-    html = highlight(content, lang)
-    if (highlightCache.size >= HIGHLIGHT_CACHE_CAP) highlightCache.clear()
-    highlightCache.set(key, html)
-  }
-  return html
-}
+// A unified row's number cells carry 28px of padding and a 1px border; the insight gutter 8px of padding.
+const NUM_CELL_CHROME_PX = 29
+const GUTTER_CELL_PADDING_PX = 8
 
 const REWRITTEN_NOTE = 'History rewritten — showing the whole file'
 const DIFF_CACHE_CAP = 60
@@ -85,6 +77,15 @@ function rememberDiff(
   next.set(key, entry)
   if (next.size > DIFF_CACHE_CAP) next.delete(next.keys().next().value as string)
   return next
+}
+
+function movedKey(block: { fromPath: string; fromLine: number; toPath: string; toLine: number }) {
+  return `${block.fromPath}:${block.fromLine}->${block.toPath}:${block.toLine}`
+}
+
+function itemShowsNewLine(item: DiffItem, line: number): boolean {
+  if (item.kind === 'line' || item.kind === 'gap-line') return item.line.newLineNumber === line
+  return item.kind === 'split-row' && item.right?.newLineNumber === line
 }
 
 function findChapterId(chapters: Chapter[], path: string): string | null {
@@ -243,9 +244,6 @@ export function ReviewDiffPane({
     () => pr.movedBlocks.filter((b) => b.fromPath === file.path),
     [pr.movedBlocks, file.path]
   )
-
-  const movedKey = (fromPath: string, fromLine: number, toPath: string, toLine: number) =>
-    `${fromPath}:${fromLine}->${toPath}:${toLine}`
 
   const movedBlockForLine = useCallback(
     (lineNum: number, side: 'LEFT' | 'RIGHT') => {
@@ -432,27 +430,6 @@ export function ReviewDiffPane({
     if (requestForThisFile) requestComposer(null)
   }, [requestForThisFile, requestComposer])
 
-  const scrollHunkIntoView = useCallback(
-    (direction: 1 | -1) => {
-      const container = scrollRef.current
-      if (!container) return
-      const headers = Array.from(container.querySelectorAll<HTMLElement>('.diff-hunk-header'))
-      if (headers.length === 0) return
-      const nextIndex = currentHunkIndexRef.current + direction
-      if (nextIndex < 0) {
-        onPrevFile()
-        return
-      }
-      if (nextIndex >= headers.length) {
-        onNextFile()
-        return
-      }
-      currentHunkIndexRef.current = nextIndex
-      headers[nextIndex].scrollIntoView({ block: 'start' })
-    },
-    [onNextFile, onPrevFile]
-  )
-
   const hunkNearTop = useCallback((): { startLine: number; endLine: number } | null => {
     if (!diff) return null
     for (const hunk of diff.hunks) {
@@ -532,6 +509,71 @@ export function ReviewDiffPane({
     }
     return views
   }, [gaps, expansions, fileText])
+
+  const hotspots = useMemo(() => (diff ? detectComplexityHotspots(diff) : []), [diff])
+  const splitRowsByHunk = useMemo(
+    () => (diff?.hunks ?? []).map((hunk) => buildSplitRows(hunk.lines)),
+    [diff]
+  )
+
+  const visibleHunks = useMemo(() => {
+    if (!diff) return []
+    if (!hideFormattingHunks) return diff.hunks.map((h, i) => ({ hunk: h, index: i }))
+    return diff.hunks
+      .map((h, i) => ({ hunk: h, index: i }))
+      .filter(({ hunk }) => classifyHunk(hunk) === 'semantic')
+  }, [diff, hideFormattingHunks])
+
+  const movedMark = useCallback(
+    (lineNum: number, side: Side): MovedMark | null => {
+      const block = movedBlockForLine(lineNum, side)
+      if (!block) return null
+      const key = movedKey(block)
+      const isStart = lineNum === (side === 'RIGHT' ? block.toLine : block.fromLine)
+      return { block, side, key, isStart, expanded: expandedMoved.has(key) }
+    },
+    [movedBlockForLine, expandedMoved]
+  )
+
+  const items = useMemo(
+    () =>
+      diff
+        ? buildDiffItems({
+            mode: diffViewMode,
+            hunkCount: diff.hunks.length,
+            visibleHunks,
+            splitRows: splitRowsByHunk,
+            gapViews,
+            hotspots,
+            movedMark,
+          })
+        : [],
+    [diff, diffViewMode, visibleHunks, splitRowsByHunk, gapViews, hotspots, movedMark]
+  )
+
+  const listRef = useRef<VirtualDiffListHandle>(null)
+  const hunkHeaderIndexes = useMemo(
+    () => items.flatMap((item, index) => (item.kind === 'hunk-header' ? [index] : [])),
+    [items]
+  )
+
+  const scrollHunkIntoView = useCallback(
+    (direction: 1 | -1) => {
+      if (hunkHeaderIndexes.length === 0) return
+      const nextIndex = currentHunkIndexRef.current + direction
+      if (nextIndex < 0) {
+        onPrevFile()
+        return
+      }
+      if (nextIndex >= hunkHeaderIndexes.length) {
+        onNextFile()
+        return
+      }
+      currentHunkIndexRef.current = nextIndex
+      listRef.current?.scrollToIndex(hunkHeaderIndexes[nextIndex], 'start')
+    },
+    [hunkHeaderIndexes, onNextFile, onPrevFile]
+  )
 
   // GitHub accepts review comments only on lines inside the diff.
   const selectionTouchesRevealed = useCallback(
@@ -702,15 +744,19 @@ export function ReviewDiffPane({
     [threadsForLine, commentVisibility]
   )
 
-  const findingsForLine = useCallback(
-    (lineNum: number, side: 'LEFT' | 'RIGHT') =>
+  const fileFindings = useMemo(
+    () =>
       agentRuns
         .filter((r) => r.status === 'done')
         .flatMap((r) => r.findings)
-        .filter(
-          (f) => !f.dismissed && f.path === file.path && f.side === side && f.endLine === lineNum
-        ),
+        .filter((f) => !f.dismissed && f.path === file.path),
     [agentRuns, file.path]
+  )
+
+  const findingsForLine = useCallback(
+    (lineNum: number, side: 'LEFT' | 'RIGHT') =>
+      fileFindings.filter((f) => f.side === side && f.endLine === lineNum),
+    [fileFindings]
   )
 
   const notesForLine = useCallback(
@@ -725,19 +771,23 @@ export function ReviewDiffPane({
     [drafts, file.path]
   )
 
-  const insightsChipForLine = useCallback(
-    (lineNum: number) => {
-      const fn = pr.insights?.complexity.functions.find(
-        (f) => f.path === file.path && f.line === lineNum && f.branchDelta > 0
-      )
-      if (!fn) return null
+  // One chip object per line, kept across renders so memoised rows see the same prop.
+  const chipsByLine = useMemo(() => {
+    const chips = new Map<number, GutterChip>()
+    for (const fn of pr.insights?.complexity.functions ?? []) {
+      if (fn.path !== file.path || fn.line == null || fn.branchDelta <= 0 || chips.has(fn.line)) {
+        continue
+      }
       const untested = pr.insights?.coverage.untestedFunctions.includes(fn.name)
-      return untested
-        ? { kind: 'danger' as const, label: 'untested' }
-        : { kind: 'warn' as const, label: `+${fn.branchDelta}` }
-    },
-    [pr.insights, file.path]
-  )
+      chips.set(
+        fn.line,
+        untested
+          ? { kind: 'danger', label: 'untested' }
+          : { kind: 'warn', label: `+${fn.branchDelta}` }
+      )
+    }
+    return chips
+  }, [pr.insights, file.path])
 
   // The gutter column is as wide as the widest chip it holds; a table squeezes
   // an unsized cell below its content, which let the chip overlap the code.
@@ -750,19 +800,6 @@ export function ReviewDiffPane({
     const widest = Math.max(0, ...labels.map((l) => l.length))
     return widest === 0 ? 18 : 22 + widest * 7
   }, [pr.insights, file.path])
-
-  const hotspots = diff ? detectComplexityHotspots(diff) : []
-  const hotspotHunks = new Set(hotspots.map((h) => h.hunkIndex))
-
-  const visibleHunks = useMemo(() => {
-    if (!diff) return []
-    if (!hideFormattingHunks) return diff.hunks.map((h, i) => ({ hunk: h, index: i }))
-    return diff.hunks
-      .map((h, i) => ({ hunk: h, index: i }))
-      .filter(({ hunk }) => classifyHunk(hunk) === 'semantic')
-  }, [diff, hideFormattingHunks])
-
-  const hiddenFormattingCount = diff ? diff.hunks.length - visibleHunks.length : 0
 
   const handleGutterMouseDown = useCallback(
     (e: React.MouseEvent, lineNum: number, side: 'LEFT' | 'RIGHT') => {
@@ -836,11 +873,11 @@ export function ReviewDiffPane({
   useEffect(() => {
     if (!pendingJump || !diff || pendingJump.path !== file.path) return
     if (performedJumpRef.current === pendingJump) return
+    const index = items.findIndex((item) => itemShowsNewLine(item, pendingJump.line))
+    if (index < 0) return
     performedJumpRef.current = pendingJump
-    scrollRef.current
-      ?.querySelector<HTMLElement>(`[data-new-line="${pendingJump.line}"]`)
-      ?.scrollIntoView({ block: 'center' })
-  }, [pendingJump, diff, file.path])
+    listRef.current?.scrollToIndex(index, 'center')
+  }, [pendingJump, diff, file.path, items])
 
   const hunkCode = (lines: Array<{ type: string; content: string }>) =>
     lines
@@ -1112,88 +1149,29 @@ export function ReviewDiffPane({
       </tr>
     ) : null
 
-  const gutterPip = (lineNum: number, side: 'LEFT' | 'RIGHT') => {
-    const hiddenThreadCount =
-      commentVisibility === 'hidden' ? threadsForLine(lineNum, side).length : 0
-    const findings = !agentNotesOn ? findingsForLine(lineNum, side) : []
-    return (
-      <>
-        {hiddenThreadCount > 0 && (
-          <button
-            type="button"
-            className="rs-pip"
-            aria-label={`${hiddenThreadCount} hidden comments`}
-            onClick={() => setCommentVisibility('all')}
-          >
-            {hiddenThreadCount}
-          </button>
-        )}
-        {findings.length > 0 && (
-          <span className="rs-pip rs-pip--ag" aria-label={`${findings.length} agent notes`}>
-            {findings.length}
-          </span>
-        )}
-      </>
-    )
-  }
+  const showHiddenComments = useCallback(() => setCommentVisibility('all'), [setCommentVisibility])
+
+  /** What a memoised row shows for its line, as primitives so unchanged rows skip rendering. */
+  const rowProps = (lineNum: number, side: Side, expanded: boolean) => ({
+    expanded,
+    language: lang,
+    selected: isLineSelected(lineNum, side),
+    commented: isCommented(lineNum, side),
+    chip: side === 'RIGHT' ? (chipsByLine.get(lineNum) ?? null) : null,
+    hiddenThreadCount: commentVisibility === 'hidden' ? threadsForLine(lineNum, side).length : 0,
+    findingCount: agentNotesOn ? 0 : findingsForLine(lineNum, side).length,
+    gutterWidth,
+    onGutterMouseDown: handleGutterMouseDown,
+    onRowMouseEnter: handleRowMouseEnter,
+    onShowHiddenComments: showHiddenComments,
+  })
 
   const renderUnifiedLine = (line: DiffLine, expanded: boolean) => {
     const lineNum = line.newLineNumber ?? line.oldLineNumber ?? 0
-    const side: 'LEFT' | 'RIGHT' = line.type === 'remove' ? 'LEFT' : 'RIGHT'
+    const side: Side = line.type === 'remove' ? 'LEFT' : 'RIGHT'
     return (
       <>
-        <tr
-          className={`diff-line diff-line--${line.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(lineNum, side) ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(lineNum, side) ? ' diff-line--commented' : ''}`}
-          data-expanded={expanded ? 'true' : undefined}
-          data-new-line={line.newLineNumber ?? undefined}
-          data-old-line={line.oldLineNumber ?? undefined}
-          onMouseEnter={() => handleRowMouseEnter(lineNum, side)}
-        >
-          <td className="diff-line__old-num diff-line__num-gutter">
-            {line.oldLineNumber ?? ''}
-            {side === 'LEFT' && (
-              <button
-                className="diff-gutter-btn"
-                aria-label="Add comment"
-                onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
-              >
-                +
-              </button>
-            )}
-          </td>
-          <td className="diff-line__new-num diff-line__num-gutter">
-            {line.newLineNumber ?? ''}
-            {side === 'RIGHT' && (
-              <button
-                className="diff-gutter-btn"
-                aria-label="Add comment"
-                onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
-              >
-                +
-              </button>
-            )}
-          </td>
-          <td className="rs-gut" style={{ width: gutterWidth, minWidth: gutterWidth }}>
-            {side === 'RIGHT' && insightsChipForLine(lineNum) && (
-              <span
-                className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(lineNum)!.kind}`}
-              >
-                {insightsChipForLine(lineNum)!.label}
-              </span>
-            )}
-            {gutterPip(lineNum, side)}
-          </td>
-          <td className="diff-line__prefix">
-            {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-          </td>
-          <td className="diff-line__content">
-            <pre
-              dangerouslySetInnerHTML={{
-                __html: highlightLine(line.content, lang),
-              }}
-            />
-          </td>
-        </tr>
+        <UnifiedLineRow line={line} {...rowProps(lineNum, side, expanded)} />
         {renderSelectionExtras(lineNum, side)}
         {renderLineAnnotations(lineNum, side)}
       </>
@@ -1232,35 +1210,12 @@ export function ReviewDiffPane({
           >
             <tbody>
               {leftLine ? (
-                <tr
-                  className={`diff-line diff-line--${leftLine.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(leftLineNum, 'LEFT') ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(leftLineNum, 'LEFT') ? ' diff-line--commented' : ''}`}
-                  data-expanded={expanded ? 'true' : undefined}
-                  data-old-line={leftLine.oldLineNumber ?? undefined}
-                  onMouseEnter={() => handleRowMouseEnter(leftLineNum, 'LEFT')}
-                >
-                  <td
-                    className="diff-line__old-num diff-line__num-gutter"
-                    style={{ width: numColWidth, minWidth: numColWidth }}
-                  >
-                    {leftLine.oldLineNumber ?? ''}
-                    <button
-                      className="diff-gutter-btn"
-                      aria-label="Add comment"
-                      onMouseDown={(e) => handleGutterMouseDown(e, leftLineNum, 'LEFT')}
-                    >
-                      +
-                    </button>
-                    {gutterPip(leftLineNum, 'LEFT')}
-                  </td>
-                  <td className="diff-line__prefix">{leftLine.type === 'remove' ? '-' : ' '}</td>
-                  <td className="diff-line__content">
-                    <pre
-                      dangerouslySetInnerHTML={{
-                        __html: highlightLine(leftLine.content, lang),
-                      }}
-                    />
-                  </td>
-                </tr>
+                <SplitLineRow
+                  line={leftLine}
+                  side="LEFT"
+                  numColWidth={numColWidth}
+                  {...rowProps(leftLineNum, 'LEFT', expanded)}
+                />
               ) : (
                 <tr className="diff-line">
                   <td colSpan={3} className="diff-line__empty-cell" />
@@ -1275,44 +1230,12 @@ export function ReviewDiffPane({
           >
             <tbody>
               {rightLine ? (
-                <tr
-                  className={`diff-line diff-line--${rightLine.type}${expanded ? ' diff-line--expanded' : ''}${isLineSelected(rightLineNum, 'RIGHT') ? ' diff-line--selecting rs-line--selected' : ''}${isCommented(rightLineNum, 'RIGHT') ? ' diff-line--commented' : ''}`}
-                  data-expanded={expanded ? 'true' : undefined}
-                  data-new-line={rightLine.newLineNumber ?? undefined}
-                  onMouseEnter={() => handleRowMouseEnter(rightLineNum, 'RIGHT')}
-                >
-                  <td
-                    className="diff-line__new-num diff-line__num-gutter"
-                    style={{ width: numColWidth, minWidth: numColWidth }}
-                  >
-                    {rightLine.newLineNumber ?? ''}
-                    <button
-                      className="diff-gutter-btn"
-                      aria-label="Add comment"
-                      onMouseDown={(e) => handleGutterMouseDown(e, rightLineNum, 'RIGHT')}
-                    >
-                      +
-                    </button>
-                  </td>
-                  <td className="rs-gut" style={{ width: gutterWidth, minWidth: gutterWidth }}>
-                    {insightsChipForLine(rightLineNum) && (
-                      <span
-                        className={`rs-gutter-chip rs-gutter-chip--${insightsChipForLine(rightLineNum)!.kind}`}
-                      >
-                        {insightsChipForLine(rightLineNum)!.label}
-                      </span>
-                    )}
-                    {gutterPip(rightLineNum, 'RIGHT')}
-                  </td>
-                  <td className="diff-line__prefix">{rightLine.type === 'add' ? '+' : ' '}</td>
-                  <td className="diff-line__content">
-                    <pre
-                      dangerouslySetInnerHTML={{
-                        __html: highlightLine(rightLine.content, lang),
-                      }}
-                    />
-                  </td>
-                </tr>
+                <SplitLineRow
+                  line={rightLine}
+                  side="RIGHT"
+                  numColWidth={numColWidth}
+                  {...rowProps(rightLineNum, 'RIGHT', expanded)}
+                />
               ) : (
                 <tr className="diff-line">
                   <td colSpan={4} className="diff-line__empty-cell" />
@@ -1402,38 +1325,131 @@ export function ReviewDiffPane({
     )
   }
 
-  const renderGap = (key: string) => {
-    const view = gapViews.get(key)
-    if (!view) return null
-    if (view.hidden === 0 && view.above.length + view.below.length === 0) return null
-    const content = view.hidden === 0 ? null : renderExpanderContent({ key }, view.hidden)
-    const rows = (lines: DiffLine[], part: string) =>
-      lines.map((line) => (
-        <React.Fragment key={`${key}-${part}-${line.newLineNumber}`}>
-          {diffViewMode === 'unified'
-            ? renderUnifiedLine(line, true)
-            : renderSplitPair(line, line, true)}
-        </React.Fragment>
-      ))
-    return diffViewMode === 'unified' ? (
-      <table className="diff-table diff-table--review">
-        <tbody>
-          {rows(view.above, 'above')}
-          {content && (
-            <tr className="diff-gap-row">
-              <td colSpan={5}>{content}</td>
-            </tr>
-          )}
-          {rows(view.below, 'below')}
-        </tbody>
-      </table>
-    ) : (
-      <div className="diff-split-hunk">
-        {rows(view.above, 'above')}
-        {content && <div className="diff-gap-row">{content}</div>}
-        {rows(view.below, 'below')}
+  const unifiedTable = (rows: React.ReactNode) => (
+    <table className="diff-table diff-table--review diff-table--row">
+      <colgroup>
+        <col style={{ width: numColWidth + NUM_CELL_CHROME_PX }} />
+        <col style={{ width: numColWidth + NUM_CELL_CHROME_PX }} />
+        <col style={{ width: gutterWidth + GUTTER_CELL_PADDING_PX }} />
+        <col className="diff-col--prefix" />
+        <col />
+      </colgroup>
+      <tbody>{rows}</tbody>
+    </table>
+  )
+
+  const toggleMoved = (key: string) =>
+    setExpandedMoved((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+
+  const renderMovedRow = (mark: MovedMark) => {
+    const here = mark.side === 'RIGHT'
+    const otherPath = here ? mark.block.fromPath : mark.block.toPath
+    return (
+      <MovedRow
+        symbol={mark.block.symbol}
+        lineCount={mark.block.lineCount}
+        otherPath={otherPath}
+        otherLine={here ? mark.block.fromLine : mark.block.toLine}
+        direction={here ? 'here' : 'away'}
+        expanded={mark.expanded}
+        onToggleShow={() => toggleMoved(mark.key)}
+        onGoToOrigin={() => goToPath(otherPath)}
+      />
+    )
+  }
+
+  const renderHunkHeader = (hunk: DiffHunk, hunkIndex: number) => {
+    const bar = (
+      <div className="rs-hunk-bar">
+        <span className="rs-hunk-bar__text">{hunk.header}</span>
+        {testsButton(`hunk-${hunkIndex}`, hunkCode(hunk.lines), hunk.header)}
       </div>
     )
+    return diffViewMode === 'unified' ? (
+      unifiedTable(
+        <tr>
+          <td colSpan={5} className="diff-hunk-header rs-hunk-anchor">
+            {bar}
+          </td>
+        </tr>
+      )
+    ) : (
+      <div className="diff-split-header rs-hunk-anchor">{bar}</div>
+    )
+  }
+
+  const renderGapExpander = (gapKey: string, hidden: number | null) => {
+    const content = renderExpanderContent({ key: gapKey }, hidden)
+    return diffViewMode === 'unified' ? (
+      unifiedTable(
+        <tr className="diff-gap-row">
+          <td colSpan={5}>{content}</td>
+        </tr>
+      )
+    ) : (
+      <div className="diff-gap-row">{content}</div>
+    )
+  }
+
+  const formattingNotice = (hiddenCount: number) => (
+    <div className="review-diff-formatting-notice">
+      {hiddenCount} formatting-only hunk
+      {hiddenCount !== 1 ? 's' : ''} hidden —{' '}
+      <button
+        className="review-diff-formatting-show-btn"
+        onClick={() => setHideFormattingHunks(false)}
+      >
+        show all
+      </button>
+    </div>
+  )
+
+  const renderUnifiedItem = (line: DiffLine, moved: MovedMark | null) =>
+    unifiedTable(
+      <>
+        {moved?.isStart && (
+          <tr>
+            <td colSpan={5}>{renderMovedRow(moved)}</td>
+          </tr>
+        )}
+        {renderUnifiedLine(line, false)}
+      </>
+    )
+
+  const renderItem = (item: DiffItem): React.ReactNode => {
+    switch (item.kind) {
+      case 'notice':
+        return formattingNotice(item.hiddenCount)
+      case 'hunk-header':
+        return renderHunkHeader(item.hunk, item.hunkIndex)
+      case 'line':
+        return renderUnifiedItem(item.line, item.moved)
+      case 'split-row':
+        return (
+          <>
+            {item.movedLeft?.isStart && renderMovedRow(item.movedLeft)}
+            {item.movedRight?.isStart && renderMovedRow(item.movedRight)}
+            {renderSplitPair(item.left, item.right, false)}
+          </>
+        )
+      case 'gap-line':
+        return diffViewMode === 'unified'
+          ? unifiedTable(renderUnifiedLine(item.line, true))
+          : renderSplitPair(item.line, item.line, true)
+      case 'gap-expander':
+        return renderGapExpander(item.gapKey, item.hidden)
+      case 'hotspot':
+        return (
+          <div className="complexity-hotspot-annotation" role="alert">
+            <TriangleAlert aria-hidden="true" /> {item.message}
+          </div>
+        )
+    }
   }
 
   return (
@@ -1496,180 +1512,12 @@ export function ReviewDiffPane({
           <div className="review-diff-error">Failed to load diff: {diffError}</div>
         ) : diff ? (
           <div className={`review-diff-table-wrap review-diff-table-wrap--${diffViewMode}`}>
-            {hiddenFormattingCount > 0 && (
-              <div className="review-diff-formatting-notice">
-                {hiddenFormattingCount} formatting-only hunk
-                {hiddenFormattingCount !== 1 ? 's' : ''} hidden —{' '}
-                <button
-                  className="review-diff-formatting-show-btn"
-                  onClick={() => setHideFormattingHunks(false)}
-                >
-                  show all
-                </button>
-              </div>
-            )}
-            {visibleHunks.map(({ hunk, index: hi }) => (
-              <React.Fragment key={hi}>
-                {hi === 0 && renderGap('top')}
-                {diffViewMode === 'unified' ? (
-                  <table className="diff-table diff-table--review">
-                    <tbody>
-                      <tr>
-                        <td colSpan={5} className="diff-hunk-header rs-hunk-anchor">
-                          <div className="rs-hunk-bar">
-                            <span className="rs-hunk-bar__text">{hunk.header}</span>
-                            {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
-                          </div>
-                        </td>
-                      </tr>
-                      {hunk.lines.map((line, li) => {
-                        const lineNum = line.newLineNumber ?? line.oldLineNumber ?? 0
-                        const side: 'LEFT' | 'RIGHT' = line.type === 'remove' ? 'LEFT' : 'RIGHT'
-                        const mb = movedBlockForLine(lineNum, side)
-                        const isRangeStart = mb
-                          ? lineNum === (side === 'RIGHT' ? mb.toLine : mb.fromLine)
-                          : false
-                        const key = mb
-                          ? movedKey(mb.fromPath, mb.fromLine, mb.toPath, mb.toLine)
-                          : null
-                        const expanded = key ? expandedMoved.has(key) : false
-
-                        if (mb && !isRangeStart && !expanded) return null
-
-                        return (
-                          <React.Fragment key={`${hi}-${li}`}>
-                            {mb && isRangeStart && (
-                              <tr>
-                                <td colSpan={5}>
-                                  <MovedRow
-                                    symbol={mb.symbol}
-                                    lineCount={mb.lineCount}
-                                    otherPath={side === 'RIGHT' ? mb.fromPath : mb.toPath}
-                                    otherLine={side === 'RIGHT' ? mb.fromLine : mb.toLine}
-                                    direction={side === 'RIGHT' ? 'here' : 'away'}
-                                    expanded={expanded}
-                                    onToggleShow={() =>
-                                      setExpandedMoved((prev) => {
-                                        const next = new Set(prev)
-                                        if (next.has(key!)) next.delete(key!)
-                                        else next.add(key!)
-                                        return next
-                                      })
-                                    }
-                                    onGoToOrigin={() =>
-                                      goToPath(side === 'RIGHT' ? mb.fromPath : mb.toPath)
-                                    }
-                                  />
-                                </td>
-                              </tr>
-                            )}
-                            {renderUnifiedLine(line, false)}
-                          </React.Fragment>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="diff-split-hunk">
-                    <div className="diff-split-header rs-hunk-anchor">
-                      <div className="rs-hunk-bar">
-                        <span className="rs-hunk-bar__text">{hunk.header}</span>
-                        {testsButton(`hunk-${hi}`, hunkCode(hunk.lines), hunk.header)}
-                      </div>
-                    </div>
-                    {buildSplitRows(hunk.lines).map((row, ri) => {
-                      const leftLine = row.kind === 'context' ? row.line : row.oldLine
-                      const rightLine = row.kind === 'context' ? row.line : row.newLine
-                      const leftLineNum = leftLine?.oldLineNumber ?? 0
-                      const rightLineNum = rightLine?.newLineNumber ?? 0
-
-                      // Moved code (S4): a moved-away block only has removed
-                      // (left) lines; a moved-here block only has added
-                      // (right) lines, so each side is checked independently.
-                      const mbLeft = leftLine ? movedBlockForLine(leftLineNum, 'LEFT') : undefined
-                      const mbRight = rightLine
-                        ? movedBlockForLine(rightLineNum, 'RIGHT')
-                        : undefined
-                      const leftIsStart = mbLeft ? leftLineNum === mbLeft.fromLine : false
-                      const rightIsStart = mbRight ? rightLineNum === mbRight.toLine : false
-                      const leftKey = mbLeft
-                        ? movedKey(mbLeft.fromPath, mbLeft.fromLine, mbLeft.toPath, mbLeft.toLine)
-                        : null
-                      const rightKey = mbRight
-                        ? movedKey(
-                            mbRight.fromPath,
-                            mbRight.fromLine,
-                            mbRight.toPath,
-                            mbRight.toLine
-                          )
-                        : null
-                      const leftExpanded = leftKey ? expandedMoved.has(leftKey) : false
-                      const rightExpanded = rightKey ? expandedMoved.has(rightKey) : false
-
-                      if (mbLeft && !leftIsStart && !leftExpanded) return null
-                      if (mbRight && !rightIsStart && !rightExpanded) return null
-
-                      return (
-                        <React.Fragment key={`${hi}-row-${ri}`}>
-                          {mbLeft && leftIsStart && (
-                            <MovedRow
-                              symbol={mbLeft.symbol}
-                              lineCount={mbLeft.lineCount}
-                              otherPath={mbLeft.toPath}
-                              otherLine={mbLeft.toLine}
-                              direction="away"
-                              expanded={leftExpanded}
-                              onToggleShow={() =>
-                                setExpandedMoved((prev) => {
-                                  const next = new Set(prev)
-                                  if (next.has(leftKey!)) next.delete(leftKey!)
-                                  else next.add(leftKey!)
-                                  return next
-                                })
-                              }
-                              onGoToOrigin={() => goToPath(mbLeft.toPath)}
-                            />
-                          )}
-                          {mbRight && rightIsStart && (
-                            <MovedRow
-                              symbol={mbRight.symbol}
-                              lineCount={mbRight.lineCount}
-                              otherPath={mbRight.fromPath}
-                              otherLine={mbRight.fromLine}
-                              direction="here"
-                              expanded={rightExpanded}
-                              onToggleShow={() =>
-                                setExpandedMoved((prev) => {
-                                  const next = new Set(prev)
-                                  if (next.has(rightKey!)) next.delete(rightKey!)
-                                  else next.add(rightKey!)
-                                  return next
-                                })
-                              }
-                              onGoToOrigin={() => goToPath(mbRight.fromPath)}
-                            />
-                          )}
-                          {renderSplitPair(leftLine, rightLine, false)}
-                        </React.Fragment>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* Complexity hotspot annotation */}
-                {hotspotHunks.has(hi) &&
-                  (() => {
-                    const hotspot = hotspots.find((h) => h.hunkIndex === hi)!
-                    return (
-                      <div className="complexity-hotspot-annotation" role="alert">
-                        <TriangleAlert aria-hidden="true" /> {hotspot.message}
-                      </div>
-                    )
-                  })()}
-                {renderGap(`after-${hi}`)}
-                {hi === diff.hunks.length - 1 && renderGap('bottom')}
-              </React.Fragment>
-            ))}
+            <VirtualDiffList
+              items={items}
+              scrollRef={scrollRef}
+              renderItem={renderItem}
+              handleRef={listRef}
+            />
           </div>
         ) : null}
       </div>

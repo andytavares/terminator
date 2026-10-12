@@ -1,6 +1,6 @@
-import { parseDiff } from '../github/pr-review-service'
 import type { DiffLine } from '../schemas/git.schema'
 import type { MovedBlock } from '../schemas/pr-review.schema'
+import type { ParsedPrFile } from './parsed-file'
 
 const MIN_RUN_LINES = 3
 
@@ -72,19 +72,15 @@ function arraysEqual(a: string[], b: string[]): boolean {
  * removed lines that is whitespace-equal to a run of >= 3 consecutive added
  * lines elsewhere. Pure — does not need tree-sitter.
  */
-export function detectMovedBlocks(
-  files: Array<{ filename?: string; path?: string; patch?: string }>
-): MovedBlock[] {
+export function detectMovedBlocks(files: ParsedPrFile[]): MovedBlock[] {
   const removedRuns: Run[] = []
   const addedRuns: Run[] = []
 
   for (const file of files) {
-    const path = file.path ?? file.filename ?? ''
-    if (!path || !file.patch) continue
-    const diff = parseDiff(file.patch, path)
-    for (const hunk of diff.hunks) {
-      collectRuns(hunk.lines, 'remove', path, removedRuns)
-      collectRuns(hunk.lines, 'add', path, addedRuns)
+    if (!file.path) continue
+    for (const hunk of file.diff.hunks) {
+      collectRuns(hunk.lines, 'remove', file.path, removedRuns)
+      collectRuns(hunk.lines, 'add', file.path, addedRuns)
     }
   }
 

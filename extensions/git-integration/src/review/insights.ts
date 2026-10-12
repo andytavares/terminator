@@ -1,12 +1,12 @@
-import { Parser, type Node } from 'web-tree-sitter'
+import type { Node } from 'web-tree-sitter'
 import {
   classifyHunk,
   classifyTier,
   computeFileCyclomaticDelta,
-  parseDiff,
   COVERAGE_CHECK_NAMES,
 } from '../github/pr-review-service'
-import { analyseSnippet, loadLanguageFor } from './symbols'
+import { analyseSnippet, withSyntaxTree } from './symbols'
+import type { ParsedPrFile } from './parsed-file'
 import type {
   Chapter,
   DryViolation,
@@ -14,14 +14,6 @@ import type {
   PrInsights,
   ReadingStep,
 } from '../schemas/pr-review.schema'
-
-interface RawPrFile {
-  filename?: string
-  path?: string
-  additions?: number
-  deletions?: number
-  patch?: string
-}
 
 interface StatusCheckLike {
   name: string
@@ -39,10 +31,6 @@ export interface ComputeInsightsOptions {
   findTestReferences?: (symbols: string[]) => Promise<Set<string>>
 }
 
-function pathOf(file: RawPrFile): string {
-  return file.path ?? file.filename ?? ''
-}
-
 function linesOf(
   hunkLines: Array<{ type: string; content: string }>,
   type: 'add' | 'remove'
@@ -56,16 +44,15 @@ function linesOf(
 // and prose (YAML, JSON, Markdown) have no branches worth counting.
 const UNPARSED_CODE_RE = /\.(kt|kts|swift|scala|c|m|mm|dart|lua|ex|exs|clj|hs|groovy|tf)$/
 
-async function computeComplexity(files: RawPrFile[]): Promise<PrInsights['complexity']> {
+async function computeComplexity(files: ParsedPrFile[]): Promise<PrInsights['complexity']> {
   const functions: FunctionComplexity[] = []
   let totalDelta = 0
   let anyGrammar = false
   let anyFallback = false
 
   for (const file of files) {
-    const path = pathOf(file)
+    const { path, diff } = file
     if (!file.patch || !path) continue
-    const diff = parseDiff(file.patch, path)
     const headLines = diff.hunks.flatMap((h) =>
       h.lines.filter((l) => l.type === 'add' || l.type === 'context')
     )
@@ -133,24 +120,23 @@ function testStem(path: string): string {
 }
 
 async function computeCoverage(
-  files: RawPrFile[],
+  files: ParsedPrFile[],
   opts: ComputeInsightsOptions
 ): Promise<PrInsights['coverage']> {
-  const sourceFiles = files.filter((f) => SOURCE_FILE_RE.test(pathOf(f)) && !isTestPath(pathOf(f)))
-  const testFiles = files.filter((f) => isTestPath(pathOf(f)))
+  const sourceFiles = files.filter((f) => SOURCE_FILE_RE.test(f.path) && !isTestPath(f.path))
+  const testFiles = files.filter((f) => isTestPath(f.path))
 
   const changedSourceFiles = sourceFiles.length
   const changedSourceFilesWithTests = sourceFiles.filter((src) => {
-    const stem = testStem(src.path ?? src.filename ?? '').replace(/\.[^.]+$/, '')
-    return testFiles.some((t) => testStem(t.path ?? t.filename ?? '').includes(stem))
+    const stem = testStem(src.path).replace(/\.[^.]+$/, '')
+    return testFiles.some((t) => testStem(t.path).includes(stem))
   }).length
 
   // Names of every function changed in a (non-test) source file with a grammar.
   const changedFunctionNames: string[] = []
   for (const file of sourceFiles) {
-    const path = pathOf(file)
+    const { path, diff } = file
     if (!file.patch) continue
-    const diff = parseDiff(file.patch, path)
     const headText = diff.hunks.flatMap((h) => linesOf(h.lines, 'add')).join('\n')
     if (!headText) continue
     const analysis = await analyseSnippet(path, headText)
@@ -160,9 +146,8 @@ async function computeCoverage(
 
   const referencedByPrTests = new Set<string>()
   for (const file of testFiles) {
-    const path = pathOf(file)
+    const { path, diff } = file
     if (!file.patch) continue
-    const diff = parseDiff(file.patch, path)
     const addedText = diff.hunks.flatMap((h) => linesOf(h.lines, 'add')).join('\n')
     if (!addedText) continue
     const analysis = await analyseSnippet(path, addedText)
@@ -242,16 +227,38 @@ interface HealthFlag {
   path: string
 }
 
+function flagsForFunction(node: Node, path: string): HealthFlag[] {
+  const flags: HealthFlag[] = []
+  const lineSpan = node.endPosition.row - node.startPosition.row + 1
+  if (lineSpan > 80) {
+    flags.push({ kind: 'long-function', label: `Function over 80 lines (${lineSpan})`, path })
+  }
+  const nesting = maxNestingDepth(node)
+  if (nesting > 4) flags.push({ kind: 'deep-nesting', label: `Nesting depth ${nesting}`, path })
+  const params = countParams(node)
+  if (params > 5) flags.push({ kind: 'many-params', label: `${params} parameters`, path })
+  return flags
+}
+
+function collectFunctionFlags(root: Node, path: string): HealthFlag[] {
+  const flags: HealthFlag[] = []
+  const visit = (n: Node): void => {
+    if (FUNCTION_NODE_TYPES.has(n.type)) flags.push(...flagsForFunction(n, path))
+    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
+  }
+  visit(root)
+  return flags
+}
+
 async function computeHealthFlags(
-  files: RawPrFile[],
+  files: ParsedPrFile[],
   dryViolations: DryViolation[]
 ): Promise<HealthFlag[]> {
   const flags: HealthFlag[] = []
 
   for (const file of files) {
-    const path = pathOf(file)
+    const { path, diff } = file
     if (!file.patch) continue
-    const diff = parseDiff(file.patch, path)
     const addedLines = diff.hunks.flatMap((h) => linesOf(h.lines, 'add'))
     const addedText = addedLines.join('\n')
     if (!addedText) continue
@@ -269,31 +276,10 @@ async function computeHealthFlags(
       flags.push({ kind: 'any', label: 'New `any` type', path })
     }
 
-    const language = await loadLanguageFor(path)
-    if (!language) continue
-    const parser = new Parser()
-    parser.setLanguage(language)
-    const tree = parser.parse(addedText)
-    if (!tree) continue
-
-    const visit = (n: Node): void => {
-      if (FUNCTION_NODE_TYPES.has(n.type)) {
-        const lineSpan = n.endPosition.row - n.startPosition.row + 1
-        if (lineSpan > 80) {
-          flags.push({ kind: 'long-function', label: `Function over 80 lines (${lineSpan})`, path })
-        }
-        const nesting = maxNestingDepth(n)
-        if (nesting > 4) {
-          flags.push({ kind: 'deep-nesting', label: `Nesting depth ${nesting}`, path })
-        }
-        const params = countParams(n)
-        if (params > 5) {
-          flags.push({ kind: 'many-params', label: `${params} parameters`, path })
-        }
-      }
-      for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
-    }
-    visit(tree.rootNode)
+    const functionFlags = await withSyntaxTree(path, addedText, (root) =>
+      collectFunctionFlags(root, path)
+    )
+    if (functionFlags) flags.push(...functionFlags)
   }
 
   for (const violation of dryViolations) {
@@ -310,16 +296,15 @@ async function computeHealthFlags(
 // ─── Understandability ──────────────────────────────────────────────────────────
 
 async function computeUnderstandability(
-  files: RawPrFile[],
+  files: ParsedPrFile[],
   opts: ComputeInsightsOptions
 ): Promise<PrInsights['understandability']> {
   let linesToRead = 0
   let newExports = 0
 
   for (const file of files) {
-    const path = pathOf(file)
+    const { path, diff } = file
     if (!file.patch || classifyTier(path) === 3) continue
-    const diff = parseDiff(file.patch, path)
     for (const hunk of diff.hunks) {
       if (classifyHunk(hunk) !== 'semantic') continue
       linesToRead += linesOf(hunk.lines, 'add').length + linesOf(hunk.lines, 'remove').length
@@ -378,14 +363,13 @@ async function computeUnderstandability(
  * understandability, each with the source that produced it.
  */
 export async function computeInsights(
-  files: unknown[],
+  files: ParsedPrFile[],
   opts: ComputeInsightsOptions
 ): Promise<PrInsights> {
-  const rawFiles = files as RawPrFile[]
-  const complexity = await computeComplexity(rawFiles)
-  const coverage = await computeCoverage(rawFiles, opts)
-  const flags = await computeHealthFlags(rawFiles, opts.dryViolations)
-  const understandability = await computeUnderstandability(rawFiles, opts)
+  const complexity = await computeComplexity(files)
+  const coverage = await computeCoverage(files, opts)
+  const flags = await computeHealthFlags(files, opts.dryViolations)
+  const understandability = await computeUnderstandability(files, opts)
 
   return {
     complexity,

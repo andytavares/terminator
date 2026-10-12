@@ -1,15 +1,7 @@
-import { classifyTier, parseDiff } from '../github/pr-review-service'
+import { classifyTier } from '../github/pr-review-service'
 import { analyseSnippet, symbolFromHunkHeader } from './symbols'
 import type { ReadingStep, SymbolUse } from '../schemas/pr-review.schema'
-
-interface RawPrFile {
-  filename?: string
-  path?: string
-  status?: string
-  additions?: number
-  deletions?: number
-  patch?: string
-}
+import type { ParsedPrFile } from './parsed-file'
 
 type ReferenceKind = 'call' | 'render' | 'use'
 
@@ -33,12 +25,9 @@ function referenceKind(addedText: string, symbol: string): ReferenceKind {
   return 'use'
 }
 
-async function buildFileNode(file: RawPrFile): Promise<FileNode> {
-  const path = file.path ?? file.filename ?? ''
-  const additions = file.additions ?? 0
-  const deletions = file.deletions ?? 0
+async function buildFileNode(file: ParsedPrFile): Promise<FileNode> {
+  const { path, additions, deletions, diff } = file
   const tier = classifyTier(path)
-  const diff = file.patch ? parseDiff(file.patch, path) : { path, hunks: [], isBinary: false }
 
   const definitions = new Set<string>()
   for (const hunk of diff.hunks) {
@@ -126,8 +115,7 @@ function stronglyConnectedComponents(nodes: string[], edges: Map<string, Set<str
  * Orders `files` for reading: symbols defined before they're used, test files
  * right after the last file they exercise, cycles kept adjacent, tier-3 last.
  */
-export async function buildReadingOrder(rawFiles: unknown[]): Promise<ReadingStep[]> {
-  const files = rawFiles as RawPrFile[]
+export async function buildReadingOrder(files: ParsedPrFile[]): Promise<ReadingStep[]> {
   const nodes = await Promise.all(files.map(buildFileNode))
   if (nodes.length === 0) return []
 

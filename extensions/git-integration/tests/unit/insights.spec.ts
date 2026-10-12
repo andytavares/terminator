@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { Parser, Tree } from 'web-tree-sitter'
 import { computeInsights, type ComputeInsightsOptions } from '../../src/review/insights'
 import type { Chapter, DryViolation, ReadingStep } from '../../src/schemas/pr-review.schema'
+import { parsePrFiles } from '../../src/review/parsed-file'
+
+const insightsOf = (files: unknown[], opts: ComputeInsightsOptions) =>
+  computeInsights(parsePrFiles(files), opts)
 
 const baseOpts: ComputeInsightsOptions = {
   readingOrder: [],
@@ -29,7 +34,7 @@ describe('computeInsights() — complexity', () => {
         ].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     expect(insights.complexity.source).toBe('tree-sitter · hunk base vs head')
     expect(insights.complexity.branchDelta).toBeGreaterThan(0)
     const fn = insights.complexity.functions.find((f) => f.name === 'risky')
@@ -50,7 +55,7 @@ describe('computeInsights() — complexity', () => {
         ].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     expect(insights.complexity.branchDelta).toBe(0)
     expect(insights.complexity.functions).toEqual([])
   })
@@ -70,7 +75,7 @@ describe('computeInsights() — complexity', () => {
         ].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     const fn = insights.complexity.functions.find((f) => f.name === 'computeRiskScore')
     expect(fn?.line).toBe(82)
   })
@@ -93,7 +98,7 @@ describe('computeInsights() — complexity', () => {
         ].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     // The whole function was removed — its branches subtract from the total delta.
     expect(insights.complexity.branchDelta).toBeLessThan(0)
   })
@@ -107,7 +112,7 @@ describe('computeInsights() — complexity', () => {
         patch: ['@@ -1,1 +1,1 @@', '-name = "a"', '+name = "b"'].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     expect(insights.complexity.functions).toEqual([])
   })
 
@@ -120,7 +125,7 @@ describe('computeInsights() — complexity', () => {
         patch: ['@@ -1,0 +2,2 @@ resource', '+  if (a && b) {}', '+  if (c || d) {}'].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     expect(insights.complexity.source).toBe('keyword count · approximate')
     expect(insights.complexity.branchDelta).toBeGreaterThan(0)
   })
@@ -151,7 +156,7 @@ describe('computeInsights() — coverage', () => {
         ].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     expect(insights.coverage.changedFunctions).toBe(1)
     expect(insights.coverage.testedFunctions).toBe(1)
     expect(insights.coverage.untestedFunctions).toEqual([])
@@ -172,10 +177,10 @@ describe('computeInsights() — coverage', () => {
         ].join('\n'),
       },
     ]
-    const withoutRepoTests = await computeInsights(files, baseOpts)
+    const withoutRepoTests = await insightsOf(files, baseOpts)
     expect(withoutRepoTests.coverage.untestedFunctions).toContain('subtractOne')
 
-    const withRepoTests = await computeInsights(files, {
+    const withRepoTests = await insightsOf(files, {
       ...baseOpts,
       findTestReferences: async (symbols) => new Set(symbols.filter((s) => s === 'subtractOne')),
     })
@@ -192,7 +197,7 @@ describe('computeInsights() — coverage', () => {
         patch: ['@@ -0,0 +1,1 @@', '+export const x = 1'].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, {
+    const insights = await insightsOf(files, {
       ...baseOpts,
       statusChecks: [{ name: 'codecov/patch', state: 'pass', description: '84.21% of diff hit' }],
     })
@@ -208,11 +213,48 @@ describe('computeInsights() — coverage', () => {
         patch: ['@@ -0,0 +1,1 @@', '+export const x = 1'].join('\n'),
       },
     ]
-    const withLocal = await computeInsights(files, { ...baseOpts, localCoverage: 72.6 })
+    const withLocal = await insightsOf(files, { ...baseOpts, localCoverage: 72.6 })
     expect(withLocal.coverage.patchPercent).toBe(73)
 
-    const withNeither = await computeInsights(files, baseOpts)
+    const withNeither = await insightsOf(files, baseOpts)
     expect(withNeither.coverage.patchPercent).toBeNull()
+  })
+})
+
+describe('computeInsights() — syntax tree memory', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('frees every tree-sitter tree it parses', async () => {
+    const parse = vi.spyOn(Parser.prototype, 'parse')
+    const free = vi.spyOn(Tree.prototype, 'delete')
+    const files = [
+      {
+        path: 'src/freed.ts',
+        additions: 3,
+        deletions: 1,
+        patch: [
+          '@@ -1,2 +1,4 @@ export function freed',
+          ' export function freed(a: number) {',
+          '-  return a',
+          '+  if (a > 1) return a',
+          '+  return 0',
+          ' }',
+        ].join('\n'),
+      },
+      {
+        path: 'src/freed.spec.ts',
+        additions: 1,
+        deletions: 0,
+        patch: ['@@ -0,0 +1,1 @@', "+it('frees', () => freed(2))"].join('\n'),
+      },
+    ]
+
+    await insightsOf(files, baseOpts)
+
+    expect(parse.mock.calls.length).toBeGreaterThan(0)
+    expect(free).toHaveBeenCalledTimes(parse.mock.calls.length)
   })
 })
 
@@ -232,7 +274,7 @@ describe('computeInsights() — health flags', () => {
         ].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     const kinds = insights.health.flags.map((f) => f.kind)
     expect(kinds).toContain('todo')
     expect(kinds).toContain('eslint-disable')
@@ -284,7 +326,7 @@ describe('computeInsights() — health flags', () => {
         patch: ['@@ -0,0 +1,3 @@', ...manyParams].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     const kinds = insights.health.flags.map((f) => f.kind)
     expect(kinds).toContain('long-function')
     expect(kinds).toContain('deep-nesting')
@@ -293,7 +335,7 @@ describe('computeInsights() — health flags', () => {
 
   it('adds one flag per DRY violation group', async () => {
     const violation: DryViolation = { files: ['a.ts', 'b.ts'], fingerprint: 'x', lineCount: 5 }
-    const insights = await computeInsights([], { ...baseOpts, dryViolations: [violation] })
+    const insights = await insightsOf([], { ...baseOpts, dryViolations: [violation] })
     expect(insights.health.flags.filter((f) => f.kind === 'duplicate-block')).toHaveLength(1)
   })
 })
@@ -319,7 +361,7 @@ describe('computeInsights() — understandability', () => {
         patch: ['@@ -0,0 +1,1 @@', '-"a": "1"', '+"a": "2"'].join('\n'),
       },
     ]
-    const insights = await computeInsights(files, baseOpts)
+    const insights = await insightsOf(files, baseOpts)
     // Only src/feature.ts's semantic hunk counts; the lock file is tier 3.
     expect(insights.understandability.linesToRead).toBe(3)
     expect(insights.understandability.newExports).toBeGreaterThan(0)
@@ -361,7 +403,7 @@ describe('computeInsights() — understandability', () => {
         status: 'not-started',
       },
     ]
-    const insights = await computeInsights([], { ...baseOpts, readingOrder, chapters })
+    const insights = await insightsOf([], { ...baseOpts, readingOrder, chapters })
     expect(insights.understandability.longestChain).toBe(3)
     // b.ts (chapter 2) uses a.ts (chapter 1) — one cross-chapter ref.
     expect(insights.understandability.crossChapterRefs).toBe(1)

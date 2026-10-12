@@ -748,7 +748,26 @@
   color: var(--tm-danger);
 }
 
-.review-diff-table-wrap {
+/* The diff list is virtualised (VirtualDiffList): a sized track with the mounted window inside. */
+.review-diff-virtual {
+  position: relative;
+  width: 100%;
+}
+.review-diff-virtual__window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+/* Each unified entry is its own table; fixed columns keep them aligned. */
+.diff-table--row {
+  table-layout: fixed;
+}
+.diff-col--prefix {
+  width: 26px;
+}
+.review-diff-table-wrap--split .diff-split-header {
+  border-top: 1px solid var(--tm-border);
 }
 
 /* Split view layout */
