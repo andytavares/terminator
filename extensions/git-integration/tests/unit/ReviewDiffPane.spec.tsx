@@ -1,6 +1,10 @@
 import React from 'react'
 import { describe, it, beforeAll, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+// Imported with the file rather than inside a test: the pane's module graph
+// (highlight.js among it) takes about a second to load under vitest, and a
+// test that imported it paid that against its own five-second timeout.
+import { ReviewDiffPane } from '../../src/components/pr-review/ReviewDiffPane'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
 const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
@@ -270,7 +274,6 @@ afterEach(() => {
 })
 
 async function renderPane(props: Partial<typeof defaultProps> = {}) {
-  const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
   return render(<ReviewDiffPane {...defaultProps} {...props} />)
 }
 
@@ -1777,7 +1780,6 @@ describe('ReviewDiffPane expandable context', () => {
     )
     await waitFor(() => expect(expandedRows(container).length).toBe(20))
 
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
     const other = { ...mockFile, path: 'src/bar.ts' }
     mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
     rerender(<ReviewDiffPane {...defaultProps} file={other} />)
