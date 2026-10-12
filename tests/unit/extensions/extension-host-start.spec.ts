@@ -32,11 +32,21 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   getAllExtensionSettings: () => ({}),
 }))
 
+// What the host writes to the main log, which `scripts/smoke-start.mjs` reads
+// to tell that every bundled extension came up.
+const logged: string[] = []
+vi.mock('../../../src/main/logger', () => {
+  const write = (message: string) => logged.push(message)
+  const log = { debug: write, info: write, warn: write, error: write }
+  return { makeLogger: () => log, logger: log }
+})
+
 let bundle: string
 
 beforeEach(() => {
   vi.resetModules()
   storeData.extensions = []
+  logged.length = 0
   bundle = join(os.tmpdir(), `ext-bundle-${Date.now()}-${Math.random()}`)
 })
 
@@ -126,6 +136,26 @@ describe('ExtensionHost.start', () => {
     expect(extensions['com.broken']).toMatchObject({ status: 'error', errorMessage: 'boom' })
     expect(extensions['com.healthy']).toMatchObject({ status: 'enabled' })
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.healthy'])
+  })
+
+  it('logs every extension it activates, new or stored, and never one that failed', async () => {
+    writeBundle({ 'com.stored': [] })
+    storeData.extensions = [storedRecord('com.stored', 'enabled')]
+    const { host } = await newHost({
+      'com.broken': () => {
+        throw new Error('boom')
+      },
+    })
+
+    await host.start({
+      bundledDirectory: writeBundle({ 'com.new': [], 'com.broken': [] }),
+      beforeActivation: ready,
+    })
+
+    expect(logged).toContain('Extension com.stored activated')
+    expect(logged).toContain('Extension com.new activated')
+    expect(logged).not.toContain('Extension com.broken activated')
+    expect(logged).toContain('Extension com.broken failed to load: boom')
   })
 
   it('lists extensions as soon as start is called, before any is activated, and activates only after beforeActivation', async () => {
