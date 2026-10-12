@@ -32,9 +32,30 @@ import {
   ArchiveAreaRequestSchema,
 } from '../schemas/vault.schema'
 import { triggerSchedulerTick, broadcast } from '../notifications/task-scheduler.js'
-import { rowToTask, rowToProject, TASK_COLS, TASK_JOINS } from '../vault/mappers'
+import { archiveAreaContents, restoreAreaContents } from '../vault/area-archive'
+import {
+  rowToTask,
+  rowToProject,
+  TASK_COLS,
+  TASK_JOINS,
+  PROJECT_COLS,
+  PROJECT_JOINS,
+} from '../vault/mappers'
 
 const localDate = _localDate
+
+/** The export writes ids; older payloads name the project or area instead. */
+async function findImportedId(
+  db: ExtensionDB,
+  table: 'projects' | 'areas',
+  id: unknown,
+  name: unknown
+): Promise<string | null> {
+  const [column, value] = id ? ['id', id] : ['name', name]
+  if (!value) return null
+  const row = await db.get<{ id: string }>(`SELECT id FROM ${table} WHERE ${column}=?`, [value])
+  return row?.id ?? null
+}
 
 /** One task as written by the JSON export. */
 interface ImportedTask {
@@ -43,6 +64,8 @@ interface ImportedTask {
   created_at: string
   updated_at: string
   status?: string
+  project_id?: string | null
+  area_id?: string | null
   project?: string | null
   area?: string | null
   context?: string | null
@@ -713,34 +736,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     const area = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [areaName])
     if (!area) return { error: 'NOT_FOUND' }
 
-    const projectRows = await db.query<{ id: string }>(`SELECT id FROM projects WHERE area_id=?`, [
-      area.id,
-    ])
-
-    for (const proj of projectRows) {
-      await db.run(
-        `WITH RECURSIVE subtree(id) AS (
-           SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
-           UNION ALL
-           SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
-         )
-         UPDATE tasks SET status='cancelled', updated_at=?
-         WHERE id IN (SELECT id FROM subtree)
-           AND status IN ('open','in-progress','in-review','blocked')`,
-        [proj.id, now]
-      )
-    }
-
-    await db.run(
-      `UPDATE tasks SET status='cancelled', updated_at=?
-       WHERE area_id=? AND project_id IS NULL
-         AND status IN ('open','in-progress','in-review','blocked')`,
-      [now, area.id]
-    )
-    await db.run(`UPDATE projects SET status='archived', updated_at=? WHERE area_id=?`, [
-      now,
-      area.id,
-    ])
+    await archiveAreaContents(db, area.id, now)
     await db.run(`UPDATE areas SET status='archived', updated_at=? WHERE id=?`, [now, area.id])
 
     api.notifications.createNotification({
@@ -799,19 +795,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       [areaName]
     )
     if (!area) return { error: 'NOT_FOUND' }
-    const archivedAt = area.updated_at
     await db.run(`UPDATE areas SET status='active', updated_at=? WHERE id=?`, [now, area.id])
-    await db.run(
-      `UPDATE projects SET status='active', updated_at=? WHERE area_id=? AND status='archived'`,
-      [now, area.id]
-    )
-    await db.run(
-      `UPDATE tasks SET status='open', updated_at=?
-       WHERE status='cancelled' AND updated_at=?
-         AND (area_id=? AND project_id IS NULL
-              OR project_id IN (SELECT id FROM projects WHERE area_id=?))`,
-      [now, archivedAt, area.id, area.id]
-    )
+    await restoreAreaContents(db, { id: area.id, archivedAt: area.updated_at }, now)
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
@@ -858,7 +843,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
         )
         const tasks = taskRows.map(rowToTask)
         const projectRows = await db.query<Record<string, unknown>>(
-          `SELECT * FROM projects WHERE area_id=? ORDER BY name`,
+          `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.area_id=? ORDER BY p.name`,
           [areaId]
         )
         const projects = await Promise.all(
@@ -935,7 +920,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
         [cutoff]
       )
       const projectRows = await db.query<Record<string, unknown>>(
-        `SELECT * FROM projects WHERE status='archived' ORDER BY updated_at DESC`
+        `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='archived' ORDER BY p.updated_at DESC`
       )
       const areaRows = await db.query<Record<string, unknown>>(
         `SELECT * FROM areas WHERE status='archived' ORDER BY updated_at DESC`
@@ -960,7 +945,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
          ORDER BY t.created_at ASC`
       )
       const projectRows = await db.query<Record<string, unknown>>(
-        `SELECT * FROM projects WHERE status='someday' ORDER BY name ASC`
+        `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='someday' ORDER BY p.name ASC`
       )
       return { tasks: taskRows.map(rowToTask), projects: projectRows.map(rowToProject) }
     } catch (err) {
@@ -1045,18 +1030,15 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       if (Array.isArray(data.areas)) {
         for (const a of data.areas) {
           await db.run(
-            `INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`,
-            [a.id, a.name, a.created_at, a.updated_at ?? a.created_at]
+            `INSERT INTO areas (id,name,status,created_at,updated_at) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING`,
+            [a.id, a.name, a.status ?? 'active', a.created_at, a.updated_at ?? a.created_at]
           )
           imported++
         }
       }
       if (Array.isArray(data.projects)) {
         for (const p of data.projects) {
-          const areaRow = p.area
-            ? await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [p.area])
-            : null
-          const areaId = areaRow?.id ?? null
+          const areaId = await findImportedId(db, 'areas', p.area_id, p.area)
           await db.run(
             `INSERT INTO projects (id,name,status,area_id,deadline,outcome,terminator_links,created_at,updated_at)
              VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
@@ -1077,14 +1059,8 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       }
       if (Array.isArray(data.tasks)) {
         for (const t of data.tasks) {
-          const projRow = t.project
-            ? await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [t.project])
-            : null
-          const projectId = projRow?.id ?? null
-          const areaRow = t.area
-            ? await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [t.area])
-            : null
-          const areaId = areaRow?.id ?? null
+          const projectId = await findImportedId(db, 'projects', t.project_id, t.project)
+          const areaId = await findImportedId(db, 'areas', t.area_id, t.area)
           await insertTask(
             db,
             {

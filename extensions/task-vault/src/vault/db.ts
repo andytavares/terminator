@@ -76,6 +76,14 @@ export async function applyTaskVaultSchema(db: ExtensionDB): Promise<void> {
       ON tasks(recurrence_template_id, due_date)
       WHERE recurrence_template_id IS NOT NULL AND due_date IS NOT NULL;
 
+    CREATE TABLE IF NOT EXISTS area_archive_changes (
+      area_id         TEXT NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
+      entity_type     TEXT NOT NULL,
+      entity_id       TEXT NOT NULL,
+      previous_status TEXT NOT NULL,
+      PRIMARY KEY (area_id, entity_type, entity_id)
+    );
+
     CREATE TABLE IF NOT EXISTS weekly_reviews (
       id           TEXT PRIMARY KEY,
       started_at   TEXT NOT NULL,

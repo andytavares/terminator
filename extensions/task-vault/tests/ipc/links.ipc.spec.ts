@@ -6,6 +6,7 @@ import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc.js'
 import {
   createIpcHarness,
   createVaultDb,
+  seedArea,
   seedProject,
   seedTask,
   taskRow,
@@ -130,6 +131,20 @@ describe('task-vault:links:get-for-terminator-target', () => {
 
     expect(result.tasks.map((task) => task.id)).toEqual(['linked'])
     expect(result.projects.map((project) => project.name)).toEqual(['alpha'])
+  })
+
+  it('names the area of a linked project', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await seedProject(db, 'p1', 'alpha', { areaId: 'a1' })
+    await db.run(`UPDATE projects SET terminator_links = ? WHERE id = 'p1'`, [
+      JSON.stringify([TARGET]),
+    ])
+
+    const result = (await invoke('task-vault:links:get-for-terminator-target', {
+      targetId: TARGET,
+    })) as { projects: { name: string; area?: string }[] }
+
+    expect(result.projects).toMatchObject([{ name: 'alpha', area: 'Work' }])
   })
 
   it('returns empty lists when nothing links to the target', async () => {

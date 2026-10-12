@@ -844,6 +844,17 @@ describe('task-vault:vault:list-archive', () => {
     expect(result.areas).toEqual([{ id: 'a-old', name: 'Old Area', updatedAt: expect.any(String) }])
   })
 
+  it('names the area of an archived project', async () => {
+    await seedArea(db, 'a1', 'Work', 'archived')
+    await seedProject(db, 'p1', 'Old Project', { status: 'archived', areaId: 'a1' })
+
+    const result = (await invoke('task-vault:vault:list-archive', {})) as {
+      projects: { name: string; area?: string }[]
+    }
+
+    expect(result.projects).toMatchObject([{ name: 'Old Project', area: 'Work' }])
+  })
+
   it('looks back 30 days when the payload is invalid', async () => {
     await seedTask(db, { id: 'recent', status: 'done', updatedAt: daysAgo(1) })
     await seedTask(db, { id: 'old', status: 'done', updatedAt: daysAgo(60) })
