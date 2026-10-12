@@ -8,6 +8,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   type AppHandle,
+  type TerminalRowsWindow,
 } from '../helpers'
 
 // SC-005: typing stays responsive while other terminals print continuously.
@@ -45,9 +46,9 @@ test('measure keystroke echo with six busy terminals', async () => {
     await page.keyboard.type(key)
     await page.waitForFunction(
       (expected) =>
-        [...document.querySelectorAll('.terminal-pane .xterm-rows > div')].some((row) =>
-          (row.textContent ?? '').includes(expected)
-        ),
+        (window as unknown as TerminalRowsWindow).terminatorE2E
+          .terminalRows()
+          .some((row) => row.includes(expected)),
       typed,
       { polling: 'raf', timeout: 5000 }
     )

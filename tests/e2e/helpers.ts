@@ -225,3 +225,14 @@ export async function selectProject(
 ): Promise<void> {
   await projectGroup(page, projectName).click()
 }
+
+/** The window as the app sets it up, with `src/renderer/terminal/terminal-rows.ts`. */
+export type TerminalRowsWindow = Window & { terminatorE2E: { terminalRows(): string[] } }
+
+/**
+ * The rows every open terminal shows, read from xterm's buffer. Under the
+ * WebGL renderer the terminal is a canvas and the DOM holds none of its text.
+ */
+export function terminalRows(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as TerminalRowsWindow).terminatorE2E.terminalRows())
+}

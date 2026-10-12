@@ -240,6 +240,9 @@ tile) disposes it, so a hidden terminal or a thumbnail never holds a GPU context
 and a terminal past that stays on the DOM renderer. A lost context (`onContextLoss`) or a machine without
 WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
 2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
+Because WebGL leaves no terminal text in the DOM, the renderer sets `window.terminatorE2E.terminalRows()`
+(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer;
+the end-to-end specs read terminals through it.
 
 **Batching and flow control.** A PTY produces thousands of small chunks a second. `OutputRelay`
 (`src/main/terminal/output-relay.ts`) joins them in an `OutputBatcher` and sends one `terminal:output`
