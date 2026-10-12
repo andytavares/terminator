@@ -11,7 +11,7 @@ When updating the extension scaffold template (`generateIndex`), enforce these r
 3. **Never add new namespaces to `window.electronAPI`** — the preload is core-only. Extensions use `extensionBridge`
 4. **Never modify core files**: `src/main/preload.ts`, `src/main/preload-webview.ts`, `src/shared/electron-api/manifest.ts`, `src/main/ipc/*.ts`
 5. **NPM deps go in the extension's own `package.json`**, not the root
-6. **Never import from other extensions, or from core source** — import only `@terminator/extension-sdk`, `@terminator/extension-ui` and the extension's own npm packages (`npm run lint` enforces it). An extension's API is what its `activate` returns, reached by a consumer that declares the provider in its manifest's extension dependencies (ADR 094). That is the rule even before the mechanism that hands the object over exists
+6. **Never import from other extensions, or from core source** — import only `@terminator/extension-sdk`, `@terminator/extension-ui` and the extension's own npm packages (`npm run lint` enforces it). An extension's API is what its `activate` returns, reached by a consumer that lists the provider in its manifest's `extensionDependencies` and reads it with `api.extensions.get(id)` (ADR 094, SDK 2.1.0). A scaffold that shows a dependency shows both halves, never an import of the provider's source
 
 ### Scaffold must NOT include
 

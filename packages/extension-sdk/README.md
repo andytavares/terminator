@@ -14,8 +14,28 @@ extensions.
 | `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`                                                                          |
 | `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` an extension view receives (loaded through `tsconfig`)                         |
 
+The main entry also declares `GithubAPI` (`api.github`, pull requests over gh), the shell
+option and result types (`ShellExecOptions`, `ShellExecResult`), and the built-in extensions'
+APIs (`TaskVaultAPI`, `BuiltInExtensionExports`).
+
 Source-only TypeScript, with `react`, `react-dom` and `zod` as peer dependencies. See
 `CHANGELOG.md`.
+
+## Using another extension's API
+
+An extension's API is the value its `activate` returns. List the provider in your manifest and
+read it through the API; never import its source:
+
+```jsonc
+{ "id": "com.example.planner", "extensionDependencies": ["terminator.task-vault"] }
+```
+
+```typescript
+const vault = api.extensions.get('terminator.task-vault') // TaskVaultAPI
+```
+
+The host activates the provider first. A missing, failed, disabled or cyclic dependency fails
+your activation with a message naming it, and `get` throws for an id you did not declare.
 
 ## Installation
 
