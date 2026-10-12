@@ -651,6 +651,8 @@ export function NoteList(): React.JSX.Element {
       },
       onDragOver(e) {
         e.preventDefault()
+        // Handled here: the list behind clears every drop target on dragover.
+        e.stopPropagation()
         e.dataTransfer.dropEffect = 'move'
         const rect = e.currentTarget.getBoundingClientRect()
         const before = e.clientY < rect.top + rect.height / 2
@@ -737,6 +739,8 @@ export function NoteList(): React.JSX.Element {
       onDragOver(e: React.DragEvent) {
         if (!dragId) return
         e.preventDefault()
+        // Handled here: the list behind clears every drop target on dragover.
+        e.stopPropagation()
         e.dataTransfer.dropEffect = 'move'
         setFolderDropTarget(folderId)
         setDropTarget(null)
