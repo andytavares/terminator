@@ -8,10 +8,6 @@ import { ELECTRON_API_MANIFEST } from '../../../../src/shared/electron-api/manif
 // deriving it from the manifest would make the SDK import core. This holds the
 // hand-written declaration to the manifest's `extensionView` specs.
 
-// Exposed by the webview preload, but the core sends extension views no
-// terminal output since 89e3b66, so the SDK does not offer it.
-const EXPOSED_BUT_NOT_DELIVERED = ['terminal.onOutput']
-
 function declaredPaths(): string[] {
   const file = path.resolve(__dirname, '../../../../packages/extension-sdk/types/renderer.d.ts')
   const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest)
@@ -32,9 +28,7 @@ describe('the SDK renderer declaration', () => {
   it('declares exactly what an extension view receives', () => {
     const delivered = ELECTRON_API_MANIFEST.filter(
       (spec) => 'extensionView' in spec && spec.extensionView !== undefined
-    )
-      .map((spec) => spec.path)
-      .filter((methodPath) => !EXPOSED_BUT_NOT_DELIVERED.includes(methodPath))
+    ).map((spec) => spec.path)
 
     expect(declaredPaths().sort()).toEqual(delivered.sort())
   })

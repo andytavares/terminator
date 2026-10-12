@@ -58,14 +58,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.send('terminal:input', { sessionId, data }),
     resize: (sessionId: string, cols: number, rows: number) =>
       ipcRenderer.send('terminal:resize', { sessionId, cols, rows }),
-    onOutput: (handler: (sessionId: string, data: string) => void) => {
-      const listener = (
-        _event: Electron.IpcRendererEvent,
-        payload: { sessionId: string; data: string }
-      ) => handler(payload.sessionId, payload.data)
-      ipcRenderer.on('terminal:output', listener)
-      return () => ipcRenderer.removeListener('terminal:output', listener)
-    },
     closeAll: () => ipcRenderer.invoke('terminal:close-all'),
     cleanupOrphans: () => ipcRenderer.invoke('terminal:cleanup-orphans'),
     onProcessExit: (handler: (sessionId: string, exitCode: number) => void) => {

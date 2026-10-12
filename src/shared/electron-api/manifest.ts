@@ -249,7 +249,6 @@ export const ELECTRON_API_MANIFEST = [
       const p = args[0] as { sessionId: string; data: string }
       return [p.sessionId, p.data]
     },
-    extensionView: 'shared',
   }),
   method({
     path: 'terminal.closeAll',
