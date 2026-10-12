@@ -1,6 +1,6 @@
 # ADR-102: Extension Shell Commands Run Only in Declared Roots (Supersedes the cwd rule of ADR-006)
 
-**Status**: Accepted
+**Status**: Accepted (root 3, `api.paths.userData`, superseded by [ADR-103](103-each-extension-has-its-own-data-folder.md))
 **Date**: 2026-10-12
 **Supersedes**: ADR-006's rule 2, "CWD pinning: the `cwd` argument must be within the current workspace's `folderPath`". The rest of ADR-006 stands: the git and gh allowlist, `execFile` without a shell, the minimal environment and the timeout.
 

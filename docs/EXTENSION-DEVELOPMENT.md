@@ -147,7 +147,7 @@ Every backend runs in the **extension host**, one Electron [`utilityProcess`](ht
 - A callback you pass (a command handler, a notification's `onClick`, `pty.onData`) stays in the extension host, and the core calls it by id. Registrations still return a `Disposable` at once.
 - Values you pass and return must survive structured clone: plain data, no functions or class instances. An `Error` arrives with its `name` and `message`.
 - `api.db` is the extension host's own connection to the app database, so `transaction(fn)` runs `fn` in your process.
-- `electron` is not available. Use `api.paths` for `app.getAppPath()` and `app.getPath('userData')`, `api.dialog` for file dialogs, and `api.window` for windows. A store such as electron-store needs `cwd: api.paths.userData`. Node's own modules work: Remote Control's HTTP server runs here.
+- `electron` is not available. Use `api.paths` for `app.getAppPath()` and for your own data folder, `api.dialog` for file dialogs, and `api.window` for windows. A store such as electron-store needs `cwd: api.paths.globalStorage`. Node's own modules work: Remote Control's HTTP server runs here.
 
 If the extension host crashes, the app stays up. It is restarted once and every backend activated
 again in the same order as at startup: an extension after those in its `extensionDependencies`, so
@@ -447,7 +447,18 @@ Test against a real in-memory database (`new DatabaseSync(':memory:')`), not a m
 
 ### `api.paths`
 
-`paths.app` (Electron's `app.getAppPath()`) and `paths.userData` (`app.getPath('userData')`), taken when the extension activates.
+`paths.app` is Electron's `app.getAppPath()`. `paths.globalStorage` is your extension's own data folder, `<userData>/extensions/<id>`, which no other extension shares: VS Code's [`ExtensionContext.globalStorageUri`](https://code.visualstudio.com/api/references/vscode-api#ExtensionContext). It may not exist yet; create it (`mkdirSync(path, { recursive: true })`) before writing into it ([ADR 103](adr/103-each-extension-has-its-own-data-folder.md)).
+
+An extension that kept data in the shared userData folder before 4.0.0 moves it at the top of `activate` with `moveFromUserData` from `@terminator/extension-sdk/node`. Each path moves only while its new location does not exist; when both exist neither is touched and `api.log.warn` names the old copy:
+
+```typescript
+import { moveFromUserData } from '@terminator/extension-sdk/node'
+
+export function activate(api: ExtensionAPI): void {
+  moveFromUserData(api, [{ from: 'foundry', to: 'records' }])
+  // ...
+}
+```
 
 ### `api.dialog`
 
@@ -557,7 +568,7 @@ Output is never trimmed. The core runs the command in the main process (`src/mai
 
 - a workspace folder (`workspace.list()`'s `folderPath`);
 - a project worktree (`workspace.listProjects(id)`'s `worktreePath`);
-- `api.paths.userData`, the application's per-user data directory (the same directory for every extension);
+- `api.paths.globalStorage`, your own data folder, and nothing else in userData: another extension's folder is outside ([ADR 103](adr/103-each-extension-has-its-own-data-folder.md));
 - the value of each folder setting your manifest declares in [`contributes.shellRoots`](#contributes).
 
 The `cwd` and each root are compared after `realpath`, by path segment: a symlink or a `..` that leads out of a root, or a sibling such as `/repos/app-old` beside the root `/repos/app`, is outside. A directory that does not exist yet is judged by where it would be. Outside every root, `exec` runs nothing and rejects with an error named `CwdOutOfScopeError`:
@@ -571,11 +582,11 @@ try {
 }
 ```
 
-When the directory does not matter to the command (`gh api` with an explicit repository, `gh api user`), run it in `api.paths.userData`. The roots bound the core's side; a channel that takes a path from a caller still checks it itself, as git-integration's `RepoRoot` schema does (`extensions/git-integration/src/ipc/repo-root.ts`).
+When the directory does not matter to the command (`gh api` with an explicit repository, `gh api user`), run it in `api.paths.globalStorage`, after creating it. The roots bound the core's side; a channel that takes a path from a caller still checks it itself, as git-integration's `RepoRoot` schema does (`extensions/git-integration/src/ipc/repo-root.ts`).
 
 ### `api.github`
 
-Pull requests and the GitHub API through the `gh` CLI the core runs. Each call takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository without a checkout (`repository: 'owner/name'`, with `cwd: api.paths.userData`), and optionally a `token` that is retried under gh's own login when GitHub rejects it. `cwd` follows the same shell roots as `api.shell.exec` and is refused with `CwdOutOfScopeError` outside them.
+Pull requests and the GitHub API through the `gh` CLI the core runs. Each call takes a `GithubTarget`: the checkout gh runs in (`cwd`), or a repository without a checkout (`repository: 'owner/name'`, with `cwd: api.paths.globalStorage`), and optionally a `token` that is retried under gh's own login when GitHub rejects it. `cwd` follows the same shell roots as `api.shell.exec` and is refused with `CwdOutOfScopeError` outside them.
 
 ```typescript
 const target = { cwd: repoRoot }
