@@ -1,142 +1,116 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ipcMain, BrowserWindow } from 'electron'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../src/shared/schemas/settings.schema'
+
+type Handler = (event: unknown, payload?: unknown) => unknown
+const handlers = vi.hoisted(() => new Map<string, Handler>())
+
+function fakeWindow({ minimized = false, destroyed = false } = {}) {
+  return {
+    isDestroyed: () => destroyed,
+    isMinimized: () => minimized,
+    restore: vi.fn(),
+    show: vi.fn(),
+    focus: vi.fn(),
+    webContents: { isDestroyed: () => destroyed, send: vi.fn() },
+  }
+}
+const windows = vi.hoisted(() => [] as Array<ReturnType<typeof fakeWindow>>)
 
 vi.mock('electron', () => ({
-  ipcMain: {
-    handle: vi.fn(),
-    on: vi.fn(),
-  },
+  ipcMain: { handle: (channel: string, handler: Handler) => handlers.set(channel, handler) },
   Notification: { isSupported: () => false },
   app: { dock: null },
-  BrowserWindow: { getAllWindows: vi.fn(() => []) },
+  BrowserWindow: { getAllWindows: () => windows },
 }))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
-const { mockList, mockDismiss, mockTriggerAction, mockCreate } = vi.hoisted(() => ({
-  mockList: vi.fn(),
-  mockDismiss: vi.fn(),
-  mockTriggerAction: vi.fn(),
-  mockCreate: vi.fn(),
-}))
-
-vi.mock('../../../src/main/notifications/notification-manager', () => ({
-  notificationManager: {
-    list: mockList,
-    dismiss: mockDismiss,
-    triggerAction: mockTriggerAction,
-    create: mockCreate,
-  },
-}))
-
-import { registerNotificationHandlers } from '../../../src/main/ipc/notification.ipc'
-
-function captureHandle(channel: string): (event: unknown, payload?: unknown) => unknown {
-  const calls = vi.mocked(ipcMain.handle).mock.calls
-  const match = calls.find(([ch]) => ch === channel)
-  if (!match) throw new Error(`No handler registered for: ${channel}`)
-  return match[1] as (event: unknown, payload?: unknown) => unknown
+function invoke<T = unknown>(channel: string, payload?: unknown): Promise<T> {
+  return Promise.resolve(handlers.get(channel)!({}, payload)) as Promise<T>
 }
 
-describe('notification IPC handlers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    registerNotificationHandlers()
+async function create(payload: Record<string, unknown>): Promise<string> {
+  const { id } = await invoke<{ id: string }>('notifications:create', {
+    type: 'info',
+    title: 'Build finished',
+    key: 'buildFinished',
+    ...payload,
   })
+  return id
+}
 
-  describe('notifications:create', () => {
-    it('calls notificationManager.create and returns the id', async () => {
-      mockCreate.mockReturnValue('new-id')
-      const handler = captureHandle('notifications:create')
-      const result = await handler(null, { type: 'info', title: 'Hello', key: 'helloKey' })
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'info', title: 'Hello', key: 'helloKey' })
-      )
-      expect(result).toEqual({ id: 'new-id' })
-    })
+// The real notification manager and settings store; only Electron is faked.
+beforeEach(async () => {
+  vi.resetModules()
+  handlers.clear()
+  windows.length = 0
+  const { registerNotificationHandlers } = await import('../../../src/main/ipc/notification.ipc')
+  registerNotificationHandlers()
+})
 
-    it('ignores a caller-supplied targets field (delivery is settings-resolved, not caller-supplied)', async () => {
-      mockCreate.mockReturnValue('tid')
-      const handler = captureHandle('notifications:create')
-      await handler(null, {
-        type: 'success',
-        title: 'T',
-        key: 'tKey',
-        targets: ['system', 'toast'],
-      })
-      expect(mockCreate).toHaveBeenCalledWith({ type: 'success', title: 'T', key: 'tKey' })
-    })
+describe('notifications:create', () => {
+  it('lists the notification, delivered where the settings say rather than where the caller asks', async () => {
+    const id = await create({ source: 'terminator.task-vault', targets: ['system'] })
 
-    it('omits onClick when no sessionId is given', async () => {
-      mockCreate.mockReturnValue('tid')
-      const handler = captureHandle('notifications:create')
-      await handler(null, { type: 'info', title: 'T', key: 'tKey' })
-      expect(mockCreate).toHaveBeenCalledWith({ type: 'info', title: 'T', key: 'tKey' })
-    })
-
-    it('passes an onClick that shows, focuses and navigates every window when sessionId is given', async () => {
-      mockCreate.mockReturnValue('sid')
-      const win = {
-        isDestroyed: () => false,
-        isMinimized: () => false,
-        restore: vi.fn(),
-        show: vi.fn(),
-        focus: vi.fn(),
-        webContents: { isDestroyed: () => false, send: vi.fn() },
-      }
-      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([win] as unknown as ReturnType<
-        typeof BrowserWindow.getAllWindows
-      >)
-      const handler = captureHandle('notifications:create')
-      await handler(null, { type: 'info', title: 'T', key: 'tKey', sessionId: 'ses-1' })
-      const passed = mockCreate.mock.calls[0][0] as { onClick?: () => void }
-      expect(passed).toEqual({
+    expect(await invoke('notifications:list')).toEqual([
+      expect.objectContaining({
+        id,
         type: 'info',
-        title: 'T',
-        key: 'tKey',
-        onClick: expect.any(Function),
-      })
-      passed.onClick!()
-      expect(win.show).toHaveBeenCalled()
-      expect(win.focus).toHaveBeenCalled()
-      expect(win.webContents.send).toHaveBeenCalledWith('terminal:navigate-to-session', {
-        sessionId: 'ses-1',
-      })
+        title: 'Build finished',
+        source: 'terminator.task-vault',
+        clickable: false,
+        targets: DEFAULT_GLOBAL_SETTINGS.notifications.defaultTargets,
+      }),
+    ])
+  })
+})
+
+describe('notifications:dismiss', () => {
+  it('takes the notification off the list', async () => {
+    const id = await create({})
+
+    expect(await invoke('notifications:dismiss', { id })).toEqual({ ok: true })
+
+    expect(await invoke('notifications:list')).toEqual([])
+  })
+})
+
+describe('notifications:trigger-action', () => {
+  it('opening a notification about a session reveals it in every live window and keeps the row', async () => {
+    const minimized = fakeWindow({ minimized: true })
+    const destroyed = fakeWindow({ destroyed: true })
+    windows.push(minimized, destroyed)
+    const id = await create({ sessionId: 'ses-1' })
+
+    expect(
+      await invoke('notifications:trigger-action', { notifId: id, actionId: '__open__' })
+    ).toEqual({ ok: true })
+
+    expect(minimized.restore).toHaveBeenCalled()
+    expect(minimized.show).toHaveBeenCalled()
+    expect(minimized.focus).toHaveBeenCalled()
+    expect(minimized.webContents.send).toHaveBeenCalledWith('terminal:navigate-to-session', {
+      sessionId: 'ses-1',
     })
+    expect(destroyed.show).not.toHaveBeenCalled()
+    expect(await invoke('notifications:list')).toEqual([expect.objectContaining({ id })])
   })
 
-  describe('notifications:list', () => {
-    it('returns serialized notification list', async () => {
-      const notifications = [{ id: '1', type: 'info', title: 'Hello', timestamp: 123 }]
-      mockList.mockReturnValue(notifications)
-      const handler = captureHandle('notifications:list')
-      const result = await handler(null)
-      expect(result).toEqual(notifications)
-      expect(mockList).toHaveBeenCalled()
-    })
+  it('cannot open a notification that is not about a session', async () => {
+    const id = await create({})
+
+    expect(
+      await invoke('notifications:trigger-action', { notifId: id, actionId: '__open__' })
+    ).toEqual({ error: 'UNKNOWN_ACTION' })
   })
 
-  describe('notifications:dismiss', () => {
-    it('calls notificationManager.dismiss with id and returns ok', async () => {
-      const handler = captureHandle('notifications:dismiss')
-      const result = await handler(null, { id: 'notif-123' })
-      expect(mockDismiss).toHaveBeenCalledWith('notif-123')
-      expect(result).toEqual({ ok: true })
-    })
-  })
+  it('answers UNKNOWN_NOTIFICATION once the notification is gone', async () => {
+    const id = await create({})
+    await invoke('notifications:dismiss', { id })
 
-  describe('notifications:trigger-action', () => {
-    it('calls triggerAction and returns result', async () => {
-      mockTriggerAction.mockReturnValue({ ok: true })
-      const handler = captureHandle('notifications:trigger-action')
-      const result = await handler(null, { notifId: 'n1', actionId: 'go' })
-      expect(mockTriggerAction).toHaveBeenCalledWith('n1', 'go')
-      expect(result).toEqual({ ok: true })
-    })
-
-    it('propagates UNKNOWN_NOTIFICATION from manager', async () => {
-      mockTriggerAction.mockReturnValue({ error: 'UNKNOWN_NOTIFICATION' })
-      const handler = captureHandle('notifications:trigger-action')
-      const result = await handler(null, { notifId: 'bad', actionId: 'go' })
-      expect(result).toEqual({ error: 'UNKNOWN_NOTIFICATION' })
+    expect(await invoke('notifications:trigger-action', { notifId: id, actionId: 'go' })).toEqual({
+      error: 'UNKNOWN_NOTIFICATION',
     })
   })
 })

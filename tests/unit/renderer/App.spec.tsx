@@ -869,11 +869,8 @@ describe('App', () => {
         getScratchSessions: vi.fn().mockReturnValue([]),
         sessions: new Map(),
         setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
-        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
       // The menu reads the store when it fires, not what the last render saw.
       setupMocks({
@@ -887,11 +884,8 @@ describe('App', () => {
         getScratchSessions: vi.fn().mockReturnValue([]),
         sessions: new Map(),
         setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
-        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
       let closeTabCallback: (() => void) | null = null
@@ -932,11 +926,8 @@ describe('App', () => {
         getScratchSessions: vi.fn().mockReturnValue([]),
         sessions: new Map(),
         setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         projectViews: new Map(),
-        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
       let closeTabCallback: (() => void) | null = null
@@ -987,13 +978,10 @@ describe('App', () => {
         getScratchSessions: vi.fn().mockReturnValue([]),
         sessions: new Map(),
         setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         projectViews: new Map([
           [SCRATCH_PROJECT_ID, { terminalCounter: 0, activeSessionId: 'ses-scratch' }],
         ]),
-        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
       let closeTabCallback: (() => void) | null = null
@@ -1038,12 +1026,9 @@ describe('App', () => {
         getScratchSessions: vi.fn().mockReturnValue([]),
         sessions: new Map(),
         setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         // proj-1 has no active session mapped
         projectViews: new Map(),
-        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
       let closeTabCallback: (() => void) | null = null
