@@ -19,6 +19,8 @@ export interface IconButtonProps
    * is not a label: it never appears for keyboard users and never on touch.
    */
   label: string
+  /** A longer tooltip than the label, when the action needs explaining. The label stays the name. */
+  description?: string
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   pressed?: boolean
   /** `sm` for a dense row or inside a chip; `md` (26px) everywhere else. */
@@ -29,6 +31,7 @@ export interface IconButtonProps
 export function IconButton({
   icon: Icon,
   label,
+  description,
   onClick,
   pressed,
   size = 'md',
@@ -42,7 +45,7 @@ export function IconButton({
       {...rest}
       className={classes.filter(Boolean).join(' ')}
       aria-label={label}
-      title={label}
+      title={description ?? label}
       aria-pressed={pressed === undefined ? undefined : pressed}
       onClick={onClick}
     >

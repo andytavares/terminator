@@ -30,6 +30,21 @@ describe('IconButton edges', () => {
     expect(screen.getByRole('button', { name: 'Close' }).hasAttribute('aria-pressed')).toBe(false)
   })
 
+  it('keeps the label as the name and shows a longer description as the tooltip', () => {
+    render(
+      <IconButton
+        icon={FileText}
+        label="Mute run-1"
+        description="Stop this run interrupting, without hiding what it does"
+        onClick={() => {}}
+      />
+    )
+    const button = screen.getByRole('button', { name: 'Mute run-1' })
+    expect(button.getAttribute('title')).toBe(
+      'Stop this run interrupting, without hiding what it does'
+    )
+  })
+
   it('reports the unpressed state of a toggle', () => {
     render(<IconButton icon={FileText} label="List view" pressed={false} onClick={() => {}} />)
     expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(

@@ -1074,6 +1074,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                 icon={BellOff}
                 size="sm"
                 label={`Mute ${entry.sessionId}`}
+                description="Stop this run interrupting, without hiding what it does"
                 onClick={() => void dismiss(entry, true)}
               />
             </div>
