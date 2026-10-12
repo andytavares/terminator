@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Button } from '@terminator/extension-ui'
 import { PasswordField } from './PasswordField'
 
 interface RemoteStatus {
@@ -164,15 +165,15 @@ export function RemoteControlSettings(): React.JSX.Element {
                 >
                   {status.publicUrl}
                 </code>
-                <button
-                  className="settings-section__btn"
-                  style={{ marginBottom: 0, flexShrink: 0 }}
+                <Button
+                  size="sm"
+                  style={{ flexShrink: 0 }}
                   onClick={() => {
                     void navigator.clipboard.writeText(status.publicUrl!)
                   }}
                 >
                   Copy
-                </button>
+                </Button>
               </div>
             </div>
           ) : status.ngrokInstalled === false ? (
@@ -190,15 +191,15 @@ export function RemoteControlSettings(): React.JSX.Element {
                   A public address needs one more program. Install it with:{' '}
                   <code>brew install ngrok</code>
                 </span>
-                <button
-                  className="settings-section__btn"
-                  style={{ marginBottom: 0, flexShrink: 0 }}
+                <Button
+                  size="sm"
+                  style={{ flexShrink: 0 }}
                   onClick={() => {
                     void navigator.clipboard.writeText('brew install ngrok')
                   }}
                 >
                   Copy
-                </button>
+                </Button>
               </div>
             </div>
           ) : status.ngrokError ? (
@@ -239,18 +240,18 @@ export function RemoteControlSettings(): React.JSX.Element {
                 </code>
                 {status.lanUrl && (
                   <>
-                    <button
-                      className="settings-section__btn"
-                      style={{ marginBottom: 0, flexShrink: 0 }}
+                    <Button
+                      size="sm"
+                      style={{ flexShrink: 0 }}
                       onClick={() => {
                         void navigator.clipboard.writeText(status.lanUrl!)
                       }}
                     >
                       Copy
-                    </button>
-                    <button
-                      className="settings-section__btn"
-                      style={{ marginBottom: 0, flexShrink: 0 }}
+                    </Button>
+                    <Button
+                      size="sm"
+                      style={{ flexShrink: 0 }}
                       onClick={() => {
                         void window.electronAPI.extensionBridge
                           .invoke('remote:caddyfile', { port })
@@ -258,7 +259,7 @@ export function RemoteControlSettings(): React.JSX.Element {
                       }}
                     >
                       Copy Caddyfile
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>

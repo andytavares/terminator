@@ -23,9 +23,9 @@ import { pullNumber } from '../line/pull-number.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
-import { RelativeTime, usePolling } from '@terminator/extension-ui'
+import { Markdown, RelativeTime, usePolling } from '@terminator/extension-ui'
 import { usePushed } from '../renderer/use-pushed.js'
-import { ExternalLink, Markdown, MarkdownInline } from './Markdown.js'
+import { ExternalLink, openInBrowser } from './ExternalLink.js'
 import {
   useRunObservation,
   type FloorView,
@@ -832,7 +832,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                   {/* An agent's question is prose; any other tool's input is
                       literal, and rendering it would eat a command's `*`s. */}
                   {ask.detail === null ? null : ask.toolName === 'AskUserQuestion' ? (
-                    <Markdown text={ask.detail} />
+                    <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+                      {ask.detail}
+                    </Markdown>
                   ) : (
                     <pre className="fdry-ask-detail">{ask.detail}</pre>
                   )}
@@ -1058,7 +1060,14 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
             <div key={entry.id} className="fdry-feed-row">
               <span className="fdry-feed-author">{entry.author}</span>
               <span className="fdry-feed-summary">
-                <MarkdownInline text={entry.summary} />
+                <Markdown
+                  inline
+                  fetchesNothing
+                  className="fdry-md-inline"
+                  onOpenLink={openInBrowser}
+                >
+                  {entry.summary}
+                </Markdown>
               </span>
               <button
                 type="button"

@@ -14,7 +14,7 @@ import {
   Hand,
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
-import { ExternalLink } from './Markdown.js'
+import { ExternalLink } from './ExternalLink.js'
 import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
 import { usePolling } from '@terminator/extension-ui'
 import type { Signal } from '../sensors/types.js'

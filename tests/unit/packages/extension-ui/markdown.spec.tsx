@@ -224,3 +224,138 @@ describe('Markdown links', () => {
     expect(container.firstElementChild?.className).toBe('tmui-markdown extra')
   })
 })
+
+describe('Markdown links to other schemes', () => {
+  const click = (anchor: Element) => {
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    anchor.dispatchEvent(event)
+    return event
+  }
+
+  beforeEach(() => onOpenLink.mockClear())
+
+  it('opens a mailto address through onOpenLink', () => {
+    const event = click(renderBody('[mail](mailto:team@example.com)').querySelector('a')!)
+    expect(onOpenLink).toHaveBeenCalledWith('mailto:team@example.com')
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('keeps a link with no destination from reloading the view', () => {
+    const event = click(renderBody('[empty]()').querySelector('a')!)
+    expect(event.defaultPrevented).toBe(true)
+    expect(onOpenLink).not.toHaveBeenCalled()
+  })
+
+  it('leaves a javascript: link inert', () => {
+    const anchor = renderBody('[click me](javascript:window.__pwned=3)').querySelector('a')!
+    expect(click(anchor).defaultPrevented).toBe(true)
+    expect(anchor.getAttribute('href') ?? '').not.toContain('javascript:')
+    expect(onOpenLink).not.toHaveBeenCalled()
+  })
+})
+
+// Text from a tracker is written by anyone who can comment on the ticket. A remote
+// image in it is a tracking pixel aimed at whoever opens it, so nothing may fetch.
+describe('Markdown that fetches nothing', () => {
+  function renderUntrusted(body: string) {
+    return render(
+      <Markdown onOpenLink={onOpenLink} fetchesNothing>
+        {body}
+      </Markdown>
+    ).container
+  }
+
+  it('drops a Markdown image instead of loading it', () => {
+    const el = renderUntrusted('![tracker](https://evil.example/pixel.png)')
+    expect(el.querySelector('img')).toBeNull()
+    expect(el.innerHTML).not.toContain('evil.example')
+  })
+
+  it('renders no raw HTML and no src attribute, even once the HTML renderer has loaded', async () => {
+    const warm = renderBody('<sub>warm</sub>')
+    await waitFor(() => expect(warm.querySelector('sub')).not.toBeNull())
+    const el = renderUntrusted(
+      [
+        '<div id="injected"><b>bold</b></div>',
+        '<script>alert(1)</script>',
+        '<video src="https://x.example/v.mp4"></video>',
+        '<img src="https://x.example/b.png">',
+        '![a](https://x.example/a.png)',
+      ].join('\n\n')
+    )
+    expect(el.querySelector('[id$="injected"]')).toBeNull()
+    expect(el.querySelector('b')).toBeNull()
+    expect(el.querySelector('script')).toBeNull()
+    expect(el.textContent).not.toContain('alert(1)')
+    expect(el.querySelectorAll('[src]')).toHaveLength(0)
+  })
+
+  it('still renders headings, lists, tables, task lists, quotes and code', () => {
+    const el = renderUntrusted(
+      [
+        '# One',
+        '- outer\n  - inner',
+        '1. first\n2. second',
+        '| Name | Value |\n| --- | --- |\n| a | 1 |',
+        '- [x] done\n- [ ] todo',
+        '> quoted',
+        '~~gone~~ **bold** _italic_',
+        '```html\n<script>window.__pwned = 4</script>\n```',
+      ].join('\n\n')
+    )
+    expect(el.querySelector('h1')?.textContent).toBe('One')
+    expect(el.querySelectorAll('ul ul li')).toHaveLength(1)
+    expect(el.querySelectorAll('ol li')).toHaveLength(2)
+    expect(el.querySelectorAll('tbody td')).toHaveLength(2)
+    const boxes = el.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+    expect(Array.from(boxes).map((box) => [box.checked, box.disabled])).toEqual([
+      [true, true],
+      [false, true],
+    ])
+    expect(el.querySelector('blockquote')?.textContent?.trim()).toBe('quoted')
+    expect(el.querySelector('del')?.textContent).toBe('gone')
+    expect(el.querySelector('pre code')?.textContent).toContain('window.__pwned = 4')
+    expect(el.querySelector('script')).toBeNull()
+  })
+
+  it('still opens a link through onOpenLink', () => {
+    onOpenLink.mockClear()
+    const anchor = renderUntrusted('[docs](https://example.com/docs)').querySelector('a')!
+    anchor.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(onOpenLink).toHaveBeenCalledWith('https://example.com/docs')
+  })
+})
+
+// One line of text — a question, an option, a reason — that sits inside a button
+// or a label, where a block element is invalid markup.
+describe('inline Markdown', () => {
+  function renderInline(body: string) {
+    return render(
+      <button type="button">
+        <Markdown onOpenLink={onOpenLink} inline>
+          {body}
+        </Markdown>
+      </button>
+    ).container
+  }
+
+  it('renders code, bold, italic and links inside a span, with no block element', () => {
+    const el = renderInline('Hide **done** in `Orders.tsx`, *not* [grey](https://e.example)')
+    expect(el.querySelector('strong')?.textContent).toBe('done')
+    expect(el.querySelector('code')?.textContent).toBe('Orders.tsx')
+    expect(el.querySelector('em')?.textContent).toBe('not')
+    expect(el.querySelector('a')?.getAttribute('href')).toBe('https://e.example')
+    expect(el.querySelector('button > span.tmui-markdown')).not.toBeNull()
+    expect(el.querySelector('p, ul, ol, li, pre, div, h1, h2, blockquote, table')).toBeNull()
+  })
+
+  it('keeps the words of a block it does not draw', () => {
+    const el = renderInline('# Heading\n\n- an item')
+    expect(el.textContent).toContain('Heading')
+    expect(el.textContent).toContain('an item')
+  })
+
+  it('shows no image', () => {
+    expect(renderInline('see ![pixel](https://evil.example/p.png)').querySelector('img')).toBeNull()
+  })
+})

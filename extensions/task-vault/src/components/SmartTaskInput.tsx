@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import { useDismissible } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
 
 interface SmartTaskInputProps {
@@ -281,21 +282,15 @@ export function SmartTaskInput({
     }
   }
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-        !inputRef.current?.contains(e.target as Node) &&
-        !dropdownRef.current?.contains(e.target as Node)
-      ) {
-        setActive(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
   const showDropdown = active !== null
+
+  useDismissible({
+    ref: dropdownRef,
+    onDismiss: () => setActive(null),
+    alsoInside: [inputRef],
+    manageFocus: false,
+    enabled: showDropdown,
+  })
 
   return (
     <div className="smart-input">

@@ -41,10 +41,10 @@ import type { MonitorStatus } from './StationMonitor.js'
 import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
-import { MarkdownInline } from '../Markdown.js'
+import { openInBrowser } from '../ExternalLink.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
-import { usePolling, everyWhileVisible } from '@terminator/extension-ui'
+import { Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
 import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 import './hall.css'
 import { invoke } from '@terminator/extension-sdk/renderer'
@@ -997,7 +997,13 @@ function InterruptionCard({
         <span id={titleId}>{item.title}</span>
       </div>
       <p className="fdry-card__detail">
-        {item.kind === 'ask' && item.prose ? <MarkdownInline text={item.detail} /> : item.detail}
+        {item.kind === 'ask' && item.prose ? (
+          <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+            {item.detail}
+          </Markdown>
+        ) : (
+          item.detail
+        )}
       </p>
       {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
       {readOnly ? (

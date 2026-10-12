@@ -1795,7 +1795,7 @@
 
 /* One weight for every heading level: a ticket's `#` is its author's habit,
    not a statement about this panel's hierarchy. */
-.fdry-md-h {
+.fdry-md :is(h1, h2, h3, h4, h5, h6) {
   color: var(--tm-text-primary);
   font-weight: 600;
   font-size: 12.5px;
@@ -1811,7 +1811,7 @@
   margin: 2px 0;
 }
 
-.fdry-md-task {
+.fdry-md .task-list-item {
   list-style: none;
   margin-left: -18px;
   display: flex;

@@ -22,17 +22,17 @@ should define a colour.
 
 **Components**
 
-| Export                               | For                                                            |
-| ------------------------------------ | -------------------------------------------------------------- |
-| `Button`                             | primary, secondary, ghost, danger; sm, md; disabled; icon slot |
-| `IconButton`                         | an icon-only control with a required accessible name           |
-| `Tabs`                               | WAI-ARIA tabs: arrow keys, Home, End, `aria-selected`          |
-| `Dialog`, `ConfirmDialog`            | a modal question or form; yes or no                            |
-| `Popover`                            | a dismissible, non-modal surface anchored to a control         |
-| `ToastRegion`, `Toast`               | transient messages                                             |
-| `EmptyState`                         | heading, one line of why, and the control that fills it        |
-| `Markdown`                           | react-markdown with GFM and sanitised raw HTML (ADR 091)       |
-| `RelativeTime`, `formatRelativeTime` | "5 minutes ago" through `Intl.RelativeTimeFormat`              |
+| Export                               | For                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| `Button`                             | primary, secondary, ghost, danger; sm, md; disabled; icon slot                       |
+| `IconButton`                         | an icon-only control with a required accessible name                                 |
+| `Tabs`                               | WAI-ARIA tabs: arrow keys, Home, End, `aria-selected`                                |
+| `Dialog`, `ConfirmDialog`            | a modal question or form; yes or no                                                  |
+| `Popover`                            | a dismissible, non-modal surface anchored to a control                               |
+| `ToastRegion`, `Toast`               | transient messages                                                                   |
+| `EmptyState`                         | heading, one line of why, and the control that fills it                              |
+| `Markdown`                           | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing` |
+| `RelativeTime`, `formatRelativeTime` | "5 minutes ago" through `Intl.RelativeTimeFormat`                                    |
 
 **Behaviour** — `usePolling(read, show, intervalMs)`, `everyWhileVisible(tick, intervalMs)`, `useDismissible`, the focus
 trap, the modal-depth registry and the layer scale (`LAYERS`, `layerValue`,
@@ -51,9 +51,18 @@ opens, and focus still returns to the control that opened it.
 `formatRelativeTime` returns `''`, and `RelativeTime` renders nothing, for a time
 that does not parse.
 
-`Markdown` takes `onOpenLink` for absolute addresses and an optional `renderCode`
-for fenced blocks (for example a syntax highlighter), so the package itself never
-sets inner HTML.
+`Markdown` takes `onOpenLink` for absolute http(s) and mailto addresses and an
+optional `renderCode` for fenced blocks (for example a syntax highlighter), so the
+package itself never sets inner HTML. Any other link is kept from navigating the
+view. Two modes:
+
+- `inline` renders a `span` holding only code, bold, italic, strikethrough and
+  links, for one line inside a button or a label; it takes its size and colour
+  from there. Other blocks keep only their words.
+- `fetchesNothing` is for text anyone can write, such as a tracker's issue: raw
+  HTML is dropped without being parsed, and no image or other `src` survives, so
+  opening it fetches nothing (a remote image would be a tracking pixel). The core's
+  issue drawer, Foundry and Task Vault render with it.
 
 ## Storybook
 

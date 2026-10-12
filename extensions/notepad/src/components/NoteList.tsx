@@ -393,6 +393,7 @@ export function NoteList(): React.JSX.Element {
   const tagDropdownRef = useRef<HTMLDivElement>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [folderContextMenu, setFolderContextMenu] = useState<FolderContextMenuState | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
   const [editModal, setEditModal] = useState<EditModalState | null>(null)
   const [archivedExpanded, setArchivedExpanded] = useState(false)
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set())
@@ -414,17 +415,13 @@ export function NoteList(): React.JSX.Element {
     return Array.from(noteCounts, ([name, noteCount]) => ({ id: `local:${name}`, name, noteCount }))
   }, [notes, diagrams])
 
-  // Close tag dropdown when clicking outside
-  useEffect(() => {
-    if (!tagDropdownOpen) return
-    function onMouseDown(e: MouseEvent) {
-      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
-        setTagDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onMouseDown)
-    return () => document.removeEventListener('mousedown', onMouseDown)
-  }, [tagDropdownOpen])
+  // The ref wraps the trigger too, so clicking it to close does not reopen.
+  useDismissible({
+    ref: tagDropdownRef,
+    onDismiss: () => setTagDropdownOpen(false),
+    manageFocus: false,
+    enabled: tagDropdownOpen,
+  })
 
   // Text search via IPC (tags are filtered client-side)
   useEffect(() => {
@@ -447,16 +444,15 @@ export function NoteList(): React.JSX.Element {
     void run()
   }, [searchQuery])
 
-  // Close context menus on any click outside
-  useEffect(() => {
-    if (!contextMenu && !folderContextMenu) return
-    function dismiss() {
+  useDismissible({
+    ref: contextMenuRef,
+    onDismiss: () => {
       setContextMenu(null)
       setFolderContextMenu(null)
-    }
-    document.addEventListener('mousedown', dismiss)
-    return () => document.removeEventListener('mousedown', dismiss)
-  }, [contextMenu, folderContextMenu])
+    },
+    manageFocus: false,
+    enabled: contextMenu !== null || folderContextMenu !== null,
+  })
 
   function handleContextMenu(e: React.MouseEvent, note: NoteListItem | SearchResult) {
     setContextMenu({
@@ -1054,7 +1050,7 @@ export function NoteList(): React.JSX.Element {
         <div
           className="notepad-context-menu"
           style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x }}
-          onMouseDown={(e) => e.stopPropagation()}
+          ref={contextMenuRef}
         >
           <button
             className="notepad-context-menu__item"
@@ -1132,7 +1128,7 @@ export function NoteList(): React.JSX.Element {
         <div
           className="notepad-context-menu"
           style={{ position: 'fixed', top: folderContextMenu.y, left: folderContextMenu.x }}
-          onMouseDown={(e) => e.stopPropagation()}
+          ref={contextMenuRef}
         >
           <button
             className="notepad-context-menu__item"

@@ -4,7 +4,8 @@ import type { LedgerEntry } from '../ledger/append.js'
 import type { Proposal } from '../ledger/curator.js'
 import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
-import { MarkdownInline } from './Markdown.js'
+import { Markdown } from '@terminator/extension-ui'
+import { openInBrowser } from './ExternalLink.js'
 import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
 import { MetricsTiles, WindowToggle } from './MetricsTiles.js'
 import { rungLevelInWords } from '../verify/ladder.js'
@@ -269,7 +270,14 @@ export function Ledger(): JSX.Element {
                       {proposal.citations.map((citation) => (
                         <li key={citation.ref}>
                           <code>{citation.subject}</code> {citation.at.slice(0, 10)} —{' '}
-                          <MarkdownInline text={citation.reason} />
+                          <Markdown
+                            inline
+                            fetchesNothing
+                            className="fdry-md-inline"
+                            onOpenLink={openInBrowser}
+                          >
+                            {citation.reason}
+                          </Markdown>
                         </li>
                       ))}
                     </ul>
@@ -315,8 +323,23 @@ export function Ledger(): JSX.Element {
                 <ul className="fdry-citations">
                   {rules?.declined?.map((entry) => (
                     <li key={entry.id}>
-                      <MarkdownInline text={declinedInWords(entry)} /> — turned down:{' '}
-                      <MarkdownInline text={entry.reason} />
+                      <Markdown
+                        inline
+                        fetchesNothing
+                        className="fdry-md-inline"
+                        onOpenLink={openInBrowser}
+                      >
+                        {declinedInWords(entry)}
+                      </Markdown>{' '}
+                      — turned down:{' '}
+                      <Markdown
+                        inline
+                        fetchesNothing
+                        className="fdry-md-inline"
+                        onOpenLink={openInBrowser}
+                      >
+                        {entry.reason}
+                      </Markdown>
                     </li>
                   ))}
                 </ul>
@@ -368,7 +391,14 @@ export function Ledger(): JSX.Element {
                       </td>
                       <td>{entry.subject}</td>
                       <td>
-                        <MarkdownInline text={entry.reason} />
+                        <Markdown
+                          inline
+                          fetchesNothing
+                          className="fdry-md-inline"
+                          onOpenLink={openInBrowser}
+                        >
+                          {entry.reason}
+                        </Markdown>
                       </td>
                     </tr>
                   ))}
