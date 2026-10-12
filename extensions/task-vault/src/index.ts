@@ -153,12 +153,13 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     async () => {
       try {
         // Delete rows in FK-safe order; do not drop tables — the settings table is
-        // shared with other extensions in the unified PGlite database.
+        // shared with other extensions in the unified PGlite database, so only this
+        // extension's own rows go.
         await db.exec(`
         DELETE FROM tasks;
         DELETE FROM projects;
         DELETE FROM areas;
-        DELETE FROM settings;
+        DELETE FROM settings WHERE extension_id = 'task-vault';
       `)
         await applyTaskVaultSchema(db)
         await applyTaskVaultMigrations(db)
