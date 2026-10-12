@@ -213,20 +213,21 @@ async function answerForgeDefect(
   if (decision.kind !== 'converge' || order === null) return false
   // Recorded, or the ledger shows no turn running while the architect
   // amends the order and every surface reads it as idle.
-  const started = await loop.convergeWithFollowUps({
+  await loop.convergeWithFollowUps({
     order,
     message: decision.message,
     autoTurns: 0,
     loopRound: 1,
-  })
-  await orderStoreAt(dataRoot()).record({
-    at: new Date().toISOString(),
-    orderId: order.id,
-    actor: 'role:architect',
-    action: started.ok ? 'converge.started' : 'converge.refused',
-    subject: started.ok ? started.sessionId : order.id,
-    reason: started.ok ? `answering ${ruleInWords(gate.rule)}` : started.reason,
-    evidence: [],
+    recordStart: (started) =>
+      orderStoreAt(dataRoot()).record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'role:architect',
+        action: started.ok ? 'converge.started' : 'converge.refused',
+        subject: started.ok ? started.sessionId : order.id,
+        reason: started.ok ? `answering ${ruleInWords(gate.rule)}` : started.reason,
+        evidence: [],
+      }),
   })
   return true
 }

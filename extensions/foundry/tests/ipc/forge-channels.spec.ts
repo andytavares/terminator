@@ -179,7 +179,8 @@ describe('foundry:order.turn', () => {
 
     expect(converge).toHaveBeenCalledWith(
       expect.objectContaining({ id: order.id }),
-      'what about resize?'
+      'what about resize?',
+      expect.any(Function)
     )
     expect(r.error).toBeUndefined()
     expect(r.converging).toBe('sess-arch')
@@ -1131,7 +1132,11 @@ describe('free text reaches the architect', () => {
     const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.turn({ id: seed.order.id, message: 'the second unit is not needed' })
-    expect(converge).toHaveBeenCalledWith(expect.anything(), 'the second unit is not needed')
+    expect(converge).toHaveBeenCalledWith(
+      expect.anything(),
+      'the second unit is not needed',
+      expect.any(Function)
+    )
   })
 
   it('leaves striking an assumption and answering a question alone', async () => {
