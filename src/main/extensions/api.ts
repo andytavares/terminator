@@ -344,8 +344,8 @@ export interface ExtensionAPI {
   ipc: {
     /**
      * Registers a main-process handler for an extension-owned channel.
-     * Extension channels are dispatchable by the remote-control bridge by
-     * default; pass `remoteAccessible: false` to keep a channel local-only.
+     * Extension channels are local-only by default; pass
+     * `remoteAccessible: true` to let the remote-control bridge dispatch one.
      */
     registerHandler(
       channel: string,
@@ -871,7 +871,7 @@ export function createExtensionAPI(
         opts?: { remoteAccessible?: boolean }
       ): Disposable {
         handleChannel(channel, (_event, payload) => handler(payload), {
-          remoteAccessible: opts?.remoteAccessible ?? true,
+          remoteAccessible: opts?.remoteAccessible ?? false,
         })
         return disposable(() => removeChannel(channel))
       },

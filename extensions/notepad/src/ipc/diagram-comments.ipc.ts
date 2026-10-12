@@ -151,15 +151,17 @@ export async function deleteDiagramComment(
 }
 
 export function registerDiagramCommentsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
-  handle('terminator.notepad:diagram-comments.create', (payload) =>
+  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  handleRemote('terminator.notepad:diagram-comments.create', (payload) =>
     createDiagramComment(db, payload)
   )
-  handle('terminator.notepad:diagram-comments.list', (payload) => listDiagramComments(db, payload))
-  handle('terminator.notepad:diagram-comments.resolve', (payload) =>
+  handleRemote('terminator.notepad:diagram-comments.list', (payload) =>
+    listDiagramComments(db, payload)
+  )
+  handleRemote('terminator.notepad:diagram-comments.resolve', (payload) =>
     resolveDiagramComment(db, payload)
   )
-  handle('terminator.notepad:diagram-comments.delete', (payload) =>
+  handleRemote('terminator.notepad:diagram-comments.delete', (payload) =>
     deleteDiagramComment(db, payload)
   )
 

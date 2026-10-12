@@ -124,12 +124,12 @@ export async function moveItemsToFolder(
 }
 
 export function registerFoldersIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
-  handle('terminator.notepad:folders.create', (payload) => createFolder(db, payload))
-  handle('terminator.notepad:folders.list', () => listFolders(db))
-  handle('terminator.notepad:folders.rename', (payload) => renameFolder(db, payload))
-  handle('terminator.notepad:folders.delete', (payload) => deleteFolder(db, payload))
-  handle('terminator.notepad:folders.move', (payload) => moveItemsToFolder(db, payload))
+  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  handleRemote('terminator.notepad:folders.create', (payload) => createFolder(db, payload))
+  handleRemote('terminator.notepad:folders.list', () => listFolders(db))
+  handleRemote('terminator.notepad:folders.rename', (payload) => renameFolder(db, payload))
+  handleRemote('terminator.notepad:folders.delete', (payload) => deleteFolder(db, payload))
+  handleRemote('terminator.notepad:folders.move', (payload) => moveItemsToFolder(db, payload))
 
   return cleanup
 }

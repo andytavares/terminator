@@ -495,11 +495,17 @@ handler.dispose()
 
 **Error handling**: throw or return `{ error: string }` to signal failure. The renderer receives the rejection or error payload.
 
-**Remote access** _(v1.4.0)_: channels registered through `registerHandler` are dispatchable by the remote-control bridge (the `/app/` browser surface) **by default**, so extension panels keep working remotely. Pass `{ remoteAccessible: false }` as the third argument to keep a channel reachable only from the local Electron renderer:
+**Remote access** _(v1.4.0; local-only by default)_: a channel registered through `registerHandler` is reachable only from the local Electron renderer. The remote-control bridge (the `/app/` browser surface) rejects it unless the channel opts in at registration with `{ remoteAccessible: true }`:
 
 ```typescript
-api.ipc.registerHandler('my-ext:local-secret', handler, { remoteAccessible: false })
+// Read and edit the extension's own data: the remote browser view may call it.
+api.ipc.registerHandler('my-ext:list-items', handler, { remoteAccessible: true })
+
+// Anything else stays local-only without further ceremony.
+api.ipc.registerHandler('my-ext:run-sql', handler)
 ```
+
+Opt in only the channels the extension's own view calls for ordinary use. Keep a channel local if it reads or writes a filesystem path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database. A remote client holds a password, not the desktop session, so each opted-in channel is attack surface and its payload must be validated as untrusted. The first-party extensions follow this: Notepad and Task Vault opt in their data channels and keep file import and export, the Task Vault SQL console and database administration local; the repository extension and Foundry opt in nothing yet, because their channels take a repository or data-root path.
 
 The declaration made at registration is the single authority — a channel that is neither in the core manifest-derived allowlist nor declared `remoteAccessible` at registration is rejected by the bridge. Extensions must never call Electron's `ipcMain` directly: handlers registered that way are invisible to the bridge registry and unreachable remotely.
 

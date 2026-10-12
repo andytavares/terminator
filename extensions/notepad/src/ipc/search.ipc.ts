@@ -157,8 +157,8 @@ export async function searchNotes(
 }
 
 export function registerSearchIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
-  handle('terminator.notepad:search.query', (payload: unknown) => searchNotes(db, payload))
+  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  handleRemote('terminator.notepad:search.query', (payload: unknown) => searchNotes(db, payload))
 
   return cleanup
 }

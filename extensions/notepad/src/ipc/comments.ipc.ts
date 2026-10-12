@@ -190,7 +190,7 @@ export function registerCommentsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
 
   const registrar = createIpcRegistrar(api)
   for (const [channel, handler] of channels) {
-    registrar.handle(channel, (payload) => handler(db, payload))
+    registrar.handleRemote(channel, (payload) => handler(db, payload))
   }
 
   return registrar.cleanup

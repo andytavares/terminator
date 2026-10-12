@@ -23,8 +23,8 @@ import {
 export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const registrar = createIpcRegistrar(api)
 
-  function handle(channel: string, fn: (payload: unknown) => Promise<unknown>) {
-    registrar.handle(channel, async (payload) => {
+  function handleRemote(channel: string, fn: (payload: unknown) => Promise<unknown>) {
+    registrar.handleRemote(channel, async (payload) => {
       try {
         return await fn(payload)
       } catch (err) {
@@ -33,7 +33,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     })
   }
 
-  handle('task-vault:projects:list', async (payload) => {
+  handleRemote('task-vault:projects:list', async (payload) => {
     const parsed = ListProjectsRequestSchema.safeParse(payload ?? {})
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
 
@@ -64,7 +64,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { projects }
   })
 
-  handle('task-vault:projects:weekly-review', async () => {
+  handleRemote('task-vault:projects:weekly-review', async () => {
     const inboxRows = await db.query<Record<string, unknown>>(
       `SELECT * FROM tasks WHERE source='inbox' AND status='open'`
     )
@@ -136,7 +136,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     }
   })
 
-  handle('task-vault:projects:create', async (payload) => {
+  handleRemote('task-vault:projects:create', async (payload) => {
     const parsed = CreateProjectRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { name, area, deadline, outcome } = parsed.data
@@ -171,7 +171,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true, filePath: displayName }
   })
 
-  handle('task-vault:projects:delete', async (payload) => {
+  handleRemote('task-vault:projects:delete', async (payload) => {
     const parsed = DeleteProjectRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { projectFilePath: projectName } = parsed.data
@@ -198,7 +198,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true }
   })
 
-  handle('task-vault:projects:update-status', async (payload) => {
+  handleRemote('task-vault:projects:update-status', async (payload) => {
     const parsed = UpdateProjectStatusRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { projectFilePath: projectName, status } = parsed.data
@@ -229,7 +229,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true }
   })
 
-  handle('task-vault:projects:update-area', async (payload) => {
+  handleRemote('task-vault:projects:update-area', async (payload) => {
     const { projectFilePath: projectName, area } = payload as {
       projectFilePath: string
       area: string | null
@@ -258,7 +258,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true }
   })
 
-  handle('task-vault:projects:update-deadline', async (payload) => {
+  handleRemote('task-vault:projects:update-deadline', async (payload) => {
     const { projectFilePath: projectName, deadline } = payload as {
       projectFilePath: string
       deadline: string | null
@@ -274,7 +274,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
     return { success: true }
   })
 
-  handle('task-vault:projects:rename', async (payload) => {
+  handleRemote('task-vault:projects:rename', async (payload) => {
     const { projectFilePath: projectName, newName } = payload as {
       projectFilePath: string
       newName: string

@@ -148,9 +148,11 @@ export interface ExtensionAPI {
     ): Disposable
   }
   ipc: {
+    /** Local-only unless `opts.remoteAccessible` is true. */
     registerHandler(
       channel: string,
-      handler: (payload: unknown) => Promise<unknown> | unknown
+      handler: (payload: unknown) => Promise<unknown> | unknown,
+      opts?: { remoteAccessible?: boolean }
     ): Disposable
     invokeChannel(channel: string, payload: unknown): Promise<unknown>
     sendChannel(channel: string, payload: unknown): void

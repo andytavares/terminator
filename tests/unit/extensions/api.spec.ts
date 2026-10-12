@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { EventEmitter } from 'events'
 
 const mockSend = vi.fn()
 const mockWindow = {
@@ -81,6 +82,8 @@ import {
   getPanelMenuItemId,
 } from '../../../src/main/extensions/api'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
+import { registerAdminIpcHandlers } from '../../../extensions/task-vault/src/ipc/admin.ipc'
+import type { ExtensionDB } from '../../../src/main/extensions/api'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
 beforeEach(() => {
@@ -399,12 +402,42 @@ describe('api.ipc.registerHandler', () => {
     disposable.dispose()
   })
 
-  it('records the channel as remoteAccessible by default', () => {
+  it('keeps a channel registered without the option local-only', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.ipc.registerHandler('test.ext:remote-default', vi.fn())
-    expect(ipcInvokeRegistry.get('test.ext:remote-default')?.remoteAccessible).toBe(true)
+    const disposable = api.ipc.registerHandler('test.ext:no-option', vi.fn())
+    expect(ipcInvokeRegistry.get('test.ext:no-option')?.remoteAccessible).toBe(false)
     disposable.dispose()
-    expect(ipcInvokeRegistry.has('test.ext:remote-default')).toBe(false)
+    expect(ipcInvokeRegistry.has('test.ext:no-option')).toBe(false)
+  })
+
+  it('makes a channel remote-accessible only when it opts in', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const disposable = api.ipc.registerHandler('test.ext:opted-in', vi.fn(), {
+      remoteAccessible: true,
+    })
+    expect(ipcInvokeRegistry.get('test.ext:opted-in')?.remoteAccessible).toBe(true)
+    disposable.dispose()
+  })
+
+  it('keeps the task-vault SQL console and its admin channels out of the remote bridge', () => {
+    const api = createExtensionAPI('terminator.task-vault', '0.1.0', {
+      bridge: {
+        invokeRegistry: ipcInvokeRegistry,
+        sendRegistry: new Map(),
+        eventBus: new EventEmitter(),
+      },
+    })
+    const dispose = registerAdminIpcHandlers(api, {} as ExtensionDB)
+
+    for (const channel of [
+      'task-vault:admin:run-query',
+      'task-vault:admin:list-tables',
+      'task-vault:admin:table-stats',
+    ]) {
+      expect(ipcInvokeRegistry.has(channel)).toBe(true)
+      expect(api.ipc.isRemoteAccessible(channel)).toBe(false)
+    }
+    dispose()
   })
 
   it('honors remoteAccessible: false for local-only channels', () => {

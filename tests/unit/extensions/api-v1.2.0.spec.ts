@@ -243,8 +243,8 @@ describe('api.ipc bridge channels', () => {
   })
 
   it('isRemoteAccessible: true for extension channels declared remoteAccessible at registration', () => {
-    // Extension channels registered via api.ipc.registerHandler default to
-    // remoteAccessible: true, which is what these registry entries reflect.
+    // Extension channels that registered with { remoteAccessible: true } are what
+    // these registry entries reflect.
     const invokeRegistry = new Map([
       ['terminator.notepad:notes.list', { handler: vi.fn(), remoteAccessible: true }],
       ['task-vault:vault:get-today', { handler: vi.fn(), remoteAccessible: true }],

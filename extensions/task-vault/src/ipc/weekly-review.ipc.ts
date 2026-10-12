@@ -50,40 +50,46 @@ const listSchema = z.object({ limit: z.number().int().positive().max(500).option
 export function registerWeeklyReviewIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const registrar = createIpcRegistrar(api)
 
-  function handle(channel: string, fn: (payload: unknown) => Promise<unknown>) {
-    registrar.handle(channel, async (payload) => {
-      try {
-        return await fn(payload)
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
-    })
+  type Register = (channel: string, fn: (payload: unknown) => Promise<unknown>) => void
+
+  function withErrorResult(register: Register): Register {
+    return (channel, fn) =>
+      register(channel, async (payload) => {
+        try {
+          return await fn(payload)
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : String(err) }
+        }
+      })
   }
 
-  handle('task-vault:review:start', async () => {
+  const handle = withErrorResult(registrar.handle)
+  const handleRemote = withErrorResult(registrar.handleRemote)
+
+  handleRemote('task-vault:review:start', async () => {
     return await startOrResumeReview(db)
   })
 
-  handle('task-vault:review:log', async (payload) => {
+  handleRemote('task-vault:review:log', async (payload) => {
     const parsed = logSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     return { action: await logReviewAction(db, parsed.data) }
   })
 
-  handle('task-vault:review:complete', async (payload) => {
+  handleRemote('task-vault:review:complete', async (payload) => {
     const parsed = completeSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     await completeReview(db, parsed.data)
     return { ok: true }
   })
 
-  handle('task-vault:review:list', async (payload) => {
+  handleRemote('task-vault:review:list', async (payload) => {
     const parsed = listSchema.safeParse(payload ?? {})
     const limit = parsed.success ? parsed.data.limit : undefined
     return { reviews: await listReviews(db, limit) }
   })
 
-  handle('task-vault:review:get', async (payload) => {
+  handleRemote('task-vault:review:get', async (payload) => {
     const parsed = idSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const review = await getReview(db, parsed.data.reviewId)

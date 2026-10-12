@@ -51,8 +51,8 @@ const SaveConfigSchema = z.object({
 })
 
 export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
-  handle('task-vault:kanban:get-config', async () => {
+  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  handleRemote('task-vault:kanban:get-config', async () => {
     try {
       return await readConfig(db)
     } catch (err) {
@@ -60,7 +60,7 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     }
   })
 
-  handle('task-vault:kanban:save-config', async (payload: unknown) => {
+  handleRemote('task-vault:kanban:save-config', async (payload: unknown) => {
     try {
       const config = SaveConfigSchema.parse(payload)
       await writeConfig(db, config)
@@ -70,7 +70,7 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     }
   })
 
-  handle('task-vault:kanban:list-tasks', async () => {
+  handleRemote('task-vault:kanban:list-tasks', async () => {
     try {
       const rows = await db.query<Record<string, unknown>>(
         `SELECT t.id, t.text, t.status, p.name AS project, t.context, a.name AS area,
@@ -108,7 +108,7 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     }
   })
 
-  handle('task-vault:kanban:list-contexts', async () => {
+  handleRemote('task-vault:kanban:list-contexts', async () => {
     try {
       const rows = await db.query<{ context: string }>(
         `SELECT DISTINCT context FROM tasks
@@ -121,7 +121,7 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
     }
   })
 
-  handle('task-vault:kanban:move-task', async (payload: unknown) => {
+  handleRemote('task-vault:kanban:move-task', async (payload: unknown) => {
     try {
       const { taskId, toStatus } = MoveTaskSchema.parse(payload)
       const now = new Date().toISOString()

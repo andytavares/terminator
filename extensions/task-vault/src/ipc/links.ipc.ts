@@ -10,8 +10,8 @@ import { rowToTask, rowToProject } from '../vault/mappers'
 export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const registrar = createIpcRegistrar(api)
 
-  function handle(channel: string, fn: (payload: unknown) => Promise<unknown>) {
-    registrar.handle(channel, async (payload) => {
+  function handleRemote(channel: string, fn: (payload: unknown) => Promise<unknown>) {
+    registrar.handleRemote(channel, async (payload) => {
       try {
         return await fn(payload)
       } catch (err) {
@@ -20,7 +20,7 @@ export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     })
   }
 
-  handle('task-vault:links:create', async (payload) => {
+  handleRemote('task-vault:links:create', async (payload) => {
     const parsed = LinksCreateRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, projectFilePath, targetId } = parsed.data
@@ -58,7 +58,7 @@ export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:links:remove', async (payload) => {
+  handleRemote('task-vault:links:remove', async (payload) => {
     const parsed = LinksRemoveRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, projectFilePath, targetId } = parsed.data
@@ -99,7 +99,7 @@ export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:links:get-for-terminator-target', async (payload) => {
+  handleRemote('task-vault:links:get-for-terminator-target', async (payload) => {
     const parsed = LinksGetForTargetRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { targetId } = parsed.data

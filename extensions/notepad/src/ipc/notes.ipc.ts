@@ -330,10 +330,10 @@ export async function deleteTag(
 }
 
 export function registerTagsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
-  handle('terminator.notepad:tags.list', (payload) => listTags(db, payload))
-  handle('terminator.notepad:tags.rename', (payload) => renameTag(db, payload))
-  handle('terminator.notepad:tags.delete', (payload) => deleteTag(db, payload))
+  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  handleRemote('terminator.notepad:tags.list', (payload) => listTags(db, payload))
+  handleRemote('terminator.notepad:tags.rename', (payload) => renameTag(db, payload))
+  handleRemote('terminator.notepad:tags.delete', (payload) => deleteTag(db, payload))
 
   return cleanup
 }
@@ -365,17 +365,17 @@ export async function reorderItems(
 // ---- IPC Registration ----
 
 export function registerNotesIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
-  handle('terminator.notepad:notes.create', (payload) => createNote(db, payload))
-  handle('terminator.notepad:notes.list', (payload) => listNotes(db, payload))
-  handle('terminator.notepad:notes.get', (payload) => getNote(db, payload))
-  handle('terminator.notepad:notes.autosave', (payload) =>
+  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  handleRemote('terminator.notepad:notes.create', (payload) => createNote(db, payload))
+  handleRemote('terminator.notepad:notes.list', (payload) => listNotes(db, payload))
+  handleRemote('terminator.notepad:notes.get', (payload) => getNote(db, payload))
+  handleRemote('terminator.notepad:notes.autosave', (payload) =>
     autosaveNote(db, payload, (channel, data) => api.window.broadcast(channel, data))
   )
-  handle('terminator.notepad:notes.archive', (payload) => archiveNote(db, payload))
-  handle('terminator.notepad:notes.restore', (payload) => restoreNote(db, payload))
-  handle('terminator.notepad:notes.hardDelete', (payload) => hardDeleteNote(db, payload))
-  handle('terminator.notepad:notes.reorder', (payload) => reorderItems(db, payload))
+  handleRemote('terminator.notepad:notes.archive', (payload) => archiveNote(db, payload))
+  handleRemote('terminator.notepad:notes.restore', (payload) => restoreNote(db, payload))
+  handleRemote('terminator.notepad:notes.hardDelete', (payload) => hardDeleteNote(db, payload))
+  handleRemote('terminator.notepad:notes.reorder', (payload) => reorderItems(db, payload))
 
   return cleanup
 }

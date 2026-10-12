@@ -225,13 +225,15 @@ export async function hardDeleteDiagram(
 }
 
 export function registerDiagramsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
-  handle('terminator.notepad:diagrams.create', (payload) => createDiagram(db, payload))
-  handle('terminator.notepad:diagrams.list', (payload) => listDiagrams(db, payload))
-  handle('terminator.notepad:diagrams.get', (payload) => getDiagram(db, payload))
-  handle('terminator.notepad:diagrams.autosave', (payload) => autosaveDiagram(db, payload))
-  handle('terminator.notepad:diagrams.archive', (payload) => archiveDiagram(db, payload))
-  handle('terminator.notepad:diagrams.restore', (payload) => restoreDiagram(db, payload))
-  handle('terminator.notepad:diagrams.hardDelete', (payload) => hardDeleteDiagram(db, payload))
+  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  handleRemote('terminator.notepad:diagrams.create', (payload) => createDiagram(db, payload))
+  handleRemote('terminator.notepad:diagrams.list', (payload) => listDiagrams(db, payload))
+  handleRemote('terminator.notepad:diagrams.get', (payload) => getDiagram(db, payload))
+  handleRemote('terminator.notepad:diagrams.autosave', (payload) => autosaveDiagram(db, payload))
+  handleRemote('terminator.notepad:diagrams.archive', (payload) => archiveDiagram(db, payload))
+  handleRemote('terminator.notepad:diagrams.restore', (payload) => restoreDiagram(db, payload))
+  handleRemote('terminator.notepad:diagrams.hardDelete', (payload) =>
+    hardDeleteDiagram(db, payload)
+  )
   return cleanup
 }
