@@ -66,6 +66,10 @@ An extension view is created by `extension:update-panel-bounds`, which first awa
 
 Because the PATH probe now runs beside the window, a child process started from a core IPC handler in the first moments after launch can still see the app's own PATH on macOS. Extension code is not affected (it waits on `beforeActivation`).
 
+### Loops in the main process
+
+- **System metrics** (`ipc/metrics.ipc.ts`). The sampler (CPU delta, and network bytes through `netstat -ib` on macOS or `/proc/net/dev` on Linux) runs only while the renderer is polling `metrics:system`, which it does only while a metrics view is showing; it stops 5 s after the last poll and restarts, with fresh baselines, on the next. `netstat` runs through `execFile`, asynchronously, never overlapping itself.
+
 ---
 
 ## IPC Contract

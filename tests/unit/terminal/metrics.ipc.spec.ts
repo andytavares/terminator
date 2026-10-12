@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { promisify } from 'util'
 
 const mockHandle = vi.fn()
 const mockRemoveHandler = vi.fn()
@@ -17,9 +18,13 @@ vi.mock('os', () => ({
 }))
 
 const mockExecSync = vi.fn()
-const mockReadFileSync = vi.fn()
-vi.mock('child_process', () => ({ execSync: mockExecSync }))
-vi.mock('fs', () => ({ readFileSync: mockReadFileSync }))
+const mockExecFile = vi.fn()
+const mockReadFile = vi.fn()
+vi.mock('child_process', () => ({
+  execSync: mockExecSync,
+  execFile: Object.assign(vi.fn(), { [promisify.custom]: mockExecFile }),
+}))
+vi.mock('fs/promises', () => ({ readFile: mockReadFile }))
 
 function makeCpus(idle: number, total: number) {
   return [
@@ -39,6 +44,8 @@ describe('registerMetricsHandlers', () => {
     vi.useFakeTimers()
     mockCpus.mockReturnValue(makeCpus(800, 1000))
     mockExecSync.mockReturnValue('')
+    mockExecFile.mockResolvedValue({ stdout: '' })
+    mockReadFile.mockResolvedValue('')
     mockHandle.mockImplementation((_ch: string, fn: (...args: unknown[]) => unknown) => fn)
     const mockGetPid = vi.fn()
     getPtyManager = () => ({ getPid: mockGetPid })
@@ -70,33 +77,77 @@ describe('registerMetricsHandlers', () => {
     expect(result.data.netOutBytesPerSec).toBeGreaterThanOrEqual(0)
   })
 
-  it('tick calculates net bytes/sec after two intervals (prevNet null → non-null path)', async () => {
-    let netCallCount = 0
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('netstat')) {
-        netCallCount++
-        // First tick: baseline; second tick: higher bytes so delta > 0
-        return netCallCount === 1
-          ? 'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop\nen0 1500 <Link> aa:bb 100 0 1000 100 0 500 0\n'
-          : 'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop\nen0 1500 <Link> aa:bb 200 0 3000 200 0 1500 0\n'
-      }
-      return ''
+  describe('sampler lifecycle', () => {
+    const netstat = (bytesIn: number, bytesOut: number) => ({
+      stdout: `Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop\nen0 1500 <Link> aa:bb 1 0 ${bytesIn} 1 0 ${bytesOut} 0\n`,
     })
-    vi.resetModules()
-    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
-    registerMetricsHandlers(getPtyManager() as never)
+    let originalPlatform: NodeJS.Platform
 
-    // First tick: prevNet is null → skips rate calc, sets prevNet
-    vi.advanceTimersByTime(1000)
-    // Second tick: prevNet is not null → executes latestNetIn/Out assignment
-    vi.advanceTimersByTime(1000)
+    beforeEach(() => {
+      originalPlatform = process.platform
+      Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    })
 
-    const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
-    const result = (await handler()) as {
-      data: { netInBytesPerSec: number; netOutBytesPerSec: number }
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+    })
+
+    async function registerAndGetSystemHandler() {
+      vi.resetModules()
+      const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
+      registerMetricsHandlers(getPtyManager() as never)
+      return mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1] as () => Promise<{
+        data: { netInBytesPerSec: number; netOutBytesPerSec: number }
+      }>
     }
-    expect(result.data.netInBytesPerSec).toBeGreaterThanOrEqual(0)
-    expect(result.data.netOutBytesPerSec).toBeGreaterThanOrEqual(0)
+
+    it('does not run netstat while no metrics view has polled', async () => {
+      await registerAndGetSystemHandler()
+
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      expect(mockExecFile).not.toHaveBeenCalled()
+    })
+
+    it('measures network bytes per second between samples once polled, without execSync', async () => {
+      mockExecFile.mockResolvedValueOnce(netstat(1000, 500)).mockResolvedValue(netstat(3000, 1500))
+      const system = await registerAndGetSystemHandler()
+
+      await system()
+      await vi.advanceTimersByTimeAsync(1000)
+      const result = await system()
+
+      expect(mockExecFile).toHaveBeenCalledWith('netstat', ['-ib'], expect.anything())
+      expect(mockExecSync).not.toHaveBeenCalled()
+      expect(result.data.netInBytesPerSec).toBe(2000)
+      expect(result.data.netOutBytesPerSec).toBe(1000)
+    })
+
+    it('stops sampling when the polls stop and starts again on the next poll', async () => {
+      mockExecFile.mockResolvedValue(netstat(1000, 500))
+      const system = await registerAndGetSystemHandler()
+
+      await system()
+      await vi.advanceTimersByTimeAsync(6000)
+      const callsWhilePolled = mockExecFile.mock.calls.length
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(mockExecFile).toHaveBeenCalledTimes(callsWhilePolled)
+
+      await system()
+      expect(mockExecFile).toHaveBeenCalledTimes(callsWhilePolled + 1)
+    })
+
+    it('does not start a second netstat while the previous one is still running', async () => {
+      let finish: (value: ReturnType<typeof netstat>) => void = () => {}
+      mockExecFile.mockReturnValue(new Promise((resolve) => (finish = resolve)))
+      const system = await registerAndGetSystemHandler()
+
+      await system()
+      await vi.advanceTimersByTimeAsync(3000)
+
+      expect(mockExecFile).toHaveBeenCalledTimes(1)
+      finish(netstat(1, 1))
+    })
   })
 
   it('metrics:processes returns empty array when no pids given', async () => {
@@ -120,26 +171,24 @@ describe('registerMetricsHandlers', () => {
   })
 
   it('readNetBytes tolerates truncated netstat rows on macOS', async () => {
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (String(cmd).startsWith('netstat')) {
-        // Header + a row with too few columns + a row with non-numeric byte counts
-        return 'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes\nen0 1500\nen1 1500 link a 1 0 abc 2 0 xyz\n'
-      }
-      return ''
+    // Header + a row with too few columns + a row with non-numeric byte counts
+    mockExecFile.mockResolvedValue({
+      stdout:
+        'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes\nen0 1500\nen1 1500 link a 1 0 abc 2 0 xyz\n',
     })
     vi.resetModules()
     const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
-    expect(readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
+    expect(await readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
   })
 
   it('readNetBytes tolerates truncated /proc/net/dev rows on linux', async () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'linux' })
     try {
-      mockReadFileSync.mockReturnValue('header\nheader\neth0:\nlo: 1 2 3 4 5 6 7 8 9\n')
+      mockReadFile.mockResolvedValue('header\nheader\neth0:\nlo: 1 2 3 4 5 6 7 8 9\n')
       vi.resetModules()
       const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
-      expect(readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
+      expect(await readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
     } finally {
       Object.defineProperty(process, 'platform', { value: originalPlatform })
     }
@@ -203,7 +252,7 @@ describe('registerMetricsHandlers', () => {
   it('metrics:system reads linux /proc/net/dev when on linux', async () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-    mockReadFileSync.mockReturnValue(
+    mockReadFile.mockResolvedValue(
       'Inter-|   Receive\nIface |bytes packets\neth0: 1000 0 0 0 0 0 0 0 0 500\n'
     )
     vi.resetModules()
@@ -217,9 +266,7 @@ describe('registerMetricsHandlers', () => {
   it('readNetBytes falls back to zero when proc/net/dev read fails on linux', async () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-    mockReadFileSync.mockImplementation(() => {
-      throw new Error('read failed')
-    })
+    mockReadFile.mockRejectedValue(new Error('read failed'))
     vi.resetModules()
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
     registerMetricsHandlers(getPtyManager() as never)
@@ -237,6 +284,7 @@ describe('readNetBytes (exported)', () => {
     vi.clearAllMocks()
     mockCpus.mockReturnValue(makeCpus(800, 1000))
     mockExecSync.mockReturnValue('')
+    mockExecFile.mockResolvedValue({ stdout: '' })
   })
 
   it('parses /proc/net/dev on Linux, sums non-loopback interfaces, skips lo', async () => {
@@ -250,11 +298,11 @@ describe('readNetBytes (exported)', () => {
       ' eth0: 1000  100    0    0    0     0          0         0      500      50    0    0    0     0       0          0',
       ' eth1: 2000  200    0    0    0     0          0         0     1000     100    0    0    0     0       0          0',
     ].join('\n')
-    mockReadFileSync.mockReturnValue(procNetDev)
+    mockReadFile.mockResolvedValue(procNetDev)
 
     vi.resetModules()
     const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = readNetBytes()
+    const result = await readNetBytes()
 
     // eth0: bytesIn=1000, bytesOut=500; eth1: bytesIn=2000, bytesOut=1000 → totals 3000/1500
     // lo is skipped
@@ -273,11 +321,11 @@ describe('readNetBytes (exported)', () => {
       'en0       1500  <Link#5>  aa:bb:cc:dd:ee:ff  5000     0    200000     4000     0    100000     0',
       'en1       1500  <Link#6>  aa:bb:cc:dd:ee:00  3000     0    120000     2000     0     60000     0',
     ].join('\n')
-    mockExecSync.mockReturnValue(netstatOutput)
+    mockExecFile.mockResolvedValue({ stdout: netstatOutput })
 
     vi.resetModules()
     const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = readNetBytes()
+    const result = await readNetBytes()
 
     // en0: Ibytes=200000 (col 6), Obytes=100000 (col 9); en1: 120000/60000; lo0 skipped
     expect(result.bytesIn).toBe(320000)
@@ -288,13 +336,11 @@ describe('readNetBytes (exported)', () => {
   it('returns { bytesIn: 0, bytesOut: 0 } when read/exec throws', async () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    mockExecSync.mockImplementation(() => {
-      throw new Error('exec failed')
-    })
+    mockExecFile.mockRejectedValue(new Error('exec failed'))
 
     vi.resetModules()
     const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
-    const result = readNetBytes()
+    const result = await readNetBytes()
 
     expect(result).toEqual({ bytesIn: 0, bytesOut: 0 })
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
