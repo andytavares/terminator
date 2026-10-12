@@ -76,6 +76,34 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+  # Every story is a test (ADR 098): it renders in Chromium and runs its play
+  # function, in the light and the dark theme. The build proves the Storybook
+  # site itself still compiles.
+  stories:
+    name: Stories
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test stories
+        run: npm run test:stories
+        timeout-minutes: 5
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
   # On Linux: GitHub allows five macOS jobs at once, and those go to the build
   # and E2E, which drive the real app. Tests of macOS behaviour pin
   # process.platform rather than inheriting the host's. Each shard writes a
