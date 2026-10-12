@@ -1,43 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
 const { mockHandle, mockOn } = vi.hoisted(() => ({ mockHandle: vi.fn(), mockOn: vi.fn() }))
+const paths = vi.hoisted(() => ({ userData: '' }))
 
 vi.mock('electron', () => ({
+  app: { getPath: () => paths.userData, dock: null },
   ipcMain: { handle: mockHandle, on: mockOn, removeHandler: vi.fn() },
+  Notification: { isSupported: () => false },
+  BrowserWindow: { getAllWindows: () => [] },
 }))
-
-vi.mock('../../../src/main/storage/settings-store.js', () => ({
-  getGlobalSettings: vi.fn(() => ({ terminal: { defaultShell: '/bin/zsh' } })),
-}))
-
-const issues = vi.hoisted(() => ({
-  link: null as unknown,
-  context: null as unknown,
-  create: vi.fn(),
-  sent: [] as Array<{ channel: string; data: unknown }>,
-}))
-
-const records = vi.hoisted(() => ({ markClosed: vi.fn().mockResolvedValue(undefined) }))
-
-vi.mock('../../../src/main/sessions/session-record-store.js', () => ({
-  markClosed: records.markClosed,
-}))
-
-vi.mock('../../../src/main/integrations/issue-link-store.js', () => ({
-  getLink: () => issues.link,
-}))
-vi.mock('../../../src/main/integrations/agent-context.js', () => ({
-  readContextFile: async () => issues.context,
-}))
-vi.mock('../../../src/main/notifications/notification-manager.js', () => ({
-  notificationManager: { create: issues.create },
-}))
-vi.mock('../../../src/main/safe-send.js', () => ({
-  sendToWindow: (_w: unknown, channel: string, data: unknown) => {
-    issues.sent.push({ channel, data })
-  },
-  sendToView: () => {},
-}))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
 import { registerTerminalHandlers, sendToRenderer } from '../../../src/main/ipc/terminal.ipc.js'
 import { OutputRelay } from '../../../src/main/terminal/output-relay.js'
@@ -45,6 +22,27 @@ import { MissingCwdError } from '../../../src/main/terminal/pty-manager.js'
 import type { SessionInfo } from '@terminator/extension-sdk'
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher.js'
 import { HIGH_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control.js'
+import { updateGlobalSettings } from '../../../src/main/storage/settings-store.js'
+import * as records from '../../../src/main/sessions/session-record-store.js'
+import * as links from '../../../src/main/integrations/issue-link-store.js'
+import { writeContextFile } from '../../../src/main/integrations/agent-context.js'
+import { notificationManager } from '../../../src/main/notifications/notification-manager.js'
+
+/** Each test starts from an empty user-data directory and an empty notification centre. */
+beforeEach(async () => {
+  paths.userData = fs.mkdtempSync(path.join(os.tmpdir(), 'terminal-ipc-'))
+  await records.loadRecords()
+  await links.loadLinks()
+  for (const notification of notificationManager.list())
+    notificationManager.dismiss(notification.id)
+  updateGlobalSettings({ terminal: { defaultShell: '/bin/zsh' } })
+})
+
+/** A window that is open, and what was sent to it. */
+function openWindow() {
+  const send = vi.fn()
+  return { isDestroyed: () => false, webContents: { isDestroyed: () => false, send } }
+}
 
 function invokeHandler(channel: string) {
   return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
@@ -111,13 +109,13 @@ const VALID_CREATE = {
 describe('registerTerminalHandlers', () => {
   let ptyManager: ReturnType<typeof makeFakePtyManager>
   let webContentsSend: ReturnType<typeof vi.fn>
-  let win: { isDestroyed: () => boolean; webContents: { send: ReturnType<typeof vi.fn> } } | null
+  let win: ReturnType<typeof openWindow> | null
 
   beforeEach(() => {
     vi.clearAllMocks()
     ptyManager = makeFakePtyManager()
-    webContentsSend = vi.fn()
-    win = { isDestroyed: () => false, webContents: { send: webContentsSend } }
+    win = openWindow()
+    webContentsSend = win.webContents.send
     const getWindow = () => win as never
     registerTerminalHandlers(
       ptyManager as never,
@@ -186,14 +184,13 @@ describe('registerTerminalHandlers', () => {
     })
 
     it('names it beside the linked issue, not instead of it', async () => {
-      issues.link = { projectId: VALID_CREATE.projectId, tracker: 'linear', key: 'TAV-42' }
+      await links.setLink({ projectId: VALID_CREATE.projectId, tracker: 'linear', key: 'TAV-42' })
       await invokeHandler('terminal:create')({}, VALID_CREATE)
       const spawned = ptyManager.spawnSession.mock.calls[0][0] as { env: Record<string, string> }
       expect(spawned.env).toMatchObject({
         TERMINATOR_ISSUE_KEY: 'TAV-42',
         TERMINATOR_SESSION_ID: expect.any(String),
       })
-      issues.link = null
     })
 
     it('runs an initial command in the terminal it opened', async () => {
@@ -285,11 +282,28 @@ describe('registerTerminalHandlers', () => {
     })
 
     it('closes the session record after killing the process', async () => {
-      await invokeHandler('terminal:close')({}, { sessionId: 's1' })
-      expect(records.markClosed).toHaveBeenCalledWith('s1', expect.any(Date))
-      expect(ptyManager.kill.mock.invocationCallOrder[0]).toBeLessThan(
-        records.markClosed.mock.invocationCallOrder[0]
+      await records.setDescription(
+        {
+          sessionId: 's1',
+          projectId: VALID_CREATE.projectId,
+          workspaceName: null,
+          projectName: null,
+          branch: null,
+          tabTitle: 'Terminal 1',
+          shell: '/bin/zsh',
+          startedAt: '2026-09-15T10:00:00.000Z',
+        },
+        'why'
       )
+      const closedAt = () => records.listRecords().find((r) => r.sessionId === 's1')?.closedAt
+      let closedAtKill: string | undefined = 'not killed'
+      ptyManager.kill.mockImplementation(() => {
+        closedAtKill = closedAt()
+        return true
+      })
+      await invokeHandler('terminal:close')({}, { sessionId: 's1' })
+      expect(closedAtKill).toBeUndefined()
+      expect(closedAt()).toEqual(expect.any(String))
     })
 
     it('writes valid input and ignores invalid payloads', async () => {
@@ -396,16 +410,11 @@ describe('registerTerminalHandlers', () => {
 
 describe('terminal:create — linked issue', () => {
   const P = '11111111-1111-4111-8111-111111111111'
-
-  beforeEach(() => {
-    issues.link = null
-    issues.context = null
-    issues.sent.length = 0
-    issues.create.mockClear()
-  })
+  let win: ReturnType<typeof openWindow>
 
   async function createTerminal(ptyManager: ReturnType<typeof makeFakePtyManager>) {
-    const getWindow = () => ({}) as never
+    win = openWindow()
+    const getWindow = () => win as never
     registerTerminalHandlers(
       ptyManager as never,
       getWindow,
@@ -419,8 +428,20 @@ describe('terminal:create — linked issue', () => {
     return handler({}, { projectId: P, tabTitle: 'shell', type: 'human', cwd: '/tmp' })
   }
 
+  const contextOf = (chars: number, truncated: boolean) => ({
+    projectId: P,
+    tracker: 'linear' as const,
+    key: 'TAV-42',
+    markdown: '# TAV-42',
+    chars,
+    truncated,
+    builtAt: '2026-09-15T10:00:00.000Z',
+  })
+
+  const sentChannels = () => win.webContents.send.mock.calls.map(([channel]) => channel)
+
   it('passes the issue key and tracker into the session environment', async () => {
-    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
     const ptyManager = makeFakePtyManager()
     await createTerminal(ptyManager)
 
@@ -446,45 +467,43 @@ describe('terminal:create — linked issue', () => {
   })
 
   it('tells the operator the session started with issue context (FR-024)', async () => {
-    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
-    issues.context = { tracker: 'linear', key: 'TAV-42', chars: 2143, truncated: false }
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
+    await writeContextFile(contextOf(2143, false))
     await createTerminal(makeFakePtyManager())
-    await new Promise((r) => setImmediate(r))
 
-    expect(issues.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: 'issueContextInjected',
-        title: expect.stringContaining('TAV-42'),
-      })
+    await vi.waitFor(() =>
+      expect(notificationManager.list()).toEqual([
+        expect.objectContaining({ title: expect.stringContaining('TAV-42') }),
+      ])
     )
-    expect(issues.sent.map((s) => s.channel)).toContain('integrations:context-injected')
+    expect(sentChannels()).toContain('integrations:context-injected')
   })
 
   it('says how much context, and whether it was shortened', async () => {
-    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
-    issues.context = { tracker: 'linear', key: 'TAV-42', chars: 9900, truncated: true }
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
+    await writeContextFile(contextOf(9900, true))
     await createTerminal(makeFakePtyManager())
-    await new Promise((r) => setImmediate(r))
 
-    const call = issues.create.mock.calls[0][0] as { message: string }
-    expect(call.message).toContain('9,900')
-    expect(call.message).toContain('shortened')
+    await vi.waitFor(() => expect(notificationManager.list()).toHaveLength(1))
+    const [notice] = notificationManager.list()
+    expect(notice.message).toContain('9,900')
+    expect(notice.message).toContain('shortened')
   })
 
   it('says nothing when injection is turned off for the project', async () => {
-    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: false }
-    issues.context = { tracker: 'linear', key: 'TAV-42', chars: 10, truncated: false }
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: false })
+    await writeContextFile(contextOf(10, false))
     await createTerminal(makeFakePtyManager())
     await new Promise((r) => setImmediate(r))
 
-    expect(issues.create).not.toHaveBeenCalled()
-    expect(issues.sent).toHaveLength(0)
+    expect(notificationManager.list()).toEqual([])
+    expect(sentChannels()).not.toContain('integrations:context-injected')
   })
 
   it('says nothing when no context has been written yet', async () => {
-    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
     await createTerminal(makeFakePtyManager())
     await new Promise((r) => setImmediate(r))
-    expect(issues.create).not.toHaveBeenCalled()
+    expect(notificationManager.list()).toEqual([])
   })
 })

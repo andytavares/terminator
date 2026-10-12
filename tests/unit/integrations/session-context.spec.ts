@@ -2,17 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import type { Issue } from '../../../src/shared/types/index'
+import type { Issue, SessionSnapshot, WorkItemRef } from '../../../src/shared/types/index'
 
 let userData: string
 
 vi.mock('electron', () => ({ app: { getPath: () => userData } }))
-
-const store = vi.hoisted(() => ({ records: [] as unknown[] }))
-
-vi.mock('../../../src/main/sessions/session-record-store', () => ({
-  listRecords: () => store.records,
-}))
 
 const P = '11111111-1111-4111-8111-111111111111'
 const SESSION_ID = 's1'
@@ -40,25 +34,24 @@ function service(get = vi.fn().mockResolvedValue(issue())) {
   return { get } as never
 }
 
-function record(link: unknown) {
-  return {
-    sessionId: SESSION_ID,
-    projectId: P,
-    workspaceName: null,
-    projectName: null,
-    branch: null,
-    tabTitle: 'zsh',
-    shell: null,
-    description: null,
-    link,
-    agent: null,
-    startedAt: '2026-09-15T10:00:00.000Z',
-    updatedAt: '2026-09-15T10:00:00.000Z',
-  }
+const SNAPSHOT: SessionSnapshot = {
+  sessionId: SESSION_ID,
+  projectId: P,
+  workspaceName: null,
+  projectName: null,
+  branch: null,
+  tabTitle: 'zsh',
+  shell: null,
+  startedAt: '2026-09-15T10:00:00.000Z',
 }
+
+const TAV_42: WorkItemRef = { tracker: 'linear', key: 'TAV-42' }
+
+let records: typeof import('../../../src/main/sessions/session-record-store')
 
 async function load() {
   vi.resetModules()
+  records = await import('../../../src/main/sessions/session-record-store')
   return import('../../../src/main/integrations/session-context')
 }
 
@@ -68,13 +61,12 @@ function contextFile(): string {
 
 beforeEach(() => {
   userData = fs.mkdtempSync(path.join(os.tmpdir(), 'session-context-ud-'))
-  store.records = []
 })
 
 describe('syncSessionContext — linked', () => {
   it('writes the session context file the hook will read', async () => {
-    store.records = [record({ tracker: 'linear', key: 'TAV-42' })]
     const mod = await load()
+    await records.setLink(SNAPSHOT, TAV_42)
     await mod.syncSessionContext(SESSION_ID, service())
 
     expect(fs.existsSync(contextFile())).toBe(true)
@@ -83,15 +75,15 @@ describe('syncSessionContext — linked', () => {
   })
 
   it('returns the context so a caller can report its size', async () => {
-    store.records = [record({ tracker: 'linear', key: 'TAV-42' })]
     const mod = await load()
+    await records.setLink(SNAPSHOT, TAV_42)
     const context = await mod.syncSessionContext(SESSION_ID, service())
     expect(context?.chars).toBeGreaterThan(0)
   })
 
   it('keeps the previous context when the tracker cannot be reached', async () => {
-    store.records = [record({ tracker: 'linear', key: 'TAV-42' })]
     const mod = await load()
+    await records.setLink(SNAPSHOT, TAV_42)
     await mod.syncSessionContext(SESSION_ID, service())
     const before = fs.readFileSync(contextFile(), 'utf8')
 
@@ -104,8 +96,8 @@ describe('syncSessionContext — linked', () => {
   })
 
   it('writes nothing when the issue does not exist', async () => {
-    store.records = [record({ tracker: 'linear', key: 'TAV-42' })]
     const mod = await load()
+    await records.setLink(SNAPSHOT, TAV_42)
     const context = await mod.syncSessionContext(
       SESSION_ID,
       service(vi.fn().mockResolvedValue(null))
@@ -117,18 +109,17 @@ describe('syncSessionContext — linked', () => {
 
 describe('syncSessionContext — unlinked', () => {
   it('deletes the file when there is no link', async () => {
-    store.records = [record({ tracker: 'linear', key: 'TAV-42' })]
     const mod = await load()
+    await records.setLink(SNAPSHOT, TAV_42)
     await mod.syncSessionContext(SESSION_ID, service())
     expect(fs.existsSync(contextFile())).toBe(true)
 
-    store.records = [record(null)]
+    await records.setLink(SNAPSHOT, null)
     await mod.syncSessionContext(SESSION_ID, service())
     expect(fs.existsSync(contextFile())).toBe(false)
   })
 
   it('is harmless when there is no record for the session at all', async () => {
-    store.records = []
     const mod = await load()
     await expect(mod.syncSessionContext(SESSION_ID, service())).resolves.toBeNull()
     expect(fs.existsSync(contextFile())).toBe(false)

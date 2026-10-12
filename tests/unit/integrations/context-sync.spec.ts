@@ -9,23 +9,20 @@ let projectDir: string
 
 vi.mock('electron', () => ({ app: { getPath: () => userData } }))
 
-const workspace = vi.hoisted(() => ({
-  project: undefined as unknown,
-  workspaces: [] as unknown[],
-}))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
-vi.mock('../../../src/main/storage/workspace-store', () => ({
-  getProjectById: () => workspace.project,
-  listWorkspaces: () => workspace.workspaces,
-}))
+let workspaces: typeof import('../../../src/main/storage/workspace-store')
+let links: typeof import('../../../src/main/integrations/issue-link-store')
+let workspaceId: string
+let P: string
 
-const link = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('../../../src/main/integrations/issue-link-store', () => ({
-  getLink: () => link.current,
-}))
-
-const P = '11111111-1111-4111-8111-111111111111'
+function addProject(name: string, worktreePath?: string): string {
+  const added = workspaces.createProject({ workspaceId, name, worktreePath })
+  if (!('project' in added)) throw new Error(added.error)
+  return added.project.id
+}
 
 function issue(over: Partial<Issue> = {}): Issue {
   return {
@@ -51,7 +48,6 @@ function service(get = vi.fn().mockResolvedValue(issue())) {
 }
 
 async function load() {
-  vi.resetModules()
   return import('../../../src/main/integrations/context-sync')
 }
 
@@ -63,12 +59,22 @@ function settingsFile(): string {
   return path.join(projectDir, '.claude', 'settings.local.json')
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules()
   userData = fs.mkdtempSync(path.join(os.tmpdir(), 'context-sync-ud-'))
   projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'context-sync-proj-'))
-  workspace.project = { id: P, workspaceId: 'w1', worktreePath: projectDir }
-  workspace.workspaces = [{ id: 'w1', folderPath: '/does/not/matter' }]
-  link.current = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
+  workspaces = await import('../../../src/main/storage/workspace-store')
+  links = await import('../../../src/main/integrations/issue-link-store')
+  const created = workspaces.createWorkspace({
+    name: 'repo',
+    folderPath: '/repo/root',
+    color: '#4A90E2',
+    tags: [],
+  })
+  if (!('workspace' in created)) throw new Error(created.error)
+  workspaceId = created.workspace.id
+  P = addProject('worktree', projectDir)
+  await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
 })
 
 describe('projectDirectory', () => {
@@ -78,20 +84,13 @@ describe('projectDirectory', () => {
   })
 
   it('falls back to the workspace folder for a plain project', async () => {
-    workspace.project = { id: P, workspaceId: 'w1' }
-    workspace.workspaces = [{ id: 'w1', folderPath: '/repo/root' }]
+    const plain = addProject('plain')
     const mod = await load()
-    expect(mod.projectDirectory(P)).toBe('/repo/root')
+    expect(mod.projectDirectory(plain)).toBe('/repo/root')
   })
 
   it('is null for a project that no longer exists', async () => {
-    workspace.project = undefined
-    const mod = await load()
-    expect(mod.projectDirectory(P)).toBeNull()
-  })
-
-  it('is null when the workspace is gone too', async () => {
-    workspace.project = { id: P, workspaceId: 'missing' }
+    workspaces.deleteProject(P)
     const mod = await load()
     expect(mod.projectDirectory(P)).toBeNull()
   })
@@ -158,7 +157,7 @@ describe('syncProjectContext — not injecting', () => {
     await mod.syncProjectContext(P, service())
     expect(fs.existsSync(contextFile())).toBe(true)
 
-    link.current = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: false }
+    await links.setInjectContext(P, false)
     await mod.syncProjectContext(P, service())
 
     expect(fs.existsSync(contextFile())).toBe(false)
@@ -169,7 +168,7 @@ describe('syncProjectContext — not injecting', () => {
     const mod = await load()
     await mod.syncProjectContext(P, service())
 
-    link.current = null
+    await links.clearLink(P)
     await mod.syncProjectContext(P, service())
 
     expect(fs.existsSync(contextFile())).toBe(false)
@@ -177,7 +176,7 @@ describe('syncProjectContext — not injecting', () => {
   })
 
   it('does not call the tracker at all when injection is off', async () => {
-    link.current = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: false }
+    await links.setInjectContext(P, false)
     const get = vi.fn()
     const mod = await load()
     await mod.syncProjectContext(P, service(get))
@@ -187,10 +186,10 @@ describe('syncProjectContext — not injecting', () => {
 
 describe('syncProjectContext — unwritable project (FR-026)', () => {
   it('rejects rather than pretending it worked', async () => {
-    fs.chmodSync(projectDir, 0o500)
+    // A file where `.claude` should be: no one can write the hook into it.
+    fs.writeFileSync(path.join(projectDir, '.claude'), '')
     const mod = await load()
     await expect(mod.syncProjectContext(P, service())).rejects.toThrow()
-    fs.chmodSync(projectDir, 0o700)
   })
 })
 
@@ -213,7 +212,7 @@ describe('clearProjectContext', () => {
   it('copes with a project whose directory has gone', async () => {
     const mod = await load()
     await mod.syncProjectContext(P, service())
-    workspace.project = undefined
+    workspaces.deleteProject(P)
     await expect(mod.clearProjectContext(P)).resolves.toBeUndefined()
     expect(fs.existsSync(contextFile())).toBe(false)
   })
@@ -240,7 +239,7 @@ describe('previewProjectContext (FR-023)', () => {
   })
 
   it('is null for an unlinked project', async () => {
-    link.current = null
+    await links.clearLink(P)
     const mod = await load()
     await expect(mod.previewProjectContext(P, service())).resolves.toBeNull()
   })

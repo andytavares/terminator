@@ -1,12 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
-const store = vi.hoisted(() => ({
-  getCredential: vi.fn().mockResolvedValue({ tracker: 'linear', apiKey: 'k' }),
-  getMine: vi.fn().mockResolvedValue({ kind: 'assignee', email: null }),
-  setLastError: vi.fn().mockResolvedValue(undefined),
+let userData: string
+
+vi.mock('electron', () => ({
+  app: { getPath: () => userData },
+  safeStorage: {
+    isEncryptionAvailable: () => true,
+    encryptString: (value: string) => Buffer.from(`enc:${value}`, 'utf8'),
+    decryptString: (buf: Buffer) => buf.toString('utf8').replace(/^enc:/, ''),
+  },
 }))
-
-vi.mock('../../../src/main/integrations/tracker-store', () => store)
 
 const providers = vi.hoisted(() => ({
   linear: { id: 'linear', get: vi.fn().mockResolvedValue(null) },
@@ -20,12 +26,28 @@ vi.mock('../../../src/main/integrations/providers/jira.provider', () => ({
   createJiraProvider: vi.fn(() => providers.jira),
 }))
 
+const LINEAR = { tracker: 'linear', apiKey: 'k' } as const
+const JIRA = {
+  tracker: 'jira',
+  site: 'acme.atlassian.net',
+  email: 'a@acme.dev',
+  apiToken: 't',
+} as const
+
+let trackers: typeof import('../../../src/main/integrations/tracker-store')
+
 async function load() {
-  vi.resetModules()
   return import('../../../src/main/integrations/index')
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(async () => {
+  vi.clearAllMocks()
+  vi.resetModules()
+  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'integrations-index-'))
+  trackers = await import('../../../src/main/integrations/tracker-store')
+  await trackers.setCredential(LINEAR)
+  await trackers.setCredential(JIRA)
+})
 
 describe('integrations composition root', () => {
   it('hands out one service, so a cached issue is shared across every surface', async () => {
@@ -45,8 +67,8 @@ describe('integrations composition root', () => {
     const service = mod.getIssueService()
     await service.get('linear', 'TAV-1')
     await service.get('jira', 'TAV-1')
-    expect(providers.linear.get).toHaveBeenCalled()
-    expect(providers.jira.get).toHaveBeenCalled()
+    expect(providers.linear.get).toHaveBeenCalledWith(LINEAR, 'TAV-1')
+    expect(providers.jira.get).toHaveBeenCalledWith(JIRA, 'TAV-1')
   })
 
   it('records a tracker error against the connection so settings can show it', async () => {
@@ -60,12 +82,21 @@ describe('integrations composition root', () => {
       .getIssueService()
       .get('linear', 'TAV-1')
       .catch(() => null)
-    expect(store.setLastError).toHaveBeenCalledWith('linear', 'auth-failed')
+    await vi.waitFor(async () =>
+      expect(await trackers.listConnections()).toContainEqual(
+        expect.objectContaining({ tracker: 'linear', lastError: 'auth-failed' })
+      )
+    )
   })
 
   it('reads credentials from the store rather than holding its own', async () => {
     const mod = await load()
-    await mod.getIssueService().get('linear', 'TAV-1')
-    expect(store.getCredential).toHaveBeenCalledWith('linear')
+    const service = mod.getIssueService()
+    await trackers.setCredential({ tracker: 'linear', apiKey: 'rotated' })
+    await service.get('linear', 'TAV-1')
+    expect(providers.linear.get).toHaveBeenCalledWith(
+      { tracker: 'linear', apiKey: 'rotated' },
+      'TAV-1'
+    )
   })
 })
