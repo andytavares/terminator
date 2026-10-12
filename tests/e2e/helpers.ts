@@ -103,6 +103,7 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
     const page = await app.firstWindow({ timeout: remaining() })
     await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
     await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
+    await moveWindowOffPointer(app)
     return { app, page, userDataDir }
   } catch (error) {
     await closeApp({ app, page: undefined as unknown as Page, userDataDir })
@@ -112,6 +113,26 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
       { cause: error }
     )
   }
+}
+
+/**
+ * Moves the app's window so the X server's own pointer is outside it, on Linux.
+ *
+ * Chromium on X11 synthesizes a mousemove at the real pointer whenever a view
+ * under it is added, removed or resized, as an extension view is when its
+ * extension activates. Xvfb parks the pointer at the centre of the screen,
+ * inside the window, and that move carries no pressed button, so it lands
+ * between Playwright's mouse down and mouse move and Chromium abandons the drag:
+ * `dragTo` returned and nothing was dropped. macOS does not synthesize it.
+ */
+async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
+  if (process.platform !== 'linux') return
+  await app.evaluate(({ BrowserWindow, screen }) => {
+    const pointer = screen.getCursorScreenPoint()
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.setPosition(window.getBounds().x, pointer.y + 1)
+    }
+  })
 }
 
 // How long to wait for a graceful Electron shutdown before force-killing. A
