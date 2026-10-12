@@ -996,6 +996,7 @@ describe('a check sees what the user’s shell startup files export', () => {
               env: process.env as Record<string, string>,
             })
             proc.onData((data) => {
+              printed += data
               // Closing the tab: the core sends the process SIGHUP.
               if (data.includes('hang-up-now')) proc.kill('SIGHUP')
             })
@@ -1008,7 +1009,26 @@ describe('a check sees what the user’s shell startup files export', () => {
     } as never
   }
 
-  function check(commandLine: string, logPath?: string): Promise<number | null> {
+  /** What the tab printed, so a check that never ends says what the shell is waiting on. */
+  let printed = ''
+
+  async function check(commandLine: string, logPath?: string): Promise<number | null> {
+    const ended = runCheck(commandLine, logPath)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const stuck = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`the check never ended; it printed:\n${printed}`)),
+        4_000
+      )
+    })
+    try {
+      return await Promise.race([ended, stuck])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  function runCheck(commandLine: string, logPath?: string): Promise<number | null> {
     return createSupervisedRunner({
       api: realPtyApi(),
       control,
@@ -1025,6 +1045,7 @@ describe('a check sees what the user’s shell startup files export', () => {
   }
 
   beforeEach(() => {
+    printed = ''
     home = mkdtempSync(join(tmpdir(), 'supervised-runner-home-'))
     delete process.env.FOUNDRY_RC_ONLY
   })
