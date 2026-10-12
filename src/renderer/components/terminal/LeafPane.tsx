@@ -71,7 +71,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
     const instance = getTerminalInstance(sessionId)
     if (!instance) return
     const paths = Array.from(e.dataTransfer.files)
-      .map((f) => (f as unknown as { path: string }).path)
+      .map((file) => window.electronAPI.getFilePath(file))
       .filter(Boolean)
       .map((p) => (/\s/.test(p) ? `'${p.replace(/'/g, "'\\''")}'` : p))
       .join(' ')

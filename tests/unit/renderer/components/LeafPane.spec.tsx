@@ -41,8 +41,16 @@ beforeEach(() => {
   mockGetFocusedSession.mockReturnValue(null)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: { input: mockTerminalInput },
+    // Electron 32+ removed File.path; the path is only available through the preload.
+    getFilePath: (file: File) => pathsByFileName[file.name] ?? '',
   }
 })
+
+const pathsByFileName: Record<string, string> = {
+  'report.pdf': '/Users/me/report.pdf',
+  'my file.txt': '/my file.txt',
+  'file.txt': '/tmp/file.txt',
+}
 
 describe('LeafPane', () => {
   it('renders without crashing when no terminal instance', () => {
@@ -99,7 +107,7 @@ describe('LeafPane', () => {
     const instance = makeInstance()
     mockGetTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    const file = Object.assign(new File([], 'report.pdf'), { path: '/Users/me/report.pdf' })
+    const file = new File([], 'report.pdf')
     fireEvent.drop(container.querySelector('.leaf-pane')!, {
       dataTransfer: { files: [file], types: ['Files'] },
     })
@@ -110,7 +118,7 @@ describe('LeafPane', () => {
     const instance = makeInstance()
     mockGetTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    const file = Object.assign(new File([], 'my file.txt'), { path: '/my file.txt' })
+    const file = new File([], 'my file.txt')
     fireEvent.drop(container.querySelector('.leaf-pane')!, {
       dataTransfer: { files: [file], types: ['Files'] },
     })
@@ -166,7 +174,7 @@ describe('LeafPane', () => {
   it('does not throw on drop when no terminal instance', () => {
     mockGetTerminalInstance.mockReturnValue(undefined)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    const file = Object.assign(new File([], 'file.txt'), { path: '/tmp/file.txt' })
+    const file = new File([], 'file.txt')
     expect(() =>
       fireEvent.drop(container.querySelector('.leaf-pane')!, {
         dataTransfer: { files: [file], types: ['Files'] },
