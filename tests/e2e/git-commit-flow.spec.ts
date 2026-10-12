@@ -128,6 +128,10 @@ test('Open PR pushes the branch and opens a pull request on GitHub', async () =>
   await dialog.getByLabel('Draft').check()
   await dialog.getByRole('button', { name: 'Create Draft PR' }).click()
   await expect(dialog).toBeHidden({ timeout: 15000 })
+  await expect(view.getByRole('status').getByRole('link')).toHaveText('#1 Greet in either order')
+  await expect(
+    handle.page.locator('.tmui-toast__message', { hasText: 'Opened #1 Greet in either order' })
+  ).toBeVisible()
 
   expect(stub.pullRequests).toHaveLength(1)
   const [created] = stub.pullRequests

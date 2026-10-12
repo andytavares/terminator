@@ -8,6 +8,7 @@ import { useResizePanel } from '../hooks/useResizePanel'
 import { StagingArea } from './StagingArea'
 import { FileDiffView } from './FileDiffView'
 import { PrDialog } from './PrDialog'
+import { PrCreatedNotice } from './PrCreatedNotice'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
 import { gitAPI, type CommitResult } from '../api/git'
 import { MergeFlowView } from './merge-flow/MergeFlowView'
@@ -270,6 +271,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
               {charCount} chars
             </span>
           )}
+          <PrCreatedNotice />
           {commitError && (
             <div className="git-view__commit-error">
               <span className="git-view__commit-error-msg">{commitError}</span>

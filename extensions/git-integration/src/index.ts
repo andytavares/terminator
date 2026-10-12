@@ -52,6 +52,7 @@ const NOTIFICATION_KEYS: { key: string; label: string }[] = [
   { key: 'pushFailed', label: 'Push failed' },
   { key: 'pullSucceeded', label: 'Pull succeeded' },
   { key: 'pullFailed', label: 'Pull failed' },
+  { key: 'prCreated', label: 'Pull request opened' },
 ]
 
 function buildNotificationSettingProperties(): Record<string, SettingDefinition> {

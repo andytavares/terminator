@@ -56,6 +56,12 @@
   border-color: var(--tm-accent);
 }
 
+.git-view__pr-created {
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  margin: var(--tm-space-1) 0;
+}
+
 .git-view__commit-error {
   color: var(--tm-danger);
   font-size: 11px;

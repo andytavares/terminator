@@ -224,6 +224,24 @@ describe('GitFullView', () => {
     dispatchSpy.mockRestore()
   })
 
+  it('shows the created pull request with a link that opens it, and announces it', async () => {
+    const openExternal = vi.fn().mockResolvedValue(undefined)
+    Object.assign((globalThis as unknown as { electronAPI: object }).electronAPI, {
+      shell: { openExternal },
+    })
+    await renderView()
+    fireEvent.click(screen.getByText('Open PR'))
+    await waitFor(() => screen.getByTestId('pr-dialog'))
+    fireEvent.click(screen.getByText('CreatePr'))
+
+    fireEvent.click(await screen.findByRole('link', { name: '#42 PR' }))
+    expect(openExternal).toHaveBeenCalledWith('http://example.com/pull/42')
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'git:notify',
+      expect.objectContaining({ type: 'success', key: 'prCreated', title: 'Opened #42 PR' })
+    )
+  })
+
   it('shows char count when commit message exceeds 50 chars', async () => {
     await renderView()
     const msg = 'a'.repeat(51)
