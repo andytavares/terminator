@@ -1,5 +1,5 @@
 import { Markdown, MarkdownInline } from './Markdown.js'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Check,
   X,
@@ -257,6 +257,17 @@ function invoke(channel: string, payload: unknown): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
+async function readCompiled(orderId: string): Promise<OrderView | null> {
+  const next = (await invoke('foundry:order.compile', { id: orderId, commit: false })) as
+    | OrderView
+    | { error: string }
+  return 'error' in next ? null : next
+}
+
+async function readRecipes(orderId: string): Promise<RecipesView> {
+  return (await invoke('foundry:run.recipes', { id: orderId })) as RecipesView
+}
+
 function clockOf(iso: string): string {
   const d = new Date(iso)
   const pad = (n: number): string => String(n).padStart(2, '0')
@@ -336,25 +347,25 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
   const [unprovenReason, setUnprovenReason] = useState('')
   const [recipes, setRecipes] = useState<RecipesView | null>(null)
   const [picked, setPicked] = useState<StepId | null>(null)
-  const [focusTarget, setFocusTarget] = useState<string | null>(null)
+  // An object, so asking for the same target twice is two requests.
+  const [focusTarget, setFocusTarget] = useState<{ readonly target: string } | null>(null)
 
   useEffect(() => {
-    if (focusTarget === null) return
-    goTo(focusTarget)
-    setFocusTarget(null)
+    if (focusTarget !== null) goTo(focusTarget.target)
   }, [focusTarget])
 
-  const refresh = useCallback(async () => {
-    const next = (await invoke('foundry:order.compile', { id: orderId, commit: false })) as
-      | OrderView
-      | { error: string }
-    if ('error' in next) return
-    setView(next)
-  }, [orderId])
+  const showCompiled = useCallback((next: OrderView | null): void => {
+    if (next !== null) setView(next)
+  }, [])
+
+  const refresh = useCallback(
+    () => readCompiled(orderId).then(showCompiled),
+    [orderId, showCompiled]
+  )
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void readCompiled(orderId).then(showCompiled)
+  }, [orderId, showCompiled])
 
   useEffect(() => {
     let live = true
@@ -367,14 +378,11 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
     }
   }, [orderId])
 
-  const refreshRecipes = useCallback(async () => {
-    const next = (await invoke('foundry:run.recipes', { id: orderId })) as RecipesView
-    setRecipes(next)
-  }, [orderId])
+  const refreshRecipes = useCallback(() => readRecipes(orderId).then(setRecipes), [orderId])
 
   useEffect(() => {
-    void refreshRecipes()
-  }, [refreshRecipes])
+    void readRecipes(orderId).then(setRecipes)
+  }, [orderId])
 
   const setWriteBack = useCallback(
     async (writeBack: WriteBack[]) => {
@@ -503,11 +511,12 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
     [orderId]
   )
 
+  // The turn that was queued behind is sent once; it clears when it has been.
+  const sentSettle = useRef<Settle | null>(null)
   useEffect(() => {
-    if (drafting || queuedSettle === null) return
-    const toSend = queuedSettle
-    setQueuedSettle(null)
-    void applySettle(toSend)
+    if (drafting || queuedSettle === null || sentSettle.current === queuedSettle) return
+    sentSettle.current = queuedSettle
+    void applySettle(queuedSettle).then(() => setQueuedSettle(null))
   }, [drafting, queuedSettle, applySettle])
 
   const handOff = useCallback(async () => {
@@ -586,7 +595,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
 
   const openStep = (id: StepId): void => {
     setPicked(id)
-    setFocusTarget(STEP_HEADING)
+    setFocusTarget({ target: STEP_HEADING })
   }
 
   const noCriteria =
@@ -645,7 +654,7 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
                 className="fdry-btn"
                 onClick={() => {
                   if (remedy.step !== null) setPicked(remedy.step)
-                  setFocusTarget(remedy.target)
+                  setFocusTarget({ target: remedy.target })
                 }}
               >
                 {remedy.label}

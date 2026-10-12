@@ -70,6 +70,21 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
+interface TicketsRead {
+  connected?: { tracker: string; account: string }[]
+  issues?: Ticket[]
+  error?: string
+}
+
+async function readOrders(): Promise<OrderRow[]> {
+  const r = (await invoke('foundry:order.list')) as { orders?: OrderRow[] }
+  return r.orders ?? []
+}
+
+async function readTickets(search: string): Promise<TicketsRead> {
+  return (await invoke('foundry:issues.mine', { term: search })) as TicketsRead
+}
+
 export interface OrdersProps {
   readonly repoRoot: string | null
   /**
@@ -88,7 +103,13 @@ export interface OrdersProps {
 
 export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps): JSX.Element {
   const [rows, setRows] = useState<OrderRow[]>([])
-  const [open, setOpen] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(openOrderId ?? null)
+  const [seenOpenOrderId, setSeenOpenOrderId] = useState(openOrderId)
+  if (openOrderId !== seenOpenOrderId) {
+    setSeenOpenOrderId(openOrderId)
+    if (openOrderId) setOpen(openOrderId)
+  }
+  const [seenFocusSignal, setSeenFocusSignal] = useState(0)
   const [idea, setIdea] = useState('')
   const ideaInputRef = useRef<HTMLInputElement | null>(null)
   // An order starts from something you typed or from a ticket. The second was
@@ -96,6 +117,10 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
   // and had no way in: the only control here sent `kind: 'typed'`, so the half
   // of the description that says "or tracker issue" was unreachable.
   const [from, setFrom] = useState<'typed' | 'tracker'>('typed')
+  if (focusIdeaSignal && focusIdeaSignal !== seenFocusSignal) {
+    setSeenFocusSignal(focusIdeaSignal)
+    setFrom('typed')
+  }
   const [term, setTerm] = useState('')
   const [tickets, setTickets] = useState<Ticket[] | null>(null)
   const [connected, setConnected] = useState<string[] | null>(null)
@@ -106,10 +131,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
   const [offer, setOffer] = useState<{ teams: Team[] } | null>(null)
   const [teamId, setTeamId] = useState('')
 
-  const refresh = useCallback(async () => {
-    const r = (await invoke('foundry:order.list')) as { orders?: OrderRow[] }
-    setRows(r.orders ?? [])
-  }, [])
+  const refresh = useCallback(() => readOrders().then(setRows), [])
 
   // The same channel the inbox answers with: the row is not a second queue, it
   // is the gate that holds this order put where you are already looking.
@@ -132,27 +154,19 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
   )
 
   useEffect(() => {
-    if (openOrderId) setOpen(openOrderId)
-  }, [openOrderId])
-
-  useEffect(() => {
-    void refresh()
+    const poll = (): void => void readOrders().then(setRows)
+    poll()
     // The counts on these rows go stale the moment a question is answered in
     // another window or a run raises one, and this list is where the tab's
     // badge sends you — so it refetches while it is on screen rather than
     // once, on mount.
-    const timer = setInterval(() => void refresh(), 4000)
+    const timer = setInterval(poll, 4000)
     return () => clearInterval(timer)
-  }, [refresh])
+  }, [])
 
   // Your tickets, listed rather than remembered. Refreshed when the picker
   // opens and when you search, not on every keystroke.
-  const loadTickets = useCallback(async (search: string) => {
-    const r = (await invoke('foundry:issues.mine', { term: search })) as {
-      connected?: { tracker: string; account: string }[]
-      issues?: Ticket[]
-      error?: string
-    }
+  const showTickets = useCallback((r: TicketsRead): void => {
     if (r.error !== undefined) {
       setProblem(r.error)
       return
@@ -161,9 +175,14 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
     setTickets(r.issues ?? [])
   }, [])
 
+  const loadTickets = useCallback(
+    (search: string) => readTickets(search).then(showTickets),
+    [showTickets]
+  )
+
   useEffect(() => {
-    if (from === 'tracker' && tickets === null) void loadTickets('')
-  }, [from, tickets, loadTickets])
+    if (from === 'tracker' && tickets === null) void readTickets('').then(showTickets)
+  }, [from, tickets, showTickets])
 
   // 0 is "never asked" — the counter the quick action bumps starts there, and
   // a mount must not steal focus nobody requested. Switching `from` unmounts
@@ -172,10 +191,7 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
   const handledFocusSignal = useRef(0)
   useEffect(() => {
     if (!focusIdeaSignal || focusIdeaSignal === handledFocusSignal.current) return
-    if (from !== 'typed') {
-      setFrom('typed')
-      return
-    }
+    if (from !== 'typed') return
     handledFocusSignal.current = focusIdeaSignal
     ideaInputRef.current?.focus()
   }, [focusIdeaSignal, from])

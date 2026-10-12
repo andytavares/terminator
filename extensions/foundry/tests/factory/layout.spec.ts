@@ -581,9 +581,7 @@ describe('layoutHall — station signs', () => {
   const map = layoutHall(graphFor('standard.yaml', [1, 2]))
 
   it('gives every station a sign that fits its width, and nothing else one', () => {
-    const stations = map.props.filter((p) =>
-      ['desk', 'rig', 'bench', 'press', 'gate'].includes(p.kind)
-    )
+    const stations = map.props.filter((p) => ['desk', 'rig', 'press', 'gate'].includes(p.kind))
     expect(stations.length).toBeGreaterThan(0)
     for (const p of stations) {
       expect(p.sign, p.id).not.toBeNull()
@@ -595,7 +593,7 @@ describe('layoutHall — station signs', () => {
   })
 
   it('sizes each sign to the stencil the station has room for', () => {
-    expect(SIGN_CHARS).toEqual({ desk: 12, press: 12, rig: 8, bench: 8, gate: 4 })
+    expect(SIGN_CHARS).toEqual({ desk: 12, press: 12, rig: 8, gate: 4 })
     for (const p of map.props.filter((q) => q.sign !== null)) {
       expect(SIGN_CHARS[p.kind as keyof typeof SIGN_CHARS]).toBe(
         Math.floor((p.w * TILE_PX + 1) / 4)

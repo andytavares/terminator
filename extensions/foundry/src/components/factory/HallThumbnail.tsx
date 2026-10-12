@@ -37,30 +37,30 @@ export function HallThumbnail({
   refreshKey,
 }: HallThumbnailProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [visible, setVisible] = useState(false)
+  // Without an `IntersectionObserver` (a test or odd runtime) there is nothing
+  // to wait for, so the card is visible and fetches right away.
+  const canObserve = typeof IntersectionObserver !== 'undefined'
+  const [intersected, setIntersected] = useState(false)
+  const visible = !canObserve || intersected
   const [map, setMap] = useState<HallMap | null>(null)
   const [draft, setDraft] = useState(false)
   const worldRef = useRef<World | null>(null)
   const fetchedFor = useRef<string | null>(null)
 
-  // Lazy: a card off-screen never fetches. Falls back to fetching right away
-  // when the test/runtime environment has no `IntersectionObserver` at all.
+  // Lazy: a card off-screen never fetches.
   useEffect(() => {
     const el = containerRef.current
     if (el === null) return
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisible(true)
-      return
-    }
+    if (!canObserve) return
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setVisible(true)
+        if (entries.some((entry) => entry.isIntersecting)) setIntersected(true)
       },
       { rootMargin: '200px' }
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [canObserve])
 
   useEffect(() => {
     if (!visible) return
@@ -101,7 +101,7 @@ export function HallThumbnail({
 
   return (
     <div ref={containerRef} className="fdry-hall-card-pic">
-      {map !== null && worldRef.current !== null ? (
+      {map !== null ? (
         <div role="img" aria-label={label} className="fdry-hall-card-pic-frame">
           <HallScene
             map={map}

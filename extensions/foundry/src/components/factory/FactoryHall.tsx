@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { ArrowLeft, History, Pause, Play, Radio, ShieldQuestion, Terminal } from 'lucide-react'
 import { useRunObservation } from '../../renderer/use-run-observation.js'
 import type { FloorView, PendingAsk } from '../../renderer/use-run-observation.js'
@@ -12,6 +20,7 @@ import type { HallSign } from '../../factory/signs.js'
 import { stepFacts } from '../../factory/step-facts.js'
 import type { FactoryEvent, Observation } from '../../factory/events.js'
 import { direct } from '../../factory/director.js'
+import { createLiveHall, statesOf } from '../../factory/live-hall.js'
 import { createBeats, release, schedule } from '../../factory/beats.js'
 import type { Beats } from '../../factory/beats.js'
 import {
@@ -35,6 +44,7 @@ import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { MarkdownInline } from '../Markdown.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
+import { usePolled } from '../../renderer/use-polled.js'
 import './hall.css'
 
 /** Half of a gate card's width, `min(360px, 60%)`, plus 16px to the scene's edge. */
@@ -86,14 +96,12 @@ interface Replay {
   readonly observation: Observation
   /** What each station is showing: the states the beat scheduler has released so far. */
   readonly shown: Readonly<Record<string, NodeState>>
+  /** The refinery queue the replayed world is standing in. */
+  readonly queue: World['queue']
 }
 
 /** How often held beats are looked at, between polls. */
 const BEAT_CHECK_MS = 200
-
-function statesOf(graph: RunGraph): Record<string, NodeState> {
-  return Object.fromEntries(graph.nodes.map((n) => [n.id, n.state]))
-}
 
 function clockText(ms: number): string {
   const s = Math.round(ms / 1000)
@@ -146,7 +154,6 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   const { view, problem, pending, refresh } = useRunObservation(orderId)
   const [activity, setActivity] = useState<Readonly<Record<string, readonly ToolActivity[]>>>({})
   const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
-  const [map, setMap] = useState<HallMap | null>(null)
   const [callouts, setCallouts] = useState<readonly Callout[]>([])
   const [calloutLift, setCalloutLift] = useState<Readonly<Record<string, number>>>({})
   const overlayRef = useRef<HTMLDivElement | null>(null)
@@ -163,51 +170,43 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   const replayRef = useRef<Replay | null>(null)
   const replayWorldRef = useRef<World | null>(null)
   const replayPrevRef = useRef<Observation | null>(null)
-
-  // Refs, not state: these are read and written inside the observation
-  // effect on every poll, and putting them in state would make the effect
-  // re-fire on its own writes.
-  const mapKeyRef = useRef<string | null>(null)
-  const worldRef = useRef<World | null>(null)
-  const prevObservationRef = useRef<Observation | null>(null)
-  // Beats the scene has been handed, and the node states they add up to. Held
-  // beats are released on a timer as well as on a poll, so a step that passed
-  // in the same instant as its feeder still plays out after it.
-  const beatsRef = useRef<Beats | null>(null)
   const replayBeatsRef = useRef<Beats | null>(null)
-  const [liveShown, setLiveShown] = useState<Readonly<Record<string, NodeState>>>({})
 
-  const pollActivity = useCallback(async () => {
+  // The live world and the beats that gate it live outside React; a render
+  // reads only the part of them it draws (see `LiveHall`).
+  const [liveHall] = useState(createLiveHall)
+  const live = useSyncExternalStore(liveHall.subscribe, liveHall.snapshot)
+  const map = live.map
+
+  const readActivity = useCallback(async () => {
     const r = (await invoke('foundry:run.activity', { id: orderId })) as {
       activity?: Record<string, readonly ToolActivity[]>
       error?: string
     }
-    if (r.error !== undefined) return
-    setActivity(r.activity ?? {})
+    return r.error === undefined ? (r.activity ?? {}) : null
   }, [orderId])
-
-  useEffect(() => {
-    void pollActivity()
-    const timer = setInterval(() => void pollActivity(), ACTIVITY_POLL_MS)
-    return () => clearInterval(timer)
-  }, [pollActivity])
+  const showActivity = useCallback(
+    (read: Readonly<Record<string, readonly ToolActivity[]>> | null) => {
+      if (read !== null) setActivity(read)
+    },
+    []
+  )
+  usePolled(readActivity, showActivity, ACTIVITY_POLL_MS)
 
   // The order's own numbers for the status wall — same cadence as the
   // activity poll, so a rework or a new CI round shows up within one beat.
-  const pollMetrics = useCallback(async () => {
+  const readOrderMetrics = useCallback(async () => {
     const r = (await invoke('foundry:factory.metrics', { window: 'all' })) as {
       orders?: OrderMetrics[]
       error?: string
     }
-    if (r.error !== undefined) return
-    setOrderMetrics(r.orders?.find((o) => o.orderId === orderId) ?? null)
+    if (r.error !== undefined) return undefined
+    return r.orders?.find((o) => o.orderId === orderId) ?? null
   }, [orderId])
-
-  useEffect(() => {
-    void pollMetrics()
-    const timer = setInterval(() => void pollMetrics(), ACTIVITY_POLL_MS)
-    return () => clearInterval(timer)
-  }, [pollMetrics])
+  const showOrderMetrics = useCallback((read: OrderMetrics | null | undefined) => {
+    if (read !== undefined) setOrderMetrics(read)
+  }, [])
+  usePolled(readOrderMetrics, showOrderMetrics, ACTIVITY_POLL_MS)
 
   // Risen callouts leave on their own; nothing has to happen for them to go.
   useEffect(() => {
@@ -235,69 +234,45 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
     []
   )
 
-  // The one place `direct` is called — on every poll of either the graph or
-  // the activity feed, event or no event, with a real clock. A call held
-  // open across polls only crosses its walking threshold on a poll that
-  // brought no new event at all.
+  useEffect(
+    () =>
+      liveHall.onEvents((events, eventLabels) => {
+        // A replay has the stage; live events still move the live world, silently.
+        if (replayRef.current === null) announce(events, eventLabels)
+      }),
+    [liveHall, announce]
+  )
+
+  // The one place the live hall is handed an observation — on every poll of
+  // either the graph or the activity feed, event or no event, with a real
+  // clock. A call held open across polls only crosses its walking threshold
+  // on a poll that brought no new event at all.
   useEffect(() => {
     if (view === null) return
-    const observation: Observation = {
-      graph: view.graph,
-      orphaned: view.orphaned ?? [],
-      stranded: view.stranded ?? [],
-      waiting: view.waiting ?? [],
-      activity,
-      ci: view.ci ?? null,
-      queue: view.queue ?? null,
-    }
-
-    // CI presence joins the key: the dispatch tower has to appear the moment
-    // a run first ships a pull, not only the next time the node set changes.
-    const nodeKey =
-      [...view.graph.nodes.map((n) => n.id)].sort().join(',') +
-      (observation.ci === null ? '' : '+ci')
-    if (mapKeyRef.current !== nodeKey) {
-      const nextMap = layoutHall(view.graph, view.labels ?? {}, observation.ci !== null)
-      mapKeyRef.current = nodeKey
-      setMap(nextMap)
-      worldRef.current = createWorld(nextMap, observation)
-      prevObservationRef.current = observation
-      beatsRef.current = createBeats(statesOf(view.graph))
-      setLiveShown(beatsRef.current.shown)
-      return
-    }
-
-    // `mapKeyRef` and `worldRef` are only ever set together, in the branch
-    // above — reaching here means both are already populated.
-    const world = worldRef.current as World
-    const now = Date.now()
-    const seen = diffObservation(prevObservationRef.current, observation)
-    const held = schedule(beatsRef.current as Beats, seen, view.graph.nodes, now)
-    const { beats, events } = release(held, now)
-    beatsRef.current = beats
-    setLiveShown(beats.shown)
-    worldRef.current = direct(world, events, now)
-    prevObservationRef.current = observation
-    // A replay has the stage; live events still move the live world, silently.
-    if (replayRef.current === null) announce(events, view.labels ?? {})
-  }, [view, activity, announce])
+    liveHall.observe(
+      {
+        graph: view.graph,
+        orphaned: view.orphaned ?? [],
+        stranded: view.stranded ?? [],
+        waiting: view.waiting ?? [],
+        activity,
+        ci: view.ci ?? null,
+        queue: view.queue ?? null,
+      },
+      view.labels ?? {},
+      Date.now()
+    )
+  }, [liveHall, view, activity])
 
   // A held beat comes due with no poll to carry it.
   const liveLabels = view?.labels
   useEffect(() => {
-    const timer = setInterval(() => {
-      const held = beatsRef.current
-      if (held === null || held.held.length === 0 || worldRef.current === null) return
-      const now = Date.now()
-      const { beats, events } = release(held, now)
-      if (events.length === 0) return
-      beatsRef.current = beats
-      setLiveShown(beats.shown)
-      worldRef.current = direct(worldRef.current, events, now)
-      if (replayRef.current === null) announce(events, liveLabels ?? {})
-    }, BEAT_CHECK_MS)
+    const timer = setInterval(
+      () => liveHall.releaseDue(liveLabels ?? {}, Date.now()),
+      BEAT_CHECK_MS
+    )
     return () => clearInterval(timer)
-  }, [announce, liveLabels])
+  }, [liveHall, liveLabels])
 
   const labelsNow = view?.labels
 
@@ -318,7 +293,8 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
     const observation = observationAt(r.timeline, gates, r.graph, clock.toReal(0))
     // A recording that wrote CI down has a tower to wait at.
     const replayMap = layoutHall(r.graph, labelsNow ?? {}, (r.timeline.ci?.length ?? 0) > 0)
-    replayWorldRef.current = createWorld(replayMap, observation)
+    const replayWorld = createWorld(replayMap, observation)
+    replayWorldRef.current = replayWorld
     replayPrevRef.current = observation
     replayBeatsRef.current = createBeats(statesOf(observation.graph))
     setCallouts([])
@@ -333,6 +309,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
       speed: 1,
       observation,
       shown: (replayBeatsRef.current as Beats).shown,
+      queue: replayWorld.queue,
     }
     replayRef.current = next
     setReplay(next)
@@ -367,6 +344,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
         pos: at,
         observation,
         shown: (replayBeatsRef.current as Beats).shown,
+        queue: (replayWorldRef.current as World).queue,
         playing: r.playing && at < r.clock.duration,
       }
       replayRef.current = next
@@ -449,24 +427,24 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
 
   // An open station's transcript is live: read at once, then on the activity
   // beat, and only for as long as this station stays open.
-  useEffect(() => {
-    setTranscript([])
-    if (selectedSessionId === null) return
-    let live = true
-    const read = async (): Promise<void> => {
-      const r = (await invoke('foundry:run-transcript', {
-        sessionId: selectedSessionId,
-        limit: MONITOR_LINES,
-      })) as { lines?: TranscriptLine[] }
-      if (live) setTranscript(r.lines ?? [])
-    }
-    void read()
-    const timer = setInterval(() => void read(), ACTIVITY_POLL_MS)
-    return () => {
-      live = false
-      clearInterval(timer)
-    }
+  const readTranscript = useCallback(async () => {
+    if (selectedSessionId === null) return null
+    const r = (await invoke('foundry:run-transcript', {
+      sessionId: selectedSessionId,
+      limit: MONITOR_LINES,
+    })) as { lines?: TranscriptLine[] }
+    return r.lines ?? []
   }, [selectedSessionId])
+  const showTranscript = useCallback((lines: TranscriptLine[] | null): void => {
+    if (lines !== null) setTranscript(lines)
+  }, [])
+  usePolled(readTranscript, showTranscript, ACTIVITY_POLL_MS)
+
+  const [transcriptFor, setTranscriptFor] = useState(selectedSessionId)
+  if (transcriptFor !== selectedSessionId) {
+    setTranscriptFor(selectedSessionId)
+    setTranscript([])
+  }
 
   const openStation = useCallback((nodeId: string) => {
     setSelected(nodeId)
@@ -532,7 +510,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
     })
 
   if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
-  if (view === null || map === null || worldRef.current === null) {
+  if (view === null || map === null) {
     return <div className="fdry-empty">Loading the hall{'…'}</div>
   }
 
@@ -541,7 +519,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   const shownMap = replay?.map ?? map
   const shownGraph = replay?.observation.graph ?? view.graph
   const shownWorldRef = (
-    replay === null ? worldRef : replayWorldRef
+    replay === null ? liveHall.world : replayWorldRef
   ) as React.MutableRefObject<World>
   const orphaned = new Set(replay === null ? (view.orphaned ?? []) : [])
   const interruptions = interruptionsFor({
@@ -554,7 +532,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
   const needsYou = [...flaggedNodes].filter((id): id is string => id !== null)
   const states: Record<string, NodeState> = {}
   // The scene shows what the beat scheduler has released, not the raw graph.
-  const shownStates = replay === null ? liveShown : replay.shown
+  const shownStates = replay === null ? live.shown : replay.shown
   for (const n of shownGraph.nodes) states[n.id] = shownStates[n.id] ?? n.state
   const selectedNode =
     selected === null ? null : (view.graph.nodes.find((n) => n.id === selected) ?? null)
@@ -595,7 +573,7 @@ export function FactoryHall({ orderId, onOpenInList, onBack }: FactoryHallProps)
             reworks: orderMetrics.reworks,
             ciRounds: orderMetrics.ciRounds,
           },
-    queue: shownWorldRef.current?.queue ?? null,
+    queue: replay === null ? live.queue : replay.queue,
     ci: shownCi === null ? null : { checks: ciChecks },
   })
   const waitingGates = replay?.observation.waiting ?? view.waiting ?? []

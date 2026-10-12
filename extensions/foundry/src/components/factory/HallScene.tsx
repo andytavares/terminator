@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import type { HallMap, HallProp, PropKind } from '../../factory/layout.js'
 import { TILE_PX } from '../../factory/layout.js'
 import { cratePosition, tick, tileOf } from '../../factory/sim.js'
@@ -250,13 +250,13 @@ function draw(
  * object itself would restart on each of them.
  */
 function useStableRecord<T>(next: Readonly<Record<string, T>>): Readonly<Record<string, T>> {
-  const held = useRef(next)
+  const [held, setHeld] = useState(next)
   const keys = Object.keys(next)
   const same =
-    keys.length === Object.keys(held.current).length &&
-    keys.every((key) => key in held.current && held.current[key] === next[key])
-  if (!same) held.current = next
-  return held.current
+    keys.length === Object.keys(held).length &&
+    keys.every((key) => key in held && held[key] === next[key])
+  if (!same) setHeld(next)
+  return same ? held : next
 }
 
 export function HallScene({
@@ -273,17 +273,21 @@ export function HallScene({
   const states = useStableRecord(statesThisRender)
   // Read by the running loop each frame, so a speed change does not restart it.
   const speedRef = useRef(speed)
-  speedRef.current = speed
   // Same reasoning: a metrics poll landing mid-run should not restart the
   // rAF loop, just be read on the next frame it already draws.
   const metricsRef = useRef(metrics)
-  metricsRef.current = metrics
   // A beacon that would blink burns steadily for someone who asked for less motion.
   const steady = reducedMotion ?? prefersReducedMotion()
   const lampsRef = useRef<Lamps>({ needsYou, orphaned, steady })
-  lampsRef.current = { needsYou, orphaned, steady }
   const bakeRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
   const lightRef = useRef<{ map: HallMap; canvas: HTMLCanvasElement } | null>(null)
+
+  // Declared before the loop's effect, so the loop's first frame reads these.
+  useEffect(() => {
+    speedRef.current = speed
+    metricsRef.current = metrics
+    lampsRef.current = { needsYou, orphaned, steady }
+  })
 
   useEffect(() => {
     const canvas = canvasRef.current

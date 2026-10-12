@@ -23,6 +23,7 @@ import { pullNumber } from '../line/pull-number.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
+import { usePolled } from '../renderer/use-polled.js'
 import { ExternalLink, Markdown, MarkdownInline } from './Markdown.js'
 import {
   useRunObservation,
@@ -146,6 +147,56 @@ function laneName(view: FloorView, lane: number): string {
   return named === undefined ? `lane ${lane}` : named.repo
 }
 
+interface LiveRead {
+  readonly stalls: StallFiring[]
+  readonly shadowMode: boolean
+  readonly feed: FeedEntry[]
+  readonly mutes: MuteRule[]
+  /** Null when no agent is being watched. */
+  readonly transcript: TranscriptLine[] | null
+}
+
+async function readActivity(watching: string | null): Promise<LiveRead> {
+  const stalled = (await invoke('foundry:stalls-list')) as {
+    firings?: StallFiring[]
+    shadowMode?: boolean
+  }
+  const activity = (await invoke('foundry:feed-list')) as {
+    entries?: FeedEntry[]
+    mutes?: MuteRule[]
+  }
+  const tail =
+    watching === null
+      ? null
+      : ((await invoke('foundry:run-transcript', { sessionId: watching, limit: 40 })) as {
+          lines?: TranscriptLine[]
+        })
+  return {
+    stalls: stalled.firings ?? [],
+    shadowMode: stalled.shadowMode ?? true,
+    feed: (activity.entries ?? []).slice(-12).reverse(),
+    mutes: activity.mutes ?? [],
+    transcript: tail === null ? null : (tail.lines ?? []),
+  }
+}
+
+/** Every running agent's own words, by session; nothing to read when none is running. */
+async function readRunningTails(
+  runningSessions: string
+): Promise<Record<string, TranscriptLine[]>> {
+  const tails: Record<string, TranscriptLine[]> = {}
+  for (const sessionId of runningSessions === '' ? [] : runningSessions.split(' ')) {
+    const tail = (await invoke('foundry:run-transcript', {
+      sessionId,
+      limit: LIVE_LINES * 3,
+    })) as { lines?: TranscriptLine[] }
+    // The agent's own words and calls. The user side is the brief and
+    // tool results, which are either enormous or empty here.
+    tails[sessionId] = byMessage((tail.lines ?? []).filter((l) => l.role === 'assistant'))
+  }
+  return tails
+}
+
 export interface FloorProps {
   readonly orderId: string
 }
@@ -160,6 +211,8 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
   /** The last few things each running agent said, by session. */
   const [live, setLive] = useState<Record<string, TranscriptLine[]>>({})
+  /** When the tails were last read: the "now" their ages are counted against. */
+  const [tailsReadAt, setTailsReadAt] = useState(0)
   const [watching, setWatching] = useState<string | null>(null)
   const [redirect, setRedirect] = useState('')
   /** What a step's attach was refused with, beside the step that asked. */
@@ -177,33 +230,16 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
   // stale answer for ever, and a held tool call shown as answered is the worst
   // of those — the agent is genuinely stopped, waiting on somebody who has
   // been told there is nothing to do.
-  const pollLive = useCallback(async () => {
-    const stalled = (await invoke('foundry:stalls-list')) as {
-      firings?: StallFiring[]
-      shadowMode?: boolean
-    }
-    setStalls(stalled.firings ?? [])
-    setShadowMode(stalled.shadowMode ?? true)
-    const activity = (await invoke('foundry:feed-list')) as {
-      entries?: FeedEntry[]
-      mutes?: MuteRule[]
-    }
-    setFeed((activity.entries ?? []).slice(-12).reverse())
-    setMutes(activity.mutes ?? [])
-    if (watching !== null) {
-      const tail = (await invoke('foundry:run-transcript', {
-        sessionId: watching,
-        limit: 40,
-      })) as { lines?: TranscriptLine[] }
-      setTranscript(tail.lines ?? [])
-    }
-  }, [watching])
-
-  useEffect(() => {
-    void pollLive()
-    const timer = setInterval(() => void pollLive(), LIVE_POLL_MS)
-    return () => clearInterval(timer)
-  }, [pollLive])
+  const readLive = useCallback(() => readActivity(watching), [watching])
+  const showLive = useCallback((read: LiveRead): void => {
+    setStalls(read.stalls)
+    setShadowMode(read.shadowMode)
+    setFeed(read.feed)
+    setMutes(read.mutes)
+    if (read.transcript !== null) setTranscript(read.transcript)
+  }, [])
+  const pollLive = useCallback(() => readLive().then(showLive), [readLive, showLive])
+  usePolled(readLive, showLive, LIVE_POLL_MS)
 
   const answer = useCallback(
     async (ask: PendingAsk, decision: 'allow' | 'deny') => {
@@ -399,33 +435,18 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     .filter((n) => isLive(n, view?.orphaned ?? []))
     .map((n) => n.sessionId)
     .join(' ')
-  useEffect(() => {
-    const sessions = runningSessions === '' ? [] : runningSessions.split(' ')
-    if (sessions.length === 0) {
-      setLive({})
-      return
-    }
-    let cancelled = false
-    const poll = async (): Promise<void> => {
-      const next: Record<string, TranscriptLine[]> = {}
-      for (const sessionId of sessions) {
-        const tail = (await invoke('foundry:run-transcript', {
-          sessionId,
-          limit: LIVE_LINES * 3,
-        })) as { lines?: TranscriptLine[] }
-        // The agent's own words and calls. The user side is the brief and
-        // tool results, which are either enormous or empty here.
-        next[sessionId] = byMessage((tail.lines ?? []).filter((l) => l.role === 'assistant'))
-      }
-      if (!cancelled) setLive(next)
-    }
-    void poll()
-    const timer = setInterval(() => void poll(), LIVE_POLL_MS)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [runningSessions])
+  const readTails = useCallback(() => readRunningTails(runningSessions), [runningSessions])
+  const showTails = useCallback((tails: Record<string, TranscriptLine[]>): void => {
+    setLive(tails)
+    setTailsReadAt(Date.now())
+  }, [])
+  usePolled(readTails, showTails, LIVE_POLL_MS)
+
+  const [polledSessions, setPolledSessions] = useState(runningSessions)
+  if (polledSessions !== runningSessions) {
+    setPolledSessions(runningSessions)
+    if (runningSessions === '') setLive({})
+  }
 
   if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
   if (view === null) return <div className="fdry-empty">Loading the run…</div>
@@ -630,7 +651,7 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
                         <b>{view.labels?.[node.id] ?? node.role ?? 'this step'}</b>
                         {last === undefined ? null : (
                           <time dateTime={new Date(last.at).toISOString()}>
-                            {ago(last.at, Date.now())}
+                            {ago(last.at, tailsReadAt)}
                           </time>
                         )}
                       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useId, useState } from 'react'
 
 // Every Forge control that can be unavailable uses this. When a reason is
 // present it renders aria-disabled instead of disabled, so it stays focusable
@@ -25,9 +25,11 @@ export function ReasonButton({
   const tipId = useId()
   const [showInline, setShowInline] = useState(false)
 
-  useEffect(() => {
+  const [shownFor, setShownFor] = useState(reason)
+  if (reason !== shownFor) {
+    setShownFor(reason)
     setShowInline(false)
-  }, [reason])
+  }
 
   if (!reason) {
     return (

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { usePolled } from './use-polled.js'
 import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
@@ -95,6 +96,11 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
+async function readPending(): Promise<PendingAsk[]> {
+  const asks = (await invoke('foundry:permissions-list')) as { pending?: PendingAsk[] }
+  return asks.pending ?? []
+}
+
 export interface UseRunObservation {
   view: FloorView | null
   problem: string | null
@@ -115,34 +121,27 @@ export function useRunObservation(orderId: string): UseRunObservation {
   const [problem, setProblem] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAsk[]>([])
 
-  const refresh = useCallback(async () => {
-    const next = (await invoke('foundry:run.observe', { id: orderId })) as
-      | FloorView
-      | { error: string }
+  const readObservation = useCallback(
+    async () =>
+      (await invoke('foundry:run.observe', { id: orderId })) as FloorView | { error: string },
+    [orderId]
+  )
+  const showObservation = useCallback((next: FloorView | { error: string }): void => {
     if ('error' in next) {
       setProblem(next.error)
       return
     }
     setProblem(null)
     setView(next)
-  }, [orderId])
-
-  useEffect(() => {
-    void refresh()
-    const timer = setInterval(() => void refresh(), LIVE_POLL_MS)
-    return () => clearInterval(timer)
-  }, [refresh])
-
-  const pollPending = useCallback(async () => {
-    const asks = (await invoke('foundry:permissions-list')) as { pending?: PendingAsk[] }
-    setPending(asks.pending ?? [])
   }, [])
 
-  useEffect(() => {
-    void pollPending()
-    const timer = setInterval(() => void pollPending(), LIVE_POLL_MS)
-    return () => clearInterval(timer)
-  }, [pollPending])
+  const refresh = useCallback(
+    () => readObservation().then(showObservation),
+    [readObservation, showObservation]
+  )
+
+  usePolled(readObservation, showObservation, LIVE_POLL_MS)
+  usePolled(readPending, setPending, LIVE_POLL_MS)
 
   return { view, problem, pending, refresh }
 }

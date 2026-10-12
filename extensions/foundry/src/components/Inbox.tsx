@@ -77,6 +77,23 @@ function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke(channel, payload)
 }
 
+interface SignalsRead {
+  readonly signals: Signal[]
+  readonly sensors: SensorRow[]
+}
+
+async function readSignals(): Promise<SignalsRead> {
+  const [sig, sen] = await Promise.all([
+    invoke('foundry:signals.list') as Promise<{ signals?: Signal[] }>,
+    invoke('foundry:sensors.list') as Promise<{ sensors?: SensorRow[] }>,
+  ])
+  return { signals: sig.signals ?? [], sensors: sen.sensors ?? [] }
+}
+
+async function readInbox(): Promise<InboxView> {
+  return (await invoke('foundry:inbox.list')) as InboxView
+}
+
 export const SIGNAL_POLL_MS = 4000
 
 export function Inbox({
@@ -94,18 +111,14 @@ export function Inbox({
   const [signalProblem, setSignalProblem] = useState<string | null>(null)
   const [promoted, setPromoted] = useState<string | null>(null)
 
-  const refreshSignals = useCallback(async () => {
-    const [sig, sen] = await Promise.all([
-      invoke('foundry:signals.list') as Promise<{ signals?: Signal[] }>,
-      invoke('foundry:sensors.list') as Promise<{ sensors?: SensorRow[] }>,
-    ])
-    setSignals(sig.signals ?? [])
-    setSensors(sen.sensors ?? [])
+  const showSignals = useCallback((read: SignalsRead): void => {
+    setSignals(read.signals)
+    setSensors(read.sensors)
   }, [])
 
-  const refreshList = useCallback(async () => {
-    setView((await invoke('foundry:inbox.list')) as InboxView)
-  }, [])
+  const refreshSignals = useCallback(() => readSignals().then(showSignals), [showSignals])
+
+  const refreshList = useCallback(() => readInbox().then(setView), [])
 
   const refresh = useCallback(async () => {
     await refreshList()
@@ -113,8 +126,11 @@ export function Inbox({
   }, [refreshList, refreshSignals])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void (async () => {
+      setView(await readInbox())
+      showSignals(await readSignals())
+    })()
+  }, [showSignals])
 
   // Sensors record signals on their own tick, and an order can start waiting
   // on you at any moment, so both are read again while the band is mounted
