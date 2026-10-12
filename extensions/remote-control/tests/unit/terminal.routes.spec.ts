@@ -163,7 +163,7 @@ describe('DELETE /api/terminals/:sessionId', () => {
     const res = await app.inject({ method: 'DELETE', url: '/api/terminals/app-owned' })
     expect(res.statusCode).toBe(200)
     expect(ptyManager.kill).not.toHaveBeenCalled()
-    expect(ptyManager.getSession('app-owned')).toBeDefined()
+    expect(await ptyManager.getSession('app-owned')).toBeDefined()
   })
 
   it('returns 404 for unknown session', async () => {
@@ -224,7 +224,7 @@ describe('PATCH /api/terminals/:sessionId', () => {
       payload: { workspaceId: 'ws-42' },
     })
     expect(res.statusCode).toBe(200)
-    expect(ptyManager.getSession(sessionId)?.workspaceId).toBe('ws-42')
+    expect((await ptyManager.getSession(sessionId))?.workspaceId).toBe('ws-42')
   })
 
   it('clears the workspaceId when null is sent', async () => {
@@ -236,7 +236,7 @@ describe('PATCH /api/terminals/:sessionId', () => {
       payload: { workspaceId: null },
     })
     expect(res.statusCode).toBe(200)
-    expect(ptyManager.getSession(sessionId)?.workspaceId).toBeUndefined()
+    expect((await ptyManager.getSession(sessionId))?.workspaceId).toBeUndefined()
   })
 
   it('assigns workspaceId to an app-origin session', async () => {
@@ -247,7 +247,7 @@ describe('PATCH /api/terminals/:sessionId', () => {
       payload: { workspaceId: 'ws-7' },
     })
     expect(res.statusCode).toBe(200)
-    expect(ptyManager.getSession('app-ws')?.workspaceId).toBe('ws-7')
+    expect((await ptyManager.getSession('app-ws'))?.workspaceId).toBe('ws-7')
   })
 
   it('returns 404 for unknown session', async () => {
@@ -390,7 +390,7 @@ describe('WS /ws/terminals/:sessionId', () => {
     ptyManager.addSession({ sessionId: 'app-full', origin: 'app' })
     vi.spyOn(subscriberManager, 'addSubscriber').mockReturnValueOnce(false)
     await connect('app-full', await ticketFor('app-full'))
-    expect(ptyManager.getSession('app-full')).toBeDefined()
+    expect(await ptyManager.getSession('app-full')).toBeDefined()
     expect(ptyManager.kill).not.toHaveBeenCalled()
     expect(ptyManager.dataListenerCount('app-full')).toBe(0)
   })
@@ -419,7 +419,7 @@ describe('WS /ws/terminals/:sessionId', () => {
       await vi.waitFor(() => expect(subscriberManager.getCount(sessionId)).toBe(0), {
         timeout: 2000,
       })
-      vi.advanceTimersByTime(30_000)
+      await vi.advanceTimersByTimeAsync(30_000)
       expect(ptyManager.kill).toHaveBeenCalledWith(sessionId)
     } finally {
       vi.useRealTimers()
@@ -436,9 +436,9 @@ describe('WS /ws/terminals/:sessionId', () => {
         timeout: 2000,
       })
       await closePromise
-      vi.advanceTimersByTime(30_000)
+      await vi.advanceTimersByTimeAsync(30_000)
       expect(ptyManager.kill).not.toHaveBeenCalled()
-      expect(ptyManager.getSession('app-grace')).toBeDefined()
+      expect(await ptyManager.getSession('app-grace')).toBeDefined()
     } finally {
       vi.useRealTimers()
     }
@@ -484,16 +484,16 @@ describe('cleanup()', () => {
   it('kills remote-origin sessions and spares app-origin ones', async () => {
     const remoteId = await createSession()
     ptyManager.addSession({ sessionId: 'app-keep', origin: 'app' })
-    routes.cleanup()
+    await routes.cleanup()
     expect(ptyManager.kill).toHaveBeenCalledWith(remoteId)
     expect(ptyManager.kill).not.toHaveBeenCalledWith('app-keep')
-    expect(ptyManager.getSession('app-keep')).toBeDefined()
+    expect(await ptyManager.getSession('app-keep')).toBeDefined()
   })
 
   it('destroys subscriber state for streamed sessions', async () => {
     const sessionId = await createSession()
     const destroy = vi.spyOn(subscriberManager, 'destroySession')
-    routes.cleanup()
+    await routes.cleanup()
     expect(destroy).toHaveBeenCalledWith(sessionId)
   })
 })

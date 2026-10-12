@@ -1,4 +1,3 @@
-import { dialog } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { z } from 'zod'
@@ -78,7 +77,7 @@ export function registerWeeklyReviewIpcHandlers(api: ExtensionAPI, db: Extension
     const review = await getReview(db, args.reviewId)
     if (!review) return { error: 'REVIEW_NOT_FOUND' }
 
-    const result = await dialog.showSaveDialog({
+    const result = await api.dialog.showSaveDialog({
       title: 'Export weekly review',
       defaultPath: `weekly-review-${review.startedAt.slice(0, 10)}.md`,
       filters: [{ name: 'Markdown', extensions: ['md'] }],

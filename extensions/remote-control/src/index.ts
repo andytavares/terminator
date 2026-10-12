@@ -84,6 +84,7 @@ export function activate(api: ExtensionAPI): void {
     try {
       remoteServer = await createRemoteServer({
         port,
+        appPath: api.paths.app,
         ptyManager: api.pty,
         deps: {
           getPasswordHash: () => credentials.getPasswordHash(),

@@ -205,6 +205,40 @@ function mapNode(
  */
 export type BranchExcluded = (branch: string, repoPath?: string) => boolean
 
+/** The core's answer for one branch, which crosses the extension host's port (SDK 4.0.0). */
+export type BranchExclusionQuery = (branch: string, repoPath?: string) => Promise<boolean>
+
+/**
+ * Asks about each distinct candidate once, then answers from the replies, so a
+ * pure filter such as `parseDashboard` stays synchronous.
+ */
+export async function resolveBranchExclusions(
+  query: BranchExclusionQuery,
+  candidates: ReadonlyArray<{ branch: string; repoPath?: string }>
+): Promise<BranchExcluded> {
+  const keyOf = (branch: string, repoPath?: string) => `${repoPath ?? ''}\0${branch}`
+  const distinct = new Map(candidates.map((c) => [keyOf(c.branch, c.repoPath), c]))
+  const answers = await Promise.all(
+    [...distinct].map(async ([key, c]) => [key, await query(c.branch, c.repoPath)] as const)
+  )
+  const excluded = new Set(answers.filter(([, isExcluded]) => isExcluded).map(([key]) => key))
+  return (branch, repoPath) => excluded.has(keyOf(branch, repoPath))
+}
+
+/** Each pull request's branch and local checkout in the raw response, for `resolveBranchExclusions`. */
+export function dashboardBranches(
+  raw: unknown,
+  localRoots: Map<string, string>
+): Array<{ branch: string; repoPath?: string }> {
+  const data = (raw as RawDashboardResponse).data ?? {}
+  return [data.reReview, data.requested, data.team, data.mine, data.involved]
+    .flatMap((result) => (result?.nodes ?? []).filter((n): n is RawPrNode => n != null))
+    .map((n) => ({
+      branch: n.headRefName ?? '',
+      repoPath: localRoots.get(n.repository.nameWithOwner),
+    }))
+}
+
 /**
  * Pure: turns the raw GraphQL response into deduped, section-tagged rows,
  * leaving out pull requests opened from an excluded branch.

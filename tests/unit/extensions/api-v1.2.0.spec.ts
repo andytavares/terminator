@@ -108,18 +108,18 @@ describe('api.globalShortcut.register', () => {
     const { globalShortcut: electronGS } = await import('electron')
     const api = createExtensionAPI('test.gs2', '0.1.0')
 
-    const d = api.globalShortcut.register('CmdOrCtrl+Shift+Y', vi.fn())
+    const d = await api.globalShortcut.register('CmdOrCtrl+Shift+Y', vi.fn())
     d.dispose()
 
     expect(electronGS.unregister).toHaveBeenCalledWith('CmdOrCtrl+Shift+Y')
   })
 
-  it('throws if Electron reports the accelerator is already registered', async () => {
+  it('rejects if Electron reports the accelerator is already registered', async () => {
     const { globalShortcut: electronGS } = await import('electron')
     vi.mocked(electronGS.register).mockReturnValueOnce(false as unknown as boolean)
     const api = createExtensionAPI('test.gs3', '0.1.0')
 
-    expect(() => api.globalShortcut.register('CmdOrCtrl+Shift+Q', vi.fn())).toThrow(
+    await expect(api.globalShortcut.register('CmdOrCtrl+Shift+Q', vi.fn())).rejects.toThrow(
       'ACCELERATOR_TAKEN'
     )
   })
@@ -230,19 +230,19 @@ describe('api.ipc bridge channels', () => {
     expect(handler).toHaveBeenCalledTimes(1)
   })
 
-  it('isRemoteAccessible: true for allowlisted core channels', () => {
+  it('isRemoteAccessible: true for allowlisted core channels', async () => {
     const api = createExtensionAPI('test.ipc6', '0.1.0', {})
-    expect(api.ipc.isRemoteAccessible('workspace:list')).toBe(true)
+    expect(await api.ipc.isRemoteAccessible('workspace:list')).toBe(true)
   })
 
-  it('isRemoteAccessible: false for channels with no registered handler and not in allowlist', () => {
+  it('isRemoteAccessible: false for channels with no registered handler and not in allowlist', async () => {
     // No bridge provided → invokeRegistry check returns false
     const api = createExtensionAPI('test.ipc6', '0.1.0', {})
-    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
-    expect(api.ipc.isRemoteAccessible('no-such-channel')).toBe(false)
+    expect(await api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+    expect(await api.ipc.isRemoteAccessible('no-such-channel')).toBe(false)
   })
 
-  it('isRemoteAccessible: true for extension channels declared remoteAccessible at registration', () => {
+  it('isRemoteAccessible: true for extension channels declared remoteAccessible at registration', async () => {
     // Extension channels that registered with { remoteAccessible: true } are what
     // these registry entries reflect.
     const invokeRegistry = new Map([
@@ -253,13 +253,13 @@ describe('api.ipc bridge channels', () => {
     const api = createExtensionAPI('test.ipc6', '0.1.0', {
       bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
     })
-    expect(api.ipc.isRemoteAccessible('terminator.notepad:notes.list')).toBe(true)
-    expect(api.ipc.isRemoteAccessible('task-vault:vault:get-today')).toBe(true)
+    expect(await api.ipc.isRemoteAccessible('terminator.notepad:notes.list')).toBe(true)
+    expect(await api.ipc.isRemoteAccessible('task-vault:vault:get-today')).toBe(true)
     // channels not in registry remain blocked even with a bridge
-    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+    expect(await api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
   })
 
-  it('isRemoteAccessible: registry presence alone is NOT sufficient — the declared flag decides', () => {
+  it('isRemoteAccessible: registry presence alone is NOT sufficient — the declared flag decides', async () => {
     // Regression test for the declared-authority design: a channel registered
     // without remoteAccessible: true stays unreachable from the bridge. The old
     // rule ("any registered channel is accessible") also exposed every internal
@@ -272,8 +272,8 @@ describe('api.ipc bridge channels', () => {
     const api = createExtensionAPI('test.ipc6', '0.1.0', {
       bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
     })
-    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
-    expect(api.ipc.isRemoteAccessible('my-ext:local-only')).toBe(false)
+    expect(await api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+    expect(await api.ipc.isRemoteAccessible('my-ext:local-only')).toBe(false)
   })
 })
 
@@ -301,7 +301,7 @@ describe('api.pty', () => {
   }
 
   describe('session authority surface (v1.4.0)', () => {
-    it('spawnSession delegates and returns the session info', () => {
+    it('spawnSession delegates and returns the session info', async () => {
       const api = createExtensionAPI('test.pty10', '0.1.0', { ptyManager: mockPtyManager })
       const opts = {
         sessionId: 's1',
@@ -310,13 +310,13 @@ describe('api.pty', () => {
         type: 'human' as const,
         origin: 'remote' as const,
       }
-      expect(api.pty.spawnSession(opts)).toEqual(sessionInfo)
+      expect(await api.pty.spawnSession(opts)).toEqual(sessionInfo)
       expect(mockPtyManager.spawnSession).toHaveBeenCalledWith(opts)
     })
 
-    it('spawnSession throws without a ptyManager in context', () => {
+    it('spawnSession rejects without a ptyManager in context', async () => {
       const api = createExtensionAPI('test.pty11', '0.1.0', {})
-      expect(() =>
+      await expect(
         api.pty.spawnSession({
           sessionId: 's',
           cwd: '/',
@@ -324,26 +324,26 @@ describe('api.pty', () => {
           type: 'human',
           origin: 'app',
         })
-      ).toThrow('PTY access not available')
+      ).rejects.toThrow('PTY access not available')
     })
 
-    it('onData/onExit delegate and fall back to null without a ptyManager', () => {
+    it('onData/onExit delegate and return a disposer that does nothing without a ptyManager', () => {
       const api = createExtensionAPI('test.pty12', '0.1.0', { ptyManager: mockPtyManager })
       expect(api.pty.onData('s1', vi.fn())).toBeTypeOf('function')
       expect(api.pty.onExit('s1', vi.fn())).toBeTypeOf('function')
       const bare = createExtensionAPI('test.pty13', '0.1.0', {})
-      expect(bare.pty.onData('s1', vi.fn())).toBeNull()
-      expect(bare.pty.onExit('s1', vi.fn())).toBeNull()
+      expect(bare.pty.onData('s1', vi.fn())).toBeTypeOf('function')
+      expect(bare.pty.onExit('s1', vi.fn())).toBeTypeOf('function')
     })
 
-    it('getSession and setWorkspace delegate, defaulting without a ptyManager', () => {
+    it('getSession and setWorkspace delegate, defaulting without a ptyManager', async () => {
       const api = createExtensionAPI('test.pty14', '0.1.0', { ptyManager: mockPtyManager })
-      expect(api.pty.getSession('s1')).toEqual(sessionInfo)
-      expect(api.pty.setWorkspace('s1', 'ws-1')).toBe(true)
+      expect(await api.pty.getSession('s1')).toEqual(sessionInfo)
+      expect(await api.pty.setWorkspace('s1', 'ws-1')).toBe(true)
       expect(mockPtyManager.setWorkspace).toHaveBeenCalledWith('s1', 'ws-1')
       const bare = createExtensionAPI('test.pty15', '0.1.0', {})
-      expect(bare.pty.getSession('s1')).toBeUndefined()
-      expect(bare.pty.setWorkspace('s1', 'ws-1')).toBe(false)
+      expect(await bare.pty.getSession('s1')).toBeUndefined()
+      expect(await bare.pty.setWorkspace('s1', 'ws-1')).toBe(false)
     })
   })
 
@@ -366,16 +366,16 @@ describe('api.pty', () => {
       expect(mockPtyManager.kill).toHaveBeenCalledWith('s1')
     })
 
-    it('listSessions returns the manager session list', () => {
+    it('listSessions returns the manager session list', async () => {
       const api = createExtensionAPI('test.pty5', '0.1.0', { ptyManager: mockPtyManager })
-      expect(api.pty.listSessions()).toEqual(['s1', 's2'])
+      expect(await api.pty.listSessions()).toEqual(['s1', 's2'])
     })
   })
 
   describe('without ptyManager', () => {
-    it('listSessions returns []', () => {
+    it('listSessions returns []', async () => {
       const api = createExtensionAPI('test.pty.nopty5', '0.1.0')
-      expect(api.pty.listSessions()).toEqual([])
+      expect(await api.pty.listSessions()).toEqual([])
     })
 
     it('write is a no-op and does not throw', () => {

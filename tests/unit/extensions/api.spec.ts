@@ -5,13 +5,20 @@ const mockSend = vi.fn()
 const mockWindow = {
   webContents: { send: mockSend, isDestroyed: vi.fn(() => false) },
   isDestroyed: vi.fn(() => false),
+  isMinimized: vi.fn(() => true),
+  restore: vi.fn(),
+  show: vi.fn(),
+  focus: vi.fn(),
 }
+const mockShowOpenDialog = vi.hoisted(() => vi.fn())
 
 // Mock electron before importing api.ts
 vi.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: vi.fn(() => [mockWindow]),
+    getFocusedWindow: vi.fn(() => null),
   },
+  dialog: { showOpenDialog: mockShowOpenDialog },
   ipcMain: {
     handle: vi.fn(),
     removeHandler: vi.fn(),
@@ -108,28 +115,28 @@ describe('api.settings.isBranchExcluded', () => {
     mockListWorkspaces.mockReturnValue([{ id: 'w1', name: 'WS', folderPath: '/repo' }])
   })
 
-  it('matches the global patterns, across slashes', () => {
+  it('matches the global patterns, across slashes', async () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.isBranchExcluded('renovate/npm/vitest-4')).toBe(true)
-    expect(api.settings.isBranchExcluded('feature/login')).toBe(false)
+    expect(await api.settings.isBranchExcluded('renovate/npm/vitest-4')).toBe(true)
+    expect(await api.settings.isBranchExcluded('feature/login')).toBe(false)
   })
 
-  it('uses the override of the workspace that owns the repository', () => {
+  it('uses the override of the workspace that owns the repository', async () => {
     mockGetWorkspaceSettings.mockReturnValue({
       workspaceId: 'w1',
       overrides: { git: { branchExcludePatterns: ['dependabot/*'] } },
       extensions: {},
     })
     const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.isBranchExcluded('dependabot/npm/x', '/repo')).toBe(true)
-    expect(api.settings.isBranchExcluded('renovate/x', '/repo')).toBe(false)
-    expect(api.settings.isBranchExcluded('renovate/x', '/elsewhere')).toBe(true)
+    expect(await api.settings.isBranchExcluded('dependabot/npm/x', '/repo')).toBe(true)
+    expect(await api.settings.isBranchExcluded('renovate/x', '/repo')).toBe(false)
+    expect(await api.settings.isBranchExcluded('renovate/x', '/elsewhere')).toBe(true)
   })
 
-  it('excludes nothing when no pattern is set', () => {
+  it('excludes nothing when no pattern is set', async () => {
     mockGetGlobalSettings.mockReturnValue({ git: {} })
     const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.isBranchExcluded('renovate/x')).toBe(false)
+    expect(await api.settings.isBranchExcluded('renovate/x')).toBe(false)
   })
 })
 
@@ -456,7 +463,7 @@ describe('api.ipc.registerHandler', () => {
     disposable.dispose()
   })
 
-  it('keeps the task-vault SQL console and its admin channels out of the remote bridge', () => {
+  it('keeps the task-vault SQL console and its admin channels out of the remote bridge', async () => {
     const api = createExtensionAPI('terminator.task-vault', '0.1.0', {
       bridge: {
         invokeRegistry: ipcInvokeRegistry,
@@ -472,7 +479,7 @@ describe('api.ipc.registerHandler', () => {
       'task-vault:admin:table-stats',
     ]) {
       expect(ipcInvokeRegistry.has(channel)).toBe(true)
-      expect(api.ipc.isRemoteAccessible(channel)).toBe(false)
+      expect(await api.ipc.isRemoteAccessible(channel)).toBe(false)
     }
     dispose()
   })
@@ -545,7 +552,7 @@ describe('api.topBar.registerMenuItem', () => {
 })
 
 describe('api.pty.listSessions', () => {
-  it('delegates to ptyManager.listSessions when deps are provided', () => {
+  it('delegates to ptyManager.listSessions when deps are provided', async () => {
     const mockPtyMgr = {
       spawn: vi.fn(),
       write: vi.fn(),
@@ -556,14 +563,14 @@ describe('api.pty.listSessions', () => {
     const api = createExtensionAPI('test.ext', '0.1.0', {
       ptyManager: mockPtyMgr as never,
     })
-    const result = api.pty.listSessions()
+    const result = await api.pty.listSessions()
     expect(result).toEqual([{ sessionId: 's1', cwd: '/tmp' }])
     expect(mockPtyMgr.listSessions).toHaveBeenCalledTimes(1)
   })
 
-  it('returns empty array when no ptyManager dep is provided', () => {
+  it('returns empty array when no ptyManager dep is provided', async () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.pty.listSessions()).toEqual([])
+    expect(await api.pty.listSessions()).toEqual([])
   })
 })
 
@@ -613,5 +620,29 @@ describe('registry query functions', () => {
     expect(onClick).toHaveBeenCalled()
     expect(getPanelMenuItemId('q-panel')).toBe('ext-menu-q-menu')
     d.dispose()
+  })
+})
+
+// The members an extension in the extension host uses instead of Electron, which
+// it cannot import there (SDK 4.0.0).
+describe('what the extension host cannot reach itself', () => {
+  it('raise restores a minimised window and brings it forward', () => {
+    createExtensionAPI('com.raise', '0.1.0').window.raise()
+    expect(mockWindow.restore).toHaveBeenCalled()
+    expect(mockWindow.show).toHaveBeenCalled()
+    expect(mockWindow.focus).toHaveBeenCalled()
+  })
+
+  it('showOpenDialog opens over a window and answers with only the chosen paths', async () => {
+    mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/x'], bookmarks: [] })
+    const api = createExtensionAPI('com.dialog', '0.1.0')
+    const result = await api.dialog.showOpenDialog({ properties: ['openDirectory'] })
+    expect(mockShowOpenDialog).toHaveBeenCalledWith(mockWindow, { properties: ['openDirectory'] })
+    expect(result).toEqual({ canceled: false, filePaths: ['/x'] })
+  })
+
+  it('paths are the directories main was given', () => {
+    const paths = { app: '/app', userData: '/data' }
+    expect(createExtensionAPI('com.paths', '0.1.0', { paths }).paths).toEqual(paths)
   })
 })

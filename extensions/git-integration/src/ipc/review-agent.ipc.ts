@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import Store from 'electron-store'
+import { namedStore } from '../storage-directory.js'
 import { randomUUID } from 'crypto'
 import { AgentScopeSchema, AGENT_REQUESTS, type AgentRun } from '../schemas/review-agent.schema.js'
 import { ensureReviewWorktree } from '../review/worktree.js'
@@ -32,18 +32,18 @@ export interface ReviewAgentDeps {
   runReview?: typeof runAgentReview
 }
 
-const store = new Store<Record<string, AgentRun[]>>({ name: 'pr-agent-reviews' })
+const store = () => namedStore<AgentRun[]>('pr-agent-reviews')
 
 function storeKey(repoRoot: string, prNumber: number, headSHA: string): string {
   return `${repoRoot}:::${prNumber}:::${headSHA}`
 }
 
 function loadRuns(repoRoot: string, prNumber: number, headSHA: string): AgentRun[] {
-  return (store.get(storeKey(repoRoot, prNumber, headSHA)) as AgentRun[] | undefined) ?? []
+  return (store().get(storeKey(repoRoot, prNumber, headSHA)) as AgentRun[] | undefined) ?? []
 }
 
 function saveRuns(repoRoot: string, prNumber: number, headSHA: string, runs: AgentRun[]): void {
-  store.set(storeKey(repoRoot, prNumber, headSHA), runs)
+  store().set(storeKey(repoRoot, prNumber, headSHA), runs)
 }
 
 function upsertRun(repoRoot: string, prNumber: number, headSHA: string, run: AgentRun): void {
@@ -57,7 +57,7 @@ function upsertRun(repoRoot: string, prNumber: number, headSHA: string, run: Age
 function findStoredRun(
   runId: string
 ): { run: AgentRun; repoRoot: string; prNumber: number; headSHA: string } | null {
-  const all = store.store as Record<string, AgentRun[]>
+  const all = store().store as Record<string, AgentRun[]>
   for (const [key, runs] of Object.entries(all)) {
     const found = runs?.find((r) => r.id === runId)
     if (found) {

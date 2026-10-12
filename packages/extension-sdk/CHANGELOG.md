@@ -1,5 +1,51 @@
 # Changelog — @terminator/extension-sdk
 
+## 4.0.0
+
+Every member of the Extension API now crosses a process boundary: extension backends run in
+the extension host, a `utilityProcess` (ADR 094), and the API reaches the core over a
+`MessagePort`. A value the core holds is a promise or a snapshot the core pushes; a callback
+stays in the extension host and the core calls it by id.
+
+### Changed (breaking)
+
+- `settings.isBranchExcluded(branch, repoPath?)` returns `Promise<boolean>`.
+- `globalShortcut.register(accelerator, handler)` returns `Promise<Disposable>` and rejects
+  with `ACCELERATOR_TAKEN`.
+- `pty.spawnSession`, `pty.getSession`, `pty.setWorkspace` and `pty.listSessions` return
+  promises; `spawnSession` rejects with a `MissingCwdError` where it threw.
+- `pty.onData` delivers output in batches of at most one per frame, every batch before the
+  session's exit. `pty.onData` and `pty.onExit` always return a disposer: a session that does
+  not exist never calls the listener (they returned `null`).
+- `ipc.isRemoteAccessible(channel)` returns `Promise<boolean>`.
+- `settings.get` and `workspace.list` / `listProjects` stay synchronous and read a snapshot the
+  core pushes on every change. `issues.supportsTransitions` / `supportsCreate` are fixed facts
+  of a tracker and stay synchronous.
+
+### Added
+
+- `pty.openTerminal(input)`: `openTerminalTab` as a promise.
+- `workspace.addProject(input)`: `createProject` as a promise.
+- `paths.app` and `paths.userData`: the application's directory and the per-user data
+  directory, for what used to come from `electron.app`.
+- `dialog.showOpenDialog(options)` / `showSaveDialog(options)`: the file dialogs, for what used
+  to come from `electron.dialog`.
+- `window.raise()`: restores and focuses every application window, for what used to come from
+  `BrowserWindow.getAllWindows()`.
+
+### Deprecated
+
+- `pty.openTerminalTab` and `workspace.createProject`, the synchronous forms. They work only in
+  an extension that still runs in the main process (Foundry, until it moves) and throw in the
+  extension host. Removed in 5.0.0.
+
+### Migrating from 3.x
+
+- An extension backend cannot import `electron`: use `api.paths`, `api.dialog` and
+  `api.window`. A store such as electron-store needs `cwd: api.paths.userData`.
+- Await the members above. A filter that needs `isBranchExcluded` asks for each candidate first,
+  then filters synchronously.
+
 ## 3.0.0
 
 ### Added

@@ -393,6 +393,7 @@ app.whenReady().then(async () => {
     ptyManager,
     terminalRelay,
     db: getAppDb(),
+    paths: { app: app.getAppPath(), userData },
     broadcastToWindows: (channel, data) => {
       // Auxiliary windows (extension pop-outs) are real BrowserWindows and must
       // receive pushes too, otherwise a pop-out and the docked panel drift apart.

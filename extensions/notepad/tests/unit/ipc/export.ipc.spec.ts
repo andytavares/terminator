@@ -2,9 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
 import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 
+const showOpenDialog = vi
+  .fn()
+  .mockResolvedValue({ canceled: false, filePaths: ['/tmp/export-test'] })
+
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
 const mockApi = {
+  dialog: { showOpenDialog },
   ipc: {
     registerHandler: (spec: ChannelSpec) => {
       ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
@@ -25,9 +30,6 @@ import { DatabaseSync } from 'node:sqlite'
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
   app: { getPath: vi.fn(() => '/tmp') },
-  dialog: {
-    showOpenDialog: vi.fn().mockResolvedValue({ canceled: false, filePaths: ['/tmp/export-test'] }),
-  },
 }))
 
 import { wrapDb } from '../../../../../src/main/db/index'
@@ -342,8 +344,7 @@ describe('registerExportIpcHandlers', () => {
     const picked = (await get('terminator.notepad:export.pickFolder')({})) as { data: unknown }
     expect(picked).toEqual({ data: '/tmp/export-test' })
 
-    const { dialog } = await import('electron')
-    vi.mocked(dialog.showOpenDialog).mockResolvedValueOnce({ canceled: true, filePaths: [] })
+    showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] })
     const cancelled = (await get('terminator.notepad:export.pickFolder')({})) as { data: unknown }
     expect(cancelled).toEqual({ data: null })
     dispose()

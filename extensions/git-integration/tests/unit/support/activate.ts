@@ -29,7 +29,12 @@ export function activateCapturingChannels(workspace?: FakeWorkspace) {
         return disposable
       },
     },
-    settings: { get: () => undefined, register: () => disposable, isBranchExcluded: () => false },
+    settings: {
+      get: () => undefined,
+      register: () => disposable,
+      isBranchExcluded: async () => false,
+    },
+    paths: { app: '/app', userData: '/user-data' },
     commands: { register: () => disposable },
     window: { broadcast: () => {}, openAuxiliary: () => {} },
     nativeMenu: { addViewMenuItem: () => disposable },

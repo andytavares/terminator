@@ -14,6 +14,7 @@ import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { registerQuickActionCommands } from './commands.js'
 import { remoteAccessFor } from './remote-access.js'
 import { bindShell } from './shell/run-git.js'
+import { setStoreDirectory } from './storage-directory.js'
 import {
   openPrReviewWindow,
   registerReviewPullRequestCommand,
@@ -80,6 +81,7 @@ export function activate(api: ExtensionAPI): void {
   const enabled = api.settings.get<boolean>('terminator.git-integration.git.enabled') ?? true
   if (!enabled) return
   bindShell(api.shell)
+  setStoreDirectory(api.paths.userData)
 
   const projectRoots = () =>
     api.workspace
@@ -117,7 +119,7 @@ export function activate(api: ExtensionAPI): void {
   registerReviewAgentHandlers(registerFn, {
     getSetting: (key) => api.settings.get(key),
     broadcast: (channel, data) => api.window.broadcast(channel, data),
-    openTerminal: ({ repoRoot, cwd, title, command }) => {
+    openTerminal: async ({ repoRoot, cwd, title, command }) => {
       let projectId: string | undefined
       for (const ws of api.workspace.list()) {
         const match = api.workspace.listProjects(ws.id).find((p) => p.worktreePath === repoRoot)
@@ -127,7 +129,7 @@ export function activate(api: ExtensionAPI): void {
         }
       }
       if (!projectId) return
-      const sessionId = api.pty.openTerminalTab({
+      const sessionId = await api.pty.openTerminal({
         projectId,
         cwd,
         tabTitle: title,

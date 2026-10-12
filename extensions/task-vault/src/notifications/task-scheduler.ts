@@ -1,4 +1,3 @@
-import { BrowserWindow } from 'electron'
 import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 import { openInVault } from '../navigation.js'
 
@@ -34,10 +33,15 @@ function getTargetTimestamp(value: string, blockedAt: number): number {
   return isNaN(ts) ? Infinity : ts
 }
 
+let _broadcast: ((channel: string, data: unknown) => void) | null = null
+
+/** Where `broadcast` sends: `api.window.broadcast`, bound by `activate`. */
+export function bindBroadcast(send: (channel: string, data: unknown) => void): void {
+  _broadcast = send
+}
+
 export function broadcast(channel: string, data: unknown): void {
-  BrowserWindow.getAllWindows().forEach((win) => {
-    if (!win.isDestroyed()) win.webContents.send(channel, data)
-  })
+  _broadcast?.(channel, data)
 }
 
 export function startTaskScheduler(

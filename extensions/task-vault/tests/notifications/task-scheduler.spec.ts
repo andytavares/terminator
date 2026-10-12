@@ -3,13 +3,6 @@ import type { ExtensionDB } from '@terminator/extension-sdk'
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-const mockSend = vi.fn()
-const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
-
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
-}))
-
 // ── DB mock factory ──────────────────────────────────────────────────────────
 
 /**
@@ -75,6 +68,7 @@ import {
   triggerSchedulerTick,
   startTaskScheduler,
   broadcast,
+  bindBroadcast,
 } from '../../src/notifications/task-scheduler.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -710,16 +704,13 @@ describe('telling every window something changed', () => {
   // Still the vault's push channel — the task and project IPC handlers use it
   // to say the index moved. Only the notifications stopped: they navigate now,
   // and navigating is a different thing from announcing.
-  it('reaches every window that is still there', () => {
+  // The backend runs in the extension host (ADR 094), which has no windows: the
+  // core's window broadcast, bound at activation, is the only way out.
+  it('sends through the broadcast activate bound', () => {
+    const send = vi.fn()
+    bindBroadcast(send)
     broadcast('task-vault:push:index-updated', { a: 1 })
-    expect(mockSend).toHaveBeenCalledWith('task-vault:push:index-updated', { a: 1 })
-  })
-
-  it('skips one that has been destroyed, rather than throwing on the way out', () => {
-    mockWin.isDestroyed.mockReturnValueOnce(true)
-    mockSend.mockClear()
-    broadcast('task-vault:push:index-updated', {})
-    expect(mockSend).not.toHaveBeenCalled()
+    expect(send).toHaveBeenCalledWith('task-vault:push:index-updated', { a: 1 })
   })
 })
 

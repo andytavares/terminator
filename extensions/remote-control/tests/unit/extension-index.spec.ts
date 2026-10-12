@@ -50,9 +50,10 @@ function makeApi() {
       invokeChannel: vi.fn().mockResolvedValue(undefined),
       sendChannel: vi.fn(),
       onWindowEvent: vi.fn().mockReturnValue(vi.fn()),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
+      isRemoteAccessible: vi.fn().mockResolvedValue(false),
     },
     window: { broadcast: mockBroadcast },
+    paths: { app: '/app', userData: '/user-data' },
     pty: {},
     workspace: { list: vi.fn(() => []), listProjects: vi.fn(() => []) },
   }

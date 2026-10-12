@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import Store from 'electron-store'
+import { namedStore } from '../storage-directory.js'
 import { basename, join } from 'path'
 import { existsSync } from 'fs'
 import { readFile } from 'fs/promises'
@@ -14,7 +14,11 @@ import type {
 } from '../schemas/pr-review.schema.js'
 import { ReviewQueuePRSchema, ReviewSessionSchema } from '../schemas/pr-review.schema.js'
 import { buildSectionQueries, parseDashboard } from '../github/dashboard-search.js'
-import type { BranchExcluded } from '../github/dashboard-search.js'
+import {
+  dashboardBranches,
+  resolveBranchExclusions,
+  type BranchExclusionQuery,
+} from '../github/dashboard-search.js'
 import {
   buildChapters,
   parseReviewQueuePR,
@@ -51,8 +55,8 @@ import { applyReadingOrder } from '../review/apply-reading-order.js'
 import { findTestReferencesInRepo } from '../review/test-references.js'
 import { findTestLocations, symbolsForBlock } from '../review/test-locations.js'
 
-const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessions' })
-const activeReviewStore = new Store<Record<string, unknown>>({ name: 'pr-active-reviews' })
+const sessionStore = () => namedStore('pr-review-sessions')
+const activeReviewStore = () => namedStore('pr-active-reviews')
 
 /** Files past this size are not sent to the renderer for context expansion. */
 const MAX_FILE_CONTENT_BYTES = 2 * 1024 * 1024
@@ -161,9 +165,14 @@ export function registerGithubHandlers(
   issues?: IssuesApi,
   listProjectRoots?: () => string[],
   getReviewRepos?: () => string[],
-  isBranchExcluded: BranchExcluded = () => false
+  isBranchExcluded: BranchExclusionQuery = async () => false
 ): void {
   const register = withTiming(registerRaw)
+  const excludedIn = (prs: ReadonlyArray<{ headRefName: string }>, repoPath: string) =>
+    resolveBranchExclusions(
+      isBranchExcluded,
+      prs.map((pr) => ({ branch: pr.headRefName, repoPath }))
+    )
   const { github } = access
   const target = (repoRoot: string) => githubTarget(repoRoot, access.getToken())
   const api = (repoRoot: string, request: GithubApiRequest) => github.api(target(repoRoot), request)
@@ -242,9 +251,9 @@ export function registerGithubHandlers(
             limit: 50,
             fields: PR_JSON_FIELDS,
           })
-          const prs: ReviewQueuePR[] = found
-            .map(parseReviewQueuePR)
-            .filter((pr) => !isBranchExcluded(pr.headRefName, repoRoot))
+          const parsed = found.map(parseReviewQueuePR)
+          const excluded = await excludedIn(parsed, repoRoot)
+          const prs: ReviewQueuePR[] = parsed.filter((pr) => !excluded(pr.headRefName, repoRoot))
           return { prs, totalCount: prs.length, hasMore: false }
         }
 
@@ -270,7 +279,8 @@ export function registerGithubHandlers(
         const data = JSON.parse(raw) as GQLResponse
         const { nodes, pageInfo, totalCount } = data.data.repository.pullRequests
         const page = nodes.map((n) => parseReviewQueuePR(normalizeGraphQLNode(n)))
-        const prs = page.filter((pr) => !isBranchExcluded(pr.headRefName, repoRoot))
+        const excluded = await excludedIn(page, repoRoot)
+        const prs = page.filter((pr) => !excluded(pr.headRefName, repoRoot))
         return {
           prs,
           // The count the summary line reports. Without it the view can only
@@ -827,7 +837,7 @@ export function registerGithubHandlers(
       schema: z.object({ key: z.string().min(1) }),
       invalid: { session: null },
       run: ({ key }) => {
-        const raw = sessionStore.get(key)
+        const raw = sessionStore().get(key)
         if (!raw) return { session: null }
         const result = ReviewSessionSchema.safeParse(raw)
         return result.success ? { session: result.data } : { session: null }
@@ -841,7 +851,7 @@ export function registerGithubHandlers(
       schema: z.object({ key: z.string().min(1), session: ReviewSessionSchema }),
       invalid: VALIDATION_ERROR,
       run: ({ key, session }) => {
-        sessionStore.set(key, session)
+        sessionStore().set(key, session)
         return { ok: true as const }
       },
       onError: errorEnvelope,
@@ -857,7 +867,7 @@ export function registerGithubHandlers(
       invalid: VALIDATION_ERROR,
       run: ({ repoRoot, pr }) => {
         const key = `${repoRoot}:${pr.number}`
-        activeReviewStore.set(key, { repoRoot, pr })
+        activeReviewStore().set(key, { repoRoot, pr })
         return { ok: true as const }
       },
       onError: errorEnvelope,
@@ -870,7 +880,7 @@ export function registerGithubHandlers(
       schema: RepoRootPayload,
       invalid: VALIDATION_ERROR,
       run: ({ repoRoot }) => {
-        const all = activeReviewStore.store
+        const all = activeReviewStore().store
         const prs = Object.values(all)
           .filter(
             (entry): entry is { repoRoot: string; pr: unknown } =>
@@ -893,11 +903,11 @@ export function registerGithubHandlers(
       schema: PullRequestPayload,
       invalid: VALIDATION_ERROR,
       run: ({ repoRoot, prNumber }) => {
-        activeReviewStore.delete(`${repoRoot}:${prNumber}`)
+        activeReviewStore().delete(`${repoRoot}:${prNumber}`)
         // Also delete all session store entries for this PR so it won't re-appear as in-progress on next load
         const sessionPrefix = `${repoRoot}:::${prNumber}:::`
-        for (const key of Object.keys(sessionStore.store)) {
-          if (key.startsWith(sessionPrefix)) sessionStore.delete(key)
+        for (const key of Object.keys(sessionStore().store)) {
+          if (key.startsWith(sessionPrefix)) sessionStore().delete(key)
         }
         return { ok: true as const }
       },
@@ -933,7 +943,7 @@ export function registerGithubHandlers(
             } else {
               // PR is CLOSED or MERGED — clean up the persisted snapshot
               const key = `${repoRoot}:${num}`
-              activeReviewStore.delete(key)
+              activeReviewStore().delete(key)
             }
           }
         }
@@ -1038,7 +1048,11 @@ export function registerGithubHandlers(
         }
 
         const sessionsByRoot = new Map<string, Map<number, ReviewSession>>()
-        const prs = parseDashboard(data, login, localRoots, isBranchExcluded).map((pr) => {
+        const excluded = await resolveBranchExclusions(
+          isBranchExcluded,
+          dashboardBranches(data, localRoots)
+        )
+        const prs = parseDashboard(data, login, localRoots, excluded).map((pr) => {
           if (!pr.localRepoRoot) return pr
           if (!sessionsByRoot.has(pr.localRepoRoot)) {
             sessionsByRoot.set(
@@ -1237,7 +1251,7 @@ export function registerGithubHandlers(
 function sessionsForRepo(repoRoot: string): ReviewSession[] {
   const prefix = `${repoRoot}:::`
   const byPrNumber = new Map<number, { session: ReviewSession; isNewKey: boolean }>()
-  for (const [key, value] of Object.entries(sessionStore.store)) {
+  for (const [key, value] of Object.entries(sessionStore().store)) {
     if (!key.startsWith(prefix)) continue
     const result = ReviewSessionSchema.safeParse(value)
     if (!result.success) continue
