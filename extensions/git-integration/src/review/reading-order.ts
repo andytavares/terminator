@@ -306,10 +306,8 @@ function readingStepFor(path: string, ctx: StepContext): ReadingStep {
   }
 }
 
-/**
- * Orders `files` for reading: symbols defined before they're used, test files
- * right after the last file they exercise, cycles kept adjacent, tier-3 last.
- */
+/** Orders `files` for reading: symbols defined before they're used, test files right after
+ * the last file they exercise, cycles kept adjacent, tier-3 last. */
 export async function buildReadingOrder(files: ParsedPrFile[]): Promise<ReadingStep[]> {
   const nodes = await Promise.all(files.map(buildFileNode))
   if (nodes.length === 0) return []

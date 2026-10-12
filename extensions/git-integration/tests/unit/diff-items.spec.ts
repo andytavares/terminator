@@ -100,10 +100,10 @@ describe('buildDiffItems() — moved blocks', () => {
 
   it('hides a split row by either side, each read by its own line number', () => {
     const hunks = [hunkOf('@@ a', [context(5), removedAt7, addedAt8])]
-    const split = (movedMark: DiffItemSource['movedMark']) =>
+    const visibleSplitKeys = (movedMark: DiffItemSource['movedMark']) =>
       keysOf(sourceOf(hunks, { mode: 'split', movedMark }))
-    expect(split(hidingOnly('LEFT', 7))).toEqual(['0-header', '0-row-0'])
-    expect(split(hidingOnly('RIGHT', 8))).toEqual(['0-header', '0-row-0'])
-    expect(split(hidingOnly('LEFT', 5))).toEqual(['0-header', '0-row-1'])
+    expect(visibleSplitKeys(hidingOnly('LEFT', 7))).toEqual(['0-header', '0-row-0'])
+    expect(visibleSplitKeys(hidingOnly('RIGHT', 8))).toEqual(['0-header', '0-row-0'])
+    expect(visibleSplitKeys(hidingOnly('LEFT', 5))).toEqual(['0-header', '0-row-1'])
   })
 })

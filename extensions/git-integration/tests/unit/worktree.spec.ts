@@ -12,10 +12,7 @@ interface GitCall {
   cwd?: string
 }
 
-/**
- * A git stand-in that records every call, creates the directory `worktree add`
- * names, records `worktree remove`, and answers `rev-parse` with `headAt`.
- */
+/** A recording git: `worktree add` creates its directory, `rev-parse` answers `headAt`. */
 function recordingGit(headAt = '') {
   const calls: GitCall[] = []
   const removed: string[] = []

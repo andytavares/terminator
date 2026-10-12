@@ -500,7 +500,7 @@ function runClaude(run: RunContext, launch: ClaudeLaunch, control: RunControl): 
   })
 }
 
-function reviewPromptFor(
+function agentReviewPrompt(
   input: RunAgentReviewInput,
   diff: { diffText: string; truncated: boolean }
 ) {
@@ -526,7 +526,7 @@ async function executeAgentRun(
     return failedRun(run, `Could not compute diff: ${String(e)}`)
   }
   if (control.cancelled) return cancelledRun(run)
-  const prompt = reviewPromptFor(input, diff)
+  const prompt = agentReviewPrompt(input, diff)
   const schemaJson = JSON.stringify(buildAgentJsonSchema())
   const { sessionId, model, effort } = input
   const args = buildClaudeArgs({ sessionId, model, effort, schemaJson })

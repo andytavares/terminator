@@ -77,11 +77,8 @@ async function grepAtHeadOrCheckout(
   }
 }
 
-/**
- * Every line of a test file that mentions one of `symbols`, searched at the
- * PR's head commit so tests added by the PR are found. Falls back to the
- * checkout when that commit has not been fetched.
- */
+/** Every test-file line mentioning one of `symbols`, searched at the PR's head commit so
+ * tests the PR adds are found; the checkout when that commit has not been fetched. */
 export async function findTestLocations(
   head: Pick<PrHead, 'repoRoot' | 'headSHA'>,
   symbols: string[],

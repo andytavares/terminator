@@ -16,7 +16,9 @@ const baseOpts: ComputeInsightsOptions = {
 }
 
 /** A changed file as GitHub lists it, with its patch given line by line. */
-function changedFile(path: string, patchLines: string[], counts = { additions: 1, deletions: 0 }) {
+const ONE_ADDITION = { additions: 1, deletions: 0 }
+
+function changedFile(path: string, patchLines: string[], counts = ONE_ADDITION) {
   return { path, ...counts, patch: patchLines.join('\n') }
 }
 
