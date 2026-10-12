@@ -83,9 +83,7 @@ async function announceStatus(): Promise<void> {
   })
 }
 
-export function registerIntegrationsHandlers(
-  window: () => BrowserWindow | null = () => null
-): void {
+export function registerIntegrationsHandlers(window: () => BrowserWindow | null): void {
   getWindow = window
   registerInvokeTable([
     defineChannel({

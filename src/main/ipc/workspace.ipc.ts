@@ -153,7 +153,7 @@ async function removeProject(id: string): Promise<{ success: boolean }> {
   const project = getProjectById(id)
   if (project?.isWorktree && project.worktreePath) {
     const workspace = listWorkspaces().find((w) => w.id === project.workspaceId)
-    if (workspace?.folderPath) {
+    if (workspace) {
       try {
         await removeWorktree(workspace.folderPath, project.worktreePath)
       } catch {

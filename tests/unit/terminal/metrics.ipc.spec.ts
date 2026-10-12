@@ -52,15 +52,6 @@ describe('registerMetricsHandlers', () => {
     vi.useRealTimers()
   })
 
-  it('registers metrics:system, metrics:processes, metrics:pids handlers', async () => {
-    vi.resetModules()
-    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
-    registerMetricsHandlers(getPtyManager() as never)
-    expect(mockHandle).toHaveBeenCalledWith('metrics:system', expect.any(Function))
-    expect(mockHandle).toHaveBeenCalledWith('metrics:processes', expect.any(Function))
-    expect(mockHandle).toHaveBeenCalledWith('metrics:pids', expect.any(Function))
-  })
-
   it('metrics:system returns cpu/mem/net data', async () => {
     vi.resetModules()
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')

@@ -181,7 +181,7 @@ describe('registering without a window', () => {
   it('drops change events rather than throwing', async () => {
     handlers.clear()
     const mod = await import('../../../src/main/ipc/session-records.ipc')
-    mod.registerSessionRecordsHandlers()
+    mod.registerSessionRecordsHandlers(() => null)
     expect(() => store.change?.('s1', null)).not.toThrow()
   })
 })

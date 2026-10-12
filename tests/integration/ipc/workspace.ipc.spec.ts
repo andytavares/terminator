@@ -1,323 +1,199 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ipcMain } from 'electron'
+import type { Project, Workspace } from '../../../src/shared/types/index'
 
-const mockWebContentsSend = vi.fn()
+type Handler = (event: unknown, payload?: unknown) => unknown
+const handlers = vi.hoisted(() => new Map<string, Handler>())
+const sent = vi.hoisted(() => [] as Array<{ channel: string; data: unknown }>)
+const git = vi.hoisted(() => ({ removeWorktree: vi.fn() }))
+
 vi.mock('electron', () => ({
-  ipcMain: { handle: vi.fn() },
+  ipcMain: { handle: (channel: string, handler: Handler) => handlers.set(channel, handler) },
   BrowserWindow: {
-    getAllWindows: vi.fn(() => [{ webContents: { send: mockWebContentsSend } }]),
+    getAllWindows: () => [
+      { webContents: { send: (channel: string, data: unknown) => sent.push({ channel, data }) } },
+    ],
   },
 }))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
+vi.mock('../../../src/main/git/git-service', () => git)
+vi.mock('../../../src/main/extensions/workspace-events', () => ({ emitProjectDelete: vi.fn() }))
 
-vi.mock('../../../src/main/storage/workspace-store', () => ({
-  listWorkspaces: vi.fn(),
-  createWorkspace: vi.fn(),
-  updateWorkspace: vi.fn(),
-  deleteWorkspace: vi.fn(),
-  reorderWorkspaces: vi.fn(),
-  listProjects: vi.fn(),
-  createProject: vi.fn(),
-  updateProjectBranch: vi.fn(),
-  renameProject: vi.fn(),
-  reorderProjects: vi.fn(),
-  deleteProject: vi.fn(),
-  getProjectById: vi.fn(),
-}))
-
-vi.mock('../../../src/main/git/git-service', () => ({
-  removeWorktree: vi.fn(),
-}))
-
-vi.mock('../../../src/main/extensions/workspace-events', () => ({
-  emitProjectDelete: vi.fn(),
-}))
-
-import * as store from '../../../src/main/storage/workspace-store'
-import * as gitService from '../../../src/main/git/git-service'
-import {
-  registerWorkspaceHandlers,
-  setActiveWorkspaceContext,
-  getActiveWorkspaceContext,
-} from '../../../src/main/ipc/workspace.ipc'
-
-const WS = '11111111-1111-4111-8111-111111111111'
-const P1 = '22222222-2222-4222-8222-222222222222'
-const P2 = '33333333-3333-4333-8333-333333333333'
-
-function captureHandler(channel: string): (event: unknown, payload?: unknown) => unknown {
-  const calls = vi.mocked(ipcMain.handle).mock.calls
-  const match = calls.find(([ch]) => ch === channel)
-  if (!match) throw new Error(`No handler registered for channel: ${channel}`)
-  return match[1] as (event: unknown, payload?: unknown) => unknown
+function invoke<T = unknown>(channel: string, payload?: unknown): Promise<T> {
+  return Promise.resolve(handlers.get(channel)!({}, payload)) as Promise<T>
 }
 
-describe('workspace IPC handlers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    registerWorkspaceHandlers()
+async function createWorkspace(name: string): Promise<Workspace> {
+  const reply = await invoke<{ workspace: Workspace }>('workspace:create', {
+    name,
+    folderPath: `/repos/${name}`,
+    color: '#4A90E2',
+    tags: [],
+  })
+  return reply.workspace
+}
+
+async function createProject(workspaceId: string, name: string, extra = {}): Promise<Project> {
+  const reply = await invoke<{ project: Project }>('project:create', {
+    workspaceId,
+    name,
+    ...extra,
+  })
+  return reply.project
+}
+
+async function workspaceNames(): Promise<string[]> {
+  const { workspaces } = await invoke<{ workspaces: Workspace[] }>('workspace:list')
+  return workspaces.map((w) => w.name)
+}
+
+async function projectNames(workspaceId: string): Promise<string[]> {
+  const { projects } = await invoke<{ projects: Project[] }>('project:list', { workspaceId })
+  return projects.map((p) => p.name)
+}
+
+beforeEach(async () => {
+  vi.resetModules()
+  git.removeWorktree.mockReset()
+  handlers.clear()
+  sent.length = 0
+  const { registerWorkspaceHandlers } = await import('../../../src/main/ipc/workspace.ipc')
+  registerWorkspaceHandlers()
+})
+
+describe('workspaces', () => {
+  it('lists the workspaces that were created, in creation order', async () => {
+    await createWorkspace('alpha')
+    await createWorkspace('beta')
+
+    expect(await workspaceNames()).toEqual(['alpha', 'beta'])
   })
 
-  describe('workspace:list', () => {
-    it('returns workspaces from store', async () => {
-      const workspaces = [{ id: '1', name: 'WS1' }]
-      vi.mocked(store.listWorkspaces).mockReturnValue(
-        workspaces as unknown as ReturnType<typeof store.listWorkspaces>
-      )
-      const handler = captureHandler('workspace:list')
-      const result = (await handler({})) as { workspaces: unknown[] }
-      expect(result.workspaces).toEqual(workspaces)
-    })
+  it('renames a workspace', async () => {
+    const workspace = await createWorkspace('alpha')
+
+    await invoke('workspace:update', { id: workspace.id, name: 'gamma' })
+
+    expect(await workspaceNames()).toEqual(['gamma'])
   })
 
-  describe('workspace:create', () => {
-    it('forwards payload to createWorkspace and returns result', async () => {
-      const ws = { id: '2', name: 'New WS' }
-      vi.mocked(store.createWorkspace).mockReturnValue({ workspace: ws } as unknown as ReturnType<
-        typeof store.createWorkspace
-      >)
-      const handler = captureHandler('workspace:create')
-      const result = await handler(
-        {},
-        { name: 'New WS', folderPath: '/a', color: '#ffffff', tags: [] }
-      )
-      expect(result).toEqual({ workspace: ws })
-    })
+  it('deletes a workspace together with its projects', async () => {
+    const workspace = await createWorkspace('alpha')
+    await createProject(workspace.id, 'app')
+
+    expect(await invoke('workspace:delete', { id: workspace.id })).toEqual({ success: true })
+
+    expect(await workspaceNames()).toEqual([])
+    expect(await projectNames(workspace.id)).toEqual([])
   })
 
-  describe('workspace:update', () => {
-    it('forwards payload to updateWorkspace and returns result', async () => {
-      const ws = { id: '1', name: 'Updated' }
-      vi.mocked(store.updateWorkspace).mockReturnValue({ workspace: ws } as unknown as ReturnType<
-        typeof store.createWorkspace
-      >)
-      const handler = captureHandler('workspace:update')
-      const result = await handler({}, { id: WS, name: 'Updated' })
-      expect(result).toEqual({ workspace: ws })
-    })
-  })
+  it('reorders workspaces', async () => {
+    const alpha = await createWorkspace('alpha')
+    const beta = await createWorkspace('beta')
 
-  describe('workspace:delete', () => {
-    it('calls deleteWorkspace with the id', async () => {
-      vi.mocked(store.deleteWorkspace).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      const handler = captureHandler('workspace:delete')
-      await handler({}, { id: 'ws-1' })
-      expect(store.deleteWorkspace).toHaveBeenCalledWith('ws-1')
-    })
-  })
+    await invoke('workspace:reorder', { ids: [beta.id, alpha.id] })
 
-  describe('workspace:reorder', () => {
-    it('calls reorderWorkspaces with payload', async () => {
-      vi.mocked(store.reorderWorkspaces).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      const handler = captureHandler('workspace:reorder')
-      await handler({}, { ids: [WS, P1] })
-      expect(store.reorderWorkspaces).toHaveBeenCalledWith({ ids: [WS, P1] })
-    })
-  })
-
-  describe('project:list', () => {
-    it('returns projects for the given workspaceId', async () => {
-      const projects = [{ id: 'p1', workspaceId: 'ws-1' }]
-      vi.mocked(store.listProjects).mockReturnValue(
-        projects as unknown as ReturnType<typeof store.listProjects>
-      )
-      const handler = captureHandler('project:list')
-      const result = (await handler({}, { workspaceId: 'ws-1' })) as { projects: unknown[] }
-      expect(store.listProjects).toHaveBeenCalledWith('ws-1')
-      expect(result.projects).toEqual(projects)
-    })
-  })
-
-  describe('project:create', () => {
-    it('calls createProject with payload and returns result', async () => {
-      const project = { id: 'p2', workspaceId: WS, name: 'MyProject' }
-      vi.mocked(store.createProject).mockReturnValue({ project } as unknown as ReturnType<
-        typeof store.createProject
-      >)
-      const handler = captureHandler('project:create')
-      const result = await handler({}, { workspaceId: WS, name: 'MyProject' })
-      expect(result).toEqual({ project })
-    })
-
-    it('broadcasts workspace:project-added to all BrowserWindows on success', async () => {
-      const project = { id: 'p2', workspaceId: WS, name: 'MyProject' }
-      vi.mocked(store.createProject).mockReturnValue({ project } as unknown as ReturnType<
-        typeof store.createProject
-      >)
-      const handler = captureHandler('project:create')
-      await handler({}, { workspaceId: WS, name: 'MyProject' })
-      expect(mockWebContentsSend).toHaveBeenCalledWith('workspace:project-added', project)
-    })
-
-    it('does not broadcast when createProject returns an error', async () => {
-      vi.mocked(store.createProject).mockReturnValue({
-        error: 'DUPLICATE_NAME',
-      } as unknown as ReturnType<typeof store.createProject>)
-      const handler = captureHandler('project:create')
-      await handler({}, { workspaceId: WS, name: 'Dup' })
-      expect(mockWebContentsSend).not.toHaveBeenCalledWith(
-        'workspace:project-added',
-        expect.anything()
-      )
-    })
-  })
-
-  describe('project:update-branch', () => {
-    it('calls updateProjectBranch with payload and returns result', async () => {
-      const project = { id: 'p1', gitBranch: 'main' }
-      vi.mocked(store.updateProjectBranch).mockReturnValue({ project } as unknown as ReturnType<
-        typeof store.createProject
-      >)
-      const handler = captureHandler('project:update-branch')
-      const result = await handler({}, { id: P1, gitBranch: 'main' })
-      expect(result).toEqual({ project })
-    })
-  })
-
-  describe('project:rename', () => {
-    it('calls renameProject with payload and returns result', async () => {
-      const project = { id: 'p1', name: 'Renamed' }
-      vi.mocked(store.renameProject).mockReturnValue({ project } as unknown as ReturnType<
-        typeof store.createProject
-      >)
-      const handler = captureHandler('project:rename')
-      const result = await handler({}, { id: P1, name: 'Renamed' })
-      expect(result).toEqual({ project })
-    })
-  })
-
-  describe('project:reorder', () => {
-    it('calls reorderProjects with payload', async () => {
-      vi.mocked(store.reorderProjects).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      const handler = captureHandler('project:reorder')
-      await handler({}, { workspaceId: WS, ids: [P2, P1] })
-      expect(store.reorderProjects).toHaveBeenCalledWith({ workspaceId: WS, ids: [P2, P1] })
-    })
-  })
-
-  describe('project:delete', () => {
-    it('calls deleteProject when project is not found', async () => {
-      vi.mocked(store.getProjectById).mockReturnValue(undefined)
-      vi.mocked(store.deleteProject).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      const handler = captureHandler('project:delete')
-      await handler({}, { id: 'p1' })
-      expect(store.deleteProject).toHaveBeenCalledWith('p1')
-    })
-
-    it('calls deleteProject when project is not a worktree', async () => {
-      vi.mocked(store.getProjectById).mockReturnValue({
-        id: 'p1',
-        isWorktree: false,
-        worktreePath: null,
-      } as unknown as ReturnType<typeof store.getProjectById>)
-      vi.mocked(store.deleteProject).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      const handler = captureHandler('project:delete')
-      await handler({}, { id: 'p1' })
-      expect(store.deleteProject).toHaveBeenCalledWith('p1')
-      expect(gitService.removeWorktree).not.toHaveBeenCalled()
-    })
-
-    it('removes worktree before deletion when project is a worktree and workspace has folderPath', async () => {
-      vi.mocked(store.getProjectById).mockReturnValue({
-        id: 'p1',
-        isWorktree: true,
-        worktreePath: '/repo/branches/feat',
-        workspaceId: 'ws-1',
-      } as unknown as ReturnType<typeof store.getProjectById>)
-      vi.mocked(store.listWorkspaces).mockReturnValue([
-        { id: 'ws-1', folderPath: '/repo' },
-      ] as unknown as ReturnType<typeof store.listWorkspaces>)
-      vi.mocked(store.deleteProject).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      vi.mocked(gitService.removeWorktree).mockResolvedValue(undefined as never)
-      const handler = captureHandler('project:delete')
-      await handler({}, { id: 'p1' })
-      expect(gitService.removeWorktree).toHaveBeenCalledWith('/repo', '/repo/branches/feat')
-      expect(store.deleteProject).toHaveBeenCalledWith('p1')
-    })
-
-    it('proceeds with deletion even if worktree removal throws', async () => {
-      vi.mocked(store.getProjectById).mockReturnValue({
-        id: 'p1',
-        isWorktree: true,
-        worktreePath: '/repo/branches/feat',
-        workspaceId: 'ws-1',
-      } as unknown as ReturnType<typeof store.getProjectById>)
-      vi.mocked(store.listWorkspaces).mockReturnValue([
-        { id: 'ws-1', folderPath: '/repo' },
-      ] as unknown as ReturnType<typeof store.listWorkspaces>)
-      vi.mocked(store.deleteProject).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      vi.mocked(gitService.removeWorktree).mockRejectedValue(new Error('worktree error'))
-      const handler = captureHandler('project:delete')
-      await handler({}, { id: 'p1' })
-      expect(store.deleteProject).toHaveBeenCalledWith('p1')
-    })
-
-    it('skips worktree removal when workspace has no folderPath', async () => {
-      vi.mocked(store.getProjectById).mockReturnValue({
-        id: 'p1',
-        isWorktree: true,
-        worktreePath: '/repo/branches/feat',
-        workspaceId: 'ws-1',
-      } as unknown as ReturnType<typeof store.getProjectById>)
-      vi.mocked(store.listWorkspaces).mockReturnValue([
-        { id: 'ws-1', folderPath: undefined },
-      ] as unknown as ReturnType<typeof store.listWorkspaces>)
-      vi.mocked(store.deleteProject).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      const handler = captureHandler('project:delete')
-      await handler({}, { id: 'p1' })
-      expect(gitService.removeWorktree).not.toHaveBeenCalled()
-      expect(store.deleteProject).toHaveBeenCalledWith('p1')
-    })
-
-    it('broadcasts workspace:project-removed to all BrowserWindows after deletion', async () => {
-      vi.mocked(store.getProjectById).mockReturnValue(undefined)
-      vi.mocked(store.deleteProject).mockReturnValue(
-        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
-      )
-      const handler = captureHandler('project:delete')
-      await handler({}, { id: 'p-del' })
-      expect(mockWebContentsSend).toHaveBeenCalledWith('workspace:project-removed', { id: 'p-del' })
-    })
-  })
-
-  describe('workspace:get-active', () => {
-    it('returns the active context', async () => {
-      setActiveWorkspaceContext({ workspaceId: 'ws-1', projectId: 'p-1', repoRoot: '/repo' })
-      const handler = captureHandler('workspace:get-active')
-      const result = await handler({})
-      expect(result).toEqual({ workspaceId: 'ws-1', projectId: 'p-1', repoRoot: '/repo' })
-    })
+    expect(await workspaceNames()).toEqual(['beta', 'alpha'])
   })
 })
 
-describe('setActiveWorkspaceContext / getActiveWorkspaceContext', () => {
-  it('stores and retrieves the active context', async () => {
-    setActiveWorkspaceContext({ workspaceId: 'ws-2', projectId: null, repoRoot: null })
-    expect(getActiveWorkspaceContext()).toEqual({
-      workspaceId: 'ws-2',
-      projectId: null,
-      repoRoot: null,
-    })
+describe('projects', () => {
+  it('lists a project in its own workspace and tells every window it was added', async () => {
+    const alpha = await createWorkspace('alpha')
+    const beta = await createWorkspace('beta')
+
+    const project = await createProject(alpha.id, 'app')
+
+    expect(await projectNames(alpha.id)).toEqual(['app'])
+    expect(await projectNames(beta.id)).toEqual([])
+    expect(sent).toEqual([{ channel: 'workspace:project-added', data: project }])
   })
 
-  it('overwrites a previous context', async () => {
-    setActiveWorkspaceContext({ workspaceId: 'ws-1', projectId: 'p-1', repoRoot: '/a' })
-    setActiveWorkspaceContext({ workspaceId: 'ws-2', projectId: 'p-2', repoRoot: '/b' })
-    expect(getActiveWorkspaceContext().workspaceId).toBe('ws-2')
+  it('tells no window when the project could not be created', async () => {
+    const workspace = await createWorkspace('alpha')
+    await createProject(workspace.id, 'app')
+    sent.length = 0
+
+    const reply = await invoke('project:create', { workspaceId: workspace.id, name: 'App' })
+
+    expect(reply).toEqual({ error: 'DUPLICATE_NAME' })
+    expect(sent).toEqual([])
+  })
+
+  it('records the branch and the new name of a project', async () => {
+    const workspace = await createWorkspace('alpha')
+    const project = await createProject(workspace.id, 'app')
+
+    await invoke('project:update-branch', { id: project.id, gitBranch: 'feature' })
+    await invoke('project:rename', { id: project.id, name: 'web' })
+
+    const { projects } = await invoke<{ projects: Project[] }>('project:list', {
+      workspaceId: workspace.id,
+    })
+    expect(projects).toMatchObject([{ id: project.id, name: 'web', gitBranch: 'feature' }])
+  })
+
+  it('reorders the projects of a workspace', async () => {
+    const workspace = await createWorkspace('alpha')
+    const app = await createProject(workspace.id, 'app')
+    const docs = await createProject(workspace.id, 'docs')
+
+    await invoke('project:reorder', { workspaceId: workspace.id, ids: [docs.id, app.id] })
+
+    expect(await projectNames(workspace.id)).toEqual(['docs', 'app'])
+  })
+})
+
+describe('project:delete', () => {
+  it('removes the project and tells every window', async () => {
+    const workspace = await createWorkspace('alpha')
+    const project = await createProject(workspace.id, 'app')
+    sent.length = 0
+
+    expect(await invoke('project:delete', { id: project.id })).toEqual({ success: true })
+
+    expect(await projectNames(workspace.id)).toEqual([])
+    expect(sent).toEqual([{ channel: 'workspace:project-removed', data: { id: project.id } }])
+    expect(git.removeWorktree).not.toHaveBeenCalled()
+  })
+
+  it("removes a worktree project's worktree from the workspace's repository first", async () => {
+    const workspace = await createWorkspace('alpha')
+    const project = await createProject(workspace.id, 'feature', {
+      isWorktree: true,
+      worktreePath: '/repos/alpha-feature',
+    })
+
+    await invoke('project:delete', { id: project.id })
+
+    expect(git.removeWorktree).toHaveBeenCalledWith('/repos/alpha', '/repos/alpha-feature')
+    expect(await projectNames(workspace.id)).toEqual([])
+  })
+
+  it('still removes the project when git cannot remove the worktree', async () => {
+    git.removeWorktree.mockRejectedValue(new Error('worktree is dirty'))
+    const workspace = await createWorkspace('alpha')
+    const project = await createProject(workspace.id, 'feature', {
+      isWorktree: true,
+      worktreePath: '/repos/alpha-feature',
+    })
+
+    expect(await invoke('project:delete', { id: project.id })).toEqual({ success: true })
+
+    expect(await projectNames(workspace.id)).toEqual([])
+  })
+})
+
+describe('workspace:get-active', () => {
+  it('answers the context the renderer last reported', async () => {
+    const { setActiveWorkspaceContext } = await import('../../../src/main/ipc/workspace.ipc')
+    setActiveWorkspaceContext({ workspaceId: 'ws-1', projectId: 'p-1', repoRoot: '/repo' })
+
+    expect(await invoke('workspace:get-active')).toEqual({
+      workspaceId: 'ws-1',
+      projectId: 'p-1',
+      repoRoot: '/repo',
+    })
   })
 })

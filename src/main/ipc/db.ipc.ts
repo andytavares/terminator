@@ -9,7 +9,6 @@ export function registerDbIpcHandlers(): void {
       schema: noPayload,
       invalid: { ok: false, message: 'VALIDATION_ERROR' },
       run: () => healthCheck(),
-      onError: (err) => ({ ok: false, message: String(err) }),
     }),
   ])
 }

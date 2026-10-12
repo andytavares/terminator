@@ -22,22 +22,12 @@ const gitService = vi.hoisted(() => ({
 }))
 vi.mock('../../../src/main/git/git-service.js', () => gitService)
 
-const stores = vi.hoisted(() => ({
-  getGlobalSettings: vi.fn(),
-  getWorkspaceSettings: vi.fn(),
-  listWorkspaces: vi.fn(),
-  listProjects: vi.fn(),
-}))
-vi.mock('../../../src/main/storage/settings-store.js', () => ({
-  getGlobalSettings: stores.getGlobalSettings,
-  getWorkspaceSettings: stores.getWorkspaceSettings,
-}))
-vi.mock('../../../src/main/storage/workspace-store.js', () => ({
-  listWorkspaces: stores.listWorkspaces,
-  listProjects: stores.listProjects,
-}))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
-import { registerGitHandlers } from '../../../src/main/ipc/git.ipc.js'
+let workspaceStore: typeof import('../../../src/main/storage/workspace-store.js')
+let settingsStore: typeof import('../../../src/main/storage/settings-store.js')
 
 function handler(channel: string) {
   return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
@@ -46,12 +36,27 @@ function handler(channel: string) {
   ) => Promise<unknown>
 }
 
-beforeEach(() => {
+/** A workspace at `folderPath`, with its own exclusion patterns when given. */
+function workspaceAt(folderPath: string, branchExcludePatterns?: string[]): string {
+  const created = workspaceStore.createWorkspace({
+    name: folderPath,
+    folderPath,
+    color: '#4A90E2',
+    tags: [],
+  })
+  if (!('workspace' in created)) throw new Error(`could not create ${folderPath}`)
+  if (branchExcludePatterns) {
+    settingsStore.updateWorkspaceSettings(created.workspace.id, { git: { branchExcludePatterns } })
+  }
+  return created.workspace.id
+}
+
+beforeEach(async () => {
   vi.clearAllMocks()
-  stores.getGlobalSettings.mockReturnValue({ git: { branchExcludePatterns: [] } })
-  stores.getWorkspaceSettings.mockReturnValue({})
-  stores.listWorkspaces.mockReturnValue([])
-  stores.listProjects.mockReturnValue([])
+  vi.resetModules()
+  workspaceStore = await import('../../../src/main/storage/workspace-store.js')
+  settingsStore = await import('../../../src/main/storage/settings-store.js')
+  const { registerGitHandlers } = await import('../../../src/main/ipc/git.ipc.js')
   registerGitHandlers()
 })
 
@@ -105,7 +110,7 @@ describe('git:list-branches', () => {
 
   it('hides branches matching the global exclusion patterns', async () => {
     gitService.listBranches.mockResolvedValue(all)
-    stores.getGlobalSettings.mockReturnValue({
+    settingsStore.updateGlobalSettings({
       git: { branchExcludePatterns: ['gh-readonly-queue/*', 'trunk-merge/*'] },
     })
     const r = (await handler('git:list-branches')({}, { path: '/r' })) as {
@@ -116,14 +121,9 @@ describe('git:list-branches', () => {
 
   it("uses the owning workspace's own patterns over the global ones", async () => {
     gitService.listBranches.mockResolvedValue(all)
-    stores.getGlobalSettings.mockReturnValue({ git: { branchExcludePatterns: ['trunk-merge/*'] } })
-    stores.listWorkspaces.mockReturnValue([
-      { id: 'other', folderPath: '/elsewhere' },
-      { id: 'ws', folderPath: '/repos/app' },
-    ])
-    stores.getWorkspaceSettings.mockImplementation((id: string) =>
-      id === 'ws' ? { overrides: { git: { branchExcludePatterns: ['gh-readonly-queue/*'] } } } : {}
-    )
+    settingsStore.updateGlobalSettings({ git: { branchExcludePatterns: ['trunk-merge/*'] } })
+    workspaceAt('/elsewhere', ['dev'])
+    workspaceAt('/repos/app', ['gh-readonly-queue/*'])
     // A worktree inside the workspace's folder belongs to it.
     const r = (await handler('git:list-branches')({}, { path: '/repos/app/.worktrees/feat' })) as {
       branches: { name: string }[]
@@ -133,11 +133,8 @@ describe('git:list-branches', () => {
 
   it("finds the workspace through a project's worktree outside its folder", async () => {
     gitService.listBranches.mockResolvedValue(all)
-    stores.listWorkspaces.mockReturnValue([{ id: 'ws', folderPath: '/repos/app' }])
-    stores.listProjects.mockReturnValue([{ id: 'p', worktreePath: '/wt/app-feat' }])
-    stores.getWorkspaceSettings.mockReturnValue({
-      overrides: { git: { branchExcludePatterns: ['trunk-merge/*'] } },
-    })
+    const workspaceId = workspaceAt('/repos/app', ['trunk-merge/*'])
+    workspaceStore.createProject({ workspaceId, name: 'feat', worktreePath: '/wt/app-feat' })
     const r = (await handler('git:list-branches')({}, { path: '/wt/app-feat' })) as {
       branches: { name: string }[]
     }
@@ -150,10 +147,7 @@ describe('git:list-branches', () => {
 
   it('does not take a sibling folder with the same prefix for the workspace', async () => {
     gitService.listBranches.mockResolvedValue(all)
-    stores.listWorkspaces.mockReturnValue([{ id: 'ws', folderPath: '/repos/app' }])
-    stores.getWorkspaceSettings.mockReturnValue({
-      overrides: { git: { branchExcludePatterns: ['trunk-merge/*'] } },
-    })
+    workspaceAt('/repos/app', ['trunk-merge/*'])
     const r = (await handler('git:list-branches')({}, { path: '/repos/app-two' })) as {
       branches: { name: string }[]
     }

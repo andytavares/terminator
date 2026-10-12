@@ -67,6 +67,7 @@ function build(over: { linear?: TrackerProvider; jira?: TrackerProvider } = {}) 
         ? { tracker: 'linear', apiKey: 'k' }
         : { tracker: 'jira', site: 's', email: 'e@x.c', apiToken: 't' },
     getMine: async () => ({ kind: 'assignee', email: null }),
+    onTrackerError: () => {},
     now: () => 1_000_000,
   })
   return { service, linear, jira }
@@ -93,6 +94,7 @@ describe('supportsTransitions', () => {
       providers: { linear: fakeProvider('linear'), jira: fakeProvider('jira') },
       getCredential: async () => null,
       getMine: async () => ({ kind: 'assignee', email: null }),
+      onTrackerError: () => {},
     })
     expect(service.supportsTransitions('linear')).toBe(false)
   })

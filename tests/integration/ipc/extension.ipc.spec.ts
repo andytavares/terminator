@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
 
 // The handlers delegate to the real api.ts registry query functions, so this
-// spec uses the real api module and seeds the real globalRegistry. Electron
-// and the storage stores are mocked the same way api.spec.ts mocks them.
+// spec uses the real api module and seeds the real globalRegistry, and the
+// real stores over an in-memory electron-store.
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
@@ -32,27 +32,9 @@ vi.mock('../../../src/main/shell/shell-executor', () => ({
   CwdOutOfScopeError: class extends Error {},
 }))
 
-vi.mock('../../../src/main/storage/settings-store', () => ({
-  getGlobalSettings: vi.fn(() => ({})),
-  getWorkspaceSettings: vi.fn(() => ({})),
-}))
-
-vi.mock('../../../src/main/storage/workspace-store', () => ({
-  listWorkspaces: vi.fn(() => []),
-  listProjects: vi.fn(() => []),
-  deleteProject: vi.fn(),
-}))
-
-vi.mock('../../../src/main/storage/extension-settings-store', () => {
-  const store: Record<string, unknown> = {}
-  return {
-    getExtensionSetting: (key: string) => store[key],
-    getAllExtensionSettings: () => ({ ...store }),
-    setExtensionSetting: (key: string, value: unknown) => {
-      store[key] = value
-    },
-  }
-})
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
 import { globalRegistry } from '../../../src/main/extensions/api'
 import { registerExtensionHandlers } from '../../../src/main/ipc/extension.ipc'
@@ -77,7 +59,11 @@ describe('extension IPC handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(globalRegistry.settingsSections as Map<string, unknown>).clear()
-    registerExtensionHandlers(mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0])
+    registerExtensionHandlers(
+      mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
+      vi.fn(),
+      () => null
+    )
   })
 
   describe('extension:list', () => {
@@ -160,7 +146,8 @@ describe('extension IPC handlers', () => {
       vi.clearAllMocks()
       registerExtensionHandlers(
         mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        broadcast
+        broadcast,
+        () => null
       )
       const ext = { id: 'com.test', status: 'enabled' }
       mockExtensionHost.reload.mockResolvedValue({ extension: ext })
@@ -174,7 +161,8 @@ describe('extension IPC handlers', () => {
       vi.clearAllMocks()
       registerExtensionHandlers(
         mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        broadcast
+        broadcast,
+        () => null
       )
       mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
       const handler = captureHandle('extension:reload')
@@ -189,7 +177,7 @@ describe('extension IPC handlers', () => {
       vi.clearAllMocks()
       registerExtensionHandlers(
         mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        undefined,
+        vi.fn(),
         () => ({ updatePanelBounds }) as never
       )
       const ext = { id: 'com.test', name: 'Test' }
@@ -213,7 +201,7 @@ describe('extension IPC handlers', () => {
       )
       registerExtensionHandlers(
         mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        undefined,
+        vi.fn(),
         () => ({ updatePanelBounds }) as never
       )
       const bounds = { x: 0, y: 0, width: 1, height: 1 }
@@ -268,21 +256,14 @@ describe('extension IPC handlers', () => {
     })
   })
 
-  describe('extension:get-settings-values', () => {
-    it('returns values from the extension settings store', async () => {
-      const handler = captureHandle('extension:get-settings-values')
-      const result = (await handler({})) as { values: Record<string, unknown> }
-      expect(typeof result.values).toBe('object')
-    })
-  })
+  describe('extension settings values', () => {
+    it('answers what extension:update-setting stored', async () => {
+      const update = captureHandle('extension:update-setting')
+      const values = captureHandle('extension:get-settings-values')
 
-  describe('extension:update-setting', () => {
-    it('writes value to the extension settings store and returns ok', async () => {
-      const handler = captureHandle('extension:update-setting')
-      const result = (await handler({}, { key: 'com.test.token', value: 'abc123' })) as {
-        ok: boolean
-      }
-      expect(result.ok).toBe(true)
+      expect(await values({})).toEqual({ values: {} })
+      expect(await update({}, { key: 'com.test.token', value: 'abc123' })).toEqual({ ok: true })
+      expect(await values({})).toEqual({ values: { 'com.test.token': 'abc123' } })
     })
   })
 })
