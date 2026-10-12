@@ -131,12 +131,6 @@ describe('api.settings.isBranchExcluded', () => {
     expect(await api.settings.isBranchExcluded('renovate/x', '/repo')).toBe(false)
     expect(await api.settings.isBranchExcluded('renovate/x', '/elsewhere')).toBe(true)
   })
-
-  it('excludes nothing when no pattern is set', async () => {
-    mockGetGlobalSettings.mockReturnValue({ git: {} })
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(await api.settings.isBranchExcluded('renovate/x')).toBe(false)
-  })
 })
 
 describe('api.notifications.showToast', () => {

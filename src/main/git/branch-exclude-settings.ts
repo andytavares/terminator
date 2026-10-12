@@ -28,5 +28,5 @@ export function branchExcludePatternsFor(path?: string): string[] {
     owner === undefined
       ? undefined
       : getWorkspaceSettings(owner.id).overrides?.git?.branchExcludePatterns
-  return override ?? getGlobalSettings().git?.branchExcludePatterns ?? []
+  return override ?? getGlobalSettings().git.branchExcludePatterns
 }
