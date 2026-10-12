@@ -90,7 +90,7 @@ export function registerMergeFlowHandlers(register: RegisterFn): void {
         }
 
         // 3. Fallback: index-based lookup (for sessions started before this fix)
-        const blocks = readConflictBlocks(filePath, content, '', '', '')
+        const blocks = readConflictBlocks(filePath, content)
         const blockIndex = parseInt(blockId.slice(hashIdx + 1), 10)
         const target = blocks[blockIndex]
         if (target) {

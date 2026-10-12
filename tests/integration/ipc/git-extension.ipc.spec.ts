@@ -82,7 +82,10 @@ describe('git-integration extension: git:diff-file IPC handler', () => {
       path: 'src/main.ts',
       staged: true,
     })
-    expect(gitService.getDiff).toHaveBeenCalledWith('/tmp/repo', 'src/main.ts', true, undefined)
+    expect(gitService.getDiff).toHaveBeenCalledWith('/tmp/repo', 'src/main.ts', {
+      staged: true,
+      isUntracked: undefined,
+    })
     expect(result).toMatchObject({ diff: expect.objectContaining({ path: 'src/main.ts' }) })
   })
 
@@ -181,12 +184,10 @@ describe('git-integration extension: git:commit IPC handler', () => {
   it('passes noVerify to commitChanges', async () => {
     vi.mocked(gitService.commitChanges).mockResolvedValue({ commitHash: 'def456' })
     await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: 'skip', noVerify: true })
-    expect(gitService.commitChanges).toHaveBeenCalledWith(
-      '/tmp/repo',
-      'skip',
-      false,
-      true,
-      expect.any(Function)
-    )
+    expect(gitService.commitChanges).toHaveBeenCalledWith('/tmp/repo', 'skip', {
+      signOff: false,
+      noVerify: true,
+      onOutput: expect.any(Function),
+    })
   })
 })

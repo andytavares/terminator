@@ -19,6 +19,19 @@ export interface CommitError {
 
 export type CommitResult = CommitSuccess | CommitError
 
+export interface CommitOptions {
+  signOff?: boolean
+  noVerify?: boolean
+  /** Receives each line the commit (and its hooks) print, as they print it. */
+  onOutput?: (line: string) => void
+}
+
+/** Which version of a file to diff: the staged one or the working tree, and whether git tracks it. */
+export interface DiffSide {
+  staged: boolean
+  isUntracked?: boolean
+}
+
 function git(args: string[], cwd: string, options: { raw?: boolean } = {}): Promise<string> {
   return runGit(cwd, args, { timeoutMs: GIT_TIMEOUT, ...options })
 }
@@ -40,36 +53,29 @@ function diff(args: string[], repoRoot: string): Promise<string> {
   })
 }
 
+/** An untracked file against /dev/null; git exits 1 when they differ, with the diff on stdout. */
+async function untrackedFileDiff(repoRoot: string, filePath: string): Promise<string | null> {
+  try {
+    return await diff(['diff', '--no-index', '--unified=3', '--', '/dev/null', filePath], repoRoot)
+  } catch (e: unknown) {
+    if (e instanceof GitCommandError && e.stdout) return e.stdout
+    return null
+  }
+}
+
 export async function getDiff(
   repoRoot: string,
   filePath: string,
-  staged: boolean,
-  isUntracked = false
+  side: DiffSide
 ): Promise<FileDiff> {
-  const args = staged
+  const args = side.staged
     ? ['diff', '--cached', '--unified=3', '--', filePath]
     : ['diff', '--unified=3', '--', filePath]
-
   const stdout = await diff(args, repoRoot)
-
-  // Untracked files produce no output from `git diff` because git has no index entry.
-  // Use --no-index to compare /dev/null against the file, showing all lines as additions.
-  // git diff --no-index exits with code 1 when files differ (normal), so stdout is in the error.
-  if (!staged && isUntracked && !stdout.trim()) {
-    try {
-      const noIndexOut = await diff(
-        ['diff', '--no-index', '--unified=3', '--', '/dev/null', filePath],
-        repoRoot
-      )
-      return { ...parseDiff(noIndexOut, DIFF_MAX_BYTES), path: filePath }
-    } catch (e: unknown) {
-      if (e instanceof GitCommandError && e.stdout) {
-        return { ...parseDiff(e.stdout, DIFF_MAX_BYTES), path: filePath }
-      }
-    }
-  }
-
-  return { ...parseDiff(stdout, DIFF_MAX_BYTES), path: filePath }
+  // `git diff` prints nothing for an untracked file: git has no index entry to compare.
+  const untracked = !side.staged && side.isUntracked && !stdout.trim()
+  const output = (untracked ? await untrackedFileDiff(repoRoot, filePath) : null) ?? stdout
+  return { ...parseDiff(output, DIFF_MAX_BYTES), path: filePath }
 }
 
 export async function stageFiles(repoRoot: string, paths: string[]): Promise<void> {
@@ -161,18 +167,16 @@ function commitFailure(error: GitCommandError): CommitError {
 export async function commitChanges(
   repoRoot: string,
   message: string,
-  signOff = false,
-  noVerify = false,
-  onOutput?: (line: string) => void
+  options: CommitOptions = {}
 ): Promise<CommitResult> {
   const args = ['commit', '-m', message]
-  if (signOff) args.push('--signoff')
-  if (noVerify) args.push('--no-verify')
+  if (options.signOff) args.push('--signoff')
+  if (options.noVerify) args.push('--no-verify')
   try {
     const stdout = await runGit(repoRoot, args, {
       timeoutMs: HOOK_TIMEOUT,
       raw: true,
-      onOutput: lineEmitter(onOutput),
+      onOutput: lineEmitter(options.onOutput),
     })
     const match = stdout.match(/^\[.+? ([a-f0-9]+)\]/m)
     return { commitHash: match?.[1] ?? '' }

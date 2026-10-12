@@ -33,7 +33,9 @@ describe('parseStatus()', () => {
       staged: false,
     })
   })
+})
 
+describe('parseStatus() — deletions, renames and conflicts', () => {
   it('parses a deleted file (D)', () => {
     const stdout = ' D old.ts\0'
     const result = parseStatus(stdout, 500)
@@ -65,7 +67,9 @@ describe('parseStatus()', () => {
     })
     expect(result.hasConflicts).toBe(true)
   })
+})
 
+describe('parseStatus() — limits and lists', () => {
   it('sets truncated=true when file count exceeds maxFiles', () => {
     // Build output with 3 files but cap at 2
     const stdout = ' M a.ts\0 M b.ts\0 M c.ts\0'
@@ -88,8 +92,7 @@ describe('parseStatus()', () => {
   })
 })
 
-describe('parseDiff()', () => {
-  const sampleDiff = `diff --git a/src/main.ts b/src/main.ts
+const sampleDiff = `diff --git a/src/main.ts b/src/main.ts
 index abc123..def456 100644
 --- a/src/main.ts
 +++ b/src/main.ts
@@ -101,6 +104,7 @@ index abc123..def456 100644
  }
 `
 
+describe('parseDiff()', () => {
   it('parses hunk header', () => {
     const diff = parseDiff(sampleDiff)
     expect(diff.hunks).toHaveLength(1)
@@ -126,7 +130,9 @@ index abc123..def456 100644
     const contextLines = diff.hunks[0].lines.filter((l) => l.type === 'context')
     expect(contextLines.length).toBeGreaterThan(0)
   })
+})
 
+describe('parseDiff() — binary, truncated and numbered', () => {
   it('detects binary files', () => {
     const binaryDiff = 'Binary files a/img.png and b/img.png differ\n'
     const diff = parseDiff(binaryDiff)
@@ -150,5 +156,36 @@ index abc123..def456 100644
     const firstContext = lines.find((l) => l.type === 'context')
     expect(firstContext?.oldLineNumber).toBe(1)
     expect(firstContext?.newLineNumber).toBe(1)
+  })
+})
+
+describe('parseStatus() — uncommon entries', () => {
+  it('parses an ignored file (!!)', () => {
+    expect(parseStatus('!! dist/out.js\0', 500).files[0]).toMatchObject({
+      path: 'dist/out.js',
+      status: 'ignored',
+      staged: false,
+    })
+  })
+
+  it('skips a token too short to be an entry', () => {
+    expect(parseStatus('M\0 M a.ts\0', 500).files.map((f) => f.path)).toEqual(['a.ts'])
+  })
+
+  it('reads a type change (T) as modified', () => {
+    expect(parseStatus('T  link.ts\0', 500).files[0]).toMatchObject({
+      status: 'modified',
+      staged: true,
+    })
+  })
+})
+
+describe('parseDiff() — malformed hunk headers', () => {
+  it('numbers lines from 1 when the hunk header carries no ranges', () => {
+    const diff = parseDiff('@@ malformed @@\n context\n+added\n')
+    expect(diff.hunks[0].lines).toEqual([
+      { type: 'context', content: 'context', oldLineNumber: 1, newLineNumber: 1 },
+      { type: 'add', content: 'added', oldLineNumber: null, newLineNumber: 2 },
+    ])
   })
 })
