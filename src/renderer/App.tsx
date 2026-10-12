@@ -36,7 +36,7 @@ import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useExtensionEscapeExit } from './hooks/useExtensionEscapeExit'
 import { useBranchSync } from './hooks/useBranchSync'
-import { installLogInterceptor, useLogStore } from './stores/log.store'
+import { useLogStore } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
 import { dispatchNotification } from './lib/notifications'
 import { useNotificationStore } from './stores/notification.store'
@@ -49,8 +49,6 @@ import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 import { adoptTerminalSession } from './terminal/session-controller'
 import { revealSession } from './terminal/navigate-to-session'
-
-installLogInterceptor()
 
 // Opened on demand, so each is its own chunk rather than part of the first
 // script (https://react.dev/reference/react/lazy).

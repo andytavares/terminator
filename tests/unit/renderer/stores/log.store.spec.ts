@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { useLogStore, installLogInterceptor } from '../../../../src/renderer/stores/log.store'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { useLogStore } from '../../../../src/renderer/stores/log.store'
 
 function resetStore() {
   useLogStore.setState({ entries: [] })
@@ -30,8 +30,8 @@ describe('useLogStore', () => {
     it('includes a timestamp string', () => {
       useLogStore.getState().addEntry('error', 'oops')
       const { entries } = useLogStore.getState()
-      expect(typeof entries[0].timestamp).toBe('string')
-      expect(entries[0].timestamp.length).toBeGreaterThan(0)
+      // A 24-hour wall-clock time, as the log window prints it.
+      expect(entries[0].timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/)
     })
 
     it('caps log at 1000 entries, dropping oldest', () => {
@@ -52,65 +52,5 @@ describe('useLogStore', () => {
       useLogStore.getState().clear()
       expect(useLogStore.getState().entries).toHaveLength(0)
     })
-  })
-})
-
-describe('installLogInterceptor', () => {
-  const originalLog = console.log
-  const originalInfo = console.info
-  const originalWarn = console.warn
-  const originalError = console.error
-
-  beforeEach(() => {
-    resetStore()
-  })
-
-  afterEach(() => {
-    // Restore original console methods after each test
-    console.log = originalLog
-    console.info = originalInfo
-    console.warn = originalWarn
-    console.error = originalError
-  })
-
-  it('intercepts console.log calls and stores them as log entries', () => {
-    installLogInterceptor()
-    console.log('intercepted log')
-    const { entries } = useLogStore.getState()
-    const entry = entries.find((e) => e.message === 'intercepted log')
-    expect(entry).toBeDefined()
-    expect(entry!.level).toBe('log')
-  })
-
-  it('intercepts console.warn and stores as warn level', () => {
-    installLogInterceptor()
-    console.warn('intercepted warn')
-    const { entries } = useLogStore.getState()
-    const entry = entries.find((e) => e.message === 'intercepted warn')
-    expect(entry!.level).toBe('warn')
-  })
-
-  it('intercepts console.error and stores as error level', () => {
-    installLogInterceptor()
-    console.error('intercepted error')
-    const { entries } = useLogStore.getState()
-    const entry = entries.find((e) => e.message === 'intercepted error')
-    expect(entry!.level).toBe('error')
-  })
-
-  it('serializes object arguments to JSON', () => {
-    installLogInterceptor()
-    console.info({ key: 'value' })
-    const { entries } = useLogStore.getState()
-    const entry = entries.find((e) => e.message.includes('"key"'))
-    expect(entry).toBeDefined()
-  })
-
-  it('joins multiple arguments with spaces', () => {
-    installLogInterceptor()
-    console.log('hello', 'world')
-    const { entries } = useLogStore.getState()
-    const entry = entries.find((e) => e.message === 'hello world')
-    expect(entry).toBeDefined()
   })
 })

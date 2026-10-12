@@ -119,6 +119,12 @@ describe('installLogInterceptor()', () => {
     expect(logged()).toContainEqual(['error', '[renderer] intercepted error'])
   })
 
+  it('joins several arguments with spaces', () => {
+    installLogInterceptor()
+    console.log('hello', 'world')
+    expect(logged()).toContainEqual(['log', '[renderer] hello world'])
+  })
+
   it('serialises object arguments', () => {
     installLogInterceptor()
     console.log({ key: 'val' })

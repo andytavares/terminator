@@ -10,6 +10,8 @@ import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { useTerminalOpenErrorStore } from '../../../src/renderer/stores/terminal-open-error.store'
 import { useIntegrationsStore } from '../../../src/renderer/stores/integrations.store'
 import { App } from '../../../src/renderer/App'
+import { installLogInterceptor } from '../../../src/renderer/logger'
+import { useLogStore } from '../../../src/renderer/stores/log.store'
 import type { QuickAction } from '../../../src/renderer/quick-actions/types'
 import type { QuickActionsProps } from '../../../src/renderer/components/QuickActions'
 import type { useTerminalSession } from '../../../src/renderer/hooks/useTerminalSession'
@@ -1404,5 +1406,23 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     expect(main.sent.input).not.toHaveBeenCalled()
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull()
     expect(toasts()).not.toContainEqual(expect.objectContaining({ type: 'error' }))
+  })
+})
+
+describe('App — console capture', () => {
+  it('records a console line in the log window once', () => {
+    const saved = { log: console.log, info: console.info, warn: console.warn, error: console.error }
+    try {
+      // What the renderer entry runs once App's module has loaded.
+      installLogInterceptor()
+      useLogStore.setState({ entries: [] })
+      console.log('captured once')
+      const lines = useLogStore
+        .getState()
+        .entries.filter((e) => e.message.includes('captured once'))
+      expect(lines.map((e) => e.message)).toEqual(['[renderer] captured once'])
+    } finally {
+      Object.assign(console, saved)
+    }
   })
 })
